@@ -151,6 +151,14 @@ describe('kit project configuration', () => {
 		expect(exclusions(aikido)).toEqual(source['minimumReleaseAgeExclude'])
 	})
 
+	// `tsx` runs every `josh` command, so a fresh release of it waits out the window like any other
+	// dependency; only vite, whose security fixes ship same-day, skips it (kit #3602).
+	it('excludes only vite from the release-age window', () => {
+		const source = yaml_document.parse_yaml(read_kit_file(WORKSPACE_FILE))
+
+		expect(source['minimumReleaseAgeExclude']).toStrictEqual(['vite'])
+	})
+
 	it('matches the Safe Chain minimum age to the workspace window', () => {
 		const minutes = release_age.parse_minimum_release_age(read_kit_file(WORKSPACE_FILE))
 		const aikido = read_kit_file(AIKIDO_FILE)

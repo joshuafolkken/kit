@@ -87,6 +87,21 @@ const DESTRUCTIVE_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(gh pr close*)',
 ]
 
+// Under `bypassPermissions` and `Bash(*)` the deny list is the only thing between the Read tool and
+// a secret file, so the dotenv variants and wrangler's `.dev.vars` are named beside `.env` itself.
+const ENV_VARIANT_DENY = 'Read(./.env.*)'
+const SECRET_READ_DENY_PATTERNS: ReadonlyArray<string> = [
+	'Read(./.env)',
+	ENV_VARIANT_DENY,
+	'Read(./.dev.vars)',
+]
+
+// `.gitignore` un-ignores these two: they are tracked placeholders, so the variant deny must not take
+// the Read tool away from them. A `!` rule carves out of the rules listed before it only, and it is
+// spelled as a bare name: measured on Claude Code 2.1.289, `Read(!./.env.example)` carved nothing out
+// while `Read(!.env.example)` made the file readable again.
+const TRACKED_ENV_CARVE_OUTS: ReadonlyArray<string> = ['Read(!.env.example)', 'Read(!.env.test)']
+
 const REQUIRED_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(rm -rf *)',
 	'Bash(rm -rf /*)',
@@ -247,6 +262,18 @@ describe('.claude/settings.json — permissions', () => {
 		const settings = load_settings()
 
 		expect(settings.permissions.deny).toContain(pattern)
+	})
+
+	it.each(SECRET_READ_DENY_PATTERNS)('denies reading the secret file %s', (pattern) => {
+		const settings = load_settings()
+
+		expect(settings.permissions.deny).toContain(pattern)
+	})
+
+	it.each(TRACKED_ENV_CARVE_OUTS)('carves %s out after the variant deny', (pattern) => {
+		const { deny } = load_settings().permissions
+
+		expect(deny.indexOf(pattern)).toBeGreaterThan(deny.indexOf(ENV_VARIANT_DENY))
 	})
 
 	// Measured against the running harness rather than read out of the documentation: `Bash(zzp4 *

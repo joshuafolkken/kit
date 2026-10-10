@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { git_command } from '#scripts/git/git-command'
@@ -10,6 +11,7 @@ import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -27,6 +29,7 @@ import { run_cut_report } from './run-cut-report'
 // session.
 
 const ARGV_OFFSET = 2
+const COMMAND = 'run:cut'
 
 const {
 	BAD_HANDOFF_VERDICT,
@@ -52,9 +55,11 @@ const {
 	report,
 	report_bad_handoff,
 	report_busy,
+	report_fault,
 	report_handed_off,
 	report_incomplete,
 	report_over,
+	report_reviewer,
 	report_stale,
 	report_under_threshold,
 	report_unknown,
@@ -374,15 +379,25 @@ function end(target: string): number {
 	return report(ENDED_VERDICT, SUCCESS_EXIT_CODE)
 }
 
+type CutCommand = Extract<Request, { kind: 'cut' }>
+
 // A bare cut is the pre-gate boundary and `--impl` the implementation-phase one.
 function cut_phase(request: { is_implementation: boolean }): string {
 	return request.is_implementation ? run_cut.IMPLEMENTATION_PHASE : run_cut.PRE_GATE_PHASE
 }
 
+// **A ship reviewer's cut is answered before the lane is looked up**: it
+// runs in the implementing child's lane and under its hold, so every check below would read it as the
+// run and relaunch a second child beside it. Asking about a cut (`--resume`, `--json`, `--end`) is
+// untouched — only taking one is refused.
+async function take_cut(target: string, request: CutCommand): Promise<number> {
+	if (agent_session_role.is_reviewer()) return report_reviewer()
+
+	return await cut(target, request.issue, cut_phase(request), request.handoff_path)
+}
+
 async function act(target: string, request: Request): Promise<number> {
-	if (request.kind === 'cut') {
-		return await cut(target, request.issue, cut_phase(request), request.handoff_path)
-	}
+	if (request.kind === 'cut') return await take_cut(target, request)
 
 	if (request.kind === 'resume') return await resume(target, request.issue)
 
@@ -392,7 +407,7 @@ async function act(target: string, request: Request): Promise<number> {
 }
 
 async function answer(request: Request): Promise<number> {
-	const directory = await run_cut.worktree_directory()
+	const directory = await run_cli_fault.directory_of(COMMAND, run_cut.worktree_directory)
 
 	if (directory === undefined) return report_unknown()
 
@@ -407,7 +422,8 @@ function refuse(): number {
 
 // Every path out prints exactly one token, including the ones nobody planned: an empty standard
 // output matches no verdict, which a resume entry check reads as "not a resume" and would let a fresh
-// process re-implement over a cut it should have carried.
+// process re-implement over a cut it should have carried. The token stays `unknown`, and the failure
+// says what it was rather than borrowing the unreadable-git-directory message.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = run_cut_args.read_arguments(argv)
 
@@ -419,8 +435,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	try {
 		return await answer(request)
-	} catch {
-		return report_unknown()
+	} catch (error) {
+		return report_fault(run_cli_fault.message(COMMAND, error))
 	}
 }
 

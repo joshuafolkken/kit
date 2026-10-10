@@ -12,8 +12,12 @@
  * is reviewed and reconciled. Only the review is enforced for tripwire pairs.
  */
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { template_source_logic } from './template-source-logic'
+
+const ARGV_OFFSET = 2
+const OPTIONS = { check: { type: 'boolean', default: false } } as const
+const USAGE = cli_flags.usage_line(['--check'], 'reconcile-templates')
 
 function check_drift(): never {
 	const copy_drift = template_source_logic.find_copy_drift()
@@ -38,16 +42,21 @@ function reconcile(): never {
 	process.exit(0)
 }
 
-function main(): void {
-	const { values } = parseArgs({
-		options: { check: { type: 'boolean', default: false } },
-		strict: true,
-	})
+// A line nobody can read is refused before either path runs: a misspelled `--check` that fell through
+// would regenerate the templates the caller only meant to verify.
+function refuse_usage(): never {
+	console.error(USAGE)
+	process.exit(1)
+}
 
+function main(argv: ReadonlyArray<string>): void {
+	const values = cli_flags.values_of(argv, OPTIONS)
+
+	if (values === undefined) refuse_usage()
 	if (values.check) check_drift()
 	reconcile()
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
-export { check_drift, reconcile }
+export { check_drift, reconcile, main }

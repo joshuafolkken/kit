@@ -5,7 +5,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
@@ -22,6 +22,7 @@ import {
 } from '#scripts/run/carry/run-carry'
 import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
+import { run_label } from '#scripts/run/run-label'
 import { run_merge } from './run-merge'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
@@ -277,15 +278,6 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	return undefined
 }
 
-// A stale label removal must not fail the run, so a failed removal is swallowed.
-async function remove_in_progress(child: string): Promise<void> {
-	try {
-		await git_gh_issue_write.issue_remove_label(child, IN_PROGRESS_LABEL)
-	} catch {
-		// A stale label may already be gone; a failed removal must not fail the run.
-	}
-}
-
 function refused_result(carry: RunCarry): FailedResult {
 	return { carry, is_parked: false, is_refused: true, blockers: NO_BLOCKERS }
 }
@@ -318,7 +310,7 @@ async function do_waiting(
 	if (refused !== undefined) return refused_result(refused)
 
 	lane_reap.reap_child(ctx.child)
-	await remove_in_progress(ctx.child)
+	await run_label.unmark(ctx.child)
 	await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.waiting_comment(blockers))
 
 	return { carry: undefined, is_parked: false, is_refused: false, blockers }
@@ -339,7 +331,7 @@ async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResu
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
 	lane_reap.reap_child(ctx.child)
-	await remove_in_progress(ctx.child)
+	await run_label.unmark(ctx.child)
 	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
 
 	if (is_parked) {
@@ -380,7 +372,7 @@ async function do_outage(ctx: MergeContext): Promise<OutageResult> {
 	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
 
 	lane_reap.reap_child(ctx.child)
-	await remove_in_progress(ctx.child)
+	await run_label.unmark(ctx.child)
 
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
 }
@@ -466,7 +458,6 @@ const run_merge_steps = {
 	has_resumable_cut,
 	is_over_budget,
 	refused_carry,
-	remove_in_progress,
 	resume_cut,
 }
 

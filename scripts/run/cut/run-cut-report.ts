@@ -90,10 +90,15 @@ function report_unreadable(): number {
 	return report(UNREADABLE_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function report_unknown(): number {
-	console.error(run_cut.unknown_message())
+// `unknown` with the reason it was answered: nothing was established, so nothing may be concluded.
+function report_fault(message: string): number {
+	console.error(message)
 
 	return report(UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function report_unknown(): number {
+	return report_fault(run_cut.unknown_message())
 }
 
 // A cut is only meaningful on a lane branch whose implementation is uncommitted. On the default
@@ -114,6 +119,18 @@ function report_under_threshold(): number {
 	)
 
 	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// **A ship reviewer takes no cut, of either phase** (joshuafolkken/kit#3623). Its supervisor is waiting
+// on the findings file it has yet to write, so a relaunch would stand a second child in the lane beside
+// the one the supervisor repairs with. Answered `not-a-lane`, the verdict that already means "nothing
+// was cut and this process carries on".
+function report_reviewer(): number {
+	console.error(
+		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Write the findings file and finish the review in this process.',
+	)
+
+	return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
 }
 
 // **An implementation cut is never resumed by a session over the threshold**.
@@ -154,9 +171,11 @@ const run_cut_report = {
 	report,
 	report_bad_handoff,
 	report_busy,
+	report_fault,
 	report_handed_off,
 	report_incomplete,
 	report_over,
+	report_reviewer,
 	report_stale,
 	report_under_threshold,
 	report_unknown,

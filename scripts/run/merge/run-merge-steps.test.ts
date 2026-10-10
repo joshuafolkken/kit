@@ -14,16 +14,16 @@ import { run_cut } from '#scripts/run/cut/run-cut'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 const add_label_mock = vi.hoisted(() => vi.fn())
-const remove_label_mock = vi.hoisted(() => vi.fn())
+const unmark_mock = vi.hoisted(() => vi.fn())
 const comment_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: {
 		issue_add_label: add_label_mock,
-		issue_remove_label: remove_label_mock,
 		issue_try_comment: comment_mock,
 	},
 }))
+vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: unmark_mock } }))
 
 const reap_mock = vi.hoisted(() => vi.fn())
 
@@ -55,7 +55,7 @@ const HANDED_OFF_CARRY = {
 
 beforeEach(() => {
 	add_label_mock.mockReset()
-	remove_label_mock.mockReset().mockResolvedValue(undefined)
+	unmark_mock.mockReset().mockResolvedValue(true)
 	reap_mock.mockReset().mockReturnValue([])
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
@@ -105,7 +105,7 @@ describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
 	it('drops in-progress but does not add needs-decision', async () => {
 		await run_merge_steps.do_outage(CONTEXT)
 
-		expect(remove_label_mock).toHaveBeenCalledTimes(1)
+		expect(unmark_mock).toHaveBeenCalledTimes(1)
 		expect(add_label_mock).not.toHaveBeenCalled()
 	})
 
@@ -116,7 +116,7 @@ describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
 		const result = await run_merge_steps.do_outage(CONTEXT)
 
 		expect(result.is_refused).toBe(true)
-		expect(remove_label_mock).not.toHaveBeenCalled()
+		expect(unmark_mock).not.toHaveBeenCalled()
 		expect(add_label_mock).not.toHaveBeenCalled()
 	})
 })
@@ -148,7 +148,7 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 
 		expect(result.is_refused).toBe(true)
 		expect(add_label_mock).not.toHaveBeenCalled()
-		expect(remove_label_mock).not.toHaveBeenCalled()
+		expect(unmark_mock).not.toHaveBeenCalled()
 	})
 
 	it('refused_carry: returns the handed-off record, and nothing when there is no record', async () => {
