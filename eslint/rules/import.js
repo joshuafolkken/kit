@@ -2,6 +2,12 @@ export const import_rules = {
 	// TypeScriptコンパイラが既にチェックするため無効化
 	'import/no-unresolved': 'off',
 	'import-x/no-unresolved': 'off',
+	// joshuafolkken/kit#3599: 同じ理由で無効化。これらは import 先ファイルの export を読むため、
+	// ファイル単位の内容キャッシュでは import 先の変更後も古い「問題なし」が残る
+	'import-x/named': 'off',
+	'import-x/namespace': 'off',
+	'import-x/default': 'off',
+	'import-x/export': 'off',
 	// Prettier: "@ianvs/prettier-plugin-sort-imports" と競合する
 	// インポートの順序を強制
 	// 'import/order': [

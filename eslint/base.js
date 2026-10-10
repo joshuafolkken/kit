@@ -3,7 +3,8 @@ import { includeIgnoreFile } from '@eslint/compat'
 import js from '@eslint/js'
 import stylistic from '@stylistic/eslint-plugin'
 import prettier from 'eslint-config-prettier'
-import importPlugin from 'eslint-plugin-import-x'
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
+import importPlugin, { createNodeResolver } from 'eslint-plugin-import-x'
 import promise from 'eslint-plugin-promise'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
@@ -125,7 +126,23 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 		{
 			plugins: { import: importPlugin },
 			settings: {
-				'import/resolver': { typescript: { alwaysTryTypes: true }, node: true },
+				// joshuafolkken/kit#3599: `import-x/resolver-next` is the key eslint-plugin-import-x
+				// reads. The resolvers used to sit under `import/resolver`, which the plugin ignores —
+				// the rules are only *named* `import/` here, the settings namespace stays the plugin's
+				// own — so every import fell back to the default node resolver, which does not follow
+				// an extensionless `.ts` specifier, and `no-cycle` was green over cycles it never saw.
+				'import-x/resolver-next': [
+					// `project` roots the resolver's tsconfig where the parser's is. Left out, the
+					// resolver reads the one in `process.cwd()`, so a run started anywhere else resolves
+					// no `paths` alias — the same silent miss, for every cycle that goes through one.
+					createTypeScriptImportResolver({ alwaysTryTypes: true, project: tsconfig_root_dir }),
+					createNodeResolver(),
+				],
+				// The other half of the same defect: the plugin reads the exports only of files whose
+				// extension is listed here, and its default list is JavaScript-only. A `.ts` import
+				// that resolves but is not listed is skipped just as silently as one that never
+				// resolved. The list is the plugin's own TypeScript preset's.
+				'import-x/extensions': importPlugin.flatConfigs.typescript.settings['import-x/extensions'],
 				'import-x/ignore': ['node_modules'],
 			},
 		},
