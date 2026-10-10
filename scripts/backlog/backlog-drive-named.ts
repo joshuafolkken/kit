@@ -3,10 +3,13 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_named } from './backlog-named'
+
+const { MERGE_TOKEN } = run_merge_token
 
 const NO_RETRIES = 0
 const FIRST = 0
@@ -48,9 +51,11 @@ function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead 
 }
 
 function is_done(result: MergeResult): boolean {
-	if (TERMINAL_OUTCOMES.has(result.outcome)) return result.code === 0 && result.token !== 'busy'
+	if (TERMINAL_OUTCOMES.has(result.outcome)) {
+		return result.code === 0 && result.token !== MERGE_TOKEN.BUSY
+	}
 
-	return result.outcome === 'failed' && result.code === 0 && result.token !== 'stop'
+	return result.outcome === 'failed' && result.code === 0 && result.token !== MERGE_TOKEN.STOP
 }
 
 function can_mark(carry: RunCarry, issue: string, owner: string): boolean {
