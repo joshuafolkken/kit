@@ -11,6 +11,7 @@ import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -28,6 +29,7 @@ import { run_cut_report } from './run-cut-report'
 // session.
 
 const ARGV_OFFSET = 2
+const COMMAND = 'run:cut'
 
 const {
 	BAD_HANDOFF_VERDICT,
@@ -53,6 +55,7 @@ const {
 	report,
 	report_bad_handoff,
 	report_busy,
+	report_fault,
 	report_handed_off,
 	report_incomplete,
 	report_over,
@@ -404,7 +407,7 @@ async function act(target: string, request: Request): Promise<number> {
 }
 
 async function answer(request: Request): Promise<number> {
-	const directory = await run_cut.worktree_directory()
+	const directory = await run_cli_fault.directory_of(COMMAND, run_cut.worktree_directory)
 
 	if (directory === undefined) return report_unknown()
 
@@ -419,7 +422,8 @@ function refuse(): number {
 
 // Every path out prints exactly one token, including the ones nobody planned: an empty standard
 // output matches no verdict, which a resume entry check reads as "not a resume" and would let a fresh
-// process re-implement over a cut it should have carried.
+// process re-implement over a cut it should have carried. The token stays `unknown`, and the failure
+// says what it was rather than borrowing the unreadable-git-directory message.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = run_cut_args.read_arguments(argv)
 
@@ -431,8 +435,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	try {
 		return await answer(request)
-	} catch {
-		return report_unknown()
+	} catch (error) {
+		return report_fault(run_cli_fault.message(COMMAND, error))
 	}
 }
 

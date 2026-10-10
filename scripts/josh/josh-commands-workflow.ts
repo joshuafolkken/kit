@@ -46,7 +46,11 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/notify/telegram-test.ts',
 		description: 'Send Telegram notification',
 		category: 'Workflow',
-		reference: ['--task-type <type> --body <text>', 'automation', ['notifications']],
+		reference: [
+			'[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]',
+			'automation',
+			['notifications'],
+		],
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict,

@@ -449,7 +449,7 @@ Re-run a merged issue’s baseline command and print the before/after pair
 
 > **Audience:** automation · **Side effects:** notifications
 
-`--task-type <type> --body <text>`
+`[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]`
 
 Send Telegram notification
 

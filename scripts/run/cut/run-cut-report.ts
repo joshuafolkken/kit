@@ -90,10 +90,15 @@ function report_unreadable(): number {
 	return report(UNREADABLE_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function report_unknown(): number {
-	console.error(run_cut.unknown_message())
+// `unknown` with the reason it was answered: nothing was established, so nothing may be concluded.
+function report_fault(message: string): number {
+	console.error(message)
 
 	return report(UNKNOWN_VERDICT, FAILURE_EXIT_CODE)
+}
+
+function report_unknown(): number {
+	return report_fault(run_cut.unknown_message())
 }
 
 // A cut is only meaningful on a lane branch whose implementation is uncommitted. On the default
@@ -166,6 +171,7 @@ const run_cut_report = {
 	report,
 	report_bad_handoff,
 	report_busy,
+	report_fault,
 	report_handed_off,
 	report_incomplete,
 	report_over,

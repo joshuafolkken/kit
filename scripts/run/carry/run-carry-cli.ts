@@ -5,6 +5,7 @@ import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_collect } from '#scripts/run/merge/run-merge-collect'
+import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stop_notify } from '#scripts/run/run-stop-notify'
 import {
@@ -45,6 +46,7 @@ const MISMATCH_VERDICT = 'mismatch'
 const BUSY_VERDICT = 'busy'
 const STANDING_VERDICT = 'standing'
 const UNKNOWN_VERDICT = 'unknown'
+const COMMAND = 'run:carry'
 // The invocation has taken its maximum cuts. A benign, non-failing refusal:
 // the run carries on uncut rather than paying a cold preamble the accumulation it would shed no longer
 // covers, exactly as an under-threshold pre-gate cut carries on to the gate.
@@ -407,16 +409,17 @@ async function act(
 	return await count(target, read, request, is_json)
 }
 
-function report_unknown(is_json: boolean): number {
-	console.error(run_carry.unknown_message())
+// `unknown` with the reason it was answered: nothing was established, so nothing may be concluded.
+function report_unknown(message: string, is_json: boolean): number {
+	console.error(message)
 
 	return report(UNKNOWN_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
 }
 
 async function answer(request: Request, is_json: boolean): Promise<number> {
-	const directory = await run_carry.repository_directory()
+	const directory = await run_cli_fault.directory_of(COMMAND, run_carry.repository_directory)
 
-	if (directory === undefined) return report_unknown(is_json)
+	if (directory === undefined) return report_unknown(run_carry.unknown_message(), is_json)
 
 	if (request.kind === 'end') return await finish(directory, request.stopped, is_json)
 
@@ -431,7 +434,8 @@ function refuse(): number {
 
 // Every path out of here prints exactly one token, including the ones nobody planned: an empty
 // standard output matches none of the verdicts, which a loop reads as "nothing to carry" before
-// starting a second budget over the first one's.
+// starting a second budget over the first one's. The token stays `unknown`, and the failure says what
+// it was rather than borrowing the unreadable-git-directory message.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const values = run_carry_args.read_arguments(argv)
 
@@ -443,8 +447,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	try {
 		return await answer(request, values.json === true)
-	} catch {
-		return report_unknown(values.json === true)
+	} catch (error) {
+		return report_unknown(run_cli_fault.message(COMMAND, error), values.json === true)
 	}
 }
 

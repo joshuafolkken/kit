@@ -45,6 +45,7 @@ const SEPARATE_WORKTREE = path.join(SEPARATE_COMMON, 'worktrees', 'lane')
 const ISSUE = '1091'
 const OTHER_ISSUE = '1090'
 const NOT_A_NUMBER = 'not-a-number'
+const HALFRUN_STOP_FLAG = '--halfrun-stop'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
@@ -84,7 +85,7 @@ describe('parse_request', () => {
 		[[], 'claim'],
 		[[ISSUE], 'claim'],
 		[[ISSUE, '--fullrun'], 'claim'],
-		[[ISSUE, '--halfrun-stop'], 'halfrun-stop'],
+		[[ISSUE, HALFRUN_STOP_FLAG], 'halfrun-stop'],
 		[[ISSUE, '--prrun-stop'], 'prrun-stop'],
 		[['--release'], 'release'],
 		[['--release', ISSUE], 'release'],
@@ -329,6 +330,27 @@ describe('a tree whose git directory cannot be read', () => {
 
 		expect(await run_hold_cli.run([ISSUE])).toBe(FAILURE_EXIT_CODE)
 		expect(out).toEqual([run_hold_cli.UNKNOWN_VERDICT])
+		expect(errors).toEqual([run_hold.unknown_message()])
+	})
+})
+
+// joshuafolkken/kit#3589: the catch around the whole answer reported every failure as an unreadable
+// git directory and dropped the failure itself.
+describe('a failure past the git directory', () => {
+	it('answers unknown with the failure rather than the git directory message', async () => {
+		preflight_check.mockRejectedValue(new TypeError('decision is not iterable'))
+
+		expect(await run_hold_cli.run([ISSUE])).toBe(FAILURE_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.UNKNOWN_VERDICT])
+		expect(errors).toEqual(['run:hold failed and established nothing: decision is not iterable'])
+	})
+
+	it('names the unreadable record when a stop cannot parse it', async () => {
+		vi.spyOn(run_hold, 'read_hold').mockReturnValue({ kind: 'unreadable' })
+
+		expect(await run_hold_cli.run([ISSUE, HALFRUN_STOP_FLAG])).toBe(FAILURE_EXIT_CODE)
+		expect(out).toEqual([run_hold_cli.UNKNOWN_VERDICT])
+		expect(errors).toEqual([run_hold.unreadable_message()])
 	})
 })
 
