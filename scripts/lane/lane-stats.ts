@@ -1,5 +1,6 @@
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
+import { lane_sampler } from './lane-sampler'
 
 // The lane-limit measurement's one table row: the ledger entries of one period
 // reduced to throughput, gate duration and machine load, in the column order
@@ -27,6 +28,8 @@ const ACTIVE_GAP_MS = MS_PER_HOUR
 const MS_PER_DAY = 86_400_000
 const MB_PER_GB = 1024
 const HALF = 2
+// Half the sampler's interval: two samples closer than this are not one interval apart.
+const MIN_RATE_GAP_MS = lane_sampler.SAMPLE_INTERVAL_MS / HALF
 const DECIMALS = 1
 const MISSING = '—'
 const CELL_SEPARATOR = ' | '
@@ -137,7 +140,7 @@ function sum_hours(gaps: ReadonlyArray<number>): number | undefined {
 // and gates) no longer than `ACTIVE_GAP_MS`.
 function gap_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 	const instants = entries
-		.filter((entry) => !is_load(entry))
+		.filter((entry) => entry.kind === 'merge' || is_gate(entry))
 		.map((entry) => Date.parse(entry.at))
 		.toSorted((left, right) => left - right)
 
@@ -157,12 +160,15 @@ function sampled_hours(samples: ReadonlyArray<LoadEntry>): number | undefined {
 }
 
 // The GB swapped per hour from one sample to the next. `swapped_mb` is a counter, so only a difference
-// says anything; a gap past `ACTIVE_GAP_MS` is a stopped sampler, whose silence is no rate.
+// says anything; a gap past `ACTIVE_GAP_MS` is a stopped sampler, whose silence is no rate. A gap under
+// `MIN_RATE_GAP_MS` is no rate either: a drive restarted seconds after its last sample, or a second
+// sampler beside it, would stretch a few seconds' burst to an hour and own the peak.
 function swap_rate(pair: SamplePair): number | undefined {
 	const swapped = machine_capacity.swapped_between(pair.sample.swapped_mb, pair.next.swapped_mb)
 	const elapsed = elapsed_ms(pair)
+	const is_one_interval = elapsed >= MIN_RATE_GAP_MS && elapsed <= ACTIVE_GAP_MS
 
-	if (swapped === undefined || elapsed <= 0 || elapsed > ACTIVE_GAP_MS) return undefined
+	if (swapped === undefined || !is_one_interval) return undefined
 
 	return swapped / MB_PER_GB / (elapsed / MS_PER_HOUR)
 }
@@ -251,8 +257,11 @@ const lane_stats = {
 	COLUMNS,
 	MISSING,
 	header,
+	in_window,
 	median,
+	peak,
 	row,
+	to_row,
 	window_of,
 }
 

@@ -37,6 +37,8 @@ const broker_request = vi.spyOn(openai_review_broker, 'request')
 
 const OK = 0
 const FAILED = 1
+// A round with nothing to review passes, and says it ran no review so the ship does not time it.
+const SKIPPED = { code: OK, is_skipped: true }
 const ISSUE = '2427'
 const BRIEF = 'medium\nbrief body'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
@@ -135,10 +137,11 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 // joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
 // to round 2 rather than reviewing the whole change again as round 1.
 describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
+	// joshuafolkken/kit#3643: a round that ran no review says so, so the ship does not time it as one.
 	it('skips the review when the issue already has a recorded round', async () => {
 		record_check_mock.mockResolvedValueOnce({ status: 'ok' })
 
-		expect(await stage_code()).toBe(OK)
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject(SKIPPED)
 		expect(record_check_mock).toHaveBeenCalledWith(Number(ISSUE))
 		expect(commands()).toStrictEqual([])
 		expect(launch).not.toHaveBeenCalled()
@@ -339,17 +342,11 @@ function answer_round_two(decision: string, failing?: string): void {
 	})
 }
 
-async function round_two_code(): Promise<number> {
-	const result = await run_ship_review_steps.round_two_stage(ISSUE)
-
-	return result.code
-}
-
 describe('run_ship_review_steps.round_two_stage — due or not', () => {
 	it('skips when round 1 left no fix delta, launching no reviewer', async () => {
 		answer_round_two('skip')
 
-		expect(await round_two_code()).toBe(OK)
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toMatchObject(SKIPPED)
 		expect(commands()).toStrictEqual([DECIDE])
 		expect(launch).not.toHaveBeenCalled()
 	})
@@ -358,7 +355,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 		missing_mock.mockReturnValue([LINT, TEST])
 		answer_round_two('required', TEST)
 
-		expect(await round_two_code()).toBe(FAILED)
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('code', FAILED)
 		expect(launch).not.toHaveBeenCalled()
 	})
 })
@@ -368,7 +365,7 @@ describe('run_ship_review_steps.round_two_stage — the verification pass after 
 		missing_mock.mockReturnValue([LINT, TEST])
 		answer_round_two('required')
 
-		expect(await round_two_code()).toBe(OK)
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([DECIDE, LINT, TEST, BRIEF_TWO, ATTEST, `${RECORD} --comment`])
 		expect(launch).toHaveBeenCalledOnce()
 		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)

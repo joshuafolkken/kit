@@ -43,6 +43,17 @@ const PREFLIGHT_STEP: Step = {
 		await run_ship_preflight.stage({ title: args.title, body_path: args.body_path }),
 }
 
+// The gate stage. **A gate that only reused the tree's green record is not timed**: after `--review`
+// launched the gate itself, this stage ends in seconds without running a check, and those seconds
+// would pull the `gate` row `lane:stats` reads for `JOSH_LANE_LIMIT` toward zero. The record is asked
+// for before the stage runs — afterwards every green gate has one.
+async function gate_stage(): Promise<StepResult> {
+	const is_skipped = await run_ship_scoped.is_gate_green()
+	const result = await run_ship_scoped.scoped_gate()
+
+	return { ...result, is_skipped }
+}
+
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
 // first: a round-1 reviewer may have edited the tree since the preflight, and `josh gate` refuses a tree
 // with no green record. The commit step carries the `--skip-*` flags a resumed ship needs, so an
@@ -59,7 +70,7 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.GATE,
 		header: run_ship.GATE_HEADER,
-		run: async () => await run_ship_scoped.scoped_gate(),
+		run: async () => await gate_stage(),
 	},
 	{
 		stage: STAGE.COMMIT,

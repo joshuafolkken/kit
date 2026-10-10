@@ -560,7 +560,7 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 #### `josh lane:sample` / `josh lane:stats`
 
-Measure a lane limit: `lane:sample [--every <seconds>]` records the machine load to a per-repository ledger that merges and gates also write to; `lane:stats --period <days> [--limit <n>]` prints a period as one table row. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
+Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch and ship stages, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, and under it the median and maximum of each stage of a lane. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 ## Session and documents
 

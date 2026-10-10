@@ -1,3 +1,4 @@
+import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
@@ -48,7 +49,15 @@ async function scoped_gate(): Promise<JoshResult> {
 	])
 }
 
-const run_ship_scoped = { run_phases, scoped_gate, scoped_pair }
+// Whether `josh gate` would only reuse this tree's green record: the gate's own reuse test rather than
+// a second copy of it, so the ship calls a gate stage a reuse on exactly the trees the gate skips.
+async function is_gate_green(): Promise<boolean> {
+	const tree = await gate_tree.read_gate_tree()
+
+	return gate_skip.reusable_green_gate(tree.files, tree.base) !== undefined
+}
+
+const run_ship_scoped = { is_gate_green, run_phases, scoped_gate, scoped_pair }
 
 export type { Phase }
 export { run_ship_scoped }

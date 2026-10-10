@@ -31,6 +31,7 @@ const { STAGE } = run_ship_stage
 const josh_spy = vi.spyOn(josh_command, 'josh_run')
 const preflight_spy = vi.spyOn(run_ship_preflight, 'stage')
 const scoped_gate_spy = vi.spyOn(run_ship_scoped, 'scoped_gate')
+const gate_green_spy = vi.spyOn(run_ship_scoped, 'is_gate_green')
 const review_spy = vi.spyOn(run_ship_review_steps, 'review_stage')
 const round_two_spy = vi.spyOn(run_ship_review_steps, 'round_two_stage')
 const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
@@ -40,6 +41,7 @@ beforeEach(() => {
 	josh_spy.mockReset().mockResolvedValue(OK)
 	preflight_spy.mockReset().mockResolvedValue(OK)
 	scoped_gate_spy.mockReset().mockResolvedValue(OK)
+	gate_green_spy.mockReset().mockResolvedValue(false)
 	review_spy.mockReset().mockResolvedValue(OK)
 	round_two_spy.mockReset().mockResolvedValue(OK)
 })
@@ -105,7 +107,18 @@ describe('run_ship_steps — the gate stage', () => {
 	it('delegates to the scoped gate and returns its result', async () => {
 		scoped_gate_spy.mockResolvedValue(FAILED)
 
-		expect(await step_for(STAGE.GATE).run(ARGS, FRESH)).toBe(FAILED)
+		expect(await step_for(STAGE.GATE).run(ARGS, FRESH)).toStrictEqual({
+			...FAILED,
+			is_skipped: false,
+		})
+		expect(scoped_gate_spy).toHaveBeenCalledOnce()
+	})
+
+	// joshuafolkken/kit#3643: a gate that reused the green record ran no check, so it is not timed as one.
+	it('marks the stage skipped when the tree already had a green gate record', async () => {
+		gate_green_spy.mockResolvedValue(true)
+
+		expect(await step_for(STAGE.GATE).run(ARGS, FRESH)).toStrictEqual({ ...OK, is_skipped: true })
 		expect(scoped_gate_spy).toHaveBeenCalledOnce()
 	})
 })

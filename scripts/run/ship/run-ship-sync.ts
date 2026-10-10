@@ -27,7 +27,10 @@ const CURRENT_SUFFIX = ' brings nothing in'
 const MERGED_PREFIX = 'merged '
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
+// `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
+// that reused a green record — so its few seconds are not timed as a run of it.
 interface StepResult extends JoshResult {
+	is_skipped?: boolean
 	conflicts?: ReadonlyArray<string>
 }
 

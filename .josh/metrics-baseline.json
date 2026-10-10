@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1050,
-		"code_lines": 87442,
-		"comment_lines": 33594,
+		"files": 1052,
+		"code_lines": 87648,
+		"comment_lines": 33658,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 461817
 	},
 	"accepted": {
-		"reason": "The cycle recheck now also covers lint:related and loads eslint lazily (#3641 review fixes)",
+		"reason": "#3643 round-2 fix: the ship gate stage asks for the tree's green record so a reused gate is not timed, with its tests",
 		"date": "2026-10-10"
 	}
 }

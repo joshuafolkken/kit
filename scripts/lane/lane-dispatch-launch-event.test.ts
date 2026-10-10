@@ -10,6 +10,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_label } from '#scripts/run/run-label'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
+import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
@@ -78,6 +79,28 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 
 		expect(outcome.kind).toBe('failed')
 		expect(emit).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3643: the lane ledger takes the dispatch too — `lane:stats` times a lane's
+// implementation from it, and the capped stream would have dropped a period's earlier dispatches.
+describe('lane_dispatch.dispatch_child — the dispatch the implementation is timed from', () => {
+	it('records the dispatch in the lane ledger once the child has started', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_dispatch').mockResolvedValue()
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(record).toHaveBeenCalledExactlyOnceWith(Number(ISSUE))
+	})
+
+	it('records no dispatch when the launch started no child', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_dispatch').mockResolvedValue()
+
+		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(record).not.toHaveBeenCalled()
 	})
 })
 
