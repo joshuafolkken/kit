@@ -102,6 +102,12 @@ describe('the handoff format the refusal asks for', () => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(run_cut_handoff.HANDOFF_FORMAT)
 	})
 
+	// A refusal that named no place got the file written beside the code, where `josh git` staged it
+	// with the commit (joshuafolkken/kit#3603).
+	it('names the ignored path the handoff file is written at', () => {
+		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(run_cut_handoff.HANDOFF_PATH)
+	})
+
 	it.each(run_cut_handoff.handoff_schema.keyof().options)('names the schema key %j', (key) => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(`"${key}"`)
 	})

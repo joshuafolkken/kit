@@ -126,8 +126,14 @@ function describe_handoff(handoff: Handoff): string {
 	].join('\n\n')
 }
 
+// Where a handoff file is written: `.claude/tmp/` is ignored, so `josh git`, which stages every
+// untracked non-ignored file, cannot commit the note with the code. A refusal that asked for "a file"
+// and named no place got one written beside the code and committed (joshuafolkken/kit#3603).
+const HANDOFF_PATH = '.claude/tmp/handoff-<N>.json'
+
 const run_cut_handoff = {
 	HANDOFF_FORMAT,
+	HANDOFF_PATH,
 	describe_handoff,
 	handoff_schema,
 	is_complete_handoff,

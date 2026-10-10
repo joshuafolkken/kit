@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1049,
-		"code_lines": 87281,
-		"comment_lines": 33526,
+		"code_lines": 87286,
+		"comment_lines": 33529,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3636: the prompt hook now asks backlogrun_launch.is_running and prints the run:board reply line while a run is live; the ports, the guarded liveness read and the line builder are new behavior with no code to remove",
+		"reason": "#3603: the handoff path constant the cut refusals name, and its import",
 		"date": "2026-10-10"
 	}
 }
