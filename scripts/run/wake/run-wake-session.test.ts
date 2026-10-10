@@ -1,8 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
@@ -331,5 +332,25 @@ describe('run_wake_session.launch — each launch is delimited', () => {
 		)
 
 		expect(await logged_text()).toContain(`started by process ${String(process.pid)}`)
+	})
+})
+
+// joshuafolkken/kit#3651: `run:wake --start` typed in a plain terminal wakes a Claude Code scheduler on
+// the default, and stderr is where the person reads that it did.
+describe('run_wake_session.scheduler_profile — the default provider', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+		vi.restoreAllMocks()
+	})
+
+	it('says the provider was defaulted when nothing named one', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		vi.stubEnv('CODEX_THREAD_ID', '')
+		for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
+		vi.stubEnv(agent_role_profile.HANDED_PROVIDER_KEY, '')
+
+		expect(run_wake_session.scheduler_profile()?.provider).toBe('anthropic')
+		expect(error).toHaveBeenCalledWith(expect.stringContaining('defaulted to anthropic'))
 	})
 })
