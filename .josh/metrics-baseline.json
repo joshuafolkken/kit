@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1044,
-		"code_lines": 87138,
-		"comment_lines": 33381,
+		"code_lines": 87184,
+		"comment_lines": 33387,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3589: run:cut / run:carry / run:hold report the real failure — a shared run-cli-fault module separates the unresolved git directory from any other exception",
+		"reason": "#3597 adds the issue-number-shape suite and the issue-0 regression cases; the 31 local pattern declarations it removes are fewer lines than the tests that pin the single declaration",
 		"date": "2026-10-10"
 	}
 }

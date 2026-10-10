@@ -103,6 +103,9 @@ describe('lane_issue_of', () => {
 		[DEFAULT_ROOT],
 		// A sibling directory whose name is not an issue number.
 		[path.join(DEFAULT_ROOT, 'main')],
+		// joshuafolkken/kit#3597: `0` and a leading zero are digits, but not an issue number.
+		[path.join(DEFAULT_ROOT, '0')],
+		[path.join(DEFAULT_ROOT, '007')],
 		// A numbered directory that is not under a lane root at all.
 		[path.join(REPOSITORY_ROOT, ISSUE)],
 	])('says nothing about %j', (directory) => {
@@ -116,7 +119,8 @@ describe('which names in a lanes root belong to the lane machinery', () => {
 		expect(lane_paths.is_lane_entry(name)).toBe(true)
 	})
 
-	it.each([[lane_paths.SEAT_LOCK_DIR], ['2879-lint.txt'], ['main'], ['lanes']])(
+	// joshuafolkken/kit#3597: `lane:open` never writes `0` or a leading zero, so the sweep keeps them.
+	it.each([[lane_paths.SEAT_LOCK_DIR], ['2879-lint.txt'], ['main'], ['lanes'], ['0'], ['007']])(
 		'leaves %j alone',
 		(name) => {
 			expect(lane_paths.is_lane_entry(name)).toBe(false)
