@@ -2,6 +2,7 @@ import { cpus, totalmem } from 'node:os'
 import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import type { ProcessReading, UsageMark } from './run-board-usage'
 import { run_board_usage_rusage, type RusageReader } from './run-board-usage-rusage'
@@ -180,18 +181,22 @@ async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise
 async function darwin_directories(
 	pids: ReadonlyArray<number>,
 ): Promise<ReadonlyMap<number, string>> {
-	// `lsof` exits non-zero when any one process is gone, and still lists the rest.
+	// `lsof` exits non-zero when any one process is gone, and still lists the rest. A budget kill is
+	// not that: it lists nothing, and `lanes_for` never asks again about a process it read as being in
+	// no lane, so the sample fails instead of pinning every live process to none.
 	const lsof_arguments = [...LSOF_ARGUMENTS, pids.join(PID_SEPARATOR)]
-	const { stdout } = await execa('lsof', lsof_arguments, { reject: false })
+	const result = await execa('lsof', lsof_arguments, { reject: false, timeout: PROBE_TIMEOUT_MS })
 
-	return parse_lsof(stdout)
+	if (result.timedOut) throw new Error('lsof timed out')
+
+	return parse_lsof(result.stdout)
 }
 
 const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, UsagePorts['directories']>>> =
 	{ darwin: darwin_directories }
 
 async function list_live(): Promise<string> {
-	const { stdout } = await execa('ps', PS_ARGUMENTS)
+	const { stdout } = await execa('ps', PS_ARGUMENTS, { timeout: PROBE_TIMEOUT_MS })
 
 	return stdout
 }

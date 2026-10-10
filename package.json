@@ -84,6 +84,7 @@
 		"!scripts/dogfood",
 		"!scripts/metrics",
 		"!scripts/test/classify-isolation.ts",
+		"!scripts/test/hanging-execa.ts",
 		"!scripts/test/http-fault-injection.ts",
 		"!scripts/test/josh-harness*.ts",
 		"!scripts/test/pure-files.ts",

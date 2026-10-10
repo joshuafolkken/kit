@@ -1,8 +1,8 @@
 {
 	"scripts": {
-		"files": 1045,
-		"code_lines": 87206,
-		"comment_lines": 33430,
+		"files": 1046,
+		"code_lines": 87284,
+		"comment_lines": 33467,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3623 adds the agent session role mark and the reviewer exemption to both cut guards and run:cut, and blanks the role in the unit-suite env (43 code lines)",
+		"reason": "#3590: timeouts on six probe spawns and the async git reads, plus the shared hanging-execa stand-in their tests run against (a test helper counted as a script)",
 		"date": "2026-10-10"
 	}
 }

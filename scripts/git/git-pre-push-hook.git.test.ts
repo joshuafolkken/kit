@@ -1,9 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GIT_BINARY_KEY } from './constants'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
 import { git_pre_push_hook } from './git-pre-push-hook'
+import { git_spawn } from './git-spawn'
 
 const WORKSPACE_PREFIX = 'kit-pre-push-hook-'
 const REPOSITORY = 'repository'
@@ -103,6 +105,7 @@ beforeEach(async () => {
 }, TIMEOUT_MS)
 
 afterEach(async () => {
+	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 	await git_fixture_workspace.close_workspace(fixture)
 })
@@ -136,6 +139,25 @@ describe('running the pre-push hook ahead of the push', () => {
 			await git_pre_push_hook.run()
 
 			expect(await read_recorded(STDIN_FILE)).toBe(to_stdin_line(head, previous))
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#3590: `git_spawn.with_output` defaults to a local command's budget, which would
+// end the hook inside the unit suite it runs.
+describe('the budget the pre-push hook runs on', () => {
+	it(
+		'gives the hook the budget of a suite',
+		async () => {
+			await install_hook(0)
+			const with_output = vi.spyOn(git_spawn, 'with_output')
+
+			await git_pre_push_hook.run()
+
+			expect(with_output).toHaveBeenCalledWith('hook', expect.any(Array), {
+				timeout_ms: SUITE_TIMEOUT_MS,
+			})
 		},
 		TIMEOUT_MS,
 	)
