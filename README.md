@@ -17,16 +17,12 @@ kit gives Claude Code or Codex your project's rules and checks. With the workflo
 - [I keep repeating the same instructions](./docs/why.md#i-keep-repeating-the-same-instructions)
 - [The agent does things I never asked for](./docs/why.md#the-agent-does-things-i-never-asked-for)
 - [Reviewing every change is a chore](./docs/why.md#reviewing-every-change-is-a-chore)
-- [I can't tell if the agent is stuck or done](./docs/why.md#i-cant-tell-if-the-agent-is-stuck-or-done)
-- [AI costs keep climbing](./docs/why.md#ai-costs-keep-climbing)
 
 ### With the GitHub workflow
 
 - [Wiring AI up to GitHub is a chore](./docs/why.md#wiring-ai-up-to-github-is-a-chore)
 - [Writing Issues is a chore](./docs/why.md#writing-issues-is-a-chore)
 - [Big requests come back sloppy](./docs/why.md#big-requests-come-back-sloppy)
-- [I spend all day talking to the agent](./docs/why.md#i-spend-all-day-talking-to-the-agent)
-- [Some changes need a human eye](./docs/why.md#some-changes-need-a-human-eye)
 
 ### Writing TypeScript
 
