@@ -53,7 +53,7 @@ After upgrading the package, pull in updated AI files, workflow templates and ot
 
 ## Next
 
-- Make your first change with an agent, from Issue to merge: [tutorial.md](../tutorial.md).
+- Make your first change with an agent: [without GitHub](../tutorial.md#without-github-one-change-checked-locally), or after `josh start` from Issue to merge with [tutorial.md](../tutorial.md).
 - Task guides: [how-to.md](../how-to.md).
 - Import the config presets and libraries directly: [package-api.md](../package-api.md), or wire them up without `josh init`: [manual-config.md](../manual-config.md).
 - Full command reference: [josh-commands.md](../josh-commands.md).
