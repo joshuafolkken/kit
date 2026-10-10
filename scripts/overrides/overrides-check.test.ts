@@ -47,7 +47,10 @@ vi.mock('node:fs', () => ({
 const { writeFileSync: write_file_sync } = await import('node:fs')
 const { run_overrides_check, main } = await import('./overrides-check')
 
+// Every spy here is one mock for the whole file — uncleared, a call an earlier test made satisfies a
+// later test's assertion before the code under test runs.
 beforeEach(() => {
+	vi.clearAllMocks()
 	vi.spyOn(process, 'exit').mockImplementation(() => {
 		throw new Error(PROCESS_EXIT_CALLED)
 	})
@@ -158,13 +161,6 @@ describe('overrides-check — overrides declared in pnpm-workspace.yaml', () => 
 // joshuafolkken/kit#3592: the flags were read by a bare `parseArgs`, so an unknown one threw
 // `ERR_PARSE_ARGS_UNKNOWN_OPTION` out of `main` instead of being refused.
 describe('overrides-check — the argument line', () => {
-	// The `process.exit` spy is one mock for the whole file, and the drift tests above already called it
-	// with 1 — uncleared, the exit code asserted here is satisfied before `main` runs.
-	beforeEach(() => {
-		vi.mocked(write_file_sync).mockClear()
-		vi.mocked(process.exit).mockClear()
-	})
-
 	it('refuses an unknown flag with usage and exit 1, writing no snapshot', () => {
 		expect(() => {
 			main(['--bogus'])
