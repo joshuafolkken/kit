@@ -4,7 +4,7 @@ import { run_board_tick } from './run-board-tick'
 import type { UsageMark } from './run-board-usage'
 
 // joshuafolkken/kit#3489: each lane's usage is read on the machine's second against the last reading,
-// and a chat, which draws none, reads none.
+// for a chat as for a screen.
 
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, MACHINE_SAMPLE_MS, tick } = run_board_tick
@@ -38,11 +38,13 @@ describe('run_board_tick.tick usage', () => {
 		expect(next.usages?.get(LANE)?.cpu_percent).toBe(50)
 	})
 
-	it('reads no usage for a chat', async () => {
+	it('reads the usage for a chat, which draws the column a screen does', async () => {
 		const { ports, read_usage } = harness(LOCAL, [plan_titled('a')])
+
+		read_usage.mockResolvedValueOnce(reading(0, 0))
 		const state = await tick(FRESH_STATE, { ...ports, form: 'chat' })
 
-		expect(read_usage).not.toHaveBeenCalled()
-		expect(state.usages).toBeUndefined()
+		expect(read_usage).toHaveBeenCalledOnce()
+		expect(state.usages).toBeDefined()
 	})
 })

@@ -30,9 +30,9 @@ const ALARM_MS = STALE_MS * ALARM_FACTOR
 const INDENT = '  '
 const RUN_NAME = 'backlogrun'
 
-// Who reads the frame: a person on a screen, or a chat a session answers a progress question in, where
-// a title is never cut, no legend is drawn and the machine is its memory alone — a CPU or swap figure
-// read once means nothing.
+// Who reads the frame: a person on a screen, or a chat a session answers a progress question in, which
+// draws what the screen does but for the machine, its memory alone — a CPU or swap figure read once
+// means nothing.
 type BoardForm = 'screen' | 'chat'
 
 interface BoardHeader {

@@ -139,7 +139,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'session:lang': {
 		script: 'scripts/josh/session-language-cli.ts',
 		description:
-			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context (the ja default prints nothing)',
+			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every

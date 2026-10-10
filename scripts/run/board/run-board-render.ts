@@ -61,21 +61,18 @@ interface BoardView extends FrameBounds {
 	resume?: string | undefined
 }
 
-// What every row of one frame is drawn with: the header, how wide the title column is, so every time
-// starts in one column, how wide the time column is, so a three-digit `125:30` and a `00:42` end in
-// the same column, and each lane's usage where its column is drawn, with the column's width.
+// What every row of one frame is drawn with: the header, how wide the time column is, so a three-digit
+// `125:30` and a `00:42` end in the same column, and each lane's usage where its column is drawn, with
+// the column's width.
 interface RowFrame {
 	header: BoardHeader
-	title_width: number
 	time_width: number
 	usage: UsageSlot | undefined
 	slot_width: number
 }
 
-// A chat wraps a long line rather than cutting it, so its titles are drawn whole.
-function title_of(header: BoardHeader, title = ''): string {
-	if (header.form === 'chat') return title
-
+// A title cut to the title column, so every time after it starts in one column.
+function title_of(title = ''): string {
 	return title.length > TITLE_LIMIT ? `${title.slice(0, TITLE_LIMIT - 1)}${ELLIPSIS}` : title
 }
 
@@ -136,11 +133,11 @@ function timed_parts(
 ): Array<string | undefined> {
 	const time = time_of(row, frame.header.now_ms)
 
-	const title = title_of(frame.header, row_title(row, frame.header))
+	const title = title_of(row_title(row, frame.header))
 
 	if (time === undefined && !is_slotted) return [title]
 
-	return [title.padEnd(frame.title_width), (time ?? '').padStart(frame.time_width)]
+	return [title.padEnd(TITLE_LIMIT), (time ?? '').padStart(frame.time_width)]
 }
 
 // A running row leads with the icon of the phase it is in now — the rightmost
@@ -235,7 +232,7 @@ function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame
 	const children = entry.rows.map((row, index) =>
 		row_line(index === last ? LAST_BRANCH : BRANCH, row, frame),
 	)
-	const title = title_of(frame.header, entry.title)
+	const title = title_of(entry.title)
 	const number = frame.header.link(String(entry.epic))
 	const epic = title === '' ? number : `${number}${GAP}${title}`
 
@@ -283,20 +280,6 @@ function time_width(header: BoardHeader): number {
 	return Math.max(0, ...times.map((time) => time.length))
 }
 
-// The title column's width: the limit a terminal cuts every title to, and in a chat — which draws each
-// title whole — the widest title a timed row draws in this frame, so its times still start in one
-// column.
-function title_width(header: BoardHeader, layout: BoardLayout): number {
-	if (header.form !== 'chat') return TITLE_LIMIT
-
-	const titles = run_board_layout
-		.rows_of(layout)
-		.filter((row) => time_of(row, header.now_ms) !== undefined)
-		.map((row) => title_of(header, row_title(row, header)).length)
-
-	return Math.max(TITLE_LIMIT, ...titles)
-}
-
 // Whether every row's usage column still fits one terminal line — measured as the deepest, an epic's
 // child — where a frame is kept within a terminal. The track after it is left out: it grows without
 // bound, so one long history would otherwise take the usage column off every row.
@@ -312,19 +295,17 @@ function is_usage_fitting(
 	)
 }
 
-// The usage column is drawn on every row or on none: a pane too narrow for it on any row, and a chat,
-// draw it on none — a finish time with it.
+// The usage column is drawn on every row or on none: a pane too narrow for it on any row draws it on
+// none — a finish time with it.
 function frame_of(
 	header: BoardHeader,
 	layout: BoardLayout,
 	size: TerminalSize | undefined,
 ): RowFrame {
-	const usages = header.form === 'chat' ? undefined : header.usages
 	const rows = run_board_layout.rows_of(layout)
-	const usage = usages === undefined ? undefined : usage_slot(rows, usages)
+	const usage = header.usages === undefined ? undefined : usage_slot(rows, header.usages)
 	const frame = {
 		header,
-		title_width: title_width(header, layout),
 		time_width: time_width(header),
 		usage,
 		slot_width: usage === undefined ? 0 : column_width(rows, usage, header.now_ms),
@@ -354,15 +335,10 @@ function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Arr
 	]
 }
 
-// The layout a legend is drawn for: none in a chat, nor before a plan is read.
-function legend_layout(header: BoardHeader): BoardLayout | undefined {
-	return header.form === 'chat' ? undefined : header.layout
-}
-
 // The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
 // many more there are, so the section never pushes the plan off the screen.
 function notes_part(notes: ReadonlyArray<BoardNote>, header: BoardHeader): NotesPart {
-	const has_legend = legend_layout(header) !== undefined
+	const has_legend = header.layout !== undefined
 	const lines = run_board_render_notes.note_lines(notes, has_legend, header.link)
 	const label = has_legend ? NOTES_ICON : WORDS.notes
 
@@ -376,9 +352,9 @@ function resume_lines(resume: string | undefined): Array<string> {
 	return ['', `${STATE_ICONS.human} ${WORDS.resume}${GAP}claude --resume ${resume}`]
 }
 
-// A chat draws no legend: the symbols are the same in every answer.
+// No legend is drawn before a plan is read: there are no rows whose symbols it would name.
 function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
-	const layout = legend_layout(header)
+	const { layout } = header
 
 	if (layout === undefined) return []
 
