@@ -2,7 +2,18 @@
 
 Every environment variable kit reads, in one place. Set the ones you need in a `.env` file at the project root — `.env` is gitignored, so each value stays on this machine — or as real environment variables, as a cloud session does ([cloud-session.md](./cloud-session.md#environment-variables)). A real environment variable wins over the same key in `.env`.
 
-Only these load `.env` themselves, and only when it exists: `josh notify`, `josh followup`, `josh doctor`, `josh latest:scope`, `josh port`, `josh session:lang`, `josh epic:next`, `josh backlog:drive`, `josh run:step`, `josh run:event`, `josh run:wake`, `josh run:stranded`, the `josh lane:*` commands except `lane:launch`, the Claude Code hooks (`josh pretool:guard` — which runs the rule, batch and investigation guards — and `josh stop:guard`) and `playwright.config.ts`. Every other command reads only the real environment — `josh gate`, `josh ship`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — so a variable one of those reads, such as `JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS` or the two `*_FORCE` switches, has to be set in the shell that runs it. `JOSH_PROGRESS_INTERVAL_MINUTES` in `.env` reaches only the `josh rule:guard` hook's heartbeat check, not `josh run:progress` itself — so set it in the shell too, or commit `josh.progress_interval_minutes` in `package.json`, or the two read different intervals.
+Only these load `.env` themselves, and only when it exists:
+
+- **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
+- **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
+- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:sample`, `josh lane:stats`.
+- **Setup** — `josh doctor`, `josh latest:scope`, `josh port`, `josh session:lang`.
+- **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
+- `playwright.config.ts`.
+
+`scripts/document/environment-file-reference.test.ts` checks this list against the command registry, both ways.
+
+Every other command reads only the real environment — `josh gate`, `josh ship`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — so a variable one of those reads, such as `JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS` or the two `*_FORCE` switches, has to be set in the shell that runs it. `JOSH_PROGRESS_INTERVAL_MINUTES` in `.env` reaches only the `josh rule:guard` hook's heartbeat check, not `josh run:progress` itself — so set it in the shell too, or commit `josh.progress_interval_minutes` in `package.json`, or the two read different intervals.
 
 All of them are optional except the two Telegram credentials, which notifications need unless `JOSH_NOTIFY=off`. A blank value (`KEY=`) means the same as leaving the key out.
 

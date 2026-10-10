@@ -49,8 +49,8 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
 | `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
-| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `backlogrun`) — the gate starts overlapped with the review, so the section is read before the gate |
-| `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `backlogrun`) |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`) — the gate overlaps the review, so the section is read before it |
+| `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
 A `skip` answer from `latest:scope` reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run reads
@@ -91,7 +91,7 @@ from — read at that trigger, never restated here.
 | Implementation is done | Refactor → `pnpm josh main:merge` → `pnpm josh gate` beside a subagent `/code-review`, joined before the commit → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
 | A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | `background-commands.md` → "Background the gate and push" |
-| E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
+| E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `prrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
 | Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan first; read its duplicate and epic answers | `issue-scout.md` |
 | Another Issue here must land first | A prerequisite is a dependency, not a park — file it, stash, record the dependency; `fullrun` / `halfrun` stop, `backlogrun` continues | `prerequisite.md` |
 | Something worth filing, none of the three | Unattended: file it (Tier A, first-party); else ask; a delegated child returns it to the parent instead | `observation-filing.md` |
