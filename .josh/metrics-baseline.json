@@ -1,18 +1,18 @@
 {
 	"scripts": {
 		"files": 1049,
-		"code_lines": 87328,
-		"comment_lines": 33543,
+		"code_lines": 87331,
+		"comment_lines": 33547,
 		"comment_ratio": 0.38
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2099
+		"lines": 2105
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 460648
+		"on_demand_bytes": 461817
 	},
 	"accepted": {
 		"reason": "#3645: review:record gains --comment (post a passing round 2 to the Issue) and its documentation",

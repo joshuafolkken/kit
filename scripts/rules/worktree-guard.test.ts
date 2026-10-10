@@ -45,6 +45,12 @@ describe('worktree_guard.WORKTREE_MUTATION_REASON', () => {
 		'git stash push -u -m',
 		'operating-rules.md',
 		'fires on every occurrence',
+		// joshuafolkken/kit#3648: the refusal has to lead to the substitution, not to a park.
+		'handed-over stash',
+		'record the substitution on the Issue',
+		'Tier A',
+		// The owner's stated reason to keep the stash is the one case that still stops.
+		'unless the plan says why the owner keeps the stash: then stop and confirm',
 	])('carries %j', (marker) => {
 		expect(worktree_guard.WORKTREE_MUTATION_REASON).toContain(marker)
 	})
