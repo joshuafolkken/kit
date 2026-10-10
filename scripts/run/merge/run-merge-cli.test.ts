@@ -46,10 +46,10 @@ vi.mock('./run-merge-steps', () => ({
 		has_resumable_cut: has_resumable_cut_mock,
 		is_over_budget: is_over_budget_mock,
 		refused_carry: refused_carry_mock,
-		remove_in_progress: vi.fn(),
 		resume_cut: resume_cut_mock,
 	},
 }))
+vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const { run_merge_cli } = await import('./run-merge-cli')
 

@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -91,6 +92,9 @@ interface LaneCutState {
 	directory: string
 	carried: (now?: Date) => RunCut | undefined
 	marked_issue: string | undefined
+	// Whether this session is a ship reviewer, which carries the implementing child's mark without
+	// being the run the cut is for (joshuafolkken/kit#3623).
+	is_reviewer: boolean
 	// **The context verdict, read lazily**. It is a thunk, like
 	// `carried`, so `current_state` builds the object without pricing a session — the read happens only
 	// after the command and lane checks pass, off the handful of calls that actually run a lane's gate.
@@ -102,6 +106,7 @@ function current_state(): LaneCutState {
 		directory: process.cwd(),
 		carried: run_cut.carried_cut_sync,
 		marked_issue: lane_child_marker.marked_issue(),
+		is_reviewer: agent_session_role.is_reviewer(),
 		context_verdict: cost_cli.session_verdict,
 	}
 }
@@ -117,12 +122,20 @@ function current_state(): LaneCutState {
 // issue means the process asking is the one the cut already produced. Without this half the rule
 // would fire on the fresh process too — refusing a gate call on a run that had kept the rule
 // perfectly, which `prompts/collaboration-workflow/rule-delivery.md` calls worse than no hook at all.
+//
+// **A ship reviewer's inherited mark is not a dispatch**. The supervisor that launched it is waiting on
+// its findings, so there is no fresh process a cut could hand the gate to; `implementation-cut.ts`
+// stands down for the same session on the same fact.
+function dispatched_issue(state: LaneCutState): string | undefined {
+	return state.is_reviewer ? undefined : state.marked_issue
+}
+
 function uncut_lane_issue(state: LaneCutState): string | undefined {
 	const issue = lane_paths.lane_issue_of(state.directory)
 
 	if (issue === undefined) return undefined
 
-	if (state.marked_issue !== issue) return undefined
+	if (dispatched_issue(state) !== issue) return undefined
 
 	return state.carried()?.issue === issue ? undefined : issue
 }

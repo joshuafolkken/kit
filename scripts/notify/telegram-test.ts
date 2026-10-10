@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '#scripts/gh/github-issue-url'
@@ -13,25 +12,36 @@ import { telegram_test_logic, type CliValues, type ResolvedContext } from './tel
 
 const REPO_NAME_SEPARATOR = '/'
 const ARGV_OFFSET = 2
+const FAILURE_EXIT_CODE = 1
+const USAGE =
+	'Usage: josh notify [--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]'
 
 // The free-text values a caller writes, often opening with a Markdown `-` bullet.
 const FREE_TEXT_FLAGS = ['--body', '--issue-title']
 
-function parse_cli_arguments(): CliValues {
-	const { values } = parseArgs({
-		args: [...cli_flags.attach_values(process.argv.slice(ARGV_OFFSET), FREE_TEXT_FLAGS)],
-		options: {
-			'task-type': { type: 'string' },
-			'repo-name': { type: 'string' },
-			'issue-title': { type: 'string' },
-			body: { type: 'string' },
-			'body-file': { type: 'string' },
-			'issue-url': { type: 'string' },
-			'pr-url': { type: 'string' },
-		},
-	})
+const OPTIONS = {
+	'task-type': { type: 'string' },
+	'repo-name': { type: 'string' },
+	'issue-title': { type: 'string' },
+	body: { type: 'string' },
+	'body-file': { type: 'string' },
+	'issue-url': { type: 'string' },
+	'pr-url': { type: 'string' },
+} as const
 
-	return values
+// `undefined` for a line nobody can read — an unknown flag, or a flag given no value.
+function parse_cli_arguments(): CliValues | undefined {
+	return cli_flags.values_of(
+		cli_flags.attach_values(process.argv.slice(ARGV_OFFSET), FREE_TEXT_FLAGS),
+		OPTIONS,
+	)
+}
+
+// A refused line sends nothing: the notification a misspelled flag would have produced is not the one
+// the caller wrote, and the non-zero exit is what tells a workflow it never went out.
+function refuse_usage(): void {
+	console.error(USAGE)
+	process.exitCode = FAILURE_EXIT_CODE
 }
 
 // The repository this notification is about, for the Telegram header.
@@ -103,6 +113,13 @@ async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 async function main(): Promise<void> {
 	josh_environment_file.load_environment_file()
 	const values = parse_cli_arguments()
+
+	if (values === undefined) {
+		refuse_usage()
+
+		return
+	}
+
 	const context = await resolve_context(values)
 	const input = telegram_test_logic.build_input({ values, context })
 

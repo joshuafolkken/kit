@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agent_headless } from './agent-headless'
 import { agent_launch_environment } from './agent-launch-environment'
 import { agent_role_profile } from './agent-role-profile'
+import { agent_session_role } from './agent-session-role'
 
 const CWD = path.join(process.cwd(), 'node_modules', '.cache', 'agent-launch-environment-test')
 const SOURCE = path.join(process.cwd(), 'node_modules', '.cache', 'agent-launch-source-test')
@@ -122,7 +123,11 @@ describe('Anthropic detached launch environment', () => {
 			input,
 		)
 
-		expect(environment).toStrictEqual({ ...agent_headless.environment(), ...input })
+		expect(environment).toStrictEqual({
+			...agent_headless.environment(),
+			...agent_session_role.env_for(agent_role_profile.WORKER),
+			...input,
+		})
 		expect(get).not.toHaveBeenCalled()
 		expect(existsSync(CWD)).toBe(false)
 	})
@@ -143,5 +148,30 @@ describe('headless agent mark', () => {
 		const input = { JOSH_LANE_CHILD_ISSUE: MARKER }
 
 		expect(agent_launch_environment.build(CWD, undefined, input)).toBe(input)
+	})
+})
+
+// joshuafolkken/kit#3623: a ship reviewer inherits its launcher's lane mark, so the role is what tells
+// it apart from the implementing child — written on every launch, so an inherited value never stands.
+describe('agent session role mark', () => {
+	it.each([
+		['Anthropic', agent_role_profile.DEFAULT_PROFILES.reviewer],
+		['OpenAI', agent_role_profile.OPENAI_PROFILES.reviewer],
+	])('marks an %s reviewer launch as a reviewer session', (_provider, profile) => {
+		get.mockReturnValue(undefined)
+
+		expect(agent_session_role.is_reviewer(agent_launch_environment.build(CWD, profile))).toBe(true)
+	})
+
+	it.each([
+		['worker', agent_role_profile.DEFAULT_PROFILES.worker],
+		['scheduler', agent_role_profile.OPENAI_PROFILES.scheduler],
+	])('marks a %s launch with its own role, not the reviewer one', (role, profile) => {
+		get.mockReturnValue(undefined)
+
+		const environment = agent_launch_environment.build(CWD, profile)
+
+		expect(environment[agent_session_role.KEY]).toBe(role)
+		expect(agent_session_role.is_reviewer(environment)).toBe(false)
 	})
 })

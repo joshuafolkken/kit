@@ -10,10 +10,14 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { overrides_snapshot_schema } from '#scripts/lib/schemas'
 import { overrides_files } from './overrides-files'
 import { overrides_check, type OverridesDiff } from './overrides-logic'
+
+const ARGV_OFFSET = 2
+const OPTIONS = { save: { type: 'boolean', default: false } } as const
+const USAGE = cli_flags.usage_line(['--save'], 'overrides')
 
 function is_file_not_found(error: unknown): boolean {
 	return error instanceof Error && 'code' in error && error.code === 'ENOENT'
@@ -70,15 +74,21 @@ function run_overrides_check(should_save: boolean): void {
 	console.info(`✔ overrides unchanged (${summary}).`)
 }
 
-function main(): void {
-	const { values } = parseArgs({
-		options: { save: { type: 'boolean', default: false } },
-		strict: true,
-	})
+// A line nobody can read is refused before the snapshot is read or written: a misspelled `--save` that
+// fell through would compare against the record the caller meant to replace.
+function refuse_usage(): never {
+	console.error(USAGE)
 
+	return process.exit(1)
+}
+
+function main(argv: ReadonlyArray<string>): void {
+	const values = cli_flags.values_of(argv, OPTIONS)
+
+	if (values === undefined) refuse_usage()
 	run_overrides_check(values.save)
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
-export { run_overrides_check }
+export { run_overrides_check, main }

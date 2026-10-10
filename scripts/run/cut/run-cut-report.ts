@@ -121,6 +121,18 @@ function report_under_threshold(): number {
 	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
 }
 
+// **A ship reviewer takes no cut, of either phase** (joshuafolkken/kit#3623). Its supervisor is waiting
+// on the findings file it has yet to write, so a relaunch would stand a second child in the lane beside
+// the one the supervisor repairs with. Answered `not-a-lane`, the verdict that already means "nothing
+// was cut and this process carries on".
+function report_reviewer(): number {
+	console.error(
+		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Write the findings file and finish the review in this process.',
+	)
+
+	return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
+}
+
 // **An implementation cut is never resumed by a session over the threshold**.
 // The cut outside a lane leaves the session that took it open, so a person retyping `fullrun #N` there
 // would be answered `resume-impl`, keep implementing over the threshold, and be cut again on the next
@@ -163,6 +175,7 @@ const run_cut_report = {
 	report_handed_off,
 	report_incomplete,
 	report_over,
+	report_reviewer,
 	report_stale,
 	report_under_threshold,
 	report_unknown,

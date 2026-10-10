@@ -38,6 +38,17 @@ const CONTEXT = {
 	over: CONTEXT_CUT_THRESHOLD,
 	owner: run_carry.NO_OWNER,
 }
+const IN_PROGRESS = 'in-progress'
+// GitHub keeps the casing a label was created with (joshuafolkken/kit#3591).
+const CREATED_CASING = 'In-Progress'
+
+// The removal reads the issue's labels first and names the spelling it finds, so each test serves
+// the ones the child carries.
+function serve_labels(...names: ReadonlyArray<string>): void {
+	vi.spyOn(git_gh_command, 'issue_get_labels_and_body').mockResolvedValue(
+		JSON.stringify({ labels: names.map((name) => ({ name })) }),
+	)
+}
 
 beforeEach(() => {
 	add_label_mock.mockReset().mockResolvedValue(true)
@@ -46,6 +57,30 @@ beforeEach(() => {
 	ensure_closed_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	serve_labels(IN_PROGRESS)
+})
+
+// joshuafolkken/kit#3591: the removal named the canonical spelling in the request path and swallowed
+// its failure, so a label stored as `In-Progress` answered 404 and stayed on with no trace.
+describe('run_merge_steps.do_failed — the stale in-progress goes through the shared removal', () => {
+	it('drops a marker stored under another casing, by the spelling GitHub stored', async () => {
+		serve_labels(CREATED_CASING)
+
+		await run_merge_steps.do_failed(CONTEXT)
+
+		expect(remove_label_mock).toHaveBeenCalledWith(CHILD, CREATED_CASING)
+	})
+
+	it('warns about a removal that failed, and still parks the child', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		remove_label_mock.mockRejectedValue(new Error('gh: Forbidden (HTTP 403)'))
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.is_parked).toBe(true)
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('labels/in-progress'))
+	})
 })
 
 describe('run_merge_steps.do_failed — the park is explained on the issue', () => {
@@ -74,7 +109,6 @@ describe('run_merge_steps.do_failed — the park is explained on the issue', () 
 const KIT = 'joshuafolkken/kit'
 const BLOCKER = 3501
 const NEEDS_DECISION = 'needs-decision'
-const IN_PROGRESS = 'in-progress'
 const OWN_CARRY = {
 	invocation: 'backlogrun #3435',
 	started_at: new Date().toISOString(),
