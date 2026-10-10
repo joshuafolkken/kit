@@ -8,8 +8,7 @@ import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { LaneUsages } from './run-board-usage'
 
-// joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row — never in a chat,
-// and on no row where the pane is too narrow for it on any.
+// joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row, on no row where the pane is too narrow for it on any.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const GB = 1024 * 1024 * 1024
@@ -66,8 +65,10 @@ describe('run_board_render.render usage column', () => {
 		expect(row_line(lines, 'Issue 2')).not.toContain('⚡')
 	})
 
-	it('draws no usage in a chat', () => {
-		expect(lines_of(board({ form: 'chat' })).join('\n')).not.toContain(USAGE)
+	it('draws the usage in a chat as on a screen', () => {
+		const lines = lines_of(board({ form: 'chat' }))
+
+		expect(row_line(lines, 'Issue 1')).toContain(USAGE)
 	})
 
 	it('drops the column from every row where a running row would wrap with it', () => {
@@ -155,11 +156,11 @@ describe('run_board_render.render usage column on every row', () => {
 		expect(row_line(lines, 'Issue 3')).toMatch(/\d{2}:\d{2} {2}🔍/u)
 	})
 
-	it('draws neither in a chat, whose rows stay as they were', () => {
+	it('draws both in a chat as on a screen', () => {
 		const lines = mixed_lines({ form: 'chat' })
 
-		expect(lines.join('\n')).not.toMatch(/[🔚⚡]/u)
-		expect(row_line(lines, 'Issue 7')).toMatch(/Issue 7 {2}🔍/u)
+		expect(lines).toStrictEqual(mixed_lines())
+		expect(row_line(lines, 'Issue 3')).toMatch(FINISH)
 	})
 })
 

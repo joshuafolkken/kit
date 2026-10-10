@@ -14,7 +14,7 @@ import { run_board_track } from './run-board-track'
 // title, elapsed `MM:SS` and its phase track; sections are rules, symbols a legend.
 
 const { clock_of } = run_board_labels
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, WORDS, header, lines_of, rule } =
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, WORDS, header, lines_of, note, rule } =
 	run_board_render_fixture
 const SECOND = 1000
 
@@ -166,43 +166,22 @@ describe('run_board_render.render sections', () => {
 	})
 })
 
-// joshuafolkken/kit#3456: a chat wraps a long line, so it reads the whole title, and needs no legend.
+// A chat is read beside the board on screen, so its plan, findings and legend are the screen's own.
 describe('run_board_render.render chat', () => {
-	it('draws a chat with every title whole and no legend', () => {
+	it('draws a chat as a screen: titles cut, finish times, findings icons and the legend', () => {
 		const long_title = 'x'.repeat(run_board_render.TITLE_LIMIT + 5)
-		const epic = { kind: 'epic' as const, epic: 10, title: long_title, rows: [row(11)] }
-		const people = [row(6, { state: 'human', title: long_title })]
-		const layout = { ...EMPTY_LAYOUT, waves: [[epic]], people }
-		const lines = lines_of(header({ layout, form: 'chat' }))
-
-		expect(lines).toContain(`  📁 10  ${long_title}`)
-		expect(lines.at(-1)).toBe(`  🙋 6    ${long_title}`)
-		expect(lines.join('\n')).not.toContain('🔚')
-	})
-
-	// joshuafolkken/kit#3544: a whole title longer than the limit no longer pushes its time to the right.
-	it('starts every time in one column, padding each title to the widest one a timed row draws', () => {
-		const long_title = 'x'.repeat(run_board_render.TITLE_LIMIT + 5)
-		const long = { ...running(1, NOW - 98 * SECOND, 'review'), title: long_title }
-		const short = running(2, NOW - 60 * SECOND, 'review')
-		const untimed = row(3, { title: 'z'.repeat(run_board_render.TITLE_LIMIT + 10) })
-		const lines = lines_of(
-			header({ layout: { ...EMPTY_LAYOUT, active: [long, short, untimed] }, form: 'chat' }),
-		)
-		const starts = [
-			[long_title, '01:38'],
-			['Issue 2', '01:00'],
-		].map(([title = '', time = '']) => {
-			const line = lines.find((text) => text.includes(title)) ?? ''
-
-			return line.indexOf(time)
+		const merged = row(1, {
+			state: 'merged',
+			title: long_title,
+			status: { state: 'merged', started_ms: STARTED, ended_ms: NOW - MINUTE, track: ['ship'] },
 		})
+		const layout = { ...EMPTY_LAYOUT, active: [merged, running(2, NOW - MINUTE, 'review')] }
+		const notes = [note(NOW, 'seen')]
+		const screen = lines_of(header({ layout, usages: new Map() }), notes)
+		const lines = lines_of(header({ layout, usages: new Map(), form: 'chat' }), notes)
 
-		expect(starts[0]).toBe(starts[1])
-		expect(lines).toContain(`  👀 1    ${long_title}  01:38  ${plain_track('review')}`)
-		expect(lines).toContain(
-			`  👀 2    ${'Issue 2'.padEnd(long_title.length)}  01:00  ${plain_track('review')}`,
-		)
+		expect(lines).toStrictEqual(screen)
+		expect(lines.join('\n')).toMatch(/x… {2}.*🔚 .*\n[^]*── 📌 [^]*\n.*✅ merged/u)
 	})
 })
 

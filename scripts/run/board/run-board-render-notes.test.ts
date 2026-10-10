@@ -48,7 +48,7 @@ const filed: BoardNote = {
 const park: BoardNote = { ...filed, kind: 'park' }
 const NOTES_LEGEND = '📌 findings and decisions'
 
-// joshuafolkken/kit#3478: the findings are named by icons the legend names, and by words in a chat.
+// joshuafolkken/kit#3478: the findings are named by icons the legend names, and by words where none is drawn.
 describe('run_board_render.render findings icons', () => {
 	it('draws the findings rule as 📌 and every row led by its icon with no kind word', () => {
 		const lines = lines_of(header(), [filed, park, note(NOW, 'seen')])
@@ -69,8 +69,15 @@ describe('run_board_render.render findings icons', () => {
 		expect(lines_of(header()).join('\n')).not.toContain('📌')
 	})
 
-	it('keeps the heading and the kind words in a chat, which draws no legend', () => {
+	it('draws a chat’s findings as a screen’s, under 📌 and named by the legend', () => {
 		const lines = lines_of(header({ form: 'chat' }), [filed])
+
+		expect(lines).toStrictEqual(lines_of(header(), [filed]))
+		expect(lines).toContain(rule('📌'))
+	})
+
+	it('keeps the heading and the kind words where no legend is drawn, before a plan is read', () => {
+		const lines = lines_of(header({ layout: undefined }), [filed])
 
 		expect(lines).toContain(rule(WORDS.notes))
 		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
@@ -155,8 +162,8 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 		)
 	})
 
-	it('keeps the kind word filed in a chat, which draws no legend', () => {
-		expect(lines_of(header({ form: 'chat' }), [bug]).at(-1)).toBe(
+	it('keeps the kind word filed where no legend is drawn', () => {
+		expect(lines_of(header({ layout: undefined }), [bug]).at(-1)).toBe(
 			`  🐛 ${minute_of(NOW)} 3473 filed  Lead`,
 		)
 	})

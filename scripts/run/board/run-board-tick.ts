@@ -37,13 +37,12 @@ async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Pro
 	return { ...state, local: await ports.read_local(), read_ms: now_ms }
 }
 
-// Each lane's usage, read on the machine's second. A chat draws none, so it reads none; a reading
-// that failed draws no column.
+// Each lane's usage, read on the machine's second; a reading that failed draws no column.
 async function read_usages(
 	state: BoardState,
 	ports: BoardPorts,
 ): Promise<Pick<BoardState, 'usage' | 'usages'>> {
-	const usage = ports.form === 'chat' ? undefined : await ports.read_usage(state.usage)
+	const usage = await ports.read_usage(state.usage)
 	const usages = usage === undefined ? undefined : run_board_usage.usage_of(state.usage, usage)
 
 	return { usage, usages }
