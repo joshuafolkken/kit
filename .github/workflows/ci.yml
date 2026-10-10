@@ -242,8 +242,14 @@ jobs:
       contents: read
       packages: read
     steps:
+      # **Two commits, not one** (joshuafolkken/kit#3644). The gate's `josh metrics` holds the totals
+      # to the ones measured on the commit this change starts from, so that commit has to be in the
+      # clone: a pull request is checked out as a merge commit whose first parent is the default
+      # branch's tip, and the default one-commit clone holds the merge commit alone.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -343,8 +349,16 @@ jobs:
       # buffered until it exits, so a check that *hangs* until this job's `timeout-minutes` is
       # cancelled with nothing printed — where a serial step streamed. That costs one local
       # `pnpm josh gate` to identify, and it is the price of the all-failures-in-one-pass summary.
+      #
+      # **`JOSH_METRICS_BASE` names the commit `josh metrics` measures from** (joshuafolkken/kit#3644).
+      # This clone has no default-branch ref to ask a merge-base of, so the first parent is named
+      # outright: the default branch's tip on a pull request, and the commit before the push on the
+      # default branch itself. A name that does not resolve fails the step rather than comparing
+      # with nothing.
       - name: Run verification gate
         run: pnpm josh gate --verbose --no-unit
+        env:
+          JOSH_METRICS_BASE: HEAD^1
 
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action

@@ -89,14 +89,14 @@ entry fullrun  227672/229376 bytes · 1704 left
 
 ### `josh metrics`
 
-Print the repository-wide quality totals no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), the number of `*:guard` commands, and the AI cost in bytes (resident, on demand) — and hold them to the baseline in `.josh/metrics-baseline.json`.
+Print the repository-wide quality totals no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), the number of `*:guard` commands, and the AI cost in bytes (resident, on demand) — and hold them to the same totals measured on the merge-base.
 
 ```bash
-pnpm josh metrics                             # print the totals and check them against the baseline
-pnpm josh metrics --accept --reason "<why>"   # raise the baseline to the current totals
+pnpm josh metrics                             # print the totals and check them against the merge-base's
+pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and why
 ```
 
-- **A ratchet, and a step of [`josh gate`](#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule lines, the guards or either AI cost grew past the baseline, naming each with both values. A total that shrank lowers the baseline, so that gate run records no green stamp. The only way up is `--accept --reason "<why>"`, recording the reason and date; parallel branches that each accept conflict on the file — re-run `--accept` on the merged tree.
+- **A ratchet, and a step of [`josh gate`](#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule lines, the guards or either AI cost grew past the merge-base's, naming each with both values. A total that shrank needs no record: once merged it is what the next branch is measured from. The only way up is `--accept --reason "<why>"`, which writes the growth, the reason and the date to `.josh/metrics-accepted/<issue>.json` — one file per issue, so parallel branches never conflict on it. `JOSH_METRICS_BASE=<commit>` names the commit to measure from where no merge-base can be asked for (CI) — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
 - **kit only**: it counts kit's own rule documents and guards, so a consumer's gate leaves the step out.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
 - **Durations** fail past +10% of this machine's baseline; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".

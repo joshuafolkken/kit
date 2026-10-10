@@ -47,6 +47,17 @@ async function group_counts(
 	return line_budget.counts_from(await eslint.lintFiles(group.paths))
 }
 
+// `effective_limit` answers "no limit" for a configuration that fails to load, which is the right
+// answer for a budget and the wrong one for a total: every file would be left out and the tree would
+// read as holding no code at all. The merge-base's tree is where that happens — its `eslint.config.js`
+// is loaded with this checkout's `node_modules`, so a branch that drops a package the old config
+// imports cannot load it — and a base of zero turns the whole codebase into growth to approve.
+function unread_config(file_count: number, root: string): Error {
+	return new Error(
+		`josh metrics: eslint set no max-lines on any of the ${String(file_count)} script files in ${root} — its eslint configuration did not load there, so the tree has no total to compare`,
+	)
+}
+
 // Keyed by absolute path, as `line_budget.counts_from` keys it. A file eslint sets no `max-lines` on
 // is absent, so it is left out of every total rather than counted as zero code lines.
 async function code_line_counts(
@@ -54,6 +65,9 @@ async function code_line_counts(
 	root: string,
 ): Promise<ReadonlyMap<string, number>> {
 	const options = await effective_limit.options_for(file_paths, root)
+
+	if (file_paths.length > 0 && options.size === 0) throw unread_config(file_paths.length, root)
+
 	const groups = [...line_budget.grouped(options).values()]
 	const counted = await Promise.all(groups.map(async (group) => await group_counts(root, group)))
 

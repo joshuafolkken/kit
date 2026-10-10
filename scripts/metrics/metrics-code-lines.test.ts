@@ -7,6 +7,7 @@ const FILE = path.join(ROOT, 'scripts/example.ts')
 const OPTIONS = { max: 300, skipBlankLines: true, skipComments: true }
 
 const constructed: Array<ESLint.Options> = []
+const limits = new Map([[FILE, OPTIONS]])
 
 // The one method the module calls, under eslint's own camelCase name.
 const LINT_FILES = 'lintFiles'
@@ -21,8 +22,7 @@ vi.mock('eslint', () => ({
 
 vi.mock('#scripts/lines/effective-limit', () => ({
 	effective_limit: {
-		options_for: async (): Promise<ReadonlyMap<string, typeof OPTIONS>> =>
-			new Map([[FILE, OPTIONS]]),
+		options_for: async (): Promise<ReadonlyMap<string, typeof OPTIONS>> => new Map(limits),
 	},
 }))
 
@@ -39,5 +39,21 @@ describe('metrics_code_lines.code_line_counts', () => {
 		const location = constructed[0]?.cacheLocation ?? path.join(ROOT, '.eslintcache')
 
 		expect(path.relative(ROOT, location).startsWith('..')).toBe(true)
+	})
+
+	// joshuafolkken/kit#3644: a configuration that fails to load reads as "no limit" on every file, and
+	// a merge-base measured that way is a total of zero the whole codebase then grew past.
+	it('refuses a tree where eslint sets max-lines on none of the files rather than totalling zero', async () => {
+		limits.clear()
+
+		const counted = metrics_code_lines.code_line_counts([FILE], ROOT)
+
+		limits.set(FILE, OPTIONS)
+
+		await expect(counted).rejects.toThrow('its eslint configuration did not load there')
+	})
+
+	it('totals nothing for a tree that holds no script file', async () => {
+		expect(await metrics_code_lines.code_line_counts([], ROOT)).toStrictEqual(new Map())
 	})
 })

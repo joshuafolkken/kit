@@ -6,7 +6,6 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-c
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
-import { merge_drivers } from './merge-drivers'
 
 // `josh main:merge` (`josh mm`) — bring the default branch into the branch this checkout is on.
 //
@@ -68,11 +67,7 @@ async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
 	const { default_branch, current_branch } = target
 
 	try {
-		await git_command.merge_branch(
-			default_branch,
-			merge_message(default_branch, current_branch),
-			merge_drivers.git_options(),
-		)
+		await git_command.merge_branch(default_branch, merge_message(default_branch, current_branch))
 	} catch (error) {
 		const files = main_merge_guard.unmerged_paths(await git_command.status())
 

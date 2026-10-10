@@ -21,7 +21,7 @@ const IDLE: BusyRead = { kind: 'idle' }
 
 // The paths joshuafolkken/kit#3582 and joshuafolkken/kit#3586 declared, abridged.
 const LIMITS_BODY = [
-	'- `scripts/lines/effective-limit.ts` と `scripts/metrics/metrics-baseline-merge.ts` を直す',
+	'- `scripts/lines/effective-limit.ts` と `scripts/metrics/metrics-ratchet.ts` を直す',
 	'- 対象は `scripts/` の外に出ない（`joshuafolkken/kit#N`）',
 ].join('\n')
 const LINT_BODY =

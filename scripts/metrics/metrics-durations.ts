@@ -2,7 +2,6 @@ import type { GateEntry, LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
-import type { Change } from './metrics-ratchet'
 
 // The duration half of `josh metrics`: the gate, the unit suite, and the
 // startup of josh and of the guard hook every tool call runs. Performance work waits for a measured
@@ -46,8 +45,16 @@ type Durations = Partial<Record<DurationName, number | undefined>>
 
 const baseline_schema = z.record(z.string(), z.number())
 
+// A duration against this machine's recorded one. The totals' own change (`metrics-ratchet.ts`) is a
+// different shape: it is measured from the merge-base and carries the growth an approval covers.
+interface DurationChange {
+	name: string
+	baseline: number
+	current: number
+}
+
 interface DurationVerdict {
-	regressions: ReadonlyArray<Change>
+	regressions: ReadonlyArray<DurationChange>
 	// The baseline with every duration it did not hold yet — a first measurement on this machine is
 	// the bar, not a regression.
 	baseline: Durations
@@ -84,7 +91,7 @@ function parse_baseline(text: string): Durations {
 	return parsed.success ? Object.fromEntries(present(parsed.data)) : {}
 }
 
-function is_regression(change: Change): boolean {
+function is_regression(change: DurationChange): boolean {
 	return change.current * PERCENT > change.baseline * (PERCENT + TOLERANCE_PERCENT)
 }
 
@@ -175,7 +182,10 @@ function render(durations: Durations, is_startup_timed: boolean): string {
 	return `durations  ${cells.join(SEPARATOR)}`
 }
 
-function render_regressions(regressions: ReadonlyArray<Change>, baseline_path: string): string {
+function render_regressions(
+	regressions: ReadonlyArray<DurationChange>,
+	baseline_path: string,
+): string {
 	const over = `more than ${String(TOLERANCE_PERCENT)}% over the baseline`
 
 	return [

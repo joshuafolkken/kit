@@ -5,13 +5,14 @@ const ACCEPT = '--accept'
 const REASON = '--reason'
 const NO_STARTUP = '--no-startup'
 const TOTALS_ONLY = '--totals-only'
+const JSON_FORM = '--json'
 
 describe('metrics_command.parse_arguments', () => {
-	it('checks against the baseline, timing the startups, when no argument is given', () => {
+	it('checks against the merge-base, timing the startups, when no argument is given', () => {
 		expect(metrics_command.parse_arguments([])).toStrictEqual({
 			reason: undefined,
 			is_startup_timed: true,
-			is_totals_only: false,
+			form: 'full',
 		})
 	})
 
@@ -20,7 +21,7 @@ describe('metrics_command.parse_arguments', () => {
 		expect(metrics_command.parse_arguments([NO_STARTUP])).toStrictEqual({
 			reason: undefined,
 			is_startup_timed: false,
-			is_totals_only: false,
+			form: 'full',
 		})
 		expect(metrics_command.parse_arguments([NO_STARTUP, ACCEPT])).toBeUndefined()
 	})
@@ -30,20 +31,30 @@ describe('metrics_command.parse_arguments', () => {
 		expect(metrics_command.parse_arguments([TOTALS_ONLY])).toStrictEqual({
 			reason: undefined,
 			is_startup_timed: false,
-			is_totals_only: true,
+			form: 'totals',
 		})
 		expect(metrics_command.parse_arguments([TOTALS_ONLY, NO_STARTUP])).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#3644: the form the command runs on the merge-base's tree.
+	it('prints the totals as JSON, held to nothing, in the merge-base form', () => {
+		expect(metrics_command.parse_arguments([JSON_FORM])).toStrictEqual({
+			reason: undefined,
+			is_startup_timed: false,
+			form: 'json',
+		})
+		expect(metrics_command.parse_arguments([JSON_FORM, ACCEPT])).toBeUndefined()
 	})
 })
 
 describe('metrics_command.parse_arguments — the accept form', () => {
-	it('raises the baseline with the trimmed reason in the full accept form', () => {
+	it('records the growth with the trimmed reason in the full accept form', () => {
 		const reason = 'New guard for #1'
 
 		expect(metrics_command.parse_arguments([ACCEPT, REASON, `  ${reason} `])).toStrictEqual({
 			reason,
 			is_startup_timed: true,
-			is_totals_only: false,
+			form: 'full',
 		})
 	})
 

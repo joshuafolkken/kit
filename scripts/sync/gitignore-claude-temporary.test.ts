@@ -60,7 +60,7 @@ describe.each([GITIGNORE, 'templates/gitignore'])('%s', (gitignore_source) => {
 	})
 
 	it('keeps the rest of .josh/ tracked', () => {
-		expect(is_ignored_by(gitignore_source, '.josh/metrics-baseline.json')).toBe(false)
+		expect(is_ignored_by(gitignore_source, '.josh/metrics-accepted/1.json')).toBe(false)
 	})
 })
 

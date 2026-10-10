@@ -15,8 +15,6 @@ import { build_bin } from '#scripts/build/build-bin'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { josh_cli_fixture, type JoshLauncher } from '#scripts/josh/josh-cli-fixture'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { metrics_logic } from '#scripts/metrics/metrics-logic'
 
 // Most defects reach a run at an environment boundary rather than inside a function:
 // a consumer without `docs/` (#2402), a lane worktree whose ledger lives in
@@ -115,24 +113,13 @@ const KIT_RULES: ReadonlyArray<FixtureFile> = [
 	['prompts/README.md', '# Prompts\n'],
 ]
 
-// The kit's gate runs `josh metrics` (#3408), which refuses a total over its baseline. The baseline is
-// derived by the command's own logic, so the fixture sits exactly at it and the gate stays green.
-const KIT_METRICS_BASELINE = metrics_logic.baseline_text({
-	scripts: metrics_logic.script_totals([]),
-	rules: metrics_logic.rule_totals(KIT_RULES.map(([, text]) => text)),
-	guards: metrics_logic.guard_count(Object.keys(COMMAND_MAP)),
-	ai_cost: metrics_logic.ai_cost_totals(
-		KIT_RULES.filter(([file]) => file === 'CLAUDE.md').map(([, text]) => text),
-		KIT_RULES.filter(([file]) => file.startsWith('prompts/')).map(([, text]) => text),
-	),
-})
-
+// The kit's gate runs `josh metrics` (#3408), which holds the totals to the merge-base's: the fixture
+// is one commit on the default branch, so it is measured against itself and the gate stays green.
 const KIT_FILES: ReadonlyArray<FixtureFile> = [
 	...TOOLCHAIN_FILES,
 	[PACKAGE_JSON, json_file({ name: PACKAGE_NAME, version: '0.0.0', ...PROJECT_FIELDS })],
 	['docs/README.md', '# Docs\n'],
 	...KIT_RULES,
-	['.josh/metrics-baseline.json', KIT_METRICS_BASELINE],
 ]
 
 // The least a consumer is: a project that depends on the kit and carries neither `docs/` nor

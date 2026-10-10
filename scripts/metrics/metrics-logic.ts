@@ -16,7 +16,6 @@ const SCRIPTS_PREFIX = 'scripts/'
 const GUARD_SUFFIX = ':guard'
 const NEWLINE = '\n'
 const RATIO_DIGITS = 2
-const JSON_INDENT = '\t'
 const ENCODING = 'utf8'
 // The `UserPromptSubmit` hook's line, in its default form — the same on every machine whatever its
 // `.env` says. Empty, and kept so a default that prints again is counted.
@@ -131,14 +130,8 @@ function render(metrics: Metrics): string {
 	].join(NEWLINE)
 }
 
-function baseline_text(metrics: Metrics): string {
-	return `${JSON.stringify(metrics, undefined, JSON_INDENT)}${NEWLINE}`
-}
-
 const metrics_logic = {
 	ai_cost_totals,
-	baseline_text,
-	comment_ratio,
 	guard_count,
 	is_measured_script,
 	physical_lines,
