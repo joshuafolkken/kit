@@ -81,14 +81,15 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 ### Merge, release and dependency updates
 
-| Variable                                      | Required | Default     | Used when                                                                                                                                                        |
-| --------------------------------------------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_CI_TIMEOUT_SECONDS`                     | No       | 32 minutes  | How long `josh followup` waits for CI ([`josh followup`](./josh-commands-automation.md#josh-followup)).                                                          |
-| `JOSH_REQUIRED_CHECKS`                        | No       | `SonarQube` | The checks a merge waits for, comma-separated.                                                                                                                   |
-| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`            | No       | 30 minutes  | How long `josh release` watches for its tag ([`josh release`](./josh-commands-automation.md#josh-release)).                                                      |
-| `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`            | No       | 30 minutes  | How long `josh release` watches for its version on npm ([`josh release`](./josh-commands-automation.md#josh-release)).                                           |
-| `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` | No       | 30 minutes  | How long `josh release` watches for its GitHub Release ([`josh release`](./josh-commands-automation.md#josh-release)).                                           |
-| `JOSH_LATEST_MAX_AGE_HOURS`                   | No       | `12`        | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)). |
+| Variable                                      | Required | Default        | Used when                                                                                                                                                                                                                  |
+| --------------------------------------------- | -------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_CI_TIMEOUT_SECONDS`                     | No       | 32 minutes     | How long `josh followup` waits for CI ([`josh followup`](./josh-commands-automation.md#josh-followup)).                                                                                                                    |
+| `JOSH_REQUIRED_CHECKS`                        | No       | `SonarQube`    | The checks a merge waits for, comma-separated.                                                                                                                                                                             |
+| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its tag ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                                |
+| `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its version on npm ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                     |
+| `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` | No       | 30 minutes     | How long `josh release` watches for its GitHub Release ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                     |
+| `JOSH_LATEST_MAX_AGE_HOURS`                   | No       | `12`           | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)).                                                           |
+| `JOSH_METRICS_BASE`                           | No       | the merge-base | The commit `josh metrics` measures the totals from, where no merge-base can be asked for — kit's CI names `HEAD^1`. A name that resolves to no commit fails the check ([`josh metrics`](./josh-commands.md#josh-metrics)). |
 
 ### Git hooks
 

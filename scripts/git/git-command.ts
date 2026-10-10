@@ -123,19 +123,12 @@ async function fast_forward_local(branch_name: string): Promise<string> {
 // `message` replaces git's default merge message, which carries no `#N` and is therefore refused
 // by the `commit-msg` hook on an issue branch.
 //
-// `config_options` carry the merge drivers `.gitattributes` names, for this merge only.
-//
-// The budget is a suite's, not a local git command's: the merge commit runs the `commit-msg` hook and
-// those drivers, neither of which is git's own work.
-async function merge_branch(
-	branch_name: string,
-	message?: string,
-	config_options: ReadonlyArray<string> = [],
-): Promise<void> {
+// The budget is a suite's, not a local git command's: the merge commit runs the `commit-msg` hook,
+// which is not git's own work.
+async function merge_branch(branch_name: string, message?: string): Promise<void> {
 	const message_arguments = message === undefined ? [] : ['-m', message]
 
 	await git_spawn.with_output('merge', [...message_arguments, `origin/${branch_name}`], {
-		config_options,
 		timeout_ms: SUITE_TIMEOUT_MS,
 	})
 }

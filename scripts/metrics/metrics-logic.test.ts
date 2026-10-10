@@ -96,12 +96,3 @@ describe('metrics_logic.render', () => {
 		)
 	})
 })
-
-describe('metrics_logic.baseline_text', () => {
-	it('writes tab-indented JSON that parses back to the metrics', () => {
-		const text = metrics_logic.baseline_text(FIXTURE_METRICS)
-
-		expect(text.endsWith('}\n')).toBe(true)
-		expect(JSON.parse(text)).toStrictEqual(FIXTURE_METRICS)
-	})
-})

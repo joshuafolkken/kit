@@ -307,20 +307,6 @@ describe('git_command.merge_branch', () => {
 			`origin/${DEFAULT_BRANCH}`,
 		])
 	})
-
-	// joshuafolkken/kit#3517: git reads `-c` only ahead of the command name.
-	it('puts config options ahead of the merge command', async () => {
-		const { git_command } = await import('./git-command')
-		const options = ['-c', 'merge.example.driver=true']
-
-		await git_command.merge_branch(DEFAULT_BRANCH, undefined, options)
-
-		expect(execa_mock.state.last_arguments).toStrictEqual([
-			...options,
-			'merge',
-			`origin/${DEFAULT_BRANCH}`,
-		])
-	})
 })
 
 // joshuafolkken/kit#1683: the pull left behind when joshuafolkken/kit#1659 fixed `josh main:merge`.

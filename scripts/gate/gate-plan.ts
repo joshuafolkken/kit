@@ -108,7 +108,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// unit suite for the whole gate.
 	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
 	// **The metrics ratchet is kit's own**: it holds kit's repository-wide
-	// totals to kit's baseline. It is one in-process eslint pass with only `max-lines` enabled, over
+	// totals to the merge-base's. It is one in-process eslint pass with only `max-lines` enabled, over
 	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
 	// It times no startup here: beside the unit suite that reads the load, not josh.
 	{

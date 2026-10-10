@@ -21,6 +21,17 @@ Each check claims a place in a machine-wide weighted core budget before it start
 
 A leaked place is swept on read by the same pid-and-start-time liveness the unit-run marker uses, and a reservation that never fits is admitted at minimum width after a wait cap — and the gate's summary then prints a `⚠ <check> — started past the core budget …` line above the verdict, so an over-subscribed run does not look like one that fitted. A gate nested inside another gate's unit suite (this repository's own gate tests) takes no place, so it never waits on cores the outer gate is holding. The pre-push `pnpm install` and `pnpm josh audit` join the same budget through [`josh reserved-run`](../josh-commands-automation.md#josh-reserved-run).
 
+## `josh metrics`' totals
+
+The totals are held to the same totals measured on the merge-base, not to a recorded file (joshuafolkken/kit#3644).
+
+- **A tracked baseline conflicted on nearly every pull request.** `.josh/metrics-baseline.json` was raised by each pull request that added code and lowered by each that removed it, so two pull requests touching unrelated sources both rewrote it. A merge driver that resolved the file and a gate exemption for the gate's own lowering write were built to live with that; measuring the merge-base removes the shared file, and both went with it.
+- **The merge-base is measured by this checkout's command in a throwaway tree** (`scripts/git/base-tree.ts`, the detached worktree `josh test:red` uses). The same ruler on both trees means a change to how a total is counted moves both sides and never reads as growth. A checkout that sits on the base commit with nothing changed is its own base, so the default branch builds no second tree.
+- **An approval records the growth, not the total it reached.** `--accept` writes `{ reason, date, growth }` to `.josh/metrics-accepted/<issue>.json`. Merging the default branch in moves both sides by what landed there, so a recorded delta stays this branch's own where an absolute total would be overtaken by somebody else's change.
+- **Only an approval this branch wrote counts.** A file whose text the merge-base already holds approved an earlier branch's growth. The files stay on the default branch as the readable history of every accepted growth; a re-opened issue rewrites its own.
+- **`JOSH_METRICS_BASE` names the commit where no merge-base can be asked for.** CI checks a pull request out as a shallow merge commit with no default-branch ref; the workflow fetches two commits and names `HEAD^1`. A name that does not resolve is an error — reading it as "nothing to compare" would turn the ratchet off where nobody watches.
+- **Rejected: one writer updating the tracked file after each merge.** It needs a bot commit to the default branch and leaves a window in which the file is stale.
+
 ## `josh metrics`' durations
 
 Performance is a goal no change may worsen (`prompts/collaboration-workflow/principles.md` → "quality-priority"), so `josh metrics` holds four durations to a baseline and fails one that slowed past a tolerance (joshuafolkken/kit#3409).

@@ -6,6 +6,3 @@ eslint/rules/** linguist-vendored
 
 scripts/*.ts linguist-language=TypeScript
 
-# kit's metrics ratchet baseline: `josh main:merge` registers this driver, which adds each side's
-# change to the totals instead of conflicting on every value (joshuafolkken/kit#3517).
-.josh/metrics-baseline.json merge=josh-metrics

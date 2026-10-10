@@ -2,10 +2,22 @@ import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import type { Metrics } from './metrics-logic'
 
-// The ratchet over `josh metrics`' totals. Measuring a slow growth does not
-// stop it, so the gate compares the totals against the recorded baseline: **a total that grew fails
-// the gate, a total that shrank moves the baseline down**, and the only way up is an explicit
-// `--accept` with a reason, recorded beside the values it raised.
+// The ratchet over `josh metrics`' totals. Measuring a slow growth does not stop it, so the gate
+// compares the totals against the same totals measured on the merge-base: **a total that grew fails
+// the gate**, and the only way past it is an explicit `--accept` with a reason, recorded in a file of
+// the issue's own.
+//
+// **Nothing is compared against a recorded total.** A tracked baseline was rewritten by nearly every
+// pull request — a raise by the one that added code, a lowering by the one that removed it — so two
+// pull requests touching unrelated sources conflicted on it. The merge-base is a total nobody writes:
+// a total that shrank is simply what the next branch is measured from.
+//
+// **An approval records the growth, not the total it reached.** Merging the default branch in moves
+// both sides of the comparison by whatever landed there, so the growth stays this branch's own while
+// an absolute total would be overtaken by somebody else's change.
+//
+// **Only an approval this branch wrote counts.** One the merge-base already holds, unchanged,
+// approved an earlier branch's growth and says nothing about this one's.
 //
 // **No tolerance on these totals.** They are counts read off the tree, so the same tree always
 // produces the same values — any increase is a real one.
@@ -15,8 +27,11 @@ import type { Metrics } from './metrics-logic'
 // file count or a comment-line count moves with them and would only state the same growth twice.
 
 const NEWLINE = '\n'
+const JSON_INDENT = '\t'
+// The comment ratio is a two-decimal value, and a float subtraction of two of them is not.
+const GROWTH_PRECISION = 100
 
-const baseline_schema = z.object({
+const metrics_schema = z.object({
 	scripts: z.object({
 		files: z.number(),
 		code_lines: z.number(),
@@ -26,26 +41,53 @@ const baseline_schema = z.object({
 	rules: z.object({ files: z.number(), lines: z.number() }),
 	guards: z.number(),
 	ai_cost: z.object({ resident_bytes: z.number(), on_demand_bytes: z.number() }),
-	accepted: z.object({ reason: z.string(), date: z.string() }).optional(),
 })
 
-type Baseline = z.infer<typeof baseline_schema>
+const approval_schema = z.object({
+	reason: z.string(),
+	date: z.string(),
+	growth: z.record(z.string(), z.number()),
+})
+
+type Approval = z.infer<typeof approval_schema>
 
 interface Change {
 	name: string
-	baseline: number
+	base: number
 	current: number
+	growth: number
+	approved: number
 }
 
 type Verdict =
 	| { kind: 'regressed'; regressions: ReadonlyArray<Change> }
-	| { kind: 'improved'; baseline: Baseline }
-	| { kind: 'unchanged' }
+	| { kind: 'approved' | 'shrank' | 'unchanged' }
 
-function parse_baseline(text: string): Baseline | undefined {
-	const parsed = baseline_schema.safeParse(json_value.parse_or_undefined(text))
+function parse_metrics(text: string): Metrics | undefined {
+	const parsed = metrics_schema.safeParse(json_value.parse_or_undefined(text))
 
 	return parsed.success ? parsed.data : undefined
+}
+
+function parse_approval(text: string): Approval | undefined {
+	const parsed = approval_schema.safeParse(json_value.parse_or_undefined(text))
+
+	return parsed.success ? parsed.data : undefined
+}
+
+function approval_text(approval: Approval): string {
+	return `${JSON.stringify(approval, undefined, JSON_INDENT)}${NEWLINE}`
+}
+
+// The approvals this branch wrote, out of every approval file by name: one whose text the merge-base
+// does not hold. A file that does not parse approves nothing.
+function fresh_approvals(
+	current: ReadonlyMap<string, string>,
+	base: ReadonlyMap<string, string>,
+): ReadonlyArray<Approval> {
+	return [...current]
+		.filter(([name, text]) => base.get(name) !== text)
+		.flatMap(([, text]) => parse_approval(text) ?? [])
 }
 
 function ratcheted(metrics: Metrics): ReadonlyArray<[string, number]> {
@@ -59,51 +101,90 @@ function ratcheted(metrics: Metrics): ReadonlyArray<[string, number]> {
 	]
 }
 
-function changes(baseline: Metrics, current: Metrics): ReadonlyArray<Change> {
-	const before = new Map(ratcheted(baseline))
+function growth_between(base: number, current: number): number {
+	return Math.round((current - base) * GROWTH_PRECISION) / GROWTH_PRECISION
+}
+
+function approved_growth(approvals: ReadonlyArray<Approval>, name: string): number {
+	return Math.max(0, ...approvals.map((approval) => approval.growth[name] ?? 0))
+}
+
+function changes(
+	base: Metrics,
+	current: Metrics,
+	approvals: ReadonlyArray<Approval>,
+): ReadonlyArray<Change> {
+	const before = new Map(ratcheted(base))
 
 	return ratcheted(current)
-		.map(([name, value]) => ({ name, baseline: before.get(name) ?? value, current: value }))
-		.filter((change) => change.current !== change.baseline)
+		.map(([name, value]) => {
+			const base_value = before.get(name) ?? value
+			const growth = growth_between(base_value, value)
+
+			return { name, base: base_value, current: value, growth }
+		})
+		.filter((change) => change.growth !== 0)
+		.map((change) => ({ ...change, approved: approved_growth(approvals, change.name) }))
 }
 
-// The improved baseline carries every current value, not only the compared ones, so the file
-// always describes one tree. The last accepted reason stays: it is the record of the last raise.
-function lowered(baseline: Baseline, current: Metrics): Baseline {
-	return baseline.accepted === undefined ? current : { ...current, accepted: baseline.accepted }
+function settled_kind(changed: number, grown: number): 'approved' | 'shrank' | 'unchanged' {
+	if (grown > 0) return 'approved'
+
+	return changed > 0 ? 'shrank' : 'unchanged'
 }
 
-function compare(baseline: Baseline, current: Metrics): Verdict {
-	const changed = changes(baseline, current)
-	const regressions = changed.filter((change) => change.current > change.baseline)
+function compare(base: Metrics, current: Metrics, approvals: ReadonlyArray<Approval>): Verdict {
+	const changed = changes(base, current, approvals)
+	const grown = changed.filter((change) => change.growth > 0)
+	const regressions = grown.filter((change) => change.growth > change.approved)
 
 	if (regressions.length > 0) return { kind: 'regressed', regressions }
-	if (changed.length === 0) return { kind: 'unchanged' }
 
-	return { kind: 'improved', baseline: lowered(baseline, current) }
+	return { kind: settled_kind(changed.length, grown.length) }
 }
 
-function accept(current: Metrics, reason: string, date: string): Baseline {
-	return { ...current, accepted: { reason, date } }
+// The approval of what grew, or `undefined` when nothing did — there is no growth to record a reason
+// for, and an empty approval would be a file every later reader has to see through.
+function accept(
+	base: Metrics,
+	current: Metrics,
+	reason: string,
+	date: string,
+): Approval | undefined {
+	const grown = changes(base, current, []).filter((change) => change.growth > 0)
+
+	if (grown.length === 0) return undefined
+
+	return {
+		reason,
+		date,
+		growth: Object.fromEntries(grown.map((change) => [change.name, change.growth])),
+	}
 }
 
-function render_regressions(regressions: ReadonlyArray<Change>, baseline_path: string): string {
+function render_regression(change: Change): string {
+	const values = `merge-base ${String(change.base)} → current ${String(change.current)}`
+
+	return `  ${change.name}  ${values} (+${String(change.growth)}, approved +${String(change.approved)})`
+}
+
+function render_regressions(regressions: ReadonlyArray<Change>, commit: string): string {
 	return [
-		`josh metrics: ${String(regressions.length)} total(s) grew past the baseline in ${baseline_path}:`,
-		...regressions.map(
-			(change) =>
-				`  ${change.name}  baseline ${String(change.baseline)} → current ${String(change.current)}`,
-		),
-		'Bring them back down, or raise the baseline with the reason it grew: pnpm josh metrics --accept --reason "<why>"',
+		`josh metrics: ${String(regressions.length)} total(s) grew past the merge-base ${commit}:`,
+		...regressions.map((change) => render_regression(change)),
+		'Bring them back down, or record the reason they grew: pnpm josh metrics --accept --reason "<why>"',
 	].join(NEWLINE)
 }
 
 const metrics_ratchet = {
 	accept,
+	approval_text,
 	compare,
-	parse_baseline,
+	fresh_approvals,
+	parse_approval,
+	parse_metrics,
 	render_regressions,
 }
 
-export type { Baseline, Change, Verdict }
+export type { Approval, Change, Verdict }
 export { metrics_ratchet }

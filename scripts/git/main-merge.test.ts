@@ -24,10 +24,6 @@ const { git_command } = await import('./git-command')
 const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
 const { git_spawn } = await import('./git-spawn')
-const { merge_drivers } = await import('./merge-drivers')
-
-// joshuafolkken/kit#3517: the baseline's merge driver rides on every merge of the default branch.
-const DRIVER_OPTIONS = merge_drivers.git_options()
 
 const CHANGED_FILE = 'scripts/a.ts'
 const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
@@ -66,7 +62,7 @@ describe('merging the default branch into the current branch', () => {
 	it('fetches the default branch and merges it', async () => {
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
 		expect(fetch_branch).toHaveBeenCalledWith('main')
-		expect(merge_branch).toHaveBeenCalledWith('main', undefined, DRIVER_OPTIONS)
+		expect(merge_branch).toHaveBeenCalledWith('main', undefined)
 	})
 
 	// The regression: a fast-forward-only merge fails on a diverged branch exactly as `git pull` did.
@@ -82,7 +78,7 @@ describe('merging the default branch into the current branch', () => {
 		await main_merge.run(NO_ARGUMENTS)
 
 		expect(fetch_branch).toHaveBeenCalledWith('develop')
-		expect(merge_branch).toHaveBeenCalledWith('develop', undefined, DRIVER_OPTIONS)
+		expect(merge_branch).toHaveBeenCalledWith('develop', undefined)
 	})
 
 	it('reports a git failure as a message rather than throwing', async () => {
@@ -171,11 +167,7 @@ describe('the merge message on an issue branch', () => {
 
 		await main_merge.run(NO_ARGUMENTS)
 
-		expect(merge_branch).toHaveBeenCalledWith(
-			'main',
-			'Merge main into 2421-lane #2421',
-			DRIVER_OPTIONS,
-		)
+		expect(merge_branch).toHaveBeenCalledWith('main', 'Merge main into 2421-lane #2421')
 	})
 
 	it('keeps git default message on a branch without an issue number', async () => {
@@ -183,7 +175,7 @@ describe('the merge message on an issue branch', () => {
 
 		await main_merge.run(NO_ARGUMENTS)
 
-		expect(merge_branch).toHaveBeenCalledWith('main', undefined, DRIVER_OPTIONS)
+		expect(merge_branch).toHaveBeenCalledWith('main', undefined)
 	})
 })
 
