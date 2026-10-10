@@ -1,3 +1,4 @@
+import { machine_capacity } from '#scripts/gate/machine-capacity'
 import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
 
 // The lane-limit measurement's one table row: the ledger entries of one period
@@ -15,6 +16,9 @@ import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
 //
 // **The means take working samples only** for the same reason: the sampler runs through the nights,
 // and their idle samples would read four busy lanes as about one. Peaks and minima take every sample.
+//
+// **Swap is a rate, not a level.** A sample carries `machine_capacity`'s counter — every page swapped
+// since boot — so the swap columns are what was swapped between consecutive samples, per hour.
 
 const MS_PER_MINUTE = 60_000
 const MS_PER_HOUR = 3_600_000
@@ -37,8 +41,8 @@ const COLUMNS = [
 	'gate max (min)',
 	'load peak',
 	'load mean',
-	'swap peak (GB)',
-	'swap mean (GB)',
+	'swapped peak (GB/h)',
+	'swapped mean (GB/h)',
 	'free memory min (GB)',
 	'free memory mean (GB)',
 	'load samples',
@@ -107,6 +111,22 @@ function is_working(sample: LoadEntry): sample is WorkingEntry {
 	return (sample.lanes ?? 0) > 0
 }
 
+interface SamplePair {
+	sample: LoadEntry
+	next: LoadEntry
+}
+
+// Each sample beside the one that followed it, in time order.
+function sample_pairs(samples: ReadonlyArray<LoadEntry>): Array<SamplePair> {
+	const sorted = samples.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+
+	return sorted.slice(1).map((next, index) => ({ sample: sorted[index] ?? next, next }))
+}
+
+function elapsed_ms({ sample, next }: SamplePair): number {
+	return Date.parse(next.at) - Date.parse(sample.at)
+}
+
 function sum_hours(gaps: ReadonlyArray<number>): number | undefined {
 	const active = gaps.filter((gap) => gap <= ACTIVE_GAP_MS).reduce((sum, gap) => sum + gap, 0)
 
@@ -129,14 +149,22 @@ function gap_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 // The time from each working sample to the next sample. The cap still applies, so a sampler stopped
 // mid-run does not count its silence as work.
 function sampled_hours(samples: ReadonlyArray<LoadEntry>): number | undefined {
-	const sorted = samples.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
-	const gaps = sorted
-		.slice(1)
-		.map((next, index) => ({ sample: sorted[index] ?? next, next }))
+	const gaps = sample_pairs(samples)
 		.filter(({ sample }) => is_working(sample))
-		.map(({ sample, next }) => Date.parse(next.at) - Date.parse(sample.at))
+		.map((pair) => elapsed_ms(pair))
 
 	return sum_hours(gaps)
+}
+
+// The GB swapped per hour from one sample to the next. `swapped_mb` is a counter, so only a difference
+// says anything; a gap past `ACTIVE_GAP_MS` is a stopped sampler, whose silence is no rate.
+function swap_rate(pair: SamplePair): number | undefined {
+	const swapped = machine_capacity.swapped_between(pair.sample.swapped_mb, pair.next.swapped_mb)
+	const elapsed = elapsed_ms(pair)
+
+	if (swapped === undefined || elapsed <= 0 || elapsed > ACTIVE_GAP_MS) return undefined
+
+	return swapped / MB_PER_GB / (elapsed / MS_PER_HOUR)
 }
 
 // The hours work was under way; `undefined` when nothing leaves any active time.
@@ -172,18 +200,26 @@ function gate_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	return [cell(median(minutes)), cell(peak(minutes))]
 }
 
+function swap_cells(samples: ReadonlyArray<LoadEntry>): Array<string> {
+	const pairs = sample_pairs(samples)
+	const rates = pairs.map((pair) => swap_rate(pair)).filter(is_number)
+	const working_rates = pairs
+		.filter(({ sample }) => is_working(sample))
+		.map((pair) => swap_rate(pair))
+		.filter(is_number)
+
+	return [cell(peak(rates)), cell(mean(working_rates))]
+}
+
 function load_cells(samples: ReadonlyArray<LoadEntry>): Array<string> {
 	const working = samples.filter(is_working)
-	const swap = samples.map((sample) => sample.swap_mb).filter(is_number)
-	const working_swap = working.map((sample) => sample.swap_mb).filter(is_number)
-	const free = samples.map((sample) => sample.free_mb)
-	const working_free = working.map((sample) => sample.free_mb)
+	const free = samples.map((sample) => sample.available_mb).filter(is_number)
+	const working_free = working.map((sample) => sample.available_mb).filter(is_number)
 
 	return [
 		cell(peak(samples.map((sample) => sample.load))),
 		cell(mean(working.map((sample) => sample.load))),
-		cell(gigabytes(peak(swap))),
-		cell(gigabytes(mean(working_swap))),
+		...swap_cells(samples),
 		cell(gigabytes(lowest(free))),
 		cell(gigabytes(mean(working_free))),
 		String(samples.length),
