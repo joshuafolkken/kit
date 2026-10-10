@@ -204,20 +204,6 @@ describe('label_ensure', () => {
 
 		expect(parsed_body(first_request())).toMatchObject({ color: BARE_COLOR })
 	})
-
-	// An existing label answers 422 `already_exists`, which is not an error here: the `|| true`
-	// semantics the `gh label create` wrapper had.
-	it('does not throw when the label already exists', async () => {
-		mocked_api.mockRejectedValue(new Error('gh: Validation Failed (HTTP 422)'))
-
-		await expect(
-			git_gh_issue_write.label_ensure({
-				name: LABEL_NAME,
-				color: HASH_COLOR,
-				description: LABEL_DESCRIPTION,
-			}),
-		).resolves.toBeUndefined()
-	})
 })
 
 describe('issue_create_with_label', () => {

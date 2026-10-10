@@ -2,6 +2,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
+import { gh_failure } from './git-gh-failure'
 
 // Writing issues and labels through REST, in the return-value contracts the `gh <noun> <verb>`
 // wrappers had.
@@ -35,6 +36,8 @@ const LABELS_SEGMENT = '/labels'
 const COMMENTS_SEGMENT = '/comments'
 const CLOSED_STATE = 'closed'
 const COLOR_HASH = '#'
+const UNPROCESSABLE_STATUS = 422
+const ALREADY_EXISTS_CODE = 'already_exists'
 
 // The four writers below answered `boolean` under `gh`, and their callers read it: `epic-run.ts`
 // only reports the epic label when it was applied, `epic-relations.ts` counts the relations it
@@ -110,13 +113,23 @@ function to_label_color(color: string): string {
 	return color.startsWith(COLOR_HASH) ? color.slice(COLOR_HASH.length) : color
 }
 
+// The one failure that means the label is there: 422 with `"code":"already_exists"` in the error
+// document. The status comes from the failed request itself (`git-gh-failure.ts`) and the code from
+// the body `to_gh_error` appends, so a 422 for another reason — an invalid color — is not read as it.
+function is_label_already_exists(error: unknown): boolean {
+	if (gh_failure.failure_of(error)?.status !== UNPROCESSABLE_STATUS) return false
+
+	return error_text.message_of(error).includes(ALREADY_EXISTS_CODE)
+}
+
 // `|| true` semantics: an existing label answers 422 `already_exists`, which is not an error here.
 //
-// **Swallowing it is safe.** `POST /issues` with `labels: [...]`, and `POST /issues/{N}/labels`,
-// both **create** a label the repository does not have, with a generated color and no
-// description. So a swallowed failure here costs the label's color and
+// **Every other failure is warned about, and still not thrown.** `POST /issues` with
+// `labels: [...]`, and `POST /issues/{N}/labels`, both **create** a label the repository does not
+// have, with a generated color and no description. So a failure here costs the label's color and
 // description, never the label itself — `epic:next` and the auto-close filter on the name, and the
-// name is applied either way.
+// name is applied either way. A 401 / 403, a rate limit or a request that never arrived is named
+// rather than read as "the label already exists".
 async function label_ensure(input: {
 	name: string
 	color: string
@@ -131,8 +144,11 @@ async function label_ensure(input: {
 				description: input.description,
 			}),
 		})
-	} catch {
-		/* the label already exists */
+	} catch (error) {
+		if (is_label_already_exists(error)) return
+		const [gist = ''] = error_text.message_of(error).split('\n', 1)
+
+		console.warn(`⚠ could not create the \`${input.name}\` label — ${gist}`)
 	}
 }
 
