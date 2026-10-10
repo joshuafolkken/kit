@@ -1,5 +1,5 @@
 {
-	"version": "1.1240.0",
+	"version": "1.1370.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
