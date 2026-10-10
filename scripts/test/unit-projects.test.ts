@@ -1,4 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { describe, expect, it } from 'vitest'
@@ -97,6 +98,12 @@ describe('each project carries the per-run environment and timeout', () => {
 	// every fixture's hold, which then reads back as stale.
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session pid for %s', (name) => {
 		expect(project(name).env[agent_session_environment.AGENT_PID_KEY]).toBe('')
+	})
+
+	// joshuafolkken/kit#3623: a ship reviewer running the suite would otherwise carry its role into every
+	// cut-guard delivery fixture, which then stands down where the refusal is expected.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
+		expect(project(name).env[agent_session_role.KEY]).toBe('')
 	})
 })
 

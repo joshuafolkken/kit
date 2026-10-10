@@ -4,6 +4,7 @@ import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { agent_headless } from './agent-headless'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
+import { agent_session_role } from './agent-session-role'
 import { codex_home_source } from './codex-home-source'
 
 const OPENAI_PROVIDER = 'openai'
@@ -60,7 +61,11 @@ function build(
 ): LaunchEnvironment {
 	if (profile === undefined) return environment
 
-	const marked = { ...agent_headless.environment(), ...environment }
+	const marked = {
+		...agent_headless.environment(),
+		...agent_session_role.env_for(profile.role),
+		...environment,
+	}
 	if (profile.provider !== OPENAI_PROVIDER) return marked
 
 	const base = { ...openai_environment(), ...marked }

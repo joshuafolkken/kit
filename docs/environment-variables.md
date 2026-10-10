@@ -123,6 +123,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_LANE_AGENT_EFFORT`   | a `backlogrun` dispatch        | The effort the lane's child was launched with.                        |
 | `JOSH_AGENT_PROVIDER`      | a detached launcher            | The provider handed to a process that is not itself an agent session. |
 | `JOSH_AGENT_HEADLESS`      | every kit agent launch         | This agent session was launched by kit, so no person reads its reply. |
+| `JOSH_AGENT_ROLE`          | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut. |
 | `JOSH_RUN_HEADLESS`        | the run supervisor             | This session was launched headless by the supervisor.                 |
 | `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                  |
 | `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                    |
