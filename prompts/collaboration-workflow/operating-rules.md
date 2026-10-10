@@ -51,6 +51,11 @@ auto-merge と `completion` 通知・明示的な起動・`confirmation` 通知�
 
   **4 番目だけが復元を伴わない。1〜3 はいずれも直後に `pnpm josh stash:pop "<メッセージ>"` で復元することが手順に含まれている**（stash はリポジトリ単位の 1 本のスタックを全 work tree が共有するため、位置指定や引数なしの `git stash pop` は別のレーンが最後に積んだ stash を取り込む — メッセージで対象を特定する。joshuafolkken/kit#2050）。 回収するのは異常終了したランの置き土産であって、いま実行中のランの作業ではないから、pop して戻す先がない。**代わりに stash を子の Issue にコメントで記録する** — 前提 Issue で中断するときの stash（`prerequisite.md`）と同じく、**その記録だけが後で pop させられる唯一の手がかり**であり、記録し忘れた stash は誰にも拾われない。これら以外の場面で退避したくなったときは、実行せずに先に確認する
 
+- **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**（経緯は `docs/maintainers/operating-rules-rationale.md` → "Why a handed-over stash is popped"）
+  - **計画には復元手順としてこの 1 行だけを書く。** `git stash apply` / `git stash pop` も「drop しない」という条件も書かない
+  - **計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。** `needs-decision` では止まらない
+  - **stash を残すのは持ち主の判断だけである。** 持ち主が計画に理由を書き、ランはそこで止まって確認する
+
 - **staging・index の書き換え・`git commit` の直接実行は deny されており、deny には「そのターンでユーザーが明示指示した」という例外がない。** だから上記ケース 1 は AI 側では実行できず、ユーザー自身の端末で実行してもらう。ユーザーが明示的にコミットを指示した場合も、承認済みのコミットは `pnpm josh git` を通す（理由は `docs/maintainers/operating-rules-rationale.md` → "Why the index is the user's"）
 - index を守る deny と `pnpm josh rule:guard`（`worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行）も事故防止の実装である — 上記「指示されていない行動は取らない」→「deny と配送ガードは実装であって規則ではない」
 

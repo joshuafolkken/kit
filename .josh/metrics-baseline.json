@@ -1,18 +1,18 @@
 {
 	"scripts": {
 		"files": 1049,
-		"code_lines": 87304,
-		"comment_lines": 33539,
+		"code_lines": 87307,
+		"comment_lines": 33543,
 		"comment_ratio": 0.38
 	},
 	"rules": {
 		"files": 26,
-		"lines": 2099
+		"lines": 2105
 	},
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 459819
+		"on_demand_bytes": 460988
 	},
 	"accepted": {
 		"reason": "#3651: the provider default (DEFAULT_PROVIDER, default_notice, warn_of_default at run:wake --start, review:brief and ship --detach) and the cost guard that keeps a defaulted provider unmeasurable add 18 code lines",

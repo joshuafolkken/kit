@@ -60,3 +60,18 @@ reaches next for `git commit -a` (stage every tracked file and commit), and refu
 `git commit -m`; blocking flag by flag always left the last escape route open, so
 joshuafolkken/kit#1075 widened the deny to the whole subcommand. An approved commit goes through
 `pnpm josh git`, which spawns git from inside a node script and so is not matched.
+
+## Why a handed-over stash is popped
+
+An implementation written in conversation is sometimes stashed and handed to a run. The plan comment
+on joshuafolkken/kit#3630 restored that stash with `git stash apply` and added "the executing side
+does not drop it". The working-tree guard refuses `apply`, and the one authorized route,
+`pnpm josh stash:pop "<message>"`, drops the stash after applying it — so the lane could satisfy
+neither line, parked as `needs-decision`, and asked the owner how to apply it.
+
+The owner's answer was to pop it: the applied content lands in the working tree and is committed from
+there, so a kept stash has no use. That answer does not vary by Issue, so joshuafolkken/kit#3648
+wrote it down once — the stash rule names the route, the plan-comment rule keeps the refused forms out
+of a plan, and the guard's refusal tells a run that meets one to substitute `stash:pop` and record it
+(Tier A). Keeping the stash remains possible, but only as the owner's decision, stated with its reason
+in the plan.
