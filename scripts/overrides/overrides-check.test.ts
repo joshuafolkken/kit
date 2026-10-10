@@ -6,6 +6,7 @@ const PROCESS_EXIT_CALLED = 'process.exit called'
 const SVELTE_SNAPSHOT = '{"svelte":"^5.55.7"}'
 const PACKAGE_JSON_WITHOUT_PNPM = '{"name":"app-kit"}'
 const WORKSPACE_YAML_WITH_SVELTE = 'overrides:\n  svelte: ^5.55.7\n'
+const USAGE = 'Usage: josh overrides [--save]'
 
 const fs_mock = vi.hoisted(() => {
 	const state: {
@@ -43,7 +44,8 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 
-const { run_overrides_check } = await import('./overrides-check')
+const { writeFileSync: write_file_sync } = await import('node:fs')
+const { run_overrides_check, main } = await import('./overrides-check')
 
 beforeEach(() => {
 	vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -150,5 +152,41 @@ describe('overrides-check — overrides declared in pnpm-workspace.yaml', () => 
 		run_overrides_check(false)
 
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('1 from pnpm-workspace.yaml'))
+	})
+})
+
+// joshuafolkken/kit#3592: the flags were read by a bare `parseArgs`, so an unknown one threw
+// `ERR_PARSE_ARGS_UNKNOWN_OPTION` out of `main` instead of being refused.
+describe('overrides-check — the argument line', () => {
+	// The `process.exit` spy is one mock for the whole file, and the drift tests above already called it
+	// with 1 — uncleared, the exit code asserted here is satisfied before `main` runs.
+	beforeEach(() => {
+		vi.mocked(write_file_sync).mockClear()
+		vi.mocked(process.exit).mockClear()
+	})
+
+	it('refuses an unknown flag with usage and exit 1, writing no snapshot', () => {
+		expect(() => {
+			main(['--bogus'])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(console.error).toHaveBeenCalledWith(USAGE)
+		expect(process.exit).toHaveBeenCalledWith(1)
+		expect(write_file_sync).not.toHaveBeenCalled()
+	})
+
+	it('saves the snapshot on --save', () => {
+		expect(() => {
+			main(['--save'])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(write_file_sync).toHaveBeenCalledOnce()
+		expect(process.exit).toHaveBeenCalledWith(0)
+	})
+
+	it('compares against the snapshot when no flag is given', () => {
+		fs_mock.state.snapshot_content = SVELTE_SNAPSHOT
+		fs_mock.state.workspace_yaml = WORKSPACE_YAML_WITH_SVELTE
+		main([])
+
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('overrides unchanged'))
 	})
 })
