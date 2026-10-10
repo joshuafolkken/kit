@@ -39,7 +39,16 @@ describe('observation-ledger.md — the commit path', () => {
 
 	// joshuafolkken/kit#2919: a later append rides the pull request, and a lane's lines ride its own.
 	it('commits a later append onto the pull request and holds nothing in the primary checkout', () => {
-		expect(LEDGER).toContain("commits a line appended after the run's commit onto the pull request")
+		expect(LEDGER).toContain(
+			"commits any other line appended after the run's commit onto the pull request",
+		)
 		expect(LEDGER).toContain('Nothing is held in the primary checkout for later.')
+	})
+
+	// joshuafolkken/kit#3645: a passing later round stays off the tree, so nothing is pushed for it.
+	it('records a round that passes after the pull request opened on the Issue', () => {
+		expect(LEDGER).toContain(
+			'A review round that passes after the pull request opened is recorded on the Issue',
+		)
 	})
 })

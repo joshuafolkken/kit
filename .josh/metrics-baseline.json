@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1049,
-		"code_lines": 87287,
-		"comment_lines": 33529,
+		"code_lines": 87328,
+		"comment_lines": 33543,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -12,10 +12,10 @@
 	"guards": 8,
 	"ai_cost": {
 		"resident_bytes": 11033,
-		"on_demand_bytes": 459819
+		"on_demand_bytes": 460648
 	},
 	"accepted": {
-		"reason": "Review fix #3601: chain-rule.md states that prrun leaves the chain at the pull request (no ship, no merging followup), and jgame joins RETIRED_PHRASES",
+		"reason": "#3645: review:record gains --comment (post a passing round 2 to the Issue) and its documentation",
 		"date": "2026-10-10"
 	}
 }

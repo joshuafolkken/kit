@@ -7,8 +7,11 @@ import { observations_flush } from '#scripts/observations/observations-flush'
 
 // The residual commit path for the observation ledger. A run's appended lines
 // ride its own commit, so the ledger is usually clean by now and this
-// short-circuits; what it still catches is a line appended after that commit — a second review round's
-// record — which would otherwise stay in the working tree after the merge.
+// short-circuits; what it still catches is a line appended after that commit — an observation
+// recorded between the commit and the merge — which would otherwise stay in the working tree after
+// the merge. **A passing second review round is not one of them**: it used to
+// be the usual case, and its push restarted the pull request's CI on six lanes of fourteen in a day,
+// so `review:record --comment` now records that round on the issue and leaves the tree clean.
 //
 // **It commits onto the pull request's own branch, before the merge**. It used
 // to flush after the merge from the default branch, which a lane cannot reach, so a lane's lines
