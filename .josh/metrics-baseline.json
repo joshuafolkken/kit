@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1051,
-		"code_lines": 87526,
-		"comment_lines": 33603,
+		"code_lines": 87537,
+		"comment_lines": 33611,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 461817
 	},
 	"accepted": {
-		"reason": "#3643: the lane ledger gains dispatch and stage entries, an in-process load sampler for backlog:drive, and the per-stage table lane:stats prints",
+		"reason": "#3643 round-2 fix: the ship gate stage asks for the tree's green record so a reused gate is not timed, with its tests",
 		"date": "2026-10-10"
 	}
 }

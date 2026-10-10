@@ -1,5 +1,6 @@
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
+import { lane_sampler } from './lane-sampler'
 
 // The lane-limit measurement's one table row: the ledger entries of one period
 // reduced to throughput, gate duration and machine load, in the column order
@@ -24,11 +25,11 @@ const MS_PER_MINUTE = 60_000
 const MS_PER_HOUR = 3_600_000
 // A busy lane pool finishes a gate well within this; a longer silence is time nobody was running work.
 const ACTIVE_GAP_MS = MS_PER_HOUR
-// Half the sampler's interval: two samples closer than this are not one interval apart.
-const MIN_RATE_GAP_MS = 30_000
 const MS_PER_DAY = 86_400_000
 const MB_PER_GB = 1024
 const HALF = 2
+// Half the sampler's interval: two samples closer than this are not one interval apart.
+const MIN_RATE_GAP_MS = lane_sampler.SAMPLE_INTERVAL_MS / HALF
 const DECIMALS = 1
 const MISSING = '—'
 const CELL_SEPARATOR = ' | '

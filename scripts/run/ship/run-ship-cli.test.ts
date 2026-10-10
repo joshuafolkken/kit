@@ -41,7 +41,11 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		])
 	}
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair: scoped_mock } }
+	// No green record: the gate stage runs its checks, so no test reads this checkout's own record.
+	const gate_green = vi.fn<typeof real_scoped.is_gate_green>().mockResolvedValue(false)
+	const mocked = { scoped_gate, scoped_pair: scoped_mock, is_gate_green: gate_green }
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, ...mocked } }
 })
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever merges into the checkout it runs in.

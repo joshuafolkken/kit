@@ -180,8 +180,9 @@ function parse(argv: ReadonlyArray<string>): ShipCommand | undefined {
 // Every stage that ran is timed into the lane ledger, failed ones included — a stage that stopped the
 // ship cost the lane its time as well. The append is local and best-effort, so it adds no wait.
 //
-// **A stage that found nothing to do is not timed**: a round 2 that was not due, or a round 1 already
-// recorded, would otherwise read as a review that took a second and pull the stage's median to zero.
+// **A stage that found nothing to do is not timed**: a round 2 that was not due, a round 1 already
+// recorded, or a gate that reused its tree's green record would otherwise read as a run that took a
+// second and pull the stage's median to zero.
 async function record_timed(step: Step, issue: string, elapsed_ms: number): Promise<void> {
 	await lane_ledger.record_stage({ stage: step.stage, elapsed_ms, issue: Number(issue) })
 }

@@ -95,7 +95,8 @@ order a lane passes them, each with its median, its maximum and how many runs th
 
 **A stage nothing recorded prints `not measured`, never `0`** — a period that ran no second review
 round has no `round-2` duration, which is not a round that took no time. A stage that found nothing
-to do — a round 2 that was not due, a round 1 already recorded — writes no entry.
+to do — a round 2 that was not due, a round 1 already recorded, a gate that reused the green record
+of its tree — writes no entry.
 
 **`runs` counts entries, not lanes.** A ship relaunched after a fix runs its stages again, and a lane
 child runs the preflight once itself before the supervisor does, so a stage can hold more runs than
