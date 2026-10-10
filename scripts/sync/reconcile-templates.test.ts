@@ -23,11 +23,12 @@ const mocked = {
 	reconcile: vi.mocked(template_source_logic.reconcile),
 }
 
-const { check_drift, reconcile } = await import('./reconcile-templates')
+const { check_drift, reconcile, main } = await import('./reconcile-templates')
 
 const PROCESS_EXIT_CALLED = 'process.exit called'
 const IN_SYNC_MESSAGE = '✔ Templates are in sync with their sources.'
 const DRIFT_MESSAGE = 'drift detected'
+const USAGE = 'Usage: josh reconcile-templates [--check]'
 const RECORDED_MANIFEST: SourceManifest = { gitignore: 'abc123' }
 const COPY_PAIR: TemplateSourcePair = { template: 'templates/gitignore', source: '.gitignore' }
 const TRIPWIRE_PAIR: TemplateSourcePair = {
@@ -137,5 +138,36 @@ describe('reconcile', () => {
 			expect.stringContaining('Templates reconciled'),
 		)
 		expect(vi.mocked(console.info)).toHaveBeenCalledWith(expect.stringContaining(MANIFEST_PATH))
+	})
+})
+
+// joshuafolkken/kit#3592: the flags were read by a bare `parseArgs`, so an unknown one threw
+// `ERR_PARSE_ARGS_UNKNOWN_OPTION` out of `main` instead of being refused.
+describe('main — the argument line', () => {
+	it('refuses an unknown flag with usage and exit 1, regenerating nothing', () => {
+		expect(() => {
+			main(['--bogus'])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(USAGE)
+		expect(vi.mocked(process.exit)).toHaveBeenCalledWith(1)
+		expect(mocked.reconcile).not.toHaveBeenCalled()
+	})
+
+	it('checks for drift on --check without regenerating', () => {
+		mocked.find_copy_drift.mockReturnValue([])
+		mocked.find_tripwire_drift.mockReturnValue([])
+
+		expect(() => {
+			main(['--check'])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(IN_SYNC_MESSAGE)
+		expect(mocked.reconcile).not.toHaveBeenCalled()
+	})
+
+	it('regenerates when no flag is given', () => {
+		expect(() => {
+			main([])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(mocked.reconcile).toHaveBeenCalledOnce()
 	})
 })

@@ -656,7 +656,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "notify": [
-      "--task-type <type> --body <text>",
+      "[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]",
       "automation",
       [
         "notifications",

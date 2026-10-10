@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import { issue_cite, type CiteTarget } from './issue-cite'
 
@@ -30,6 +30,7 @@ const READ_CONCURRENCY = 8
 const TITLE_FIELD = 'title'
 const LINE_SEPARATOR = '\n'
 const USAGE = 'Usage: josh issue:cite <issue-number|owner/repo#N> [ ... ] [--repo <owner/repo>]'
+const OPTIONS = { repo: { type: 'string' } } as const
 
 const title_schema = z.looseObject({ title: z.string() })
 
@@ -115,13 +116,17 @@ function report(results: ReadonlyArray<LineResult>): number {
 	return failures.length === 0 ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+// The targets the command line names, or `undefined` for a line nobody can read — an unknown flag and
+// a `--repo` given no value are refused with the same usage a non-numeric token is.
+function read_targets(args: ReadonlyArray<string>): ReadonlyArray<CiteTarget> | undefined {
+	const parsed = cli_flags.arguments_of(args, OPTIONS)
+	if (parsed === undefined) return undefined
+
+	return parse_targets(parsed.positionals, parsed.values.repo)
+}
+
 async function run(args: ReadonlyArray<string>): Promise<number> {
-	const parsed = parseArgs({
-		args: [...args],
-		options: { repo: { type: 'string' } },
-		allowPositionals: true,
-	})
-	const targets = parse_targets(parsed.positionals, parsed.values.repo)
+	const targets = read_targets(args)
 
 	if (targets === undefined) {
 		console.error(USAGE)

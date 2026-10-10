@@ -1,8 +1,8 @@
 {
 	"scripts": {
 		"files": 1044,
-		"code_lines": 87138,
-		"comment_lines": 33381,
+		"code_lines": 87163,
+		"comment_lines": 33390,
 		"comment_ratio": 0.38
 	},
 	"rules": {
@@ -15,7 +15,7 @@
 		"on_demand_bytes": 459560
 	},
 	"accepted": {
-		"reason": "#3589: run:cut / run:carry / run:hold report the real failure — a shared run-cli-fault module separates the unresolved git directory from any other exception",
+		"reason": "Four commands gain an unknown-flag refusal branch (usage + exit 1) in place of a bare parseArgs throw, and the notify synopsis lists every flag its usage line names #3592",
 		"date": "2026-10-10"
 	}
 }
