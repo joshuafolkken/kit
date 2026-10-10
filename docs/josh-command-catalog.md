@@ -497,9 +497,9 @@ Count review findings by category from the observation ledger
 
 ### `josh review:record`
 
-> **Audience:** automation · **Side effects:** files
+> **Audience:** automation · **Side effects:** files, network
 
-`--issue <N> [<category>:<severity>:<file> ...] | --check --issue <N>`
+`--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>`
 
 Record a review round’s findings, or check a round was recorded
 

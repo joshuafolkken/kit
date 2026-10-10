@@ -369,12 +369,14 @@ describe('run_ship_review_steps.round_two_stage — the verification pass after 
 		answer_round_two('required')
 
 		expect(await round_two_code()).toBe(OK)
-		expect(commands()).toStrictEqual([DECIDE, LINT, TEST, BRIEF_TWO, ATTEST, RECORD])
+		expect(commands()).toStrictEqual([DECIDE, LINT, TEST, BRIEF_TWO, ATTEST, `${RECORD} --comment`])
 		expect(launch).toHaveBeenCalledOnce()
 		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)
 		expect(resolve_in_mock.mock.calls[0]?.[0]).toContain('round-2 verification pass')
 	})
 
+	// joshuafolkken/kit#3645: the passing round above records with `--comment` — no commit is left for
+	// its lines to ride — while a blocking one keeps the tree, where the fix's commit carries them.
 	it.each([
 		[MEDIUM, MEDIUM],
 		[`fixed ${MEDIUM}`, MEDIUM],
