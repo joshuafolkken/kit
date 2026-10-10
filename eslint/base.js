@@ -245,6 +245,16 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				// the annotation (JSDoc does not satisfy them), making them unsatisfiable there.
 				'@typescript-eslint/explicit-function-return-type': 'off',
 				'@typescript-eslint/explicit-module-boundary-types': 'off',
+				// joshuafolkken/kit#3599: `rules/import.js` switches these off because the compiler runs
+				// the same checks — which holds only for a file the compiler checks. Nothing else reads
+				// a hand-authored module's imports against the exports they name, so here they stay at
+				// the severities of the plugin's recommended preset.
+				'import-x/named': 'error',
+				'import-x/namespace': 'error',
+				'import-x/default': 'error',
+				'import-x/export': 'error',
+				'import-x/no-named-as-default': 'warn',
+				'import-x/no-named-as-default-member': 'warn',
 			},
 		},
 		// joshuafolkken/kit#1233: the test-filename bans are wired into the shared base config
