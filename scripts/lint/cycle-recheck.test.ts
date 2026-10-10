@@ -40,6 +40,11 @@ for (const [name, source] of FIXTURE_FILES) {
 
 // `no-cycle` reads the import graph, not types, so the typed parser is switched off rather than
 // handed a tsconfig project to build for three-line files.
+//
+// `disallowAutomaticSingleRunInference`: under `CI=true` typescript-eslint takes the process for one
+// CLI run, and a file parsed a second time in it gets a single-file fallback program — which a
+// type-aware rule then reads, and `sonarjs/deprecation` throws on. These cases lint the same two
+// files over and over in one process, where a lint run parses each once.
 const options: CycleRecheckOptions = {
 	cache_file,
 	patterns: ['.'],
@@ -52,6 +57,7 @@ const options: CycleRecheckOptions = {
 				tsconfig_root_dir: root,
 			}),
 			ts.configs.disableTypeChecked,
+			{ languageOptions: { parserOptions: { disallowAutomaticSingleRunInference: true } } },
 		],
 	},
 }
