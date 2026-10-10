@@ -1,6 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { detached_launch } from '#scripts/run/detached-launch'
@@ -20,6 +21,7 @@ const ISSUE = '2464'
 const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`)
 const LOG_PATH = path.join(os.tmpdir(), `josh-lane-dispatch-${ISSUE}.log`)
 const PID = 2464
+const SPAWN_FAILURE = 'spawn claude ENOENT'
 
 const launch = vi.spyOn(detached_launch, 'launch')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
@@ -70,11 +72,50 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 	})
 
 	it('records nothing when the launch started no child', async () => {
-		launch.mockReturnValue({ kind: 'failed', note: 'spawn claude ENOENT' })
+		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
 
 		const outcome = await lane_dispatch.dispatch_child(ISSUE)
 
 		expect(outcome.kind).toBe('failed')
 		expect(emit).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3651: a plain terminal names no provider, so the child starts on the default — and
+// the dispatch line is where the person who typed it reads that it did.
+describe('lane_dispatch.describe — a dispatch on the default provider', () => {
+	const DEFAULTED = 'defaulted to anthropic'
+
+	it('says the provider was defaulted when nothing named one', async () => {
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		vi.stubEnv(agent_role_profile.HANDED_PROVIDER_KEY, '')
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(outcome.kind).toBe('dispatched')
+		expect(lane_dispatch.describe(outcome, ISSUE)).toContain(DEFAULTED)
+	})
+
+	// A defaulted launch that starts nothing is where the default most needs saying: the note names a
+	// Claude Code the person never asked for.
+	it('says the provider was defaulted when the defaulted launch started no child', async () => {
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', '')
+		vi.stubEnv(agent_role_profile.HANDED_PROVIDER_KEY, '')
+		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(outcome.kind).toBe('failed')
+		expect(lane_dispatch.describe(outcome, ISSUE)).toContain(DEFAULTED)
+	})
+
+	it('says nothing of a default when a session named the provider', async () => {
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+
+		const outcome = await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(outcome.kind).toBe('dispatched')
+		expect(lane_dispatch.describe(outcome, ISSUE)).not.toContain(DEFAULTED)
 	})
 })
