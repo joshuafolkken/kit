@@ -38,9 +38,10 @@ const STEP_ORDER: ReadonlyArray<string> = [
 // registry's newest, which is what adoption is for and exactly what propagation's exact-version wait
 // exists to prevent — and an unrelated dependency's breakage would stop a release reaching a
 // consumer. Derived from `STEP_ORDER` rather than listed, so the two cannot drift apart; behind the
-// sync, so its `pnpm update` is the last writer of the lockfile: the sync can add devDependencies to
-// `package.json` without installing them, and a pull request opened over that fails CI's frozen
-// install. The related checks and the gate that follow then verify the tree as it will be committed.
+// sync, because the sync can add devDependencies to `package.json` without installing them, and a
+// pull request opened over that fails CI's frozen install — the step installs before it updates
+// (`propagate_steps`), so the lockfile is re-resolved even when `josh latest` rolls its update back.
+// The related checks and the gate that follow then verify the tree as it will be committed.
 const ADOPT_STEP_ORDER: ReadonlyArray<string> = STEP_ORDER.flatMap((step) =>
 	step === STEP_SYNC ? [step, STEP_LATEST] : step,
 )

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const execa_sync_mock = vi.hoisted(() => vi.fn().mockReturnValue({ exitCode: 0 }))
 const sync_mock = vi.hoisted(() => vi.fn())
@@ -40,6 +40,7 @@ const { latest_update } = await import('./latest-update')
 
 const PNPM = 'pnpm'
 const UPDATE_ARGS = ['update', '--latest']
+const FAILED_UPDATE_EXIT_CODE = 3
 
 describe('latest_update.run — execaSync dispatch', () => {
 	it('calls execaSync with the first argument as the command', () => {
@@ -149,6 +150,32 @@ describe('latest_update.main — preinstall sync guard', () => {
 		latest_update.main()
 
 		expect(sync_mock).not.toHaveBeenCalled()
+	})
+})
+
+// `josh latest` chains on this command's exit code, and `josh adopt` on `josh latest`'s: a failed
+// update that exited zero went on to the audit, the gate and a pull request reported as a success.
+describe('latest_update.main — exit code', () => {
+	beforeEach(() => {
+		process.exitCode = undefined
+	})
+
+	afterEach(() => {
+		process.exitCode = undefined
+	})
+
+	it('fails the command with the failing stage exit code', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: FAILED_UPDATE_EXIT_CODE })
+		latest_update.main()
+
+		expect(process.exitCode).toBe(FAILED_UPDATE_EXIT_CODE)
+	})
+
+	it('leaves the exit code alone when the update succeeds', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: 0 })
+		latest_update.main()
+
+		expect(process.exitCode).toBeUndefined()
 	})
 })
 

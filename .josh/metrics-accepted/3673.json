@@ -1,8 +1,8 @@
 {
-	"reason": "#3673 adds the josh latest step to josh adopt: one step constant, the derived adopt order and its command (+10 code lines), and names josh adopt in the dependency-update skill so its checks apply after an adoption (+14 resident, +270 on-demand bytes)",
+	"reason": "#3673 adds the josh latest step to josh adopt: one step constant, the derived adopt order and its command (+10 code lines); the round-2 review fixes add the install-then-latest script constant and the exit code a failed pnpm update now returns (+2 code lines); and it names josh adopt in the dependency-update skill so its checks apply after an adoption (+14 resident, +270 on-demand bytes)",
 	"date": "2026-10-11",
 	"growth": {
-		"scripts.code_lines": 10,
+		"scripts.code_lines": 12,
 		"ai_cost.resident_bytes": 14,
 		"ai_cost.on_demand_bytes": 270
 	}
