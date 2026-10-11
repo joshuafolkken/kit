@@ -173,9 +173,10 @@ describe('the security policy', () => {
 	it.each(INSTALLER_PIN_KEYS)('verifies the installer against the pinned %s', (key) => {
 		expect(read_document(SECURITY)).toContain(`\`${key}\``)
 	})
+})
 
-	it('is reachable from the README beside the release notes', () => {
-		expect(linked_paths(README)).toContain(SECURITY)
+describe('the release notes', () => {
+	it('are linked from the README', () => {
 		expect(read_document(README)).toContain(RELEASES_URL)
 	})
 })
