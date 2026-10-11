@@ -36,9 +36,10 @@ const BARE_ARROW_PATTERN = /→\s*(?:§\w+,\s*)?["「](?<heading>[^"「」]+)["�
 // arrow — the link text already carries the file the reference names.
 const LINK_TARGET_PATTERN = /\]\([^)\s]*\)/gu
 
-// A relative markdown link target, with an optional `#anchor`. External `https://…` links carry no
-// `.md`, so the pattern never matches them.
-const LINK_PATTERN = /\]\(([\w./-]+\.md)(?:#[\w-]+)?\)/gu
+// A relative markdown link target, with an optional `#anchor` — a page, or the image a page shows
+// (`![alt](./docs/images/board.png)`). An external `https://…` link carries a colon the target class
+// leaves out, so the pattern never matches one.
+const LINK_PATTERN = /\]\(([\w./-]+\.(?:md|png|jpe?g|gif|svg|webp))(?:#[\w-]+)?\)/gu
 
 // Filenames that appear in the documents as illustrations of the reference form itself, never as real
 // targets — the doc-section explanation cites `` `path.md` → "Heading" `` and `` `X.md` → "Heading" ``.
