@@ -13,9 +13,9 @@ import { run_headless } from './run-headless'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
-import { run_step, type StepInput } from './run-step'
+import { run_step, type ParentInput, type StepInput } from './run-step'
 
-// `josh run:step <N>` — print the run's next single action, computed from the event stream, the carry
+// `josh run:step [<N>]` — print the run's next single action, computed from the event stream, the carry
 // record and the issue state. It reads exactly those three, never the
 // conversation: the issue facts through `run:prep`'s own gather (so this and `run:next` never answer
 // from different reads), the newest event off the stream, and the carry record's kind. The reader runs
@@ -25,7 +25,8 @@ import { run_step, type StepInput } from './run-step'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh run:step <issue-number>'
+const USAGE =
+	'Usage: josh run:step [<issue-number>] — without a number it answers for the `backlogrun` carry record this session drives'
 
 interface RunReads {
 	carry_kind: CarryRead['kind']
@@ -118,7 +119,54 @@ async function gather(issue_number: string): Promise<Gathered> {
 	return { input: step_input(parts, run_reads, is_lane_child), ship_problems: parts.ship_problems }
 }
 
+const UNREADABLE_CARRY: CarryRead = { kind: 'unreadable' }
+
+// The parent's own position — a run asked about with no issue. The last event is the run's newest in
+// scope, whichever issue it names: a parent is positioned by the whole batch, never by one child.
+function parent_reads(directory: string): Pick<ParentInput, 'carry_kind' | 'last_event'> & {
+	carry: CarryRead
+} {
+	const carry = run_carry.read_carry(run_carry.carry_path(directory))
+	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
+	const last = run_event_scope.last_scoped_event(events, run_event_scope.scope_of(carry))
+
+	return { carry, carry_kind: carry.kind, last_event: last?.kind }
+}
+
+function parent_input(directory: string | undefined): ParentInput {
+	const { carry, ...position } =
+		directory === undefined
+			? { carry: UNREADABLE_CARRY, carry_kind: UNREADABLE_CARRY.kind, last_event: undefined }
+			: parent_reads(directory)
+
+	return {
+		...position,
+		is_driving: run_headless.driven_here(carry, lane_reap.own_ancestry) !== undefined,
+		is_handed_off: is_handed_off_here(carry),
+		is_at_cut_cap: carry.kind === 'carried' && run_headless.is_cut_capped(carry.carry),
+		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		is_retrospective_done: run_carry.retrospective_done_of(carry),
+		is_consumer: doctor_consumer.is_kit_consumer(find_package_directory(process.cwd())),
+		is_retrospective_enabled: run_retrospective.is_enabled(),
+	}
+}
+
+// `unknown` is the one answer with nothing to run — no record this session drives — so it exits non-zero
+// with the usage, exactly as a position missing its issue state does.
+async function run_parent(): Promise<number> {
+	const { line } = run_step.parent_action(parent_input(await run_carry.repository_directory()))
+
+	console.info(line)
+	if (line !== run_step.UNKNOWN) return SUCCESS_EXIT_CODE
+
+	console.error(USAGE)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (argv.length === 0) return await run_parent()
+
 	const issue_number = run_prep_cli.parse_number(argv)
 
 	if (issue_number === undefined) {

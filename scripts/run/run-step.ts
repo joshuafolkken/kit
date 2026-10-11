@@ -3,7 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
-import { run_retrospective } from './run-retrospective'
+import { run_retrospective, type RetrospectiveFacts } from './run-retrospective'
 
 // `josh run:step <N>` — the run's next single action, computed from three mechanical inputs and nothing
 // else, so the run's loop is not a state machine written in English that the reader rebuilds every
@@ -278,16 +278,19 @@ function closed_action(input: StepInput): StepAction {
 	}
 }
 
+// What the carry record alone says — the part an issue's position and the parent's own share.
+type CarryFacts = Pick<StepInput, 'carry_kind' | 'is_handed_off' | 'is_lane_child'>
+
 // **A cut hands the run on, so the session that took it stops** — otherwise it would go on answering
 // `wait` or the next offer after `run:carry --cut`, launching children in the same conversation. A
 // lane child never holds the carry record, so its own position is not decided here.
-function is_handed_off_parent(input: StepInput): boolean {
+function is_handed_off_parent(input: CarryFacts): boolean {
 	return input.is_handed_off && input.carry_kind === 'carried' && !input.is_lane_child
 }
 
 // The carry record's terminal answers: an unreadable record leaves the position unknowable, a handed-off
 // run is its successor's, and a spent budget is the person's call.
-function carry_terminal_action(input: StepInput): StepAction | undefined {
+function carry_terminal_action(input: CarryFacts): StepAction | undefined {
 	if (input.carry_kind === 'unreadable') return verdict(UNKNOWN)
 	if (is_handed_off_parent(input)) return verdict(STOP)
 	if (input.carry_kind === 'expired') return { kind: 'decide', line: EXPIRED_DECISION }
@@ -306,6 +309,47 @@ function terminal_action(input: StepInput): StepAction | undefined {
 	if (input.state === CLOSED) return closed_action(input)
 
 	return undefined
+}
+
+// **A run with no issue still has a next action** — the `backlogrun` parent's own position, read off the
+// carry record alone. Without it a run that dispatched nothing — one begun on an empty backlog — has no
+// position to ask about, and "the backlog is empty, so the run is over" is decided in the conversation
+// instead of by the idle watch.
+interface ParentInput extends RetrospectiveFacts {
+	carry_kind: CarryRead['kind']
+	// Whether this session declared the live record and no cut has handed it off yet.
+	is_driving: boolean
+	is_handed_off: boolean
+	is_at_cut_cap: boolean
+	last_event: string | undefined
+}
+
+// The positions the end-of-run retrospective fires at, whoever asks.
+const RETROSPECTIVE_POSITIONS: ReadonlySet<string> = new Set([KIND.DRAIN, KIND.STOP])
+
+function is_retrospective_position(input: ParentInput): boolean {
+	return RETROSPECTIVE_POSITIONS.has(input.last_event ?? '') && run_retrospective.is_owed(input)
+}
+
+// **The loop belongs to the supervisor, so a driving parent's next action is the hand-off whatever the
+// plan held.** The supervisor starts no driver while a live owner holds the record, and only the driver
+// runs the idle watch. A record at the cut cap has no cut left to take, so its session carries on.
+function driving_action(input: ParentInput): StepAction {
+	if (is_retrospective_position(input)) return command(RETROSPECTIVE_COMMAND)
+
+	return input.is_at_cut_cap ? verdict(WAIT) : command(HAND_OFF_COMMAND)
+}
+
+// A lane child's position is its issue's, and a record this session does not drive — absent, or another
+// session's — is not its to hand off: both are `unknown`, never a guess at someone else's run.
+function parent_action(input: ParentInput): StepAction {
+	if (input.is_lane_child) return verdict(UNKNOWN)
+
+	const terminal = carry_terminal_action(input)
+
+	if (terminal !== undefined) return terminal
+
+	return input.is_driving ? driving_action(input) : verdict(UNKNOWN)
 }
 
 // The one entry point: the run's next action, from the three inputs and nothing else. A terminal answer
@@ -339,8 +383,9 @@ const run_step = {
 	VOCABULARY,
 	WAIT,
 	next_action,
+	parent_action,
 	pre_verdict,
 }
 
-export type { PreInput, PreVerdict, StepAction, StepInput }
+export type { ParentInput, PreInput, PreVerdict, StepAction, StepInput }
 export { run_step }

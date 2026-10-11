@@ -13,7 +13,8 @@ that same backlog. **`--only` stops it after the named list**, draining nothing.
 
 **The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
 reads where the run is from the event stream, the carry record and the issue state, and prints the next
-single action — a runnable command, or the one point a person has to judge.
+single action — a runnable command, or the one point a person has to judge. **With no `<N>` it answers
+for the parent itself**, from the carry record alone.
 
 **A named item may be a single issue or an epic.** A single-issue item is one `fullrun`; **a named epic runs its children in
 dependency order across the free lanes, and the run does not advance to the next named item until
@@ -40,10 +41,11 @@ is still that one invocation (`backlogrun-steps.md` → "The session cut is insi
    `run:lane` in the same pass.
 5. **Named issues run first, in order** — each as a delegated `fullrun`, one at a time, then the pool;
    `--only` stops after the list.
-6. **The loop belongs to the supervisor** — `run:wake` runs `backlog:drive`, which returns a branch to
-   an AI session only when it needs judgment.
+6. **The loop belongs to the supervisor — hand it over with what the bare `pnpm josh run:step`
+   prints**, whatever the plan held: `run:wake` runs `backlog:drive`, which returns a branch to an AI
+   session only when it needs judgment.
 7. **End the record when the run ends** — `run:report`, then `run:carry --end` (or `--end --stopped
-   "<reason>"`) and `run:wake --stop`.
+   "<reason>"`) and `run:wake --stop`. An empty plan is not that end; the driver's idle watch decides it.
 
 ## The route table
 

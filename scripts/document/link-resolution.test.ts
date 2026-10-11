@@ -80,6 +80,22 @@ describe('every cross-document reference resolves', () => {
 	})
 })
 
+// An image is a link the page renders in place, so the same scan resolves it: a README that shows a
+// picture the repository does not hold is as broken as one linking a missing page.
+describe('an image is resolved as a relative link', () => {
+	it('flags a relative image that is missing and leaves an external one alone', () => {
+		const text = '![a](./docs/images/missing.png) ![b](https://example.com/badge.svg)'
+
+		expect(broken_links('README.md', text)).toStrictEqual(['./docs/images/missing.png'])
+	})
+
+	it('reads the image the README shows', () => {
+		expect(document_scan.link_targets(read_document('README.md'))).toContain(
+			'./docs/images/backlogrun-board.png',
+		)
+	})
+})
+
 describe('every reference that names no file resolves in its own document', () => {
 	const missing = '"No Such Heading Here"'
 

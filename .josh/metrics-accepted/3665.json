@@ -1,0 +1,8 @@
+{
+	"reason": "#3665 adds the bare run:step entry point (parent_action and its CLI reads) so an empty backlogrun reaches the idle watch; the code is the new position logic, and the on-demand bytes are the two skill-doc pointer lines plus the command reference paragraph",
+	"date": "2026-10-11",
+	"growth": {
+		"scripts.code_lines": 58,
+		"ai_cost.on_demand_bytes": 402
+	}
+}

@@ -52,6 +52,7 @@ vi.mock('#scripts/run/event/run-event-stream', () => ({
 			OUTAGE: 'outage',
 			CUT: 'cut',
 			STOP: 'stop',
+			DRAIN: 'drain',
 			PR_OPENED: 'pr-opened',
 			REVIEW_ROUND: 'review-round',
 			SHIP_STAGE: TRACE_KIND,
@@ -187,11 +188,12 @@ describe('run_step_cli.run', () => {
 		expect(printed()).toBe(run_step.UNKNOWN)
 	})
 
-	it('refuses a missing issue number', async () => {
+	it('refuses an argument that is not an issue number', async () => {
 		parse_number_mock.mockReturnValue(undefined)
 
-		expect(await run_step_cli.run([])).toBe(FAILURE)
+		expect(await run_step_cli.run(['abc'])).toBe(FAILURE)
 		expect(gather_mock).not.toHaveBeenCalled()
+		expect(printed()).toBe('')
 	})
 })
 

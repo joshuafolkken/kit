@@ -106,7 +106,7 @@ const BATCH_ORACLES: ReadonlyArray<DecisionOracle> = [
 	{
 		name: 'run:step',
 		decision: 'The run’s next single action, computed from the event stream, carry and issue state',
-		args: ISSUE_N_ARG,
+		args: `[${ISSUE_N_ARG}]`,
 		// The non-command answers: `run:step` prints a runnable command for a phase with one to run, and
 		// one of these verdicts otherwise. A command line is not a vocabulary token, exactly as an issue
 		// number is not one for `backlog:next`.

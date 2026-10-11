@@ -8,7 +8,7 @@ import {
 	FAIL_EXIT_CODE,
 	type BufferedProcessResult,
 } from '#scripts/lib/buffered-process'
-import { cycle_recheck, type CycleRecheckOptions } from './cycle-recheck'
+import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
 
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
@@ -17,16 +17,16 @@ const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
 // moves, with every test still green.
 const WHOLE_TREE = '.'
 const ESLINT_ARGS = ['exec', 'eslint', WHOLE_TREE, ...ESLINT_CACHE_FLAGS] as const
-const WHOLE_TREE_RECHECK: CycleRecheckOptions = {
+const WHOLE_TREE_RECHECK: CrossFileRecheckOptions = {
 	cache_file: ESLINT_CACHE_FILE,
 	patterns: [WHOLE_TREE],
 }
 
-// What one eslint run is made of: the child's arguments, and what re-reading a cached cycle report
-// (joshuafolkken/kit#3641) needs to ask the same question again — the cache file and the targets.
+// What one eslint run is made of: the child's arguments, and what re-reading a cached cross-file report
+// (`cross-file-recheck.ts`) needs to ask the same question again — the cache file and the targets.
 interface EslintRun {
 	args: ReadonlyArray<string>
-	recheck: CycleRecheckOptions
+	recheck: CrossFileRecheckOptions
 }
 
 // The finished report is re-read before it is returned, inside the lane's cache sharing, because
@@ -35,7 +35,7 @@ async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
 	return await lane_cache_run.run(eslint.recheck.cache_file, async () => {
 		const result = await buffered_process.run_buffered_process(eslint.args)
 
-		return await cycle_recheck.verify(result, eslint.recheck)
+		return await cross_file_recheck.verify(result, eslint.recheck)
 	})
 }
 
@@ -80,12 +80,13 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 // run would have skipped. The skip reasons answer nothing for a full
 // project, so the one path serves both profiles.
 //
-// A narrowed run re-reads a cached cycle report too (joshuafolkken/kit#3641): one change's files can
-// hold both sides of a cycle, and closing it by editing one leaves the other's cached report standing.
+// A narrowed run re-reads a cached cross-file report too (`cross-file-recheck.ts`): one change's
+// files can hold both the reported file and the one it reads, and fixing the second leaves the
+// first's cached report standing.
 async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,
 	eslint_args: ReadonlyArray<string>,
-	recheck: CycleRecheckOptions,
+	recheck: CrossFileRecheckOptions,
 ): Promise<number> {
 	const directory = process.cwd()
 	const [prettier, eslint] = await Promise.all([
