@@ -25,4 +25,5 @@ The agent-facing version of steps 3 and 4 is the [`dependency-update` skill](../
 - The audit fails because no scanner is installed: run [`josh audit:provision`](../josh-commands-automation.md#josh-auditprovision).
 - A bump breaks the build: fix forward. Pin back only as a last resort, record why, and track the removal.
 - `josh latest` ends with `✖ pnpm bump failed`: the dependencies were updated but pnpm was not, and the run is not recorded, so the next one retries. Under the Corepack shim, run `corepack disable pnpm` and install a standalone pnpm ([`josh latest:corepack`](../josh-commands.md#josh-latestcorepack)).
+- `josh latest` ends with `✖ Playwright browser install failed`: `@playwright/test` moved but its browsers were not downloaded, so browser tests cannot run. Rerun `josh latest` once the network allows — it retries the install for any browser still missing — or run the printed `pnpm exec playwright install …` command yourself ([`josh latest:update`](../josh-commands.md#josh-latestupdate)).
 - The wrong Node or pnpm version is in use: [troubleshooting.md](../troubleshooting.md#wrong-node-or-pnpm-version).
