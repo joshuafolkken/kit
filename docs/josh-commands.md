@@ -448,11 +448,13 @@ pnpm josh version --upgrade   # upgrade global + project to latest, then re-run 
 
 Check that every dependency range this package **publishes** still resolves for a consumer. For each `dependencies` entry it runs `pnpm view <name>@<range> version` under safe-chain's shims, so the age-filtered view a consumer installs under is observed rather than modelled. `devDependencies`, peer ranges, and non-registry protocols (`workspace:*`, `catalog:`, `file:`, `link:`, git URLs) are set aside and printed, not probed.
 
+In a package built on a `@joshuafolkken/*` toolkit it also compares each published `peerDependencies` range with that of every installed toolkit `package.json` declares, and fails when a floor sits below the toolkit's — `josh latest` never rewrites a peer range, so the declaration would otherwise keep promising versions nobody verified. Matching or narrower ranges, peers no toolkit shares, and kit's own repository report nothing.
+
 ```bash
 pnpm josh ranges
 ```
 
-**Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`).
+**Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`). A peer-floor violation names the dependency, its range, and the toolkit (name and installed version) with the range it requires; raise the `peerDependencies` floor to that range.
 
 ---
 

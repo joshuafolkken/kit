@@ -20,7 +20,8 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	// before chaining here, exactly as it already does for `latest:update`.
 	ranges: {
 		script: 'scripts/version/publishable-range-check.ts',
-		description: 'Check that every published dependency range still resolves for a consumer',
+		description:
+			'Check that every published dependency range still resolves for a consumer and no peer range falls below an installed toolkit',
 		category: 'Versioning',
 		reference: ['', 'developer', ['network']],
 	},
