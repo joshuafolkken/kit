@@ -2,6 +2,7 @@ import { read_spawn_stderr, read_spawn_stdout } from '#scripts/lib/spawn-exit'
 import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { git_utilities } from './constants'
+import { git_location_environment } from './git-location-environment'
 
 // The one place a synchronous git command is spawned from — the sync
 // counterpart of `git-spawn.ts`. Every caller here wants an answer rather than an exception, so a
@@ -51,8 +52,15 @@ function read(args: ReadonlyArray<string>, options: GitSyncOptions = {}): string
 }
 
 // The configured `origin` URL, or undefined when the repository has none.
+//
+// **The git location variables are cleared, so `cwd` is the repository that answers.** A hook exports
+// `GIT_DIR`, which beats `cwd` outright — a caller reached from inside `pre-push` would otherwise be
+// told the `origin` of the repository being pushed rather than of the directory it named.
 function origin_url(cwd: string): string | undefined {
-	return read(['config', '--get', 'remote.origin.url'], { cwd })
+	return read(['config', '--get', 'remote.origin.url'], {
+		cwd,
+		env: git_location_environment.location_free_environment(),
+	})
 }
 
 // The absolute repository (or worktree) root, asked under the C locale so a caller can tell "not a
