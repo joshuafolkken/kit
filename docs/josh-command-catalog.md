@@ -521,7 +521,7 @@ Bump package version
 
 _No arguments._
 
-Check that every published dependency range still resolves for a consumer
+Check that every published dependency range still resolves for a consumer and no peer range falls below an installed toolkit
 
 ---
 
