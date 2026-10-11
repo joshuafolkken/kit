@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { propagate_run } from '#scripts/propagate/propagate-run'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { adopt } from './adopt'
 import { adopt_logic } from './adopt-logic'
@@ -197,6 +198,33 @@ describe('adopt.run_here — a declared toolkit that fell out of the plan', () =
 
 		expect(adopt.run_here(make_partial_install(), true)).toBe(FAILURE_EXIT_CODE)
 		expect(spy.mock.calls.flat().join('\n')).toContain(APP_KIT)
+	})
+})
+
+// The dry run and the real run walk one sequence, so what the dry run lists is what will run.
+describe('adopt.run_sequence — a dry run', () => {
+	const target = { repo: `joshuafolkken/${CONSUMER}`, path: '/nowhere', state: 'ready' as const }
+
+	function dry_run_output(): string {
+		const spy = vi.spyOn(console, 'info')
+
+		expect(adopt.run_sequence(target, undefined)).toBe(SUCCESS_EXIT_CODE)
+
+		return spy.mock.calls.flat().join('\n')
+	}
+
+	it('lists josh latest among the steps it would run', () => {
+		expect(dry_run_output()).toContain(`would run ${propagate_run.STEP_LATEST}`)
+	})
+
+	it('lists every step of the adoption sequence, in order', () => {
+		const listed = dry_run_output()
+		const positions = propagate_run.ADOPT_STEP_ORDER.map((step) =>
+			listed.indexOf(`would run ${step}`),
+		)
+
+		expect(positions).not.toContain(-1)
+		expect(positions).toEqual(positions.toSorted((left, right) => left - right))
 	})
 })
 

@@ -13,6 +13,7 @@ import type { PropagateTarget } from './propagate-targets'
 const STEP_PRECHECK = 'working tree check'
 const STEP_UPGRADE = 'josh vu'
 const STEP_SYNC = 'josh sync'
+const STEP_LATEST = 'josh latest'
 const STEP_LINT_RELATED = 'related lint check'
 const STEP_TEST_RELATED = 'related test check'
 const STEP_VERIFY = 'verification gate'
@@ -32,6 +33,17 @@ const STEP_ORDER: ReadonlyArray<string> = [
 	STEP_PR,
 	STEP_RETURN,
 ]
+// The same sequence with the consumer's other dependencies, its audit and its pnpm pin brought up
+// to date after the sync. Only `josh adopt` runs it: `josh latest` moves every dependency to the
+// registry's newest, which is what adoption is for and exactly what propagation's exact-version wait
+// exists to prevent — and an unrelated dependency's breakage would stop a release reaching a
+// consumer. Derived from `STEP_ORDER` rather than listed, so the two cannot drift apart; behind the
+// sync, so its `pnpm update` is the last writer of the lockfile: the sync can add devDependencies to
+// `package.json` without installing them, and a pull request opened over that fails CI's frozen
+// install. The related checks and the gate that follow then verify the tree as it will be committed.
+const ADOPT_STEP_ORDER: ReadonlyArray<string> = STEP_ORDER.flatMap((step) =>
+	step === STEP_SYNC ? [step, STEP_LATEST] : step,
+)
 const PROPAGATED_REASON = 'opened a pull request'
 
 type RunOutcome = 'propagated' | 'failed' | 'skipped'
@@ -130,10 +142,11 @@ function run_target(
 	target: PropagateTarget,
 	run_step: RunStep,
 	success_reason: string = PROPAGATED_REASON,
+	order: ReadonlyArray<string> = STEP_ORDER,
 ): TargetResult {
 	const steps: Array<StepResult> = []
 
-	for (const step of STEP_ORDER) {
+	for (const step of order) {
 		const result = run_step(target, step)
 
 		steps.push(result)
@@ -192,11 +205,13 @@ const propagate_run = {
 	STEP_ISSUE,
 	STEP_UPGRADE,
 	STEP_SYNC,
+	STEP_LATEST,
 	STEP_LINT_RELATED,
 	STEP_TEST_RELATED,
 	STEP_VERIFY,
 	STEP_PR,
 	STEP_ORDER,
+	ADOPT_STEP_ORDER,
 	skip_reason,
 	run_target,
 	run_targets,

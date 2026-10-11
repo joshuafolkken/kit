@@ -93,6 +93,63 @@ describe('propagate_run.run_target — what the failure left behind', () => {
 	})
 })
 
+// `josh adopt` catches a consumer up on everything, so its sequence carries `josh latest`;
+// `josh propagate` carries one exact release, which `josh latest` would move past.
+describe('propagate_run.ADOPT_STEP_ORDER', () => {
+	// After the sync, so `josh latest` re-resolves the lockfile over whatever the sync added to
+	// `package.json`; before the related checks, so they verify the updated tree.
+	it('runs josh latest between the sync and the related checks', () => {
+		const order = propagate_run.ADOPT_STEP_ORDER
+		const latest = order.indexOf(propagate_run.STEP_LATEST)
+
+		expect(order[latest - 1]).toBe(propagate_run.STEP_SYNC)
+		expect(order[latest + 1]).toBe(propagate_run.STEP_LINT_RELATED)
+	})
+
+	it('is the propagation sequence with that one step added', () => {
+		const without_latest = propagate_run.ADOPT_STEP_ORDER.filter(
+			(step) => step !== propagate_run.STEP_LATEST,
+		)
+
+		expect(without_latest).toEqual([...propagate_run.STEP_ORDER])
+	})
+
+	it('leaves josh latest out of the propagation sequence', () => {
+		expect(propagate_run.STEP_ORDER).not.toContain(propagate_run.STEP_LATEST)
+	})
+})
+
+describe('propagate_run.run_target — a sequence that carries josh latest', () => {
+	it('runs every step of the order it is given', () => {
+		const result = propagate_run.run_target(
+			ready(APP_KIT),
+			all_pass,
+			propagate_run.PROPAGATED_REASON,
+			propagate_run.ADOPT_STEP_ORDER,
+		)
+
+		expect(result.outcome).toBe('propagated')
+		expect(result.steps.map((step) => step.step)).toEqual([...propagate_run.ADOPT_STEP_ORDER])
+	})
+
+	// A failed dependency update must not go on to open a pull request reported as a success.
+	it('fails at josh latest without reaching the checks, the issue or the pull request', () => {
+		const result = propagate_run.run_target(
+			ready(APP_KIT),
+			fail_step(APP_KIT, propagate_run.STEP_LATEST),
+			propagate_run.PROPAGATED_REASON,
+			propagate_run.ADOPT_STEP_ORDER,
+		)
+		const ran = result.steps.map((step) => step.step)
+
+		expect(result.outcome).toBe('failed')
+		expect(result.reason).toContain(propagate_run.STEP_LATEST)
+		expect(ran.at(-1)).toBe(propagate_run.STEP_LATEST)
+		expect(ran).not.toContain(propagate_run.STEP_ISSUE)
+		expect(ran).not.toContain(propagate_run.STEP_PR)
+	})
+})
+
 describe('propagate_run.run_target — how a failure is reported', () => {
 	it('names the failing step and its detail in the reason', () => {
 		const result = propagate_run.run_target(

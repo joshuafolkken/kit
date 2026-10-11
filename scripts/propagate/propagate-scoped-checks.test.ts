@@ -60,6 +60,7 @@ describe('running scoped checks in a consumer', () => {
 	it.each([
 		[propagate_run.STEP_LINT_RELATED, 'lint:related'],
 		[propagate_run.STEP_TEST_RELATED, 'test:related'],
+		[propagate_run.STEP_LATEST, 'latest'],
 	])('runs %s in the consumer checkout', (step, command) => {
 		answer_with(SUCCESS)
 		const result = propagate_steps.create_step_runner({ releases: [], origin: 'adopt' })(
@@ -87,4 +88,19 @@ describe('running scoped checks in a consumer', () => {
 			expect(result.is_ok).toBe(false)
 		},
 	)
+})
+
+// `josh latest` exits non-zero on a failed update or audit; the run must read that as a failure
+// rather than open a pull request over it.
+describe('running josh latest in a consumer', () => {
+	it.each([FAILURE, undefined])('reports a failed or timed-out josh latest (%s)', (exit_code) => {
+		answer_with(exit_code)
+		const result = propagate_steps.create_step_runner({ releases: [], origin: 'adopt' })(
+			CONSUMER,
+			propagate_run.STEP_LATEST,
+		)
+
+		expect(result.is_ok).toBe(false)
+		expect(result.step).toBe(propagate_run.STEP_LATEST)
+	})
 })

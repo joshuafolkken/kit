@@ -343,7 +343,7 @@ See [sync.md](./sync.md) for the full file list.
 
 ### `josh adopt`
 
-Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each one's managed files, verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](josh-commands-automation.md#josh-propagate), sharing the same step order.
+Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each toolkit's managed files, update the other dependencies with [`josh latest`](#josh-latest), verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](josh-commands-automation.md#josh-propagate), sharing its step order with `josh latest` added — propagation carries one exact release and leaves the other dependencies alone.
 
 ```bash
 pnpm josh adopt
@@ -354,9 +354,9 @@ pnpm josh adopt --dry-run # report the steps without touching anything
 
 - `--dry-run` — report the plan without writing.
 
-Steps, in this repository's directory: working-tree check, `pnpm add -D <toolkit>@latest` (once per installed toolkit, base tier first), `pnpm josh sync` per toolkit's own CLI, verification gate ([`josh gate`](#josh-gate)), open issue, `pnpm josh git`, return to default branch.
+Steps, in this repository's directory: working-tree check, `pnpm add -D <toolkit>@latest` (once per installed toolkit, base tier first), `pnpm josh sync` per toolkit's own CLI, `pnpm josh latest` (the other dependencies, the audit and the pnpm pin — after the sync, so the lockfile is re-resolved over anything the sync added to `package.json`), verification gate ([`josh gate`](#josh-gate)), open issue, `pnpm josh git`, return to default branch.
 
-**Output / exit codes:** exits `0` on a skip (no toolkit declared, or all current with no file changed). Refused inside kit's own repository, when a runnable toolkit is missing or declared under `dependencies`, or when `@joshuafolkken/kit` is not a direct dependency. Stops at the open pull request — merging is [`josh followup`](josh-commands-automation.md#josh-followup)'s job.
+**Output / exit codes:** exits `0` on a skip (no toolkit declared, or all current with no file changed). A failing step — `josh latest` included — exits non-zero and opens no pull request. Refused inside kit's own repository, when a runnable toolkit is missing or declared under `dependencies`, or when `@joshuafolkken/kit` is not a direct dependency. Stops at the open pull request — merging is [`josh followup`](josh-commands-automation.md#josh-followup)'s job.
 
 ---
 

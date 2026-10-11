@@ -22,7 +22,7 @@ const KIT = '@joshuafolkken/kit'
 const APP_KIT = '@joshuafolkken/app-kit'
 const VERSION = '1.111.0'
 const LATEST = 'latest'
-const ADOPT_ORIGIN = 'Opened by `josh adopt` in this repository.'
+const PLAN_ORIGIN = 'Opened by `josh adopt` in this repository.'
 const TARGET: PropagateTarget = {
 	repo: 'joshuafolkken/app-kit',
 	path: '/Users/example/Development/app-kit',
@@ -301,7 +301,7 @@ const PLAN = {
 		{ package_name: KIT, version: LATEST, bin_name: 'josh' },
 		{ package_name: APP_KIT, version: LATEST, bin_name: 'josh-app' },
 	],
-	origin: ADOPT_ORIGIN,
+	origin: PLAN_ORIGIN,
 }
 
 describe('propagate_steps — a plan repeats the upgrade and the sync per release', () => {
@@ -346,7 +346,7 @@ describe('propagate_steps — one issue names every release the plan carries', (
 
 		expect(body).toContain(`\`${KIT}@${LATEST}\``)
 		expect(body).toContain(`\`${APP_KIT}@${LATEST}\``)
-		expect(body).toContain(ADOPT_ORIGIN)
+		expect(body).toContain(PLAN_ORIGIN)
 	})
 
 	// `josh git` refuses an issue with no release classification (joshuafolkken/kit#2858).

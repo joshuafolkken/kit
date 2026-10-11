@@ -13,9 +13,11 @@ import { adopt_toolkits } from './adopt-toolkits'
 //
 // It is `josh propagate` seen from the other end: propagation stands in the supplier and pushes one
 // released version out to every consumer, adoption stands in the consumer and pulls whatever is
-// newest in. The step sequence is literally the same one — `propagate_run.STEP_ORDER`, run through
-// `propagate_run.run_target` — so the working-tree pre-check, the ordering and the return to the
-// default branch cannot drift between the two.
+// newest in. The step sequence is the same one with `josh latest` added — `propagate_run
+// .ADOPT_STEP_ORDER`, derived from `STEP_ORDER` and run through `propagate_run.run_target` — so the
+// working-tree pre-check, the ordering and the return to the default branch cannot drift between the
+// two. `josh latest` is adoption's alone: catching a consumer up means its other dependencies and its
+// pnpm pin too, in the same pull request, where propagation carries one exact release and nothing else.
 //
 // It stops at the open pull request. Merging is what `pnpm josh followup` does, under an
 // authorization a CLI does not have.
@@ -62,7 +64,7 @@ function run_sequence(target: PropagateTarget, plan: ReleasePlan | undefined): n
 		plan === undefined ? propagate_steps.describe_step : propagate_steps.create_step_runner(plan)
 	const reason = plan === undefined ? DRY_RUN_REASON : propagate_run.PROPAGATED_REASON
 
-	return report(propagate_run.run_target(target, step, reason))
+	return report(propagate_run.run_target(target, step, reason, propagate_run.ADOPT_STEP_ORDER))
 }
 
 // A declared toolkit that cannot be carried stops the run, whichever of the two ways it fell out —
@@ -158,6 +160,7 @@ const adopt = {
 	KNOWN_FLAGS,
 	NOTHING_TO_ADOPT,
 	parse_options,
+	run_sequence,
 	run_here,
 	run,
 }
