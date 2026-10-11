@@ -125,7 +125,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Print the run’s next single action, computed from the event stream, carry record and issue state',
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network', 'files']],
+		reference: ['[<issue>]', 'automation', ['network', 'files']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

@@ -1519,7 +1519,7 @@ Bundle a run’s read-only status: issue state, cost verdict, carry counters
 
 > **Audience:** automation · **Side effects:** network, files
 
-`<issue>`
+`[<issue>]`
 
 Print the run’s next single action, computed from the event stream, carry record and issue state
 
