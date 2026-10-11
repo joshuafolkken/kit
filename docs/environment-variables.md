@@ -7,7 +7,7 @@ Only these load `.env` themselves, and only when it exists:
 - **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
 - **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:sample`, `josh lane:stats`.
-- **Setup** — `josh doctor`, `josh latest:scope`, `josh port`, `josh session:lang`.
+- **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.
 - **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
 - `playwright.config.ts`.
 
@@ -89,6 +89,7 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its version on npm ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                     |
 | `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` | No       | 30 minutes     | How long `josh release` watches for its GitHub Release ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                     |
 | `JOSH_LATEST_MAX_AGE_HOURS`                   | No       | `12`           | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)).                                                           |
+| `JOSH_PLAYWRIGHT_BROWSERS`                    | No       | `chromium`     | The browsers `josh latest:update` installs after it moves `@playwright/test`, space-separated ([`josh latest:update`](./josh-commands.md#josh-latestupdate)).                                                              |
 | `JOSH_METRICS_BASE`                           | No       | the merge-base | The commit `josh metrics` measures the totals from, where no merge-base can be asked for — kit's CI names `HEAD^1`. A name that resolves to no commit fails the check ([`josh metrics`](./josh-commands.md#josh-metrics)). |
 
 ### Git hooks
