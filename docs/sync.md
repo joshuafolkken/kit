@@ -14,7 +14,7 @@ Unlike `josh init` (which skips existing files), `josh sync` is designed for kee
 
 ### AI files (overwritten)
 
-These files are copied verbatim from the package, with one path transformation applied (see below). `CLAUDE.md` is not overwritten: sync only ensures its bootstrap line and package import, keeping your additions (see [Path transformation](#path-transformation)).
+These files are copied verbatim from the package, with one path transformation applied (see below). `CLAUDE.md` is not overwritten: sync only ensures its bootstrap line and package import, keeping your additions (see [Path transformation](#path-transformation)). `SECURITY.md` is not kit's own file either: it is written from a template with your repository's `owner/repo` — read from the Git `origin` — filled into the advisory and release links, and it is skipped with a warning when `origin` is not a GitHub repository. If an earlier sync left kit's own policy there, the warning says that file is stale: it still sends reports to kit, so replace it with your own policy or delete it.
 
 ```text
 AGENTS.md           GEMINI.md

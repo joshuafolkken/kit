@@ -16,6 +16,7 @@ import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
 import type { ProjectShape } from './project-profile'
+import { security_policy } from './security-policy'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CLAUDE_MD_FILENAME = 'CLAUDE.md'
@@ -23,7 +24,7 @@ const BASIC_CLAUDE_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.
 const PRETTIER_IGNORE = '.prettierignore'
 const GIT_ATTRIBUTES = '.gitattributes'
 const CODE_OF_CONDUCT = 'CODE_OF_CONDUCT.md'
-const SECURITY_MD = 'SECURITY.md'
+const { SECURITY_MD } = security_policy
 const BASIC_AI_FILES = [
 	'AGENTS.md',
 	'GEMINI.md',
@@ -37,6 +38,10 @@ const BASIC_AI_FILES = [
 const BASIC_SOURCES: Readonly<Record<string, string>> = {
 	[PRETTIER_IGNORE]: 'templates/prettierignore.basic',
 	[WORKSPACE_YAML]: 'templates/pnpm-workspace.basic.yaml',
+}
+// Written from a template of the consumer's own on every profile, not from kit's same-named file.
+const CONSUMER_SOURCES: Readonly<Record<string, string>> = {
+	[SECURITY_MD]: security_policy.SECURITY_TEMPLATE,
 }
 const GITHUB_FILES = new Set([CODE_OF_CONDUCT, SECURITY_MD])
 const BASIC_POINTER_MAPPING = { src: 'templates/cursorrules.basic', dest: '.cursorrules' }
@@ -143,14 +148,16 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 }
 
 // The package file an AI file is copied from: a basic project gets its own template for a few of
-// them, every other file is copied from the path it is written to.
+// them, a few are a consumer template on every profile, and every other file is copied from the
+// path it is written to.
 function ai_file_source(filename: string, shape?: ProjectShape): string {
 	const basic_source = shape?.profile === 'basic' ? BASIC_SOURCES[filename] : undefined
 
-	return basic_source ?? filename
+	return basic_source ?? CONSUMER_SOURCES[filename] ?? filename
 }
 
 function did_skip_ai_file_copy(filename: string, shape?: ProjectShape): boolean {
+	if (security_policy.did_skip_unresolved(filename, PROJECT_ROOT)) return false
 	const source_path = package_path(ai_file_source(filename, shape))
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
