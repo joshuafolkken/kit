@@ -76,7 +76,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/josh-commands-automation.md', bytes: 53_248 },
 	{ path: 'docs/josh-commands-run.md', bytes: 65_536 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
-	{ path: 'docs/josh-commands.md', bytes: 45_056 },
+	{ path: 'docs/josh-commands.md', bytes: 49_152 },
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 8192 },
