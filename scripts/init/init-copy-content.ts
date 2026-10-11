@@ -5,6 +5,7 @@ import { claude_kit_only_settings } from './claude-kit-only-settings'
 import { claude_plugin_config } from './claude-plugin-config'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { init_logic } from './init-logic'
+import { security_policy } from './security-policy'
 
 /**
  * The single transform applied to every file kit copies verbatim into a consumer
@@ -29,6 +30,10 @@ import { init_logic } from './init-logic'
  * Keeping both on this one function is the same guarantee as the workflow passes — a copy path that
  * skipped the plugin block would ship a settings file that never enables the plugin, and one that
  * skipped the rewrite would leave every consumer hook slower than it has to be.
+ *
+ * The consumer's `SECURITY.md` gets one further pass: the repository it lands in is filled into the
+ * template, so its advisory and release links name that repository and not kit (see
+ * security-policy.ts).
  */
 function transform_copied_content(destination_path: string, content: string): string {
 	const with_paths = init_logic.transform_distributed_paths(content)
@@ -47,10 +52,12 @@ function transform_copied_content(destination_path: string, content: string): st
 		with_kit_only_stripped,
 	)
 
-	return hook_command_rewrite.apply_hook_command_rewrite_for_destination(
+	const with_hooks = hook_command_rewrite.apply_hook_command_rewrite_for_destination(
 		destination_path,
 		with_plugin,
 	)
+
+	return security_policy.apply_repository_for_destination(destination_path, with_hooks)
 }
 
 export { transform_copied_content }

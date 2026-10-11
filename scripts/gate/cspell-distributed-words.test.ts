@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
+import { init_ai_copy } from '#scripts/init/init-ai-copy'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { execaSync } from 'execa'
@@ -32,11 +33,13 @@ const CSPELL_FLAGS: ReadonlyArray<string> = [
 
 // `josh init` / `josh sync` write all of these into the consumer tree — verbatim copies, renamed
 // copies, and the rendered sonar template — so reading the lists back from init-logic keeps the
-// guard covering anything added to the distribution later. The gitignore template is deliberately
+// guard covering anything added to the distribution later. Each file is read from the source the
+// copy reads, not from its own name: a consumer's `SECURITY.md` is written from a template, and
+// kit's same-named file is not what reaches them. The gitignore template is deliberately
 // absent: the distributed `ignorePaths` drops `**/.gitignore`, so a consumer never spell-checks
 // the file it becomes.
 const DISTRIBUTED_FILES: ReadonlyArray<string> = [
-	...init_logic.get_ai_copy_files(),
+	...init_logic.get_ai_copy_files().map((filename) => init_ai_copy.ai_file_source(filename)),
 	...init_logic.get_ai_copy_file_mappings().map((mapping) => mapping.src),
 	init_logic.get_sonar_template_source(),
 ]

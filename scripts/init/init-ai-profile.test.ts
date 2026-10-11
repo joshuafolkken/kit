@@ -42,4 +42,12 @@ describe('profile-specific AI files', () => {
 		expect(files).not.toContain(GIT_ATTRIBUTES)
 		expect(files).not.toContain(SECURITY_MD)
 	})
+
+	it('writes SECURITY.md from the consumer template on every profile', () => {
+		const template = 'templates/SECURITY.md'
+
+		expect(init_ai_copy.ai_file_source(SECURITY_MD)).toBe(template)
+		expect(init_ai_copy.ai_file_source(SECURITY_MD, BASIC_SHAPE)).toBe(template)
+		expect(init_ai_copy.ai_file_source('AGENTS.md')).toBe('AGENTS.md')
+	})
 })
