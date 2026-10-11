@@ -11,12 +11,12 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
 	},
 }))
-vi.mock('./cycle-recheck', () => ({
-	cycle_recheck: { verify: vi.fn(async (result: unknown) => await result) },
+vi.mock('./cross-file-recheck', () => ({
+	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
 }))
 
-const { cycle_recheck } = await import('./cycle-recheck')
-const mocked_verify = vi.mocked(cycle_recheck.verify)
+const { cross_file_recheck } = await import('./cross-file-recheck')
+const mocked_verify = vi.mocked(cross_file_recheck.verify)
 const { lint_parallel } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
@@ -87,9 +87,9 @@ describe('run_lint_parallel_checks', () => {
 	})
 })
 
-// joshuafolkken/kit#3641: the verdict the run exits on is the re-read one, so a cached cycle report
+// joshuafolkken/kit#3641: the verdict the run exits on is the re-read one, so a cached cross-file report
 // the re-reading withdrew does not fail the lint.
-describe('run_lint_parallel_checks — the cycle recheck', () => {
+describe('run_lint_parallel_checks — the cross-file recheck', () => {
 	it('exits on the eslint report the recheck returns', async () => {
 		mock_exit_codes(0, 1)
 		mocked_verify.mockResolvedValueOnce({ output: '', exit_code: 0, elapsed_ms: 0 })
@@ -120,9 +120,9 @@ describe('run_lint_checks', () => {
 		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(eslint_args)
 	})
 
-	// One change's files can hold both sides of a cycle, so a narrowed run's cached cycle report is
+	// One change's files can hold both sides of a cycle, so a narrowed run's cached report is
 	// re-read over the targets and the cache file that run used, not the whole tree's.
-	it('re-reads a narrowed run through the cycle recheck it was given', async () => {
+	it('re-reads a narrowed run through the cross-file recheck it was given', async () => {
 		mock_exit_codes(0, 1)
 		mocked_verify.mockResolvedValueOnce({ output: '', exit_code: 0, elapsed_ms: 0 })
 
