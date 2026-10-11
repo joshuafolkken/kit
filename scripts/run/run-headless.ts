@@ -123,6 +123,7 @@ async function is_backlog_parent(
 const run_headless = {
 	HEADLESS_ENV_KEY,
 	current_carry,
+	driven_here,
 	driving_carry,
 	environment,
 	is_backlog_parent,

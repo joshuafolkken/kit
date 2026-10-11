@@ -230,6 +230,12 @@ re-decides: a merged child's outcome stays `run:merge`'s, the next issue `backlo
 is now its degenerate form — the pre-implementation position mapped to prose over the one shared
 mapping, so there is no second implementation.
 
+**With no issue number it answers for the `backlogrun` parent**, from the carry record alone: `run:carry
+--cut` for the live record this session drives — whatever the plan held, an empty backlog included, so
+the supervisor's driver runs the idle watch — `pnpm josh retrospective` at a drain that owes one, `wait`
+at the cut cap, `stop` once the session has handed the record off, and `unknown` (exit 1, with the usage
+on stderr) in a lane child or when no record is this session's.
+
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the one action line.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an

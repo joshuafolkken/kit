@@ -70,7 +70,7 @@ and `--filed 1`, and **`--cut` is the session's last write**.
 
 | It answers | What the run does |
 | --- | --- |
-| `began` | Report the plan and run the decision pass |
+| `began` | Report the plan and run the decision pass, then run what the bare `pnpm josh run:step` prints — an empty plan or a `none` from `backlog:next` included, which the driver's idle watch ends, never the session |
 | `resumed` | Take the budget from `--json`, report the plan again, read `backlogrun-progress.md` → "Resuming after a cut" |
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
