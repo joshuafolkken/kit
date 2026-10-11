@@ -1,0 +1,7 @@
+{
+	"reason": "josh latest:update installs the matching Playwright browsers after a version move and retries browsers an earlier failed install left missing (#3675): one new module with its dry-run presence check, plus its wiring",
+	"date": "2026-10-11",
+	"growth": {
+		"scripts.code_lines": 66
+	}
+}

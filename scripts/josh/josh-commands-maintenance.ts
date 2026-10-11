@@ -80,6 +80,9 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Update all dependencies to latest',
 		category: 'Maintenance',
 		reference: ['', 'developer', ['files', 'network']],
+		// `JOSH_PLAYWRIGHT_BROWSERS` widens the browsers a Playwright bump installs, and a project
+		// keeps that setting in its `.env`.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
