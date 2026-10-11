@@ -26,11 +26,16 @@ const POST_CUT_CONTEXT = 60_000
 const EXPECTED_REMAINING_REQUESTS = 10
 
 // The price of a dropped token relative to a rewritten one, from `cost-pricing.ts`. A cache read bills
-// `CACHE_READ_MULTIPLIER` of base input and a 5-minute cache write `CACHE_WRITE_5M_MULTIPLIER`, so a
-// preamble rewrite costs this many per-request cache reads. The base input rate is common to both and
-// cancels, which is why only the ratio appears.
+// `DEFAULT_CACHE_READ_MULTIPLIER` of base input and a 5-minute cache write `CACHE_WRITE_5M_MULTIPLIER`,
+// so a preamble rewrite costs this many per-request cache reads. The base input rate is common to both
+// and cancels, which is why only the ratio appears.
+//
+// **The standard cache-read rate, deliberately, not the running model's.** Opus 5.5 reads cache at
+// 0.05x and Fable 5.1 at 0.025x, which would move the threshold from 135,000 to 210,000 and 360,000 —
+// outside the 100k–200k band the cut was validated in. That changes when a cut fires, a decision that
+// needs a lane measurement of its own rather than arriving as a side effect of a corrected price list.
 function write_over_read(): number {
-	return cost_pricing.CACHE_WRITE_5M_MULTIPLIER / cost_pricing.CACHE_READ_MULTIPLIER
+	return cost_pricing.CACHE_WRITE_5M_MULTIPLIER / cost_pricing.DEFAULT_CACHE_READ_MULTIPLIER
 }
 
 // The current per-request context at which a cut breaks even over exactly `remaining` requests. The

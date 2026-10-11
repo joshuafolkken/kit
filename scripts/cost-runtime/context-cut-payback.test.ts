@@ -72,7 +72,8 @@ describe('context_cut_payback reads the cache multipliers from cost-pricing', ()
 	// No second price list: the break-even is the write/read ratio scaled by the post-cut floor, so
 	// rebuilding it from `cost-pricing.ts` reproduces the boundary to the token.
 	it('reconstructs the break-even context from the pricing multipliers', () => {
-		const ratio = cost_pricing.CACHE_WRITE_5M_MULTIPLIER / cost_pricing.CACHE_READ_MULTIPLIER
+		const ratio =
+			cost_pricing.CACHE_WRITE_5M_MULTIPLIER / cost_pricing.DEFAULT_CACHE_READ_MULTIPLIER
 		const expected = Math.round(POST * (1 + ratio / HORIZON))
 
 		expect(context_cut_payback.break_even_context(HORIZON)).toBe(expected)
