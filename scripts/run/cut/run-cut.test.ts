@@ -118,7 +118,7 @@ describe('a cut written by one process and read by the next', () => {
 	})
 })
 
-describe('the whole-run bound', () => {
+describe('the cut record’s own age bound', () => {
 	it('is spent once the record is older than the bound', () => {
 		begun()
 

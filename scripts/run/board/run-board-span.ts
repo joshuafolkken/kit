@@ -28,7 +28,6 @@ function ended_span(ended: EndedRun | undefined): BoardSpan | undefined {
 }
 
 // The running run wins over the ended one, so a run that begins replaces the finished board at once.
-// An expired carry is still the running run's budget spent, not a run that ended, so it draws nothing.
 function span_of(read: CarryRead, ended: EndedRun | undefined): BoardSpan | undefined {
 	if (read.kind !== 'carried') return read.kind === 'none' ? ended_span(ended) : undefined
 

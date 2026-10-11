@@ -28,7 +28,7 @@ const STOP_RECOVERY =
 // nothing readable there is no run this can honestly say stopped.
 function plan(read: CarryRead, reason: string | undefined): StopNotice | undefined {
 	if (reason === undefined || reason.length === 0) return undefined
-	if (read.kind !== 'carried' && read.kind !== 'expired') return undefined
+	if (read.kind !== 'carried') return undefined
 
 	return { reason }
 }

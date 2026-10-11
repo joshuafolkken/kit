@@ -37,7 +37,8 @@ const INVOCATION = 'backlogrun --max 5'
 const OTHER_INVOCATION = 'backlogrun --max 10 --idle 30'
 const RETROSPECTIVE = '--retrospective'
 const SUMMARY = '--summary'
-const LONG_AGO = new Date(Date.now() - run_carry.CARRY_MAX_AGE_MS * 2)
+// A start far more than eight hours ago: the age that used to expire a record (joshuafolkken/kit#3687).
+const LONG_AGO = new Date('2026-09-01T00:00:00.000Z')
 const START = new Date('2026-09-11T00:00:00.000Z')
 // The opening list, pinned: it is what a named-issue `backlogrun` writes to `--begin` at every cut,
 // including the one the successor makes (joshuafolkken/kit#1774, folded in by joshuafolkken/kit#1984).
@@ -147,33 +148,38 @@ describe('who a standing record belongs to', () => {
 })
 
 describe('beginning a run over a record that is already there', () => {
-	it('replaces a record whose whole-run bound is spent', async () => {
+	// joshuafolkken/kit#3687: a record older than eight hours used to be replaced by `--begin`. It has no
+	// expiry now, so an old record no cut handed off stands exactly as a young one does — a person
+	// resumes or ends it, and `--begin` never deletes a run on its age.
+	it('never replaces a standing record on its age', async () => {
 		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 
-		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
-		expect(out).toStrictEqual([run_carry_cli.BEGAN_VERDICT])
-		expect(run_carry.read_carry(target()).kind).toBe('carried')
+		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(1)
+		expect(out).toStrictEqual([run_carry_cli.STANDING_VERDICT])
+		expect(run_carry.read_carry(target())).toMatchObject({
+			carry: { started_at: LONG_AGO.toISOString() },
+		})
 	})
 
-	// The bound ends *that* run. Replacing a spent record a live parent is still counting into would
-	// delete its budget and answer `began` — the two-parents defect, one branch over.
-	it.skipIf(!has_owner_probe)('refuses a spent record whose owner is still running', async () => {
+	// Replacing an old record a live parent is still counting into would delete its budget and answer
+	// `began` — the two-parents defect, one branch over.
+	it.skipIf(!has_owner_probe)('refuses an old record whose owner is still running', async () => {
 		run_carry.begin_carry(target(), INVOCATION, run_carry.owner_of(process.pid), LONG_AGO)
 
 		expect(await run_carry_cli.run(['--begin', INVOCATION, '--owner', String(DEAD_PID)])).toBe(1)
 		expect(out).toStrictEqual([run_carry_cli.BUSY_VERDICT])
-		expect(run_carry.read_carry(target()).kind).toBe('expired')
+		expect(run_carry.read_carry(target()).kind).toBe('carried')
 	})
 
-	// A hand-off makes the resumption the same run, so its spent bound is this session's. Replaced
-	// here, `started_at` would come back as now and `backlog:budget --started` would never end the run.
-	it('answers expired for a spent record its own cut handed off, keeping its start time', async () => {
-		const spent = run_carry.fresh_carry(INVOCATION, run_carry.NO_OWNER, LONG_AGO)
+	// A hand-off makes the resumption the same run however long ago it started, and it keeps the start
+	// the first session wrote.
+	it('resumes an old record its own cut handed off, keeping its start time', async () => {
+		const old = run_carry.fresh_carry(INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 
-		run_carry.apply_change(target(), spent, { cuts: 1 })
+		run_carry.apply_change(target(), old, { cuts: 1 })
 
 		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
-		expect(out).toStrictEqual([run_carry_cli.EXPIRED_VERDICT])
+		expect(out).toStrictEqual([run_carry_cli.RESUMED_VERDICT])
 		expect(run_carry.read_carry(target())).toMatchObject({
 			carry: { started_at: LONG_AGO.toISOString() },
 		})
@@ -255,11 +261,11 @@ describe('counting into a carried run', () => {
 		expect(out).toStrictEqual([run_carry_cli.NONE_VERDICT])
 	})
 
-	it('answers expired once the bound is spent, without losing the count', async () => {
+	it('counts into a record older than eight hours as into any other', async () => {
 		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 
 		expect(await run_carry_cli.run(['--merged', '1'])).toBe(0)
-		expect(out).toStrictEqual([run_carry_cli.EXPIRED_VERDICT])
+		expect(out).toStrictEqual([run_carry_cli.COUNTED_VERDICT])
 	})
 })
 
@@ -369,8 +375,8 @@ describe('a named-issue backlogrun carried across a session cut', () => {
 		expect(run_carry_cli_fixture.last_json(out).remaining).toStrictEqual([1749, 1759])
 	})
 
-	// The whole-run bound belongs to the record, so the resumption keeps the start the first session
-	// wrote rather than beginning the eight hours again.
+	// The run's clock belongs to the record, so the resumption keeps the start the first session wrote
+	// rather than beginning it again.
 	it('keeps the start time the first session recorded', async () => {
 		run_carry.begin_carry(target(), NAMED, run_carry.NO_OWNER, START)
 		await run_carry_cli.run(['--cut'])

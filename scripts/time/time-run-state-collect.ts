@@ -16,14 +16,10 @@ import { time_run_state, type RunStateFacts, type WhiffSession } from './time-ru
 
 const NO_ACTIVITY = undefined
 
-// A carried or expired record carries a `RunCarry`; the two other kinds carry none. Reading the owner
-// liveness needs that record, so it is `false` wherever there is nothing to test.
+// Only a carried record carries a `RunCarry`. Reading the owner liveness needs that record, so it is
+// `false` wherever there is nothing to test.
 function owner_live_of(carry: CarryRead): boolean {
-	if (carry.kind === 'carried' || carry.kind === 'expired') {
-		return run_carry.is_owner_live(carry.carry)
-	}
-
-	return false
+	return carry.kind === 'carried' && run_carry.is_owner_live(carry.carry)
 }
 
 // The most recent transcript touch across the checkout, which stands in for "last activity" — a

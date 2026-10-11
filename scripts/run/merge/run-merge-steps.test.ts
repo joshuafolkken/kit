@@ -158,12 +158,6 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 
 		expect(await run_merge_steps.refused_carry(CONTEXT)).toBeUndefined()
 	})
-
-	it('do_merged: refuses an expired record whose budget was handed off', async () => {
-		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'expired', carry: HANDED_OFF_CARRY })
-
-		expect(await run_merge_steps.do_merged(CONTEXT)).toStrictEqual(HANDED_OFF_CARRY)
-	})
 })
 
 // joshuafolkken/kit#2476: the merged path removed a lane by force while it still held work the child had

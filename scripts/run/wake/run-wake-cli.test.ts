@@ -342,12 +342,11 @@ describe('josh run:wake --list — what a stalled cut looks like', () => {
 })
 
 // joshuafolkken/kit#1746. `backlogrun.md` promises that a failure is visible rather than silent, and
-// only one of the five reasons a supervisor can stop on was wired to the notification — so a run left
-// asleep by an expired or unreadable carry record reached nobody at all.
+// only one of the reasons a supervisor can stop on was wired to the notification — so a run left
+// asleep by an unreadable carry record reached nobody at all.
 describe('josh run:wake — which stops reach a person', () => {
 	it('warns on the stops that leave a carried run with nobody watching it', () => {
 		expect(run_wake_cli.stop_body('failed')).toBeDefined()
-		expect(run_wake_cli.stop_body('expired')).toBeDefined()
 		expect(run_wake_cli.stop_body('unreadable')).toBeDefined()
 	})
 

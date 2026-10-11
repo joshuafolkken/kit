@@ -13,7 +13,7 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 const { minute_of } = run_board_labels
 const { WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
-const RUNNING_CLOCK = `⏱ 30:00  ⌛ 7h30m  ${MACHINE_UNKNOWN}`
+const RUNNING_CLOCK = `⏱ 0:30:00  ${MACHINE_UNKNOWN}`
 const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = backlog_budget.MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
@@ -87,7 +87,7 @@ describe('run_board_header.header_lines state', () => {
 
 		expect(lines_of(board)).toStrictEqual([
 			`■ backlogrun  ✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`⏱ 90:00  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
+			`⏱ 1:30:00  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
 		])
 	})
 
@@ -97,7 +97,7 @@ describe('run_board_header.header_lines state', () => {
 })
 
 describe('run_board_header.header_lines shape', () => {
-	it('draws the progress then the heartbeat on the state line, the elapsed and the time left on the clock line', () => {
+	it('draws the progress then the heartbeat on the state line, the run’s age on the clock line', () => {
 		const activity = { last_event_ms: NOW - MINUTE, idle: undefined, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
@@ -126,7 +126,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(clock_line_of(header({ machine }))).toBe(
-			'⏱ 30:00  ⌛ 7h30m  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────',
+			'⏱ 0:30:00  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────',
 		)
 	})
 
@@ -167,9 +167,7 @@ describe('run_board_header.header_lines chat', () => {
 			memory_pressure: undefined,
 		}
 
-		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe(
-			'⏱ 30:00  ⌛ 7h30m  🧠  37% ■■■■──────',
-		)
+		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe('⏱ 0:30:00  🧠  37% ■■■■──────')
 	})
 })
 

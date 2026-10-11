@@ -9,7 +9,7 @@ import { z } from 'zod'
 
 // The process outside the conversation that starts the next session after a `backlogrun` cut.
 // Whether to wake is the carry record's answer, never a judgement: `carried` and handed off wakes;
-// `none`, `expired` (the whole-run bound) and `unreadable` stop. A hand-off is set by `run:carry --cut`,
+// `none` and `unreadable` stop. A hand-off is set by `run:carry --cut`,
 // or by this supervisor when it recovers a record whose owner died, so a live session never reads as
 // waiting. The supervisor owns the record while its deterministic driver spends the budget; a judgment
 // branch hands it off so one AI session can adopt it.
@@ -23,8 +23,8 @@ const WAKE_LOG_SUFFIX = '.log'
 const WAKE_GRACE_MS = 600_000
 // Retried before failing: stopping ends a run nobody is watching.
 const MAX_WAKE_ATTEMPTS = 3
-// An empty backlog still needs one session to finish the run, so a deferral is bounded by the
-// `backlogrun` idle watch's own default.
+// A run with nothing to start still needs one session to finish it, so a deferral is bounded by the
+// `backlogrun` idle wait itself.
 const IDLE_CEILING_MS = backlog_budget.DEFAULT_IDLE_MS
 const NO_WAKES = 0
 const ONE_WAKE = 1
@@ -53,7 +53,7 @@ interface RunWake {
 	idle_since?: string | undefined
 }
 
-type WakeStopReason = 'ended' | 'expired' | 'unreadable' | 'failed' | 'stopped'
+type WakeStopReason = 'ended' | 'unreadable' | 'failed' | 'stopped'
 
 // `superseded`: another supervisor holds the record and this process is the replaced one.
 type WakeTidyResult = 'absent' | 'removed' | 'superseded'
@@ -87,9 +87,8 @@ const WAIT_DECISION: WakeDecision = { kind: 'wait' }
 const PENDING_DECISION: WakeDecision = { kind: 'pending' }
 const FAILED_DECISION: WakeDecision = { kind: 'failed' }
 
-const STOP_REASONS: Record<'none' | 'expired' | 'unreadable', WakeStopReason> = {
+const STOP_REASONS: Record<'none' | 'unreadable', WakeStopReason> = {
 	none: 'ended',
-	expired: 'expired',
 	unreadable: 'unreadable',
 }
 

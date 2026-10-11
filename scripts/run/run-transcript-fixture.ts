@@ -114,12 +114,6 @@ const SCENARIOS: ReadonlyArray<Scenario> = [
 		],
 	},
 	{
-		name: 'expired-budget',
-		summary: 'the whole-run budget is spent — a person decides',
-		base: { carry_kind: 'expired' },
-		frames: [START],
-	},
-	{
 		name: 'unreadable-carry',
 		summary: 'the carry record cannot be read',
 		base: { carry_kind: 'unreadable' },

@@ -225,8 +225,8 @@ async function decide(values: ParsedValues, counts: OfferCounts): Promise<number
 
 	await mark_drain(decision.verdict, offer.answer, counts.running)
 
-	// The idle window with the ask that read it, once per watching poll, so `run:board` counts the next
-	// check from the poll that ran rather than guessing one.
+	// The idle window with the ask that read it, once per watching poll, so `run:board` draws the wait
+	// from the window the poll read rather than guessing one.
 	if (decision.idle !== undefined) {
 		await run_event_stream_emit.emit_changed(run_event_stream.EVENT_KIND.IDLE, decision.idle)
 	}

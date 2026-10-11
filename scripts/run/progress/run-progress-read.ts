@@ -123,7 +123,7 @@ function is_hold_present(read: HoldRead): boolean {
 }
 
 function is_carry_present(read: CarryRead): boolean {
-	return read.kind === 'carried' || read.kind === 'expired'
+	return read.kind === 'carried'
 }
 
 function hold_present(worktree: string | undefined): boolean {

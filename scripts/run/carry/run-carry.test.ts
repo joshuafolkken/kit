@@ -8,8 +8,7 @@ import { run_carry, type CarryClaimRequest, type CarryOwner, type RunCarry } fro
 
 // joshuafolkken/kit#1714: the record exists so a `backlogrun` keeps one budget across its own session
 // cuts. What these tests pin is the part a rewrite would lose first — that a resumed session reads
-// the *same* `started_at` back, that the counters accumulate rather than reset, and that the 8-hour
-// whole-run bound is spent even though the session that started it is gone.
+// the *same* `started_at` back, and that the counters accumulate rather than reset.
 //
 // joshuafolkken/kit#1722 adds the ownership half. The three cases it separates are the three a
 // string comparison could not: the owner still running, the owner gone, and the *same* invocation
@@ -30,8 +29,8 @@ const NAMED_INVOCATION = 'backlogrun #1762 #1749 #1759'
 const NAMED_ONLY_INVOCATION = 'backlogrun #1762 #1749 --only'
 const NOT_CREATED = 'the scratch record was not created'
 const START = new Date('2026-09-10T00:00:00.000Z')
-const WITHIN_BOUND = new Date('2026-09-10T07:59:00.000Z')
-const PAST_BOUND = new Date('2026-09-10T08:00:01.000Z')
+// A start far more than eight hours before any moment these tests read at.
+const LONG_AGO = new Date('2026-09-01T00:00:00.000Z')
 
 function target(): string {
 	return run_carry.carry_path(REPOSITORY)
@@ -81,7 +80,7 @@ describe('a repository with no run in flight', () => {
 	it('reads as none', () => {
 		run_carry.end_carry(target())
 
-		expect(run_carry.read_carry(target(), START).kind).toBe('none')
+		expect(run_carry.read_carry(target()).kind).toBe('none')
 	})
 
 	it('keys separately from another repository', () => {
@@ -94,7 +93,7 @@ describe('a record written by one session and read by the next', () => {
 		run_carry.end_carry(target())
 		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, START)
 
-		expect(run_carry.read_carry(target(), WITHIN_BOUND)).toStrictEqual({
+		expect(run_carry.read_carry(target())).toStrictEqual({
 			kind: 'carried',
 			carry: {
 				invocation: INVOCATION,
@@ -112,7 +111,7 @@ describe('a record written by one session and read by the next', () => {
 		const started = begun()
 
 		run_carry.apply_change(target(), started, { merged: 1, filed: 1 })
-		const read = run_carry.read_carry(target(), WITHIN_BOUND)
+		const read = run_carry.read_carry(target())
 		const carried = read.kind === 'carried' ? read.carry : started
 
 		expect(run_carry.apply_change(target(), carried, { merged: 2, cuts: 1 })).toMatchObject({
@@ -161,36 +160,33 @@ it('the consecutive-outage streak advances through the record and records its fo
 	expect(run_carry.apply_change(target(), one, { merged: 1 }, at).outages).toBe(0)
 })
 
-describe('the whole-run bound', () => {
-	it('is spent once the record is older than eight hours', () => {
-		begun()
+// joshuafolkken/kit#3687: the record's age ended a run eight hours after it started, whatever it was
+// doing. Only the idle wait ends a run now, so a record reads the same however old it is.
+describe('a record has no expiry of its own', () => {
+	it('still reads as carried long after eight hours', () => {
+		begun(run_carry.NO_OWNER, LONG_AGO)
 
-		expect(run_carry.read_carry(target(), PAST_BOUND).kind).toBe('expired')
+		expect(run_carry.read_carry(target())).toMatchObject({
+			kind: 'carried',
+			carry: { started_at: LONG_AGO.toISOString() },
+		})
 	})
 
-	it('treats a start time that is not a date as spent rather than as current', () => {
-		const undated = {
-			invocation: INVOCATION,
-			started_at: 'not-a-date',
-			merged: 0,
-			filed: 0,
-			cuts: 0,
-			failures: 0,
-			outages: 0,
-		}
+	it('reads a start time that is not a date as unreadable rather than as a run', () => {
+		const undated = JSON.stringify({ ...begun(), started_at: 'not-a-date' })
 
-		expect(run_carry.is_expired(undated, START)).toBe(true)
+		expect(run_carry.classify(undated).kind).toBe('unreadable')
 	})
 })
 
 describe('a record that cannot be parsed', () => {
 	it('is unreadable, never none', () => {
-		expect(run_carry.classify('{"invocation":1}', START).kind).toBe('unreadable')
-		expect(run_carry.classify('not json', START).kind).toBe('unreadable')
+		expect(run_carry.classify('{"invocation":1}').kind).toBe('unreadable')
+		expect(run_carry.classify('not json').kind).toBe('unreadable')
 	})
 
 	it('is none only when nothing is there', () => {
-		expect(run_carry.classify(undefined, START).kind).toBe('none')
+		expect(run_carry.classify(undefined).kind).toBe('none')
 	})
 })
 
@@ -201,14 +197,13 @@ describe('the record is claimed exclusively', () => {
 		expect(run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, START)).toBeUndefined()
 	})
 
-	// `replace_carry` never consults the bound — deciding that a record may be replaced is the
-	// caller's — so what this pins is that replacing succeeds where a bare `begin_carry` would not.
-	it('replaces whatever record is there', () => {
-		begun()
+	it('refuses it however old the record is, so an old run is never silently replaced', () => {
+		begun(run_carry.NO_OWNER, LONG_AGO)
 
-		const replaced = run_carry.replace_carry(target(), OTHER_INVOCATION, run_carry.NO_OWNER, START)
-
-		expect(replaced).toEqual(expect.objectContaining({ invocation: OTHER_INVOCATION }))
+		expect(
+			run_carry.begin_carry(target(), OTHER_INVOCATION, run_carry.NO_OWNER, START),
+		).toBeUndefined()
+		expect(run_carry.read_carry(target())).toMatchObject({ carry: { invocation: INVOCATION } })
 	})
 })
 
@@ -434,7 +429,7 @@ describe('a --only invocation carried across a cut', () => {
 		)
 
 		if (started === undefined) throw new Error(NOT_CREATED)
-		const read = run_carry.read_carry(target(), WITHIN_BOUND)
+		const read = run_carry.read_carry(target())
 
 		expect(read.kind === 'carried' ? read.carry.invocation : '').toBe(NAMED_ONLY_INVOCATION)
 		expect(run_carry.remaining_of(started)).toStrictEqual([1762, 1749])

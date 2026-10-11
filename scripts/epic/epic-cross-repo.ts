@@ -80,7 +80,7 @@ const NOT_FOUND_STATUS = 404
 //
 // **`absent` is not `unreadable`.** A repository with no
 // manifest, or one whose manifest says `private`, publishes nothing — so a closed blocker there has
-// no release anyone could wait for, and waiting means waiting until the run's own eight-hour timeout
+// no release anyone could wait for, and waiting means waiting until the run's idle wait runs out
 // with nothing an operator can edit to clear it. A read that merely failed says none of that.
 //
 // **It is read from the repository rather than from the registry, and that is the whole design.** The
@@ -123,7 +123,7 @@ type WorkspaceCheck = 'workspace' | 'single' | 'unreadable'
 //
 // **The file's existence proves nothing.** `josh sync` distributes it to every consumer regardless of
 // layout — it carries `allowBuilds`, `overrides` and the like — so probing for its presence would read
-// every private first-party repository as a workspace and wait the eight-hour timeout on each. What
+// every private first-party repository as a workspace and wait the whole idle wait on each. What
 // makes a repository a workspace is a non-empty `packages`
 // key, so that is what is read.
 function declares_packages(yaml: string): boolean {
@@ -285,7 +285,7 @@ function publishes_nothing(repo: string): boolean {
 //
 // **"Ships nothing" is asked first, and it is a different question.** Waiting is right only where
 // something could still arrive; a closed blocker in a repository that publishes no package has no
-// release for `is_published` to ever find, so it would wait until the run's own eight-hour timeout
+// release for `is_published` to ever find, so it would wait until the run's idle wait runs out
 // with nothing an operator could edit to clear it. It is answered from that repository's own manifest and never from
 // the registry, for the reason `ManifestAnswer` records: a registry 404 also means "this token may
 // not see it", and resolving on one would start a consumer child before its blocker's release

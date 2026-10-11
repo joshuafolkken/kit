@@ -55,16 +55,12 @@ function scoped_events(
 	return events.filter((event) => is_within(event, floor))
 }
 
-// The scope the run's own carry record implies. A record that reads at all names the invocation's start, and
-// **an expired one names it just as well**: expiry is the budget's verdict on a run, not a gap in the record,
-// so rounding it to unknown would withhold the scope from exactly the long runs that most need one. Only an
-// absent or unreadable record leaves the scope undetermined.
+// The scope the run's own carry record implies. A record that reads at all names the invocation's start,
+// however long ago that was; only an absent or unreadable record leaves the scope undetermined.
 function scope_of(read: CarryRead): EventScope {
-	if (read.kind === 'carried' || read.kind === 'expired') {
-		return { kind: SINCE_SCOPE, started_at: read.carry.started_at }
-	}
+	if (read.kind !== 'carried') return UNKNOWN_EVENT_SCOPE
 
-	return UNKNOWN_EVENT_SCOPE
+	return { kind: SINCE_SCOPE, started_at: read.carry.started_at }
 }
 
 // The newest event within scope, or `undefined` when the scope could not be determined or nothing falls

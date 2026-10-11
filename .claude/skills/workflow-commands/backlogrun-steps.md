@@ -29,7 +29,7 @@ provenance of each rule: `docs/maintainers/backlogrun-steps-rationale.md` → "W
 | The bound | What it limits | Counted by |
 | --- | --- | --- |
 | `--max` | merges per invocation — a run's own filing competes for it | `run:carry --merged` |
-| `--idle`, and the 8-hour whole-run bound | how long the run looks for more | the record's `started_at` |
+| `--idle` (8 hours unless typed) | how long the run waits once nothing can proceed | `--active`, the moment its hands became free |
 | **Ten filings per invocation** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `run:carry --filed` |
 | The WIP cap on open issues | the pool across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
@@ -75,8 +75,6 @@ and `--filed 1`, and **`--cut` is the session's last write**.
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
 | `standing` | **Stop; do not open a lane**: report `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` and `pnpm josh run:carry --end` for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
-| `expired` | On standard output: report, stop and `--end` it. On standard error ahead of `began`: a new run replaced it |
-
 **End the record when the run ends** — `pnpm josh run:report`, then `pnpm josh run:carry --end`, **never
 batched with it**, and `pnpm josh run:wake --stop` in the same turn. **A run that ends by _stopping_**
 (a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:carry --end --stopped
@@ -140,7 +138,7 @@ section the row names:
 
 **A candidate only in another repository is never a token** — report it with its checkout. The budgets,
 verdicts and stops are the driver's own: `docs/maintainers/backlogrun-driver.md` (rationale:
-`docs/maintainers/backlogrun-steps-rationale.md` → "Why the idle watch defaults to 30 minutes";
+`docs/maintainers/backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free";
 `docs/maintainers/backlogrun-steps-rationale.md` → "Why the cost check skips a watch").
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the loop's contract is shaped this way"

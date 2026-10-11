@@ -60,8 +60,7 @@ Issue, as after any filing.
 `issue:file`'s default applies the label and the next run picks the improvements up without waiting
 for a person. **`backlogrun-steps.md` → "What one invocation approves" is that default's single
 source**; it is written there, beside the brakes that bound it, rather than restated here. Every brake still counts a retrospective's filings: the
-ten-per-invocation ceiling, the WIP cap, `--max`, the 150,000-token session budget and the 8-hour
-whole-run bound.
+ten-per-invocation ceiling, the WIP cap, `--max` and the 150,000-token session budget.
 
 **Close with `pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID"`.** It marks the
 retrospective run on the carry record, so `run:step` prints `stop` from then on rather than the step a

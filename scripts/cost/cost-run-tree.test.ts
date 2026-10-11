@@ -117,6 +117,28 @@ describe('cost_run_tree.build_tree run grouping', () => {
 	})
 })
 
+describe('cost_run_tree.build_tree across an idle wait', () => {
+	// joshuafolkken/kit#3687: a run idles for up to the idle wait and then runs a child before the wake
+	// that judges it, so its two mains start ten hours apart while no stretch between them is quiet for
+	// longer than the wait.
+	it('keeps one run when a child and its judging wake follow the wait', () => {
+		const waited = [
+			sf('p1', false, 0, HOUR_MS),
+			sf('L', false, 0, 10 * HOUR_MS),
+			sf('p2', false, 0, 0),
+		]
+		const starts = new Map([
+			['p1', 0],
+			['L', 9 * HOUR_MS],
+			['p2', 10 * HOUR_MS + 1],
+		])
+		const tree = cost_run_tree.build_tree(waited, context(starts, new Map([['L', 1]])), undefined)
+
+		expect(tree?.run_count).toBe(1)
+		expect(tree?.nodes.map((node) => node.session_id)).toEqual(['p1', 'p2', 'L'])
+	})
+})
+
 describe('cost_run_tree.build_tree without a parent session', () => {
 	it('roots the run on its lane sessions when no main-checkout session exists', () => {
 		const files = [sf('La', false, 0, 5), sf(SUB_LA, true, 1, 6)]

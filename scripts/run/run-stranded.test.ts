@@ -68,13 +68,6 @@ describe('run_stranded.is_stranded', () => {
 	it('is not stranded when the supervisor liveness is unknown', () => {
 		expect(run_stranded.is_stranded(input({ supervisor: run_stranded.UNKNOWN }))).toBe(false)
 	})
-
-	// An expired budget is the whole-run bound, not a strand: the supervisor stops on it by design.
-	it('is not stranded when the budget has expired', () => {
-		const expired = input({ read: { kind: 'expired', carry: carry({}) } })
-
-		expect(run_stranded.is_stranded(expired)).toBe(false)
-	})
 })
 
 describe('run_stranded.supervisor_liveness', () => {

@@ -1,8 +1,6 @@
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { git_command } from '#scripts/git/git-command'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { stamp_record, type StampRecordSpec } from '#scripts/josh/stamp-record'
 import { json_value } from '#scripts/lib/json-value'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { z } from 'zod'
@@ -10,7 +8,7 @@ import { run_carry_added, type CarryAddition } from './run-carry-added'
 import { run_carry_change } from './run-carry-change'
 import { run_carry_conversation } from './run-carry-conversation'
 
-// A `backlogrun` declares a budget — `--max`, `--idle` and the 8-hour whole-run bound — and the session
+// A `backlogrun` declares a budget — `--max` and `--idle` — and the session
 // cut ends the session, so the next one would start from nothing. **The cut is an execution detail of
 // the same authorization**, so the budget has to survive it: this record carries it across sessions,
 // where there is no epic to read progress back off when the run began from the backlog.
@@ -20,9 +18,10 @@ import { run_carry_conversation } from './run-carry-conversation'
 // one *invocation's* budget, and that invocation opens lanes — each a work tree of its own — so the
 // key is the common git directory, which every lane of one repository shares.
 //
-// **The 8-hour bound is the record's expiry.** Held as an age rather than as prose, the bound is
-// decided the same way `backlog:budget` decides the other two: the command answers, and the run
-// obeys. A run that reads `expired` has spent the bound whatever any count says.
+// **The record has no expiry of its own.** A run is bounded by its idle wait, which `backlog:budget`
+// counts from when the run last had work; an age counted from `started_at` would end a run that is
+// still working or still inside that wait. So a record a run never ended — a crash — stays `standing`
+// until a person carries it with `--resume` or discards it with `--end`.
 //
 // **Whose record it is, is decided by liveness and by a declared hand-off — never by the invocation
 // text**. Comparing the `invocation` string alone walks straight through the case that happens most: a
@@ -38,21 +37,14 @@ import { run_carry_conversation } from './run-carry-conversation'
 
 const CARRY_PREFIX = 'josh-run-carry-'
 const REPOSITORY_DIRECTORY_INDEX = 1
-// **The whole-run bound is `backlog-budget.ts`'s, imported rather than restated.** `backlogrun.md` →
-// "Waiting, and never waiting forever" states the figure and that module applies it; a second copy
-// here would drift, and the drift is silent in exactly the direction that matters — raised there and
-// still 8 here, this record answers `expired`, `--begin` replaces it, and the budget restarts at
-// zero — the loss this record exists to prevent.
-const CARRY_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
-const CARRY_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
 const NO_INCREMENT = 0
 
 // The most session cuts one invocation may take. This bounds `cuts`, which
 // only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge (~one per
-// 50 minutes over the 8-hour whole-run budget), not the `run:cut` phase cuts a lane child takes. Each
+// 50 minutes of work), not the `run:cut` phase cuts a lane child takes. Each
 // cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
-// re-establishment costs more than the accumulation it sheds; six sits well under the ~10 an 8-hour run
-// could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
+// re-establishment costs more than the accumulation it sheds; six sits well under the ~10 a night of
+// work could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the
 // `--cut` count is refused at it rather than incrementing past it — except a headless judgment
 // session's hand-back to the driver, which `run_headless.is_cut_capped` exempts.
 const MAX_CUTS = 6
@@ -185,11 +177,7 @@ interface CarryChange {
 	retrospective?: boolean
 }
 
-type CarryRead =
-	| { kind: 'none' }
-	| { kind: 'carried'; carry: RunCarry }
-	| { kind: 'expired'; carry: RunCarry }
-	| { kind: 'unreadable' }
+type CarryRead = { kind: 'none' } | { kind: 'carried'; carry: RunCarry } | { kind: 'unreadable' }
 
 const NO_OWNER: CarryOwner = {}
 
@@ -234,32 +222,23 @@ function parse_carry(raw: string): RunCarry | undefined {
 	return json_value.parse_with(raw, run_carry_schema)
 }
 
-function started_at_of(carry: RunCarry): string {
-	return carry.started_at
+// **A record that cannot be read is `unreadable`, never `none`** — absent is none; present and
+// unparseable is the state a guard must not fall open on. A `started_at` that is not a date is the
+// same state: it passes the schema as a string, and every reader of the record measures from it.
+function classify(raw: string | undefined): CarryRead {
+	if (raw === undefined) return { kind: 'none' }
+
+	const carry = parse_carry(raw)
+
+	if (carry === undefined || Number.isNaN(Date.parse(carry.started_at))) {
+		return { kind: 'unreadable' }
+	}
+
+	return { kind: 'carried', carry }
 }
 
-// The expiry and the classification are `stamp-record.ts`'s, shared with `run-cut.ts` and
-// `run-hold.ts`; what a `started_at` that is not a date means is decided there.
-const CARRY_SPEC: StampRecordSpec<RunCarry> = {
-	parse: parse_carry,
-	timestamp_of: started_at_of,
-	max_age_ms: CARRY_MAX_AGE_MS,
-}
-
-function is_expired(carry: RunCarry, now: Date): boolean {
-	return stamp_record.is_older_than(started_at_of(carry), CARRY_MAX_AGE_MS, now)
-}
-
-function classify(raw: string | undefined, now: Date): CarryRead {
-	const read = stamp_record.classify(raw, CARRY_SPEC, now)
-
-	if (!('record' in read)) return read
-
-	return { kind: read.kind, carry: read.record }
-}
-
-function read_carry(target: string, now: Date = new Date()): CarryRead {
-	return classify(stamp_file.read_stamp_text(target), now)
+function read_carry(target: string): CarryRead {
+	return classify(stamp_file.read_stamp_text(target))
 }
 
 // The identity to record for a pid the caller declared. `read_start` is what makes the pair an
@@ -302,20 +281,6 @@ function begin_carry(
 	const carry = fresh_carry(invocation, owner, now)
 
 	return stamp_file.create_stamp(target, carry) ? carry : undefined
-}
-
-// Replacing a record whose bound is spent. It removes and then creates exclusively rather than
-// writing over the old bytes, for the reason `run-hold.ts` replaces a stale hold the same way: a
-// plain write would put the race back one branch over.
-function replace_carry(
-	target: string,
-	invocation: string,
-	owner: CarryOwner = NO_OWNER,
-	now: Date = new Date(),
-): RunCarry | undefined {
-	stamp_file.remove_stamp(target)
-
-	return begin_carry(target, invocation, owner, now)
 }
 
 // Taking over a standing record: the counters and `started_at` are the run's and stay, the owner
@@ -424,9 +389,7 @@ function end_carry(target: string): void {
 // no record — `none` or `unreadable` — is not a run whose retrospective has run, so it answers `false`;
 // `run:step` reads it to decide whether the stop position still owes a retrospective.
 function retrospective_done_of(read: CarryRead): boolean {
-	if (read.kind !== 'carried' && read.kind !== 'expired') return false
-
-	return read.carry.retrospective === true
+	return read.kind === 'carried' && read.carry.retrospective === true
 }
 
 // **What the resumed session has to be told, computed rather than stored.** A stored remainder would
@@ -456,10 +419,6 @@ function done_note(carry: RunCarry): string {
 
 function describe_carry(carry: RunCarry): string {
 	return `${carry.invocation} started ${carry.started_at}; ${String(carry.merged)} merged, ${String(carry.filed)} filed, ${String(carry.failures)} failed in a row, ${String(carry.outages)} outage(s) in a row, ${String(carry.cuts)} cut(s) crossed${done_note(carry)}`
-}
-
-function expired_message(carry: RunCarry): string {
-	return `The ${String(CARRY_MAX_AGE_HOURS)}-hour whole-run bound is spent: ${describe_carry(carry)}. Clear it with \`${END_COMMAND}\`.`
 }
 
 // A record left standing by a run that never reached `--end`. Naming both invocations is the point:
@@ -525,8 +484,6 @@ function unknown_message(): string {
 }
 
 const run_carry = {
-	CARRY_MAX_AGE_HOURS,
-	CARRY_MAX_AGE_MS,
 	END_COMMAND,
 	MAX_CUTS,
 	NO_OWNER,
@@ -543,11 +500,9 @@ const run_carry = {
 	is_at_cut_cap,
 	describe_carry,
 	end_carry,
-	expired_message,
 	mismatch_message,
 	fresh_carry,
 	is_count_refused,
-	is_expired,
 	is_foreign_live_owner,
 	is_owner_live,
 	lost_message,
@@ -556,7 +511,6 @@ const run_carry = {
 	parse_carry,
 	read_carry,
 	remaining_of,
-	replace_carry,
 	repository_directory,
 	retrospective_done_of,
 	standing_message,

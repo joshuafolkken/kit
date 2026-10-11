@@ -71,17 +71,15 @@ const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh 
 // `stopped` is a person's own `--stop` or a supervisor being superseded, and a warning channel that
 // fired on those is one that stops being read.
 //
-// **`expired` and `unreadable` warn**, because both end the supervisor while a carry record is still
-// sitting there handed off, so the run would otherwise be left asleep with nothing anywhere saying so.
+// **`unreadable` warns**, because it ends the supervisor while a carry record is still sitting there
+// handed off, so the run would otherwise be left asleep with nothing anywhere saying so.
 // **Every reason is listed, and the silent two are listed as `undefined`.** A partial map would let a
-// sixth stop reason compile straight past this and reach nobody, which is the defect class this
+// fifth stop reason compile straight past this and reach nobody, which is the defect class this
 // section exists to close.
 const STOP_BODIES: Record<WakeStopReason, string | undefined> = {
 	ended: undefined,
 	stopped: undefined,
 	failed: 'The supervisor could not continue the run and has stopped.',
-	expired:
-		'The carried run passed its whole-run bound, so the supervisor stopped without continuing it.',
 	unreadable:
 		'The carry record could not be read, so the supervisor stopped rather than guess at it.',
 }
@@ -221,9 +219,9 @@ async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext):
 	})
 }
 
-// **Only a failed wake exits non-zero; `expired` and `unreadable` warn but exit zero.** The
+// **Only a failed wake exits non-zero; `unreadable` warns but exits zero.** The
 // verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract callers branch on,
-// and what those two need is the notification, not a different exit code.
+// and what that one needs is the notification, not a different exit code.
 function exit_code_of(reason: WakeStopReason): number {
 	return reason === run_wake_loop.FAILED_REASON ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }

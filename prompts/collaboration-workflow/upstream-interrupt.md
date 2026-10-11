@@ -18,7 +18,7 @@
 1. **起票する** — `pnpm josh issue:file "<title>" --body-file <path> --depth <n> --route interrupt --label priority:high`。上限は効かない（`wip-cap.md` →「割り込み起票 — 上限が効かない側」の条件 2）
 2. **止まらずに直す** — 壊れた機構を迂回しない（回避策の禁止と、検証ゲートを緩めない規則はここでも変わらない）。`backlogrun` の中では、その割り込みを次の子にし、修正が着地してから塞がれていた子へ戻る。プールから選ぶランでは `priority:high` が先頭に並べ、epic の下では `wip-cap.md` の手順 3 で挿入する。名前を指定したランのドライバーは指定された Issue しか出さないので、`pnpm josh lane:launch <N>` で自分で dispatch する。バッチの外では `wip-cap.md` の手順 4 が変わらず効く — 起票まで済ませ、打つべき `fullrun #<N>` を報告して止まる
 3. **再開できるなら自分で再開し、動くことを確かめる** — 修正のマージ後、再開の手段がある答えには人の打ち直しを求めない。手渡し済みの記録、所有者が死んだ記録、監督プロセスの停止（`warning` Telegram）には `pnpm josh run:wake --start`、`run:carry` の `standing` には `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` を自分で打つ。そのあと `pnpm josh run:wake --list` が監督プロセスを示し、そのログに次の子の dispatch が現れることを確かめて報告する
-4. **人に打ち直しを求めるのは再開の手段が無いときだけ** — `expired`（8 時間の上限を使い切った）、`mismatch`（別の起動の記録）、別の生きた所有者の `busy`。新しい承認を宣言するのは人だけ、という規則も変わらない
+4. **人に打ち直しを求めるのは再開の手段が無いときだけ** — `mismatch`（別の起動の記録）、別の生きた所有者の `busy`。新しい承認を宣言するのは人だけ、という規則も変わらない
 5. **`needs-decision` を付けない** — ランが自分で直せる不具合は人の判断を要さない（`.claude/skills/workflow-commands/backlogrun-park.md` → "Only a person's judgement carries `needs-decision`"）
 
 手順:

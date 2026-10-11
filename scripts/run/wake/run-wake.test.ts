@@ -72,20 +72,10 @@ describe('run_wake.decide — whether to wake is the record’s answer', () => {
 	})
 
 	// joshuafolkken/kit#2336. The same record with a *dead* owner is a session that claimed it and then
-	// died without cutting; answered `wait` before, it stalled the run in silence until the 8-hour
-	// bound. Now the dead owner routes into the grace/retry machinery below and the run is recovered.
+	// died without cutting; answered `wait` before, it stalled the run in silence.
+	// Now the dead owner routes into the grace/retry machinery below and the run is recovered.
 	it('wakes a carried record no cut handed off once its owner has died', () => {
 		expect(run_wake.decide(input(IN_FLIGHT))).toStrictEqual({ kind: 'wake' })
-	})
-
-	// The 8-hour whole-run bound is the carry record's expiry, so this is the only place it is
-	// enforced — and enforcing it means never waking, not waking with a shorter budget.
-	it('never wakes an expired record, and stops instead', () => {
-		const decision = run_wake.decide(
-			input({ kind: 'expired', carry: carry({ is_handed_off: true }) }),
-		)
-
-		expect(decision).toStrictEqual({ kind: 'stop', reason: 'expired' })
 	})
 
 	it('stops when the run ended and no record is left', () => {

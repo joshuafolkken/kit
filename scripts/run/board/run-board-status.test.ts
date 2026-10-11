@@ -54,7 +54,6 @@ function phase_after(...later: ReadonlyArray<Step>): string | undefined {
 const IDLE_TEXT = backlog_idle.text_of({
 	since_ms: Date.parse(T2),
 	until_ms: Date.parse(T3),
-	bound: 'idle',
 	asked_ms: Date.parse(T2),
 })
 

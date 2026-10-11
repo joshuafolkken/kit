@@ -6,16 +6,16 @@ import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
-// The words and the clock `run:board` draws with. A moment on the board is a local `HH:MM:SS` clock;
-// how long something has run is a short `MM:SS`, so a person reads the board against the clock on
-// their own screen.
+// The words and the clock `run:board` draws with. A moment on the board is a local clock, `HH:MM`
+// where a person reads it to the minute; how long a row or the heartbeat has run is a short `MM:SS`,
+// and how long the run has run or its wait has left is `H:MM:SS` — two separators are a length and one
+// is a time of day, so the header's second line never reads a length as a moment.
 
 const CLOCK_WIDTH = 2
 const CLOCK_PAD = '0'
 const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
-const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
@@ -58,11 +58,6 @@ const WORDS = {
 	followup: 'followup',
 	report: 'report',
 	failed: 'failed',
-	idle_until: 'wait ends',
-	idle_left: 'left',
-	idle_end_idle: 'ends and reports if nothing new',
-	idle_end_run: 'ends at the whole-run cut-off and reports',
-	next_check: 'next check',
 	notes: 'findings and decisions',
 	more: 'more',
 	filed: 'filed',
@@ -174,6 +169,9 @@ const HEADER_ICONS = {
 	memory: '🧠',
 	swap: '💾',
 	ended: '🔚',
+	// When the run's hands became free, and how long the wait that began then has left.
+	idle_since: '⏸',
+	idle_left: '⌛',
 	loading: '⏳',
 } as const
 
@@ -216,12 +214,15 @@ function elapsed_of(ms: number): string {
 	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
 }
 
-// How long is left, as `7h38m`; a deadline already passed reads as zero.
-function left_of(ms: number): string {
-	const minutes = Math.floor(Math.max(0, ms) / MS_PER_MINUTE)
+// How long the run has run or its wait has left, as `H:MM:SS` with the hours not padded; a negative
+// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
+function span_of(ms: number): string {
+	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
+	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
 	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
+	const tail = [minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
 
-	return `${String(hours)}h${two_digits(minutes % MINUTES_PER_HOUR)}m`
+	return [String(hours), ...tail.map((value) => two_digits(value))].join(':')
 }
 
 function is_shade(color: Paint): color is Shade {
@@ -289,9 +290,9 @@ const run_board_labels = {
 	bar_of,
 	clock_of,
 	elapsed_of,
-	left_of,
 	minute_of,
 	painted,
+	span_of,
 	spinner_of,
 }
 

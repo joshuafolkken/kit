@@ -10,7 +10,7 @@ import { vi } from 'vitest'
 const UNMEASURABLE: CostVerdict = 'unmeasurable'
 
 // What `--json` puts on standard output. Only the two fields the suites read are named: `remaining`
-// is the answer a resumed named-issue run acts on, and `started_at` is what says the whole-run bound was
+// is the answer a resumed named-issue run acts on, and `started_at` is what says the run's clock was
 // not restarted by the resumption.
 interface CarryJson {
 	carry?: { started_at?: string }

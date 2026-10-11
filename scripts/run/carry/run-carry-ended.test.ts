@@ -33,7 +33,7 @@ describe('run_carry_ended', () => {
 		const target = path.join(scratch, 'replace.json')
 
 		run_carry_ended.record_ended(target, { kind: 'carried', carry: carry('backlogrun') }, ENDED_AT)
-		run_carry_ended.record_ended(target, { kind: 'expired', carry: carry(EPIC_RUN) }, ENDED_AT)
+		run_carry_ended.record_ended(target, { kind: 'carried', carry: carry(EPIC_RUN) }, ENDED_AT)
 
 		expect(run_carry_ended.read_ended(target)).toStrictEqual({
 			invocation: EPIC_RUN,

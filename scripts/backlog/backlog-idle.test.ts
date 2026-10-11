@@ -6,10 +6,10 @@ import { backlog_idle, type IdleWindow } from './backlog-idle'
 // that measures it, the offer that records it and the board that reads it never disagree.
 
 const MINUTE_MS = backlog_budget.MS_PER_MINUTE
+const MINUTES_PER_HOUR = 60
 const STARTED_MS = Date.parse('2026-10-08T10:00:00.000Z')
 const IDLE_MS = backlog_budget.DEFAULT_IDLE_MS
-const WHOLE_RUN_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
-const POLL_MS = backlog_budget.IDLE_POLL_MINUTES * MINUTE_MS
+const LONG_RUN_MS = IDLE_MS + MINUTE_MS
 const ASKED_OFFSET_MS = 2 * MINUTE_MS
 
 function input(active_at_ms: number, idle_budget_ms: number | undefined): BudgetInput {
@@ -26,28 +26,34 @@ function input(active_at_ms: number, idle_budget_ms: number | undefined): Budget
 }
 
 function window_at(asked_ms: number): IdleWindow {
-	return { since_ms: STARTED_MS, until_ms: STARTED_MS + IDLE_MS, bound: 'idle', asked_ms }
+	return { since_ms: STARTED_MS, until_ms: STARTED_MS + IDLE_MS, asked_ms }
 }
 
-describe('backlog_idle.window_of — when the wait on an empty backlog ends', () => {
-	it('ends at the idle budget when that comes first, as asked now', () => {
+describe('backlog_idle.window_of — when the wait ends', () => {
+	it('runs for the idle budget from when the run last had work, as asked now', () => {
 		const active = STARTED_MS + MINUTE_MS
 
 		expect(backlog_idle.window_of(input(active, IDLE_MS))).toEqual({
 			since_ms: active,
 			until_ms: active + IDLE_MS,
-			bound: 'idle',
 			asked_ms: active + ASKED_OFFSET_MS,
 		})
 	})
 
-	it('ends at the whole-run bound when that comes first', () => {
-		const active = STARTED_MS + WHOLE_RUN_MS - MINUTE_MS
+	it('is eight hours long by default', () => {
+		const window = backlog_idle.window_of(input(STARTED_MS, IDLE_MS))
+
+		expect(IDLE_MS).toBe(backlog_budget.IDLE_WAIT_HOURS * MINUTES_PER_HOUR * MINUTE_MS)
+		expect(window?.until_ms).toBe(STARTED_MS + IDLE_MS)
+	})
+
+	// joshuafolkken/kit#3687: the run's start no longer cuts the wait short.
+	it('is not cut short by how long ago the run started', () => {
+		const active = STARTED_MS + LONG_RUN_MS
 
 		expect(backlog_idle.window_of(input(active, IDLE_MS))).toMatchObject({
 			since_ms: active,
-			until_ms: STARTED_MS + WHOLE_RUN_MS,
-			bound: 'whole-run',
+			until_ms: active + IDLE_MS,
 		})
 	})
 
@@ -64,26 +70,10 @@ describe('backlog_idle.text_of / parse — the line the stream carries', () => {
 	})
 
 	it('reads a malformed line as no window', () => {
-		expect(backlog_idle.parse('idle since never until later (idle) asked now')).toBeUndefined()
+		expect(backlog_idle.parse('idle since never until later asked now')).toBeUndefined()
 		expect(
-			backlog_idle.parse(
-				'idle since 2026-01-01T00:00:00.000Z until 2026-01-01T00:30:00.000Z (idle)',
-			),
+			backlog_idle.parse('idle since 2026-01-01T00:00:00.000Z until 2026-01-01T08:00:00.000Z'),
 		).toBeUndefined()
 		expect(backlog_idle.parse('backlog drained')).toBeUndefined()
-	})
-})
-
-describe('backlog_idle.next_check_ms — the watching poll cadence', () => {
-	it('counts the next poll from the recorded ask, not from the start of the wait', () => {
-		const asked = STARTED_MS + ASKED_OFFSET_MS + POLL_MS
-
-		expect(backlog_idle.next_check_ms(window_at(asked))).toBe(asked + POLL_MS)
-	})
-
-	it('never names a check past the end of the wait', () => {
-		const window = window_at(STARTED_MS + IDLE_MS - MINUTE_MS)
-
-		expect(backlog_idle.next_check_ms(window)).toBe(window.until_ms)
 	})
 })

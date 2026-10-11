@@ -39,7 +39,6 @@ const RESUMED_VERDICT = 'resumed'
 const CARRIED_VERDICT = 'carried'
 const COUNTED_VERDICT = 'counted'
 const ENDED_VERDICT = 'ended'
-const EXPIRED_VERDICT = 'expired'
 const NONE_VERDICT = 'none'
 const UNREADABLE_VERDICT = 'unreadable'
 const MISMATCH_VERDICT = 'mismatch'
@@ -94,26 +93,12 @@ function report_unreadable(is_json: boolean): number {
 	return report(UNREADABLE_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
 }
 
-function report_expired(carry: RunCarry, is_json: boolean): number {
-	console.error(run_carry.expired_message(carry))
-
-	return report_carry(EXPIRED_VERDICT, carry, is_json)
-}
-
 function report_read(read: CarryRead, is_json: boolean): number {
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, SUCCESS_EXIT_CODE)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
 
-	if (read.kind === 'expired') return report_expired(read.carry, is_json)
-
 	return report_carry(CARRIED_VERDICT, read.carry, is_json)
-}
-
-function report_busy(carry: RunCarry, is_json: boolean): number {
-	console.error(run_carry.busy_message(carry))
-
-	return report(BUSY_VERDICT, carry, is_json, FAILURE_EXIT_CODE)
 }
 
 function refusal_message(claim: CarryClaim, carry: RunCarry, invocation: string): string {
@@ -149,7 +134,7 @@ function report_adoption(
 
 // **Whose record it is, is the classifier's answer and not this command's guess.** `--end` is only
 // reached on the clean-finish path, so a run that crashed or stopped on a guard leaves its record
-// standing for up to the whole-run bound; `resumed` is reached only where the run itself declared the
+// standing until a person carries or discards it; `resumed` is reached only where the run itself declared the
 // cut, or where `--resume` says the reader has decided to carry it.
 function report_claim(
 	target: string,
@@ -166,49 +151,17 @@ function report_claim(
 	return report(CLAIM_VERDICTS[claim], carry, is_json, FAILURE_EXIT_CODE)
 }
 
-function start_fresh(
-	target: string,
-	request: CarryClaimRequest,
-	is_replacement: boolean,
-	is_json: boolean,
-): number {
-	const carry = is_replacement
-		? run_carry.replace_carry(target, request.invocation, request.owner)
-		: run_carry.begin_carry(target, request.invocation, request.owner)
+function start_fresh(target: string, request: CarryClaimRequest, is_json: boolean): number {
+	const carry = run_carry.begin_carry(target, request.invocation, request.owner)
 
 	if (carry === undefined) return report_lost(is_json)
 
 	return report_carry(BEGAN_VERDICT, carry, is_json)
 }
 
-// **The bound ends *that* run, so a spent record whose owner is still running is not replaced
-// either.** Replacing it would delete a live parent's budget and answer `began` — two parents on one
-// record. Only that run, or a person who knows it is over, ends it.
-function begin_over_expired(
-	target: string,
-	carry: RunCarry,
-	request: CarryClaimRequest,
-	is_json: boolean,
-): number {
-	if (run_carry.is_foreign_live_owner(carry, request.owner)) return report_busy(carry, is_json)
-
-	// **A hand-off says the resumption *is* that run, so the spent bound is this session's too.**
-	// Replaced here, the record would come back with `started_at` set to now — and `backlog:budget
-	// --started` reads that field, so the 8-hour bound would restart at every cut and never end the
-	// run. The answer is `expired`, and a person who really is starting a new run clears the record
-	// with `--end`, which is what the expiry message says.
-	if (carry.is_handed_off === true) return report_expired(carry, is_json)
-
-	console.error(run_carry.expired_message(carry))
-
-	return start_fresh(target, request, true, is_json)
-}
-
-// **A live record is never replaced, and never resumed into by something else.** Replacing one would
-// restart the budget the cut exists to carry, and resuming into one would put two parents on a single
-// budget. An expired one is replaced,
-// because its run has spent the whole-run bound and a person typing the keyword again is starting a
-// new run — unless its owner is still running, which is the case above.
+// **A standing record is never replaced, and never resumed into by something else.** Replacing one
+// would restart the budget the cut exists to carry, and resuming into one would put two parents on a
+// single budget. Its age changes none of that: a record is replaced by nothing but a person's `--end`.
 function begin(target: string, request: CarryClaimRequest, is_json: boolean): number {
 	const read = run_carry.read_carry(target)
 
@@ -216,9 +169,7 @@ function begin(target: string, request: CarryClaimRequest, is_json: boolean): nu
 
 	if (read.kind === 'carried') return report_claim(target, read.carry, request, is_json)
 
-	if (read.kind === 'expired') return begin_over_expired(target, read.carry, request, is_json)
-
-	return start_fresh(target, request, false, is_json)
+	return start_fresh(target, request, is_json)
 }
 
 function report_nothing_to_resume(is_json: boolean): number {
@@ -236,8 +187,6 @@ function adopt(target: string, request: CarryClaimRequest, is_json: boolean): nu
 	if (read.kind === 'none') return report_nothing_to_resume(is_json)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
-
-	if (read.kind === 'expired') return report_expired(read.carry, is_json)
 
 	return report_claim(target, read.carry, request, is_json)
 }
@@ -334,9 +283,7 @@ async function count(
 
 	await record_retrospective(request)
 
-	return read.kind === 'expired'
-		? report_expired(carry, is_json)
-		: report_carry(COUNTED_VERDICT, carry, is_json)
+	return report_carry(COUNTED_VERDICT, carry, is_json)
 }
 
 // **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**.
@@ -463,7 +410,6 @@ const run_carry_cli = {
 	CARRIED_VERDICT,
 	COUNTED_VERDICT,
 	ENDED_VERDICT,
-	EXPIRED_VERDICT,
 	MISMATCH_VERDICT,
 	NONE_VERDICT,
 	OVER_VERDICT,

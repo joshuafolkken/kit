@@ -99,12 +99,6 @@ describe('run_wake_describe.describe_wake — the always-present lines', () => {
 })
 
 describe('run_wake_describe.describe_wake — the cut count read from the carry record', () => {
-	it('reads the cuts of an expired carry record too', () => {
-		carry_spy.mockReturnValue({ kind: 'expired', carry: CARRY })
-
-		expect(lines()[3]).toBe(WOKE_LINE)
-	})
-
 	it.each([{ kind: 'none' as const }, { kind: 'unreadable' as const }])(
 		'says the count is unreadable when the carry record is $kind',
 		(read) => {
@@ -182,13 +176,12 @@ describe('run_wake_describe.describe_wake — the wait line on a handed-off reco
 })
 
 describe('run_wake_describe.describe_wake — the wait line on a live owner', () => {
-	it('names the live session that holds the record and the record expiry', () => {
+	it('names the live session that holds the record, and no expiry the record no longer has', () => {
 		owner_spy.mockReturnValue(true)
 		carry_spy.mockReturnValue({ kind: 'carried', carry: { ...CARRY, owner_pid: 999 } })
-		const expiry = new Date(Date.parse(CARRY.started_at) + run_carry.CARRY_MAX_AGE_MS).toISOString()
 
 		expect(wait_line(WAKE)).toBe(
-			`waiting: process 999 holds the carry record; the driver starts at its next cut or once it exits, and the record expires at ${expiry}`,
+			'waiting: process 999 holds the carry record; the driver starts at its next cut or once it exits',
 		)
 	})
 

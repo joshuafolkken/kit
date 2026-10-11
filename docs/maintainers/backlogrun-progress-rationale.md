@@ -125,8 +125,9 @@ child — waits that cost no AI turns.
 
 **Why the stale window is 90 minutes.** It is longer than any single child has taken.
 
-**Why the whole run is bounded at 8 hours.** An unattended run that has not finished overnight needs a
-person, not more waiting.
+**Why no bound is counted from the run's start.** A run whose children are still working has nothing
+to be stopped for, and the 8 hours a run promises is the wait after its hands became free
+(`backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free").
 
 **Why the idle-watch poll is five minutes.** What a watch waits on happens on human timescales, and every
 ask bills the parent session's whole history.

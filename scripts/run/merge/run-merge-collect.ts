@@ -93,7 +93,7 @@ async function collect_carried(carry: RunCarry): Promise<void> {
 async function collect_merged(directory: string): Promise<void> {
 	const read = run_carry.read_carry(run_carry.carry_path(directory))
 
-	if (read.kind !== 'carried' && read.kind !== 'expired') return
+	if (read.kind !== 'carried') return
 
 	try {
 		await collect_carried(read.carry)

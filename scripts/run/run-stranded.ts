@@ -72,9 +72,9 @@ function supervisor_liveness(
 	return is_same ? LIVE : GONE
 }
 
-// **The whole of the judgement, in four reads.** The carry record must be `carried` — an `expired`,
-// `none` or `unreadable` read is never a strand, because there is either no budget to strand or no way
-// to trust what the record says. It must be handed off and *not* yet adopted — `adopt_carry` spends
+// **The whole of the judgement, in four reads.** The carry record must be `carried` — a `none` or
+// `unreadable` read is never a strand, because there is either no run to strand or no way to trust
+// what the record says. It must be handed off and *not* yet adopted — `adopt_carry` spends
 // `is_handed_off` the instant a successor claims it, so a claimed successor reads `false` here. The owner
 // must be gone — a live owner is a session still spending the budget, the ordinary in-flight state. And
 // the supervisor must be `gone` — `live` or `unknown` both count as something that could still wake a
