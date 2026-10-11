@@ -172,6 +172,7 @@ describe('playwright_browsers.install_when_needed — nothing to install', () =>
 	it('installs nothing for an unmoved version whose browser is a system channel', () => {
 		install_manifest(PREVIOUS_VERSION)
 		arrange_plan(SYSTEM_PLAN)
+		exists_mock.mockReturnValue(false)
 
 		expect(playwright_browsers.install_when_needed(PREVIOUS_VERSION)).toBe(0)
 		expect(count_installs()).toBe(0)

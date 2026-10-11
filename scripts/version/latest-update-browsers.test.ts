@@ -131,16 +131,28 @@ describe('latest_update.main — when the browser install must not run', () => {
 		expect(count_installs()).toBe(1)
 	})
 
-	it('runs no install when the update itself failed', () => {
-		arrange_update(BUMPED_VERSION, UPDATE_FAILURE_STATUS)
+	it('runs no install when the update failed before moving @playwright/test', () => {
+		arrange_update(PREVIOUS_VERSION, UPDATE_FAILURE_STATUS)
 		latest_update.main()
 
 		expect(count_installs()).toBe(0)
+		expect(sync_mock).not.toHaveBeenCalled()
+	})
+})
+
+// `node_modules` carries the bumped package however the update ended, and the browser tests that
+// run next launch that one.
+describe('latest_update.main — an update that moved @playwright/test and did not settle', () => {
+	it('installs the browsers when a later stage of the update failed', () => {
+		arrange_update(BUMPED_VERSION, UPDATE_FAILURE_STATUS)
+		latest_update.main()
+
+		expect(count_installs()).toBe(1)
+		expect(sync_mock).not.toHaveBeenCalled()
 	})
 
-	// A rollback restores the manifest and the lockfile, so the next install puts the previous
-	// Playwright back — its browsers are the ones already downloaded.
-	it('runs no install after a rollback', () => {
+	// A rollback restores the manifest and the lockfile only; the bumped package stays installed.
+	it('installs the browsers after a rollback', () => {
 		execa_sync_mock.mockImplementation(() => {
 			tree.package_json = DOWNGRADED_MANIFEST
 			tree.installed = BUMPED_VERSION
@@ -149,6 +161,7 @@ describe('latest_update.main — when the browser install must not run', () => {
 		})
 		latest_update.main()
 
-		expect(count_installs()).toBe(0)
+		expect(count_installs()).toBe(1)
+		expect(sync_mock).not.toHaveBeenCalled()
 	})
 })

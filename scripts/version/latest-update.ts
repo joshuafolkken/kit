@@ -165,16 +165,17 @@ function report_lockfile_overrides(): void {
 	process.exitCode = 1
 }
 
-// Both follow-ups act on the versions the update settled on, so neither runs after a failed update
-// or after a rollback — the latter so the tree really is left exactly as it was found: the sync
-// rewrites the workflows' pinned safe-chain installer, which would contradict the notice that
-// nothing changed.
-function follow_up_update(playwright_version: string | undefined): void {
-	safe_chain_version_update.sync()
-
+// The browsers follow what `node_modules` holds, not how the update ended: a later stage failing
+// after `@playwright/test` moved, and a rollback — which restores the manifest and the lockfile but
+// leaves the newer package installed — both leave a Playwright whose browsers were never downloaded,
+// and the browser tests that run next would fail with "Executable doesn't exist".
+function install_browsers(playwright_version: string | undefined): void {
 	if (playwright_browsers.install_when_needed(playwright_version) !== 0) process.exitCode = 1
 }
 
+// The sync acts on the versions the update settled on, so it runs neither after a failed update nor
+// after a rollback — the latter so the files really are left exactly as they were found: it rewrites
+// the workflows' pinned safe-chain installer, which would contradict the notice that nothing changed.
 function main(): void {
 	const snapshot = take_snapshot()
 	const playwright_version = playwright_browsers.read_installed_version()
@@ -187,7 +188,9 @@ function main(): void {
 	report_overrides(overrides)
 	report_lockfile_overrides()
 
-	if (outcome.status === 0 && !outcome.is_rolled_back) follow_up_update(playwright_version)
+	if (outcome.status === 0 && !outcome.is_rolled_back) safe_chain_version_update.sync()
+
+	install_browsers(playwright_version)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
