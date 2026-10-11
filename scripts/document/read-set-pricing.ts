@@ -9,11 +9,12 @@
 // was worth moving off the entry read.
 //
 // **The rate is not defined here.** The per-million-token input rate and the cache-read multiplier
-// come from `cost-pricing.ts` — the same constants `josh cost` and `josh time` price a run with — so
+// come from `cost-pricing.ts` — the same price table `josh cost` and `josh time` price a run with — so
 // there is no second price list to drift. This file is the model (a token rides every request as a
 // cache read) and the one assumption the model needs (how many requests a run makes); the arithmetic
 // is `cost_pricing.estimate_cost`'s.
 
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import { cost_usage } from '#scripts/cost-runtime/cost-usage'
 
@@ -23,10 +24,10 @@ import { cost_usage } from '#scripts/cost-runtime/cost-usage'
 // much per entry-read token, so the figure is "per run of this size", never an absolute.
 const ASSUMED_REQUESTS = 118
 
-// The model these runs execute on. Its base input rate and the cache-read multiplier are read from
-// the price table rather than written here, so the dollar figure tracks any price change with no edit
-// to this file.
-const REFERENCE_MODEL = 'claude-opus-4-8'
+// The model these runs execute on — the worker's default, read from the profile that launches a lane
+// rather than written here, so a model migration moves the dollar figure with no edit to this file.
+// Its base input rate and cache-read multiplier come from the price table in the same way.
+const REFERENCE_MODEL = agent_role_profile.DEFAULT_PROFILES.worker.model
 
 // A token read at the entry is written to cache once and then read back on every request. Modelled as
 // a pure cache read across the run — the one-time write is under 1% of the total and folding it in
@@ -45,6 +46,7 @@ function dollars_per_run(tokens: number): number {
 
 const read_set_pricing = {
 	ASSUMED_REQUESTS,
+	REFERENCE_MODEL,
 	dollars_per_run,
 }
 
