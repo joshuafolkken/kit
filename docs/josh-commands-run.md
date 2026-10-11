@@ -447,7 +447,7 @@ pnpm josh run:watcher:guard
 
 ### `josh run:stranded`
 
-Report whether the run has been left stranded: the budget was handed off at a cut, the session that owned it has died, no successor ever claimed it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the carry record's hand-off, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. Wired into the `Stop` hook beside `backlog:stalled`, so it runs at each loop boundary; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.
+Report whether the run has been left stranded: the session that owned the budget has died — at a cut it handed off, or with no hand-off at all — no successor holds it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the driver the carry record names, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. Wired into the `Stop` hook beside `backlog:stalled`, so it runs at each loop boundary; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.
 
 ```bash
 pnpm josh run:stranded

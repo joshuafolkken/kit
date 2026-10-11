@@ -155,7 +155,8 @@ async function carried_owner_live(): Promise<boolean | undefined> {
 // **A stall is a live driver not dispatching, so a record whose owner is gone is not asked.** A record
 // stands until a person carries or discards it, so a crashed run's would otherwise re-arm the stall's
 // `git worktree list` and network backlog probe on every stop in the repository, for a run nobody
-// drives. A gone driver is the strand check's question, and that one reads local files only.
+// drives. A gone driver is the strand check's question — handed off or not (`run-stranded.ts` →
+// `had_driver`) — and that one reads local files only.
 async function run_report_checks(): Promise<void> {
 	const is_owner_live = await carried_owner_live()
 

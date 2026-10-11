@@ -271,7 +271,7 @@ function read_default_branch_version(repo: string): string | undefined {
 // would start a dependent before its blocker's release existed. What is asked is only whether the
 // repository *is* a workspace — the members are not enumerated and nothing looks for which of them
 // publishes, so a workspace whose members are all private waits when it need not. That is the safe
-// direction: waiting ends at the run's own timeout, resolving early does not end at all.
+// direction: waiting ends when the run's idle wait runs out, resolving early does not end at all.
 function publishes_nothing(repo: string): boolean {
 	const answer = read_manifest(repo)
 

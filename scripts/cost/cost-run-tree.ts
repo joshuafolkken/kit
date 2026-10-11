@@ -14,8 +14,8 @@ import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes
 // transcript, which under a batch is one lane child and answers for a twelfth of the run.
 
 // A main-checkout session that starts after the store sat quiet for longer than this opens a new run.
-// **The quiet is measured from the last write of any session, not from the previous main's start**: a
-// run idles for the whole idle wait once nothing can proceed, then a child runs for as long as it
+// **The quiet is measured from the last write any session made before it, not from the previous
+// main's start**: a run idles for the whole idle wait once nothing can proceed, then a child runs for as long as it
 // takes before the wake that judges it, so two mains of one run start any distance apart — but no
 // session writes only while the run waits, and that wait is bounded. One poll is added because the
 // pick the last poll makes starts its child after the wait's end. Two runs closer than this merge,
@@ -59,15 +59,33 @@ function start_of(file: SessionFile, context: NodeContext): number {
 	return cost_run_nodes.started_ms(context.facts(file.session_id).records)
 }
 
-// The last write of any other session that had begun by the time `main` started — `-Infinity` when it
-// is the first, so nothing precedes it.
-function active_before(main: SessionFile, activity: Activity, context: NodeContext): number {
-	const start = start_of(main, context)
-	const earlier = activity.sessions.filter(
-		(file) => file !== main && start_of(file, context) <= start,
+// Every write of the top-level sessions, oldest first. A session is written for as long as it is
+// continued, so its last write says nothing about a moment before it: a conversation resumed the next
+// morning, or a lane still running, was last written after every main that started in between.
+function write_stamps(activity: Activity, context: NodeContext): Array<number> {
+	const stamps = activity.sessions.flatMap((file) =>
+		context.facts(file.session_id).records.map((record) => record.at_ms),
 	)
 
-	return Math.max(...earlier.map((file) => file.modified_ms))
+	return stamps.filter((ms) => ms !== undefined).toSorted((left, right) => left - right)
+}
+
+// The last write before each main started — `-Infinity` when nothing precedes it. A session's own
+// writes begin at its start, so none of them is counted against it. `mains` are oldest-first, so one
+// pass over the stamps serves them all.
+function writes_before(activity: Activity, context: NodeContext): Map<string, number> {
+	const stamps = write_stamps(activity, context)
+	const before = new Map<string, number>()
+	let cursor = FIRST
+
+	for (const main of activity.mains) {
+		const start = start_of(main, context)
+
+		while ((stamps[cursor] ?? Infinity) < start) cursor += 1
+		before.set(main.session_id, stamps[cursor - 1] ?? -Infinity)
+	}
+
+	return before
 }
 
 // Whether the store was still active within the run window before `main` started, so the main extends
@@ -85,12 +103,13 @@ function open_cluster(file: SessionFile, start: number): Cluster {
 // the run window.
 function cluster_mains(activity: Activity, context: NodeContext): Array<Cluster> {
 	const clusters: Array<Cluster> = []
+	const before = writes_before(activity, context)
 
 	for (const file of activity.mains) {
 		const start = start_of(file, context)
 		const last = clusters.at(NONE)
 
-		if (fits(last, start - active_before(file, activity, context))) last.files.push(file)
+		if (fits(last, start - (before.get(file.session_id) ?? -Infinity))) last.files.push(file)
 		else clusters.push(open_cluster(file, start))
 	}
 
