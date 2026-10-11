@@ -88,7 +88,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	},
 	adopt: {
 		script: 'scripts/adopt/adopt.ts',
-		description: 'Upgrade every installed @joshuafolkken toolkit here and open the pull request',
+		description: 'Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR',
 		category: 'Project',
 		reference: ['[--dry-run]', 'developer', ['files', 'git', 'network', 'processes']],
 	},

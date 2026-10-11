@@ -8,7 +8,10 @@ import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 // The decisions `josh adopt` makes before any step runs: whether this repository may adopt at all,
 // which repository the issue is opened in, and what the run is carrying.
 
-const ADOPT_ORIGIN = 'Opened by `josh adopt` in this repository.'
+// It names `josh latest` because the issue title names only the toolkits: without this sentence the
+// other dependency bumps in the pull request have nothing in the issue that accounts for them.
+const ADOPT_ORIGIN =
+	'Opened by `josh adopt` in this repository, which also ran `josh latest` — the other dependencies and the pnpm pin are updated alongside.'
 const INCOMPLETE_HEADLINE =
 	'Refusing to adopt: these declared toolkits would fall out of the plan, and the run would sync the rest without them.'
 const INCOMPLETE_EFFECT =

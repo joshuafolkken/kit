@@ -1,6 +1,6 @@
 ---
 name: dependency-update
-description: Checks after `pnpm update`, `josh latest`, `pnpm josh overrides` or any dependency update — the `overrides` survived, the one expected `devEngines` change. Read it before reporting the pins intact or pinning a bump back.
+description: Checks after `pnpm update`, `josh latest`, `josh adopt`, `pnpm josh overrides` or any dependency update — the `overrides` survived, the one expected `devEngines` change. Read it before reporting the pins intact or pinning a bump back.
 ---
 
 # After a dependency-update command
@@ -8,8 +8,9 @@ description: Checks after `pnpm update`, `josh latest`, `pnpm josh overrides` or
 `CLAUDE.md` → "Decision autonomy" keeps both prohibitions resident as Tier C — never touch `overrides`
 in either file, never touch `devEngines`, without explicit user approval. This skill is the other
 half: what you actually run to find out whether a command already touched them, and how to read the
-one change that is expected. It applies after `pnpm update`, `josh latest`, `pnpm josh overrides`,
-a Dependabot merge, or any other command that can rewrite dependency versions.
+one change that is expected. It applies after `pnpm update`, `josh latest`, `josh adopt` (which runs
+`josh latest` as one of its steps), `pnpm josh overrides`, a Dependabot merge, or any other command
+that can rewrite dependency versions.
 
 This skill is the single source of the overrides protection's procedure;
 `prompts/collaboration-workflow/operating-rules.md` only points here. Overrides were added on
@@ -34,6 +35,8 @@ or any dependency-update command, verify the overrides in both `pnpm-workspace.y
 git diff -- pnpm-workspace.yaml package.json
 ```
 
+(after `josh adopt`, which has already committed and returned to the default branch, compare the
+pull-request branch instead: `git diff <default>...<branch> -- pnpm-workspace.yaml package.json`)
 and confirm the effective `overrides:` block in `pnpm-workspace.yaml` and any historical
 `pnpm.overrides` declarations in `package.json` are untouched, **and** that `devDependencies`
 versions still respect the effective overrides. If any entry was removed, modified, or bumped past

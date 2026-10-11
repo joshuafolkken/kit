@@ -281,7 +281,7 @@ Run unit tests with Vitest (skips when Vitest is absent; fails when it has no te
 
 `[--dry-run]`
 
-Upgrade every installed @joshuafolkken toolkit here and open the pull request
+Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR
 
 ---
 

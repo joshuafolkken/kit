@@ -185,6 +185,10 @@ function main(): void {
 
 	const outcome = update_without_downgrading(snapshot)
 
+	// A failed `pnpm update` fails the command: the `josh latest` chain and `josh adopt` both read the
+	// exit code, and a zero here would let them carry on over dependencies that were never updated.
+	if (outcome.status !== 0) process.exitCode = outcome.status
+
 	report_overrides(overrides)
 	report_lockfile_overrides()
 
