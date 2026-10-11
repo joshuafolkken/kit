@@ -32,7 +32,7 @@ interface WakeContext {
 }
 
 function carry_cuts(read: CarryRead): string {
-	if (read.kind === 'carried' || read.kind === 'expired') return String(read.carry.cuts)
+	if (read.kind === 'carried') return String(read.carry.cuts)
 
 	return UNKNOWN_CUTS
 }
@@ -70,15 +70,13 @@ function deadline(marked_at: string | undefined, limit_ms: number): string {
 }
 
 // A live owner that is this supervisor is its own driver at work; any other is a session spending the
-// budget, which has no deadline of its own short of the carry record's whole-run expiry.
+// budget, which has no deadline of its own.
 function owner_wait(wake: RunWake, carry: RunCarry): string {
 	if (carry.owner_pid === wake.pid) {
 		return 'waiting: the driver holds the carry record and is running'
 	}
 
-	const expiry = deadline(carry.started_at, run_carry.CARRY_MAX_AGE_MS)
-
-	return `waiting: process ${String(carry.owner_pid)} holds the carry record; the driver starts at its next cut or once it exits, and the record expires at ${expiry}`
+	return `waiting: process ${String(carry.owner_pid)} holds the carry record; the driver starts at its next cut or once it exits`
 }
 
 const WAIT_LINES: Partial<Record<WakeDecision['kind'], (wake: RunWake) => string>> = {

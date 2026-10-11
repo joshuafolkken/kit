@@ -6,7 +6,7 @@ import { run_board_phase } from './run-board-phase'
 // joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a short span.
 // joshuafolkken/kit#3486: its words are English whatever the session language.
 
-const { WORDS, bar_of, clock_of, elapsed_of, left_of, minute_of, spinner_of } = run_board_labels
+const { WORDS, bar_of, clock_of, elapsed_of, minute_of, span_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_INTERVAL_MS, painted } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
@@ -23,7 +23,7 @@ describe('run_board_labels.WORDS', () => {
 	})
 })
 
-// joshuafolkken/kit#3444: elapsed times are a short `MM:SS`, time left is `7h38m`, and the one bar the
+// joshuafolkken/kit#3444: elapsed times are a short `MM:SS`, and the one bar the
 // board draws fills in proportion.
 describe('run_board_labels.elapsed_of', () => {
 	it('draws minutes and seconds whose minutes never carry into hours', () => {
@@ -37,11 +37,21 @@ describe('run_board_labels.elapsed_of', () => {
 	})
 })
 
-describe('run_board_labels.left_of', () => {
-	it('draws hours and zero-padded minutes, a passed deadline as zero', () => {
-		expect(left_of(7 * HOUR + 38 * MINUTE + 59 * SECOND)).toBe('7h38m')
-		expect(left_of(5 * MINUTE)).toBe('0h05m')
-		expect(left_of(-MINUTE)).toBe('0h00m')
+// joshuafolkken/kit#3687: an ended run's `⏱ 03:25` read as a time of day beside `🔚 03:33`. A span is
+// always three fields, so two separators are a length and one is a moment.
+describe('run_board_labels.span_of', () => {
+	it('draws a span under an hour with its zero hour, so it never reads as a time', () => {
+		expect(span_of(3 * MINUTE + 25 * SECOND + 999)).toBe('0:03:25')
+		expect(span_of(0)).toBe('0:00:00')
+	})
+
+	it('carries minutes into hours it does not pad', () => {
+		expect(span_of(7 * HOUR + 42 * MINUTE + 18 * SECOND)).toBe('7:42:18')
+		expect(span_of(12 * HOUR + 5 * SECOND)).toBe('12:00:05')
+	})
+
+	it('reads a negative span as zero', () => {
+		expect(span_of(-MINUTE)).toBe('0:00:00')
 	})
 })
 

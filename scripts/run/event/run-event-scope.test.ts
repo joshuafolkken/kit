@@ -35,10 +35,6 @@ describe('run_event_scope.scope_of', () => {
 		expect(run_event_scope.scope_of({ kind: 'carried', carry: CARRY })).toEqual(since(START))
 	})
 
-	it('takes it from an expired record too, since expiry is a budget verdict not a missing start', () => {
-		expect(run_event_scope.scope_of({ kind: 'expired', carry: CARRY })).toEqual(since(START))
-	})
-
 	it('leaves the scope undetermined when no record is there or it cannot be read', () => {
 		expect(run_event_scope.scope_of({ kind: 'none' })).toEqual(run_event_scope.UNKNOWN_EVENT_SCOPE)
 		expect(run_event_scope.scope_of({ kind: 'unreadable' })).toEqual(

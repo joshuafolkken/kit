@@ -24,7 +24,6 @@ const LAUNCH = {
 const WINDOW = {
 	since_ms: START,
 	until_ms: START + 20 * MINUTE,
-	bound: 'idle' as const,
 	asked_ms: START,
 }
 const IDLE = { pos: 2, at: LAUNCH.at, kind: 'idle', text: backlog_idle.text_of(WINDOW) }
@@ -78,18 +77,19 @@ describe('run_board_tick.tick before the plan is read', () => {
 	})
 
 	// The regression: the running count was the plan's, so a board still loading drew a run as waiting.
-	it('draws no wait line and no ⏸ while a child runs, though the stream says the run waits', async () => {
+	it('draws no ⏸ and no ⌛ while a child runs, though the stream says the run waits', async () => {
 		const lines = await loading([LAUNCH, IDLE])
 
 		expect(lines[0]).not.toMatch(/^⏸/u)
-		expect(lines.join('\n')).not.toContain('wait ends')
+		expect(lines[1]).not.toMatch(/[⏸⌛]/u)
 	})
 
-	it('draws the wait under the blank when no child runs', async () => {
+	it('draws the wait on the second line, and nothing under the blank, when no child runs', async () => {
 		const lines = await loading([{ ...IDLE, pos: 1 }])
 
 		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines.slice(2, 4)).toStrictEqual(['', expect.stringMatching(/^ {2}⏸ wait ends /u)])
+		expect(lines[1]).toMatch(/^⏱ \S+ {2}⏸ \d{2}:\d{2} {2}⌛ \d+:\d{2}:\d{2}/u)
+		expect(lines.slice(2).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 })
 

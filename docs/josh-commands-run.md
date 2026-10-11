@@ -58,7 +58,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 - `--end` over a live record first collects each lane the run launched and never settled whose issue merged — closed by a merged pull request, or left open behind one — exactly as `run:merge` would: the merge is counted, put on the event stream and in the ledger, and the lane closed. A lane a detached `josh ship` still supervises, or one that did not merge, is left; a failed collection goes to stderr and the record is still cleared.
 - `--end` keeps the run it removes as the last ended run — its invocation, start and end, one record overwritten by the next `--end` — so `run:board` can still draw a finished run.
 
-**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended`, `expired` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
+**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
 ### `josh run:add`
 
@@ -98,7 +98,7 @@ another live owner's run.
 
 **A failure is visible rather than silent.** A judgment wake that never claims the carry record is
 retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
-record that expired or cannot be read ends it the same way. A `failed` stop while the carry record is
+record that cannot be read ends it the same way. A `failed` stop while the carry record is
 still resumable restarts the supervisor in place after one interval, up to three times; only the
 failure past that bound sends the warning, its note counting the restarts. `none` — the run having finished — and a
 person's own `--stop` stay silent. Once the run-tooling defect that stopped it has been fixed, a stop
@@ -125,7 +125,7 @@ outdated or unauthenticated CLI refuses without fallback, promotion or worker re
 `run:wake --list`, `lane:list`, the review brief and each launch log expose the resolved provider,
 role, model and effort; the worker's launch is "`josh lane:dispatch`".
 
-**Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `expired`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `expired`, `unreadable`, and `failed` each warn.
+**Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `unreadable` and `failed` each warn.
 
 ### `josh run:cut`
 
@@ -225,7 +225,7 @@ merge, `backlog:next` after a park, `run:cut --resume <N>` after a cut — until
 appends `resume`, which reads as `implement` again — `run:carry --cut` after a
 Codex parent's dispatch below the cut cap), a fixed verdict otherwise
 (`implement`, `human-review`, `update-deps`, `already-done`, `wait`, `stop`, `unknown`), or a `decide:`
-line for the one Tier-B point it surfaces — a spent whole-run budget. It dispatches rather than
+line for the one Tier-B point it surfaces — a closed issue whose tree still holds uncommitted work. It dispatches rather than
 re-decides: a merged child's outcome stays `run:merge`'s, the next issue `backlog:next`'s. `run:next`
 is now its degenerate form — the pre-implementation position mapped to prose over the one shared
 mapping, so there is no second implementation.
@@ -429,7 +429,7 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 `--every <minutes>` answers a request for periodic progress off-screen, with no model in between: started in the background, it sends the `--chat` frame as a `📊 Progress` Telegram at once and every `<minutes>` after, sends the ended run's frame once after `run:carry --end` and exits; with no run here it sends nothing and exits. It runs only when a person asks for it — the `run:progress` heartbeat still sends no Telegram — and `JOSH_PROGRESS=0` sends nothing. A failed send is reported on stderr and the next interval sends again.
 
-The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, `✋` waiting on a person, `■` ended), a progress bar with arrivals as `(+N)` and per-state counts, `💓` age of the newest event (yellow after 15 silent minutes, red after 30), `⚠` only when a plan read failed; then `⏱` elapsed, `⌛` time left to the cut-off and the machine's gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). While the run waits on an empty backlog it adds when the wait ends and why. Below: touched children — each with its elapsed `MM:SS` and a track of every phase it has passed (`investigate` → `plan` → `implement` → `review` → `gate` → `commit` → `followup`, read from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events), a settled child's ending on its state icon — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
+The header is two lines of symbols: the run's state (`▶` running, `⏸` idle, `✋` waiting on a person, `■` ended), a progress bar with arrivals as `(+N)` and per-state counts, `💓` age of the newest event (yellow after 15 silent minutes, red after 30), `⚠` only when a plan read failed; then `⏱` elapsed as `H:MM:SS` and the machine's gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). Only while the run waits with no child running, the second line also carries `⏸ HH:MM`, when its hands became free, and `⌛ H:MM:SS`, the wait left — two colons are a length, one is a time of day — and a run waiting on a person leads with `✋` instead of `⏸`. An ended run draws `⏱ H:MM:SS  🔚 HH:MM`. The header never grows a third line. Below: touched children — each with its elapsed `MM:SS` and a track of every phase it has passed (`investigate` → `plan` → `implement` → `review` → `gate` → `commit` → `followup`, read from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events), a settled child's ending on its state icon — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
 
 On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
 
@@ -447,7 +447,7 @@ pnpm josh run:watcher:guard
 
 ### `josh run:stranded`
 
-Report whether the run has been left stranded: the budget was handed off at a cut, the session that owned it has died, no successor ever claimed it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the carry record's hand-off, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. Wired into the `Stop` hook beside `backlog:stalled`, so it runs at each loop boundary; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.
+Report whether the run has been left stranded: the session that owned the budget has died — at a cut it handed off, or with no hand-off at all — no successor holds it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the driver the carry record names, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. Wired into the `Stop` hook beside `backlog:stalled`, so it runs at each loop boundary; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.
 
 ```bash
 pnpm josh run:stranded

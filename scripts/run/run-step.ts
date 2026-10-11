@@ -46,11 +46,6 @@ const VOCABULARY: ReadonlyArray<string> = [
 	UNKNOWN,
 ]
 
-// The whole-run bound is spent, and carrying the budget or discarding it is a person's call — the one
-// Tier-B point this machine surfaces rather than choosing.
-const EXPIRED_DECISION =
-	'decide: whole-run budget spent — resume with `pnpm josh run:carry --resume` | discard with `pnpm josh run:carry --end`'
-
 // The one step a stopped run still owes before it ends: the end-of-run retrospective.
 // It reads the run's own measurements and files the improvements worth carrying into the next run;
 // the command is kit-only, so it means nothing — and is never printed — in a consumer project.
@@ -288,12 +283,11 @@ function is_handed_off_parent(input: CarryFacts): boolean {
 	return input.is_handed_off && input.carry_kind === 'carried' && !input.is_lane_child
 }
 
-// The carry record's terminal answers: an unreadable record leaves the position unknowable, a handed-off
-// run is its successor's, and a spent budget is the person's call.
+// The carry record's terminal answers: an unreadable record leaves the position unknowable, and a
+// handed-off run is its successor's.
 function carry_terminal_action(input: CarryFacts): StepAction | undefined {
 	if (input.carry_kind === 'unreadable') return verdict(UNKNOWN)
 	if (is_handed_off_parent(input)) return verdict(STOP)
-	if (input.carry_kind === 'expired') return { kind: 'decide', line: EXPIRED_DECISION }
 
 	return undefined
 }
@@ -371,7 +365,6 @@ function next_action(input: StepInput): StepAction {
 
 const run_step = {
 	ALREADY_DONE,
-	EXPIRED_DECISION,
 	HAND_OFF_COMMAND,
 	HUMAN_REVIEW,
 	IMPLEMENT,

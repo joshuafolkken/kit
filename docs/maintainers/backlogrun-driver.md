@@ -20,10 +20,10 @@ next `--begin` naming the same invocation answers `resumed` — even while the c
 running. A `--merged` or `--filed` issued after the `--cut` is refused.
 
 **`backlog:budget` is fed from the record, never from a count kept in the conversation:** `--started`
-takes the record's `started_at` and `--merged` its `merged`, so `--max` and the 8-hour whole-run bound
-count across cuts, as one invocation's worth. The 10-filings-per-run ceiling is counted the same way,
-from `filed`. **`--idle` is the one budget that is not carried**: a resumed session states its resume
-moment as `--active` and the watch begins again at its full budget, bounded by the 8 hours.
+takes the record's `started_at` and `--merged` its `merged`, so `--max` counts across cuts, as one
+invocation's worth. The 10-filings-per-run ceiling is counted the same way, from `filed`. **`--idle`
+is the one budget that is not carried**: a resumed session states its resume moment as `--active` and
+the watch begins again at its full budget.
 
 **How many cuts the run crossed is named in the completion report**, read from the record's `cuts`,
 beside how many sessions were woken — one wake per cut is the invariant, and what counts is a carry
@@ -32,26 +32,27 @@ record actually claimed, never a process started.
 **`run:wake` supervises the driver.** After a cut or dead-owner recovery it adopts the carry record and
 runs `backlog:drive` itself; the driver dispatches, collects, watches and reports without starting a
 parent AI session. A handed-off record, or one whose owner died, starts the driver; a live owner
-prevents a second driver from taking it over; on `none`, `expired` or `unreadable` it stops. The
+prevents a second driver from taking it over; on `none` or `unreadable` it stops. The
 supervisor writes no label of its own, takes named issues from the invocation and pool issues from the
 offer command, and spends the declared budget without ever declaring another. The named prefix
-consults the carried maximum and whole-run bound before each launch, and a failed named issue skips
+consults the carried maximum before each launch, and a failed named issue skips
 the rest of the prefix. `window`, `merge busy` and `merge retry` reach a session only after the
 supervisor's own re-runs run out (`run-wake-driver.ts`).
 
 ## The two budgets
 
-**A `backlogrun` may declare how long it will watch an empty backlog and how many issues it may
-take.** The idle watch is on by default while the maximum is not:
+**A `backlogrun` may declare how long it will wait once nothing can proceed and how many issues it
+may take.** The idle watch is on by default while the maximum is not:
 
-| Budget         | Written            | Default        | What it does                                                                                                                     |
-| -------------- | ------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Idle watch     | `--idle <minutes>` | **30 minutes** | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch from that moment |
-| Maximum issues | `--max <count>`    | unlimited      | How many issues this invocation may take. On reaching it the run reports and finishes                                            |
+| Budget         | Written            | Default     | What it does                                                                                                                                                                                                                                             |
+| -------------- | ------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Idle watch     | `--idle <minutes>` | **8 hours** | Once nothing can proceed — the backlog is empty, every opted-in issue waits on a person, or the listing could not be read — keep polling this long, counted from when the run's hands became free. A child that runs restarts the watch from that moment |
+| Maximum issues | `--max <count>`    | unlimited   | How many issues this invocation may take. On reaching it the run reports and finishes                                                                                                                                                                    |
 
 **`--idle 0` is the only way to turn the watch off.** The default's single source is
-`scripts/backlog/backlog-budget.ts` → `DEFAULT_IDLE_MINUTES`. A watch is polled every 5 minutes, not
-at the loop's 60-second interval.
+`scripts/backlog/backlog-budget.ts` → `IDLE_WAIT_HOURS` — the only 8 hours the run knows: nothing is
+counted from the run's start, so no run is ended by its own age. A watch is polled
+every 5 minutes, not at the loop's 60-second interval.
 
 **`backlog:offer` asks `backlog:budget` on every iteration** and hands back one verdict:
 
@@ -86,16 +87,16 @@ took, how many were picked up during an idle watch, and the termination reason q
 **A watch does not count towards the session cut.** The hand-off check is asked at a child's merge,
 and a watch has no merges, so a run that is only watching never reaches one — nor does the
 supervisor's `backlog:drive`, which has no session to cut (joshuafolkken/kit#3156). A Codex parent's
-cut is the one taken at a dispatch instead. The 8-hour whole-run bound still outranks all of this.
+cut is the one taken at a dispatch instead.
 
 ## Where the run stops
 
 Termination is decided by what the loop is told, never by a judgement that enough has been done:
 
 - **`--only` ends the run once the named list is done** — it never enters the pool loop.
-- **`pnpm josh backlog:budget` answering `stop`** — an idle watch running out, the backlog emptying
-  with the watch off, the maximum reached, a parked backlog, an unreadable listing, and the whole-run
-  bound.
+- **`pnpm josh backlog:budget` answering `stop`** — an idle watch running out, the maximum reached,
+  and, only with the watch turned off by `--idle 0`, an empty backlog, a parked backlog or an
+  unreadable listing. With the watch on, all three wait instead.
 - **The guards in `backlogrun.md` → "Guards"**, counted over the whole `backlogrun`; whichever binds
   first ends the run.
 - **A `needs-human-review` child stops the whole run** before its commit (`needs-human-review.md`).
@@ -124,7 +125,7 @@ graph).
 asks, not a timer the parent sets.** `backlog:drive` polls lane completion and the backlog inside the
 detached process; `lane:await` wakes on a child's completion and `run:progress --wait` on an arrival,
 and the watcher's interval reports wake nobody (joshuafolkken/kit#3102). With no child in flight the
-watcher may decline; the driver still polls for new work and enforces the idle and whole-run bounds. A
+watcher may decline; the driver still polls for new work and enforces the idle bound. A
 GitHub listing failure stays a retry or unreadable answer from the offer command, never an empty
 backlog. `epic:next` prints each holder's label age beside it, marked `stale` past the window.
 

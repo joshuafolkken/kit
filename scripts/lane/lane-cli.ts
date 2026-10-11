@@ -62,9 +62,7 @@ async function guard_cut_session(): Promise<string | undefined> {
 
 	const read = run_carry.read_carry(run_carry.carry_path(directory))
 
-	if ((read.kind !== 'carried' && read.kind !== 'expired') || read.carry.is_handed_off !== true) {
-		return undefined
-	}
+	if (read.kind !== 'carried' || read.carry.is_handed_off !== true) return undefined
 
 	return run_carry.count_refused_message(read.carry)
 }

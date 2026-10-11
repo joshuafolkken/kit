@@ -33,7 +33,7 @@ describe('backlog_budget.decide — the defaults', () => {
 		const decision = backlog_budget.decide(input_of({ answer: 'exhausted' }))
 
 		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.NO_IDLE_WATCH_REASON)
+		expect(decision.reason).toBe(backlog_budget.no_idle_watch_reason('exhausted'))
 	})
 
 	it('watches an empty backlog for the default budget when none was written', () => {
@@ -46,13 +46,13 @@ describe('backlog_budget.decide — the defaults', () => {
 	})
 
 	it('tells a watching run to ask again on the idle poll, not on the loop interval', () => {
-		const reason = backlog_budget.idle_watch_reason(backlog_budget.DEFAULT_IDLE_MS)
+		const reason = backlog_budget.idle_watch_reason('exhausted', backlog_budget.DEFAULT_IDLE_MS)
 
 		expect(reason).toContain(`ask again in ${String(backlog_budget.IDLE_POLL_MINUTES)} minutes`)
 	})
 
 	it('never asks for a sleep longer than the watch has left', () => {
-		const reason = backlog_budget.idle_watch_reason(LAST_MINUTE_MS)
+		const reason = backlog_budget.idle_watch_reason('exhausted', LAST_MINUTE_MS)
 
 		expect(reason).toContain(`ask again in ${String(LAST_MINUTE_MINUTES)} minutes`)
 	})
@@ -84,7 +84,7 @@ describe('backlog_budget.decide — the idle watch', () => {
 		)
 
 		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.idle_watch_reason(HALF_IDLE_MS))
+		expect(decision.reason).toBe(backlog_budget.idle_watch_reason('exhausted', HALF_IDLE_MS))
 	})
 
 	it('finishes once the idle budget has run out', () => {
@@ -97,7 +97,7 @@ describe('backlog_budget.decide — the idle watch', () => {
 		)
 
 		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.idle_expired_reason(IDLE_BUDGET_MS))
+		expect(decision.reason).toBe(backlog_budget.idle_expired_reason('exhausted', IDLE_BUDGET_MS))
 	})
 })
 
@@ -117,7 +117,7 @@ describe('backlog_budget.decide — a watch that opens while children are still 
 
 		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
 		expect(decision.reason).toBe(
-			backlog_budget.running_watch_reason(MERGED_UNDER_MAX, HALF_IDLE_MS),
+			backlog_budget.running_watch_reason('exhausted', MERGED_UNDER_MAX, HALF_IDLE_MS),
 		)
 	})
 
@@ -135,7 +135,7 @@ describe('backlog_budget.decide — a watch that opens while children are still 
 		expect(decision.reason).toBe(
 			backlog_budget.draining_reason(
 				MERGED_UNDER_MAX,
-				backlog_budget.idle_expired_reason(IDLE_BUDGET_MS),
+				backlog_budget.idle_expired_reason('exhausted', IDLE_BUDGET_MS),
 			),
 		)
 	})
@@ -160,7 +160,7 @@ describe('backlog_budget.decide — a candidate that appears during the watch', 
 		)
 
 		expect(restarted.verdict).toBe(backlog_budget.WATCH_VERDICT)
-		expect(restarted.reason).toBe(backlog_budget.idle_watch_reason(IDLE_BUDGET_MS))
+		expect(restarted.reason).toBe(backlog_budget.idle_watch_reason('exhausted', IDLE_BUDGET_MS))
 	})
 })
 
@@ -220,7 +220,10 @@ describe('backlog_budget.decide — no ending abandons a lane', () => {
 
 		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
 		expect(decision.reason).toBe(
-			backlog_budget.draining_reason(MERGED_UNDER_MAX, backlog_budget.UNREADABLE_REASON),
+			backlog_budget.draining_reason(
+				MERGED_UNDER_MAX,
+				backlog_budget.no_idle_watch_reason('unreadable'),
+			),
 		)
 	})
 
@@ -247,32 +250,6 @@ describe('backlog_budget.decide — no ending abandons a lane', () => {
 	})
 })
 
-describe('backlog_budget.decide — the bounds that outrank both budgets', () => {
-	it('stops at the whole-run bound even mid-watch', () => {
-		const decision = backlog_budget.decide(
-			input_of({
-				answer: 'candidates',
-				started_at_ms: NOW_MS - backlog_budget.WHOLE_RUN_BUDGET_MS,
-				idle_budget_ms: IDLE_BUDGET_MS,
-			}),
-		)
-
-		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.WHOLE_RUN_REASON)
-	})
-
-	it('keeps running just under the whole-run bound', () => {
-		const decision = backlog_budget.decide(
-			input_of({
-				answer: 'candidates',
-				started_at_ms: NOW_MS - backlog_budget.WHOLE_RUN_BUDGET_MS + MINUTE_MS,
-			}),
-		)
-
-		expect(decision.verdict).toBe(backlog_budget.RUN_VERDICT)
-	})
-})
-
 describe('backlog_budget.decide — an untriaged candidate', () => {
 	it('answers triage so the parent judges it, even with children running', () => {
 		const decision = backlog_budget.decide(
@@ -291,56 +268,5 @@ describe('backlog_budget.decide — an untriaged candidate', () => {
 		)
 
 		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
-	})
-})
-
-describe('backlog_budget.decide — the answers no budget can rescue', () => {
-	it('reports a parked backlog rather than watching it', () => {
-		const decision = backlog_budget.decide(
-			input_of({ answer: 'parked', idle_budget_ms: IDLE_BUDGET_MS }),
-		)
-
-		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.PARKED_REASON)
-	})
-
-	it('reports an unreadable listing rather than reading it as an empty backlog', () => {
-		const decision = backlog_budget.decide(
-			input_of({ answer: 'unreadable', idle_budget_ms: IDLE_BUDGET_MS }),
-		)
-
-		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.UNREADABLE_REASON)
-	})
-
-	it('says the listing broke even when the maximum was reached in the same ask', () => {
-		const decision = backlog_budget.decide(
-			input_of({ answer: 'unreadable', max_issues: MAX_ISSUES, merged: MAX_ISSUES }),
-		)
-
-		expect(decision.reason).toBe(backlog_budget.UNREADABLE_REASON)
-	})
-
-	it('says the backlog is parked even when the whole-run bound has also passed', () => {
-		const decision = backlog_budget.decide(
-			input_of({ answer: 'parked', started_at_ms: NOW_MS - backlog_budget.WHOLE_RUN_BUDGET_MS }),
-		)
-
-		expect(decision.reason).toBe(backlog_budget.PARKED_REASON)
-	})
-})
-
-// joshuafolkken/kit#2508: `backlog:drive` ends the carry record with `--stopped` unless the stop is the
-// run finishing — the idle watch ending on an empty backlog.
-describe('backlog_budget.is_finish — finishing against stopping', () => {
-	it('reads an empty backlog with the watch off as the run finishing', () => {
-		expect(backlog_budget.is_finish(input_of({ answer: 'exhausted' }))).toBe(true)
-	})
-
-	it('reads a parked backlog and the maximum as stopping', () => {
-		const at_max = input_of({ answer: 'exhausted', merged: MAX_ISSUES, max_issues: MAX_ISSUES })
-
-		expect(backlog_budget.is_finish(input_of({ answer: 'parked' }))).toBe(false)
-		expect(backlog_budget.is_finish(at_max)).toBe(false)
 	})
 })

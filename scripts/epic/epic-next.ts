@@ -194,7 +194,7 @@ function refuse(reason: string): number {
 
 // The verdict as it applies to *this* repository. `run` never reaches a caller here: it means some
 // other repository has work, which for this session is something to wait on rather than a state its
-// loop has a branch for. The whole-run timeout is what bounds that wait.
+// loop has a branch for. The idle wait is what bounds that wait.
 function repo_verdict(verdict: LaneOffer['verdict']): LaneOffer['verdict'] {
 	return verdict === 'run' ? 'wait' : verdict
 }

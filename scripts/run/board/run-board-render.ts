@@ -373,11 +373,7 @@ function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const above = [
-		...run_board_header.header_lines(header),
-		...resume_lines(view.resume),
-		...run_board_header.idle_lines(header),
-	]
+	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
 		plan: plan_sections(header, view.size),

@@ -55,7 +55,7 @@ function record_ended(
 	now: Date = new Date(),
 	stopped?: string,
 ): void {
-	if (read.kind !== 'carried' && read.kind !== 'expired') return
+	if (read.kind !== 'carried') return
 
 	const { invocation, started_at, owner_transcript } = read.carry
 	const ended_at = now.toISOString()

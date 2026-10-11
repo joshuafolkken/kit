@@ -117,6 +117,76 @@ describe('cost_run_tree.build_tree run grouping', () => {
 	})
 })
 
+describe('cost_run_tree.build_tree across an idle wait', () => {
+	// joshuafolkken/kit#3687: a run idles for up to the idle wait and then runs a child before the wake
+	// that judges it, so its two mains start ten hours apart while no stretch between them is quiet for
+	// longer than the wait.
+	it('keeps one run when a child and its judging wake follow the wait', () => {
+		const waited = [
+			sf('p1', false, 0, HOUR_MS),
+			sf('L', false, 0, 10 * HOUR_MS),
+			sf('p2', false, 0, 0),
+		]
+		const starts = new Map([
+			['p1', 0],
+			['L', 9 * HOUR_MS],
+			['p2', 10 * HOUR_MS + 1],
+		])
+		const tree = cost_run_tree.build_tree(waited, context(starts, new Map([['L', 1]])), undefined)
+
+		expect(tree?.run_count).toBe(1)
+		expect(tree?.nodes.map((node) => node.session_id)).toEqual(['p1', 'p2', 'L'])
+	})
+})
+
+// A context whose sessions carry every write, not only the first — a session continued later.
+function written(
+	writes: ReadonlyMap<string, ReadonlyArray<number>>,
+	lanes: ReadonlyMap<string, number>,
+): NodeContext {
+	return {
+		facts: (id) => ({
+			records: (writes.get(id) ?? []).map((at_ms) => rec(at_ms)),
+			baseline_tokens: 0,
+			is_readable: true,
+		}),
+		lane_issue: (file) => lanes.get(file.session_id),
+		took_cut: () => false,
+	}
+}
+
+describe('cost_run_tree.build_tree when an earlier session is written again later', () => {
+	// joshuafolkken/kit#3687: the quiet before a main is what was written before it started. A
+	// conversation continued the next morning, or a lane still running, is last written after the later
+	// main — and that write must not join two runs the store sat quiet between.
+	const files = [
+		sf('p1', false, 0, 30 * HOUR_MS),
+		sf('L', false, 0, 31 * HOUR_MS),
+		sf('p2', false, 0, 0),
+	]
+	const lanes = new Map([['L', 1]])
+
+	it('keeps two runs apart when the earlier parent is continued after the later one starts', () => {
+		const writes = new Map([
+			['p1', [0, 30 * HOUR_MS]],
+			['L', [HOUR_MS, 31 * HOUR_MS]],
+			['p2', [10 * HOUR_MS]],
+		])
+
+		expect(cost_run_tree.build_tree(files, written(writes, lanes), undefined)?.run_count).toBe(2)
+	})
+
+	it('keeps one run when the lane was still writing inside the window before the later parent', () => {
+		const writes = new Map([
+			['p1', [0, 30 * HOUR_MS]],
+			['L', [HOUR_MS, 9 * HOUR_MS, 31 * HOUR_MS]],
+			['p2', [10 * HOUR_MS]],
+		])
+
+		expect(cost_run_tree.build_tree(files, written(writes, lanes), undefined)?.run_count).toBe(1)
+	})
+})
+
 describe('cost_run_tree.build_tree without a parent session', () => {
 	it('roots the run on its lane sessions when no main-checkout session exists', () => {
 		const files = [sf('La', false, 0, 5), sf(SUB_LA, true, 1, 6)]

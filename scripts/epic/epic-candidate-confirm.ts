@@ -111,7 +111,7 @@ function is_still_runnable(
 // A read that failed withholds the candidate rather than confirming it. "Could not tell" is not
 // "nothing blocks it", and this is the one direction the guard may not fail in, because that answer
 // *starts* work — the same reason `epic-busy.ts` answers `wait` for a listing it could not read. The
-// caller then offers the next candidate or waits, and the whole-run timeout bounds the wait.
+// caller then offers the next candidate or waits, and the idle wait bounds the wait.
 async function read_or_withhold(
 	candidate: EpicChild,
 	read_blockers: BlockersReader,

@@ -29,7 +29,7 @@ const EVENT_PREFIX = 'josh-run-events-'
 // every reader — a person, an editor — that it is a line stream rather than a single document, the same
 // distinction the ambient `.log` draws.
 const EVENT_SUFFIX = '.jsonl'
-// A run's session-facing events over the 8-hour whole-run bound: a plan, a launch/PR/review-round/merge
+// A run's session-facing events over one unattended night: a plan, a launch/PR/review-round/merge
 // per child across a few dozen children, plus parks, cuts and stops. Five hundred keeps the whole of a
 // large `backlogrun` and still bounds an unattended run — past it the oldest events roll off.
 const EVENT_CAP = 500

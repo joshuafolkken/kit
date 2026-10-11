@@ -15,7 +15,7 @@ interface RestartPorts {
 	// One run of the loop over the record the caller claimed once and holds across every restart, so a
 	// `--stop` landing in the pause is read by the next pass as the person's stop.
 	pass: () => Promise<LoopStop>
-	// Whether the carry record can still be continued — `carried`, neither `expired` nor gone.
+	// Whether the carry record can still be continued — `carried`, neither unreadable nor gone.
 	is_resumable: () => boolean
 	pause: () => Promise<void>
 	note: (text: string) => void

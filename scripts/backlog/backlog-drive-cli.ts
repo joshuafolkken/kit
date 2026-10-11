@@ -71,7 +71,7 @@ async function read_record(): Promise<RunCarry | undefined> {
 
 	const read = run_carry.read_carry(run_carry.carry_path(target))
 
-	return read.kind === 'carried' || read.kind === 'expired' ? read.carry : undefined
+	return read.kind === 'carried' ? read.carry : undefined
 }
 
 async function read_offer(

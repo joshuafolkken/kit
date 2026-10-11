@@ -44,8 +44,8 @@ function is_cut_capped(carry: RunCarry, source: EnvironmentSource = process.env)
 }
 
 // Only a live, un-handed-off record binds the session to its lanes. After `run:carry --cut` the next
-// successor drives them, and after `--end` (`none`) or past the bound (`expired`) there is no run left
-// to drive — ending the turn is correct in all three. An unreadable record fails open, as every stop
+// successor drives them, and after `--end` (`none`) there is no run left to drive — ending the turn is
+// correct in both. An unreadable record fails open, as every stop
 // rule does (`stop-guard.ts`).
 function is_driving(read: CarryRead | undefined): boolean {
 	return read?.kind === 'carried' && read.carry.is_handed_off !== true

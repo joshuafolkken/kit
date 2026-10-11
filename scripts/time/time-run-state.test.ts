@@ -88,13 +88,6 @@ describe('time_run_state.classify status', () => {
 	it('reads an owner gone with no hand-off as owner_gone', () => {
 		expect(time_run_state.classify(input()).status).toBe(time_run_state.OWNER_GONE)
 	})
-
-	it('reads an expired record as abandoned and ended', () => {
-		const facts = time_run_state.classify(input({ carry: { kind: 'expired', carry: carry() } }))
-
-		expect(facts.status).toBe(time_run_state.EXPIRED)
-		expect(facts.is_ended).toBe(true)
-	})
 })
 
 describe('time_run_state.classify measurement', () => {

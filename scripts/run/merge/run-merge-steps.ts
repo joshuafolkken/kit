@@ -102,7 +102,7 @@ async function read_record(): Promise<{ target: string; carry: RunCarry } | unde
 	const target = run_carry.carry_path(directory)
 	const read = run_carry.read_carry(target)
 
-	if (read.kind !== 'carried' && read.kind !== 'expired') return undefined
+	if (read.kind !== 'carried') return undefined
 
 	return { target, carry: read.carry }
 }

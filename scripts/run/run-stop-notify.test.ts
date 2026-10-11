@@ -11,7 +11,6 @@ const CARRY = run_carry.fresh_carry(
 	new Date('2026-09-19T00:00:00.000Z'),
 )
 const CARRIED: CarryRead = { kind: 'carried', carry: CARRY }
-const EXPIRED: CarryRead = { kind: 'expired', carry: CARRY }
 const NONE: CarryRead = { kind: 'none' }
 const UNREADABLE: CarryRead = { kind: 'unreadable' }
 const REASON = 'every remaining child is blocked behind a parked one'
@@ -19,10 +18,6 @@ const REASON = 'every remaining child is blocked behind a parked one'
 describe('planning the stop the person is told about', () => {
 	it('plans a notice for a stop over a carried record', () => {
 		expect(run_stop_notify.plan(CARRIED, REASON)).toStrictEqual({ reason: REASON })
-	})
-
-	it('plans a notice over an expired record too', () => {
-		expect(run_stop_notify.plan(EXPIRED, REASON)).toStrictEqual({ reason: REASON })
 	})
 
 	it('plans nothing once the record is gone, so a re-run never sends twice', () => {

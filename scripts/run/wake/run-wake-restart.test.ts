@@ -9,7 +9,7 @@ import { run_wake_restart, type RestartPorts } from './run-wake-restart'
 const LIMIT = run_wake_restart.RESTART_LIMIT
 const FAILED: LoopStop = { reason: 'failed', note: 'main:sync failed' }
 const ENDED: LoopStop = { reason: 'ended', note: undefined }
-const EXPIRED: LoopStop = { reason: 'expired', note: undefined }
+const UNREADABLE: LoopStop = { reason: 'unreadable', note: undefined }
 const STOPPED: LoopStop = { reason: 'stopped', note: undefined }
 
 function ports_of(stops: ReadonlyArray<LoopStop>, is_resumable = true): RestartPorts {
@@ -53,7 +53,7 @@ describe('run_wake_restart.supervise — what is never restarted', () => {
 		expect(ports.pass).toHaveBeenCalledTimes(1)
 	})
 
-	it.each([ENDED, EXPIRED])('hands a $reason stop straight back', async (stop) => {
+	it.each([ENDED, UNREADABLE])('hands a $reason stop straight back', async (stop) => {
 		const ports = ports_of([stop])
 
 		expect(await run_wake_restart.supervise(ports)).toEqual(stop)

@@ -140,9 +140,12 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 	}
 }
 
+// Only an empty backlog drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a
+// parked or unreadable backlog has no retrospective for `run:step` to fire and stays the driver's.
 function is_drain(read: OfferRead, state: DriveState): boolean {
 	return (
 		read.verdict === WATCH_VERDICT &&
+		read.answer === 'exhausted' &&
 		state.in_flight.length === 0 &&
 		read.is_retrospective_owed === true
 	)

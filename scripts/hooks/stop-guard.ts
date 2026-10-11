@@ -126,20 +126,22 @@ async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 
 // A live carry record is in place — `carried` alone reads as a run. Both report checks below are about
 // a carried run: the strand judge reads this very record and returns on anything but `carried`, and a
-// stall needs a backlog driver, which begins one before its plan. A spent (`expired`) or `unreadable`
-// record a crashed run left behind is no run either, so it does not re-arm the stall's backlog probe
-// on every stop.
+// stall needs a backlog driver, which begins one before its plan. An `unreadable`
+// record a crashed run left behind is no run either.
+// The answer is whether that run's owner is still live, and `undefined` where there is no run at all.
 // A failed git read — outside a repository, `git rev-parse` exits non-zero — reads as no run, since this
 // gate sits ahead of the checks' own swallowing and must not throw into the stop decision either.
-async function has_run_record(): Promise<boolean> {
+async function carried_owner_live(): Promise<boolean | undefined> {
 	try {
 		const directory = await run_carry.repository_directory()
 
-		if (directory === undefined) return false
+		if (directory === undefined) return undefined
 
-		return run_carry.read_carry(run_carry.carry_path(directory)).kind === 'carried'
+		const read = run_carry.read_carry(run_carry.carry_path(directory))
+
+		return read.kind === 'carried' ? run_carry.is_owner_live(read.carry) : undefined
 	} catch {
-		return false
+		return undefined
 	}
 }
 
@@ -149,10 +151,19 @@ async function has_run_record(): Promise<boolean> {
 // — the budget handed off, the owner dead, no supervisor watching. Both only report and swallow their
 // own failures, so neither can change the stop decision. An ordinary stop with no run record skips
 // both, so it pays one directory read rather than their reads and a stale stream's backlog probe.
+//
+// **A stall is a live driver not dispatching, so a record whose owner is gone is not asked.** A record
+// stands until a person carries or discards it, so a crashed run's would otherwise re-arm the stall's
+// `git worktree list` and network backlog probe on every stop in the repository, for a run nobody
+// drives. A gone driver is the strand check's question — handed off or not (`run-stranded.ts` →
+// `had_driver`) — and that one reads local files only.
 async function run_report_checks(): Promise<void> {
-	if (!(await has_run_record())) return
+	const is_owner_live = await carried_owner_live()
 
-	await backlog_stalled_detect.run_stall_check(backlog_ready.DEFAULT_PORTS)
+	if (is_owner_live === undefined) return
+
+	if (is_owner_live) await backlog_stalled_detect.run_stall_check(backlog_ready.DEFAULT_PORTS)
+
 	await run_stranded_detect.run_stranded_check()
 }
 

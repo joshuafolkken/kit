@@ -25,7 +25,6 @@ const USAGE = 'Usage: josh run:status <issue-number> [--repo <owner/repo>]'
 const CARRY_NONE_NOTE = 'no run recorded here'
 const CARRY_UNREADABLE_NOTE = '(run record not bundled: unreadable)'
 const CARRY_SUMMARY_NONE = 'none'
-const CARRY_SUMMARY_EXPIRED = 'expired'
 const CARRY_SUMMARY_UNREADABLE = 'unreadable'
 const MERGED_SUFFIX = ' merged'
 
@@ -94,16 +93,13 @@ function failure_note(issue_number: string, kind: string): string {
 
 function carry_summary(carry: CarryRead): string {
 	if (carry.kind === 'carried') return `${String(carry.carry.merged)}${MERGED_SUFFIX}`
-	if (carry.kind === 'expired') return CARRY_SUMMARY_EXPIRED
 	if (carry.kind === 'unreadable') return CARRY_SUMMARY_UNREADABLE
 
 	return CARRY_SUMMARY_NONE
 }
 
 function carry_detail(carry: CarryRead): string {
-	if (carry.kind === 'carried' || carry.kind === 'expired') {
-		return run_carry.describe_carry(carry.carry)
-	}
+	if (carry.kind === 'carried') return run_carry.describe_carry(carry.carry)
 
 	if (carry.kind === 'unreadable') return CARRY_UNREADABLE_NOTE
 

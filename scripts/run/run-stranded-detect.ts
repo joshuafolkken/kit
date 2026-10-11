@@ -18,7 +18,7 @@ import {
 //
 // **Cheap and local.** Every read is a file on disk — the carry record, the wake record — and a process
 // liveness probe; there is no network call, so unlike the stall detector this makes every read every
-// time. The gate is the carry record itself: nothing carried, or a record that is expired or unreadable,
+// time. The gate is the carry record itself: nothing carried, or a record that is unreadable,
 // returns before the wake record is even read.
 
 // The recovery line names the command that hands the run to a fresh supervisor — the same one the pure
@@ -74,8 +74,8 @@ const DEFAULT_PORTS: DetectPorts = {
 	notify_stranded: real_notify_stranded,
 }
 
-// The three facts, assembled behind the carry-record gate. A non-`carried` read — nothing carried, a
-// spent bound, or an unreadable record — is `undefined`: there is no live budget to be stranded, so the
+// The three facts, assembled behind the carry-record gate. A non-`carried` read — nothing carried, or
+// an unreadable record — is `undefined`: there is no live budget to be stranded, so the
 // wake record is never read and the judge is never asked.
 async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
 	const targets = await ports.resolve_targets()

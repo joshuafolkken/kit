@@ -11,7 +11,6 @@ import { run_carry_added } from './run-carry-added'
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-added-test-'))
 const NAMED_ONLY_INVOCATION = 'backlogrun #1762 #1749 --only'
 const START = new Date('2026-09-10T00:00:00.000Z')
-const WITHIN_BOUND = new Date('2026-09-10T01:00:00.000Z')
 
 function target(): string {
 	return run_carry.carry_path(path.join(scratch, 'repository.git'))
@@ -50,7 +49,7 @@ describe('the issues run:add put into a --only run', () => {
 
 	it('are written to the record a resumed session reads back', () => {
 		added_run()
-		const read = run_carry.read_carry(target(), WITHIN_BOUND)
+		const read = run_carry.read_carry(target())
 
 		expect(read.kind === 'carried' ? run_carry.remaining_of(read.carry) : []).toStrictEqual([
 			3432, 3433, 1762, 1749, 3434,

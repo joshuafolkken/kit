@@ -53,10 +53,25 @@ describe('run_stranded.is_stranded', () => {
 		expect(run_stranded.is_stranded(input({ is_owner_live: true }))).toBe(false)
 	})
 
+	// `adopt_carry` spends the hand-off and rewrites the owner, so a claimed budget reads as a live owner.
 	it('is not stranded when a successor has claimed the handed-off budget', () => {
-		const claimed = input({ read: carried({ is_handed_off: false }) })
+		const claimed = input({ read: carried({ is_handed_off: false }), is_owner_live: true })
 
 		expect(run_stranded.is_stranded(claimed)).toBe(false)
+	})
+
+	// joshuafolkken/kit#3687: a record no longer expires, so an owner that died without a cut leaves a
+	// run nothing else reports — the stall check is not asked about a gone driver.
+	it('is stranded when the owner died without handing off', () => {
+		const crashed = input({ read: carried({ is_handed_off: false }) })
+
+		expect(run_stranded.is_stranded(crashed)).toBe(true)
+	})
+
+	it('is not stranded when the record names no owner and no hand-off', () => {
+		const unowned = input({ read: carried({ is_handed_off: false, owner_pid: undefined }) })
+
+		expect(run_stranded.is_stranded(unowned)).toBe(false)
 	})
 
 	it('is not stranded when the carry record could not be read', () => {
@@ -67,13 +82,6 @@ describe('run_stranded.is_stranded', () => {
 	// strand is never reported on an unprovable supervisor.
 	it('is not stranded when the supervisor liveness is unknown', () => {
 		expect(run_stranded.is_stranded(input({ supervisor: run_stranded.UNKNOWN }))).toBe(false)
-	})
-
-	// An expired budget is the whole-run bound, not a strand: the supervisor stops on it by design.
-	it('is not stranded when the budget has expired', () => {
-		const expired = input({ read: { kind: 'expired', carry: carry({}) } })
-
-		expect(run_stranded.is_stranded(expired)).toBe(false)
 	})
 })
 
