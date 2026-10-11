@@ -12,6 +12,7 @@ const SECURITY_TEMPLATE = 'templates/SECURITY.md'
 const REPOSITORY_PLACEHOLDER = '{{REPOSITORY}}'
 const KIT_ADVISORY_URL = 'https://github.com/joshuafolkken/kit/security/advisories/new'
 const UNRESOLVED_REASON = '`origin` is not a GitHub repository `owner/repo` can be read from'
+const LINK_DELIMITER = /[\s()<>[\]]+/u
 
 // Read from the local `origin` rather than asked of GitHub: the basic profile decides whether to
 // write the file from the same remote, and a policy file must not depend on `gh` being signed in.
@@ -40,11 +41,13 @@ function apply_repository_for_destination(destination_path: string, content: str
 }
 
 // A full project synced before the template existed holds kit's own policy under this name, and the
-// skip leaves that file on disk — still sending its readers to kit's advisory form.
+// skip leaves that file on disk — still sending its readers to kit's advisory form. The form is
+// matched as a whole link target, not as a substring: a longer address that merely starts with it
+// is another address.
 function does_report_to_kit(root: string): boolean {
-	const existing = file_reader.read_if_readable(path.join(root, SECURITY_MD))
+	const existing = file_reader.read_if_readable(path.join(root, SECURITY_MD)) ?? ''
 
-	return existing?.includes(KIT_ADVISORY_URL) === true
+	return new Set(existing.split(LINK_DELIMITER)).has(KIT_ADVISORY_URL)
 }
 
 function unresolved_warning(root: string): string {

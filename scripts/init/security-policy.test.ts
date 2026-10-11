@@ -142,6 +142,14 @@ describe('security_policy.did_skip_unresolved over a policy already on disk', ()
 		expect(warn_spy).toHaveBeenCalledWith(expect.stringContaining('not a GitHub repository'))
 	})
 
+	it("does not call a longer address that starts with kit's advisory form stale", () => {
+		origin_url_mock.mockReturnValue(undefined)
+		write_policy(`[advisory](${KIT_ADVISORY_URL}-elsewhere/owner/repo)`)
+
+		expect(did_skip(project_root)).toBe(true)
+		expect(warn_spy).not.toHaveBeenCalledWith(expect.stringContaining('stale'))
+	})
+
 	it("does not call a consumer's own policy stale", () => {
 		origin_url_mock.mockReturnValue(undefined)
 		write_policy('# Our own policy')
