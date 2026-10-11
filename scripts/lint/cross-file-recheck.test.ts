@@ -6,7 +6,7 @@ import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { ESLint } from 'eslint'
 import ts from 'typescript-eslint'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { cycle_recheck, NO_CYCLE_RULE, type CycleRecheckOptions } from './cycle-recheck'
+import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
 
 // joshuafolkken/kit#3641. Every case lints a real cycle on disk against a real cache file, because
 // the defect is the cache file's: a verdict keyed on one file's content, about a fact that lives in
@@ -30,7 +30,7 @@ const FIXTURE_FILES: Array<[string, string]> = [
 
 // `realpathSync`: macOS hands back `/var/…`, a symlink to `/private/var/…`, and the resolver
 // answers with the real path — the two have to agree for a cycle to close.
-const created_root = mkdtempSync(path.join(tmpdir(), 'kit-cycle-recheck-'))
+const created_root = mkdtempSync(path.join(tmpdir(), 'kit-cross-file-recheck-'))
 const root = realpathSync(created_root)
 const cache_file = path.join(root, '.eslintcache')
 
@@ -45,7 +45,7 @@ for (const [name, source] of FIXTURE_FILES) {
 // CLI run, and a file parsed a second time in it gets a single-file fallback program — which a
 // type-aware rule then reads, and `sonarjs/deprecation` throws on. These cases lint the same two
 // files over and over in one process, where a lint run parses each once.
-const options: CycleRecheckOptions = {
+const options: CrossFileRecheckOptions = {
 	cache_file,
 	patterns: ['.'],
 	eslint_options: {
@@ -61,6 +61,20 @@ const options: CycleRecheckOptions = {
 		],
 	},
 }
+
+const NO_CYCLE_RULE = 'import/no-cycle'
+// The plugin's second name: its own preset's rules, which the base config keeps for a `.js` file.
+const NAMED_RULE = 'import-x/named'
+const IMPORTER = 'importer.js'
+const EXPORTER = 'exporter.js'
+const IMPORTER_SOURCE =
+	"import { DELTA } from './exporter.js'\n\nexport const EPSILON = DELTA + 1\n"
+const WITHOUT_EXPORT = 'export const OTHER = 1\n'
+const WITH_EXPORT = `${WITHOUT_EXPORT}\nexport const DELTA = 2\n`
+// A rule that reads the linted file alone, and a file that is clean but for it.
+const OWN_FILE_RULE = 'no-debugger'
+const OWN_FILE_RED = 'c.ts'
+const OWN_FILE_RED_SOURCE = 'debugger\n\nexport const GAMMA = 1\n'
 
 // What the cached whole-tree run hands over: a failed report that names the rule.
 const CACHED_RED: BufferedProcessResult = { output: NO_CYCLE_RULE, exit_code: 1, elapsed_ms: 0 }
@@ -84,9 +98,9 @@ afterAll(() => {
 	rmSync(root, { recursive: true, force: true })
 })
 
-describe('cycle_recheck.verify — a cycle that is there', () => {
+describe('cross_file_recheck.verify — a cycle that is there', () => {
 	it('reports it when no cache file exists yet', async () => {
-		const verified = await cycle_recheck.verify(CACHED_RED, options)
+		const verified = await cross_file_recheck.verify(CACHED_RED, options)
 
 		expect(verified.exit_code).toBe(1)
 		expect(verified.output).toContain(NO_CYCLE_RULE)
@@ -94,20 +108,20 @@ describe('cycle_recheck.verify — a cycle that is there', () => {
 	})
 
 	it('reports it again from the cache file the first run wrote', async () => {
-		const verified = await cycle_recheck.verify(CACHED_RED, options)
+		const verified = await cross_file_recheck.verify(CACHED_RED, options)
 
 		expect(verified.exit_code).toBe(1)
 		expect(verified.output).toContain(UNTOUCHED_SIDE)
 	})
 })
 
-describe('cycle_recheck.verify — a cycle closed by editing one side', () => {
+describe('cross_file_recheck.verify — a cycle closed by editing one side', () => {
 	it('drops the report the cache still holds for the untouched side', async () => {
 		writeFileSync(path.join(root, EDITED_SIDE), ACYCLIC_A)
 
 		await expect(cached_cycle_files()).resolves.toEqual([UNTOUCHED_SIDE])
 
-		const verified = await cycle_recheck.verify(CACHED_RED, options)
+		const verified = await cross_file_recheck.verify(CACHED_RED, options)
 
 		expect(verified.output).toBe('')
 		expect(verified.exit_code).toBe(0)
@@ -118,32 +132,77 @@ describe('cycle_recheck.verify — a cycle closed by editing one side', () => {
 	it('drops it for a run narrowed to the two files as well', async () => {
 		const narrowed = { ...options, patterns: [EDITED_SIDE, UNTOUCHED_SIDE] }
 
-		const verified = await cycle_recheck.verify(CACHED_RED, narrowed)
+		const verified = await cross_file_recheck.verify(CACHED_RED, narrowed)
 
 		expect(verified.output).toBe('')
 		expect(verified.exit_code).toBe(0)
 	})
 })
 
-describe('cycle_recheck.verify — a run that reports no cycle', () => {
+// Narrowed to the importer, so the untouched side's withdrawn cycle report stays out of the answer.
+describe('cross_file_recheck.verify — a name the imported file did not export yet', () => {
+	const narrowed = { ...options, patterns: [IMPORTER] }
+
+	it('reports it under the plugin’s own rule name while the export is missing', async () => {
+		writeFileSync(path.join(root, EXPORTER), WITHOUT_EXPORT)
+		writeFileSync(path.join(root, IMPORTER), IMPORTER_SOURCE)
+
+		const verified = await cross_file_recheck.verify(CACHED_RED, narrowed)
+
+		expect(verified.exit_code).toBe(1)
+		expect(verified.output).toContain(NAMED_RULE)
+	})
+
+	it('drops the report the cache still holds for the importer once it is exported', async () => {
+		writeFileSync(path.join(root, EXPORTER), WITH_EXPORT)
+
+		const verified = await cross_file_recheck.verify(CACHED_RED, narrowed)
+
+		expect(verified.output).toBe('')
+		expect(verified.exit_code).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#3667: the red is read off the cache rather than off the report's text, so a
+// rule that reads nothing else costs the cached asking and no second lint.
+describe('cross_file_recheck.verify — a red about the linted file alone', () => {
+	afterAll(() => {
+		rmSync(path.join(root, OWN_FILE_RED))
+	})
+
+	// Narrowed to the one file: the cache still holds the untouched side's withdrawn cycle report.
+	it('hands the report back as the run wrote it, linting nothing afresh', async () => {
+		writeFileSync(path.join(root, OWN_FILE_RED), OWN_FILE_RED_SOURCE)
+		const result = { output: OWN_FILE_RULE, exit_code: 1, elapsed_ms: 0 }
+		const narrowed = { ...options, patterns: [OWN_FILE_RED] }
+		const lint_files = vi.spyOn(ESLint.prototype, 'lintFiles')
+
+		await expect(cross_file_recheck.verify(result, narrowed)).resolves.toBe(result)
+		expect(lint_files).toHaveBeenCalledTimes(1)
+		await expect(lint_files.mock.results[0]?.value).resolves.toContainEqual(
+			expect.objectContaining({ filePath: path.join(root, OWN_FILE_RED), errorCount: 1 }),
+		)
+	})
+})
+
+describe('cross_file_recheck.verify — a run that is not red', () => {
 	it.each([
 		['a green run', { output: '', exit_code: 0, elapsed_ms: 0 }],
-		['a red run about another rule', { output: 'no-console', exit_code: 1, elapsed_ms: 0 }],
 		['a green run that only mentions the rule', { ...CACHED_RED, exit_code: 0 }],
 		['a run that crashed while naming the rule', { ...CACHED_RED, exit_code: 2 }],
 		['a run killed before it exited', { ...CACHED_RED, exit_code: undefined }],
 	])('hands %s back untouched', async (_label, result) => {
 		const lint_files = vi.spyOn(ESLint.prototype, 'lintFiles')
 
-		await expect(cycle_recheck.verify(result, options)).resolves.toBe(result)
+		await expect(cross_file_recheck.verify(result, options)).resolves.toBe(result)
 		expect(lint_files).not.toHaveBeenCalled()
 	})
 })
 
 // `eslint` is an optional peer, and `josh lint` imports this module in a basic-profile project that
-// does not have it: the module has to load there, and a run that reports no cycle has to pass
-// through, so the linter is loaded only once a cycle report is being re-read.
-describe('cycle_recheck — a project without eslint', () => {
+// does not have it: the module has to load there, and a run that is not red has to pass
+// through, so the linter is loaded only once a red report is being re-read.
+describe('cross_file_recheck — a project without eslint', () => {
 	afterAll(() => {
 		vi.doUnmock('eslint')
 		vi.resetModules()
@@ -156,9 +215,9 @@ describe('cycle_recheck — a project without eslint', () => {
 		vi.doMock('eslint', () => {
 			throw new Error('Cannot find package eslint')
 		})
-		const reloaded = await import('./cycle-recheck')
+		const reloaded = await import('./cross-file-recheck')
 
-		await expect(reloaded.cycle_recheck.verify(green, options)).resolves.toBe(green)
-		await expect(reloaded.cycle_recheck.verify(CACHED_RED, options)).rejects.toThrow()
+		await expect(reloaded.cross_file_recheck.verify(green, options)).resolves.toBe(green)
+		await expect(reloaded.cross_file_recheck.verify(CACHED_RED, options)).rejects.toThrow()
 	})
 })
