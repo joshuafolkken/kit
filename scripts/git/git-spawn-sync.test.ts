@@ -2,6 +2,7 @@ import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_utilities } from './constants'
 import { git_command } from './git-command'
+import { git_location_environment } from './git-location-environment'
 import { git_spawn_sync } from './git-spawn-sync'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
@@ -85,6 +86,16 @@ describe('git_spawn_sync.origin_url', () => {
 		expect(git_spawn_sync.origin_url(ROOT)).toBe(ORIGIN)
 		expect(last_call()[1]).toStrictEqual(['config', '--get', 'remote.origin.url'])
 		expect(last_call()[2]).toMatchObject({ cwd: ROOT })
+	})
+
+	it('clears the git location variables so the given directory is what answers', () => {
+		answer(0, `${ORIGIN}\n`)
+		git_spawn_sync.origin_url(ROOT)
+
+		expect(last_call()[2]).toMatchObject({
+			env: git_location_environment.location_free_environment(),
+			extendEnv: true,
+		})
 	})
 
 	it('is undefined when the repository has no origin', () => {

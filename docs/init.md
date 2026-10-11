@@ -239,7 +239,7 @@ The `josh` script runs every subcommand indexed in the [Command Catalog](./josh-
 
 ## AI files
 
-The following is the `full` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. The `basic` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves the esbuild and unrs-resolver build scripts (kit's CLI runs on tsx, which depends on esbuild; kit's optional ESLint import plugins bring in unrs-resolver; and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped; in a `full` project the run ends with a hint to run `josh sync` to update it.
+The following is the `full` profile's candidate list. Git and GitHub files are included only when their respective conditions hold. `SECURITY.md` is written from a template with your repository's `owner/repo` filled in, so it is skipped when the Git `origin` is not a GitHub repository. The `basic` profile copies short AI pointers, a `pnpm-workspace.yaml` that approves the esbuild and unrs-resolver build scripts (kit's CLI runs on tsx, which depends on esbuild; kit's optional ESLint import plugins bring in unrs-resolver; and pnpm fails an install with an unapproved build), adds `.prettierignore` for Web files, and adds Git or GitHub files only when present. If a file already exists, it is skipped; in a `full` project the run ends with a hint to run `josh sync` to update it.
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md

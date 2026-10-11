@@ -36,6 +36,7 @@ const GITIGNORE = '.gitignore'
 const GITHUB_DIR = '.github'
 const BASIC_PROFILE_ENTRY = '"profile": "basic"'
 const SECURITY_MD = 'SECURITY.md'
+const GITHUB_ORIGIN = 'git@github.com:owner/repo.git'
 const BASIC_PRETTIER = 'prettier.config.mjs'
 const NO_INSTALL = '--no-install'
 const INSTALL_HINT = 'run `pnpm install`'
@@ -207,11 +208,23 @@ describe('basic initialization after Git adoption', () => {
 
 	it('adds GitHub files only after a GitHub origin is added', async () => {
 		mkdirSync(path.join(paths_mock.root, '.git'))
-		mocked_execa.mockReturnValue(fake_git_result(0, 'git@github.com:owner/repo.git'))
+		mocked_execa.mockReturnValue(fake_git_result(0, GITHUB_ORIGIN))
 		await run_init()
 
 		expect(existsSync(path.join(paths_mock.root, SECURITY_MD))).toBe(true)
 		expect(existsSync(path.join(paths_mock.root, GITHUB_DIR, 'release.yml'))).toBe(true)
+	})
+})
+
+describe('basic initialization of the security policy', () => {
+	it('writes a SECURITY.md that reports to the repository it lands in, not to kit', async () => {
+		mkdirSync(path.join(paths_mock.root, '.git'))
+		mocked_execa.mockReturnValue(fake_git_result(0, GITHUB_ORIGIN))
+		await run_init()
+		const policy = readFileSync(path.join(paths_mock.root, SECURITY_MD), 'utf8')
+
+		expect(policy).toContain('https://github.com/owner/repo/security/advisories/new')
+		expect(policy).not.toContain('https://github.com/joshuafolkken/kit/security/advisories/new')
 	})
 })
 

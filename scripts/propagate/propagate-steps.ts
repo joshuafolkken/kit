@@ -27,10 +27,17 @@ const SUCCESS_EXIT_CODE = 0
 // pass — so the chain is not repeated here. It resolves in the consumer's directory, which by this
 // point has already been upgraded to the version being propagated, so the command is present.
 const VERIFY_SCRIPT = `pnpm josh ${GATE_COMMAND}`
+// `josh latest` behind an install of its own. The sync can add devDependencies to `package.json`
+// without installing them, and `josh latest` does not always re-resolve the lockfile: when the age
+// gate would downgrade a dependency it restores the files it found and exits zero. Installing first
+// makes the tree it finds a consistent one, so the lockfile matches `package.json` on either path.
+// `--no-frozen-lockfile` because the install exists to write the lockfile, which pnpm refuses under CI.
+const LATEST_SCRIPT = 'pnpm install --no-frozen-lockfile && pnpm josh latest'
 
 // The commands the release-independent spawning steps run inside the target's own directory. The
 // upgrade and the sync are not here: both are per toolkit, so they are built from the plan instead.
 const STEP_COMMANDS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	[propagate_run.STEP_LATEST]: ['sh', '-c', LATEST_SCRIPT],
 	[propagate_run.STEP_LINT_RELATED]: ['pnpm', 'josh', 'lint:related'],
 	[propagate_run.STEP_TEST_RELATED]: ['pnpm', 'josh', 'test:related'],
 	[propagate_run.STEP_VERIFY]: ['sh', '-c', VERIFY_SCRIPT],
@@ -353,7 +360,8 @@ interface Release {
 // `josh propagate` always passes exactly one release; `josh adopt` passes every toolkit installed in
 // the repository it runs in. Only the upgrade and the sync repeat per
 // release — the pre-check, the verification gate, the issue, the pull request and the return to the
-// default branch happen once, which is why the step order itself is unchanged.
+// default branch happen once, which is why the step order does not depend on the plan — `josh adopt`
+// runs `propagate_run.ADOPT_STEP_ORDER`, the same order with `josh latest` added.
 interface ReleasePlan {
 	releases: ReadonlyArray<Release>
 	origin: string

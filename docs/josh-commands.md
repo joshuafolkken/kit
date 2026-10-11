@@ -343,7 +343,7 @@ See [sync.md](./sync.md) for the full file list.
 
 ### `josh adopt`
 
-Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each one's managed files, verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](josh-commands-automation.md#josh-propagate), sharing the same step order.
+Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each toolkit's managed files, update the other dependencies with [`josh latest`](#josh-latest), verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](josh-commands-automation.md#josh-propagate), sharing its step order with `josh latest` added — propagation carries one exact release and leaves the other dependencies alone.
 
 ```bash
 pnpm josh adopt
@@ -354,9 +354,9 @@ pnpm josh adopt --dry-run # report the steps without touching anything
 
 - `--dry-run` — report the plan without writing.
 
-Steps, in this repository's directory: working-tree check, `pnpm add -D <toolkit>@latest` (once per installed toolkit, base tier first), `pnpm josh sync` per toolkit's own CLI, verification gate ([`josh gate`](#josh-gate)), open issue, `pnpm josh git`, return to default branch.
+Steps, in this repository's directory: working-tree check, `pnpm add -D <toolkit>@latest` (once per installed toolkit, base tier first), `pnpm josh sync` per toolkit's own CLI, `pnpm install` then `pnpm josh latest` (the other dependencies, the audit and the pnpm pin — after the sync and behind an install, so the lockfile covers what the sync added to `package.json` even when `josh latest` rolls its update back), verification gate ([`josh gate`](#josh-gate)), open issue, `pnpm josh git`, return to default branch.
 
-**Output / exit codes:** exits `0` on a skip (no toolkit declared, or all current with no file changed). Refused inside kit's own repository, when a runnable toolkit is missing or declared under `dependencies`, or when `@joshuafolkken/kit` is not a direct dependency. Stops at the open pull request — merging is [`josh followup`](josh-commands-automation.md#josh-followup)'s job.
+**Output / exit codes:** exits `0` on a skip (no toolkit declared, or all current with no file changed). A failing step exits non-zero; one that fails before `pnpm josh git` — `josh latest` included — opens no pull request, and a failed return to the default branch leaves the pull request open. Refused inside kit's own repository, when a runnable toolkit is missing or declared under `dependencies`, or when `@joshuafolkken/kit` is not a direct dependency. Stops at the open pull request — merging is [`josh followup`](josh-commands-automation.md#josh-followup)'s job.
 
 ---
 
@@ -448,11 +448,13 @@ pnpm josh version --upgrade   # upgrade global + project to latest, then re-run 
 
 Check that every dependency range this package **publishes** still resolves for a consumer. For each `dependencies` entry it runs `pnpm view <name>@<range> version` under safe-chain's shims, so the age-filtered view a consumer installs under is observed rather than modelled. `devDependencies`, peer ranges, and non-registry protocols (`workspace:*`, `catalog:`, `file:`, `link:`, git URLs) are set aside and printed, not probed.
 
+In a package built on a `@joshuafolkken/*` toolkit it also compares each published `peerDependencies` range with that of every installed toolkit `package.json` declares, and fails when a floor sits below the toolkit's — `josh latest` never rewrites a peer range, so the declaration would otherwise keep promising versions nobody verified. Matching or narrower ranges, peers no toolkit shares, and kit's own repository report nothing.
+
 ```bash
 pnpm josh ranges
 ```
 
-**Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`).
+**Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`). A peer-floor violation names the dependency, its range, and the toolkit (name and installed version) with the range it requires; raise the `peerDependencies` floor to that range.
 
 ---
 
@@ -552,6 +554,8 @@ Updates pnpm and pins `packageManager` to the newest release on the project's **
 #### `josh latest:update`
 
 Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`. Otherwise it also moves the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env to the newest `@aikidosec/safe-chain` release — a registry answer that is not an exact semver version is refused and nothing moves — in every workflow under `.github/workflows` and `templates/workflows` and every local composite action under `.github/actions` that carries the pin — in kit itself, the `.github/actions/setup-pnpm` action every workflow installs through, the distributed `ci.yml` included — the hash is computed from that release's `install-safe-chain.sh`, and a failed download leaves the workflows' pins untouched (the next `josh latest` retries).
+
+When the update moved the installed `@playwright/test`, it runs `pnpm exec playwright install chromium`: a Playwright release cannot launch the browsers an earlier one downloaded. Set `JOSH_PLAYWRIGHT_BROWSERS` in `.env` to a space-separated list (`chromium firefox webkit`) for more — CI reads the same name from a repository variable ([troubleshooting.md](./troubleshooting.md#widening-the-fallback-browser-list)). An unmoved version installs only missing browsers. A failed or rolled-back update that moved it still installs. A failed install prints `✖ Playwright browser install failed` and exits non-zero, stopping `josh latest`.
 
 ## AI tools
 

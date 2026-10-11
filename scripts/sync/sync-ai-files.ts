@@ -5,6 +5,7 @@ import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { ProjectShape } from '#scripts/init/project-profile'
+import { security_policy } from '#scripts/init/security-policy'
 import { file_reader } from '#scripts/lib/read-file'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
 import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
@@ -80,6 +81,7 @@ function sync_workspace_yaml(
 
 // The source is the profile's: a basic project syncs from its own templates, as `josh init` wrote it.
 function sync_ai_copy_file(filename: string, is_force: boolean, shape?: ProjectShape): void {
+	if (security_policy.did_skip_unresolved(filename, PROJECT_ROOT)) return
 	const source = init_ai_copy.ai_file_source(filename, shape)
 
 	if (filename === WORKSPACE_YAML) {

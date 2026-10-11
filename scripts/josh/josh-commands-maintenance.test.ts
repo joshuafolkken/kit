@@ -30,6 +30,16 @@ describe('MAINTENANCE_COMMANDS latest:update', () => {
 	})
 })
 
+describe('MAINTENANCE_COMMANDS latest:update environment', () => {
+	// `JOSH_PLAYWRIGHT_BROWSERS` is a project setting, so it has to be readable from the `.env`.
+	it('loads the optional .env file', () => {
+		const cmd = MAINTENANCE_COMMANDS[LATEST_UPDATE_COMMAND]
+		if (!cmd) throw new Error(LATEST_UPDATE_NOT_DEFINED)
+
+		expect(cmd.tsx_arguments).toEqual(['--env-file-if-exists=.env'])
+	})
+})
+
 describe('MAINTENANCE_COMMANDS latest:corepack', () => {
 	it('uses latest-corepack.ts script instead of hardcoding pnpm@latest', () => {
 		const cmd = MAINTENANCE_COMMANDS['latest:corepack']

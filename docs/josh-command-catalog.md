@@ -281,7 +281,7 @@ Run unit tests with Vitest (skips when Vitest is absent; fails when it has no te
 
 `[--dry-run]`
 
-Upgrade every installed @joshuafolkken toolkit here and open the pull request
+Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR
 
 ---
 
@@ -521,7 +521,7 @@ Bump package version
 
 _No arguments._
 
-Check that every published dependency range still resolves for a consumer
+Check that every published dependency range still resolves for a consumer and no peer range falls below an installed toolkit
 
 ---
 

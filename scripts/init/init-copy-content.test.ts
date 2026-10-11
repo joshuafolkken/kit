@@ -1,9 +1,16 @@
 import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import { workflow_pin_logic } from '#scripts/sync/workflow-pin-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
+import { security_policy } from './security-policy'
+
+// The origin is the one fact this transform reads from outside the package; pinned so the suite does
+// not depend on the remote of the checkout it runs in.
+vi.mock('#scripts/git/git-spawn-sync', () => ({
+	git_spawn_sync: { origin_url: (): string => 'https://github.com/owner/repo.git' },
+}))
 
 const CHECKOUT = 'actions/checkout'
 const STALE_REF = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
@@ -70,5 +77,11 @@ describe('transform_copied_content', () => {
 
 		expect(rewritten).toBe(init_logic.transform_prompt_paths(PROMPT_LINE))
 		expect(rewritten).not.toBe(PROMPT_LINE)
+	})
+
+	it('fills the repository into a SECURITY.md write', () => {
+		expect(transform_copied_content('SECURITY.md', security_policy.REPOSITORY_PLACEHOLDER)).toBe(
+			'owner/repo',
+		)
 	})
 })
