@@ -83,7 +83,7 @@ function apply_change(
 		retrospective: effective.retrospective === true || carry.retrospective,
 	}
 
-	stamp_file.write_stamp(target, next)
+	stamp_file.replace_stamp(target, next)
 
 	return next
 }

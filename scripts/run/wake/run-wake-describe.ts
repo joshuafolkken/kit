@@ -19,6 +19,8 @@ const UNREADABLE_TIME = 'an unreadable time'
 // checkout — a lane must never be where the next session resumes, because a lane belongs to one child.
 interface WakeContext {
 	carry_target: string
+	// Where `run:carry --end` records the run it removes — what tells an ended run from an unread one.
+	ended_target: string
 	wake_target: string
 	// Where everything this supervisor starts writes its output. It is named
 	// in `--list` and in every warning, because a path nobody is told is a file nobody reads.

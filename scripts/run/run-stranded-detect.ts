@@ -1,5 +1,6 @@
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_wake, type RunWake } from '#scripts/run/wake/run-wake'
@@ -27,13 +28,14 @@ import {
 // so recovery is another actor's.
 const STRAND_RECOVERY = `Restart supervision with \`${run_stranded.RECOVERY_COMMAND}\` — it wakes a fresh successor to claim the budget; the cutting session must not resume it itself.`
 
-// The seams a test replaces: the two record targets, the two record reads, the owner and supervisor
-// liveness probes, and the two side effects. The defaults are the real readers; a test hands fakes so
+// The seams a test replaces: the two record targets, the two record reads, the ended-run read, the owner
+// and supervisor liveness probes, and the two side effects. The defaults are the real readers; a test hands fakes so
 // the gather and report logic run without a git tree, a process table or a network.
 interface DetectPorts {
 	resolve_targets: () => Promise<RecordTargets | undefined>
 	read_carry: (target: string) => CarryRead
 	is_owner_live: (carry: RunCarry) => boolean
+	has_ended: (target: string, started_at: string) => boolean
 	read_wake: (target: string) => RunWake | undefined
 	supervisor_liveness: (wake: RunWake | undefined) => SupervisorLiveness
 	emit_stranded: (text: string) => Promise<boolean>
@@ -45,15 +47,25 @@ interface RecordTargets {
 	wake: string
 }
 
+// The run a supervisor was watching: its carry record, where `run:carry --end` records the run it
+// removes, and the `started_at` the supervisor read when it took the run on.
+interface WatchedRun {
+	carry_target: string
+	ended_target: string
+	started_at: string
+}
+
+function targets_of(directory: string): RecordTargets {
+	return { carry: run_carry.carry_path(directory), wake: run_wake.wake_path(directory) }
+}
+
 // Both records key on the common git directory, the same one `run-carry.ts` and `run-wake.ts` resolve,
 // so a strand read from any lane reads the one run's records. `undefined` outside a repository: no git
 // directory to key on, so no run to be stranded.
 async function real_resolve_targets(): Promise<RecordTargets | undefined> {
 	const directory = await run_carry.repository_directory()
 
-	if (directory === undefined) return undefined
-
-	return { carry: run_carry.carry_path(directory), wake: run_wake.wake_path(directory) }
+	return directory === undefined ? undefined : targets_of(directory)
 }
 
 async function real_emit_stranded(text: string): Promise<boolean> {
@@ -68,6 +80,7 @@ const DEFAULT_PORTS: DetectPorts = {
 	resolve_targets: real_resolve_targets,
 	read_carry: (target) => run_carry.read_carry(target),
 	is_owner_live: run_carry.is_owner_live,
+	has_ended: run_carry_ended.has_ended,
 	read_wake: (target) => run_wake.read_wake(target),
 	supervisor_liveness: (wake) => run_stranded.supervisor_liveness(wake),
 	emit_stranded: real_emit_stranded,
@@ -77,11 +90,7 @@ const DEFAULT_PORTS: DetectPorts = {
 // The three facts, assembled behind the carry-record gate. A non-`carried` read — nothing carried, or
 // an unreadable record — is `undefined`: there is no live budget to be stranded, so the
 // wake record is never read and the judge is never asked.
-async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
-	const targets = await ports.resolve_targets()
-
-	if (targets === undefined) return undefined
-
+function input_at(ports: DetectPorts, targets: RecordTargets): StrandedInput | undefined {
 	const read = ports.read_carry(targets.carry)
 
 	if (read.kind !== 'carried') return undefined
@@ -91,6 +100,12 @@ async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
 		is_owner_live: ports.is_owner_live(read.carry),
 		supervisor: ports.supervisor_liveness(ports.read_wake(targets.wake)),
 	}
+}
+
+async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
+	const targets = await ports.resolve_targets()
+
+	return targets === undefined ? undefined : input_at(ports, targets)
 }
 
 // The marker and the notification, both once per strand episode. `emit_stranded` refuses a second while
@@ -128,7 +143,38 @@ async function run_stranded_check(): Promise<void> {
 	}
 }
 
-const run_stranded_detect = { detect_and_report, run_stranded_check }
+// The same judgement for a reader that draws the run rather than reports on it: `run:board` asks it
+// every local read, so a run nobody is driving is not drawn as one still waiting for work.
+function is_stranded_at(directory: string, ports: DetectPorts = DEFAULT_PORTS): boolean {
+	const input = input_at(ports, targets_of(directory))
+
+	return input !== undefined && run_stranded.is_stranded(input)
+}
+
+// The judgement a supervisor asks of the run it is about to stop watching. The asker is that
+// supervisor on its way out, so it is taken as gone, and so is an owner that is the asker itself
+// (`run_carry.is_held_by_another`) — that owner is about to be gone. A
+// record another session holds is not left stranded. **A record that does not read is left stranded
+// unless `run:carry --end` ended this very run**: the read that failed the driver fails here too, and
+// that run still has its budget and nobody watching it.
+function is_left_stranded(run: WatchedRun, ports: DetectPorts = DEFAULT_PORTS): boolean {
+	const read = ports.read_carry(run.carry_target)
+
+	if (read.kind !== 'carried') return !ports.has_ended(run.ended_target, run.started_at)
+
+	return run_stranded.is_stranded({
+		read,
+		is_owner_live: run_carry.is_held_by_another(read.carry, ports.is_owner_live),
+		supervisor: run_stranded.GONE,
+	})
+}
+
+const run_stranded_detect = {
+	detect_and_report,
+	is_left_stranded,
+	is_stranded_at,
+	run_stranded_check,
+}
 
 export { run_stranded_detect }
-export type { DetectPorts, RecordTargets }
+export type { DetectPorts, RecordTargets, WatchedRun }

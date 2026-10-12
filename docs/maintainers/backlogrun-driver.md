@@ -102,6 +102,30 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   first ends the run.
 - **A `needs-human-review` child stops the whole run** before its commit (`needs-human-review.md`).
 - **Parking is not stopping.** Only the consecutive-failure guard can turn repeated parks into a stop.
+- **A driver that cannot read the carry record asks again before it ends** (joshuafolkken/kit#3697).
+  `backlog:drive` checks the record before every offer, merge and launch; a read that is not
+  `carried` is repeated up to 6 times at the 60-second offer interval, each failed read logged with
+  what it answered and whether the file was there
+  (`scripts/backlog/backlog-drive-owner.ts` → `READ_ATTEMPTS`). One failed read therefore costs one
+  interval of the idle watch, never the rest of it. Two records are not re-read: one `run:carry --end`
+  ended stops at once with `The carry record is no longer active.`, and one another owner holds
+  stops with `The driver no longer owns the carry record.`
+- **A driver failure the supervisor cannot recover from ends the watch, and says so.** The driver
+  exits non-zero once its re-reads run out, and the supervisor — whose own read of the record then
+  fails too — stops as `failed`: it removes its wake record, sends the warning, and — when the run is
+  left stranded and the warning was sent — leaves a `stranded` event carrying the driver's own error.
+  A record that does not read is left stranded unless `run:carry --end` closed that very run, and one
+  the driver left owned by the supervisor's own process is too, since that owner is the one leaving
+  (`run-stranded-detect.ts` → `is_left_stranded`). A driver that fails while the record still reads
+  is re-driven by the supervisor's restart: the record it left owned by the supervisor's own process
+  is not read as a session at work (`run-carry.ts` → `is_held_by_another`), so the restarted pass
+  claims it again and runs the driver, and a driver that keeps failing stops as `failed` after
+  `RESTART_LIMIT` restarts (joshuafolkken/kit#3701). A record another live process holds is still
+  waited on. After a failed send the stop-time detector leaves the marker and
+  notifies instead, and a run `run:carry --end` closed gets none. `run:board` then draws
+  the run `■` rather than `⏸` — it reads the same owner-gone, no-supervisor judgement as
+  `run:stranded` — so a run nobody is polling for is never drawn as one still waiting. Recovery is
+  `pnpm josh run:wake --start`.
 
 ## Running a named epic's children — the loop `backlog:drive` walks
 

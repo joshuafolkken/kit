@@ -15,6 +15,8 @@ const SHAPE: ProjectShape = {
 const SELF_RUN_REFUSAL = 'Refusing to sync'
 const INIT_COMMAND_FLAG = '--init-command'
 const INIT_COMMAND = 'josh-app init'
+const PREFLIGHT_FLAG = '--push-preflight-command'
+const PREFLIGHT_COMMAND = 'josh-app start:preflight'
 const START_USAGE = 'Usage: josh start'
 const NO_GIT = {
 	has_git: false,
@@ -125,6 +127,7 @@ describe('josh start options', () => {
 			is_github: false,
 			visibility: 'private',
 			init_command: undefined,
+			push_preflight_command: undefined,
 		})
 	})
 
@@ -137,6 +140,7 @@ describe('josh start options', () => {
 			is_github: true,
 			visibility: 'public',
 			init_command: undefined,
+			push_preflight_command: undefined,
 		})
 	})
 
@@ -182,6 +186,36 @@ describe('the josh start initialize command option (#2872)', () => {
 		)
 		expect(console.info).toHaveBeenCalledWith(
 			expect.stringContaining(`1. Initialize with ${INIT_COMMAND}`),
+		)
+	})
+})
+
+describe('the josh start push preflight command option (#3702)', () => {
+	it('reads the push preflight command beside the initialize command', () => {
+		const args = [PREFLIGHT_FLAG, PREFLIGHT_COMMAND, INIT_COMMAND_FLAG, INIT_COMMAND, '--github']
+		const options = start.parse_start_options(args)
+
+		expect(options.push_preflight_command).toBe(PREFLIGHT_COMMAND)
+		expect(options.init_command).toBe(INIT_COMMAND)
+		expect(options.is_github).toBe(true)
+	})
+
+	it.each([[[PREFLIGHT_FLAG]], [[PREFLIGHT_FLAG, ' ']], [[PREFLIGHT_FLAG, '--yes']]])(
+		'refuses the push preflight flag without a command: %j',
+		(args) => {
+			expect(() => start.parse_start_options(args)).toThrow(START_USAGE)
+		},
+	)
+
+	it('hands the push preflight command to the steps only after every refusal', async () => {
+		const args = ['--yes', PREFLIGHT_FLAG, PREFLIGHT_COMMAND]
+
+		expect(await start.run(args, false)).toBe(1)
+		expect(start_steps.run_steps).not.toHaveBeenCalled()
+		expect(await start.run([...args, '--github'], false)).toBe(0)
+		expect(start_steps.run_steps).toHaveBeenCalledWith(
+			expect.arrayContaining(['repository']),
+			expect.objectContaining({ push_preflight_command: PREFLIGHT_COMMAND }),
 		)
 	})
 })

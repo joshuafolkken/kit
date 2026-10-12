@@ -26,6 +26,7 @@ const OPTIONS: StartOptions = {
 	is_github: false,
 	visibility: 'private',
 	init_command: undefined,
+	push_preflight_command: undefined,
 }
 const CHOICES: Choices = {
 	options: OPTIONS,

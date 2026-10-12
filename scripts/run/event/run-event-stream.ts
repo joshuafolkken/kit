@@ -83,7 +83,8 @@ const EVENT_KIND = {
 	// stalled is pointed straight at dispatching the work rather than left waiting.
 	STALL: 'stall',
 	// The run's own driver is gone: the cut handed the budget off, the owner has died, and no supervisor
-	// is watching. Emitted once per strand episode by the stop-time detector,
+	// is watching. Emitted once per strand episode by the stop-time detector — or by the `run:wake`
+	// supervisor as it fails, leaves that state behind and has warned of it —
 	// exactly as `STALL` is — the newest-event dedup keeps a run polled every stop from notifying more
 	// than once, and a terminal reader following the stream sees the line. The strand is the step before
 	// the stall: a stalled run still has a driver that could dispatch, a stranded one has none.
@@ -124,6 +125,11 @@ const EVENT_KIND = {
 	// arrival probe reads it as a wake: the lanes a raise frees are new room for a pool its baseline
 	// already holds. A trace: it says the run gained room, not where the run is.
 	LANE_LIMIT: 'lane-limit',
+	// One stage of the run's start — the session starting, the plan, the hand-off to the supervisor, a
+	// lane opening (`run-event-setup.ts`). `run:board` draws it until the first child launches, so the
+	// minutes before one read as work rather than as a run that has stopped. A trace: it says the run is
+	// getting ready, not where the run is.
+	SETUP: 'setup',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -141,13 +147,19 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.LANE_PHASE,
 	EVENT_KIND.ADD,
 	EVENT_KIND.LANE_LIMIT,
+	EVENT_KIND.SETUP,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
 // it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
-// `run:board` draws from that line.
-const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE, EVENT_KIND.HEARTBEAT])
+// `run:board` draws from that line. A `setup` line is read only until the child it prepares launches,
+// so every one but the newest goes.
+const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
+	EVENT_KIND.SHIP_STAGE,
+	EVENT_KIND.HEARTBEAT,
+	EVENT_KIND.SETUP,
+])
 
 const event_schema = z.object({
 	pos: z.number(),
@@ -241,10 +253,18 @@ function is_stage_start(event: RunEvent): boolean {
 	return event.text.split(WORD_SEPARATOR)[STAGE_PHASE_INDEX] === run_ship_stage.PHASE.START
 }
 
+// The disposable lines the bound never drops: each issue's newest ship-stage and the run's newest
+// `setup` stage, the ones `run:board` draws from now.
+function drawn_lines(events: ReadonlyArray<RunEvent>): ReadonlySet<RunEvent> {
+	const setup = events.findLast((event) => event.kind === EVENT_KIND.SETUP)
+
+	return new Set([...newest_stages(events), ...(setup === undefined ? [] : [setup])])
+}
+
 // The lines the bound may drop, in the order it drops them: the ones that draw nothing first, then the
 // ones `run:board` draws from, each group oldest first.
 function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
-	const kept = newest_stages(events)
+	const kept = drawn_lines(events)
 	const disposable = events.filter((event) => DISPOSABLE_KINDS.has(event.kind) && !kept.has(event))
 
 	return [
@@ -261,7 +281,8 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 //
 // **Each issue's newest ship-stage is not disposable**: it is the only record `run:board` draws a lane's
 // review-and-later phase from, and on a stream full of positions it would otherwise roll off in its own
-// append.
+// append. **The newest `setup` stage is kept for the same reason**: it is the stage `run:board` draws
+// until the first child launches, and a run that starts on a full stream would otherwise show none.
 //
 // **A ship-stage `start` outlasts the other disposable lines**: each one is a phase on the lane's track,
 // so it is kept past the `done` lines and the heartbeats.

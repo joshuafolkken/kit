@@ -11,7 +11,7 @@ import type { LocalRead } from './run-board-read'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
-import { run_board_status } from './run-board-status'
+import { run_board_status, type RunActivity } from './run-board-status'
 import { run_board_usage } from './run-board-usage'
 
 // One `run:board` redraw. **Three speeds**: the frame is redrawn once a second, on the second, so
@@ -116,6 +116,14 @@ interface Redraw {
 	now_ms: number
 }
 
+// A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
+function activity_here(local: LocalRead): RunActivity {
+	return run_board_status.activity_of(
+		local.events,
+		local.ended_ms !== undefined || local.is_stranded,
+	)
+}
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
@@ -126,7 +134,7 @@ function header_of(
 		now_ms: redraw.now_ms,
 		started_ms: local.started_ms,
 		ended_ms: local.ended_ms,
-		activity: run_board_status.activity_of(local.events, local.ended_ms !== undefined),
+		activity: activity_here(local),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,

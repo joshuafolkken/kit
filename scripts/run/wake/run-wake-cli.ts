@@ -8,8 +8,11 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
+import { run_stranded_detect, type WatchedRun } from '#scripts/run/run-stranded-detect'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
@@ -145,6 +148,7 @@ async function resolve_context(): Promise<WakeContext | undefined> {
 
 	return {
 		carry_target: run_carry.carry_path(directory),
+		ended_target: run_carry_ended.ended_path(directory),
 		wake_target: run_wake.wake_path(directory),
 		log_target,
 		event_target: run_event_stream.target_of(directory),
@@ -180,10 +184,13 @@ function wake_session(
 	return run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
 }
 
+// **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record
+// adopted for this process, so reading that owner as live would have every restarted pass wait on
+// itself and never drive again.
 function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 	return {
 		read_carry: () => run_carry.read_carry(context.carry_target),
-		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_owner_live(read.carry),
+		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_held_by_another(read.carry),
 		has_work: async () => true,
 		new_session_id: () => randomUUID(),
 		hand_off: () => {
@@ -211,12 +218,43 @@ function warning_body(stop: LoopStop, body: string, context: WakeContext): strin
 	return [body, log_hint(context), stop.note].filter(Boolean).join('\n')
 }
 
-async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<void> {
-	await telegram_notify.warn({
+// Whether the warning reached a person — the answer `record_failure` leaves its marker on.
+async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<boolean> {
+	return await telegram_notify.warn({
 		issue_title: WARNING_TITLE,
 		body: warning_body(stop, body, context),
 		recovery: WARNING_RECOVERY,
 	})
+}
+
+// **A failed supervisor that leaves the run stranded says so on the stream, with its cause.** Nothing
+// else writes there when the supervisor gives up, so a reader of the events would see the last merge
+// and a run that looks as if it were still watching. The cause is the note's first line — the
+// driver's own `error …` — because the rest is a stderr tail the log already holds.
+//
+// **Only a strand, and only one a person was told of.** A `failed` stop is not always a strand: a
+// `run:carry --end` under a live driver fails it too, and that run ended cleanly. And the event is the
+// marker `run_stranded_detect` holds its own notification back on, so it is left only when the warning
+// was sent — after a failed send the stop-time detector still finds no marker, and notifies.
+function is_strand_told(stop: LoopStop, watched: WatchedRun, is_warned: boolean): boolean {
+	if (!is_warned || stop.reason !== run_wake_loop.FAILED_REASON) return false
+
+	return run_stranded_detect.is_left_stranded(watched)
+}
+
+async function record_failure(
+	stop: LoopStop,
+	watched: WatchedRun,
+	is_warned: boolean,
+): Promise<void> {
+	if (!is_strand_told(stop, watched, is_warned)) return
+
+	const [cause = ''] = (stop.note ?? '').split('\n', 1)
+
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.STRANDED,
+		`The supervisor failed and stopped watching the run — ${cause}`,
+	)
 }
 
 // **Only a failed wake exits non-zero; `unreadable` warns but exits zero.** The
@@ -234,13 +272,17 @@ function stop_body(reason: WakeStopReason): string | undefined {
 	return STOP_BODIES[reason]
 }
 
-async function finish(stop: LoopStop, context: WakeContext): Promise<number> {
+// `started_at` is the run this supervisor took on — what `record_failure` tells an ended run by once
+// the carry record that held it no longer reads.
+async function finish(stop: LoopStop, context: WakeContext, started_at: string): Promise<number> {
 	const body = stop_body(stop.reason)
 
 	if (body === undefined) return report(stop.reason)
 
 	console.error(stop.note ?? body)
-	await warn_of_stop(stop, body, context)
+	const is_warned = await warn_of_stop(stop, body, context)
+
+	await record_failure(stop, { ...context, started_at }, is_warned)
 
 	return report(stop.reason, exit_code_of(stop.reason))
 }
@@ -336,7 +378,7 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 
 	tidy_up(context.wake_target)
 
-	return await finish(stop, context)
+	return await finish(stop, context, read.carry.started_at)
 }
 
 // **The verdict tracks whether the supervisor is actually running, not merely whether a record is
@@ -419,6 +461,9 @@ const run_wake_cli = {
 	SUPERVISING_VERDICT,
 	UNKNOWN_VERDICT,
 	USAGE,
+	finish,
+	ports_for,
+	record_failure,
 	run,
 	stop_body,
 	warning_body,

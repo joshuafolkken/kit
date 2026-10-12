@@ -1,5 +1,6 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveResult } from './run-wake-loop'
 
@@ -125,10 +126,16 @@ function read_result(
 	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
 }
 
+// **A record this process already owns is claimed again.** A driver that failed leaves the record
+// adopted for the supervisor and not handed off, and the restarted pass re-drives it from here; only a
+// record another live process holds is refused.
 function claim_record(target: string, invocation: string): boolean {
 	const current = run_carry.read_carry(target)
 	if (current.kind !== 'carried' || current.carry.invocation !== invocation) return false
-	if (current.carry.is_handed_off !== true && run_carry.is_owner_live(current.carry)) return false
+
+	if (current.carry.is_handed_off !== true && run_carry.is_held_by_another(current.carry)) {
+		return false
+	}
 
 	return run_carry.adopt_carry(target, current.carry, run_carry.owner_of(process.pid)) !== undefined
 }
@@ -187,6 +194,8 @@ async function drive(target: string, wait: Pause = pause): Promise<DriveResult> 
 	if (!claim_record(target, read.carry.invocation)) {
 		return { kind: 'failed', note: 'The driver could not claim the carry record.' }
 	}
+
+	await run_event_setup.emit(run_event_setup.STAGE.HANDING_OFF)
 
 	return read_result(
 		await run_driver(target, args, wait, RERUN_LIMIT),
