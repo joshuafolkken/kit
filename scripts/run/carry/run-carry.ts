@@ -336,6 +336,21 @@ function is_foreign_live_owner(carry: RunCarry, owner: CarryOwner): boolean {
 	return is_owner_live(carry) && !is_owned_by(carry, owner)
 }
 
+// Whether a process other than the caller still holds the record. **By process alone, never by
+// conversation**: the wake supervisor inherits the environment of the session that started it, so a
+// conversation match would read that live session's record as the supervisor's own. The driver adopts
+// the record for the supervisor's process (`run-wake-driver.ts` → `claim_record`), so without this a
+// supervisor reads itself as a session at work.
+function is_held_by_another(
+	carry: RunCarry,
+	is_live: (carry: RunCarry) => boolean = is_owner_live,
+): boolean {
+	const caller = owner_of(process.pid)
+	const is_own = carry.owner_pid === caller.pid && carry.owner_start === caller.start
+
+	return !is_own && is_live(carry)
+}
+
 function is_handed_off_to(carry: RunCarry, invocation: string): boolean {
 	return carry.is_handed_off === true && carry.invocation === invocation
 }
@@ -504,6 +519,7 @@ const run_carry = {
 	fresh_carry,
 	is_count_refused,
 	is_foreign_live_owner,
+	is_held_by_another,
 	is_owner_live,
 	lost_message,
 	nothing_to_resume_message,

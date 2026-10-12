@@ -117,8 +117,11 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   A record that does not read is left stranded unless `run:carry --end` closed that very run, and one
   the driver left owned by the supervisor's own process is too, since that owner is the one leaving
   (`run-stranded-detect.ts` → `is_left_stranded`). A driver that fails while the record still reads
-  is not re-driven by the supervisor's restart, which waits on a record it owns itself
-  (joshuafolkken/kit#3701). After a failed send the stop-time detector leaves the marker and
+  is re-driven by the supervisor's restart: the record it left owned by the supervisor's own process
+  is not read as a session at work (`run-carry.ts` → `is_held_by_another`), so the restarted pass
+  claims it again and runs the driver, and a driver that keeps failing stops as `failed` after
+  `RESTART_LIMIT` restarts (joshuafolkken/kit#3701). A record another live process holds is still
+  waited on. After a failed send the stop-time detector leaves the marker and
   notifies instead, and a run `run:carry --end` closed gets none. `run:board` then draws
   the run `■` rather than `⏸` — it reads the same owner-gone, no-supervisor judgement as
   `run:stranded` — so a run nobody is polling for is never drawn as one still waiting. Recovery is

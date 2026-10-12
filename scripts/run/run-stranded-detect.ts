@@ -151,18 +151,9 @@ function is_stranded_at(directory: string, ports: DetectPorts = DEFAULT_PORTS): 
 	return input !== undefined && run_stranded.is_stranded(input)
 }
 
-// Whether a session other than the caller still holds the record. The driver adopts the record for the
-// supervisor's own process (`run-wake-driver.ts` → `claim_record`), so a supervisor asking as it exits
-// reads itself as the live owner — and that owner is about to be gone.
-function is_held_by_another(carry: RunCarry, ports: DetectPorts): boolean {
-	const caller = run_carry.owner_of(process.pid)
-	const is_own = carry.owner_pid === caller.pid && carry.owner_start === caller.start
-
-	return !is_own && ports.is_owner_live(carry)
-}
-
 // The judgement a supervisor asks of the run it is about to stop watching. The asker is that
-// supervisor on its way out, so it is taken as gone, and so is an owner that is the asker itself. A
+// supervisor on its way out, so it is taken as gone, and so is an owner that is the asker itself
+// (`run_carry.is_held_by_another`) — that owner is about to be gone. A
 // record another session holds is not left stranded. **A record that does not read is left stranded
 // unless `run:carry --end` ended this very run**: the read that failed the driver fails here too, and
 // that run still has its budget and nobody watching it.
@@ -173,7 +164,7 @@ function is_left_stranded(run: WatchedRun, ports: DetectPorts = DEFAULT_PORTS): 
 
 	return run_stranded.is_stranded({
 		read,
-		is_owner_live: is_held_by_another(read.carry, ports),
+		is_owner_live: run_carry.is_held_by_another(read.carry, ports.is_owner_live),
 		supervisor: run_stranded.GONE,
 	})
 }
