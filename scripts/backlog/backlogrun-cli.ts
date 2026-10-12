@@ -6,22 +6,25 @@ import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { backlogrun_args, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
+import { backlogrun_stop, type StopReport } from './backlogrun-stop'
 
-// `josh backlogrun` — start a `backlogrun` from the terminal and watch it. A
+// `josh backlogrun` — start a `backlogrun` from the terminal and watch it, or stop it with `--stop`. A
 // run already going is never joined by a second one: the board is shown, and any issue named is pointed
 // at `run:add` rather than added behind the person's back. Otherwise the agent is started in the
 // background, its output to a log file, and the board takes over the terminal at once. Closing the
 // board closes only the board.
 
 const ARGV_OFFSET = 2
+const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlogrun [#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]'
+	'Usage: josh backlogrun [#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop'
 
 interface BacklogrunPorts {
 	repository_directory: () => Promise<string | undefined>
 	is_running: (git_directory: string) => boolean
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
+	stop: (git_directory: string) => Promise<StopReport>
 	show_board: () => Promise<number>
 	write: (line: string) => void
 }
@@ -30,6 +33,7 @@ const LIVE_PORTS: BacklogrunPorts = {
 	repository_directory: run_carry.repository_directory,
 	is_running: backlogrun_launch.is_running,
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
+	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	show_board: async () => await run_board_cli.run([]),
 	write: (line) => process.stdout.write(`${line}\n`),
 }
@@ -77,25 +81,34 @@ async function begin(
 	return await ports.show_board()
 }
 
+// Stopping starts nothing and draws no board: the lines say what was stopped, and a run left with an
+// owner this command may not signal is a failure the exit code carries.
+async function stop(git_directory: string, ports: BacklogrunPorts): Promise<number> {
+	const report = await ports.stop(git_directory)
+
+	for (const line of backlogrun_stop.lines_of(report)) ports.write(line)
+
+	return backlogrun_stop.is_stopped(report) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+}
+
+function refuse(line: string, ports: BacklogrunPorts): number {
+	ports.write(line)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function run(
 	argv: ReadonlyArray<string>,
 	ports: BacklogrunPorts = LIVE_PORTS,
 ): Promise<number> {
 	const parsed = backlogrun_args.parse(argv)
 
-	if (parsed.kind === 'refused') {
-		ports.write(USAGE)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (parsed.kind === 'refused') return refuse(USAGE, ports)
 
 	const git_directory = await ports.repository_directory()
 
-	if (git_directory === undefined) {
-		ports.write('backlogrun: not inside a git repository')
-
-		return FAILURE_EXIT_CODE
-	}
+	if (git_directory === undefined) return refuse('backlogrun: not inside a git repository', ports)
+	if (parsed.kind === 'stop') return await stop(git_directory, ports)
 
 	return await begin(parsed.args, git_directory, ports)
 }

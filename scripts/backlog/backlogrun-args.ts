@@ -9,8 +9,12 @@ import { run_invocation } from '#scripts/run/run-invocation'
 //
 // **A bare number is an issue.** A shell reads an unquoted `#3437` as a comment, so `3437` in the named
 // list is taken as `#3437`; a number after the first flag is that flag's value and is left alone.
+//
+// **`--stop` stands alone.** It stops the run rather than starting one, so beside an issue or any other
+// flag it is refused before anything is stopped — a mistyped start must never end a run.
 
 const AGENT_FLAG = '--agent'
+const STOP_FLAG = '--stop'
 const BACKLOG_COMMAND = 'backlogrun'
 const ISSUE_PREFIX = '#'
 const FLAG_PREFIX = '-'
@@ -26,7 +30,8 @@ interface BacklogrunArguments {
 	issues: ReadonlyArray<number>
 }
 
-type ArgumentsResult = { kind: 'args'; args: BacklogrunArguments } | { kind: 'refused' }
+type ArgumentsResult =
+	{ kind: 'args'; args: BacklogrunArguments } | { kind: 'stop' } | { kind: 'refused' }
 
 interface AgentSplit {
 	agent: string | undefined
@@ -56,7 +61,7 @@ function normalized(rest: ReadonlyArray<string>): Array<string> {
 	return [...rest.slice(0, split_at).map((token) => issue_token(token)), ...rest.slice(split_at)]
 }
 
-function parse(argv: ReadonlyArray<string>): ArgumentsResult {
+function parse_start(argv: ReadonlyArray<string>): ArgumentsResult {
 	const { agent, rest } = split_agent(argv)
 	const provider = agent === undefined ? undefined : AGENTS[agent]
 	const invocation = run_invocation.rebuild([BACKLOG_COMMAND, ...normalized(rest)].join(' '))
@@ -66,6 +71,12 @@ function parse(argv: ReadonlyArray<string>): ArgumentsResult {
 	const issues = run_invocation.issue_numbers(invocation) ?? []
 
 	return { kind: 'args', args: { provider, invocation, issues } }
+}
+
+function parse(argv: ReadonlyArray<string>): ArgumentsResult {
+	if (!argv.includes(STOP_FLAG)) return parse_start(argv)
+
+	return { kind: argv.length === 1 ? 'stop' : 'refused' }
 }
 
 const backlogrun_args = { parse }

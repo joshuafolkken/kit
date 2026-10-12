@@ -85,7 +85,8 @@ named epic's children", never the root as a standalone `fullrun`, then ask `pnpm
 a child number or `complete` continues; only `stop` or a failure records `pnpm josh run:carry --done <E>
 --owner "$PPID"`.
 
-**A person keeps control of the supervisor** — `pnpm josh run:wake --list` / `--stop`.
+**A person keeps control of the run** — `pnpm josh run:wake --list` reads it, `pnpm josh backlogrun
+--stop` stops it (`docs/josh-commands.md` → "`josh backlogrun`").
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why a session cut does not end the run"
 

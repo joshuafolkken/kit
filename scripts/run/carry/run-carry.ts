@@ -102,6 +102,9 @@ interface RunCarry {
 	// The owner conversation's transcript, which outlives a restart of its process
 	// (`run-carry-conversation.ts`). Optional for the same reason as the pid.
 	owner_transcript?: string | undefined
+	// The owner is a session the run launched headless (`run-headless.ts`), so nobody can end the run
+	// from it. Kept here, beside the owner it describes, so it outlives the supervisor's own record.
+	is_owner_headless?: boolean | undefined
 	// Set by `--cut`, and by nothing else. A crash never reaches `--cut`, which is what makes a
 	// declared cut the only standing record carried without a person deciding.
 	is_handed_off?: boolean | undefined
@@ -138,6 +141,7 @@ interface CarryOwner {
 	pid?: number | undefined
 	start?: string | undefined
 	transcript?: string | undefined
+	is_headless?: boolean | undefined
 }
 
 // **`resume` is the only one of the four that establishes anything.** The other three are refusals,
@@ -199,6 +203,7 @@ const run_carry_schema = z.object({
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
 	owner_transcript: z.string().optional(),
+	is_owner_headless: z.boolean().optional(),
 	is_handed_off: z.boolean().optional(),
 	done: z.array(z.number()).optional(),
 	retrospective: z.boolean().optional(),
@@ -265,6 +270,7 @@ function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		owner_transcript: owner.transcript,
+		is_owner_headless: owner.is_headless,
 	}
 }
 
@@ -297,7 +303,7 @@ function adopt_carry(
 	owner: CarryOwner = NO_OWNER,
 ): RunCarry | undefined {
 	// The run's own fields carry across untouched — the counters, the outage fold timestamp, `done` so the successor does not re-run what the cut session finished,
-	// and `retrospective` so a run resumed after a cut does not repeat its retrospective. Only the three
+	// and `retrospective` so a run resumed after a cut does not repeat its retrospective. Only the
 	// ownership fields are overridden: the new owner replaces the old — a caller that declared none
 	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
 	const next: RunCarry = {
@@ -305,6 +311,7 @@ function adopt_carry(
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		owner_transcript: owner.transcript,
+		is_owner_headless: owner.is_headless,
 		is_handed_off: false,
 	}
 

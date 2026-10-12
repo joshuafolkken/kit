@@ -13,13 +13,14 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect, type WatchedRun } from '#scripts/run/run-stranded-detect'
-import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
+import { run_wake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_restart, type RestartPorts } from './run-wake-restart'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
+import { run_wake_stop } from './run-wake-stop'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
 // `backlogrun` or `queue` without a person retyping the keyword. **Which invocations it may continue
@@ -394,30 +395,10 @@ function list(context: WakeContext): number {
 	return report(run_wake.is_supervisor_live(wake) ? SUPERVISING_VERDICT : STALE_VERDICT)
 }
 
-// **Removing the record is the stop; the signal only shortens the wait.** A pid already gone, or one
-// this process may not signal, is not an error — the loop ends at its next pass either way, because it
-// re-reads the record it no longer finds and `run_wake.update_wake` refuses to write one back.
-function signal_supervisor(wake: RunWake): void {
-	if (!run_wake.is_supervisor_live(wake)) return
-
-	try {
-		process.kill(wake.pid, 'SIGTERM')
-	} catch {
-		console.error(
-			`Process ${String(wake.pid)} could not be signalled; the record is removed regardless.`,
-		)
-	}
-}
-
 function stop_supervisor(context: WakeContext): number {
-	const wake = run_wake.read_wake(context.wake_target)
+	const stopped = run_wake_stop.stop(context.wake_target)
 
-	if (wake === undefined) return report(NONE_VERDICT)
-
-	run_wake.remove_wake(context.wake_target)
-	signal_supervisor(wake)
-
-	return report(STOPPED_VERDICT)
+	return report(stopped === undefined ? NONE_VERDICT : STOPPED_VERDICT)
 }
 
 async function dispatch(

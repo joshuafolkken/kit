@@ -60,3 +60,22 @@ describe('backlogrun_args.parse flags', () => {
 		expect(parse(argv)).toStrictEqual({ kind: 'refused' })
 	})
 })
+
+// joshuafolkken/kit#3708: `--stop` stops the run, so it is read only where it stands alone.
+describe('backlogrun_args.parse --stop', () => {
+	it('reads a lone --stop as the stop', () => {
+		expect(parse(['--stop'])).toStrictEqual({ kind: 'stop' })
+	})
+
+	it.each([
+		{ argv: ['3437', '--stop'] },
+		{ argv: ['--stop', '#3437'] },
+		{ argv: ['--stop', '--only'] },
+		{ argv: ['--max', '3', '--stop'] },
+		{ argv: ['--stop', '--idle', '30'] },
+		{ argv: ['--stop', '--agent', 'codex'] },
+		{ argv: ['--stop', '--stop'] },
+	])('refuses $argv, so a mistyped start stops nothing', ({ argv }) => {
+		expect(parse(argv)).toStrictEqual({ kind: 'refused' })
+	})
+})

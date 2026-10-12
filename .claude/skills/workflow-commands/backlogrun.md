@@ -46,6 +46,7 @@ is still that one invocation (`backlogrun-steps.md` → "The session cut is insi
    session only when it needs judgment.
 7. **End the record when the run ends** — `run:report`, then `run:carry --end` (or `--end --stopped
    "<reason>"`) and `run:wake --stop`. An empty plan is not that end; the driver's idle watch decides it.
+   A person stops a run from the terminal with `pnpm josh backlogrun --stop`, which makes both calls.
 
 ## The route table
 
