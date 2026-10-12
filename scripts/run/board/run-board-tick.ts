@@ -135,6 +135,7 @@ function header_of(
 		machine: state.gauges,
 		usages: state.usages,
 		form: redraw.ports.form,
+		repo: state.plan?.context.repo,
 		spinner: redraw.ports.is_tty ? SPOT : undefined,
 		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
 	}

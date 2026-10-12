@@ -9,11 +9,16 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // fetch has failed, and how the progress counts are drawn from the layout. joshuafolkken/kit#3444: two
 // lines of symbols, no `updated` line, and a heartbeat colored by how stale the stream is.
 // joshuafolkken/kit#3508: the run's state with its progress, then the time with the machine.
+// joshuafolkken/kit#3692: three columns — the name, the time, then the progress over the machine.
 
 const { minute_of } = run_board_labels
 const { WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
-const RUNNING_CLOCK = `⏱ 0:30:00  ${MACHINE_UNKNOWN}`
+// The second line's first two columns where nothing is drawn in them: no repository, no heartbeat.
+const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
+const TIME_BLANK = ' '.repeat('⏰ 0:30:00'.length + 1)
+const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
+const STALE_BEAT = '💓 0:40:00'
 const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = backlog_budget.MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
@@ -28,7 +33,7 @@ const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running'
 
 // A 40-minute heartbeat drawn alarming — read at the call, after the case has forced color on.
 function alarmed(): string {
-	return styleText('red', '💓 0:40:00')
+	return styleText('red', STALE_BEAT)
 }
 
 function header(extra: Partial<BoardHeader> = {}): BoardHeader {
@@ -45,6 +50,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		machine: undefined,
 		spinner: undefined,
 		form: 'screen',
+		repo: undefined,
 		link: (reference) => reference,
 		...extra,
 	}
@@ -62,11 +68,11 @@ function clock_line_of(board: BoardHeader): string {
 	return lines_of(board)[1] ?? ''
 }
 
-// The raw title, colors kept, of a running run whose newest event is `age_ms` old.
-function aged_title(age_ms: number): string {
+// The raw second line, colors kept, of a running run whose newest event is `age_ms` old.
+function aged_beat(age_ms: number): string {
 	const activity = { last_event_ms: NOW - age_ms, is_stopped: false }
 
-	return run_board_header.header_lines(header({ layout: RUNNING_LAYOUT, activity }))[0] ?? ''
+	return run_board_header.header_lines(header({ layout: RUNNING_LAYOUT, activity }))[1] ?? ''
 }
 
 describe('run_board_header.header_lines state', () => {
@@ -91,38 +97,39 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ backlogrun  ✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`⏱ 1:30:00  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
+			`■ backlogrun  ⏰ 1:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}    ${MACHINE_UNKNOWN}`,
 		])
 	})
 
 	it('leaves out the heartbeat before the stream has one', () => {
-		expect(title_of(header())).not.toContain('💓')
+		expect(lines_of(header()).join('\n')).not.toContain('💓')
 	})
 })
 
 describe('run_board_header.header_lines shape', () => {
-	it('draws the progress then the heartbeat on the state line, the run’s age on the clock line', () => {
+	// joshuafolkken/kit#3692: the run's age over the heartbeat, in one column.
+	it('draws the run’s age then the progress on the first line, the heartbeat under the age', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ backlogrun  ✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0  💓 0:01:00`,
-			RUNNING_CLOCK,
+			`⏸ backlogrun  ⏰ 0:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${NAME_BLANK}  💓 0:01:00  ${MACHINE_UNKNOWN}`,
 		])
 	})
 
 	// joshuafolkken/kit#3486: two lines in every state, a machine not sampled yet drawn as `-`.
-	it('draws the state with the progress bar, then the clock with the machine, with no updated line', () => {
+	it('draws the state with the progress bar, then the machine, with no updated line', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
-			`▶ backlogrun  ✅ 0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
+			`▶ backlogrun  ⏰ 0:30:00  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
 			RUNNING_CLOCK,
 		])
 	})
 
 	// joshuafolkken/kit#3450
-	it('draws the machine gauges after the time on the clock line', () => {
+	it('draws the machine gauges under the progress', () => {
 		const machine = {
 			cpu_percent: 15,
 			memory_percent: 37,
@@ -131,7 +138,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(clock_line_of(header({ machine }))).toBe(
-			'⏱ 0:30:00  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────',
+			`${NAME_BLANK}  ${TIME_BLANK}  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
 		)
 	})
 
@@ -152,7 +159,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
 
 		expect(lines_of(board)).toStrictEqual([
-			`▶ backlogrun  ✅ 0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
+			`▶ backlogrun  ⏰ 0:30:00  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
 			RUNNING_CLOCK,
 		])
 	})
@@ -164,7 +171,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 
 // joshuafolkken/kit#3456: a figure read once means nothing, so a chat's machine line is its memory.
 describe('run_board_header.header_lines chat', () => {
-	it('draws the memory alone after the time on the clock line of a chat', () => {
+	it('draws the memory alone under the progress of a chat', () => {
 		const machine = {
 			cpu_percent: 15,
 			memory_percent: 37,
@@ -172,7 +179,9 @@ describe('run_board_header.header_lines chat', () => {
 			memory_pressure: undefined,
 		}
 
-		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe('⏱ 0:30:00  🧠  37% ■■■■──────')
+		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe(
+			`${NAME_BLANK}  ${TIME_BLANK}  🧠  37% ■■■■──────`,
+		)
 	})
 })
 
@@ -208,17 +217,18 @@ describe('run_board_header.header_lines heartbeat color', () => {
 	it('leaves a fresh heartbeat plain, then yellow past 15 minutes and red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(aged_title(MINUTE)).toContain(' 💓 0:01:00')
-		expect(aged_title(20 * MINUTE)).toContain(styleText('yellow', '💓 0:20:00'))
-		expect(aged_title(40 * MINUTE)).toContain(alarmed())
+		expect(aged_beat(MINUTE)).toContain(' 💓 0:01:00')
+		expect(aged_beat(20 * MINUTE)).toContain(styleText('yellow', '💓 0:20:00'))
+		expect(aged_beat(40 * MINUTE)).toContain(alarmed())
 	})
 
 	it('leaves a stale heartbeat plain while the run is not running', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const activity = { last_event_ms: NOW - 40 * MINUTE, is_stopped: false }
-		const title = run_board_header.header_lines(header({ activity }))[0] ?? ''
+		const beat = run_board_header.header_lines(header({ activity }))[1] ?? ''
 
-		expect(title).not.toContain(alarmed())
+		expect(beat).toContain(STALE_BEAT)
+		expect(beat).not.toContain(alarmed())
 	})
 })
 
@@ -228,7 +238,7 @@ function progress_of(settled: number, total: number): string {
 	const waiting = Array.from({ length: total - settled }, (_, index) => row(100 + index, 'waiting'))
 	const layout = { ...EMPTY_LAYOUT, active: merged, unreached: waiting }
 
-	return title_of(header({ layout })).replace(/^\S+ backlogrun {2}/u, '')
+	return title_of(header({ layout })).replace(/^\S+ backlogrun {2}⏰ \S+ {2}/u, '')
 }
 
 // joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.

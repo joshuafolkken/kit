@@ -9,7 +9,7 @@ import type { ItemState } from './run-board-status'
 // The words and the clock `run:board` draws with. A moment on the board is a local clock, `HH:MM`
 // where a person reads it to the minute; how long a row or the heartbeat has run is a short `MM:SS`,
 // and how long the run has run or its wait has left is `H:MM:SS` — two separators are a length and one
-// is a time of day, so the header's second line never reads a length as a moment.
+// is a time of day, so the header's time column never reads a length as a moment.
 
 const CLOCK_WIDTH = 2
 const CLOCK_PAD = '0'
@@ -163,13 +163,16 @@ const KIND_WORDS: Readonly<Record<FiledKind, keyof Words>> = {
 }
 
 // The header's gauges and marks. ⚡ rather than 🔥: a fire beside a gauge drawn green reads as an
-// alarm.
+// alarm. ⏰ rather than ⏱, a text symbol some terminals draw one column wide: under it the 💓's digits
+// would stand a column off.
 const HEADER_ICONS = {
 	cpu: '⚡',
 	memory: '🧠',
 	swap: '💾',
 	ended: '🔚',
 	loading: '⏳',
+	elapsed: '⏰',
+	heartbeat: '💓',
 } as const
 
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red

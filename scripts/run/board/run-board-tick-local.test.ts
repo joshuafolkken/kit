@@ -63,7 +63,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('draws two header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
-		expect(lines[0]).toMatch(/ {2}✅ 0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
+		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
 		expect(lines[2]).toBe('')
 		expect(lines[3]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}    …`, 'u'))
@@ -76,12 +76,13 @@ describe('run_board_tick.tick before the plan is read', () => {
 		expect(lines[0]).not.toMatch(/^⏸/u)
 	})
 
-	// joshuafolkken/kit#3689: a waiting run's second line is a working run's — the time, then the machine.
+	// joshuafolkken/kit#3689: a waiting run's second line is a working run's — the heartbeat, then the
+	// machine. joshuafolkken/kit#3692: no plan is read yet, so no repository is named before them.
 	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
 		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
-		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines[1]).toMatch(/^⏱ \d+:\d{2}:\d{2} {2}🧠/u)
+		expect(lines[0]).toMatch(/^⏸ backlogrun {2}⏰ \d+:\d{2}:\d{2} {2}✅/u)
+		expect(lines[1]).toMatch(/^ +💓 \d+:\d{2}:\d{2} {2}🧠/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 })

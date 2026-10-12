@@ -32,6 +32,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		machine: undefined,
 		spinner: undefined,
 		form: 'screen',
+		repo: undefined,
 		link: (reference) => reference,
 		...extra,
 	}
