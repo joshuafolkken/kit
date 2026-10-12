@@ -18,6 +18,7 @@ interface StepContext {
 	profile: ProjectProfile
 	visibility: Visibility
 	init_command: string | undefined
+	push_preflight_command: string | undefined
 }
 
 interface RunContext extends StepContext {
@@ -69,6 +70,13 @@ function self_run_refusal(root: string): string | undefined {
 	return self_sync_guard.self_sync_refusal(PACKAGE_DIR, root)
 }
 
+// A caller's command line runs without a shell, split the way execa splits one.
+function run_command_line(command_line: string, extra: ReadonlyArray<string>, root: string): void {
+	const [command = '', ...args] = parseCommandString(command_line)
+
+	run_local(command, [...args, ...extra], root)
+}
+
 function create_git_repository(context: StepContext): void {
 	initial_commit.create_repository(context.root)
 }
@@ -84,9 +92,7 @@ function initialize(context: StepContext): void {
 		return
 	}
 
-	const [command = '', ...args] = parseCommandString(context.init_command)
-
-	run_local(command, [...args, '--profile', context.profile], context.root)
+	run_command_line(context.init_command, ['--profile', context.profile], context.root)
 }
 
 function commit_all(context: StepContext): void {
@@ -122,6 +128,26 @@ function baseline_of(
 	return start_setup_pr.changed_paths(context.root)
 }
 
+// A toolkit's own pre-push hook can need something kit knows nothing about (app-kit's needs a Docker
+// daemon), and a push it refuses lands after `gh repo create` has made the repository. So the caller
+// names a check that runs only when the plan pushes, before the first step: a run that does not push
+// is never stopped by it, and one it stops has written nothing (#3702).
+function run_push_preflight(steps: ReadonlyArray<StartStep>, context: StepContext): void {
+	const command_line = context.push_preflight_command
+
+	if (command_line === undefined || !start_plan.has_push(steps)) return
+
+	console.info(`\nPush preflight: ${command_line}`)
+
+	try {
+		run_command_line(command_line, [], context.root)
+	} catch (error) {
+		const cause = error_text.message_of(error)
+
+		throw new Error(start_plan.preflight_report(command_line, cause), { cause: error })
+	}
+}
+
 type StepAction = (context: RunContext) => void | Promise<void>
 
 const STEP_ACTIONS: Readonly<Record<StartStep, StepAction>> = {
@@ -150,6 +176,8 @@ async function run_step(
 
 async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext): Promise<void> {
 	const labels = start_plan.step_labels(context.init_command)
+
+	run_push_preflight(steps, context)
 	const run_context: RunContext = { ...context, baseline: baseline_of(steps, context) }
 
 	for (const [index, step] of steps.entries()) {

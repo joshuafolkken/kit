@@ -1140,7 +1140,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "start": [
-      "[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]",
+      "[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]",
       "developer",
       [
         "files",

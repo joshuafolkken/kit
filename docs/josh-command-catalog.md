@@ -359,7 +359,7 @@ Fail when a pull request adds any new SonarCloud issue or duplicated block
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]`
+`[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]`
 
 Set a project up for the GitHub Issue workflow, from git init to the setup PR
 

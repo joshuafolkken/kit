@@ -15,8 +15,9 @@ import { start_steps } from './start-steps'
 const ARGUMENT_START_INDEX = 2
 const READY_MESSAGE = 'GitHub workflow ready. Use kickoff new in your assistant to plan an Issue.'
 const START_USAGE =
-	'josh start [--profile basic|full] [--yes] [--github] [--public] [--init-command <command>]'
+	'josh start [--profile basic|full] [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]'
 const INIT_COMMAND_FLAG = '--init-command'
+const PUSH_PREFLIGHT_COMMAND_FLAG = '--push-preflight-command'
 const YES_FLAG = '--yes'
 const GITHUB_FLAG = '--github'
 const PUBLIC_FLAG = '--public'
@@ -28,34 +29,38 @@ interface Prepared {
 	choices: Choices
 }
 
-interface InitCommandSplit {
-	init_command: string | undefined
+interface CommandSplit {
+	command: string | undefined
 	rest: ReadonlyArray<string>
 }
 
 // A value that is blank or another flag means the command itself was left out, which would otherwise
-// swallow the next switch or hand the initialize step nothing to run.
+// swallow the next switch or hand its step nothing to run.
 function is_command_value(value: string | undefined): value is string {
 	return value !== undefined && value.trim() !== '' && !value.startsWith('-')
 }
 
 // The command arrives as the one argument after its flag and is removed together with it.
-function split_init_command(args: ReadonlyArray<string>): InitCommandSplit {
-	const index = args.indexOf(INIT_COMMAND_FLAG)
+function split_command(args: ReadonlyArray<string>, flag: string): CommandSplit {
+	const index = args.indexOf(flag)
 
-	if (index === -1) return { init_command: undefined, rest: args }
+	if (index === -1) return { command: undefined, rest: args }
 
 	const value = args[index + 1]
 
 	if (!is_command_value(value)) throw new Error(`Usage: ${START_USAGE}`)
 
-	return { init_command: value, rest: args.filter((_, at) => at !== index && at !== index + 1) }
+	return { command: value, rest: args.filter((_, at) => at !== index && at !== index + 1) }
 }
 
-// The switches and the initialize command are peeled off first, so what remains is exactly the
+// The switches and the caller's commands are peeled off first, so what remains is exactly the
 // `--profile` pair `josh init` accepts — one parser for the profile in both commands.
 function parse_start_options(args: ReadonlyArray<string>): StartOptions {
-	const { init_command, rest } = split_init_command(args)
+	const init = split_command(args, INIT_COMMAND_FLAG)
+	const { command: push_preflight_command, rest } = split_command(
+		init.rest,
+		PUSH_PREFLIGHT_COMMAND_FLAG,
+	)
 	const profile_args = rest.filter((argument) => !SWITCHES.has(argument))
 
 	return {
@@ -63,7 +68,8 @@ function parse_start_options(args: ReadonlyArray<string>): StartOptions {
 		is_yes: rest.includes(YES_FLAG),
 		is_github: rest.includes(GITHUB_FLAG),
 		visibility: rest.includes(PUBLIC_FLAG) ? 'public' : 'private',
-		init_command,
+		init_command: init.command,
+		push_preflight_command,
 	}
 }
 
@@ -112,12 +118,13 @@ async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void>
 	const { steps, interaction, choices } = prepare(args, is_tty, process.cwd())
 
 	const { root, options } = choices
-	const { visibility, init_command } = options
+	const { visibility, init_command, push_preflight_command } = options
 
 	console.info(start_plan.plan_summary(steps, start_plan.step_labels(init_command)))
 	const profile = await resolve_profile(choices, interaction)
+	const context = { root, profile, visibility, init_command, push_preflight_command }
 
-	await start_steps.run_steps(steps, { root, profile, visibility, init_command })
+	await start_steps.run_steps(steps, context)
 	console.info(`\n${READY_MESSAGE}`)
 }
 

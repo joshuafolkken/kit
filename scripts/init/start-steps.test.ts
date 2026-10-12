@@ -26,8 +26,11 @@ const CONTEXT: StepContext = {
 	profile: 'basic',
 	visibility: 'private',
 	init_command: undefined,
+	push_preflight_command: undefined,
 }
 const INIT_COMMAND = 'josh-app init --verbose'
+const PREFLIGHT_COMMAND = 'josh-app start:preflight'
+const COMMAND_FAILURE = 'Command failed with exit code 1'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
@@ -173,7 +176,7 @@ describe('an initialize step handed to a caller command (#2872)', () => {
 
 	it('stops before the commit when the command fails', async () => {
 		mocked_execa.mockImplementation((command) => {
-			if (command === 'josh-app') throw new Error('Command failed with exit code 1')
+			if (command === 'josh-app') throw new Error(COMMAND_FAILURE)
 
 			return result(0)
 		})
@@ -183,6 +186,53 @@ describe('an initialize step handed to a caller command (#2872)', () => {
 			/stopped at: Initialize with josh-app init[\s\S]*Completed: nothing[\s\S]*exit code 1/u,
 		)
 		expect(commands()).not.toContain(GIT_ADD_ALL)
+	})
+})
+
+describe('a push preflight handed to a caller command (#3702)', () => {
+	const context = { ...CONTEXT, push_preflight_command: PREFLIGHT_COMMAND }
+
+	it('runs the command in the root before the first step of a plan that pushes', async () => {
+		await start_steps.run_steps(['git_init', 'repository'], context)
+
+		expect(commands()[0]).toBe(PREFLIGHT_COMMAND)
+		const call: ReadonlyArray<unknown> = mocked_execa.mock.calls[0] ?? []
+
+		expect(call[2]).toMatchObject({ cwd: ROOT, stdio: 'inherit' })
+		expect(commands().some((command) => command.startsWith('gh repo create'))).toBe(true)
+	})
+
+	it('runs it ahead of the setup pull request too', async () => {
+		await start_steps.run_steps(['labels', 'setup_pr'], context)
+
+		expect(commands()).toStrictEqual([PREFLIGHT_COMMAND])
+	})
+
+	it('creates neither repository when the command fails', async () => {
+		mocked_execa.mockImplementation((command) => {
+			if (command === 'josh-app') throw new Error(COMMAND_FAILURE)
+
+			return result(0)
+		})
+
+		await expect(start_steps.run_steps(['git_init', 'repository'], context)).rejects.toThrow(
+			/before its first step: the push preflight \(josh-app start:preflight\) failed\. Nothing was changed\.[\s\S]*exit code 1/u,
+		)
+		expect(commands()).toStrictEqual([PREFLIGHT_COMMAND])
+		expect(start_setup_pr.changed_paths).not.toHaveBeenCalled()
+	})
+
+	it('does not run the command when the plan does not push', async () => {
+		await start_steps.run_steps(['initialize', 'labels'], context)
+
+		expect(commands()).toStrictEqual([])
+	})
+
+	it('runs nothing ahead of the first step when no command was given', async () => {
+		await start_steps.run_steps(['repository'], CONTEXT)
+
+		expect(commands()).toHaveLength(1)
+		expect(commands()[0]).toMatch(/^gh repo create/u)
 	})
 })
 

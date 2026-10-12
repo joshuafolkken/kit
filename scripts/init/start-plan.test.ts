@@ -15,6 +15,7 @@ const OPTIONS: StartOptions = {
 	is_github: false,
 	visibility: 'private',
 	init_command: undefined,
+	push_preflight_command: undefined,
 }
 const WITH_REPOSITORY = ['initialize', 'repository'] as const
 const ADD_GITHUB = 'Add --github'
@@ -187,6 +188,26 @@ describe('consent to create the GitHub repository', () => {
 
 	it('asks at a terminal before opening the setup pull request', () => {
 		expect(start_plan.github_consent(['setup_pr'], OPTIONS, 'interactive').value).toBe('ask')
+	})
+})
+
+describe('the steps a push preflight guards (#3702)', () => {
+	it.each([[WITH_REPOSITORY], [['initialize', 'labels', 'setup_pr'] as const]])(
+		'finds the push in %j',
+		(steps) => {
+			expect(start_plan.has_push(steps)).toBe(true)
+		},
+	)
+
+	it('finds none when the origin is on GitHub and kit is committed', () => {
+		expect(start_plan.has_push(['initialize', 'labels'])).toBe(false)
+	})
+
+	it('reports a failed preflight as a run that changed nothing', () => {
+		const report = start_plan.preflight_report('josh-app start:preflight', 'exit code 1')
+
+		expect(report).toContain('the push preflight (josh-app start:preflight) failed')
+		expect(report).toContain('Nothing was changed.\nCause: exit code 1')
 	})
 })
 
