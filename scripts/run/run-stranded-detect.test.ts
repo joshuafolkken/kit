@@ -122,6 +122,49 @@ describe('run_stranded_detect.detect_and_report — no strand', () => {
 	})
 })
 
+// joshuafolkken/kit#3697: `run:board` asks the same judgement of the run it draws.
+describe('run_stranded_detect.is_stranded_at', () => {
+	const DIRECTORY = '/repo/.git'
+
+	it('reads a carried run with its owner gone and no supervisor as stranded', () => {
+		expect(run_stranded_detect.is_stranded_at(DIRECTORY, ports({}))).toBe(true)
+	})
+
+	it('reads a run whose owner is alive as not stranded', () => {
+		const live = ports({ is_owner_live: () => true })
+
+		expect(run_stranded_detect.is_stranded_at(DIRECTORY, live)).toBe(false)
+	})
+
+	it('reads a record that is not carried as not stranded', () => {
+		const none = ports({ read_carry: () => ({ kind: 'none' }) })
+
+		expect(run_stranded_detect.is_stranded_at(DIRECTORY, none)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3697: the supervisor asks this as it fails, while its own wake record still reads
+// live — so the judgement must not wait for that record to go.
+describe('run_stranded_detect.is_left_stranded', () => {
+	it('reads a carried run with its owner gone as left stranded under a live supervisor', () => {
+		const watched = ports({ read_wake: () => wake(), supervisor_liveness: () => run_stranded.LIVE })
+
+		expect(run_stranded_detect.is_left_stranded(CARRY_TARGET, watched)).toBe(true)
+	})
+
+	it('reads a run `run:carry --end` closed as not left stranded', () => {
+		const ended = ports({ read_carry: () => ({ kind: 'none' }) })
+
+		expect(run_stranded_detect.is_left_stranded(CARRY_TARGET, ended)).toBe(false)
+	})
+
+	it('reads a run whose owner is alive as not left stranded', () => {
+		const live = ports({ is_owner_live: () => true })
+
+		expect(run_stranded_detect.is_left_stranded(CARRY_TARGET, live)).toBe(false)
+	})
+})
+
 describe('run_stranded_detect.detect_and_report — supervision present', () => {
 	// The supervisor being present and alive keeps the run from reading as stranded — recovery is in
 	// flight, not needed.

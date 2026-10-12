@@ -45,15 +45,17 @@ interface RecordTargets {
 	wake: string
 }
 
+function targets_of(directory: string): RecordTargets {
+	return { carry: run_carry.carry_path(directory), wake: run_wake.wake_path(directory) }
+}
+
 // Both records key on the common git directory, the same one `run-carry.ts` and `run-wake.ts` resolve,
 // so a strand read from any lane reads the one run's records. `undefined` outside a repository: no git
 // directory to key on, so no run to be stranded.
 async function real_resolve_targets(): Promise<RecordTargets | undefined> {
 	const directory = await run_carry.repository_directory()
 
-	if (directory === undefined) return undefined
-
-	return { carry: run_carry.carry_path(directory), wake: run_wake.wake_path(directory) }
+	return directory === undefined ? undefined : targets_of(directory)
 }
 
 async function real_emit_stranded(text: string): Promise<boolean> {
@@ -77,11 +79,7 @@ const DEFAULT_PORTS: DetectPorts = {
 // The three facts, assembled behind the carry-record gate. A non-`carried` read — nothing carried, or
 // an unreadable record — is `undefined`: there is no live budget to be stranded, so the
 // wake record is never read and the judge is never asked.
-async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
-	const targets = await ports.resolve_targets()
-
-	if (targets === undefined) return undefined
-
+function input_at(ports: DetectPorts, targets: RecordTargets): StrandedInput | undefined {
 	const read = ports.read_carry(targets.carry)
 
 	if (read.kind !== 'carried') return undefined
@@ -91,6 +89,12 @@ async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
 		is_owner_live: ports.is_owner_live(read.carry),
 		supervisor: ports.supervisor_liveness(ports.read_wake(targets.wake)),
 	}
+}
+
+async function gather(ports: DetectPorts): Promise<StrandedInput | undefined> {
+	const targets = await ports.resolve_targets()
+
+	return targets === undefined ? undefined : input_at(ports, targets)
 }
 
 // The marker and the notification, both once per strand episode. `emit_stranded` refuses a second while
@@ -128,7 +132,35 @@ async function run_stranded_check(): Promise<void> {
 	}
 }
 
-const run_stranded_detect = { detect_and_report, run_stranded_check }
+// The same judgement for a reader that draws the run rather than reports on it: `run:board` asks it
+// every local read, so a run nobody is driving is not drawn as one still waiting for work.
+function is_stranded_at(directory: string, ports: DetectPorts = DEFAULT_PORTS): boolean {
+	const input = input_at(ports, targets_of(directory))
+
+	return input !== undefined && run_stranded.is_stranded(input)
+}
+
+// The judgement a supervisor asks of the run it is about to stop watching: its own wake record still
+// reads live, so the supervisor is taken as gone and only the carry record and its owner are read. A
+// run `run:carry --end` closed under it, or one whose owner still runs, is not left stranded.
+function is_left_stranded(carry_target: string, ports: DetectPorts = DEFAULT_PORTS): boolean {
+	const read = ports.read_carry(carry_target)
+
+	if (read.kind !== 'carried') return false
+
+	return run_stranded.is_stranded({
+		read,
+		is_owner_live: ports.is_owner_live(read.carry),
+		supervisor: run_stranded.GONE,
+	})
+}
+
+const run_stranded_detect = {
+	detect_and_report,
+	is_left_stranded,
+	is_stranded_at,
+	run_stranded_check,
+}
 
 export { run_stranded_detect }
 export type { DetectPorts, RecordTargets }

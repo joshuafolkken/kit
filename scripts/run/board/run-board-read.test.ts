@@ -2,6 +2,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_read } from './run-board-read'
 
@@ -57,7 +58,17 @@ describe('run_board_read.read_local', () => {
 			events: [INSIDE],
 			lanes: ['3432'],
 			resume: undefined,
+			is_stranded: false,
 		})
+	})
+
+	// joshuafolkken/kit#3697: whether anything still drives the run is read beside it.
+	it('reads whether the run is stranded from the run’s own records', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const is_stranded_at = vi.spyOn(run_stranded_detect, 'is_stranded_at').mockReturnValue(true)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ is_stranded: true })
+		expect(is_stranded_at).toHaveBeenCalledWith(REPOSITORY)
 	})
 
 	it('reads nothing when no run has started or ended here', async () => {

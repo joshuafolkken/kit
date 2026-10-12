@@ -51,7 +51,7 @@ function add_issues(
 ): RunCarry {
 	const next: RunCarry = { ...carry, added: next_added(carry, additions) }
 
-	stamp_file.write_stamp(target, next)
+	stamp_file.replace_stamp(target, next)
 
 	return next
 }

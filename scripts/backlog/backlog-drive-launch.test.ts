@@ -1,5 +1,6 @@
 import { git_stash, type StashEntry } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -8,6 +9,7 @@ const OWNER = '4242'
 const FIRST = '3300'
 const SECOND = '3301'
 const LOST_OWNER = 'no longer owns'
+const CARRY = run_carry.fresh_carry('backlogrun', run_carry.NO_OWNER, new Date(0))
 const MESSAGE = backlog_drive_launch.LATEST_STASH_MESSAGE
 const LATEST: StashEntry = { selector: 'stash@{0}', subject: `On main: ${MESSAGE}` }
 const OTHER: StashEntry = { selector: 'stash@{1}', subject: 'On 3200-lane: 3200: parked' }
@@ -18,7 +20,7 @@ function launched_with(): ReadonlyArray<string | undefined> {
 }
 
 beforeEach(() => {
-	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue()
+	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
 	vi.spyOn(lane_launch_cli, 'launch_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
 })
 

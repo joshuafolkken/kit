@@ -21,7 +21,7 @@ function hand_off(target: string): void {
 
 	if (read.kind !== 'carried' || read.carry.is_handed_off === true) return
 
-	stamp_file.write_stamp(target, { ...read.carry, is_handed_off: true })
+	stamp_file.replace_stamp(target, { ...read.carry, is_handed_off: true })
 }
 
 const run_wake_handoff = { hand_off }

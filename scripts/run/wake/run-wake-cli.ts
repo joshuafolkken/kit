@@ -9,7 +9,9 @@ import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
+import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
@@ -211,12 +213,43 @@ function warning_body(stop: LoopStop, body: string, context: WakeContext): strin
 	return [body, log_hint(context), stop.note].filter(Boolean).join('\n')
 }
 
-async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<void> {
-	await telegram_notify.warn({
+// Whether the warning reached a person — the answer `record_failure` leaves its marker on.
+async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<boolean> {
+	return await telegram_notify.warn({
 		issue_title: WARNING_TITLE,
 		body: warning_body(stop, body, context),
 		recovery: WARNING_RECOVERY,
 	})
+}
+
+// **A failed supervisor that leaves the run stranded says so on the stream, with its cause.** Nothing
+// else writes there when the supervisor gives up, so a reader of the events would see the last merge
+// and a run that looks as if it were still watching. The cause is the note's first line — the
+// driver's own `error …` — because the rest is a stderr tail the log already holds.
+//
+// **Only a strand, and only one a person was told of.** A `failed` stop is not always a strand: a
+// `run:carry --end` under a live driver fails it too, and that run ended cleanly. And the event is the
+// marker `run_stranded_detect` holds its own notification back on, so it is left only when the warning
+// was sent — after a failed send the stop-time detector still finds no marker, and notifies.
+function is_strand_told(stop: LoopStop, context: WakeContext, is_warned: boolean): boolean {
+	if (!is_warned || stop.reason !== run_wake_loop.FAILED_REASON) return false
+
+	return run_stranded_detect.is_left_stranded(context.carry_target)
+}
+
+async function record_failure(
+	stop: LoopStop,
+	context: WakeContext,
+	is_warned: boolean,
+): Promise<void> {
+	if (!is_strand_told(stop, context, is_warned)) return
+
+	const [cause = ''] = (stop.note ?? '').split('\n', 1)
+
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.STRANDED,
+		`The supervisor failed and stopped watching the run — ${cause}`,
+	)
 }
 
 // **Only a failed wake exits non-zero; `unreadable` warns but exits zero.** The
@@ -240,7 +273,7 @@ async function finish(stop: LoopStop, context: WakeContext): Promise<number> {
 	if (body === undefined) return report(stop.reason)
 
 	console.error(stop.note ?? body)
-	await warn_of_stop(stop, body, context)
+	await record_failure(stop, context, await warn_of_stop(stop, body, context))
 
 	return report(stop.reason, exit_code_of(stop.reason))
 }
@@ -419,6 +452,8 @@ const run_wake_cli = {
 	SUPERVISING_VERDICT,
 	UNKNOWN_VERDICT,
 	USAGE,
+	finish,
+	record_failure,
 	run,
 	stop_body,
 	warning_body,
