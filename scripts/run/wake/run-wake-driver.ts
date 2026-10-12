@@ -126,10 +126,16 @@ function read_result(
 	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
 }
 
+// **A record this process already owns is claimed again.** A driver that failed leaves the record
+// adopted for the supervisor and not handed off, and the restarted pass re-drives it from here; only a
+// record another live process holds is refused.
 function claim_record(target: string, invocation: string): boolean {
 	const current = run_carry.read_carry(target)
 	if (current.kind !== 'carried' || current.carry.invocation !== invocation) return false
-	if (current.carry.is_handed_off !== true && run_carry.is_owner_live(current.carry)) return false
+
+	if (current.carry.is_handed_off !== true && run_carry.is_held_by_another(current.carry)) {
+		return false
+	}
 
 	return run_carry.adopt_carry(target, current.carry, run_carry.owner_of(process.pid)) !== undefined
 }

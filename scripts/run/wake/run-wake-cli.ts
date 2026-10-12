@@ -184,10 +184,13 @@ function wake_session(
 	return run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
 }
 
+// **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record
+// adopted for this process, so reading that owner as live would have every restarted pass wait on
+// itself and never drive again.
 function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 	return {
 		read_carry: () => run_carry.read_carry(context.carry_target),
-		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_owner_live(read.carry),
+		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_held_by_another(read.carry),
 		has_work: async () => true,
 		new_session_id: () => randomUUID(),
 		hand_off: () => {
@@ -459,6 +462,7 @@ const run_wake_cli = {
 	UNKNOWN_VERDICT,
 	USAGE,
 	finish,
+	ports_for,
 	record_failure,
 	run,
 	stop_body,

@@ -231,9 +231,20 @@ test('does not re-drive a failed driver run', async () => {
 
 test('does not take a live owner over on supervisor restart', async () => {
 	run_carry.end_carry(scratch.target)
-	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.owner_of(process.pid))
-	const subprocess = vi.spyOn(josh_command, 'josh_run')
+	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.owner_of(process.ppid))
+	const subprocess = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: OUTPUT })
 
 	expect(await run_wake_driver.drive(scratch.target)).toMatchObject({ kind: 'failed' })
 	expect(subprocess).not.toHaveBeenCalled()
+})
+
+// joshuafolkken/kit#3701: a failed driver leaves the record adopted for this process and not handed
+// off, and refusing that claim left the restarted supervisor with nothing it could drive.
+test('claims a record this process already owns and drives it again', async () => {
+	run_carry.end_carry(scratch.target)
+	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.owner_of(process.pid))
+	const subprocess = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: OUTPUT })
+
+	expect(await run_wake_driver.drive(scratch.target)).toMatchObject({ kind: 'judgment' })
+	expect(subprocess).toHaveBeenCalledOnce()
 })
