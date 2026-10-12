@@ -1,3 +1,4 @@
+import type { PendingLaunch } from '#scripts/backlog/backlogrun-launch'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -27,9 +28,40 @@ function ended_span(ended: EndedRun | undefined): BoardSpan | undefined {
 	return { invocation: ended.invocation, started_ms, ended_ms }
 }
 
+// A run `josh backlogrun` launched and its parent has not claimed yet: it has no carry record, so the
+// launch record is the only one that says a run is here and since when.
+function launch_span(launch: PendingLaunch | undefined): BoardSpan | undefined {
+	const started_ms = launch === undefined ? undefined : moment_of(launch.started_at)
+
+	if (launch === undefined || started_ms === undefined) return undefined
+
+	return { invocation: launch.invocation, started_ms, ended_ms: undefined }
+}
+
+// With no carry record: the run on its way, else the one that last ended. **A launch older than that
+// end is the ended run's own** — its parent outlives `run:carry --end` for a moment — so it never
+// redraws a finished run as one starting.
+function idle_span(
+	ended: EndedRun | undefined,
+	launch: PendingLaunch | undefined,
+): BoardSpan | undefined {
+	const last = ended_span(ended)
+	const coming = launch_span(launch)
+
+	if (coming === undefined) return last
+
+	return (last?.ended_ms ?? 0) >= coming.started_ms ? last : coming
+}
+
 // The running run wins over the ended one, so a run that begins replaces the finished board at once.
-function span_of(read: CarryRead, ended: EndedRun | undefined): BoardSpan | undefined {
-	if (read.kind !== 'carried') return read.kind === 'none' ? ended_span(ended) : undefined
+// **The launch's start is the carry's**: `run:carry --begin` inherits it for the parent the launch
+// started, so the clock does not restart when the record appears.
+function span_of(
+	read: CarryRead,
+	ended: EndedRun | undefined,
+	launch?: PendingLaunch,
+): BoardSpan | undefined {
+	if (read.kind !== 'carried') return read.kind === 'none' ? idle_span(ended, launch) : undefined
 
 	const started_ms = moment_of(read.carry.started_at)
 
@@ -38,12 +70,22 @@ function span_of(read: CarryRead, ended: EndedRun | undefined): BoardSpan | unde
 	return { invocation: read.carry.invocation, started_ms, ended_ms: undefined }
 }
 
-// The session a person resumes a stopped run from: only while the ended run is
-// the one drawn, and only when it stopped rather than finished. A run that begins hides it at once.
-function resume_of(read: CarryRead, ended: EndedRun | undefined): string | undefined {
-	if (read.kind !== 'none' || ended?.stopped === undefined) return undefined
+// Whether the span drawn with no carry record is the ended run's, rather than a launch's.
+function is_ended_drawn(ended: EndedRun | undefined, launch: PendingLaunch | undefined): boolean {
+	return idle_span(ended, launch)?.ended_ms !== undefined
+}
 
-	return ended.session
+// The session a person resumes a stopped run from: only while the ended run is
+// the one drawn, and only when it stopped rather than finished. A run that begins — or is on its way —
+// hides it at once.
+function resume_of(
+	read: CarryRead,
+	ended: EndedRun | undefined,
+	launch?: PendingLaunch,
+): string | undefined {
+	if (read.kind !== 'none' || !is_ended_drawn(ended, launch)) return undefined
+
+	return ended?.stopped === undefined ? undefined : ended.session
 }
 
 function is_within(event: RunEvent, span: BoardSpan): boolean {

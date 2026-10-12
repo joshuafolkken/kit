@@ -7,6 +7,7 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_phase, type Phase } from './run-board-phase'
+import { run_board_setup, type SetupRead } from './run-board-setup'
 
 // What each issue of a run is doing now, read from the run's own event stream and its open lanes.
 // Local reads only — no `gh` call — so `run:board` can redraw it every few seconds; the plan these
@@ -26,8 +27,9 @@ interface ItemStatus {
 	track?: ReadonlyArray<Phase> | undefined
 }
 
-// The run as a whole, read off the same stream.
-interface RunActivity {
+// The run as a whole, read off the same stream. The setup half is `run-board-setup.ts`'s, absent
+// where a stream carries no stage.
+interface RunActivity extends Partial<SetupRead> {
 	last_event_ms: number | undefined
 	// The run's last position is a `stop` that names no child — the run itself ended.
 	is_stopped: boolean
@@ -125,16 +127,17 @@ function fold_events(events: ReadonlyArray<RunEvent>): Map<number, ItemStatus> {
 function is_running_lane(
 	issue: number,
 	status: ItemStatus | undefined,
+	events: ReadonlyArray<RunEvent>,
 	in_run: ReadonlySet<number>,
 ): boolean {
-	if (status === undefined) return in_run.has(issue)
+	if (status !== undefined) return status.state === 'running'
 
-	return status.state === 'running'
+	return in_run.has(issue) && !run_board_setup.is_lane_pending(events, issue)
 }
 
 // Every child the run has touched, with the lane each running child holds. A lane the stream never saw
 // launched — a run restored after the stream rolled — still reads as running while its issue is in the
-// run's plan (`in_run`).
+// run's plan (`in_run`); one the run is still setting up for stays waiting until its launch.
 function statuses_of(
 	events: ReadonlyArray<RunEvent>,
 	lanes: ReadonlyArray<string>,
@@ -146,7 +149,7 @@ function statuses_of(
 		const issue = Number(lane)
 		const status = statuses.get(issue)
 
-		if (is_running_lane(issue, status, in_run)) {
+		if (is_running_lane(issue, status, events, in_run)) {
 			statuses.set(issue, { state: 'running', ...status, lane: `lane ${lane}` })
 		}
 	}
@@ -251,6 +254,7 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
 
 	return {
+		...run_board_setup.read(events),
 		last_event_ms: last === undefined ? undefined : moment(last),
 		is_stopped: is_ended || is_run_stop(position),
 	}

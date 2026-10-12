@@ -3,6 +3,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlogrun_launch } from './backlogrun-launch'
 
@@ -11,7 +12,12 @@ import { backlogrun_launch } from './backlogrun-launch'
 const GIT_DIRECTORY = '/repo/.git'
 const WORKTREE = '/repo'
 const SESSION = '00000000-0000-4000-8000-000000000000'
-const LAUNCH_RECORD = JSON.stringify({ pid: 42, start: 'Thu Oct  9 00:00:00 2026' })
+const LAUNCHED_PID = 42
+const LAUNCH_RECORD = JSON.stringify({ pid: LAUNCHED_PID, start: 'Thu Oct  9 00:00:00 2026' })
+const INVOCATION = 'backlogrun'
+const TARGET = { worktree: WORKTREE, git_directory: GIT_DIRECTORY }
+const STARTED_AT = '2026-10-12T09:00:00.000Z'
+const STARTED_RECORD = { pid: LAUNCHED_PID, invocation: INVOCATION, started_at: STARTED_AT }
 const CARRY: RunCarry = {
 	invocation: 'backlogrun',
 	started_at: '2026-10-09T00:00:00.000Z',
@@ -112,18 +118,107 @@ describe('backlogrun_launch.is_running', () => {
 	})
 })
 
+// A started parent, with every write it makes — the record and the stage — held by a spy.
+function stage_start(): void {
+	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	vi.spyOn(process_identity, 'read_start').mockReturnValue(undefined)
+	vi.spyOn(stamp_file, 'replace_stamp').mockReturnValue('')
+	vi.spyOn(run_event_setup, 'emit_in').mockReturnValue()
+	vi.spyOn(detached_launch, 'launch').mockReturnValue({ kind: 'launched', pid: LAUNCHED_PID })
+}
+
 describe('backlogrun_launch.start', () => {
 	it('starts the parent with no Codex session key inherited from the shell it was typed in', () => {
-		vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-		vi.spyOn(process_identity, 'read_start').mockReturnValue(undefined)
-		vi.spyOn(stamp_file, 'replace_stamp').mockReturnValue('')
-		const launch = vi
-			.spyOn(detached_launch, 'launch')
-			.mockReturnValue({ kind: 'launched', pid: 42 })
-		const target = { worktree: WORKTREE, git_directory: GIT_DIRECTORY }
+		stage_start()
 
-		expect(backlogrun_launch.start('backlogrun', 'anthropic', target).kind).toBe('launched')
-		expect(launch.mock.calls[0]?.[0].env).toHaveProperty('CODEX_THREAD_ID', undefined)
-		expect(launch.mock.calls[0]?.[0].env).toHaveProperty('JOSH_AGENT_PROVIDER', 'anthropic')
+		expect(backlogrun_launch.start(INVOCATION, 'anthropic', TARGET).kind).toBe('launched')
+
+		const { env } = vi.mocked(detached_launch.launch).mock.calls[0]?.[0] ?? {}
+
+		expect(env).toHaveProperty('CODEX_THREAD_ID', undefined)
+		expect(env).toHaveProperty('JOSH_AGENT_PROVIDER', 'anthropic')
+	})
+
+	// joshuafolkken/kit#3696: the record says what was started and when, and the run's first stage is
+	// dated that same moment.
+	it('records what it started and when, and says the session is starting at that moment', () => {
+		stage_start()
+		backlogrun_launch.start(INVOCATION, 'anthropic', TARGET)
+
+		const record = vi.mocked(stamp_file.replace_stamp).mock.calls[0]?.[1]
+		const [repository, text, at] = vi.mocked(run_event_setup.emit_in).mock.calls[0] ?? []
+
+		expect(record).toMatchObject({ pid: LAUNCHED_PID, invocation: INVOCATION })
+		expect(record).toHaveProperty('started_at', at?.toISOString())
+		expect([repository, text]).toStrictEqual([GIT_DIRECTORY, 'starting session'])
+	})
+
+	it('records nothing and says nothing for a parent that did not start', () => {
+		stage_start()
+		vi.mocked(detached_launch.launch).mockReturnValue({ kind: 'failed', note: 'no agent' })
+
+		expect(backlogrun_launch.start(INVOCATION, 'anthropic', TARGET).kind).toBe('failed')
+		expect(stamp_file.replace_stamp).not.toHaveBeenCalled()
+		expect(run_event_setup.emit_in).not.toHaveBeenCalled()
+	})
+})
+
+// A launch record on disk, its launched pid live or gone.
+function stage_launch(record: object, is_live = true): void {
+	stage(false, false, JSON.stringify(record))
+	vi.spyOn(process_identity, 'is_same_process').mockReturnValue(is_live)
+}
+
+describe('backlogrun_launch.pending_launch', () => {
+	it('reads what a live launch started and when', () => {
+		stage_launch(STARTED_RECORD)
+
+		expect(backlogrun_launch.pending_launch(GIT_DIRECTORY)).toStrictEqual({
+			invocation: INVOCATION,
+			started_at: STARTED_AT,
+		})
+	})
+
+	it('reads nothing once the launched parent is gone, or where there is no record', () => {
+		stage_launch(STARTED_RECORD, false)
+
+		expect(backlogrun_launch.pending_launch(GIT_DIRECTORY)).toBeUndefined()
+
+		stage(false, false, undefined)
+
+		expect(backlogrun_launch.pending_launch(GIT_DIRECTORY)).toBeUndefined()
+	})
+
+	it('reads nothing from a record an earlier version wrote, which names no start', () => {
+		stage_launch({ pid: LAUNCHED_PID })
+
+		expect(backlogrun_launch.pending_launch(GIT_DIRECTORY)).toBeUndefined()
+	})
+})
+
+describe('backlogrun_launch.started_for', () => {
+	it('hands the launch’s start to the parent it started', () => {
+		stage_launch(STARTED_RECORD)
+
+		expect(backlogrun_launch.started_for(GIT_DIRECTORY, LAUNCHED_PID)).toStrictEqual(
+			new Date(STARTED_AT),
+		)
+	})
+
+	it('hands nothing to another owner, or to a run that names none', () => {
+		stage_launch(STARTED_RECORD)
+
+		expect(backlogrun_launch.started_for(GIT_DIRECTORY, LAUNCHED_PID + 1)).toBeUndefined()
+		expect(backlogrun_launch.started_for(GIT_DIRECTORY, undefined)).toBeUndefined()
+	})
+
+	it('hands nothing where no launch is live, or its start is not a time', () => {
+		stage_launch(STARTED_RECORD, false)
+
+		expect(backlogrun_launch.started_for(GIT_DIRECTORY, LAUNCHED_PID)).toBeUndefined()
+
+		stage_launch({ ...STARTED_RECORD, started_at: 'soon' })
+
+		expect(backlogrun_launch.started_for(GIT_DIRECTORY, LAUNCHED_PID)).toBeUndefined()
 	})
 })

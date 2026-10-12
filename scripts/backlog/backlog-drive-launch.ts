@@ -1,5 +1,6 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { backlog_drive_owner } from './backlog-drive-owner'
 
 // The driver's lane launch. The parent that ran `josh latest` in the primary
@@ -28,6 +29,7 @@ async function latest_stash(): Promise<string | undefined> {
 
 async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind']> {
 	await backlog_drive_owner.assert_current(owner)
+	await run_event_setup.emit(run_event_setup.opening_lane(issue))
 
 	const outcome = await lane_launch_cli.launch_lane({ issue, stash: await latest_stash() })
 

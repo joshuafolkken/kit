@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_collect } from '#scripts/run/merge/run-merge-collect'
@@ -151,10 +153,28 @@ function report_claim(
 	return report(CLAIM_VERDICTS[claim], carry, is_json, FAILURE_EXIT_CODE)
 }
 
-function start_fresh(target: string, request: CarryClaimRequest, is_json: boolean): number {
-	const carry = run_carry.begin_carry(target, request.invocation, request.owner)
+// When the run began: the moment `josh backlogrun` launched this owner, so the clock `run:board` was
+// already counting from does not restart at the claim; `undefined` — now — for every other run.
+async function launch_start(request: CarryClaimRequest): Promise<Date | undefined> {
+	const directory = await run_carry.repository_directory()
+
+	if (directory === undefined) return undefined
+
+	return backlogrun_launch.started_for(directory, request.owner.pid)
+}
+
+// A run that began is planning, which is what its board says until the supervisor takes it over.
+async function start_fresh(
+	target: string,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): Promise<number> {
+	const started = await launch_start(request)
+	const carry = run_carry.begin_carry(target, request.invocation, request.owner, started)
 
 	if (carry === undefined) return report_lost(is_json)
+
+	await run_event_setup.emit(run_event_setup.STAGE.PLANNING)
 
 	return report_carry(BEGAN_VERDICT, carry, is_json)
 }
@@ -162,14 +182,18 @@ function start_fresh(target: string, request: CarryClaimRequest, is_json: boolea
 // **A standing record is never replaced, and never resumed into by something else.** Replacing one
 // would restart the budget the cut exists to carry, and resuming into one would put two parents on a
 // single budget. Its age changes none of that: a record is replaced by nothing but a person's `--end`.
-function begin(target: string, request: CarryClaimRequest, is_json: boolean): number {
+async function begin(
+	target: string,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): Promise<number> {
 	const read = run_carry.read_carry(target)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
 
 	if (read.kind === 'carried') return report_claim(target, read.carry, request, is_json)
 
-	return start_fresh(target, request, is_json)
+	return await start_fresh(target, request, is_json)
 }
 
 function report_nothing_to_resume(is_json: boolean): number {
@@ -203,10 +227,16 @@ function report_over(is_json: boolean): number {
 	return report(OVER_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
 }
 
-function claim_record(target: string, request: CarryClaimRequest, is_json: boolean): number {
+async function claim_record(
+	target: string,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): Promise<number> {
 	if (cost_cli.session_verdict() === cost_verdict.OVER_VERDICT) return report_over(is_json)
 
-	return request.is_adoption ? adopt(target, request, is_json) : begin(target, request, is_json)
+	if (request.is_adoption) return adopt(target, request, is_json)
+
+	return await begin(target, request, is_json)
 }
 
 // The record is no longer this session's to advance — handed off at a cut, or taken over by a live
@@ -347,7 +377,7 @@ async function act(
 	request: Exclude<Request, { kind: 'end' }>,
 	is_json: boolean,
 ): Promise<number> {
-	if (request.kind === 'claim') return claim_record(target, request.claim, is_json)
+	if (request.kind === 'claim') return await claim_record(target, request.claim, is_json)
 
 	const read = run_carry.read_carry(target)
 

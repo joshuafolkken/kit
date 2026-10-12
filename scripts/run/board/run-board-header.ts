@@ -74,13 +74,15 @@ interface BoardCounts {
 	remaining: number
 }
 
-type RunMark = 'running' | 'idle' | 'human' | 'stopped'
+// `setup` is a run with no child running that is getting one ready (`run-board-setup.ts`).
+type RunMark = 'running' | 'setup' | 'idle' | 'human' | 'stopped'
 
 type TextColor = Parameters<typeof styleText>[0]
 
 // The run's state as a colored glyph before its name.
 const RUN_MARKS: Readonly<Record<RunMark, { glyph: string; color: TextColor }>> = {
 	running: { glyph: '▶', color: 'green' },
+	setup: { glyph: '▶', color: 'green' },
 	idle: { glyph: '⏸', color: 'yellow' },
 	human: { glyph: '✋', color: 'magenta' },
 	stopped: { glyph: '■', color: 'gray' },
@@ -99,23 +101,33 @@ function counts_of(layout: BoardLayout): BoardCounts {
 	return { total, settled, parked, running, remaining: total - settled - running }
 }
 
+// The marks of a run that is working: they turn the spinner, and only they can go stale.
+const WORKING_MARKS: ReadonlySet<RunMark> = new Set<RunMark>(['running', 'setup'])
+// What follows the stage once the plan is read: how many issues the run is setting up for.
+const STAGE_SEPARATOR = ' · '
+const PLANNED = 'planned'
+
 // Nothing running: the run is waiting on a person when all the plan has left is what
-// `needs-decision` holds, and otherwise idle.
-function quiet_mark(layout: BoardLayout | undefined): RunMark {
-	return layout?.waves.length === 0 && layout.people.length > 0 ? 'human' : 'idle'
+// `needs-decision` holds; otherwise it is getting a child ready, or idle.
+function quiet_mark(header: BoardHeader): RunMark {
+	const { layout } = header
+
+	if (layout?.waves.length === 0 && layout.people.length > 0) return 'human'
+
+	return header.activity.is_preparing === true ? 'setup' : 'idle'
 }
 
 // The run's state, each state overriding the ones below it.
 function mark_of(header: BoardHeader, running: number): RunMark {
 	if (header.activity.is_stopped) return 'stopped'
 
-	return running > 0 ? 'running' : quiet_mark(header.layout)
+	return running > 0 ? 'running' : quiet_mark(header)
 }
 
-// A running run turns the spinner in place of ▶, both one column wide; every other mark stands still.
+// A working run turns the spinner in place of ▶, both one column wide; every other mark stands still.
 function run_part(mark: RunMark, spinner: string | undefined): string {
 	const { glyph, color } = RUN_MARKS[mark]
-	const shown = mark === 'running' ? (spinner ?? glyph) : glyph
+	const shown = WORKING_MARKS.has(mark) ? (spinner ?? glyph) : glyph
 
 	return styleText(color, `${shown} ${RUN_NAME}`)
 }
@@ -153,7 +165,7 @@ function ended_part(header: BoardHeader): string {
 }
 
 // The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
-// only a running run can be stale, so only it is colored. Only an ended run draws anything else there:
+// only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
 // the minute it ended.
 function beat_part(header: BoardHeader, mark: RunMark, width: number): string {
 	const age = age_of(header)
@@ -162,7 +174,7 @@ function beat_part(header: BoardHeader, mark: RunMark, width: number): string {
 
 	const part = `${HEADER_ICONS.heartbeat} ${span_of(age).padStart(width)}`
 
-	return mark === 'running' ? aged(part, age) : part
+	return WORKING_MARKS.has(mark) ? aged(part, age) : part
 }
 
 // A run's age over the `💓`, or over the minute an ended run ended: the shorter of the two lengths is
@@ -243,9 +255,23 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string>
 	]
 }
 
-// The run's progress, then what its plan read is doing.
-function progress_part(counts: BoardCounts, header: BoardHeader): string {
-	const parts = [...progress_parts(counts, header), loading_part(header), plan_warning(header)]
+// The stage a run is at before its first child launches, standing where the progress will: a tally of
+// nothing settled says less than what the run is doing. Only a run marked as setting up is at a stage:
+// a stopped run and one waiting on a person keep their progress.
+function stage_part(counts: BoardCounts, header: BoardHeader, mark: RunMark): string | undefined {
+	const { setup } = header.activity
+
+	if (setup === undefined || mark !== 'setup') return undefined
+	if (!is_plan_read(header)) return setup
+
+	return `${setup}${STAGE_SEPARATOR}${String(counts.total)} ${PLANNED}`
+}
+
+// The run's stage or its progress, then what its plan read is doing.
+function progress_part(counts: BoardCounts, header: BoardHeader, mark: RunMark): string {
+	const stage = stage_part(counts, header, mark)
+	const progress = stage === undefined ? progress_parts(counts, header) : [stage]
+	const parts = [...progress, loading_part(header), plan_warning(header)]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
 }
@@ -286,7 +312,7 @@ function header_lines(header: BoardHeader): Array<string> {
 	const columns = [
 		column_of([run_part(mark, header.spinner), repo_part(header, mark)]),
 		column_of(time_parts(header, mark)),
-		[progress_part(counts, header), machine_part(counts, header)],
+		[progress_part(counts, header, mark), machine_part(counts, header)],
 	]
 
 	return [0, 1].map((line) => columns.map((column) => column[line]).join(GAP))

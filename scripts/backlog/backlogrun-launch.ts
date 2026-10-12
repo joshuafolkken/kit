@@ -11,6 +11,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_headless } from '#scripts/run/run-headless'
 import { z } from 'zod'
 
@@ -34,9 +35,19 @@ const launch_schema = z.object({
 	pid: z.number(),
 	start: z.string().optional(),
 	session: z.string().optional(),
+	// What the parent was started to run and when, so `run:board` has a run to draw and a clock to count
+	// before the parent claims the carry record. Absent on a record an earlier version wrote.
+	invocation: z.string().optional(),
+	started_at: z.string().optional(),
 })
 
 type LaunchRecord = z.infer<typeof launch_schema>
+
+// A launched run the parent has not claimed yet, as far as its record says.
+interface PendingLaunch {
+	invocation: string
+	started_at: string
+}
 
 interface LaunchTarget {
 	// The checkout the parent runs in, and its common git directory the records are keyed on.
@@ -117,10 +128,48 @@ function note_to_stderr(note: string): void {
 	console.error(`backlogrun: ${note}`)
 }
 
-function record_launch(git_directory: string, pid: number, session: string | undefined): void {
-	const started = process_identity.read_start(pid)
+// **The record and the run's first stage carry one moment**, so the `starting session` event is never
+// dated before the start the board measures from.
+function record_launch(
+	git_directory: string,
+	launch: Pick<LaunchRecord, 'pid' | 'session' | 'invocation'>,
+): void {
+	const now = new Date()
+	const identity = process_identity.read_start(launch.pid)
+	const record: LaunchRecord = { ...launch, start: identity, started_at: now.toISOString() }
 
-	stamp_file.replace_stamp(launch_path(git_directory), { pid, start: started, session })
+	stamp_file.replace_stamp(launch_path(git_directory), record)
+	run_event_setup.emit_in(git_directory, run_event_setup.STAGE.STARTING, now)
+}
+
+// The live launch record here, `undefined` once the parent it names is gone.
+function live_launch(git_directory: string): LaunchRecord | undefined {
+	const record = read_launch(launch_path(git_directory))
+
+	return is_launch_live(record) ? record : undefined
+}
+
+// The launch `run:board` draws while no carry record stands: one whose record says what it runs and
+// since when.
+function pending_launch(git_directory: string): PendingLaunch | undefined {
+	const { invocation, started_at } = live_launch(git_directory) ?? {}
+
+	if (invocation === undefined || started_at === undefined) return undefined
+
+	return { invocation, started_at }
+}
+
+// When the launch that started `owner_pid` began, for `run:carry --begin` to start the run's clock
+// from: **only the parent this launch started inherits it**, so a run typed inside a session — which has
+// no launch record, or another parent's — still starts at its own `--begin`.
+function started_for(git_directory: string, owner_pid: number | undefined): Date | undefined {
+	const record = live_launch(git_directory)
+
+	if (record?.started_at === undefined || record.pid !== owner_pid) return undefined
+
+	const started_ms = Date.parse(record.started_at)
+
+	return Number.isNaN(started_ms) ? undefined : new Date(started_ms)
 }
 
 // The headless mark holds the parent's turn open while its lanes run, as `run:wake`'s does. The launch
@@ -160,7 +209,7 @@ function start(invocation: string, provider: AgentProvider, target: LaunchTarget
 
 	if (result.kind === 'failed') return result
 
-	record_launch(target.git_directory, result.pid, session)
+	record_launch(target.git_directory, { pid: result.pid, session, invocation })
 
 	const launched = { pid: result.pid, session, log_path: log_path(target.git_directory) }
 
@@ -171,8 +220,10 @@ const backlogrun_launch = {
 	argv_of,
 	chosen_environment,
 	is_running,
+	pending_launch,
 	start,
+	started_for,
 }
 
-export type { Launched, LaunchTarget, StartResult }
+export type { Launched, LaunchTarget, PendingLaunch, StartResult }
 export { backlogrun_launch }
