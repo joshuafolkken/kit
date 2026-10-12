@@ -53,8 +53,8 @@ describe('run_board_tick.tick speeds', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, ports)
 
-		expect(frames[0]).toContain('⏱ 0:00:00')
-		expect(frames[1]).toContain('⏱ 0:00:01')
+		expect(frames[0]).toContain('⏰ 0:00:00')
+		expect(frames[1]).toContain('⏰ 0:00:01')
 	})
 
 	it('reads the plan at most once per retry interval while redrawing every tick', async () => {
@@ -105,7 +105,7 @@ describe('run_board_tick.tick machine', () => {
 
 		const [first_machine, second_machine] = frames.map((frame) => frame.split('\n', 2)[1] ?? '')
 
-		expect(first_machine).toMatch(/⏱ \S+ {2}🧠 /u)
+		expect(first_machine).toMatch(/^ {2}kit +🧠 /u)
 		expect(first_machine).not.toContain('💾')
 		expect(second_machine).toContain('💾')
 	})
