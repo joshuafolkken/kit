@@ -111,11 +111,15 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   ended stops at once with `The carry record is no longer active.`, and one another owner holds
   stops with `The driver no longer owns the carry record.`
 - **A driver failure the supervisor cannot recover from ends the watch, and says so.** The driver
-  exits non-zero once its re-reads run out; the supervisor restarts it while the record still reads
-  (`run-wake-restart.ts`) and, past that bound, stops as `failed`: it sends the warning, removes its
-  wake record, and — when the run is left stranded and the warning was sent — leaves a `stranded`
-  event carrying the driver's own error. After a failed send the stop-time detector leaves the marker
-  and notifies instead, and a run `run:carry --end` closed gets none. `run:board` then draws
+  exits non-zero once its re-reads run out, and the supervisor — whose own read of the record then
+  fails too — stops as `failed`: it removes its wake record, sends the warning, and — when the run is
+  left stranded and the warning was sent — leaves a `stranded` event carrying the driver's own error.
+  A record that does not read is left stranded unless `run:carry --end` closed that very run, and one
+  the driver left owned by the supervisor's own process is too, since that owner is the one leaving
+  (`run-stranded-detect.ts` → `is_left_stranded`). A driver that fails while the record still reads
+  is not re-driven by the supervisor's restart, which waits on a record it owns itself
+  (joshuafolkken/kit#3701). After a failed send the stop-time detector leaves the marker and
+  notifies instead, and a run `run:carry --end` closed gets none. `run:board` then draws
   the run `■` rather than `⏸` — it reads the same owner-gone, no-supervisor judgement as
   `run:stranded` — so a run nobody is polling for is never drawn as one still waiting. Recovery is
   `pnpm josh run:wake --start`.

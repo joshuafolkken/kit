@@ -23,9 +23,7 @@ function owns_record(carry: RunCarry, owner: string): boolean {
 
 // `--end` records the run it removes, so an ended run answers at once rather than after the re-reads.
 function is_ended(directory: string): boolean {
-	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(directory))
-
-	return ended !== undefined && ended.started_at === seen.started_at
+	return run_carry_ended.has_ended(run_carry_ended.ended_path(directory), seen.started_at)
 }
 
 // Whether the file is there is said beside the read, because `none` is the answer both to a record

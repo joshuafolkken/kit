@@ -1,6 +1,7 @@
 import { git_stash, type StashEntry } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -22,6 +23,8 @@ function launched_with(): ReadonlyArray<string | undefined> {
 beforeEach(() => {
 	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
 	vi.spyOn(lane_launch_cli, 'launch_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
+	// The stage a launch writes goes to the checkout's own stream, which is a live run's: never from a test.
+	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
 })
 
 afterEach(() => {
@@ -61,6 +64,29 @@ describe('backlog_drive_launch.launch', () => {
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).rejects.toThrow(LOST_OWNER)
 		expect(list).not.toHaveBeenCalled()
 		expect(lane_launch_cli.launch_lane).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3696: the lane opening is a stage `run:board` draws, for every child the run launches.
+describe('backlog_drive_launch.launch setup stage', () => {
+	it('says which lane it is opening before it launches it', async () => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([])
+		const emit = vi.mocked(run_event_setup.emit)
+
+		await backlog_drive_launch.launch(FIRST, OWNER)
+		await backlog_drive_launch.launch(SECOND, OWNER)
+
+		expect(emit.mock.calls).toStrictEqual([[`opening lane #${FIRST}`], [`opening lane #${SECOND}`]])
+		expect(emit.mock.invocationCallOrder[0]).toBeLessThan(
+			vi.mocked(lane_launch_cli.launch_lane).mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('says nothing once the driver lost its owner', async () => {
+		vi.mocked(backlog_drive_owner.assert_current).mockRejectedValue(new Error(LOST_OWNER))
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).rejects.toThrow(LOST_OWNER)
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
 	})
 })
 
