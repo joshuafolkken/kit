@@ -52,7 +52,8 @@ may take.** The idle watch is on by default while the maximum is not:
 **`--idle 0` is the only way to turn the watch off.** The default's single source is
 `scripts/backlog/backlog-budget.ts` → `IDLE_WAIT_HOURS` — the only 8 hours the run knows: nothing is
 counted from the run's start, so no run is ended by its own age. A watch is polled
-every 5 minutes, not at the loop's 60-second interval.
+at the loop's one 60-second interval, the same as a running batch
+(`scripts/backlog/backlog-budget.ts` → `OFFER_INTERVAL_SECONDS`).
 
 **`backlog:offer` asks `backlog:budget` on every iteration** and hands back one verdict:
 
@@ -67,11 +68,11 @@ when it last had work, so refreshing it restarts the idle watch. Both are ISO-86
 `--merged` and `--running` both count against the maximum. **No ending abandons a lane**: whatever would
 have ended the run answers `watch` while `--running` is above zero.
 
-| Verdict | What the loop does                                                                                                                                  |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run`   | Start what `backlog:next` offered, up to the free lanes and no more than the maximum still allows                                                   |
-| `watch` | Ask again — at the 5-minute idle poll while nothing of this run's is in flight, at the 60-second interval otherwise. Nothing is held while watching |
-| `stop`  | Report and finish. The reason it printed **is** the termination reason the completion report carries                                                |
+| Verdict | What the loop does                                                                                                                                                |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run`   | Start what `backlog:next` offered, up to the free lanes and no more than the maximum still allows                                                                 |
+| `watch` | Ask again at the 60-second interval, whether or not anything of this run's is in flight; a collected child is asked about at once. Nothing is held while watching |
+| `stop`  | Report and finish. The reason it printed **is** the termination reason the completion report carries                                                              |
 
 **At the drain the retrospective fires before the watch** (joshuafolkken/kit#2335): `backlog:offer`
 marks the drain on the event stream and `run:step` fires the retrospective there, so the watch that

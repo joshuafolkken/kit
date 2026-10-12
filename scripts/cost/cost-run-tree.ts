@@ -20,8 +20,7 @@ import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes
 // session writes only while the run waits, and that wait is bounded. One poll is added because the
 // pick the last poll makes starts its child after the wait's end. Two runs closer than this merge,
 // deliberately: merging is a visible over-count a reader can see, while splitting one hides half of it.
-const RUN_GAP_MS =
-	backlog_budget.DEFAULT_IDLE_MS + backlog_budget.IDLE_POLL_MINUTES * backlog_budget.MS_PER_MINUTE
+const RUN_GAP_MS = backlog_budget.DEFAULT_IDLE_MS + backlog_budget.OFFER_INTERVAL_MS
 const FIRST = 0
 const NONE = -1
 

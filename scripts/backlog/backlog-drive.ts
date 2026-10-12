@@ -355,8 +355,8 @@ async function run_pass(
 
 interface LoopConfig {
 	poll_ms: number
-	// The floor between two `backlog:offer` asks while nothing was collected — the same one-minute
-	// cadence the wake supervisor polls the backlog on, so an idle stretch is not a network hammer.
+	// The floor between two `backlog:offer` asks while nothing was collected, running or idle alike —
+	// `backlog_budget.OFFER_INTERVAL_MS`, the interval the wake supervisor polls on too.
 	offer_ms: number
 	// How long one invocation may wait before returning `window`, or `undefined` for no bound. A headless
 	// parent's foreground call is capped by its shell's timeout, so it passes one under that cap.

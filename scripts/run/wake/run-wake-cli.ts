@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -34,7 +35,6 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const ONE_GROUP = 1
 const MS_PER_SECOND = 1000
-const DEFAULT_INTERVAL_SECONDS = 60
 // Whole and positive. A zero interval is a busy loop against the temp directory, not a faster
 // supervisor.
 const INTERVAL_PATTERN = /^[1-9]\d*$/u
@@ -116,7 +116,7 @@ function note_to_stderr(note: string): void {
 }
 
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
-	if (typeof value !== 'string') return DEFAULT_INTERVAL_SECONDS * MS_PER_SECOND
+	if (typeof value !== 'string') return backlog_budget.OFFER_INTERVAL_MS
 	if (!INTERVAL_PATTERN.test(value)) return undefined
 
 	const seconds = Number(value)

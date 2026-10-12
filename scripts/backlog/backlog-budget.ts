@@ -28,13 +28,14 @@ const IDLE_WAIT_HOURS = 8
 const DEFAULT_IDLE_MINUTES = IDLE_WAIT_HOURS * MINUTES_PER_HOUR
 const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 
-// **What a watching run sleeps between asks, and it is not the loop's 60-second polling interval.**
-// That one is sized to a child's `fullrun`, which finishes in minutes; a watch is waiting on a person
-// to file an issue and opt it in, which happens on human timescales. Polling a watch every minute
-// would spend the parent session's own requests — each one billing the whole session history — to
-// learn nothing each time. `backlogrun-progress.md` → "Waiting, and never waiting forever" holds
+// **The one interval between two asks for work, whether lanes are running or nothing is.** The driver
+// and the wake supervisor both read it from here. The loop is a process, so an ask spends no AI turn,
+// and a watch is polled as often as a running batch; a child collected in between is asked about at
+// once, without waiting it out. `backlogrun-progress.md` → "Waiting, and never waiting forever" holds
 // the row; the figure is here because `idle_watch_reason` below has to say it.
-const IDLE_POLL_MINUTES = 5
+const OFFER_INTERVAL_SECONDS = 60
+const MS_PER_SECOND = 1000
+const OFFER_INTERVAL_MS = OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 
 const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
@@ -127,27 +128,19 @@ function idle_expired_reason(answer: BacklogAnswer, idle_budget_ms: number): str
 	return `${waiting_on(answer)}, and stayed so for the whole ${to_minutes(idle_budget_ms)}-minute idle watch. Report what was done, including how many were picked up during the watch, and finish.`
 }
 
-// Never longer than the watch has left: "about 2 minutes left, ask again in 5 minutes" would overrun
-// the budget a person declared, and a sentence that contradicts itself is read as neither half.
-function next_ask_minutes(left_ms: number): string {
-	const left_minutes = Number(to_minutes(left_ms))
-
-	return String(Math.min(IDLE_POLL_MINUTES, left_minutes))
-}
-
 function idle_watch_reason(answer: BacklogAnswer, left_ms: number): string {
-	return `${waiting_on(answer)} and the idle watch has about ${to_minutes(left_ms)} minutes left. Release the working tree, ask again in ${next_ask_minutes(left_ms)} minutes, and restart the watch the moment a candidate appears.`
+	return `${waiting_on(answer)} and the idle watch has about ${to_minutes(left_ms)} minutes left. Release the working tree, ask again in ${String(OFFER_INTERVAL_SECONDS)} seconds, and restart the watch the moment a candidate appears.`
 }
 
 // **A watch that opens while children are still in lanes is not the idle watch's ordinary shape**: the
-// backlog can offer nothing while this run's own children are still merging. Two things the sentence
-// above would get wrong there — the working tree is still held, because the hold is released at the
-// *last* child's merge, and a five-minute poll would leave a merge unnoticed for five minutes.
+// backlog can offer nothing while this run's own children are still merging. The sentence above
+// would get one thing wrong there — the working tree is still held, because the hold is released at
+// the *last* child's merge.
 //
 // **The watch runs down while they drain, and restarts at each one collected.** A collected child is
 // work, so it moves `active_at`; an ask that offered nothing never does.
 function running_watch_reason(answer: BacklogAnswer, running: number, left_ms: number): string {
-	return `${waiting_on(answer)} and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree until they merge and poll at the polling interval, not the idle poll — the watch is running down meanwhile.`
+	return `${waiting_on(answer)} and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree until they merge and poll at the polling interval — the watch is running down meanwhile.`
 }
 
 function watching_reason(input: BudgetInput, left_ms: number): string {
@@ -237,9 +230,9 @@ const backlog_budget = {
 	BLOCKED_REASON,
 	DEFAULT_IDLE_MINUTES,
 	DEFAULT_IDLE_MS,
-	IDLE_POLL_MINUTES,
 	IDLE_WAIT_HOURS,
 	MS_PER_MINUTE,
+	OFFER_INTERVAL_MS,
 	RUN_VERDICT,
 	STOP_VERDICT,
 	TRIAGE_REASON,

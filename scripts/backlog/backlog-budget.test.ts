@@ -45,18 +45,6 @@ describe('backlog_budget.decide — the defaults', () => {
 		expect(decision.reason).toContain(String(backlog_budget.DEFAULT_IDLE_MINUTES))
 	})
 
-	it('tells a watching run to ask again on the idle poll, not on the loop interval', () => {
-		const reason = backlog_budget.idle_watch_reason('exhausted', backlog_budget.DEFAULT_IDLE_MS)
-
-		expect(reason).toContain(`ask again in ${String(backlog_budget.IDLE_POLL_MINUTES)} minutes`)
-	})
-
-	it('never asks for a sleep longer than the watch has left', () => {
-		const reason = backlog_budget.idle_watch_reason('exhausted', LAST_MINUTE_MS)
-
-		expect(reason).toContain(`ask again in ${String(LAST_MINUTE_MINUTES)} minutes`)
-	})
-
 	it('starts every candidate when no maximum was given', () => {
 		const input = input_of({ answer: 'candidates', merged: MANY_MERGED })
 		const decision = backlog_budget.decide(input)
@@ -70,6 +58,26 @@ describe('backlog_budget.decide — the defaults', () => {
 
 		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
 		expect(decision.reason).toBe(backlog_budget.BLOCKED_REASON)
+	})
+})
+
+// joshuafolkken/kit#3691: one 60-second interval, however much of the watch is left.
+describe('backlog_budget — the ask interval a watch names', () => {
+	it.each([backlog_budget.DEFAULT_IDLE_MS, LAST_MINUTE_MS])(
+		'tells a watching run to ask again at the one 60-second interval (%d ms left)',
+		(left_ms) => {
+			const reason = backlog_budget.idle_watch_reason('exhausted', left_ms)
+
+			expect(reason).toContain('ask again in 60 seconds')
+			expect(reason).not.toMatch(/ask again in \d+ minutes/u)
+		},
+	)
+
+	it('names no second poll while children are still running', () => {
+		const reason = backlog_budget.running_watch_reason('exhausted', 1, LAST_MINUTE_MS)
+
+		expect(reason).toContain('poll at the polling interval')
+		expect(reason).not.toContain('idle poll')
 	})
 })
 

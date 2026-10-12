@@ -24,12 +24,6 @@ const STOPPED_REASON: WakeStopReason = 'stopped'
 const FAILED_REASON: WakeStopReason = 'failed'
 const NO_ATTEMPTS = 0
 const STOPPED_BY_PERSON: LoopStop = { reason: STOPPED_REASON, note: undefined }
-// **The back-off after repeated whiffs, and its ceiling.** While a launch is
-// deferred for want of work, each wait is as long as the idle stretch so far — so the polling interval
-// doubles pass by pass — capped at this multiple of the configured one. Eight times the one-minute
-// default is eight minutes: far fewer backlog reads over a long empty stretch, and still well inside
-// the idle ceiling, so work that appears is picked up within one capped wait.
-const MAX_BACKOFF_FACTOR = 8
 
 interface LoopPorts {
 	// The carry record, re-read every pass rather than cached: it is written by the parent loop of a
@@ -157,18 +151,6 @@ async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecisio
 	return run_wake.decide({ ...input, has_work: await ports.has_work(input.read) })
 }
 
-// The wait before the next pass: the configured interval, stretched while a launch is being deferred
-// to the length of the idle stretch so far and capped at `MAX_BACKOFF_FACTOR` times the interval.
-function next_interval(wake: RunWake | undefined, interval_ms: number, now: Date): number {
-	const idle_since = wake?.idle_since === undefined ? NaN : Date.parse(wake.idle_since)
-
-	if (Number.isNaN(idle_since)) return interval_ms
-
-	const stretched = Math.max(interval_ms, now.getTime() - idle_since)
-
-	return Math.min(stretched, interval_ms * MAX_BACKOFF_FACTOR)
-}
-
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
 // One pass: decide, act, write the result back. `undefined` means carry on to the next interval.
@@ -187,6 +169,9 @@ async function run_pass(
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
 //
+// **The wait between two passes is the configured interval, however long the run has been idle**: a
+// launch deferred for want of work is asked about again as soon as a running one would be.
+//
 // **`read_own_wake` rather than `read_wake`, and the difference is a whole pass.**
 // A record that has become a *successor's* is not this loop's to act on, and reading it back would
 // have this pass decide from another supervisor's counters — spawning a session for a cut that
@@ -203,7 +188,7 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 		if (stop !== undefined) return stop
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await ports.sleep(next_interval(run_wake.read_own_wake(target), interval_ms, ports.now()))
+		await ports.sleep(interval_ms)
 		wake = run_wake.read_own_wake(target)
 	}
 
@@ -212,8 +197,6 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 
 const run_wake_loop = {
 	FAILED_REASON,
-	MAX_BACKOFF_FACTOR,
-	next_interval,
 	run_loop,
 }
 

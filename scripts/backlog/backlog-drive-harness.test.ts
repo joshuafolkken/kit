@@ -7,7 +7,7 @@ import { backlog_drive_restore } from './backlog-drive-restore'
 const START = '2026-09-24T00:00:00.000Z'
 const START_MS = Date.parse(START)
 const POLL_MS = 5000
-const OFFER_MS = 60_000
+const OFFER_MS = backlog_budget.OFFER_INTERVAL_MS
 const FIRST = '1'
 const SECOND = '2'
 const THIRD = '3'

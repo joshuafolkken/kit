@@ -106,8 +106,7 @@ the epic body; what merged the epic's task list.
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** |
-| `backlogrun` idle-watch poll | 5 min | Not the interval above, and a floor in the same sense. |
+| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch is polled at this same interval. |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget. A failed publish never appears. |
