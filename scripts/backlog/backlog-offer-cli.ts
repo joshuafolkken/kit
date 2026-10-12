@@ -125,27 +125,19 @@ const budget_read_schema = z.object({
 	[BUDGET_JSON_KEY]: z.string(),
 	reason: z.string(),
 	is_finish: z.boolean(),
-	idle: z.string().optional(),
 })
 
 interface BudgetRead {
 	verdict: string
 	reason: string
 	is_finish: boolean
-	// The idle watch's window, as `backlog_idle.text_of` wrote it, when the budget opened one.
-	idle?: string | undefined
 }
 
 function budget_of(out: string): BudgetRead | undefined {
 	const read = json_value.parse_with(out, budget_read_schema)
 	if (read === undefined) return undefined
 
-	return {
-		verdict: read[BUDGET_JSON_KEY],
-		reason: read.reason,
-		is_finish: read.is_finish,
-		idle: read.idle,
-	}
+	return { verdict: read[BUDGET_JSON_KEY], reason: read.reason, is_finish: read.is_finish }
 }
 
 function to_tokens(out: string): ReadonlyArray<string> {
@@ -224,12 +216,6 @@ async function decide(values: ParsedValues, counts: OfferCounts): Promise<number
 	if (decision === undefined) return FAILURE_EXIT_CODE
 
 	await mark_drain(decision.verdict, offer.answer, counts.running)
-
-	// The idle window with the ask that read it, once per watching poll, so `run:board` draws the wait
-	// from the window the poll read rather than guessing one.
-	if (decision.idle !== undefined) {
-		await run_event_stream_emit.emit_changed(run_event_stream.EVENT_KIND.IDLE, decision.idle)
-	}
 
 	return emit(decision, offer, values.json === true)
 }

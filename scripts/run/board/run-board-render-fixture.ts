@@ -23,7 +23,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		now_ms: NOW,
 		started_ms: STARTED,
 		ended_ms: undefined,
-		activity: { last_event_ms: NOW - MINUTE, idle: undefined, is_stopped: false },
+		activity: { last_event_ms: NOW - MINUTE, is_stopped: false },
 		layout: EMPTY_LAYOUT,
 		baseline_total: undefined,
 		plan_fetched_ms: NOW,

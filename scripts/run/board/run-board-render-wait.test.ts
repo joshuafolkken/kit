@@ -1,27 +1,26 @@
-import type { IdleWindow } from '#scripts/backlog/backlog-idle'
 import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#3687: the wait is two parts of the header's second line — the minute the run's
-// hands became free and how long the wait has left — and never a third line, so the table under the
-// header does not move when a wait begins. What these cases pin is the header in each of the four
-// states a run can be in: waiting, running, waiting on a person, and ended.
+// joshuafolkken/kit#3689: the header is written the same while the run works and while it waits. The
+// wait is read off the first line — the mark and the `💓` that counts on from the run's last event —
+// and the second line never gains a part for it. What these cases pin is the header in each of the
+// four states a run can be in: waiting, running, waiting on a person, and ended.
 
 const { minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
-const HOUR = 60 * MINUTE
 const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
 const EMPTY_BAR = '─'.repeat(10)
 const COUNTS = `✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`
-// The run's hands became free ten minutes ago, and the wait that began then has 7:42:18 left.
-const SINCE = NOW - 10 * MINUTE
-const LEFT = 7 * HOUR + 42 * MINUTE + 18 * SECOND
-const IDLE: IdleWindow = { since_ms: SINCE, until_ms: NOW + LEFT, asked_ms: NOW - 3 * MINUTE }
-const WAIT_PARTS = `⏸ ${minute_of(SINCE)}  ⌛ 7:42:18`
-const WAITING = { last_event_ms: NOW - MINUTE, idle: IDLE, is_stopped: false }
+const CLOCK_LINE = `⏱ 2:10:00  ${MACHINE_UNKNOWN}`
+// The run's last event is 5:35:49 old: the wait has gone on that long, and the `💓` says so.
+const WAITED_MINUTES = 335
+const WAITED_SECONDS = 49
+const WAITED = WAITED_MINUTES * MINUTE + WAITED_SECONDS * SECOND
+const WAITING = { last_event_ms: NOW - WAITED, is_stopped: false }
+const WAIT_GLYPHS = /[⏸⌛]/u
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -30,41 +29,55 @@ function row(number: number, state: BoardRow['state']): BoardRow {
 const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running')] }
 const PEOPLE_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, people: [row(2, 'human')] }
 
+function clock_of(layout: BoardLayout): string | undefined {
+	return lines_of(header({ activity: WAITING, layout }))[1]
+}
+
 describe('run_board_render.render — the header while the run waits', () => {
-	it('draws when the wait began and how long it has left on the second line', () => {
+	it('draws the wait on the first line alone: the mark and the age of the last event', () => {
 		expect(lines_of(header({ activity: WAITING })).slice(0, 2)).toStrictEqual([
-			`⏸ backlogrun  ${COUNTS}  💓 01:00`,
-			`⏱ 2:10:00  ${WAIT_PARTS}  ${MACHINE_UNKNOWN}`,
+			`⏸ backlogrun  ${COUNTS}  💓 5:35:49`,
+			CLOCK_LINE,
 		])
 	})
 
-	it('draws no third line for the wait, so what follows the header does not move', () => {
-		const waiting = lines_of(header({ activity: WAITING }))
-		const quiet = lines_of(header())
+	it.each([
+		['under an hour', 3 * MINUTE + 58 * SECOND, '💓 0:03:58'],
+		['a second short of an hour', 59 * MINUTE + 59 * SECOND, '💓 0:59:59'],
+		['over an hour', WAITED, '💓 5:35:49'],
+	])('draws the age as the ⏱ is drawn, `H:MM:SS`, %s', (_span, waited, drawn) => {
+		const activity = { last_event_ms: NOW - waited, is_stopped: false }
 
-		expect(waiting).toHaveLength(quiet.length)
-		expect(waiting.slice(2)).toStrictEqual(quiet.slice(2))
+		expect(lines_of(header({ activity }))[0]).toMatch(new RegExp(` {2}${drawn}$`, 'u'))
 	})
 
-	it('marks a run waiting on a person ✋ and changes nothing else', () => {
+	it('draws the second line of a waiting run as it draws a running run’s', () => {
+		const running = lines_of(header({ activity: WAITING, layout: RUNNING_LAYOUT }))
+
+		expect(running[0]).toMatch(/^▶ backlogrun/u)
+		expect(clock_of(EMPTY_LAYOUT)).toBe(running[1])
+	})
+
+	it('marks a run waiting on a person ✋ and changes nothing on the second line', () => {
 		const lines = lines_of(header({ activity: WAITING, layout: PEOPLE_LAYOUT }))
 
 		expect(lines[0]).toMatch(/^✋ backlogrun {2}✅ 0\/1 /u)
-		expect(lines[1]).toBe(`⏱ 2:10:00  ${WAIT_PARTS}  ${MACHINE_UNKNOWN}`)
+		expect(lines[1]).toBe(CLOCK_LINE)
+	})
+
+	it.each([
+		['waiting', EMPTY_LAYOUT],
+		['waiting on a person', PEOPLE_LAYOUT],
+		['running', RUNNING_LAYOUT],
+	])('draws no wait part on the second line while %s', (_state, layout) => {
+		expect(clock_of(layout)).not.toMatch(WAIT_GLYPHS)
 	})
 })
 
-describe('run_board_render.render — the header while the run is not waiting', () => {
-	it('draws neither wait part while a child runs, though the stream says the run waits', () => {
-		const lines = lines_of(header({ activity: WAITING, layout: RUNNING_LAYOUT }))
-
-		expect(lines[0]).toMatch(/^▶ backlogrun/u)
-		expect(lines[1]).toBe(`⏱ 2:10:00  ${MACHINE_UNKNOWN}`)
-	})
-
-	it('draws an ended run’s length and the minute it ended, and no wait', () => {
+describe('run_board_render.render — the header once the run has ended', () => {
+	it('draws an ended run’s length and the minute it ended', () => {
 		const ended_ms = STARTED + 3 * MINUTE + 25 * SECOND
-		const activity = { last_event_ms: ended_ms, idle: IDLE, is_stopped: true }
+		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms }))
 
 		expect(lines.slice(0, 2)).toStrictEqual([

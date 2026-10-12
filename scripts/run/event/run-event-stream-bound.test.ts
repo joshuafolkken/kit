@@ -7,8 +7,8 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_event_stream } from './run-event-stream'
 
-// joshuafolkken/kit#3541: the bound drops a ship-stage `start` and an `idle` line after the lines
-// `run:board` draws nothing from, so a shipped child's track keeps every stage it passed through.
+// joshuafolkken/kit#3541: the bound drops a ship-stage `start` after the lines `run:board` draws
+// nothing from, so a shipped child's track keeps every stage it passed through.
 
 const KIND = run_event_stream.EVENT_KIND
 const { PHASE, STAGE } = run_ship_stage
@@ -16,9 +16,10 @@ const AT = '2026-10-09T00:00:00.000Z'
 const ISSUE = '#3541'
 const OLDER_START = `${ISSUE} review start`
 const NEWEST_START = `${ISSUE} gate start`
-const IDLE = 'idle'
-// The older start, a `done`, a heartbeat and an idle line, before the issue's newest stage.
-const DISPOSABLE_COUNT = 5
+// The older start, a `done` and a heartbeat, before the issue's newest stage.
+const LEADING_COUNT = 4
+// The `done` and the heartbeat: the lines that draw nothing.
+const SILENT_COUNT = 2
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-bound-'))
 
 function fresh_target(): string {
@@ -39,16 +40,15 @@ function texts_of(target: string): ReadonlyArray<string> {
 	return run_event_stream.read_events(target).map((event) => event.text)
 }
 
-// A full stream: the four disposable lines and the issue's newest stage, then positions to the cap.
+// A full stream: the three disposable lines and the issue's newest stage, then positions to the cap.
 function full_stream(): string {
 	const target = fresh_target()
 
 	run_event_stream.append(target, KIND.SHIP_STAGE, OLDER_START, AT)
 	run_event_stream.append(target, KIND.SHIP_STAGE, `${ISSUE} review done`, AT)
 	run_event_stream.append(target, KIND.HEARTBEAT, 'beat', AT)
-	run_event_stream.append(target, KIND.IDLE, IDLE, AT)
 	run_event_stream.append(target, KIND.SHIP_STAGE, NEWEST_START, AT)
-	append_many(target, KIND.LANE_PHASE, run_event_stream.EVENT_CAP - DISPOSABLE_COUNT)
+	append_many(target, KIND.LANE_PHASE, run_event_stream.EVENT_CAP - LEADING_COUNT)
 
 	return target
 }
@@ -75,33 +75,27 @@ function track_of(target: string): ReadonlyArray<Phase> {
 	return track
 }
 
-describe('run_event_stream.append — the bound drops a stage start and an idle line last', () => {
-	it('drops the done and heartbeat lines before an older stage start and an idle line', () => {
+describe('run_event_stream.append — the bound drops a stage start last', () => {
+	it('drops the done and heartbeat lines before an older stage start', () => {
 		const target = full_stream()
-		const overflow = DISPOSABLE_COUNT - 3
 
-		append_many(target, KIND.LANE_PHASE, overflow)
+		append_many(target, KIND.LANE_PHASE, SILENT_COUNT)
 
 		const texts = texts_of(target)
 
-		expect(texts.slice(0, 3)).toStrictEqual([OLDER_START, IDLE, NEWEST_START])
+		expect(texts.slice(0, 2)).toStrictEqual([OLDER_START, NEWEST_START])
 		expect(texts).toHaveLength(run_event_stream.EVENT_CAP)
-	})
-
-	it('drops an older stage start before a newer idle line', () => {
-		const target = full_stream()
-
-		append_many(target, KIND.LANE_PHASE, DISPOSABLE_COUNT - 2)
-
-		expect(texts_of(target).slice(0, 2)).toStrictEqual([IDLE, NEWEST_START])
 	})
 
 	it('drops the older stage start once nothing else is disposable, and keeps the newest', () => {
 		const target = full_stream()
 
-		append_many(target, KIND.LANE_PHASE, DISPOSABLE_COUNT - 1)
+		append_many(target, KIND.LANE_PHASE, SILENT_COUNT + 1)
 
-		expect(texts_of(target)[0]).toBe(NEWEST_START)
+		const texts = texts_of(target)
+
+		expect(texts[0]).toBe(NEWEST_START)
+		expect(texts).toHaveLength(run_event_stream.EVENT_CAP)
 	})
 })
 

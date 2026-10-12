@@ -26,12 +26,17 @@ function row(number: number, state: BoardRow['state']): BoardRow {
 
 const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running')] }
 
+// A 40-minute heartbeat drawn alarming — read at the call, after the case has forced color on.
+function alarmed(): string {
+	return styleText('red', '💓 0:40:00')
+}
+
 function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 	return {
 		now_ms: NOW,
 		started_ms: STARTED,
 		ended_ms: undefined,
-		activity: { last_event_ms: undefined, idle: undefined, is_stopped: false },
+		activity: { last_event_ms: undefined, is_stopped: false },
 		layout: EMPTY_LAYOUT,
 		baseline_total: undefined,
 		plan_fetched_ms: NOW,
@@ -59,14 +64,14 @@ function clock_line_of(board: BoardHeader): string {
 
 // The raw title, colors kept, of a running run whose newest event is `age_ms` old.
 function aged_title(age_ms: number): string {
-	const activity = { last_event_ms: NOW - age_ms, idle: undefined, is_stopped: false }
+	const activity = { last_event_ms: NOW - age_ms, is_stopped: false }
 
 	return run_board_header.header_lines(header({ layout: RUNNING_LAYOUT, activity }))[0] ?? ''
 }
 
 describe('run_board_header.header_lines state', () => {
 	it('draws an ended run as ended even with a child still marked running', () => {
-		const activity = { last_event_ms: undefined, idle: undefined, is_stopped: true }
+		const activity = { last_event_ms: undefined, is_stopped: true }
 
 		expect(title_of(header({ layout: RUNNING_LAYOUT, activity }))).toMatch(/^■ backlogrun/u)
 	})
@@ -82,7 +87,7 @@ describe('run_board_header.header_lines state', () => {
 	// joshuafolkken/kit#3439, joshuafolkken/kit#3450
 	it('draws an ended run with how long it took and the minute it ended, and no heartbeat', () => {
 		const ended_ms = STARTED + 90 * MINUTE
-		const activity = { last_event_ms: ended_ms, idle: undefined, is_stopped: true }
+		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
@@ -98,10 +103,10 @@ describe('run_board_header.header_lines state', () => {
 
 describe('run_board_header.header_lines shape', () => {
 	it('draws the progress then the heartbeat on the state line, the run’s age on the clock line', () => {
-		const activity = { last_event_ms: NOW - MINUTE, idle: undefined, is_stopped: false }
+		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ backlogrun  ✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0  💓 01:00`,
+			`⏸ backlogrun  ✅ 0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0  💓 0:01:00`,
 			RUNNING_CLOCK,
 		])
 	})
@@ -132,7 +137,7 @@ describe('run_board_header.header_lines shape', () => {
 
 	// joshuafolkken/kit#3452
 	it('turns the spinner in place of ▶ for a running run only, every other mark standing still', () => {
-		const stopped = { last_event_ms: undefined, idle: undefined, is_stopped: true }
+		const stopped = { last_event_ms: undefined, is_stopped: true }
 
 		expect(title_of(header({ layout: RUNNING_LAYOUT, spinner: '⠙' }))).toMatch(/^⠙ backlogrun/u)
 		expect(title_of(header({ spinner: '⠙' }))).toMatch(/^⏸ backlogrun/u)
@@ -203,17 +208,17 @@ describe('run_board_header.header_lines heartbeat color', () => {
 	it('leaves a fresh heartbeat plain, then yellow past 15 minutes and red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(aged_title(MINUTE)).toContain(' 💓 01:00')
-		expect(aged_title(20 * MINUTE)).toContain(styleText('yellow', '💓 20:00'))
-		expect(aged_title(40 * MINUTE)).toContain(styleText('red', '💓 40:00'))
+		expect(aged_title(MINUTE)).toContain(' 💓 0:01:00')
+		expect(aged_title(20 * MINUTE)).toContain(styleText('yellow', '💓 0:20:00'))
+		expect(aged_title(40 * MINUTE)).toContain(alarmed())
 	})
 
 	it('leaves a stale heartbeat plain while the run is not running', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
-		const activity = { last_event_ms: NOW - 40 * MINUTE, idle: undefined, is_stopped: false }
+		const activity = { last_event_ms: NOW - 40 * MINUTE, is_stopped: false }
 		const title = run_board_header.header_lines(header({ activity }))[0] ?? ''
 
-		expect(title).not.toContain(styleText('red', '💓 40:00'))
+		expect(title).not.toContain(alarmed())
 	})
 })
 

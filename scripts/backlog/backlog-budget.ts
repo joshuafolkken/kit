@@ -100,10 +100,6 @@ const WAITING_ON: Readonly<Partial<Record<BacklogAnswer, string>>> = {
 	unreadable: 'The backlog listing could not be read',
 }
 
-function is_idle_answer(answer: BacklogAnswer): boolean {
-	return WAITING_ON[answer] !== undefined
-}
-
 function waiting_on(answer: BacklogAnswer): string {
 	return WAITING_ON[answer] ?? EMPTY_BACKLOG
 }
@@ -220,12 +216,6 @@ function is_finish(input: BudgetInput): boolean {
 	return input.answer === 'exhausted' && max_decision(input) === undefined
 }
 
-// Whether this input opens or continues the idle watch: one of the three answers that offer nothing,
-// under the maximum. `backlog:budget` carries the watch's window on exactly these.
-function is_idle_watch(input: BudgetInput): boolean {
-	return is_idle_answer(input.answer) && max_decision(input) === undefined
-}
-
 // The answers whose decision no count changes, once the maximum above has been applied.
 const FIXED_DECISIONS: Readonly<Partial<Record<BacklogAnswer, BudgetDecision>>> = {
 	blocked: { verdict: WATCH_VERDICT, reason: BLOCKED_REASON },
@@ -261,7 +251,6 @@ const backlog_budget = {
 	idle_expired_reason,
 	idle_watch_reason,
 	is_finish,
-	is_idle_watch,
 	max_reached_reason,
 	no_idle_watch_reason,
 	run_reason,

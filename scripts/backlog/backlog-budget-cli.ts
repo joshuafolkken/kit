@@ -8,7 +8,6 @@ import {
 	type BudgetDecision,
 	type BudgetInput,
 } from './backlog-budget'
-import { backlog_idle } from './backlog-idle'
 
 // The thin half of `josh backlog:budget` (joshuafolkken/kit#1632): read the loop's state off the
 // command line, hand it to the pure decision, print the verdict on stdout and the reason on stderr
@@ -164,25 +163,11 @@ function build_input(values: ParsedValues, now_ms: number): BudgetInput | undefi
 	return input_of(values, { answer, now_ms, started_at_ms })
 }
 
-// The idle window, carried only on the watch an answer that offers nothing opens — the one
-// `idle_decision` reaches, not the draining watch a reached maximum returns while children still run —
-// so `backlog:offer` can record when that wait ends (joshuafolkken/kit#3430).
-function idle_of(input: BudgetInput, verdict: string): string | undefined {
-	const is_idle_watch =
-		verdict === backlog_budget.WATCH_VERDICT && backlog_budget.is_idle_watch(input)
-	const window = is_idle_watch ? backlog_idle.window_of(input) : undefined
-
-	return window === undefined ? undefined : backlog_idle.text_of(window)
-}
-
 function print_json(input: BudgetInput, decision: BudgetDecision): void {
 	const { verdict, reason } = decision
-	const idle = idle_of(input, verdict)
 	const is_finish = backlog_budget.is_finish(input)
 
-	console.info(
-		JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish, ...(idle !== undefined && { idle }) }),
-	)
+	console.info(JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish }))
 }
 
 function refuse(): number {

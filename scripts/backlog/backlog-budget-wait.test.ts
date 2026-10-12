@@ -121,19 +121,3 @@ describe('backlog_budget.is_finish — the run finishing, as against stopping on
 		expect(backlog_budget.is_finish(at_max)).toBe(false)
 	})
 })
-
-describe('backlog_budget.is_idle_watch — the inputs that carry a wait window', () => {
-	it.each(IDLE_ANSWERS)('is one on %s under the maximum', (answer) => {
-		expect(backlog_budget.is_idle_watch(input_of({ answer }))).toBe(true)
-	})
-
-	it.each(['candidates', 'blocked', 'untriaged'] as const)('is not one on %s', (answer) => {
-		expect(backlog_budget.is_idle_watch(input_of({ answer }))).toBe(false)
-	})
-
-	it('is not one at the maximum, where the watch only drains', () => {
-		const at_max = input_of({ answer: 'parked', max_issues: MAX_ISSUES, merged: MAX_ISSUES })
-
-		expect(backlog_budget.is_idle_watch(at_max)).toBe(false)
-	})
-})
