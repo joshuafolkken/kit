@@ -73,7 +73,7 @@ describe('run_wake_describe.describe_wake — the always-present lines', () => {
 			WOKE_LINE,
 			'output: /stub/wake.log',
 			WATCH_LINE,
-			'stop it with `pnpm josh run:wake --stop`',
+			'stop it with `pnpm josh backlogrun --stop`',
 		])
 	})
 
@@ -221,6 +221,6 @@ describe('run_wake_describe — citing issues in the description', () => {
 	})
 
 	it('pins the stop command', () => {
-		expect(run_wake_describe.STOP_COMMAND).toBe('pnpm josh run:wake --stop')
+		expect(run_wake_describe.STOP_COMMAND).toBe('pnpm josh backlogrun --stop')
 	})
 })

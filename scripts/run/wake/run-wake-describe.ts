@@ -11,7 +11,9 @@ import { run_wake, type RunWake, type WakeDecision, type WakeDecisionInput } fro
 
 const UNKNOWN_CUTS = 'an unreadable number of'
 const REPO_LOOKUP_TIMEOUT_MS = 10_000
-const STOP_COMMAND = 'pnpm josh run:wake --stop'
+// The whole run, not the supervisor alone: `run:wake --stop` leaves the run's record behind, and a
+// record with no owner is what the next `josh backlogrun` stands on without starting.
+const STOP_COMMAND = 'pnpm josh backlogrun --stop'
 const UNREADABLE_TIME = 'an unreadable time'
 
 // The three paths every verb needs: the carry record it reads, its own record, and the work tree a

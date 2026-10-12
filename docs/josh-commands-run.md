@@ -83,9 +83,11 @@ Continue a cut `backlogrun` from outside the conversation. The detached supervis
 ```bash
 pnpm josh run:wake --start                 # launch the detached supervisor
 pnpm josh run:wake --list                  # supervisor state, cut/wake counts, latest progress line
-pnpm josh run:wake --stop                  # stop it
+pnpm josh run:wake --stop                  # stop the supervisor alone
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
+
+**To stop a `backlogrun`, use [`pnpm josh backlogrun --stop`](./josh-commands.md#josh-backlogrun)**: it stops this supervisor and ends the run's record together. `run:wake --stop` alone leaves the record behind with no owner, and the next `pnpm josh backlogrun` answers `standing` on it rather than starting.
 
 `scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
 `sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.

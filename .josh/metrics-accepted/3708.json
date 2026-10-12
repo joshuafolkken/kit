@@ -1,0 +1,8 @@
+{
+	"reason": "josh backlogrun --stop is a new command (#3708): the stop order, its report lines and the --stop argument are new code, and the supervisor stop and the record end were moved into run-wake-stop.ts / run-carry-end.ts so both commands share one implementation; the review fix adds stopping the headless session the supervisor woke when it holds the record (stop_woken, its port and report line); the on-demand bytes are the one-line stop pointers in the backlogrun skill docs",
+	"date": "2026-10-12",
+	"growth": {
+		"scripts.code_lines": 173,
+		"ai_cost.on_demand_bytes": 183
+	}
+}
