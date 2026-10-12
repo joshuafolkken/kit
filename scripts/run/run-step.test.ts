@@ -72,13 +72,6 @@ describe('run_step.next_action — carry and state guards', () => {
 		})
 	})
 
-	it('surfaces the expired budget as a person’s decision', () => {
-		const action = run_step.next_action(input({ carry_kind: 'expired' }))
-
-		expect(action.kind).toBe('decide')
-		expect(action.line).toBe(run_step.EXPIRED_DECISION)
-	})
-
 	it('answers already-done for a closed issue whatever the event', () => {
 		expect(run_step.next_action(input({ state: 'CLOSED', last_event: KIND.MERGE })).line).toBe(
 			run_step.ALREADY_DONE,
@@ -326,7 +319,6 @@ describe('run_step.next_action — the printed contract', () => {
 		{ latest_scope: 'required' },
 		{ is_human_review: true },
 		{ carry_kind: 'unreadable' },
-		{ carry_kind: 'expired' },
 		...Object.values(KIND).map((last_event) => ({ last_event })),
 	]
 

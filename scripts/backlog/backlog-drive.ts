@@ -140,9 +140,12 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 	}
 }
 
+// Only an empty backlog drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a
+// parked or unreadable backlog has no retrospective for `run:step` to fire and stays the driver's.
 function is_drain(read: OfferRead, state: DriveState): boolean {
 	return (
 		read.verdict === WATCH_VERDICT &&
+		read.answer === 'exhausted' &&
 		state.in_flight.length === 0 &&
 		read.is_retrospective_owed === true
 	)
@@ -352,8 +355,8 @@ async function run_pass(
 
 interface LoopConfig {
 	poll_ms: number
-	// The floor between two `backlog:offer` asks while nothing was collected — the same one-minute
-	// cadence the wake supervisor polls the backlog on, so an idle stretch is not a network hammer.
+	// The floor between two `backlog:offer` asks while nothing was collected, running or idle alike —
+	// `backlog_budget.OFFER_INTERVAL_MS`, the interval the wake supervisor polls on too.
 	offer_ms: number
 	// How long one invocation may wait before returning `window`, or `undefined` for no bound. A headless
 	// parent's foreground call is capped by its shell's timeout, so it passes one under that cap.

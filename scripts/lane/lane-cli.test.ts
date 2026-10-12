@@ -317,13 +317,6 @@ describe('lane:open cut-session guard', () => {
 		expect(vi.mocked(lane_open.open_lane)).not.toHaveBeenCalled()
 	})
 
-	it('also refuses an expired record whose budget was handed off', async () => {
-		vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'expired', carry: HANDED_OFF_CARRY })
-
-		expect(await lane_cli.run(['open', ISSUE])).toBe(FAILURE)
-		expect(vi.mocked(lane_open.open_lane)).not.toHaveBeenCalled()
-	})
-
 	it('proceeds normally when the record is not handed off', async () => {
 		vi.spyOn(run_carry, 'read_carry').mockReturnValue({
 			kind: 'carried',

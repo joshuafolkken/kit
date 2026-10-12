@@ -144,7 +144,9 @@ describe('a backlogrun begun on an empty backlog — inside the driver', () => {
 		const budget = empty_backlog_budget('backlogrun --idle 0')
 		const driven = await drive(budget)
 
-		expect(backlog_budget.decide(budget).reason).toBe(backlog_budget.NO_IDLE_WATCH_REASON)
+		expect(backlog_budget.decide(budget).reason).toBe(
+			backlog_budget.no_idle_watch_reason('exhausted'),
+		)
 		expect(driven.reason).toBe('stop')
 		expect(driven.calls).toContain('finish')
 	})

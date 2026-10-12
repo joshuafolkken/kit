@@ -214,7 +214,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// credentials, the same reason `run:wake` carries these flags.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
-			'Report whether the run is stranded — budget handed off, owner gone, and no supervisor watching',
+			'Report whether the run is stranded — owner gone, no successor holding the budget, and no supervisor watching',
 		category: 'AI tools',
 		reference: ['', 'automation', ['processes', 'notifications']],
 	},

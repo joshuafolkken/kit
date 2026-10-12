@@ -446,11 +446,11 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 
 - `--answer <candidates|exhausted|blocked|parked|unreadable|untriaged>` — `backlog:next`'s answer, mapped.
 - `--started` / `--active` — when the invocation began / when it last had work (required unless the watch is off).
-- `--idle <minutes>` — after candidates run out, keep polling this long (default 30; `--idle 0` turns the watch off).
+- `--idle <minutes>` — once nothing can proceed, keep polling this long, counted from `--active` (default 480, 8 hours; `--idle 0` turns the watch off).
 - `--max <count>` — issues one invocation may take (default unlimited); `--merged` and `--running` count against it.
 - `--json` — collapse verdict and reason into `{"budget": "<verdict>", "reason": "…"}`.
 
-stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the bound and the maximum), or empty with exit 1 if the invocation is unreadable. The whole-run bound (8 hours) is decided here and outranks both budgets, but a `parked` or `unreadable` answer outranks the bound. A watch polls every 5 min.
+stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the maximum), or empty with exit 1 if the invocation is unreadable. An `exhausted`, `parked` or `unreadable` answer all enter the same watch: 8 hours from `--active`, restarted when a child runs, and ended early only by `--idle 0`. No bound is counted from `--started`. A watch polls every 60 s, the same interval as a running batch.
 
 ### `josh backlog:offer`
 

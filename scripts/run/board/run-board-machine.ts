@@ -157,28 +157,40 @@ function alert_of(spec: GaugeSpec, value: number, pressure: number | undefined):
 	return verdict ?? threshold_alert(value, spec)
 }
 
+// One gauge's reading: its value, the width its figure is right-aligned to where that is wider than
+// the figure's own, and the kernel's pressure verdict where the gauge takes one.
+interface Reading {
+	value: number | undefined
+	width: number
+	pressure?: number | undefined
+}
+
 // Icon, figure, then bar: the figure is what a person reads, and its fixed
 // width keeps every bar starting in one column. The bar stops full past `spec.full`; the figure still
 // says how far past, and takes the warning colors only, so a quiet machine's figures stay the terminal's
 // own.
-function gauge(spec: GaugeSpec, value: number | undefined, pressure?: number): string | undefined {
+function gauge(spec: GaugeSpec, reading: Reading): string | undefined {
+	const { value, width } = reading
+
 	if (value === undefined) return undefined
 
-	const alert = alert_of(spec, value, pressure)
+	const alert = alert_of(spec, value, reading.pressure)
 	const warning = alert === 'normal' ? undefined : GAUGE_SHADES[alert]
 	const bar = bar_of(value, spec.full, undefined, warning ?? spec.normal)
 
-	return `${spec.icon} ${painted(warning, spec.format(value))} ${bar}`
+	return `${spec.icon} ${painted(warning, spec.format(value).padStart(width))} ${bar}`
 }
 
-// `undefined` when not one gauge could be read, so the header draws no line at all.
-function line_of(gauges: MachineGauges | undefined): string | undefined {
+// `undefined` when not one gauge could be read, so the header draws no line at all. `width` is the
+// header's figure column: a figure narrower than it is right-aligned to it, so the first gauge's bar
+// starts under the progress bar whichever gauge that is.
+function line_of(gauges: MachineGauges | undefined, width = 0): string | undefined {
 	if (gauges === undefined) return undefined
 
 	const parts = [
-		gauge(SPECS.cpu, gauges.cpu_percent),
-		gauge(SPECS.memory, gauges.memory_percent, gauges.memory_pressure),
-		gauge(SPECS.swap, gauges.swap_mb_per_s),
+		gauge(SPECS.cpu, { value: gauges.cpu_percent, width }),
+		gauge(SPECS.memory, { value: gauges.memory_percent, width, pressure: gauges.memory_pressure }),
+		gauge(SPECS.swap, { value: gauges.swap_mb_per_s, width }),
 	].filter((part) => part !== undefined)
 
 	return parts.length === 0 ? undefined : parts.join(GAP)
@@ -188,6 +200,7 @@ const run_board_machine = {
 	CPU_YELLOW,
 	GAP,
 	MEMORY_YELLOW,
+	PERCENT_WIDTH,
 	gauges_of,
 	line_of,
 	percent_text,

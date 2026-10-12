@@ -159,9 +159,9 @@ function is_mechanical(result: JoshResult): boolean {
 	)
 }
 
-// A record that expired or was removed during the pause answers `undefined`: its stale verdict must not
-// reach a session, so the supervisor's own next pass re-reads the record and ends the run as `expired`
-// or `stopped`; a rerun would only fail on it and report the run as `failed`.
+// A record that was removed during the pause answers `undefined`: its stale verdict must not reach a
+// session, so the supervisor's own next pass re-reads the record and ends the run as `ended` or
+// `stopped`; a rerun would only fail on it and report the run as `failed`.
 async function run_driver(
 	target: string,
 	args: ReadonlyArray<string>,

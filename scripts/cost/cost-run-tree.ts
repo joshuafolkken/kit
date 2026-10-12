@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -12,13 +13,14 @@ import { cost_run_nodes, type NodeContext, type RunNode } from './cost-run-nodes
 // default is the *last run* — the cluster whose activity is newest — rather than the newest single
 // transcript, which under a batch is one lane child and answers for a twelfth of the run.
 
-// Two main-checkout sessions that start more than this apart are different runs. A batch's wakes fire
-// as its children finish, so they sit minutes apart; separate batches sit hours apart. The run-carry
-// record expires at 8 hours, so a gap under that is deliberately generous — merging two runs is a
-// visible over-count a reader can see, while splitting one hides half of it.
-const MS_PER_HOUR = 3_600_000
-const RUN_GAP_HOURS = 8
-const RUN_GAP_MS = RUN_GAP_HOURS * MS_PER_HOUR
+// A main-checkout session that starts after the store sat quiet for longer than this opens a new run.
+// **The quiet is measured from the last write any session made before it, not from the previous
+// main's start**: a run idles for the whole idle wait once nothing can proceed, then a child runs for as long as it
+// takes before the wake that judges it, so two mains of one run start any distance apart — but no
+// session writes only while the run waits, and that wait is bounded. One poll is added because the
+// pick the last poll makes starts its child after the wait's end. Two runs closer than this merge,
+// deliberately: merging is a visible over-count a reader can see, while splitting one hides half of it.
+const RUN_GAP_MS = backlog_budget.DEFAULT_IDLE_MS + backlog_budget.OFFER_INTERVAL_MS
 const FIRST = 0
 const NONE = -1
 
@@ -38,40 +40,76 @@ interface RunTree {
 interface Cluster {
 	root_id: string
 	first_start: number
-	last_start: number
 	files: Array<SessionFile>
+}
+
+// The top-level sessions whose writes say the store was active: the mains to group, and the lane
+// children that ran between them.
+interface Activity {
+	mains: ReadonlyArray<SessionFile>
+	sessions: ReadonlyArray<SessionFile>
 }
 
 function cluster_end(cluster: Cluster): number {
 	return Math.max(...cluster.files.map((file) => file.modified_ms))
 }
 
-// Whether `start` falls within the run window of the cluster still open, so the main extends it rather
-// than opening a new run.
-function fits(last: Cluster | undefined, start: number): last is Cluster {
-	return last !== undefined && start - last.last_start <= RUN_GAP_MS
+function start_of(file: SessionFile, context: NodeContext): number {
+	return cost_run_nodes.started_ms(context.facts(file.session_id).records)
+}
+
+// Every write of the top-level sessions, oldest first. A session is written for as long as it is
+// continued, so its last write says nothing about a moment before it: a conversation resumed the next
+// morning, or a lane still running, was last written after every main that started in between.
+function write_stamps(activity: Activity, context: NodeContext): Array<number> {
+	const stamps = activity.sessions.flatMap((file) =>
+		context.facts(file.session_id).records.map((record) => record.at_ms),
+	)
+
+	return stamps.filter((ms) => ms !== undefined).toSorted((left, right) => left - right)
+}
+
+// The last write before each main started — `-Infinity` when nothing precedes it. A session's own
+// writes begin at its start, so none of them is counted against it. `mains` are oldest-first, so one
+// pass over the stamps serves them all.
+function writes_before(activity: Activity, context: NodeContext): Map<string, number> {
+	const stamps = write_stamps(activity, context)
+	const before = new Map<string, number>()
+	let cursor = FIRST
+
+	for (const main of activity.mains) {
+		const start = start_of(main, context)
+
+		while ((stamps[cursor] ?? Infinity) < start) cursor += 1
+		before.set(main.session_id, stamps[cursor - 1] ?? -Infinity)
+	}
+
+	return before
+}
+
+// Whether the store was still active within the run window before `main` started, so the main extends
+// the cluster still open rather than opening a new run.
+function fits(last: Cluster | undefined, quiet_ms: number): last is Cluster {
+	return last !== undefined && quiet_ms <= RUN_GAP_MS
 }
 
 function open_cluster(file: SessionFile, start: number): Cluster {
-	return { root_id: file.session_id, first_start: start, last_start: start, files: [file] }
+	return { root_id: file.session_id, first_start: start, files: [file] }
 }
 
-// The main-checkout sessions grouped into runs by start-time proximity. `order_mains` has already put
-// them oldest-first, so a new cluster opens whenever the gap since the previous main exceeds the run
-// window.
-function cluster_mains(mains: ReadonlyArray<SessionFile>, context: NodeContext): Array<Cluster> {
+// The main-checkout sessions grouped into runs by how long the store sat quiet before each.
+// `order_mains` has already put them oldest-first, so a new cluster opens whenever that quiet exceeds
+// the run window.
+function cluster_mains(activity: Activity, context: NodeContext): Array<Cluster> {
 	const clusters: Array<Cluster> = []
+	const before = writes_before(activity, context)
 
-	for (const file of mains) {
-		const start = cost_run_nodes.started_ms(context.facts(file.session_id).records)
+	for (const file of activity.mains) {
+		const start = start_of(file, context)
 		const last = clusters.at(NONE)
 
-		if (fits(last, start)) {
-			last.files.push(file)
-			last.last_start = start
-		} else {
-			clusters.push(open_cluster(file, start))
-		}
+		if (fits(last, start - (before.get(file.session_id) ?? -Infinity))) last.files.push(file)
+		else clusters.push(open_cluster(file, start))
 	}
 
 	return clusters
@@ -128,7 +166,8 @@ function build_clusters(files: ReadonlyArray<SessionFile>, context: NodeContext)
 	const split = cost_run_nodes.split_files(files, context)
 	const has_mains = split.mains.length > FIRST
 	const roots = has_mains ? split.mains : split.lanes
-	const clusters = cluster_mains(cost_run_nodes.order_mains(roots, context), context)
+	const mains = cost_run_nodes.order_mains(roots, context)
+	const clusters = cluster_mains({ mains, sessions: [...split.mains, ...split.lanes] }, context)
 
 	if (has_mains) attach_lanes(clusters, split.lanes, context)
 	attach_subs(clusters, split.subs, context)

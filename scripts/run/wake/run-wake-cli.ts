@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -34,7 +35,6 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const ONE_GROUP = 1
 const MS_PER_SECOND = 1000
-const DEFAULT_INTERVAL_SECONDS = 60
 // Whole and positive. A zero interval is a busy loop against the temp directory, not a faster
 // supervisor.
 const INTERVAL_PATTERN = /^[1-9]\d*$/u
@@ -71,17 +71,15 @@ const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh 
 // `stopped` is a person's own `--stop` or a supervisor being superseded, and a warning channel that
 // fired on those is one that stops being read.
 //
-// **`expired` and `unreadable` warn**, because both end the supervisor while a carry record is still
-// sitting there handed off, so the run would otherwise be left asleep with nothing anywhere saying so.
+// **`unreadable` warns**, because it ends the supervisor while a carry record is still sitting there
+// handed off, so the run would otherwise be left asleep with nothing anywhere saying so.
 // **Every reason is listed, and the silent two are listed as `undefined`.** A partial map would let a
-// sixth stop reason compile straight past this and reach nobody, which is the defect class this
+// fifth stop reason compile straight past this and reach nobody, which is the defect class this
 // section exists to close.
 const STOP_BODIES: Record<WakeStopReason, string | undefined> = {
 	ended: undefined,
 	stopped: undefined,
 	failed: 'The supervisor could not continue the run and has stopped.',
-	expired:
-		'The carried run passed its whole-run bound, so the supervisor stopped without continuing it.',
 	unreadable:
 		'The carry record could not be read, so the supervisor stopped rather than guess at it.',
 }
@@ -118,7 +116,7 @@ function note_to_stderr(note: string): void {
 }
 
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
-	if (typeof value !== 'string') return DEFAULT_INTERVAL_SECONDS * MS_PER_SECOND
+	if (typeof value !== 'string') return backlog_budget.OFFER_INTERVAL_MS
 	if (!INTERVAL_PATTERN.test(value)) return undefined
 
 	const seconds = Number(value)
@@ -221,9 +219,9 @@ async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext):
 	})
 }
 
-// **Only a failed wake exits non-zero; `expired` and `unreadable` warn but exit zero.** The
+// **Only a failed wake exits non-zero; `unreadable` warns but exits zero.** The
 // verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract callers branch on,
-// and what those two need is the notification, not a different exit code.
+// and what that one needs is the notification, not a different exit code.
 function exit_code_of(reason: WakeStopReason): number {
 	return reason === run_wake_loop.FAILED_REASON ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }

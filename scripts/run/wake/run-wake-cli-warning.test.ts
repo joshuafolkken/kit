@@ -36,8 +36,8 @@ describe('run_wake_cli.warning_body', () => {
 
 	it('leaves out a missing note', () => {
 		const body = run_wake_cli.warning_body(
-			{ reason: 'expired', note: undefined },
-			'Expired.',
+			{ reason: 'unreadable', note: undefined },
+			'Unreadable.',
 			CONTEXT,
 		)
 

@@ -39,7 +39,6 @@ describe(`${UPSTREAM_INTERRUPT} — the run-tooling defect is an interrupt`, () 
 		'pnpm josh run:wake --start',
 		'pnpm josh run:carry --resume',
 		'pnpm josh run:wake --list',
-		'`expired`',
 		'`mismatch`',
 	])(CARRIES, (marker) => {
 		expect(content).toContain(marker)

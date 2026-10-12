@@ -46,9 +46,13 @@ describe('stop_guard — fail open', () => {
 const CARRY = run_carry.fresh_carry('backlogrun', run_carry.NO_OWNER, new Date())
 
 // The two report checks of one stop on a repository whose carry record reads as `read`.
-async function report_checks_on(read: CarryRead): Promise<ReadonlyArray<MockInstance>> {
+async function report_checks_on(
+	read: CarryRead,
+	is_owner_live = true,
+): Promise<ReadonlyArray<MockInstance>> {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(process.cwd())
 	vi.spyOn(run_carry, 'read_carry').mockReturnValue(read)
+	vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(is_owner_live)
 	const stall = vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
 	const strand = vi.spyOn(run_stranded_detect, 'run_stranded_check').mockResolvedValue(undefined)
 
@@ -60,7 +64,7 @@ async function report_checks_on(read: CarryRead): Promise<ReadonlyArray<MockInst
 // joshuafolkken/kit#2995: the stall and strand checks are about a carried run, so a stop without one
 // pays for neither.
 describe('write_stop_decision — the report checks are gated on a run record', () => {
-	it.each<CarryRead>([{ kind: 'none' }, { kind: 'unreadable' }, { kind: 'expired', carry: CARRY }])(
+	it.each<CarryRead>([{ kind: 'none' }, { kind: 'unreadable' }])(
 		'runs neither check when the carry record reads as $kind',
 		async (read) => {
 			const [stall, strand] = await report_checks_on(read)
@@ -92,6 +96,15 @@ describe('write_stop_decision — the report checks are gated on a run record', 
 
 		expect(run_carry.read_carry).toHaveBeenCalledWith(run_carry.carry_path(process.cwd()))
 		expect(stall).toHaveBeenCalledWith(backlog_ready.DEFAULT_PORTS)
+		expect(strand).toHaveBeenCalledOnce()
+	})
+
+	// joshuafolkken/kit#3687: a record no longer expires, so a crashed run's stands until a person
+	// clears it — and its stall probe must not ride every stop in the repository meanwhile.
+	it('leaves the stall probe out, and still asks the strand, when the record owner is gone', async () => {
+		const [stall, strand] = await report_checks_on({ kind: 'carried', carry: CARRY }, false)
+
+		expect(stall).not.toHaveBeenCalled()
 		expect(strand).toHaveBeenCalledOnce()
 	})
 })

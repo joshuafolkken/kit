@@ -74,12 +74,9 @@ describe('run_board_span.span_of', () => {
 		).toBeUndefined()
 	})
 
-	it('draws nothing over a spent or unreadable carry rather than the run before it', () => {
+	it('draws nothing over an unreadable carry rather than the run before it', () => {
 		const before = ended(FIRST_START, FIRST_END)
 
-		expect(
-			run_board_span.span_of({ kind: 'expired', carry: carry(SECOND_START) }, before),
-		).toBeUndefined()
 		expect(run_board_span.span_of({ kind: 'unreadable' }, before)).toBeUndefined()
 	})
 })

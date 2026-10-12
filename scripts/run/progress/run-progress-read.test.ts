@@ -236,11 +236,8 @@ describe('has_run_started — a run underway, read from a mechanical record', ()
 		await expect(run_progress_read.has_run_started([])).resolves.toBe(true)
 	})
 
-	it.each([
-		['carried', { kind: 'carried', carry: A_CARRY }],
-		['expired', { kind: 'expired', carry: A_CARRY }],
-	] as const)('is true when the repository carry is %s', async (_label, read) => {
-		read_carry.mockReturnValue(read)
+	it('is true when the repository carry is carried', async () => {
+		read_carry.mockReturnValue({ kind: 'carried', carry: A_CARRY })
 
 		await expect(run_progress_read.has_run_started([])).resolves.toBe(true)
 	})

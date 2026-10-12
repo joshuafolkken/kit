@@ -35,10 +35,6 @@ the backlog drains, so the retrospective runs before the idle watch
   backlog drained    command  pnpm josh retrospective
   retrospective done verdict  wait
 
-## expired-budget
-the whole-run budget is spent — a person decides
-  start              decide   decide: whole-run budget spent — resume with `pnpm josh run:carry --resume` | discard with `pnpm josh run:carry --end`
-
 ## unreadable-carry
 the carry record cannot be read
   start              verdict  unknown

@@ -99,7 +99,7 @@ describe('run_wake_session.wake_argv — the invocation is rebuilt, not passed t
 
 	// `--idle 0` turns the idle watch off (joshuafolkken/kit#1676), so zero is a budget a person can
 	// declare rather than a value that only ever meant "unset". A rebuild that refused it would wake
-	// the next session watching for 30 minutes a run that asked to finish at its first empty backlog.
+	// the next session watching for the whole idle wait a run that asked to finish at its first empty backlog.
 	it('carries an idle watch turned off across the cut', () => {
 		expect(prompt_of(NO_WATCH_INVOCATION)).toBe(NO_WATCH_INVOCATION)
 	})

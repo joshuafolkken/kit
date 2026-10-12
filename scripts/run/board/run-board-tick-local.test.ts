@@ -1,5 +1,4 @@
 import { stripVTControlCharacters } from 'node:util'
-import { backlog_idle } from '#scripts/backlog/backlog-idle'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
@@ -11,9 +10,8 @@ import { run_board_tick } from './run-board-tick'
 // are drawn before the plan is read, a run with a child running never reads as waiting, and a live frame
 // is kept within its terminal.
 
-const { LOCAL, START, harness } = run_board_fixture
+const { LOCAL, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const MINUTE = 60_000
 const CHILD = 3421
 const LAUNCH = {
 	pos: 1,
@@ -21,13 +19,7 @@ const LAUNCH = {
 	kind: 'child-launch',
 	text: `#${String(CHILD)} a`,
 }
-const WINDOW = {
-	since_ms: START,
-	until_ms: START + 20 * MINUTE,
-	bound: 'idle' as const,
-	asked_ms: START,
-}
-const IDLE = { pos: 2, at: LAUNCH.at, kind: 'idle', text: backlog_idle.text_of(WINDOW) }
+const DRAIN = { pos: 2, at: LAUNCH.at, kind: 'drain', text: 'backlog drained' }
 const REPO = 'joshuafolkken/kit'
 const SHORT = { rows: 15, columns: 80 }
 
@@ -71,25 +63,27 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('draws two header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
-		expect(lines[0]).toMatch(/ {2}✅ 0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
+		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
 		expect(lines[2]).toBe('')
 		expect(lines[3]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}    …`, 'u'))
 	})
 
 	// The regression: the running count was the plan's, so a board still loading drew a run as waiting.
-	it('draws no wait line and no ⏸ while a child runs, though the stream says the run waits', async () => {
-		const lines = await loading([LAUNCH, IDLE])
+	it('draws no ⏸ while a child runs, though the stream says the backlog drained', async () => {
+		const lines = await loading([LAUNCH, DRAIN])
 
 		expect(lines[0]).not.toMatch(/^⏸/u)
-		expect(lines.join('\n')).not.toContain('wait ends')
 	})
 
-	it('draws the wait under the blank when no child runs', async () => {
-		const lines = await loading([{ ...IDLE, pos: 1 }])
+	// joshuafolkken/kit#3689: a waiting run's second line is a working run's — the heartbeat, then the
+	// machine. joshuafolkken/kit#3692: no plan is read yet, so no repository is named before them.
+	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
+		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
-		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines.slice(2, 4)).toStrictEqual(['', expect.stringMatching(/^ {2}⏸ wait ends /u)])
+		expect(lines[0]).toMatch(/^⏸ backlogrun {2}⏰ \d+:\d{2}:\d{2} {2}✅/u)
+		expect(lines[1]).toMatch(/^ +💓 \d+:\d{2}:\d{2} {2}🧠/u)
+		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 })
 

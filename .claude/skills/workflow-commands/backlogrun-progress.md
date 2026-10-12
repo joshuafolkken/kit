@@ -106,12 +106,11 @@ the epic body; what merged the epic's task list.
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** |
-| `backlogrun` idle-watch poll | 5 min | Not the interval above, and a floor in the same sense. |
+| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch is polled at this same interval. |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget. A failed publish never appears. |
-| Whole run | 8 h | Past it, the run needs a person. |
+| `backlogrun` idle watch | 8 h | Counted from when the run's hands became free, never from its start; `pnpm josh backlog:budget` decides it. |
 
 Each timeout **ends the wait and reports** — none is retried indefinitely. Rationale for the figures:
 `docs/maintainers/backlogrun-progress-rationale.md` → "Why the parent waits on classification, not a

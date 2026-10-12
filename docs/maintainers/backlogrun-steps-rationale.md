@@ -31,7 +31,7 @@ terminates: after them the run ends and the next one waits for a person to type 
 **Why the end-of-run retrospective may apply `auto-ok`** (joshuafolkken/kit#2328). It is the single path
 on which a run labels its own input, and it is not the self-widening the rule guards against because
 every brake bounds it with no exception: its filings count against the ten-per-invocation ceiling, the
-WIP cap, `--max`, the session budget and the 8-hour whole-run bound exactly as any other filing does.
+WIP cap, `--max` and the session budget exactly as any other filing does.
 A retrospective that judges nothing worth carrying files nothing, so "file → drain → file again"
 converges the moment improvements run out.
 
@@ -138,14 +138,22 @@ one `backlogrun` run two epics in order without the person sequencing the comman
 **Why merged issues are fed back through `--exclude`.** GitHub applies `closes #N` asynchronously, so a
 just-merged issue can still read as open on the next ask and be offered a second time.
 
-## Why the idle watch defaults to 30 minutes
+## Why the idle watch lasts 8 hours from when the hands became free
 
 The budgets were introduced by joshuafolkken/kit#1632 and the watch was turned on by default by
-joshuafolkken/kit#1676. **30 minutes** (single source `scripts/backlog/backlog-budget.ts` →
-`DEFAULT_IDLE_MINUTES`) is about the length of one child (12–28 minutes), so a run that has emptied its
-backlog waits roughly as long as one more issue would have taken. **A watch is polled every 5 minutes
-rather than at the loop's 60-second interval** because it is waiting on a person, on human timescales;
-the reason `backlog:budget` prints names the interval so the loop reads it rather than remembering it.
+joshuafolkken/kit#1676. **8 hours** (single source `scripts/backlog/backlog-budget.ts` →
+`IDLE_WAIT_HOURS`) is what a run promises at its start, and joshuafolkken/kit#3687 made it the length
+of the wait rather than a bound on the whole run. The watch exists to pick up an issue opted in just
+after the work ran out; a run that finished the moment every opted-in issue waited on a person missed
+the `auto-ok` that arrived four minutes later, and a 30-minute watch was a second number beside the
+8 hours for no reason of its own. **The wait is counted from when the hands became free, never from
+the run's start**: a bound counted from the start would end a run whose children were still working,
+and would leave a late wait shorter than the one promised. So an empty backlog, a backlog whose every
+opted-in issue waits on a person, and a listing that could not be read all wait the same 8 hours, and
+a child that runs restarts them. **A watch is polled at the loop's one 60-second
+interval, the same as a running batch** (joshuafolkken/kit#3691): the loop is a process, so an ask
+spends no AI turn, and a second, slower interval was only a number the documents and the code disagreed
+on; the reason `backlog:budget` prints names the interval so a reader sees it rather than remembering it.
 
 **Why `--active` is required whenever the watch is on**: without it an emptiness nobody watched could
 be reported as an ordinary `stop`.

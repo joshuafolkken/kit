@@ -50,12 +50,12 @@ const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
 // `pnpm josh cost --cut` hand-off uses (`backlogrun-progress.md` → "The hand-off"). The shared
 // threshold prevents the scheduler and worker boundaries from drifting apart.
 const IMPLEMENTATION_CONTEXT_THRESHOLD = CONTEXT_CUT_THRESHOLD
-// **The whole-run bound is `backlog-budget.ts`'s, imported rather than restated** — the same reuse
-// `run-carry.ts` makes. A resume is expected within seconds of the cut, so this age is only a backstop
+// **The bound is `backlog-budget.ts`'s idle wait, imported rather than restated**, so the eight hours
+// stay written once. A resume is expected within seconds of the cut, so this age is only a backstop
 // against a fresh process that never started; an expired record is cleared and replaced by the next
 // cut rather than blocking it.
-const CUT_MAX_AGE_MS = backlog_budget.WHOLE_RUN_BUDGET_MS
-const CUT_MAX_AGE_HOURS = backlog_budget.WHOLE_RUN_BUDGET_HOURS
+const CUT_MAX_AGE_MS = backlog_budget.DEFAULT_IDLE_MS
+const CUT_MAX_AGE_HOURS = backlog_budget.IDLE_WAIT_HOURS
 
 const END_COMMAND = 'pnpm josh run:cut --end'
 const READ_COMMAND = 'pnpm josh run:cut --json'

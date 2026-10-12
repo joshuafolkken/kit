@@ -1,4 +1,5 @@
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+import { backlog_budget } from './backlog-budget'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
 
 // The scripted ports every `backlog_drive` suite drives the loop through — one copy, so the suites
@@ -7,7 +8,7 @@ import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from '
 const ACTIVE = '2026-09-24T00:00:00.000Z'
 const START_MS = Date.parse(ACTIVE)
 const POLL_MS = 5000
-const OFFER_MS = 60_000
+const OFFER_MS = backlog_budget.OFFER_INTERVAL_MS
 const CONFIG = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
 const FIRST_CHILD = '2400'
 const SECOND_CHILD = '2401'

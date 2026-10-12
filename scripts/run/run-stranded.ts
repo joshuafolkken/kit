@@ -2,10 +2,10 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunWake } from '#scripts/run/wake/run-wake'
 
-// The mechanical judge of a *stranded* run: a handed-off budget whose cutting session died, with no
-// successor claiming it and no supervisor watching, so lanes run on with nobody driving. Three facts,
-// read and never weighed, are what say that state has been reached: the budget was handed off, its
-// owner is gone, and no supervisor is alive to wake a successor.
+// The mechanical judge of a *stranded* run: a budget whose owning session died — at a cut it handed
+// off, or with no hand-off at all — with no successor holding it and no supervisor watching, so lanes
+// run on with nobody driving. Three facts, read and never weighed, are what say that state has been
+// reached: the record names a driver, that owner is gone, and no supervisor is alive to wake a successor.
 //
 // **Pure by design, exactly as `backlog-stalled.ts` is.** The carry read, the owner's liveness and the
 // supervisor's are handed in, so the four acceptance cases — all three holding, a live owner, a claimed
@@ -72,19 +72,27 @@ function supervisor_liveness(
 	return is_same ? LIVE : GONE
 }
 
-// **The whole of the judgement, in four reads.** The carry record must be `carried` — an `expired`,
-// `none` or `unreadable` read is never a strand, because there is either no budget to strand or no way
-// to trust what the record says. It must be handed off and *not* yet adopted — `adopt_carry` spends
-// `is_handed_off` the instant a successor claims it, so a claimed successor reads `false` here. The owner
-// must be gone — a live owner is a session still spending the budget, the ordinary in-flight state. And
-// the supervisor must be `gone` — `live` or `unknown` both count as something that could still wake a
-// successor, so only a proven-absent supervisor completes the strand.
+// Whether the record names a driver whose absence can be proven: a hand-off waiting for its successor,
+// or an owner process. A record with neither was begun by nobody this machine can probe, and an
+// unprovable owner is never a strand.
+function had_driver(carry: RunCarry): boolean {
+	return carry.is_handed_off === true || carry.owner_pid !== undefined
+}
+
+// **The whole of the judgement, in four reads.** The carry record must be `carried` — a `none` or
+// `unreadable` read is never a strand, because there is either no run to strand or no way to trust
+// what the record says. The owner must be gone — a live owner is a session still spending the budget,
+// the ordinary in-flight state, and a successor that claimed a hand-off is that live owner, since
+// `adopt_carry` rewrites the owner as it spends `is_handed_off`. The record must name the driver that
+// is gone (`had_driver`). And the supervisor must be `gone` — `live` or `unknown` both count as
+// something that could still wake a successor, so only a proven-absent supervisor completes the strand.
+//
+// **A hand-off is not required.** An owner that died between its claim and the next cut — the
+// supervisor killed mid-drive, an interactive parent's terminal closed — leaves a record no cut handed
+// off, and with no supervisor nothing drives it either. `run-wake.ts` → `decide_not_handed_off`
+// recovers exactly that record, so the recovery the notification names holds for it too.
 function is_stranded(input: StrandedInput): boolean {
-	if (
-		input.read.kind !== 'carried' ||
-		input.read.carry.is_handed_off !== true ||
-		input.is_owner_live
-	) {
+	if (input.read.kind !== 'carried' || input.is_owner_live || !had_driver(input.read.carry)) {
 		return false
 	}
 
@@ -94,7 +102,7 @@ function is_stranded(input: StrandedInput): boolean {
 // The one line a person reads in the notification and on the stream: which run is stranded, and why. The
 // carry record's own summary carries the counts; this frames it as the strand it is.
 function describe(carry: RunCarry): string {
-	return `Run stranded — ${run_carry.describe_carry(carry)}. The owner is gone, no cut successor claimed the budget, and no supervisor is watching.`
+	return `Run stranded — ${run_carry.describe_carry(carry)}. The owner is gone, no successor holds the budget, and no supervisor is watching.`
 }
 
 function verdict_of(is_run_stranded: boolean): StrandedVerdict {

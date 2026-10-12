@@ -13,7 +13,7 @@ You have several Issues, or an epic, that an agent may implement and merge witho
    To add an Issue to a run that is already going, run [`pnpm josh run:add <N>`](../josh-commands-run.md#josh-runadd): it is taken at the next free lane, ahead of the queue, without stopping a running child. Add `--no-priority` to put it at the end instead.
 4. Put `needs-human-review` on any Issue that must not be committed without you: the run implements and verifies it, then stops before the commit ([the label](../labels-and-run-states.md#needs-human-review--the-opposite-label)).
 
-The run's budgets — the idle watch, the child limit and the whole-run bound — are described in [the two budgets](../maintainers/backlogrun-driver.md#the-two-budgets).
+The run's budgets — the 8-hour idle watch and the child limit — are described in [the two budgets](../maintainers/backlogrun-driver.md#the-two-budgets).
 
 ## Check it worked
 

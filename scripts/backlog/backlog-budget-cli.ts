@@ -8,7 +8,6 @@ import {
 	type BudgetDecision,
 	type BudgetInput,
 } from './backlog-budget'
-import { backlog_idle } from './backlog-idle'
 
 // The thin half of `josh backlog:budget` (joshuafolkken/kit#1632): read the loop's state off the
 // command line, hand it to the pure decision, print the verdict on stdout and the reason on stderr
@@ -18,7 +17,6 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'budget'
-const EXHAUSTED_ANSWER: BacklogAnswer = 'exhausted'
 
 const USAGE = `Usage: josh backlog:budget --answer <${backlog_budget.ANSWERS.join('|')}> --started <ISO-8601> [--active <ISO-8601>, required unless the watch is off] [--merged <count>] [--running <count>] [--max <count>] [--idle <minutes>, 0 to turn the watch off] [--json]`
 
@@ -71,7 +69,7 @@ function to_count(raw: string | undefined): number | undefined {
 
 // A flag that was given but could not be read makes the whole invocation unreadable. Falling back to
 // the default instead would answer a question nobody asked — a mistyped `--idle 0` would read as the
-// default 30-minute watch and hold a run open that was asked to finish at its first empty backlog.
+// default watch and hold a run open that was asked to finish at its first empty backlog.
 function is_readable(raw: string | undefined, parsed: number | undefined): boolean {
 	return raw === undefined || parsed !== undefined
 }
@@ -165,27 +163,11 @@ function build_input(values: ParsedValues, now_ms: number): BudgetInput | undefi
 	return input_of(values, { answer, now_ms, started_at_ms })
 }
 
-// The idle window, carried only on the watch an empty backlog opens — the one `idle_decision` reaches,
-// not the draining watch a reached bound returns while children still run — so `backlog:offer` can
-// record when that wait ends (joshuafolkken/kit#3430).
-function idle_of(input: BudgetInput, verdict: string): string | undefined {
-	const is_idle_watch =
-		verdict === backlog_budget.WATCH_VERDICT &&
-		input.answer === EXHAUSTED_ANSWER &&
-		backlog_budget.is_finish(input)
-	const window = is_idle_watch ? backlog_idle.window_of(input) : undefined
-
-	return window === undefined ? undefined : backlog_idle.text_of(window)
-}
-
 function print_json(input: BudgetInput, decision: BudgetDecision): void {
 	const { verdict, reason } = decision
-	const idle = idle_of(input, verdict)
 	const is_finish = backlog_budget.is_finish(input)
 
-	console.info(
-		JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish, ...(idle !== undefined && { idle }) }),
-	)
+	console.info(JSON.stringify({ [JSON_KEY]: verdict, reason, is_finish }))
 }
 
 function refuse(): number {

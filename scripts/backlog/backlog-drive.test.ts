@@ -197,15 +197,12 @@ describe('backlog_drive.run_pass — verdicts', () => {
 	})
 
 	it('hands a drained watch back but waits out a watch with children in flight', async () => {
-		const drained = await backlog_drive.run_pass(
-			state(),
-			true,
-			harness({ offers: [{ ...offer('watch'), is_retrospective_owed: true }] }).ports,
-		)
+		const owed = { ...offer('watch'), answer: 'exhausted', is_retrospective_owed: true }
+		const drained = await backlog_drive.run_pass(state(), true, harness({ offers: [owed] }).ports)
 		const waiting = await backlog_drive.run_pass(
 			state([FIRST_CHILD]),
 			true,
-			harness({ offers: [{ ...offer('watch'), is_retrospective_owed: true }] }).ports,
+			harness({ offers: [owed] }).ports,
 		)
 
 		expect(drained.kind === 'end' && drained.end.reason).toBe('watch')
@@ -288,6 +285,18 @@ it('continues the idle watch on a drain that owes no retrospective', async () =>
 
 	expect(end.reason).toBe('window')
 })
+
+// joshuafolkken/kit#3687: a parked or unreadable backlog is watched too, but `backlog:offer` marks no
+// drain there, so a hand-back would wake a session `run:step` has no retrospective for.
+it.each(['parked', 'unreadable'])(
+	'keeps a watch over a %s backlog in the driver',
+	async (answer) => {
+		const owed = { ...offer('watch'), answer, is_retrospective_owed: true }
+		const result = await backlog_drive.run_pass(state(), true, harness({ offers: [owed] }).ports)
+
+		expect(result.kind).toBe('continue')
+	},
+)
 
 it('keeps the budget reason on the first stop verdict', async () => {
 	const reason = 'maximum reached'

@@ -13,10 +13,12 @@ import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_cli, type MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { z } from 'zod'
+import { backlog_budget } from './backlog-budget'
 import {
 	backlog_drive,
 	type DriveEnd,
 	type DriveState,
+	type LoopConfig,
 	type LoopPorts,
 	type OfferRead,
 } from './backlog-drive'
@@ -46,7 +48,6 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
 const POLL_MS = 5000
-const OFFER_MS = 60_000
 const FIRST_LINE = 0
 
 // The `--json` object `backlog:offer` prints, keyed under its `JSON_KEY`.
@@ -71,7 +72,7 @@ async function read_record(): Promise<RunCarry | undefined> {
 
 	const read = run_carry.read_carry(run_carry.carry_path(target))
 
-	return read.kind === 'carried' || read.kind === 'expired' ? read.carry : undefined
+	return read.kind === 'carried' ? read.carry : undefined
 }
 
 async function read_offer(
@@ -204,6 +205,11 @@ async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string
 	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [])
 }
 
+// The interval between two asks is `backlog:budget`'s own, so the driver keeps the one its reason prints.
+function loop_config(window_ms: number | undefined): LoopConfig {
+	return { poll_ms: POLL_MS, offer_ms: backlog_budget.OFFER_INTERVAL_MS, window_ms }
+}
+
 async function drive(context: DriveContext): Promise<number> {
 	const seeded = await seeded_lanes(context)
 
@@ -212,7 +218,7 @@ async function drive(context: DriveContext): Promise<number> {
 	const initial =
 		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 	const last = { state: { ...initial, exclude: [...context.exclude] } }
-	const config = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: context.window_ms }
+	const config = loop_config(context.window_ms)
 	const end = await backlog_drive.run_loop(last.state, config, ports_of(context, seeded, last))
 
 	console.info(end_line(end))
@@ -258,6 +264,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const backlog_drive_cli = {
 	end_line,
 	finish: backlog_drive_finish.finish,
+	loop_config,
 	merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,

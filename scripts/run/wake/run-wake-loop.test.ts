@@ -129,13 +129,12 @@ describe('run_wake_loop.run_loop — deterministic driver', () => {
 	})
 
 	it('leaves a record released during the driver pause to the next pass', async () => {
-		const expired: CarryRead = { kind: 'expired', carry: carry({ is_handed_off: true }) }
-		const scripted = recorder([HANDED_OFF, expired])
+		const scripted = recorder([HANDED_OFF, ENDED])
 		const ports = { ...scripted.ports, drive: async () => ({ kind: 'released' as const }) }
 
 		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
 
-		expect(stop.reason).toBe('expired')
+		expect(stop.reason).toBe('ended')
 		expect(scripted.wakes).toStrictEqual([])
 	})
 })
@@ -193,7 +192,7 @@ describe('run_wake_loop.run_loop — one wake per cut', () => {
 describe('run_wake_loop.run_loop — recovering a session that claimed and died', () => {
 	// joshuafolkken/kit#2336. A woken session claimed the record and then exited without cutting or
 	// ending, so the record reads carried, no cut handed off, owned by a dead process. Before this the
-	// loop waited on it until the whole-run bound and the run stopped in silence; now it re-wakes.
+	// loop waited on it without end and the run stopped in silence; now it re-wakes.
 	it('re-wakes when the record is carried but its owner has died', async () => {
 		const scripted = recorder([IN_FLIGHT, ENDED])
 		const ports = { ...scripted.ports, is_owner_live: () => false }
@@ -227,15 +226,6 @@ describe('run_wake_loop.run_loop — recovering a session that claimed and died'
 })
 
 describe('run_wake_loop.run_loop — where it stops', () => {
-	it('stops on an expired record without waking anything', async () => {
-		const scripted = recorder([{ kind: 'expired', carry: carry({ is_handed_off: true }) }])
-
-		const stop = await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
-
-		expect(stop.reason).toBe('expired')
-		expect(scripted.wakes).toStrictEqual([])
-	})
-
 	it('stops when the run ends', async () => {
 		const stop = await run_wake_loop.run_loop(scratch.target, recorder([ENDED]).ports, 0)
 

@@ -6,16 +6,16 @@ import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
-// The words and the clock `run:board` draws with. A moment on the board is a local `HH:MM:SS` clock;
-// how long something has run is a short `MM:SS`, so a person reads the board against the clock on
-// their own screen.
+// The words and the clock `run:board` draws with. A moment on the board is a local clock, `HH:MM`
+// where a person reads it to the minute; how long a row or the heartbeat has run is a short `MM:SS`,
+// and how long the run has run or its wait has left is `H:MM:SS` — two separators are a length and one
+// is a time of day, so the header's time column never reads a length as a moment.
 
 const CLOCK_WIDTH = 2
 const CLOCK_PAD = '0'
 const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
-const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
@@ -58,11 +58,6 @@ const WORDS = {
 	followup: 'followup',
 	report: 'report',
 	failed: 'failed',
-	idle_until: 'wait ends',
-	idle_left: 'left',
-	idle_end_idle: 'ends and reports if nothing new',
-	idle_end_run: 'ends at the whole-run cut-off and reports',
-	next_check: 'next check',
 	notes: 'findings and decisions',
 	more: 'more',
 	filed: 'filed',
@@ -168,13 +163,16 @@ const KIND_WORDS: Readonly<Record<FiledKind, keyof Words>> = {
 }
 
 // The header's gauges and marks. ⚡ rather than 🔥: a fire beside a gauge drawn green reads as an
-// alarm.
+// alarm. ⏰ rather than ⏱, a text symbol some terminals draw one column wide: under it the 💓's digits
+// would stand a column off.
 const HEADER_ICONS = {
 	cpu: '⚡',
 	memory: '🧠',
 	swap: '💾',
 	ended: '🔚',
 	loading: '⏳',
+	elapsed: '⏰',
+	heartbeat: '💓',
 } as const
 
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red
@@ -207,8 +205,8 @@ function minute_of(ms: number): string {
 	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
-// How long something has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so the header
-// and every row read one short column; a negative span reads as zero.
+// How long a row's child has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so every
+// row reads one short column; a negative span reads as zero.
 function elapsed_of(ms: number): string {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
 	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
@@ -216,12 +214,15 @@ function elapsed_of(ms: number): string {
 	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
 }
 
-// How long is left, as `7h38m`; a deadline already passed reads as zero.
-function left_of(ms: number): string {
-	const minutes = Math.floor(Math.max(0, ms) / MS_PER_MINUTE)
+// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
+// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
+function span_of(ms: number): string {
+	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
+	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
 	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
+	const tail = [minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
 
-	return `${String(hours)}h${two_digits(minutes % MINUTES_PER_HOUR)}m`
+	return [String(hours), ...tail.map((value) => two_digits(value))].join(':')
 }
 
 function is_shade(color: Paint): color is Shade {
@@ -289,9 +290,9 @@ const run_board_labels = {
 	bar_of,
 	clock_of,
 	elapsed_of,
-	left_of,
 	minute_of,
 	painted,
+	span_of,
 	spinner_of,
 }
 

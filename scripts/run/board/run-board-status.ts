@@ -1,4 +1,3 @@
-import { backlog_idle, type IdleWindow } from '#scripts/backlog/backlog-idle'
 import {
 	has_label_name,
 	IN_PROGRESS_LABEL,
@@ -30,8 +29,6 @@ interface ItemStatus {
 // The run as a whole, read off the same stream.
 interface RunActivity {
 	last_event_ms: number | undefined
-	// The idle watch's window, when the newest one opened after the newest launch.
-	idle: IdleWindow | undefined
 	// The run's last position is a `stop` that names no child — the run itself ended.
 	is_stopped: boolean
 }
@@ -243,19 +240,6 @@ function settle_closed(
 	return new Map([...statuses].map(([issue, status]) => [issue, settled(issue, status, read)]))
 }
 
-function newest_of(events: ReadonlyArray<RunEvent>, kind: string): RunEvent | undefined {
-	return events.findLast((event) => event.kind === kind)
-}
-
-function idle_of(events: ReadonlyArray<RunEvent>): IdleWindow | undefined {
-	const idle = newest_of(events, KIND.IDLE)
-	const launch = newest_of(events, KIND.CHILD_LAUNCH)
-
-	if (idle === undefined || (launch !== undefined && launch.pos > idle.pos)) return undefined
-
-	return backlog_idle.parse(idle.text)
-}
-
 function is_run_stop(event: RunEvent | undefined): boolean {
 	return event?.kind === KIND.STOP && run_event_scope.issue_named(event) === undefined
 }
@@ -268,7 +252,6 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 
 	return {
 		last_event_ms: last === undefined ? undefined : moment(last),
-		idle: idle_of(events),
 		is_stopped: is_ended || is_run_stop(position),
 	}
 }

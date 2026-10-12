@@ -1,7 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import type { IdleWindow } from '#scripts/backlog/backlog-idle'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
@@ -9,12 +7,10 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 import { run_board_track } from './run-board-track'
 
-// joshuafolkken/kit#3430: the board as a person reads it. Expected clocks are built with the board's own
-// `clock_of`, so the assertions hold in any time zone. joshuafolkken/kit#3444: a row carries its number,
-// title, elapsed `MM:SS` and its phase track; sections are rules, symbols a legend.
+// joshuafolkken/kit#3430: the board as a person reads it. joshuafolkken/kit#3444: a row carries its
+// number, title, elapsed `MM:SS` and its phase track; sections are rules, symbols a legend.
 
-const { clock_of } = run_board_labels
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, WORDS, header, lines_of, note, rule } =
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of, note, rule } =
 	run_board_render_fixture
 const SECOND = 1000
 
@@ -290,26 +286,7 @@ describe('run_board_render.render header', () => {
 		const layout = { ...EMPTY_LAYOUT, active, unreached: [row(3)] }
 		const progress = lines_of(header({ layout, baseline_total: 2 }))[0] ?? ''
 
-		expect(progress).toMatch(/ {2}✅ 1\/3 \S+ \(\+1\)/u)
+		expect(progress).toMatch(/ {2}✅ {2}1\/3 \S+ \(\+1\)/u)
 		expect(progress).toContain('(+1)  🔄 1  ⏳ 1  💤 0')
-	})
-
-	it('says until when an idle run waits, what ends the wait and when it next looks', () => {
-		const idle: IdleWindow = {
-			since_ms: NOW - 10 * MINUTE,
-			until_ms: NOW + 20 * MINUTE,
-			bound: 'idle',
-			asked_ms: NOW - 3 * MINUTE,
-		}
-		const activity = { last_event_ms: NOW, idle, is_stopped: false }
-		const lines = lines_of(header({ activity, layout: undefined }))
-
-		const until = `wait ends ${clock_of(idle.until_ms)} (20:00 left) → ${WORDS.idle_end_idle}`
-
-		expect(lines[0]).toMatch(/^⏸ backlogrun/u)
-		expect(lines.slice(2, 4)).toStrictEqual([
-			'',
-			`  ⏸ ${until} · next check ${clock_of(NOW + 2 * MINUTE)}`,
-		])
 	})
 })

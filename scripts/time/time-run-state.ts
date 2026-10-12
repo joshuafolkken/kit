@@ -1,4 +1,4 @@
-import type { CarryRead } from '#scripts/run/carry/run-carry'
+import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunWake } from '#scripts/run/wake/run-wake'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 
@@ -13,8 +13,8 @@ import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 // and says, in one block, whether the run ended, was handed off, or is simply stuck.
 //
 // **The record's presence is the run's incompleteness.** A run that finishes cleanly ends its carry
-// record through `run:carry --end`, which removes the file — so a record still sitting here (carried
-// or expired) is a run that never completed, and that is what `is_unfinished` reads.
+// record through `run:carry --end`, which removes the file — so a record still sitting here is a run
+// that never completed, and that is what `is_unfinished` reads.
 
 const MS_PER_MINUTE = 60_000
 // The window past which a run with no transcript activity is treated as idle rather than working —
@@ -22,11 +22,6 @@ const MS_PER_MINUTE = 60_000
 const SILENT_MINUTES = 30
 const SILENT_WINDOW_MS = SILENT_MINUTES * MS_PER_MINUTE
 const COST_DECIMALS = 2
-
-// The carry-read kind that means the whole-run bound elapsed, matched here rather than imported so
-// this module reads no more of `run-carry` than the two types it renders.
-const EXPIRED_KIND = 'expired'
-const CARRIED_KIND = 'carried'
 
 // The tool names and josh subcommands that mean a session actually moved the work forward. A wake
 // session that only checked `run:carry` / `run:hold` and exited touched none of them, which is what
@@ -39,13 +34,7 @@ const PROGRESS_COMMANDS: ReadonlySet<string> = new Set(['josh git', 'josh follow
 // how a *session* ended; this says whether the *run* is progressing, and the two states the report
 // could never express — a cut with no successor, and a live owner sitting idle — are members here.
 type RunStatus =
-	| 'not_measured'
-	| 'running'
-	| 'handed_off'
-	| 'cut_no_successor'
-	| 'owner_stalled'
-	| 'owner_gone'
-	| 'expired'
+	'not_measured' | 'running' | 'handed_off' | 'cut_no_successor' | 'owner_stalled' | 'owner_gone'
 
 const NOT_MEASURED: RunStatus = 'not_measured'
 const RUNNING: RunStatus = 'running'
@@ -53,7 +42,6 @@ const HANDED_OFF: RunStatus = 'handed_off'
 const CUT_NO_SUCCESSOR: RunStatus = 'cut_no_successor'
 const OWNER_STALLED: RunStatus = 'owner_stalled'
 const OWNER_GONE: RunStatus = 'owner_gone'
-const EXPIRED: RunStatus = 'expired'
 
 // One wake session that spun up and did no work, already priced. The tally below turns a list of
 // these into the count / dollars / times the block prints.
@@ -126,7 +114,6 @@ function tally_whiffs(whiffs: ReadonlyArray<WhiffSession>): WhiffTotals {
 }
 
 interface StatusInput {
-	kind: CarryRead['kind']
 	is_handed_off: boolean
 	is_owner_live: boolean
 	is_idle: boolean
@@ -140,7 +127,6 @@ function active_status(is_owner_live: boolean, is_idle: boolean): RunStatus {
 }
 
 function status_of(input: StatusInput): RunStatus {
-	if (input.kind === EXPIRED_KIND) return EXPIRED
 	if (input.is_handed_off) return input.is_owner_live ? HANDED_OFF : CUT_NO_SUCCESSOR
 
 	return active_status(input.is_owner_live, input.is_idle)
@@ -173,16 +159,10 @@ function not_measured_facts(kind: CarryRead['kind'], whiffs: WhiffTotals): RunSt
 	}
 }
 
-function measured_facts(input: RunStateInput, whiffs: WhiffTotals): RunStateFacts {
-	const read = input.carry
-	const carry = read.kind === CARRIED_KIND || read.kind === EXPIRED_KIND ? read.carry : undefined
-
-	if (carry === undefined) return not_measured_facts(read.kind, whiffs)
-
+function measured_facts(input: RunStateInput, carry: RunCarry, whiffs: WhiffTotals): RunStateFacts {
 	const idle_ms = idle_of(input.now_ms, input.last_activity_ms)
 	const is_handed_off = carry.is_handed_off === true
 	const status = status_of({
-		kind: read.kind,
 		is_handed_off,
 		is_owner_live: input.is_owner_live,
 		is_idle: idle_ms !== undefined && idle_ms >= SILENT_WINDOW_MS,
@@ -191,7 +171,7 @@ function measured_facts(input: RunStateInput, whiffs: WhiffTotals): RunStateFact
 	return {
 		status,
 		is_measured: true,
-		is_ended: read.kind === EXPIRED_KIND,
+		is_ended: false,
 		cuts: carry.cuts,
 		is_handed_off,
 		is_owner_live: input.is_owner_live,
@@ -204,11 +184,9 @@ function measured_facts(input: RunStateInput, whiffs: WhiffTotals): RunStateFact
 function classify(input: RunStateInput): RunStateFacts {
 	const whiffs = tally_whiffs(input.whiffs)
 
-	if (input.carry.kind === 'none' || input.carry.kind === 'unreadable') {
-		return not_measured_facts(input.carry.kind, whiffs)
-	}
+	if (input.carry.kind !== 'carried') return not_measured_facts(input.carry.kind, whiffs)
 
-	return measured_facts(input, whiffs)
+	return measured_facts(input, input.carry.carry, whiffs)
 }
 
 // A run is unfinished whenever a record is still here to read: a clean finish removes it. This is what
@@ -224,7 +202,6 @@ const STATUS_TEXT: Record<RunStatus, string> = {
 	cut_no_successor: 'cut, but no successor took over',
 	owner_stalled: 'owner process alive but idle',
 	owner_gone: 'owner process gone, run not handed off',
-	expired: 'past the whole-run bound, so left abandoned',
 }
 
 const HEADING = 'Run state (from run:carry / run:wake):'
@@ -286,7 +263,6 @@ const time_run_state = {
 	CUT_NO_SUCCESSOR,
 	OWNER_STALLED,
 	OWNER_GONE,
-	EXPIRED,
 	SILENT_WINDOW_MS,
 	is_whiff,
 	classify,

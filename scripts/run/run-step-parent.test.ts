@@ -80,11 +80,9 @@ describe('run_step.parent_action — a run that is not this session’s', () => 
 		expect(run_step.parent_action(input({ is_lane_child: true })).line).toBe(run_step.UNKNOWN)
 	})
 
-	it('answers unknown for an unreadable record and surfaces a spent budget', () => {
+	it('answers unknown for an unreadable record', () => {
 		const unreadable = input({ carry_kind: 'unreadable', is_driving: false })
-		const expired = input({ carry_kind: 'expired', is_driving: false })
 
 		expect(run_step.parent_action(unreadable).line).toBe(run_step.UNKNOWN)
-		expect(run_step.parent_action(expired).line).toBe(run_step.EXPIRED_DECISION)
 	})
 })

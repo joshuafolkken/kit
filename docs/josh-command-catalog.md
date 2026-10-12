@@ -1531,7 +1531,7 @@ Print the run’s next single action, computed from the event stream, carry reco
 
 _No arguments._
 
-Report whether the run is stranded — budget handed off, owner gone, and no supervisor watching
+Report whether the run is stranded — owner gone, no successor holding the budget, and no supervisor watching
 
 ---
 

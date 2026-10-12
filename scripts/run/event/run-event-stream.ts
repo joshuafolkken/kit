@@ -29,7 +29,7 @@ const EVENT_PREFIX = 'josh-run-events-'
 // every reader — a person, an editor — that it is a line stream rather than a single document, the same
 // distinction the ambient `.log` draws.
 const EVENT_SUFFIX = '.jsonl'
-// A run's session-facing events over the 8-hour whole-run bound: a plan, a launch/PR/review-round/merge
+// A run's session-facing events over one unattended night: a plan, a launch/PR/review-round/merge
 // per child across a few dozen children, plus parks, cuts and stops. Five hundred keeps the whole of a
 // large `backlogrun` and still bounds an unattended run — past it the oldest events roll off.
 const EVENT_CAP = 500
@@ -106,11 +106,6 @@ const EVENT_KIND = {
 	// The position that hands control back: `run:step` prints the command that
 	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
 	SHIP_STOP: 'ship-stop',
-	// The idle watch's window — when the run began waiting on an empty backlog and when that wait ends
-	// `backlog:offer` writes it whenever the window changes, so `run:board` reads
-	// the deadline rather than guessing it. It is a trace: `emit_once`'s drain dedup and `run:step`'s
-	// position both read past it, so a watching loop never re-marks the drain it is waiting after.
-	IDLE: 'idle',
 	// An Issue the run filed on its way, written by `issue:file`, so a run started from the command line
 	// still surfaces what it found — `run:board`'s findings section reads it.
 	FILED: 'filed',
@@ -141,7 +136,6 @@ const EVENT_KINDS: ReadonlyArray<string> = Object.values(EVENT_KIND)
 const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SHIP_STAGE,
 	EVENT_KIND.HEARTBEAT,
-	EVENT_KIND.IDLE,
 	EVENT_KIND.FILED,
 	EVENT_KIND.NOTE,
 	EVENT_KIND.LANE_PHASE,
@@ -151,13 +145,9 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
-// it rolls off only with the positions. A ship-stage `start` and an `idle` line are disposable but go
-// last of them: `run:board` draws from those lines.
-const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
-	EVENT_KIND.SHIP_STAGE,
-	EVENT_KIND.HEARTBEAT,
-	EVENT_KIND.IDLE,
-])
+// it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
+// `run:board` draws from that line.
+const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([EVENT_KIND.SHIP_STAGE, EVENT_KIND.HEARTBEAT])
 
 const event_schema = z.object({
 	pos: z.number(),
@@ -200,9 +190,10 @@ function parse_line(line: string): RunEvent | undefined {
 	return event_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
 
-// Every event on the stream, oldest first. An absent or unreadable file is an empty stream, the same
-// fail-quiet direction `stamp_file.read_stamp_text` takes for a planted or unowned file.
-function read_events(target: string): ReadonlyArray<RunEvent> {
+// Every line on the stream that parses, oldest first, whatever its kind. An absent or unreadable file
+// is an empty stream, the same fail-quiet direction `stamp_file.read_stamp_text` takes for a planted or
+// unowned file.
+function read_lines(target: string): ReadonlyArray<RunEvent> {
 	const raw = stamp_file.read_stamp_text(target)
 
 	if (raw === undefined) return []
@@ -213,6 +204,13 @@ function read_events(target: string): ReadonlyArray<RunEvent> {
 		.filter((line) => line.length > 0)
 		.map((line) => parse_line(line))
 		.filter(is_present)
+}
+
+// Every event on the stream, oldest first. A line whose kind the enumeration no longer names — one a
+// previous version wrote — reads as no event, so no reader takes it for a position or for the run's
+// newest activity.
+function read_events(target: string): ReadonlyArray<RunEvent> {
+	return read_lines(target).filter((event) => is_event_kind(event.kind))
 }
 
 function last_position(events: ReadonlyArray<RunEvent>): number {
@@ -243,12 +241,6 @@ function is_stage_start(event: RunEvent): boolean {
 	return event.text.split(WORD_SEPARATOR)[STAGE_PHASE_INDEX] === run_ship_stage.PHASE.START
 }
 
-// A disposable line `run:board` draws from: a ship-stage `start` is a phase on a lane's track, and an
-// `idle` line is the deadline of the run's wait.
-function is_drawn(event: RunEvent): boolean {
-	return event.kind === EVENT_KIND.IDLE || is_stage_start(event)
-}
-
 // The lines the bound may drop, in the order it drops them: the ones that draw nothing first, then the
 // ones `run:board` draws from, each group oldest first.
 function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
@@ -256,8 +248,8 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 	const disposable = events.filter((event) => DISPOSABLE_KINDS.has(event.kind) && !kept.has(event))
 
 	return [
-		...disposable.filter((event) => !is_drawn(event)),
-		...disposable.filter((event) => is_drawn(event)),
+		...disposable.filter((event) => !is_stage_start(event)),
+		...disposable.filter((event) => is_stage_start(event)),
 	]
 }
 
@@ -272,8 +264,7 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 // append.
 //
 // **A ship-stage `start` outlasts the other disposable lines**: each one is a phase on the lane's track,
-// so it is kept past the `done` lines and the heartbeats. An `idle` line goes with them, oldest first,
-// so a run's newest wait is not the first line a stream of starts and positions gives up.
+// so it is kept past the `done` lines and the heartbeats.
 //
 // **The kept line carries the history**: on a stream the positions fill, every append still rolls off
 // the issue's previous stage line, so the newest one lists every stage its
@@ -293,11 +284,12 @@ function serialize(events: ReadonlyArray<RunEvent>): string {
 }
 
 // The read-modify-write, run only while the stream's lock is held. `replace_text_stamp` publishes the
-// rewrite with a rename, so a reader never sees the stream absent or half-written.
+// rewrite with a rename, so a reader never sees the stream absent or half-written. The position counts
+// on from every line the file holds, so a line of a retired kind — dropped by this rewrite — never
+// hands its position to a new event.
 function append_held(target: string, event: Omit<RunEvent, 'pos'>): number {
-	const existing = read_events(target)
-	const position = last_position(existing) + POSITION_INCREMENT
-	const events = bounded([...existing, { pos: position, ...event }])
+	const position = last_position(read_lines(target)) + POSITION_INCREMENT
+	const events = bounded([...read_events(target), { pos: position, ...event }])
 
 	stamp_file.replace_text_stamp(target, serialize(events))
 
