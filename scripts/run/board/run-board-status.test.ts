@@ -1,4 +1,3 @@
-import { backlog_idle } from '#scripts/backlog/backlog-idle'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -50,12 +49,6 @@ function track_after(...later: ReadonlyArray<Step>): ReadonlyArray<string> {
 function phase_after(...later: ReadonlyArray<Step>): string | undefined {
 	return track_after(...later).at(-1)
 }
-
-const IDLE_TEXT = backlog_idle.text_of({
-	since_ms: Date.parse(T2),
-	until_ms: Date.parse(T3),
-	asked_ms: Date.parse(T2),
-})
 
 describe('run_board_status.statuses_of', () => {
 	it('follows each child from launch to merge or park, keeping when it started', () => {
@@ -324,26 +317,18 @@ describe('run_board_status settled tracks', () => {
 })
 
 describe('run_board_status.activity_of', () => {
-	it('reads the newest idle window opened after the newest launch', () => {
+	// joshuafolkken/kit#3689: the run's activity is its newest event and whether it stopped — no wait
+	// window, so a waiting run's header is drawn from the same two facts as a working one's.
+	it('reads the newest event’s time and nothing about a wait', () => {
 		const events = [
 			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
-			event_at(2, T2, KIND.IDLE, IDLE_TEXT),
+			event_at(2, T2, KIND.MERGE, MERGE_3409),
 		]
 
 		expect(run_board_status.activity_of(events)).toStrictEqual({
 			last_event_ms: Date.parse(T2),
-			idle: backlog_idle.parse(IDLE_TEXT),
 			is_stopped: false,
 		})
-	})
-
-	it('drops an idle window a later launch ended', () => {
-		const events = [
-			event_at(1, T2, KIND.IDLE, IDLE_TEXT),
-			event_at(2, T3, KIND.CHILD_LAUNCH, '#3438 launched'),
-		]
-
-		expect(run_board_status.activity_of(events).idle).toBeUndefined()
 	})
 
 	it('reads a stop naming no child as the run itself ending, past trailing trace events', () => {

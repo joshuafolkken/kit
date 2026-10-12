@@ -113,8 +113,8 @@ it('prints the finish classification beside a JSON budget verdict', () => {
 	info.mockRestore()
 })
 
-// joshuafolkken/kit#3430: the watch an answer that offers nothing opens carries its window, so `backlog:offer` can
-// record when the wait ends; every other verdict carries none.
+// joshuafolkken/kit#3689: no verdict carries the wait's window — nothing reads it, so a watching poll
+// has nothing to record.
 const WATCH_JSON = '"budget":"watch"'
 
 function json_for(answer: string, extra: ReadonlyArray<string> = []): string {
@@ -129,38 +129,24 @@ function json_for(answer: string, extra: ReadonlyArray<string> = []): string {
 	return line
 }
 
-describe('backlog_budget_cli.run — the idle window beside a JSON verdict', () => {
-	it.each(['exhausted', 'parked', 'unreadable'])(
-		'names the window on a watch over %s',
-		(answer) => {
-			const watching = json_for(answer)
+describe('backlog_budget_cli.run — a JSON verdict names no idle window', () => {
+	it.each(['exhausted', 'parked', 'unreadable'])('names none on a watch over %s', (answer) => {
+		const watching = json_for(answer)
 
-			expect(watching).toContain(WATCH_JSON)
-			expect(watching).toContain(
-				'"idle":"idle since 2026-09-09T11:45:00.000Z until 2026-09-09T19:45:00.000Z asked 2026-09-09T12:00:00.000Z"',
-			)
+		expect(watching).toContain(WATCH_JSON)
+		expect(watching).not.toContain('"idle"')
+	})
+
+	it.each(['parked', 'unreadable'])(
+		'stops unfinished once `--idle 0` ends the run on %s',
+		(answer) => {
+			const stopped = json_for(answer, ['--idle', '0'])
+
+			expect(stopped).toContain('"budget":"stop"')
+			expect(stopped).toContain('"is_finish":false')
+			expect(stopped).not.toContain('"idle"')
 		},
 	)
-
-	it.each(['parked', 'unreadable'])('names none once `--idle 0` ends the run on %s', (answer) => {
-		const stopped = json_for(answer, ['--idle', '0'])
-
-		expect(stopped).toContain('"budget":"stop"')
-		expect(stopped).toContain('"is_finish":false')
-		expect(stopped).not.toContain('"idle"')
-	})
-
-	it('names none on a run or a blocked watch', () => {
-		expect(json_for('candidates')).not.toContain('"idle"')
-		expect(json_for('blocked')).not.toContain('"idle"')
-	})
-
-	it('names none on the draining watch a reached maximum returns while children still run', () => {
-		const draining = json_for('exhausted', ['--max', '2', '--merged', '2', '--running', '1'])
-
-		expect(draining).toContain(WATCH_JSON)
-		expect(draining).not.toContain('"idle"')
-	})
 })
 
 describe('backlog_budget_cli.run', () => {

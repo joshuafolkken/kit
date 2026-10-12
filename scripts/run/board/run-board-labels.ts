@@ -169,9 +169,6 @@ const HEADER_ICONS = {
 	memory: '🧠',
 	swap: '💾',
 	ended: '🔚',
-	// When the run's hands became free, and how long the wait that began then has left.
-	idle_since: '⏸',
-	idle_left: '⌛',
 	loading: '⏳',
 } as const
 
@@ -205,8 +202,8 @@ function minute_of(ms: number): string {
 	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
-// How long something has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so the header
-// and every row read one short column; a negative span reads as zero.
+// How long a row's child has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so every
+// row reads one short column; a negative span reads as zero.
 function elapsed_of(ms: number): string {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
 	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
@@ -214,7 +211,7 @@ function elapsed_of(ms: number): string {
 	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
 }
 
-// How long the run has run or its wait has left, as `H:MM:SS` with the hours not padded; a negative
+// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
 // span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
 function span_of(ms: number): string {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)

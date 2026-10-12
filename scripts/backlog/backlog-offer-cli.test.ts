@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const rule_value_emit_mock = vi.hoisted(() => vi.fn())
 const emit_once_mock = vi.hoisted(() => vi.fn())
-const emit_changed_mock = vi.hoisted(() => vi.fn())
+const emit_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/rules/rule-value-cache', () => ({
 	rule_value_cache: { emit: rule_value_emit_mock },
 }))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit_once: emit_once_mock, emit_changed: emit_changed_mock },
+	run_event_stream_emit: { emit_once: emit_once_mock, emit: emit_mock },
 }))
 
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
@@ -38,7 +38,7 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	rule_value_emit_mock.mockReset()
 	emit_once_mock.mockReset()
-	emit_changed_mock.mockReset()
+	emit_mock.mockReset()
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -131,30 +131,23 @@ describe('backlog_offer_cli.run — the output the loop reads', () => {
 	})
 })
 
-// joshuafolkken/kit#3430: the idle window the budget names is recorded, so `run:board` reads when the
-// wait ends instead of guessing it; a budget that names none records nothing.
-const IDLE_TEXT = 'idle since 2026-01-01T00:00:00.000Z until 2026-01-01T00:30:00.000Z (idle)'
-
-async function offer_with_budget(budget: Record<string, unknown>): Promise<void> {
-	josh_run_mock.mockResolvedValueOnce({ code: OK, out: 'none' })
-	josh_run_mock.mockResolvedValueOnce({ code: OK, out: JSON.stringify(budget) })
-
-	await backlog_offer_cli.run(BASE)
-}
-
-describe('backlog_offer_cli.run — the idle window is recorded on the stream', () => {
+// joshuafolkken/kit#3689: a watching poll adds no line to the stream, so the `💓` on `run:board` keeps
+// counting from the run's last event however often the loop asks. `--running 1` keeps the poll off the
+// drain, the one marker a watch does write.
+describe('backlog_offer_cli.run — a watching poll leaves the stream alone', () => {
 	const WATCH = { budget: 'watch', reason: 'watching', is_finish: false }
+	const IDLE_TEXT = 'idle since 2026-01-01T00:00:00.000Z until 2026-01-01T08:00:00.000Z'
 
-	it('records the window the budget names', async () => {
-		await offer_with_budget({ ...WATCH, idle: IDLE_TEXT })
+	it.each([
+		['a watch', WATCH],
+		['a watch a previous version’s budget names a window on', { ...WATCH, idle: IDLE_TEXT }],
+	])('appends nothing on %s', async (_label, budget) => {
+		josh_run_mock.mockResolvedValueOnce({ code: OK, out: 'none' })
+		josh_run_mock.mockResolvedValueOnce({ code: OK, out: JSON.stringify(budget) })
 
-		expect(emit_changed_mock).toHaveBeenCalledWith('idle', IDLE_TEXT)
-	})
-
-	it('records nothing when the budget names no window', async () => {
-		await offer_with_budget(WATCH)
-
-		expect(emit_changed_mock).not.toHaveBeenCalled()
+		expect(await backlog_offer_cli.run([...BASE, '--running', '1'])).toBe(OK)
+		expect(emit_once_mock).not.toHaveBeenCalled()
+		expect(emit_mock).not.toHaveBeenCalled()
 	})
 })
 
