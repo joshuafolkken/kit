@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { run_headless } from '#scripts/run/run-headless'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_args } from './run-carry-args'
 
@@ -22,6 +23,15 @@ function request_for(argv: ReadonlyArray<string>): ReturnType<typeof run_carry_a
 
 	return run_carry_args.to_request(parsed)
 }
+
+// The suite runs inside whatever session started it, so the headless mark is cleared rather than read.
+beforeEach(() => {
+	vi.stubEnv(run_headless.HEADLESS_ENV_KEY, undefined)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 describe('run_carry_args.read_arguments', () => {
 	it('answers the parsed values for known flags', () => {

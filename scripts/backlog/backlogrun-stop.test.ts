@@ -24,7 +24,6 @@ const CARRY: RunCarry = {
 
 interface Stage {
 	supervisor?: number
-	woke_pid?: number
 	parent?: number
 	read?: CarryRead
 	live?: ReadonlyArray<number>
@@ -35,6 +34,11 @@ function carried(owner_pid?: number): CarryRead {
 	return { kind: 'carried', carry: { ...CARRY, owner_pid } }
 }
 
+// A record whose owner the run launched headless.
+function carried_headless(owner_pid: number): CarryRead {
+	return { kind: 'carried', carry: { ...CARRY, owner_pid, is_owner_headless: true } }
+}
+
 function harness(stage: Stage = {}): { ports: StopPorts; calls: Array<string> } {
 	const calls: Array<string> = []
 	const read = stage.read ?? NONE
@@ -42,9 +46,7 @@ function harness(stage: Stage = {}): { ports: StopPorts; calls: Array<string> } 
 		stop_supervisor: vi.fn(() => {
 			calls.push('supervisor')
 
-			if (stage.supervisor === undefined) return undefined
-
-			return { pid: stage.supervisor, woke_pid: stage.woke_pid }
+			return stage.supervisor
 		}),
 		stop_session: vi.fn(() => {
 			calls.push('session')
@@ -138,11 +140,12 @@ describe('backlogrun_stop.stop — a record left behind', () => {
 	})
 })
 
-const WOKEN: Stage = { supervisor: SUPERVISOR_PID, woke_pid: WOKEN_PID }
+const WOKEN: Stage = { supervisor: SUPERVISOR_PID }
 
-describe('backlogrun_stop.stop — a session the supervisor woke', () => {
-	it('stops the woken session that owns the record, then ends the record', async () => {
-		const { ports, calls } = harness({ ...WOKEN, read: carried(WOKEN_PID), live: [WOKEN_PID] })
+describe('backlogrun_stop.stop — a headless session the run launched', () => {
+	it('stops the headless session that owns the record, then ends the record', async () => {
+		const read = carried_headless(WOKEN_PID)
+		const { ports, calls } = harness({ ...WOKEN, read, live: [WOKEN_PID] })
 		const report = await backlogrun_stop.stop(GIT_DIRECTORY, ports)
 
 		expect(report).toMatchObject({ session: WOKEN_PID, record: { kind: 'ended' } })
@@ -151,27 +154,23 @@ describe('backlogrun_stop.stop — a session the supervisor woke', () => {
 		expect(backlogrun_stop.is_stopped(report)).toBe(true)
 	})
 
-	it('does not signal a woken session that no longer owns the record', async () => {
-		const { ports } = harness({
-			...WOKEN,
-			read: carried(SUPERVISOR_PID),
-			live: [SUPERVISOR_PID, WOKEN_PID],
+	it('stops it where the supervisor’s record is already gone', async () => {
+		const { ports } = harness({ read: carried_headless(WOKEN_PID), live: [WOKEN_PID] })
+		const report = await backlogrun_stop.stop(GIT_DIRECTORY, ports)
+
+		expect(report).toMatchObject({
+			supervisor: undefined,
+			session: WOKEN_PID,
+			record: { kind: 'ended' },
 		})
+		expect(ports.stop_session).toHaveBeenCalledExactlyOnceWith(WOKEN_PID)
+	})
+
+	it('does not signal a headless owner that is no longer running', async () => {
+		const { ports } = harness({ ...WOKEN, read: carried_headless(WOKEN_PID) })
 		const report = await backlogrun_stop.stop(GIT_DIRECTORY, ports)
 
 		expect(report).toMatchObject({ session: undefined, record: { kind: 'ended' } })
-		expect(ports.stop_session).not.toHaveBeenCalled()
-	})
-
-	it('still keeps a record another session owns beside a woken one', async () => {
-		const { ports } = harness({
-			...WOKEN,
-			read: carried(SESSION_PID),
-			live: [SESSION_PID, WOKEN_PID],
-		})
-		const report = await backlogrun_stop.stop(GIT_DIRECTORY, ports)
-
-		expect(report.record).toStrictEqual({ kind: 'held', owner: SESSION_PID })
 		expect(ports.stop_session).not.toHaveBeenCalled()
 	})
 })
@@ -224,7 +223,7 @@ describe('backlogrun_stop.lines_of', () => {
 		expect(backlogrun_stop.lines_of(report)).toStrictEqual([
 			'backlogrun: stopped the supervisor (process 4242)',
 			'backlogrun: stopped the parent session (process 42)',
-			'backlogrun: stopped the session the supervisor woke (process 555)',
+			'backlogrun: stopped the headless session (process 555)',
 			"backlogrun: ended the run's record",
 		])
 	})

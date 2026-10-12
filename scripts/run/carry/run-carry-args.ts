@@ -1,5 +1,6 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { run_carry, type CarryChange, type CarryClaimRequest, type CarryOwner } from './run-carry'
 
@@ -178,6 +179,13 @@ function group_count(values: ParsedValues): number {
 	return groups.filter(Boolean).length
 }
 
+// The mark rides the environment the run launched its session with; the record keeps it beside the
+// owner, so `josh backlogrun --stop` knows that owner for the run's own. An attached owner is left as
+// it is, so its record is the one it always was.
+function marked(owner: CarryOwner): CarryOwner {
+	return run_headless.is_headless_parent(process.env) ? { ...owner, is_headless: true } : owner
+}
+
 // **`--owner` is what makes liveness answerable at all.** The process that runs this command is a
 // short-lived `tsx`, so its own pid says nothing about whether the run is still going; the caller
 // names the process that is — its own session — and a `backlogrun` passes `--owner "$PPID"`. Absent,
@@ -192,7 +200,7 @@ function to_owner(value: OptionValue): CarryOwner | undefined {
 
 	const pid = Number(text)
 
-	return pid < MIN_PID ? undefined : run_carry.owner_of(pid)
+	return pid < MIN_PID ? undefined : marked(run_carry.owner_of(pid))
 }
 
 // A non-empty `--summary`, or nothing. An empty string is nothing here, so it reads as absent and the

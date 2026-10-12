@@ -2,7 +2,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_end } from '#scripts/run/carry/run-carry-end'
-import { run_wake, type RunWake } from '#scripts/run/wake/run-wake'
+import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_wake_stop } from '#scripts/run/wake/run-wake-stop'
 import { backlogrun_launch } from './backlogrun-launch'
 
@@ -17,8 +17,9 @@ import { backlogrun_launch } from './backlogrun-launch'
 // is owned by that session; its record is kept and the owner is named, because ending a record under a
 // live owner leaves a session running lanes nothing counts.
 //
-// **A session the supervisor woke is the run's own.** It is headless — nobody can end the run from it —
-// so when it holds the record it is stopped with the supervisor that started it.
+// **A headless session is the run's own.** Nobody can end the run from it, so when it holds the record
+// it is stopped too. The record says so itself (`is_owner_headless`): the supervisor's record is gone
+// after a `run:wake --stop` or a supervisor that gave up, and the session it woke outlives both.
 //
 // **Lanes are counted, never stopped**: a child killed mid-change leaves a tree nobody can resume.
 
@@ -26,16 +27,13 @@ const STOPPED_REASON = 'stopped by a person with `josh backlogrun --stop`'
 const PREFIX = 'backlogrun:'
 const ISSUE_PREFIX = '#'
 
-// The supervisor that was stopped, with the session it last woke.
-type StoppedSupervisor = Pick<RunWake, 'pid' | 'woke_pid'>
-
 type RecordOutcome = { kind: 'none' } | { kind: 'ended' } | { kind: 'held'; owner: number }
 
 interface StopReport {
 	// The pids stopped, `undefined` where there was nothing to stop.
 	supervisor: number | undefined
 	parent: number | undefined
-	// The session the supervisor woke, stopped only where it held the record.
+	// The headless session that held the record.
 	session: number | undefined
 	record: RecordOutcome
 	// The issues whose lanes are still open, left running.
@@ -43,7 +41,7 @@ interface StopReport {
 }
 
 interface StopPorts {
-	stop_supervisor: (git_directory: string) => StoppedSupervisor | undefined
+	stop_supervisor: (git_directory: string) => number | undefined
 	stop_parent: (git_directory: string) => number | undefined
 	stop_session: (pid: number) => void
 	read_carry: (git_directory: string) => CarryRead
@@ -60,7 +58,7 @@ async function open_lanes(): Promise<Array<string>> {
 
 // A person who typed the stop is at the terminal, so the ⏸️ confirmation a stop pushes is not sent.
 const LIVE_PORTS: StopPorts = {
-	stop_supervisor: (git_directory) => run_wake_stop.stop(run_wake.wake_path(git_directory)),
+	stop_supervisor: (git_directory) => run_wake_stop.stop(run_wake.wake_path(git_directory))?.pid,
 	stop_parent: backlogrun_launch.stop_parent,
 	stop_session: run_wake_stop.signal,
 	read_carry: (git_directory) => run_carry.read_carry(run_carry.carry_path(git_directory)),
@@ -89,14 +87,18 @@ function standing_owner(
 	return stopped.includes(owner) ? undefined : owner
 }
 
-// Stops the owner where it is the session the stopped supervisor woke — the pid stopped, `undefined`
-// where the owner is any other process, which this command has no business signalling.
-function stop_woken(
+function is_headless_owner(read: CarryRead): boolean {
+	return read.kind === 'carried' && read.carry.is_owner_headless === true
+}
+
+// Stops the owner where the record marks it headless — the pid stopped, `undefined` where the owner
+// is any other process, which this command has no business signalling.
+function stop_headless(
 	owner: number | undefined,
-	wake: StoppedSupervisor | undefined,
+	read: CarryRead,
 	ports: StopPorts,
 ): number | undefined {
-	if (owner === undefined || owner !== wake?.woke_pid) return undefined
+	if (owner === undefined || !is_headless_owner(read)) return undefined
 
 	ports.stop_session(owner)
 
@@ -118,16 +120,16 @@ async function close_record(
 }
 
 async function stop(git_directory: string, ports: StopPorts = LIVE_PORTS): Promise<StopReport> {
-	const wake = ports.stop_supervisor(git_directory)
+	const supervisor = ports.stop_supervisor(git_directory)
 	const parent = ports.stop_parent(git_directory)
 	const read = ports.read_carry(git_directory)
-	const owner = standing_owner(read, [wake?.pid, parent], ports)
-	const session = stop_woken(owner, wake, ports)
+	const owner = standing_owner(read, [supervisor, parent], ports)
+	const session = stop_headless(owner, read, ports)
 	const holder = session === undefined ? owner : undefined
 	const record = await close_record(git_directory, read, holder, ports)
 	const lanes = await ports.lanes()
 
-	return { supervisor: wake?.pid, parent, session, record, lanes }
+	return { supervisor, parent, session, record, lanes }
 }
 
 function process_line(what: string, pid: number | undefined): Array<string> {
@@ -156,7 +158,7 @@ function lines_of(report: StopReport): Array<string> {
 	const done = [
 		...process_line('supervisor', report.supervisor),
 		...process_line('parent session', report.parent),
-		...process_line('session the supervisor woke', report.session),
+		...process_line('headless session', report.session),
 		...record_lines(report.record),
 	]
 	const stopped = done.length === 0 ? [`${PREFIX} nothing is running`] : done
