@@ -450,7 +450,7 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 - `--max <count>` — issues one invocation may take (default unlimited); `--merged` and `--running` count against it.
 - `--json` — collapse verdict and reason into `{"budget": "<verdict>", "reason": "…"}`.
 
-stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the maximum), or empty with exit 1 if the invocation is unreadable. An `exhausted`, `parked` or `unreadable` answer all enter the same watch: 8 hours from `--active`, restarted when a child runs, and ended early only by `--idle 0`. No bound is counted from `--started`. A watch polls every 5 min.
+stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the maximum), or empty with exit 1 if the invocation is unreadable. An `exhausted`, `parked` or `unreadable` answer all enter the same watch: 8 hours from `--active`, restarted when a child runs, and ended early only by `--idle 0`. No bound is counted from `--started`. A watch polls every 60 s, the same interval as a running batch.
 
 ### `josh backlog:offer`
 

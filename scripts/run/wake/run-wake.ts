@@ -49,7 +49,7 @@ interface RunWake {
 	woke_pid?: number | undefined
 	// Every `--session-id` this forced, so `josh time --run` attributes whiffs only to its own sessions.
 	spawned?: ReadonlyArray<string> | undefined
-	// Start of one unbroken idle stretch: bounds the deferral and backs off the polling interval.
+	// Start of one unbroken idle stretch: bounds the deferral.
 	idle_since?: string | undefined
 }
 
