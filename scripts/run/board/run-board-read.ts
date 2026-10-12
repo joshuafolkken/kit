@@ -1,4 +1,5 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
@@ -28,10 +29,11 @@ interface SpanHere {
 function span_here(repository: string): SpanHere {
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
 	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
+	const launch = backlogrun_launch.pending_launch(repository)
 
 	return {
-		span: run_board_span.span_of(read, ended),
-		resume: run_board_span.resume_of(read, ended),
+		span: run_board_span.span_of(read, ended, launch),
+		resume: run_board_span.resume_of(read, ended, launch),
 	}
 }
 

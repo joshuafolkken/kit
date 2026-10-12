@@ -1,5 +1,6 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveResult } from './run-wake-loop'
 
@@ -187,6 +188,8 @@ async function drive(target: string, wait: Pause = pause): Promise<DriveResult> 
 	if (!claim_record(target, read.carry.invocation)) {
 		return { kind: 'failed', note: 'The driver could not claim the carry record.' }
 	}
+
+	await run_event_setup.emit(run_event_setup.STAGE.HANDING_OFF)
 
 	return read_result(
 		await run_driver(target, args, wait, RERUN_LIMIT),

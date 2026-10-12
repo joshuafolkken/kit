@@ -326,6 +326,8 @@ describe('run_board_status.activity_of', () => {
 		]
 
 		expect(run_board_status.activity_of(events)).toStrictEqual({
+			setup: undefined,
+			is_preparing: false,
 			last_event_ms: Date.parse(T2),
 			is_stopped: false,
 		})

@@ -50,6 +50,8 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 		const events = run_event_stream.read_events(legacy_stream())
 
 		expect(run_board_status.activity_of(events)).toStrictEqual({
+			setup: undefined,
+			is_preparing: false,
 			last_event_ms: Date.parse(LAUNCHED_AT),
 			is_stopped: false,
 		})

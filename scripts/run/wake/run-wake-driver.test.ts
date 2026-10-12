@@ -4,6 +4,7 @@ import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { josh_command } from '#scripts/josh/josh-run'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
 
@@ -21,6 +22,8 @@ beforeEach(() => {
 	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-driver-'))
 	scratch.target = path.join(scratch.directory, 'carry.json')
 	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.NO_OWNER, new Date())
+	// The stage a claim writes goes to the checkout's own stream, which is a live run's: never from a test.
+	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
 })
 
 afterEach(() => {
@@ -57,6 +60,31 @@ test('claims the carry record and supplies a judgment branch with its resume mat
 		kind: 'carried',
 		carry: { owner_pid: process.pid, is_handed_off: false },
 	})
+})
+
+// joshuafolkken/kit#3696: the supervisor taking the run over is a stage `run:board` draws.
+test('says the run is handing off once the claim holds, before the driver runs', async () => {
+	const order: Array<string> = []
+
+	vi.mocked(run_event_setup.emit).mockImplementation(async (text) => {
+		order.push(text)
+	})
+	vi.spyOn(josh_command, 'josh_run').mockImplementation(async () => {
+		order.push('driver')
+
+		return { code: 0, out: OUTPUT }
+	})
+
+	await run_wake_driver.drive(scratch.target)
+
+	expect(order).toStrictEqual([run_event_setup.STAGE.HANDING_OFF, 'driver'])
+})
+
+test('says nothing of a hand-off the driver could not claim', async () => {
+	run_carry.end_carry(scratch.target)
+
+	expect(await run_wake_driver.drive(scratch.target)).toMatchObject({ kind: 'failed' })
+	expect(run_event_setup.emit).not.toHaveBeenCalled()
 })
 
 test('finishes without a judgment when the driver ends the carry record', async () => {
