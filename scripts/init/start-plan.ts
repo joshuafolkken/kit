@@ -9,6 +9,7 @@ interface StartOptions {
 	is_github: boolean
 	visibility: Visibility
 	init_command: string | undefined
+	push_preflight_command: string | undefined
 }
 
 type StartStep = 'git_init' | 'initialize' | 'commit' | 'repository' | 'labels' | 'setup_pr'
@@ -53,7 +54,8 @@ const STEP_LABELS: Readonly<Record<StartStep, string>> = {
 	setup_pr: 'Open an Issue and a pull request that add the kit setup to main',
 }
 
-// The GitHub write steps `--yes` alone never consents to.
+// The GitHub write steps `--yes` alone never consents to. Each one pushes — main, or the setup branch —
+// so they are also the steps a caller's push preflight guards (#3702).
 const GITHUB_WRITE_STEPS: ReadonlySet<StartStep> = new Set(['repository', 'setup_pr'])
 
 function refused(refusal: string): StepPlan {
@@ -107,6 +109,10 @@ function plan_steps(state: GitState): StepPlan {
 	return { steps: FULL_STEPS, refusal: undefined }
 }
 
+function has_push(steps: ReadonlyArray<StartStep>): boolean {
+	return steps.some((step) => GITHUB_WRITE_STEPS.has(step))
+}
+
 function interaction_of(options: StartOptions, is_tty: boolean): Verdict<Interaction> {
 	if (options.is_yes) return { value: 'unattended', refusal: undefined }
 	if (is_tty) return { value: 'interactive', refusal: undefined }
@@ -126,9 +132,7 @@ function github_consent(
 	options: StartOptions,
 	interaction: Interaction,
 ): Verdict<Consent> {
-	const is_github_write = steps.some((step) => GITHUB_WRITE_STEPS.has(step))
-
-	if (!is_github_write || options.is_github) return { value: 'granted', refusal: undefined }
+	if (!has_push(steps) || options.is_github) return { value: 'granted', refusal: undefined }
 	if (interaction === 'interactive') return { value: 'ask', refusal: undefined }
 
 	return {
@@ -158,6 +162,11 @@ function progress_report(
 	return `josh start stopped at: ${labels[failed]}\nCompleted: ${done}\nCause: ${cause}`
 }
 
+// What a run prints when the caller's push preflight fails: no step has run yet, so nothing changed.
+function preflight_report(command: string, cause: string): string {
+	return `josh start stopped before its first step: the push preflight (${command}) failed. Nothing was changed.\nCause: ${cause}`
+}
+
 function plan_summary(
 	steps: ReadonlyArray<StartStep>,
 	labels: Readonly<Record<StartStep, string>> = STEP_LABELS,
@@ -169,9 +178,11 @@ function plan_summary(
 
 const start_plan = {
 	plan_steps,
+	has_push,
 	interaction_of,
 	github_consent,
 	progress_report,
+	preflight_report,
 	plan_summary,
 	step_labels,
 	STEP_LABELS,
