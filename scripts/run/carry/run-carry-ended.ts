@@ -79,7 +79,15 @@ function read_ended(target: string): EndedRun | undefined {
 	return raw === undefined ? undefined : parse_ended(raw)
 }
 
-const run_carry_ended = { ended_path, read_ended, record_ended }
+// Whether the run that began at `started_at` is the one `--end` last ended — what tells a record that is
+// gone because its run ended from one that only failed to read.
+function has_ended(target: string, started_at: string | undefined): boolean {
+	const ended = read_ended(target)
+
+	return ended !== undefined && ended.started_at === started_at
+}
+
+const run_carry_ended = { ended_path, has_ended, read_ended, record_ended }
 
 export { run_carry_ended }
 export type { EndedRun }

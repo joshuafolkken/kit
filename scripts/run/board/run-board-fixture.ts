@@ -21,6 +21,7 @@ const LOCAL: LocalRead = {
 	events: [],
 	lanes: [],
 	resume: undefined,
+	is_stranded: false,
 }
 const STOPPED = new Error('stopped')
 // A machine with nothing swapped and half its memory free.

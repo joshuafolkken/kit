@@ -104,7 +104,7 @@ describe('backlog_drive_cli.offer_argv', () => {
 
 describe('backlog_drive_cli.merge', () => {
 	it('merges without a hand-off threshold, so the supervisor is never handed back over', async () => {
-		vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue()
+		vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
 		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 		vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
 		const merge_child = vi

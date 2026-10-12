@@ -89,6 +89,19 @@ describe('run_carry_ended reads', () => {
 		expect(run_carry_ended.read_ended(target)?.invocation).toBe('backlogrun')
 	})
 
+	// joshuafolkken/kit#3697: a record that is gone because its run ended is told from one that only
+	// failed to read by the run the ended record names.
+	it('answers ended only for the run the last `--end` closed', () => {
+		const target = path.join(scratch, 'has-ended.json')
+
+		run_carry_ended.record_ended(target, { kind: 'carried', carry: carry('backlogrun') }, ENDED_AT)
+
+		expect(run_carry_ended.has_ended(target, STARTED_AT)).toBe(true)
+		expect(run_carry_ended.has_ended(target, '2026-10-09T09:00:00.000Z')).toBe(false)
+		expect(run_carry_ended.has_ended(target, undefined)).toBe(false)
+		expect(run_carry_ended.has_ended(path.join(scratch, 'never.json'), STARTED_AT)).toBe(false)
+	})
+
 	it('reads nothing when no run has ended or the record is not one', () => {
 		const corrupt = path.join(scratch, 'corrupt.json')
 

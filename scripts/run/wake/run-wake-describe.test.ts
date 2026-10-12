@@ -14,6 +14,7 @@ const BARE = 'backlogrun #1'
 
 const CONTEXT: WakeContext = {
 	carry_target: '/stub/carry.json',
+	ended_target: '/stub/ended.json',
 	wake_target: '/stub/wake.json',
 	log_target: '/stub/wake.log',
 	event_target: '/stub/events.jsonl',

@@ -85,6 +85,16 @@ describe('run_board_tick.tick before the plan is read', () => {
 		expect(lines[1]).toMatch(/^ +💓 \d+:\d{2}:\d{2} {2}🧠/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
+
+	// joshuafolkken/kit#3697: a run whose driver and supervisor are gone was drawn as still waiting.
+	it('marks a run nobody is driving ■, not ⏸', async () => {
+		const stranded = { ...LOCAL, events: [{ ...DRAIN, pos: 1 }], is_stranded: true }
+		const { ports, frames } = harness(stranded, [])
+
+		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
+
+		expect(lines_of(frames[0])[0]).toMatch(/^■ backlogrun/u)
+	})
 })
 
 // The regression: a plan taller than the pane pushed the header off the top of the screen.

@@ -4,6 +4,7 @@ import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
 
@@ -19,6 +20,9 @@ interface LocalRead {
 	lanes: ReadonlyArray<string>
 	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
+	// The run is carried but nothing drives it — its owner and its supervisor are both gone
+	// (`run-stranded.ts`). Drawn as a stopped run, since no one is looking for its next issue.
+	is_stranded: boolean
 }
 
 interface SpanHere {
@@ -55,6 +59,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		events: run_board_span.events_of(events, span),
 		lanes: lanes.map((lane) => lane.issue),
 		resume,
+		is_stranded: run_stranded_detect.is_stranded_at(repository),
 	}
 }
 

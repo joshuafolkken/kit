@@ -79,10 +79,7 @@ async function read_offer(
 	state: DriveState,
 	context: DriveContext,
 ): Promise<OfferRead | undefined> {
-	await backlog_drive_owner.assert_current(context.owner)
-	const carry = await read_record()
-
-	if (carry === undefined) return undefined
+	const carry = await backlog_drive_owner.assert_current(context.owner)
 	const named = await backlog_drive_named_offer.read(carry, state, context)
 	if (named !== undefined) return named
 
@@ -269,6 +266,7 @@ const backlog_drive_cli = {
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse: backlog_drive_args.parse,
+	read_offer,
 	resume_line: backlog_drive_args.resume_line,
 	run,
 	to_offer,
