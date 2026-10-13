@@ -166,14 +166,25 @@ async function delete_branch(branch_name: string): Promise<void> {
 // report "nothing is stranded" about a branch nobody measured, which is the one wrong answer that
 // loses work. `count_merges` guards the same way and falls back to `0` instead, because there a
 // missing count means an empty range rather than a claim about somebody's commits.
-async function commit_count_beyond(base: string, tip: string): Promise<number> {
-	const range = `${base}..${tip}`
-	const output = await git_spawn.read(['rev-list', '--count', range])
+async function read_commit_count(revisions: ReadonlyArray<string>): Promise<number> {
+	const output = await git_spawn.read(['rev-list', '--count', ...revisions])
 	const parsed = Number(output)
 
 	if (output.length > 0 && Number.isFinite(parsed)) return parsed
 
-	throw new Error(`\`git rev-list --count ${range}\` printed \`${output}\` rather than a count`)
+	throw new Error(
+		`\`git rev-list --count ${revisions.join(' ')}\` printed \`${output}\` rather than a count`,
+	)
+}
+
+async function commit_count_beyond(base: string, tip: string): Promise<number> {
+	return await read_commit_count([`${base}..${tip}`])
+}
+
+// How many commits `branch_name` holds that no remote-tracking ref reaches — what deleting the branch
+// would lose. An unparseable count throws for the reason `commit_count_beyond`'s does.
+async function commit_count_unpushed(branch_name: string): Promise<number> {
+	return await read_commit_count([branch_name, '--not', '--remotes'])
 }
 
 function is_exit_code_128(cause: unknown): boolean {
@@ -397,6 +408,7 @@ const git_command = {
 	checkout,
 	commit,
 	commit_count_beyond,
+	commit_count_unpushed,
 	delete_branch,
 	push,
 	pull_fast_forward,

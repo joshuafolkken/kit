@@ -578,7 +578,9 @@ pnpm josh backlogrun --stop             # stop the run in this repository
 - An idle run is replaced by a different invocation, so `--stop` need not be typed first. The run going is stopped as `--stop` stops it and the typed one is started when all of these hold:
   - the typed invocation differs from the one the run was started with — the same invocation, a bare `pnpm josh backlogrun` over a bare one included, only shows the board, so reopening the board never rebuilds a run;
   - the run is watching: its backlog drained, it has launched no child since, and it owes no end-of-run retrospective (`JOSH_RETROSPECTIVE`);
-  - no lane is open.
+  - no child is working in a lane — a lane left open with no child in it (a parked child's, a merged one's not yet closed) does not keep the run, and stays where it is.
+  - A run that is kept says why in one line above the board, naming `pnpm josh lane:close <N>` when a lane is the reason (an unanswered process probe is said as that); the same invocation prints no such line.
+  - Before the run's record is written, the launch's own invocation is compared: any other is kept as still starting.
   - What was stopped and what was started are printed, one line each, before the board. A run owned by a session of your own is not replaced: the owner's pid is printed and the exit code is 1.
 - Closing the board (Ctrl+C) closes only the board; the run goes on, and the board's last line says so. When the run stops for a person, the board prints the `claude --resume <session-id>` that reopens it.
 - `--stop` stops the run in this repository in one command, so the next `pnpm josh backlogrun` starts a new one. It stops the [`run:wake`](./josh-commands-run.md#josh-runwake) supervisor, then the parent session `josh backlogrun` started, then a headless session the run launched (the one the supervisor woke) where that session holds the run's record — the record itself marks it, so this holds after the supervisor's record is gone, then ends the run's record as a stopped run (the board keeps it as one). It takes no other argument: beside an Issue or another flag it prints the usage and stops nothing.

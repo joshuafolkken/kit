@@ -1,11 +1,24 @@
+import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it, vi } from 'vitest'
 import { backlogrun_cli, type BacklogrunPorts } from './backlogrun-cli'
 import type { StartResult } from './backlogrun-launch'
+import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
 import type { StopReport } from './backlogrun-stop'
 
 // joshuafolkken/kit#3437: a run already going is shown, never joined; otherwise one is started and shown.
 
 const GIT_DIRECTORY = '/repo/.git'
+const DRAINED_AT = '2026-10-12T10:00:00.000Z'
+const CARRY: RunCarry = {
+	invocation: 'backlogrun',
+	started_at: '2026-10-12T09:00:00.000Z',
+	merged: 0,
+	filed: 0,
+	cuts: 0,
+	failures: 0,
+	outages: 0,
+}
 const LAUNCHED: StartResult = {
 	kind: 'launched',
 	launched: { pid: 42, session: 'session-1', log_path: '/state/josh-backlogrun-log.log' },
@@ -17,6 +30,12 @@ const STOPPED: StopReport = {
 	record: { kind: 'ended' },
 	lanes: ['3701'],
 }
+const BOARD_LINE = 'backlogrun: a run is already going; showing its board.'
+const SAME: ReplaceVerdict = { kind: 'same' }
+const REPLACE: ReplaceVerdict = { kind: 'replace' }
+const REPLACING_LINE = 'backlogrun: replacing the idle run with `backlogrun #3724 --only`'
+const STARTED_LINE =
+	'backlogrun: started (pid 42, session session-1); log /state/josh-backlogrun-log.log'
 const STOPPED_LINES = [
 	'backlogrun: stopped the supervisor (process 4242)',
 	"backlogrun: ended the run's record",
@@ -31,7 +50,7 @@ function harness(
 	const ports: BacklogrunPorts = {
 		repository_directory: vi.fn(async () => GIT_DIRECTORY),
 		is_running: vi.fn(() => is_running),
-		is_replaceable: vi.fn(async () => false),
+		replacement: vi.fn(async () => SAME),
 		start: vi.fn(() => started),
 		stop: vi.fn(async () => STOPPED),
 		show_board: vi.fn(async () => 0),
@@ -71,19 +90,57 @@ describe('backlogrun_cli.run', () => {
 describe('backlogrun_cli.run replacing an idle run', () => {
 	it('stops the idle run, starts the typed one and says both before the board', async () => {
 		const { ports, lines } = harness(true)
-		const idle = { ...ports, is_replaceable: vi.fn(async () => true) }
+		const idle = { ...ports, replacement: vi.fn(async () => REPLACE) }
 
 		await expect(backlogrun_cli.run(['3724', '--only'], idle)).resolves.toBe(0)
-		expect(idle.is_replaceable).toHaveBeenCalledExactlyOnceWith(
+		expect(idle.replacement).toHaveBeenCalledExactlyOnceWith(
 			'backlogrun #3724 --only',
 			GIT_DIRECTORY,
 		)
 		expect(ports.stop).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY)
-		expect(lines).toStrictEqual([
-			'backlogrun: replacing the idle run with `backlogrun #3724 --only`',
-			...STOPPED_LINES,
-			'backlogrun: started (pid 42, session session-1); log /state/josh-backlogrun-log.log',
-		])
+		expect(lines).toStrictEqual([REPLACING_LINE, ...STOPPED_LINES, STARTED_LINE])
+		expect(ports.show_board).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#3733: a lane a past run left behind — open on disk, nobody in it — kept a watching
+// run from being replaced. The verdict here is the real one, read over a watching run's record.
+describe('backlogrun_cli.run beside a leftover lane', () => {
+	const WATCHING = {
+		read_carry: (): CarryRead => ({ kind: 'carried', carry: CARRY }),
+		events: (): Array<RunEvent> => [{ pos: 1, at: DRAINED_AT, kind: 'drain', text: 'drained' }],
+		is_retrospective_owed: (): boolean => false,
+	}
+
+	function beside(in_use: ReadonlyArray<string>): BacklogrunPorts['replacement'] {
+		const replace_ports = {
+			...WATCHING,
+			pending_invocation: (): undefined => undefined,
+			lanes: async () => ({ working: [...in_use], unread: [] }),
+		}
+
+		return async (invocation, git_directory) =>
+			await backlogrun_replace.decide(invocation, git_directory, replace_ports)
+	}
+
+	it('stops the watching run and starts the typed one when no child is in the lane', async () => {
+		const { ports, lines } = harness(true)
+		const idle = { ...ports, replacement: beside([]) }
+
+		await expect(backlogrun_cli.run(['3724', '--only'], idle)).resolves.toBe(0)
+		expect(ports.stop).toHaveBeenCalledBefore(vi.mocked(ports.start))
+		expect(lines).toStrictEqual([REPLACING_LINE, ...STOPPED_LINES, STARTED_LINE])
+	})
+
+	it('keeps the run and names the lane a child is working in, above the board', async () => {
+		const { ports, lines } = harness(true)
+		const busy = { ...ports, replacement: beside(['3701']) }
+
+		await expect(backlogrun_cli.run(['3724', '--only'], busy)).resolves.toBe(0)
+		expect(ports.stop).not.toHaveBeenCalled()
+		expect(lines[0]).toBe(
+			'backlogrun: not replacing the run — a child is still working in the lane for #3701 (`pnpm josh lane:close <N>` discards a lane)',
+		)
 		expect(ports.show_board).toHaveBeenCalledOnce()
 	})
 })
@@ -98,11 +155,40 @@ describe('backlogrun_cli.run keeping a run', () => {
 		expect(lines).toContain('  pnpm josh run:add 3724')
 		expect(ports.show_board).toHaveBeenCalledOnce()
 	})
+})
 
+// joshuafolkken/kit#3733: a kept run looked the same whichever condition kept it.
+describe('backlogrun_cli.run saying why a run is kept', () => {
+	it.each([
+		'the run still owes its retrospective',
+		'the run is not watching: it is still starting or has a child at work',
+		"the run's record could not be read",
+		'the run is still starting: it has not written its record yet',
+	])('says why it did not replace the run before the board: %s', async (reason) => {
+		const { ports, lines } = harness(true)
+		const kept = {
+			...ports,
+			replacement: async (): Promise<ReplaceVerdict> => ({ kind: 'keep', reason }),
+		}
+
+		await expect(backlogrun_cli.run(['3724'], kept)).resolves.toBe(0)
+		expect(lines[0]).toBe(`backlogrun: not replacing the run — ${reason}`)
+		expect(lines[1]).toBe(BOARD_LINE)
+	})
+
+	it('adds no reason when the board is reopened with the same invocation', async () => {
+		const { ports, lines } = harness(true)
+
+		await expect(backlogrun_cli.run([], ports)).resolves.toBe(0)
+		expect(lines).toStrictEqual([BOARD_LINE])
+	})
+})
+
+describe('backlogrun_cli.run replacing nothing', () => {
 	it('starts nothing and exits 1 when the owner cannot be stopped', async () => {
 		const { ports, lines } = harness(true)
 		const held: StopReport = { ...STOPPED, record: { kind: 'held', owner: 777 } }
-		const kept = { ...ports, is_replaceable: async () => true, stop: async () => held }
+		const kept = { ...ports, replacement: async () => REPLACE, stop: async () => held }
 
 		await expect(backlogrun_cli.run(['3724'], kept)).resolves.toBe(1)
 		expect(lines.join('\n')).toContain('process 777 owns the run')
@@ -114,7 +200,7 @@ describe('backlogrun_cli.run keeping a run', () => {
 		const { ports } = harness(false)
 
 		await expect(backlogrun_cli.run(['3724'], ports)).resolves.toBe(0)
-		expect(ports.is_replaceable).not.toHaveBeenCalled()
+		expect(ports.replacement).not.toHaveBeenCalled()
 		expect(ports.stop).not.toHaveBeenCalled()
 	})
 })
