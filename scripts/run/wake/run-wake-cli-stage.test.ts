@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -45,7 +46,10 @@ function stages(): Array<string> {
 		.map((event) => event.text)
 }
 
+// The agent CLI is not installed where CI runs these, so the preflight that reads its version is answered
+// here rather than spawned.
 beforeEach(() => {
+	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-cli-stage-'))
 })
 
