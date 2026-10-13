@@ -18,6 +18,8 @@ Each route below is the tool's own official installer. Use one route per machine
 
 Do not rely on the Corepack bundled with Node.js to provide pnpm: it may fail to launch pnpm 12, stopping with an error that `bin/pnpm.cjs` cannot be found. If Corepack manages pnpm on your machine, run `corepack disable pnpm` first, then install pnpm with a route below — [Troubleshooting → pnpm does not start](../troubleshooting.md#pnpm-does-not-start--binpnpmcjs-not-found) has the details.
 
+`pnpm` has to be reachable from every place `josh` runs, not only from your terminal: an editor task, an AI agent's shell or a CI step each has its own `PATH`, and one that skips your shell profile may see `node` and not `pnpm`. `josh` runs its checks through `pnpm`, so there they all fail before starting — `josh doctor` reports whether pnpm is reachable, and [Troubleshooting → Every `josh gate` check fails at once](../troubleshooting.md#every-josh-gate-check-fails-at-once-in-00s) shows the fix.
+
 ### Linux and macOS
 
 Install pnpm with its standalone script, which does not need Node.js, then let pnpm install Node.js:

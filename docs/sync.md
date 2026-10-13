@@ -6,7 +6,7 @@ For projects already set up with `josh init`, after upgrading kit: which files `
 pnpm josh sync
 ```
 
-Unlike `josh init` (which skips existing files), `josh sync` is designed for keeping managed files up to date. Most managed files are overwritten; `pnpm-workspace.yaml` is merged (see below).
+Unlike `josh init` (which skips existing files), `josh sync` is designed for keeping managed files up to date. Most managed files are overwritten; `pnpm-workspace.yaml` and `.claude/settings.json` are merged (see below).
 
 > **`josh sync` follows the recorded profile.** When `package.json` records `josh.profile` as `basic` (or the pre-rename `static`), sync writes only the files `josh init` gives a `basic` project — the `basic` templates of `AGENTS.md`, `GEMINI.md` and `.cursorrules` (pointers to `CLAUDE.md` that name no hook or `prompts/` file), of `.prettierignore` (only with HTML/CSS/JS files) and of `pnpm-workspace.yaml`, `.gitattributes` with Git, and, with a GitHub remote, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/pull_request_template.md` and `.github/release.yml`. It keeps `CLAUDE.md` on the `basic` rules import, moves the pre-rename `CLAUDE.static.md` import and `prettier/static` preset path onto the `basic` ones, and writes none of the workflows, `.claude/settings.json`, `.codex/*`, `.coderabbit.yaml`, Sonar or config files below. Every other project — `full` recorded, or no profile recorded — gets the `full` set this page lists ([#2827](https://github.com/joshuafolkken/kit/issues/2827)).
 
@@ -40,6 +40,24 @@ SECURITY.md         tsconfig.sonar.json
 ```
 
 The Codex project files are managed by kit. Sync overwrites both files, and rewrites `.codex/hooks.json` commands to run the consumer's installed kit bundles. If sync is run from a newer kit than the consumer has installed, it skips both hook files (`.claude/settings.json` and `.codex/hooks.json`) and tells the consumer to update the installed package first; `.codex/config.toml` can still be synced.
+
+**`.claude/settings.json` is merged, not overwritten**: sync replaces kit's entries and keeps the ones your project added, so a shared hook or permission can live in the committed file.
+
+| Part of the file                        | What sync does                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hooks`                                 | Replaces kit's hooks with the distributed ones and removes a hook kit has retired. A hook is kit's when its command runs kit's hook launcher (`scripts/hooks/run-hook.sh`) or the installed `dist/josh.js`, or is exactly one of the six `pnpm josh <command>` hooks kit distributed before 2026-09-13 (`audit:provision`, `batch:guard`, `format:edited`, `investigation:guard`, `rule:guard`, `session:lang`). Every other hook stays, after kit's. |
+| `permissions.allow`, `permissions.deny` | Keeps every kit entry present — a kit `deny` you removed comes back — and keeps your own entries after them. An entry kit has withdrawn is removed.                                                                                                                                                                                                                                                                                                   |
+| Other keys kit ships                    | Set to kit's value (`permissions.defaultMode`, for example). Inside an object such as `env` or `enabledPlugins`, kit's entries win and your own entries stay.                                                                                                                                                                                                                                                                                         |
+| Keys kit does not ship                  | Left as they are.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+- A kit `deny` cannot be removed from the project file: the list guards the verification gate. If one is wrong for your project, open an issue on kit.
+- An entry kit stops shipping inside an object (an `env` variable, an `enabledPlugins` entry) cannot be told from one you added, so it stays until you delete it. A withdrawn `allow` / `deny` entry is the exception: kit names it and sync removes it.
+- `josh sync --force` replaces the file with the distributed one, dropping your additions.
+- A file that is not a JSON object is replaced with the distributed one. The merge rewrites the file as plain JSON, so comments in it are not kept.
+- The `echo` reminder hooks kit distributed before the hook launcher cannot be told from your own, so one left over from an older kit stays until you delete it.
+- `.codex/hooks.json` is generated by kit and is still overwritten.
+
+Rationale: `docs/maintainers/sync-rationale.md` → "The merge of .claude/settings.json".
 
 What else a consumer should know about the files above. Each item is the behavior; why it is that way, and the history behind it, is maintainer rationale in `docs/maintainers/sync-rationale.md`.
 

@@ -37,6 +37,20 @@ corepack disable pnpm
 
 Then follow [Install pnpm and Node.js](./setup/prerequisites.md#2-install-pnpm-and-nodejs) and check `pnpm -v` in a new terminal.
 
+## Every `josh gate` check fails at once, in 0.0s
+
+`josh gate` marks every check ✗ after `0.0s`, and each one says `spawn pnpm ENOENT` and that pnpm was not found on the PATH. `josh` runs each check as a `pnpm josh <check>` child process, so none of them could start. Before this message existed, the same failure printed bare ✗ lines and left the log file empty.
+
+`pnpm` works in your terminal and is still missing here when the gate was started from somewhere with a different `PATH` — an editor task, an AI agent's shell, a CI step, or a service. Those shells often skip the profile file (`~/.zshrc`, `~/.bashrc`) that `pnpm setup` or the install script wrote the `PATH` line into, and Node.js can stay reachable while pnpm is not when the two were installed by different routes.
+
+Ask from the same place the gate ran:
+
+```bash
+josh doctor   # the `pnpm:` line prints a version, or `(not on PATH)`
+```
+
+Then make pnpm's directory part of that process's `PATH`: print it with `dirname "$(command -v pnpm)"` in a terminal where pnpm works, and add it to the editor's, agent's or service's environment settings — or start that program from a terminal that already has it. If pnpm is not installed at all, follow [Install pnpm and Node.js](./setup/prerequisites.md#2-install-pnpm-and-nodejs).
+
 ## Wrong Node or pnpm version
 
 kit needs the Node.js and pnpm versions [Install the prerequisites](./setup/prerequisites.md) lists. A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
