@@ -34,6 +34,12 @@ vi.mock('./lane-reap', () => ({
 	lane_reap: { reap_child: vi.fn() },
 }))
 
+// Nothing is spent unless a test says so: a live lane is kept, as it was before spent lanes were swept.
+vi.mock('./lane-spent', () => ({
+	lane_spent: { sort_lanes: vi.fn(async () => ({ spent: [], kept: [] })) },
+}))
+
+const { lane_spent } = await import('./lane-spent')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_reap } = await import('./lane-reap')
 const { git_worktree } = await import('#scripts/git/git-worktree')
@@ -186,10 +192,33 @@ describe('sweeping up after an interruption', () => {
 
 		lanes_are([live, stranded])
 
-		expect(await lane_close.prune_lanes()).toStrictEqual({ closed: [OTHER_ISSUE], failed: [] })
+		expect(await lane_close.prune_lanes()).toStrictEqual({
+			closed: [OTHER_ISSUE],
+			failed: [],
+			kept: [],
+		})
 		expect(existsSync(live.directory)).toBe(true)
 	})
+})
 
+describe('sweeping up what a past run left', () => {
+	// joshuafolkken/kit#3733: a lane a past run left spent is discarded with the stranded ones, and a
+	// live lane that is not spent stays on disk with its reason handed back.
+	it('closes a spent lane and keeps the others, saying why', async () => {
+		const spent = open_on_disk(ISSUE, SEED)
+		const live = open_on_disk(OTHER_ISSUE, SEED + 1)
+		const kept = [{ issue: OTHER_ISSUE, reason: 'it has uncommitted changes' }]
+
+		lanes_are([spent, live])
+		vi.mocked(lane_spent.sort_lanes).mockResolvedValueOnce({ spent: [spent], kept })
+
+		expect(await lane_close.prune_lanes()).toStrictEqual({ closed: [ISSUE], failed: [], kept })
+		expect(existsSync(spent.directory)).toBe(false)
+		expect(existsSync(live.directory)).toBe(true)
+	})
+})
+
+describe('closing every lane', () => {
 	it('closes every open lane on request', async () => {
 		const lanes = [open_on_disk(ISSUE, SEED), open_on_disk(OTHER_ISSUE, SEED + 1)]
 

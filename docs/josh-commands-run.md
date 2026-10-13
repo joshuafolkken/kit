@@ -481,7 +481,7 @@ pnpm josh lane:prune
 
 **Options:**
 
-- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree, then remove unregistered lanes-root leftovers git can fully restore (the rest are kept with a reason).
+- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree and lanes that are spent (no child working in it, its Issue closed, not a lane the running `backlogrun` launched and has not collected with `run:merge`, a clean tree, no commit that is on no remote), then remove unregistered lanes-root leftovers git can fully restore (the rest are kept with a reason). Every other lane is kept and named on standard error with why — a condition that could not be read keeps the lane too — beside the `pnpm josh lane:close <N>` that discards it.
 
 **Settings:**
 

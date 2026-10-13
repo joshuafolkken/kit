@@ -6,7 +6,7 @@ import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { backlogrun_args, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
-import { backlogrun_replace } from './backlogrun-replace'
+import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
 import { backlogrun_stop, type StopReport } from './backlogrun-stop'
 
 // `josh backlogrun` — start a `backlogrun` from the terminal and watch it, or stop it with `--stop`. A
@@ -15,9 +15,10 @@ import { backlogrun_stop, type StopReport } from './backlogrun-stop'
 // background, its output to a log file, and the board takes over the terminal at once. Closing the
 // board closes only the board.
 //
-// **An idle run gives way to a different invocation.** A run watching with no lane open is stopped as
-// `--stop` stops it and the typed one is started in its place (`backlogrun-replace.ts`); the same
-// invocation only shows the board, so looking at a run never rebuilds it.
+// **An idle run gives way to a different invocation.** A run watching with no child at work in a lane
+// is stopped as `--stop` stops it and the typed one is started in its place (`backlogrun-replace.ts`);
+// a run that is kept says why in one line above the board. The same invocation only shows the board,
+// so looking at a run never rebuilds it.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -28,7 +29,7 @@ const USAGE =
 interface BacklogrunPorts {
 	repository_directory: () => Promise<string | undefined>
 	is_running: (git_directory: string) => boolean
-	is_replaceable: (invocation: string, git_directory: string) => Promise<boolean>
+	replacement: (invocation: string, git_directory: string) => Promise<ReplaceVerdict>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
 	stop: (git_directory: string) => Promise<StopReport>
 	show_board: () => Promise<number>
@@ -38,8 +39,8 @@ interface BacklogrunPorts {
 const LIVE_PORTS: BacklogrunPorts = {
 	repository_directory: run_carry.repository_directory,
 	is_running: backlogrun_launch.is_running,
-	is_replaceable: async (invocation, git_directory) =>
-		await backlogrun_replace.is_replaceable(invocation, git_directory),
+	replacement: async (invocation, git_directory) =>
+		await backlogrun_replace.decide(invocation, git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	show_board: async () => await run_board_cli.run([]),
@@ -51,6 +52,12 @@ function running_notes(issues: ReadonlyArray<number>): Array<string> {
 	const guidance = additions.length > 0 ? ['To add the named issues to it:', ...additions] : []
 
 	return ['backlogrun: a run is already going; showing its board.', ...guidance]
+}
+
+// Why a different invocation did not replace the run, ahead of the board. The same invocation is the
+// board reopened, and adds nothing.
+function kept_notes(verdict: ReplaceVerdict): Array<string> {
+	return verdict.kind === 'keep' ? [`backlogrun: not replacing the run — ${verdict.reason}`] : []
 }
 
 function launched_note(result: Extract<StartResult, { kind: 'launched' }>): string {
@@ -108,11 +115,11 @@ async function begin(
 ): Promise<number> {
 	if (!ports.is_running(git_directory)) return await launch(args, git_directory, ports)
 
-	if (await ports.is_replaceable(args.invocation, git_directory)) {
-		return await replace(args, git_directory, ports)
-	}
+	const verdict = await ports.replacement(args.invocation, git_directory)
 
-	for (const note of running_notes(args.issues)) ports.write(note)
+	if (verdict.kind === 'replace') return await replace(args, git_directory, ports)
+
+	for (const note of [...kept_notes(verdict), ...running_notes(args.issues)]) ports.write(note)
 
 	return await ports.show_board()
 }

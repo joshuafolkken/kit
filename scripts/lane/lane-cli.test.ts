@@ -2,6 +2,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CloseKind } from './lane-close'
 import type { LaneInfo } from './lane-registry'
+import type { KeptLane } from './lane-spent'
 
 // joshuafolkken/kit#1490: `lane:open` prints the lane directory on standard output and nothing else,
 // so `dir=$(pnpm josh lane:open 1490)` is what a caller needs and a refusal is an empty capture
@@ -74,6 +75,14 @@ function closes_as(kind: CloseKind, left_behind: ReadonlyArray<string> = []): vo
 		kind,
 		left_behind: [...left_behind],
 		reaped: [],
+	})
+}
+
+function prunes_as(closed: ReadonlyArray<string>, kept: ReadonlyArray<KeptLane> = []): void {
+	vi.mocked(lane_close.prune_lanes).mockResolvedValue({
+		closed: [...closed],
+		failed: [],
+		kept: [...kept],
 	})
 }
 
@@ -157,16 +166,32 @@ describe('lane:close, lane:list and lane:prune', () => {
 	})
 
 	it('prunes the lanes an interruption stranded', async () => {
-		vi.mocked(lane_close.prune_lanes).mockResolvedValue({ closed: [OTHER_ISSUE], failed: [] })
+		prunes_as([OTHER_ISSUE])
 
 		expect(await lane_cli.run(['prune'])).toBe(SUCCESS)
 		expect(printed).toStrictEqual([OTHER_ISSUE])
+	})
+})
+
+describe('lane:prune beyond the stranded lanes', () => {
+	// joshuafolkken/kit#3733: a lane left open is named with why, on standard error — the closed
+	// issues stay alone on standard output.
+	it('says why each kept lane was not discarded, beside the ones it closed', async () => {
+		prunes_as([OTHER_ISSUE], [{ issue: ISSUE, reason: 'it has uncommitted changes' }])
+
+		expect(await lane_cli.run(['prune'])).toBe(SUCCESS)
+		expect(printed).toStrictEqual([OTHER_ISSUE])
+		expect(console.error).toHaveBeenCalledExactlyOnceWith(
+			expect.stringMatching(
+				/^Kept the lane for .*#1490.*: it has uncommitted changes\. `pnpm josh lane:close 1490` discards it\.$/u,
+			),
+		)
 	})
 
 	// joshuafolkken/kit#3370: the lanes root's unregistered leftovers are swept by the same command,
 	// after the closes, so a close that left its directory behind is swept in the same run.
 	it('sweeps the unregistered leftovers after the closes', async () => {
-		vi.mocked(lane_close.prune_lanes).mockResolvedValue({ closed: [], failed: [] })
+		prunes_as([])
 
 		expect(await lane_cli.run(['prune'])).toBe(SUCCESS)
 		expect(lane_stray.sweep_and_report).toHaveBeenCalledAfter(vi.mocked(lane_close.prune_lanes))

@@ -142,6 +142,7 @@ conflict.
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at. Name the lane directory in the stop report and in the Telegram |
 | The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs. **A merge conflict is not this row** — it takes the row above, and it is not counted |
 | **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | A lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open`. Closing frees the seat; parking is right because the cause is one a person fixes. Carry pnpm's reason into the park note |
+| The lane is **spent** — no child working in it, its Issue closed, not one this run launched and has not collected with `run:merge`, a clean tree, no commit that is on no remote | Nothing to do — `pnpm josh lane:prune` closes it | Nothing in it is wanted, so no one has to type the close. Any other lane is kept and `lane:prune` says why on standard error |
 | The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out |
 
 **A lane closed after a push is reopened by `pnpm josh lane:open <N>`**, which attaches to a local
