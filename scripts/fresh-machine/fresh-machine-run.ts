@@ -101,10 +101,10 @@ function stage(scenario: Scenario): Stage {
 	return { root, seed_directory, pack_directory: staged_directory(root, 'pack') }
 }
 
-// Run once everything is staged, so the tarball is covered as well as the seed.
+// Run once everything is staged, so the tarball is covered as well as the seed. The root itself stays
+// as private as `mkdtemp` made it: a bind mount never enters a source through its parent, and on a
+// shared host an open root would let every other user read the tarball for the length of the run.
 function share(root: string): void {
-	chmodSync(root, SHARED_DIRECTORY_MODE)
-
 	const entries = readdirSync(root, { withFileTypes: true, recursive: true })
 
 	for (const entry of entries) {

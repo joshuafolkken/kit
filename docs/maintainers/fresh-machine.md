@@ -183,5 +183,6 @@ repository of an earlier run, wherever that run was started.
   gh repo delete <owner>/<name>
   ```
 
-- **Deleting the logs restarts the numbering**, and the next run of a GitHub scenario then asks for a
-  repository name that is already taken. Delete the repositories together with the logs.
+- **Deleting the logs does not free a repository name.** The number of a GitHub scenario also counts
+  the account's repositories (see "The log"), so the next run takes the number after them. The
+  repositories stay until they are deleted by hand, with or without their logs.

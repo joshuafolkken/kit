@@ -42,6 +42,8 @@ const SYSTEM_PATH = '/usr/bin:/bin'
 const RUN_ARGV = 'run.argv'
 const VIEW_ARGV = 'view.argv'
 const MODES = 'modes.ls'
+const MOUNT_MODES = 'mounts.ls'
+const ROOT_MODES = 'root.ls'
 const PRIVATE_UMASK = 0o077
 const NESTED_SEED_FILE = 'assets/app.js'
 // Of an `ls -l` line: the entry's type, then the three permission characters of everyone else.
@@ -49,6 +51,7 @@ const OTHERS_START = 7
 const OTHERS_END = 10
 const READABLE_FILE = '-r--'
 const READABLE_DIRECTORY = 'dr-x'
+const PRIVATE_DIRECTORY = 'd---'
 // Two seed files, the directory of one of them, and the tarball.
 const STAGED_ENTRIES = 4
 const DOCKER = String.raw`#!/bin/sh
@@ -61,6 +64,8 @@ printf '%s\n' "$@" > "$FAKE_DIR/${RUN_ARGV}"
 for argument in "$@"; do
 	case "$argument" in *:/seed:ro) ls "$${'{'}argument%%:*}" > "$FAKE_DIR/seed.ls" ;; esac
 	case "$argument" in *:ro) ls -lR "$${'{'}argument%%:*}" >> "$FAKE_DIR/${MODES}" ;; esac
+	case "$argument" in *:ro) ls -ld "$${'{'}argument%%:*}" >> "$FAKE_DIR/${MOUNT_MODES}" ;; esac
+	case "$argument" in *:/seed:ro) ls -ld "$${'{'}argument%%/seed:*}" > "$FAKE_DIR/${ROOT_MODES}" ;; esac
 done
 printf '%s\n' '${CONTAINER_LINE}' "token $GH_TOKEN"
 exit "$FAKE_RUN_EXIT"
@@ -127,6 +132,24 @@ function staged_seed(): string {
 		.find((line) => line.endsWith(':/seed:ro'))
 
 	return mount?.split(':', 1)[0] ?? ''
+}
+
+// What everyone else may do with each entry of a recorded `ls -l` listing.
+function others(name: string): Array<string> {
+	return recorded(name)
+		.split('\n')
+		.filter((line) => /^[-d]/u.test(line))
+		.map((line) => `${line.charAt(0)}${line.slice(OTHERS_START, OTHERS_END)}`)
+}
+
+async function run_with_private_umask(run_request: RunRequest): Promise<void> {
+	const previous = process.umask(PRIVATE_UMASK)
+
+	try {
+		await fresh_machine_run.run(run_request)
+	} finally {
+		process.umask(previous)
+	}
 }
 
 function write_checkout(): void {
@@ -201,21 +224,20 @@ describe('fresh_machine_run.run — a host whose umask keeps files private', () 
 	it('stages the seed, its directories and the tarball readable by the container', async () => {
 		const { scenario: flat } = request({})
 		const scenario = { ...flat, files: { ...flat.files, [NESTED_SEED_FILE]: '\n' } }
-		const previous = process.umask(PRIVATE_UMASK)
 
-		try {
-			await fresh_machine_run.run(request({ scenario }))
-		} finally {
-			process.umask(previous)
-		}
+		await run_with_private_umask(request({ scenario }))
 
-		const modes = recorded(MODES)
-			.split('\n')
-			.filter((line) => /^[-d]/u.test(line))
-			.map((line) => `${line.charAt(0)}${line.slice(OTHERS_START, OTHERS_END)}`)
+		const modes = others(MODES)
 
 		expect(modes).toHaveLength(STAGED_ENTRIES)
 		expect(new Set(modes)).toStrictEqual(new Set([READABLE_FILE, READABLE_DIRECTORY]))
+	})
+
+	it('opens the two mounted directories and keeps the directory above them private', async () => {
+		await run_with_private_umask(request({}))
+
+		expect(others(MOUNT_MODES)).toStrictEqual([READABLE_DIRECTORY, READABLE_DIRECTORY])
+		expect(others(ROOT_MODES)).toStrictEqual([PRIVATE_DIRECTORY])
 	})
 })
 
