@@ -362,7 +362,6 @@ async function settle_gate(
 		is_verbose: options.is_verbose ?? false,
 		log_path: options.log_path,
 		elapsed_ms,
-		step_count: String(plan.checks.length),
 	})
 	const is_passed = failed_labels.length === 0
 

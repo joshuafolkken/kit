@@ -2,6 +2,7 @@ import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { status_icons } from '#scripts/lib/status-icons'
+import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
@@ -11,7 +12,7 @@ import { gate_plan } from './gate-plan'
 // about what is printed changes in the move: the four blocks, the log notice and the verdict come out
 // exactly as before, with one addition — the per-failure action lines below.
 
-const { FAIL_ICON, PASS_ICON } = status_icons
+const { FAIL_ICON, PASS_ICON, WARN_ICON } = status_icons
 
 interface GateStep {
 	label: string
@@ -76,16 +77,46 @@ function has_warnings(result: GateStepResult): boolean {
 // other line still withholds.
 const SAFE_CHAIN_BANNER = 'safe-chain is not available'
 
+function checker_lines(result: GateStepResult): ReadonlyArray<string> {
+	return result.output.split('\n').filter((line) => !line.includes(SAFE_CHAIN_BANNER))
+}
+
 function has_checker_warning(result: GateStepResult): boolean {
 	if (!gate_plan.WARNING_CHECKER_LABELS.includes(result.label)) return false
 
-	return result.output
-		.split('\n')
-		.some(
-			(line) =>
-				!line.includes(SAFE_CHAIN_BANNER) &&
-				WARNING_MARKERS.some((marker) => line.includes(marker)),
-		)
+	return checker_lines(result).some((line) =>
+		WARNING_MARKERS.some((marker) => line.includes(marker)),
+	)
+}
+
+// **A check the verdict counts as skipped said nothing but that it checked nothing.** `is_skip_notice`
+// asks whether a check carries a skip notice, which is the right question for printing its body and for
+// withholding the green record; it is the wrong one for a count, twice over. A check can skip half of
+// itself — a `basic` project's `lint` runs Prettier and skips eslint — and calling it skipped would
+// have the verdict say nothing ran on a gate that checked the formatting. And a check can run with
+// nothing of the project's to look at — `exports` in a consumer, `behavior` with no transcript — which
+// is no skip, and still left an empty `basic` project reading `2 ran`. A line that is neither notice is
+// something a tool printed, so the check ran.
+//
+// **pnpm's script header is not something the check printed.** Every check is spawned as
+// `pnpm josh <target>`, and where the project declares a `josh` script — `josh init` writes one — pnpm
+// opens the captured output with `$ josh <target>`. Counted as a line, it made every spawned check one
+// that ran, and `not verified` unreachable in the very project it was written for.
+const IDLE_MARKERS: ReadonlyArray<string> = [test_unit_guard.SKIP_MARKER, NOTHING_TO_CHECK_MARKER]
+const PNPM_SCRIPT_HEADER = '$ '
+
+function is_idle_line(line: string): boolean {
+	return IDLE_MARKERS.some((marker) => line.includes(marker))
+}
+
+function is_tool_line(line: string): boolean {
+	return line.trim() !== '' && !line.startsWith(PNPM_SCRIPT_HEADER)
+}
+
+function is_idle(result: GateStepResult): boolean {
+	const lines = checker_lines(result).filter((line) => is_tool_line(line))
+
+	return lines.length > 0 && lines.every((line) => is_idle_line(line))
 }
 
 function should_print_body(result: GateStepResult, is_verbose: boolean): boolean {
@@ -144,10 +175,7 @@ function format_failure_actions(failed: ReadonlyArray<GateStepResult>): string {
 
 // **A check that started past the core budget is said in the summary, not only in the log**.
 // The wait cap admits a check that waited two minutes whatever the budget says,
-// so a gate that ran over-subscribed would otherwise look exactly like one that fitted. The icon is
-// local rather than in `status-icons.ts` because nothing reads this line back.
-const WARN_ICON = '⚠'
-
+// so a gate that ran over-subscribed would otherwise look exactly like one that fitted.
 function format_budget_notes(results: ReadonlyArray<GateStepResult>): string {
 	const lines = results.flatMap((result) =>
 		result.budget_note === undefined
@@ -156,6 +184,24 @@ function format_budget_notes(results: ReadonlyArray<GateStepResult>): string {
 	)
 
 	return lines.length === 0 ? '' : `${lines.join('\n')}\n`
+}
+
+// **The verdict counts what ran apart from what was skipped, and a gate that ran nothing does not say
+// `passed`.** It printed the planned number of checks whatever happened to them, so a `basic` project
+// whose every check skipped read `passed (6 checks)` — the same last line as a gate that ran them all,
+// and the skip this module keeps visible in the bodies was invisible in the one line a `tail` keeps.
+//
+// **A gate with no skip keeps the line it always printed.** A check with nothing to check is counted
+// apart only beside a skip: `exports` says so in every consumer, and counting it alone would reword the
+// verdict of every gate that skipped nothing.
+function format_green_verdict(results: ReadonlyArray<GateStepResult>, total: string): string {
+	const has_skip = results.some((result) => is_skip_notice(result))
+	const skipped = has_skip ? results.filter((result) => is_idle(result)).length : 0
+	const ran = results.length - skipped
+
+	if (ran === 0) return josh_verdict.format_gate_unverified(skipped, total)
+
+	return josh_verdict.format_gate_passed({ ran, skipped }, total)
 }
 
 // The total is wall-clock for the whole command, not the sum of the four — they run concurrently,
@@ -172,7 +218,7 @@ function print_gate_summary(
 	const total = format_seconds(report.elapsed_ms)
 	const verdict =
 		failed.length === 0
-			? josh_verdict.format_gate_passed(report.step_count, total)
+			? format_green_verdict(results, total)
 			: josh_verdict.format_gate_failed(failed.map((result) => result.label).join(', '), total)
 	const notes = format_budget_notes(results)
 
@@ -185,7 +231,6 @@ interface GateReport {
 	is_verbose: boolean
 	log_path: string | undefined
 	elapsed_ms: number
-	step_count: string
 }
 
 // Everything a finished run says, in the order a reader meets it: the four blocks, then the log the

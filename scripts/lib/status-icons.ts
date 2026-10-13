@@ -15,10 +15,14 @@
 // `✔ verification gate passed` line to tell a green gate from the third-party warning bodies it
 // forwards, so the pass icon is under the same rule as the failure icon: declared
 // once, imported by the printer and the reader alike.
+//
+// **The warning icon is read as well.** It opens the gate's `not verified` verdict — a gate that ran no
+// check — which `josh-verdict.ts` reads back, so it is declared here for the reason the other two are.
 
 const FAIL_ICON = '✗'
 const PASS_ICON = '✔'
+const WARN_ICON = '⚠'
 
-const status_icons = { FAIL_ICON, PASS_ICON }
+const status_icons = { FAIL_ICON, PASS_ICON, WARN_ICON }
 
 export { status_icons }

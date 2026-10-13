@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { project_checks } from '#scripts/gate/project-checks'
+import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import type { NamespaceMember } from './namespace-members'
 
 const CHECK = 'exports'
@@ -13,7 +14,7 @@ const FAIL_EXIT_CODE = 1
 // **Not a skip notice**. `SKIP_MARKER` means "a check passed without running",
 // and the gate withholds its green record on it — so a consumer, where this notice prints on every
 // run, never got a green record. Out of scope by design is not unverified, so the marker stays out.
-const CONSUMER_NOTICE = `josh ${CHECK}: checks only the kit repository itself — nothing to check in a consumer project.`
+const CONSUMER_NOTICE = `josh ${CHECK}: checks only the kit repository itself — ${NOTHING_TO_CHECK_MARKER} in a consumer project.`
 
 function format_member(root: string, member: NamespaceMember): string {
 	return `${path.relative(root, member.file)}:${String(member.line)}  ${member.namespace}.${member.member}`

@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { status_icons } from '#scripts/lib/status-icons'
+import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import { behavior_assertion, type Violation } from './behavior-assertion'
 import { behavior_rules } from './behavior-rules'
 
@@ -32,8 +33,12 @@ function current_session(cwd: string = process.cwd()): SessionFile | undefined {
 // **A run with no transcript passes, and passes without the skip marker.** The gate reads `—
 // skipping` to withhold its green record; a behavior check that found no transcript — a CI runner has
 // none — has nothing to say about the tree and must not withhold the record the other checks earned.
+// It carries the nothing-to-check marker instead, so the gate's verdict does not count it as a check
+// that ran.
 function report_no_transcript(): number {
-	console.info(`${LABEL}: no recorded transcript to check ${status_icons.PASS_ICON}`)
+	console.info(
+		`${LABEL}: no recorded transcript — ${NOTHING_TO_CHECK_MARKER} ${status_icons.PASS_ICON}`,
+	)
 
 	return PASS_EXIT_CODE
 }
