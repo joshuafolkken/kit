@@ -84,6 +84,8 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 		'**An unmeasurable session warrants the cut**',
 		'**It is silent between a cut and its resume**',
 		'the implementation resume clears the record',
+		// joshuafolkken/kit#3734: a lane child sent the ⏸️ confirmation for a cut that resumes itself.
+		'**A cut that relaunches its successor owes no Telegram**',
 	])('states the boundary %j', (marker) => {
 		expect(content).toContain(marker)
 	})
