@@ -9,7 +9,8 @@ import { hook_command_rewrite } from './hook-command-rewrite'
 import { hook_launch } from './hook-launch'
 import { transform_copied_content } from './init-copy-content'
 
-const { apply_hook_command_rewrite_for_destination, rewrite_hook_commands } = hook_command_rewrite
+const { apply_hook_command_rewrite_for_destination, is_kit_hook_command, rewrite_hook_commands } =
+	hook_command_rewrite
 const SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
 const CODEX_HOOKS_DESTINATION = path.join('.codex', 'hooks.json')
 const CODEX_HOOKS_SOURCE = fileURLToPath(new URL('../../.codex/hooks.json', import.meta.url))
@@ -24,12 +25,8 @@ const FOREIGN_DIRECTORY_PREFIX = 'kit-hook-foreign-'
 const CONSUMER_JOSH_COMMAND = 'node ./node_modules/@joshuafolkken/kit/dist/josh.js'
 const ROOT_COMMAND = 'git rev-parse --show-toplevel'
 
-function consumer_hook_commands(): ReadonlyArray<string> {
-	const transformed = transform_copied_content(
-		SETTINGS_DESTINATION,
-		claude_settings_fixture.read_settings_text(),
-	)
-	const { hooks } = JSON.parse(transformed) as ReturnType<
+function hook_commands(settings_text: string): ReadonlyArray<string> {
+	const { hooks } = JSON.parse(settings_text) as ReturnType<
 		typeof claude_settings_fixture.load_settings
 	>
 	const events = [
@@ -43,6 +40,16 @@ function consumer_hook_commands(): ReadonlyArray<string> {
 	return events
 		.flatMap((matchers) => matchers ?? [])
 		.flatMap((entry) => entry.hooks.map((handler) => handler.command))
+}
+
+function consumer_hook_commands(): ReadonlyArray<string> {
+	return hook_commands(
+		transform_copied_content(SETTINGS_DESTINATION, claude_settings_fixture.read_settings_text()),
+	)
+}
+
+function source_hook_commands(): ReadonlyArray<string> {
+	return hook_commands(claude_settings_fixture.read_settings_text())
 }
 
 describe('rewrite_hook_commands', () => {
@@ -248,6 +255,42 @@ describe('the distributed settings.json a consumer receives', () => {
 		for (const command of bundle_hooks) {
 			expect(command).toContain(`${CONSUMER_LAUNCHER} `)
 		}
+	})
+})
+
+describe('is_kit_hook_command', () => {
+	it('recognizes every hook kit distributes, as kit names it', () => {
+		expect(source_hook_commands().length).toBeGreaterThan(0)
+		expect(source_hook_commands().filter((command) => !is_kit_hook_command(command))).toEqual([])
+	})
+
+	it('recognizes every hook kit distributes, as a consumer receives it', () => {
+		expect(consumer_hook_commands().filter((command) => !is_kit_hook_command(command))).toEqual([])
+	})
+
+	it('recognizes a hook an earlier release ran through the installed dispatcher', () => {
+		expect(is_kit_hook_command(`${CONSUMER_JOSH_COMMAND} batch:guard`)).toBe(true)
+	})
+
+	// Until joshuafolkken/kit#1930 a consumer received `pnpm josh <command>` as it stands in kit's file.
+	it.each([
+		'pnpm josh audit:provision',
+		'pnpm josh batch:guard',
+		'pnpm josh format:edited',
+		'pnpm josh investigation:guard',
+		'pnpm josh rule:guard',
+		'pnpm josh session:lang',
+	])('recognizes a hook kit distributed before any rewrite: %s', (command) => {
+		expect(is_kit_hook_command(command)).toBe(true)
+	})
+
+	it.each([
+		'sh scripts/notify-team.sh',
+		'pnpm josh lint',
+		'pnpm josh format:edited && sh scripts/notify-team.sh',
+		"echo 'run-hook.sh'",
+	])("leaves a project's own command alone: %s", (command) => {
+		expect(is_kit_hook_command(command)).toBe(false)
 	})
 })
 

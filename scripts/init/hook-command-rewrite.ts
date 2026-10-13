@@ -25,6 +25,30 @@ const CONSUMER_PACKAGE_MANIFEST = `${claude_plugin_config.MARKETPLACE_PATH}/pack
 const MISSING_INSTALL_NOTICE = 'kit hooks inactive: run pnpm install, then reread CLAUDE.md'
 const MISSING_INSTALL_GUARD = `if [ ! -f ${CONSUMER_PACKAGE_MANIFEST} ]; then echo '${MISSING_INSTALL_NOTICE}' >&2; exit 0; fi; `
 const CODEX_HOOKS_DESTINATION = '.codex/hooks.json'
+// Every shape a hook command kit wrote can carry: the launcher as kit's own file names it, the
+// launcher rebased onto the installed package, and the installed dispatcher the releases from
+// 2026-09-13 (joshuafolkken/kit#1930) to the launcher rebased `pnpm josh` onto. The settings merge
+// tells kit's hooks from a project's own by these and the list below, so the shapes stay beside the
+// rewrite that produces them.
+const KIT_COMMAND_MARKERS: ReadonlyArray<string> = [
+	RUN_HOOK_INVOCATION,
+	CONSUMER_RUN_HOOK_INVOCATION,
+	BUNDLE_INVOCATION,
+]
+// Before joshuafolkken/kit#1930 nothing was rebased: a consumer received these six as the whole hook
+// command. A plain `pnpm josh <command>` is also how a project writes a hook of its own, so only the
+// exact commands count — and kit still delivers each of them through the launcher, so one left in
+// place would run its guard or formatter a second time. The list is history and never grows.
+const PLAIN_KIT_COMMANDS: ReadonlySet<string> = new Set(
+	[
+		'audit:provision',
+		'batch:guard',
+		'format:edited',
+		'investigation:guard',
+		'rule:guard',
+		'session:lang',
+	].map((command) => `${PNPM_JOSH_PREFIX}${command}`),
+)
 // The values below are matched inside raw JSON text, so the root prefix is taken in its escaped form.
 const PROJECT_ROOT_PREFIX = JSON.stringify(hook_launch.PROJECT_ROOT_PREFIX).slice(1, -1)
 // Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
@@ -80,8 +104,15 @@ function apply_hook_command_rewrite_for_destination(
 	return content
 }
 
+function is_kit_hook_command(command: string): boolean {
+	if (PLAIN_KIT_COMMANDS.has(command)) return true
+
+	return KIT_COMMAND_MARKERS.some((marker) => command.includes(marker))
+}
+
 const hook_command_rewrite = {
 	apply_hook_command_rewrite_for_destination,
+	is_kit_hook_command,
 	rewrite_hook_commands,
 }
 
