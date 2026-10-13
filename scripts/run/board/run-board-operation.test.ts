@@ -102,6 +102,23 @@ describe('run_board_operation.latest_of — a variable whose value is quoted', (
 
 		expect(operation?.target).toBe('pnpm josh notify')
 	})
+
+	it.each([
+		['holds an escaped quote', String.raw`PAYLOAD="{\"a\": 1}" node x.js`, 'node x.js'],
+		['runs over a line break', 'BODY="line one\nline two" gh issue comment', 'gh issue comment'],
+		['is a command of its own', 'SHA=$(git rev-parse HEAD) && echo $SHA', 'echo $SHA'],
+		['is a command in backticks', 'SHA=`git rev-parse HEAD`; git show $SHA', 'git show $SHA'],
+		['stands on a line of its own', 'TOKEN=ghp_secret\ngh api user', 'gh api user'],
+	])('leaves out a value that %s', (_name, command, target) => {
+		expect(latest_of(bash(command))?.target).toBe(target)
+	})
+
+	it.each([
+		['a quote that never closes', 'MSG="hello world pnpm josh gate'],
+		['a variable and no command', 'TOKEN=ghp_secret'],
+	])('draws the tool alone for %s', (_name, command) => {
+		expect(latest_of(bash(command))?.target).toBeUndefined()
+	})
 })
 
 describe('run_board_operation.latest_of — which call is the newest', () => {

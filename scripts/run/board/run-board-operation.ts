@@ -23,9 +23,16 @@ const TOOL_USE = 'tool_use'
 // A line that holds no call is never parsed: one can be tens of thousands of characters long.
 const TOOL_USE_MARK = `"${TOOL_USE}"`
 const NEWLINE = '\n'
-// One variable set ahead of the command: it carries a value, never what the command does. A quoted
-// value is one value, the spaces inside its quotes included.
-const ASSIGNMENT = /^\w+=(?:"[^"]*"|'[^']*'|[^\s"'])*\s+/u
+// One variable set ahead of the command, with what parts it from the command: it carries a value,
+// never what the command does. The value is read as the shell reads one word — a quoted stretch with
+// its escapes and line breaks, a command run for its output, an escaped character, a plain one.
+const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/su
+const SUBSTITUTED = /\$\((?:[^()]|\([^()]*\))*\)|`[^`]*`/su
+const PLAIN = /\\.|[^\s"'`;&|()\\]/su
+const VALUE = `(?:${QUOTED.source}|${SUBSTITUTED.source}|${PLAIN.source})*`
+const ASSIGNMENT = new RegExp(String.raw`^\w+=${VALUE}(?:\s*(?:&&|;)\s*|\s+|$)`, 'su')
+// A variable still at the head once every readable one is gone: its value could not be read as one.
+const UNREAD_ASSIGNMENT = /^\w+=/u
 const SPACES = /\s+/gu
 // The printable ASCII a target begins with: what follows may be the session's own language.
 const ASCII_HEAD = /^[ -~]*/u
@@ -62,18 +69,20 @@ function cut(text: string): string {
 	return text.length > TARGET_LIMIT ? `${text.slice(0, TARGET_LIMIT)}${CUT_MARK}` : text
 }
 
-// The line without every variable set ahead of its command, one at a time.
-function without_assignments(line: string): string {
-	const rest = line.replace(ASSIGNMENT, '')
+// The command without every variable set ahead of it, one at a time.
+function without_assignments(command: string): string {
+	const rest = command.replace(ASSIGNMENT, '')
 
-	return rest === line ? line : without_assignments(rest)
+	return rest === command ? command : without_assignments(rest)
 }
 
-// The command's first line without the variables set ahead of it, cut to the limit.
+// The first line of what the command runs, cut to the limit. A command whose variable cannot be read
+// to its end is drawn as nothing: a part of the value would stand where the command should.
 function command_target(command: string): string {
-	const [first = ''] = command.trim().split(NEWLINE)
+	const [first = ''] = without_assignments(command.trim()).split(NEWLINE)
+	if (UNREAD_ASSIGNMENT.test(first)) return ''
 
-	return cut(ascii_head(without_assignments(first).replaceAll(SPACES, ' ')))
+	return cut(ascii_head(first.replaceAll(SPACES, ' ')))
 }
 
 // The path from `root` down; a file outside it is drawn by its name alone, never by where it is.
