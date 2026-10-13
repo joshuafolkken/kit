@@ -78,14 +78,17 @@ interface SeparateContext {
 	repo: string
 }
 
-// The path each running lane declares, mapped to the issue that holds it.
-function running_claims(declared: Declared, read: BusyRead): Map<string, number> {
-	const holders = read.kind === 'busy' ? read.issues.map((issue) => issue.number) : []
+// The path each of `holders` declares, mapped to the issue that holds it.
+function claims_of(declared: Declared, holders: ReadonlyArray<number>): Map<string, number> {
 	const pairs = holders.flatMap((number) =>
 		[...(declared.get(number) ?? [])].map((path): [string, number] => [path, number]),
 	)
 
 	return new Map(pairs)
+}
+
+function running_claims(declared: Declared, read: BusyRead): Map<string, number> {
+	return claims_of(declared, read.kind === 'busy' ? read.issues.map((issue) => issue.number) : [])
 }
 
 function paths_of(child: EpicChild, declared: Declared, repo: string): ReadonlySet<string> {
@@ -111,6 +114,20 @@ function clash_of(
 	)
 
 	return clashes[0]
+}
+
+// The running issues a candidate is weighed against, and the repository they are in.
+interface Holding {
+	holders: ReadonlyArray<number>
+	repo: string
+}
+
+// The path `child` declares that one of the running `holders` already declares — the clash `separate`
+// withholds a candidate on, for a reader that names the running issues itself (`run:board`).
+function running_clash(child: EpicChild, declared: Declared, holding: Holding): Clash | undefined {
+	const claims = claims_of(declared, holding.holders)
+
+	return clash_of(claims, paths_of(child, declared, holding.repo))
 }
 
 function clash_note(child: EpicChild, clash: Clash): string {
@@ -172,7 +189,7 @@ function separate(
 	return { offered: walk.offered, withheld, ...(notice !== undefined && { notice }) }
 }
 
-const backlog_overlap = { declared_of, declared_paths, separate }
+const backlog_overlap = { declared_of, declared_paths, running_clash, separate }
 
 export { backlog_overlap }
-export type { Declared }
+export type { Clash, Declared }

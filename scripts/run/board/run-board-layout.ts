@@ -1,3 +1,4 @@
+import type { Declared } from '#scripts/backlog/backlog-overlap'
 import { backlog_plan, type PlanContext } from '#scripts/backlog/backlog-plan'
 import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
@@ -25,7 +26,21 @@ interface BoardPlan {
 	// Each issue's label names as the open listing read them, so a running row is drawn as its labels
 	// say it stopped.
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
+	// The paths each issue's body declares (`Plan.scope.declared`), which a waiting row is checked
+	// against a running one by; a plan read without them checks none.
+	declared?: Declared | undefined
 }
+
+// Why a waiting row waits, or the stage its lane's launch is at, in the board's own words.
+interface RowReason {
+	text: string
+	// When the row entered a stage, where the reason is one — how long it has stood there is counted
+	// from it.
+	since_ms?: number | undefined
+}
+
+// What a waiting child's row says after its blockers; `undefined` says nothing.
+type ReasonOf = (child: EpicChild) => RowReason | undefined
 
 interface BoardRow {
 	number: number
@@ -36,6 +51,8 @@ interface BoardRow {
 	status: ItemStatus | undefined
 	// The standing blockers this row still waits on, as the plan names them.
 	waits: ReadonlyArray<string>
+	// Why the row waits beyond its blockers (`run-board-reason.ts`); a row the run has touched has none.
+	reason?: RowReason | undefined
 }
 
 type WaveEntry =
@@ -60,6 +77,11 @@ interface Overlay {
 	statuses: ReadonlyMap<number, ItemStatus>
 }
 
+// The overlay a layout is drawn from: the plan under the statuses, and what each waiting row says.
+interface Drawn extends Overlay {
+	reason_of: ReasonOf | undefined
+}
+
 const SETTLED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'parked', 'done'])
 
 function is_settled(state: ItemState): boolean {
@@ -80,13 +102,20 @@ function reference_of(edge: IssueReference, repo: string): string {
 	return edge.repo === repo ? String(edge.number) : issue_cite.plain(edge.number, edge.repo)
 }
 
-function plan_row(child: EpicChild, state: ItemState, overlay: Overlay): BoardRow {
+// Whether a blocker the plan names still stands for `child` — the wait its row draws as 🔗.
+function is_blocked(child: EpicChild, overlay: Overlay): boolean {
+	return child.blocked_by.some((edge) => is_waiting_on(edge, overlay))
+}
+
+function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow {
 	const { context } = overlay.plan
 	const waits = child.blocked_by
 		.filter((edge) => is_waiting_on(edge, overlay))
 		.map((edge) => reference_of(edge, context.repo))
+	const reason = state === 'waiting' ? overlay.reason_of?.(child) : undefined
 
 	return {
+		...(reason !== undefined && { reason }),
 		number: child.number,
 		title: context.titles.get(child.number),
 		kind: run_board_kind.kind_of(child.labels),
@@ -119,7 +148,7 @@ function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): 
 function place_in_epic(
 	entries: Array<WaveEntry>,
 	epic: number,
-	overlay: Overlay,
+	overlay: Drawn,
 	row: BoardRow,
 ): void {
 	const group = entries.find((entry) => entry.kind === 'epic' && entry.epic === epic)
@@ -144,7 +173,7 @@ function wave_state(child: EpicChild): ItemState {
 
 // One wave, its rows in the plan's order, an epic's children gathered under the epic where the first
 // of them falls.
-function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Overlay): Array<WaveEntry> {
+function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Drawn): Array<WaveEntry> {
 	const entries: Array<WaveEntry> = []
 
 	for (const child of wave) {
@@ -158,7 +187,7 @@ function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Overlay): Array<W
 	return entries
 }
 
-function unreached_rows(overlay: Overlay, is_people: boolean): Array<BoardRow> {
+function unreached_rows(overlay: Drawn, is_people: boolean): Array<BoardRow> {
 	const state: ItemState = is_people ? 'human' : 'waiting'
 
 	return overlay.plan.waves.unreached
@@ -166,8 +195,25 @@ function unreached_rows(overlay: Overlay, is_people: boolean): Array<BoardRow> {
 		.map((child) => plan_row(child, state, overlay))
 }
 
-function layout_of(plan: BoardPlan, statuses: ReadonlyMap<number, ItemStatus>): BoardLayout {
-	const overlay = { plan, statuses }
+// Every issue the plan holds, wave or unreached.
+function children_of(plan: BoardPlan): Array<EpicChild> {
+	return [...plan.waves.waves.flat(), ...plan.waves.unreached]
+}
+
+// The children whose rows wait on the run rather than on a person: the run has not touched them, and
+// no decision is asked of anyone.
+function waiting_children(overlay: Overlay): Array<EpicChild> {
+	return children_of(overlay.plan).filter(
+		(child) => is_untouched(child, overlay) && !is_human(child),
+	)
+}
+
+function layout_of(
+	plan: BoardPlan,
+	statuses: ReadonlyMap<number, ItemStatus>,
+	reason_of?: ReasonOf,
+): BoardLayout {
+	const overlay = { plan, statuses, reason_of }
 	const waves = plan.waves.waves.map((wave) =>
 		wave_entries(
 			wave.filter((child) => is_untouched(child, overlay)),
@@ -195,9 +241,9 @@ function local_layout_of(statuses: ReadonlyMap<number, ItemStatus>): BoardLayout
 	}
 }
 
-// Every issue the plan holds, wave or unreached — the run's scope a lane is checked against.
+// The run's scope a lane is checked against.
 function numbers_of(plan: BoardPlan): ReadonlySet<number> {
-	return new Set([...plan.waves.waves.flat(), ...plan.waves.unreached].map((child) => child.number))
+	return new Set(children_of(plan).map((child) => child.number))
 }
 
 // Every row the layout draws, an epic's children among them — what the header counts and the legend reads.
@@ -211,12 +257,14 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 
 const run_board_layout = {
 	EMPTY_LAYOUT,
+	is_blocked,
 	is_settled,
 	layout_of,
 	local_layout_of,
 	numbers_of,
 	rows_of,
+	waiting_children,
 }
 
 export { run_board_layout }
-export type { BoardLayout, BoardPlan, BoardRow, WaveEntry }
+export type { BoardLayout, BoardPlan, BoardRow, Overlay, ReasonOf, RowReason, WaveEntry }
