@@ -26,6 +26,12 @@ const PUBLISH_JOBS = ['publish-github', 'publish-npm', 'create-release']
 const INSTALL_COMMAND = 'pnpm install --frozen-lockfile --ignore-scripts'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const WHEN_INSTALLING = "inputs.install == 'true'"
+const COREPACK_SYMPTOM_HEADING = 'pnpm does not start — `bin/pnpm.cjs` not found'
+const COREPACK_SYMPTOM_ANCHOR = 'pnpm-does-not-start--binpnpmcjs-not-found'
+const DISABLE_COREPACK = 'corepack disable pnpm'
+const COREPACK_ENABLE = 'corepack enable'
+const COREPACK_PREPARE = 'corepack prepare'
+const TROUBLESHOOTING_MD = 'docs/troubleshooting.md'
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
@@ -129,7 +135,7 @@ describe('the setup-pnpm composite action', () => {
 it.each([ci_yml_fixture.SETUP_PNPM_ACTION, ci_yml_fixture.TEMPLATE_CI_YML])(
 	'does not invoke Corepack in %s',
 	(relative_path) => {
-		expect(ci_yml_fixture.read_workflow(relative_path)).not.toContain('corepack enable')
+		expect(ci_yml_fixture.read_workflow(relative_path)).not.toContain(COREPACK_ENABLE)
 	},
 )
 
@@ -230,9 +236,32 @@ describe('Node compatibility job', () => {
 describe('pnpm update documentation', () => {
 	it('describes self-update without a Corepack installation instruction', () => {
 		const commands = readFileSync(package_path('docs/josh-commands.md'), 'utf8')
-		const troubleshooting = readFileSync(package_path('docs/troubleshooting.md'), 'utf8')
+		const troubleshooting = readFileSync(package_path(TROUBLESHOOTING_MD), 'utf8')
 
 		expect(commands).toContain('pnpm self-update')
-		expect(troubleshooting).not.toContain('corepack prepare')
+		expect(troubleshooting).not.toContain(COREPACK_PREPARE)
+	})
+})
+
+// joshuafolkken/kit#3725: pnpm that Corepack cannot launch never reaches `josh`, so only the docs
+// can say it — by the symptom in troubleshooting, and ahead of the install in the prerequisites.
+describe('Corepack launch failure documentation', () => {
+	const troubleshooting = readFileSync(package_path(TROUBLESHOOTING_MD), UTF8)
+	const prerequisites = readFileSync(package_path('docs/setup/prerequisites.md'), UTF8)
+
+	it('is found in troubleshooting by its symptom, with the way out', () => {
+		expect(troubleshooting).toContain(`## ${COREPACK_SYMPTOM_HEADING}`)
+		expect(troubleshooting).toContain(DISABLE_COREPACK)
+	})
+
+	it('is warned about in the prerequisites, linking to the troubleshooting entry', () => {
+		expect(prerequisites).toContain('Corepack bundled with Node.js')
+		expect(prerequisites).toContain(DISABLE_COREPACK)
+		expect(prerequisites).toContain(`../troubleshooting.md#${COREPACK_SYMPTOM_ANCHOR}`)
+	})
+
+	it.each([COREPACK_ENABLE, COREPACK_PREPARE])('never instructs %s', (command) => {
+		expect(troubleshooting).not.toContain(command)
+		expect(prerequisites).not.toContain(command)
 	})
 })
