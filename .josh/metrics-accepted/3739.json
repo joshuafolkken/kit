@@ -1,0 +1,8 @@
+{
+	"reason": "#3739 adds the named-issue state-read retry (backlog-drive-unread.ts) and its loop-table wording; the growth is the new behavior itself",
+	"date": "2026-10-13",
+	"growth": {
+		"scripts.code_lines": 38,
+		"ai_cost.on_demand_bytes": 67
+	}
+}

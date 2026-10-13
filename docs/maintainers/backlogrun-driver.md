@@ -110,6 +110,11 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   interval of the idle watch, never the rest of it. Two records are not re-read: one `run:carry --end`
   ended stops at once with `The carry record is no longer active.`, and one another owner holds
   stops with `The driver no longer owns the carry record.`
+- **A named issue whose state does not read is read again before a session hears of it**
+  (joshuafolkken/kit#3739). The failure is a `wait`, so the next offer — 60 seconds on — reads it again
+  while the children in flight are still collected. The third consecutive failure (`backlog:offer`'s
+  retry limit) hands back `offer`, with the issue and why the read failed on stderr; a number that
+  resolves to nothing is handed back at once (`scripts/backlog/backlog-drive-unread.ts`).
 - **A driver failure the supervisor cannot recover from ends the watch, and says so.** The driver
   exits non-zero once its re-reads run out, and the supervisor — whose own read of the record then
   fails too — stops as `failed`: it removes its wake record, sends the warning, and — when the run is
