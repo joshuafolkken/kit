@@ -809,9 +809,9 @@ Report whether ready backlog work is sitting undispatched with a free lane and n
 
 > **Audience:** developer · **Side effects:** files, network, processes
 
-`[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop`
+`[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop`
 
-Start a backlogrun in the background and show its board; with one already running, only show the board; --stop stops it
+Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it
 
 ---
 
