@@ -5,6 +5,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now } from './run-board-now'
+import type { SessionOperations } from './run-board-operation-read'
 import { run_board_render_slot } from './run-board-render-slot'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
@@ -46,6 +47,8 @@ interface BoardHeader {
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
 	activity: RunActivity
+	// The newest operation of each session of the run, `undefined` where none was read.
+	operations?: SessionOperations | undefined
 	layout: BoardLayout | undefined
 	// The total the board first saw, so arrivals since then read as `(+N)`.
 	baseline_total: number | undefined
@@ -261,12 +264,21 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	return parts.filter((part) => part !== undefined).join(GAP)
 }
 
+// The children drawn as running: only their operations are the run's newest.
+function running_issues(layout: BoardLayout): ReadonlySet<number> {
+	const running = layout.active.filter((row) => row.state === 'running')
+
+	return new Set(running.map((row) => row.number))
+}
+
 // What the run is doing now, in words (`run-board-now.ts`).
 function now_part(counts: BoardCounts, header: BoardHeader): string {
 	return run_board_now.line_of({
 		now_ms: header.now_ms,
 		ended_ms: header.ended_ms,
 		activity: header.activity,
+		operations: header.operations,
+		children: running_issues(layout_of(header)),
 		running: counts.running,
 		waiting: is_plan_read(header) ? counts.remaining : undefined,
 		people: layout_of(header).people.length,

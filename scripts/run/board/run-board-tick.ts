@@ -135,6 +135,7 @@ function header_of(
 		started_ms: local.started_ms,
 		ended_ms: local.ended_ms,
 		activity: activity_here(local),
+		operations: local.operations,
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,

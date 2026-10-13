@@ -63,6 +63,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['lane/lane-dispatch.ts', 2],
 	['lane/lane-phase.ts', 1],
 	['run/board/run-board-layout.ts', 1],
+	// The run board's frame, which a person watches in a terminal or on Telegram; `run:board --chat`
+	// answers with it inside one code block, where nothing is linked.
+	['run/board/run-board-now.ts', 1],
 	['run/cut/run-cut-cli.ts', 3],
 	['run/entry/run-entry-stop.ts', 3],
 	['run/event/run-event-filed.ts', 1],
