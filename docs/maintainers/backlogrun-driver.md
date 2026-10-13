@@ -144,6 +144,16 @@ hands `epic #N` back with the original invocation only on `epic:next`'s `stop`, 
 waits on a person, or after `backlog:offer`'s retry limit of consecutive `epic:next` failures (a broken
 graph).
 
+**`triage` is handed back rather than waited on** (joshuafolkken/kit#3731), when a child carries neither
+`run:solo` nor `run:lane`. `epic:next --lanes` answers it with exit 0 on every pass, so it never reaches
+the failure limit, and the named path gives `backlog:budget` a fixed `candidates` answer
+(`scripts/backlog/backlog-drive-named-offer.ts`), so the idle bound never ends it either — a wait there
+starts nothing and tells nobody. **It is handed back as `triage`, the pool path's word, never as
+`epic #N`**: the `epic #N` procedure runs the epic's children and asks the single-child `epic:next`,
+which is not triage-gated, so a session woken on it would launch the untriaged child. On `triage` the
+session labels each child standard error names and cuts (`backlogrun-steps.md` → "The loop"), and the
+next pass offers them; a child already running is left running.
+
 ## Waiting while something is in flight
 
 **The numbers in `backlogrun-progress.md` → "Waiting, and never waiting forever" are floors between

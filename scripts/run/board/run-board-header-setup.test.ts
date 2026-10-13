@@ -102,6 +102,9 @@ describe('run_board_header.header_lines before the first child launches', () => 
 		const opening = planned_title(ONE_PLANNED, preparing(OPENING))
 
 		expect(handing_off).toMatch(/ {2}handing off · 1 planned$/u)
+		expect(planned_title(ONE_PLANNED, preparing(STAGE.JUDGING))).toMatch(
+			/ {2}waiting on judgment · 1 planned$/u,
+		)
 		expect(opening).toMatch(/^⠋ backlogrun .* opening lane #278 · 1 planned$/u)
 	})
 

@@ -41,6 +41,15 @@ describe('run_board_setup.read before the first launch', () => {
 		})
 	})
 
+	// joshuafolkken/kit#3731: the hand-back replaces the hand-off it follows, and the next one replaces it.
+	it('reads a run handed to a session as waiting on judgment until the next hand-off', () => {
+		const handed_back = stream(setup(STAGE.HANDING_OFF), setup(STAGE.JUDGING))
+		const resumed = stream(setup(STAGE.HANDING_OFF), setup(STAGE.JUDGING), setup(STAGE.HANDING_OFF))
+
+		expect(run_board_setup.read(handed_back).setup).toBe(STAGE.JUDGING)
+		expect(run_board_setup.read(resumed).setup).toBe(STAGE.HANDING_OFF)
+	})
+
 	it('keeps the stage past a position that is not a launch', () => {
 		const events = stream(setup(STAGE.PLANNING), [KIND.PLAN, 'planned #278'])
 

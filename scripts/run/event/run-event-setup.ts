@@ -15,6 +15,9 @@ const STAGE = {
 	PLANNING: 'planning',
 	// The supervisor took the run over from the parent and is asking for the first offer.
 	HANDING_OFF: 'handing off',
+	// The driver answered something only a session can act on — an untriaged child, an epic left to a
+	// person — and the supervisor is waking one. The next hand-off replaces it.
+	JUDGING: 'waiting on judgment',
 } as const
 
 const OPENING = 'opening lane'

@@ -65,6 +65,7 @@ describe('run_event_setup stages', () => {
 			STARTING: 'starting session',
 			PLANNING: 'planning',
 			HANDING_OFF: 'handing off',
+			JUDGING: 'waiting on judgment',
 		})
 		expect(run_event_setup.opening_lane('278')).toBe('opening lane #278')
 	})
@@ -74,7 +75,7 @@ describe('run_event_setup stages', () => {
 			.map((text) => ({ pos: 1, at: AT, kind: KIND.SETUP, text }))
 			.map((event) => run_event_scope.issue_named(event))
 
-		expect(named).toStrictEqual([undefined, undefined, undefined, '278'])
+		expect(named).toStrictEqual([undefined, undefined, undefined, undefined, '278'])
 	})
 })
 
