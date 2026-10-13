@@ -74,6 +74,14 @@ describe('run_board_now.line_of with no stage', () => {
 		expect(line_of()).toBe('watching 24:10 — pool empty')
 	})
 
+	// A judgment session's minutes are the run's own: the watch is counted from the stage's end, not
+	// from the merge before it.
+	it('counts the watch from the run’s own newest moment, not from its newest position', () => {
+		const activity = { ...after('#5 merged', 22 * MINUTE), idle_ms: NOW - 2 * MINUTE }
+
+		expect(line_of({ activity })).toBe('watching 2:00 — pool empty')
+	})
+
 	it('writes what the pool holds that the run cannot take', () => {
 		expect(line_of({ waiting: 3, people: 1 })).toBe('watching 24:10 — 3 waiting')
 	})

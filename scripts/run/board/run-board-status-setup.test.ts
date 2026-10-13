@@ -15,7 +15,8 @@ const { STAGE } = run_event_setup
 const IN_RUN: ReadonlySet<number> = new Set([278, 279])
 const LANES = ['278']
 const MERGED_278 = '#278 merged'
-const LAUNCH_278: Step = [KIND.CHILD_LAUNCH, '#278 launched']
+const LAUNCHED_278 = '#278 launched'
+const LAUNCH_278: Step = [KIND.CHILD_LAUNCH, LAUNCHED_278]
 
 // One event, as its kind and text.
 type Step = [string, string]
@@ -113,8 +114,13 @@ describe('run_board_status.activity_of idle time', () => {
 	})
 
 	it('counts the idle time from a position newer than every stage', () => {
-		const events = stream(setup(STAGE.HANDING_OFF), LAUNCH_278, [KIND.MERGE, MERGED_278])
+		const events: Array<RunEvent> = [
+			{ pos: 1, at: AT, kind: KIND.SETUP, text: STAGE.HANDING_OFF },
+			{ pos: 2, at: SESSION_AT, kind: KIND.CHILD_LAUNCH, text: LAUNCHED_278 },
+			{ pos: 3, at: HANDED_AT, kind: KIND.MERGE, text: MERGED_278 },
+			{ pos: 4, at: BEAT_AT, kind: KIND.HEARTBEAT, text: 'at #278' },
+		]
 
-		expect(run_board_status.activity_of(events).idle_ms).toBe(Date.parse(AT))
+		expect(run_board_status.activity_of(events).idle_ms).toBe(Date.parse(HANDED_AT))
 	})
 })
