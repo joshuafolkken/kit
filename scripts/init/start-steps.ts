@@ -2,6 +2,8 @@ import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
+import { security_audit } from '#scripts/security/security-audit'
+import { security_audit_provision } from '#scripts/security/security-audit-provision'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { parseCommandString } from 'execa'
 import { main as init_main } from './init'
@@ -29,6 +31,10 @@ const GH_INSTALL_HINT =
 	'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/, run gh auth login, then run josh start again. Nothing was changed.'
 const GH_AUTH_HINT =
 	'GitHub CLI is not signed in. Run gh auth login, then run josh start again. Nothing was changed.'
+// Printed before the scanner is looked for: a first run downloads tens of megabytes, and a terminal
+// that says nothing for minutes reads as a hang the user interrupts (#3755).
+const SCANNER_NOTICE =
+	'Checking for osv-scanner, which the pre-push audit needs. A first run downloads it, which can take a few minutes on a slow connection.'
 
 const { git_succeeds, git_read, run_local } = start_exec
 
@@ -148,6 +154,27 @@ function run_push_preflight(steps: ReadonlyArray<StartStep>, context: StepContex
 	}
 }
 
+// The `full` profile installs kit's pre-push hook, whose audit refuses a push without osv-scanner. The
+// scanner is otherwise fetched at an agent's session start, which a first `josh start` from a terminal
+// has not had, so it is fetched here — forced, because a person asked for this run. A scanner that
+// still cannot be found stops the run before the first step rather than at the push (#3755).
+async function ensure_audit_scanner(
+	steps: ReadonlyArray<StartStep>,
+	context: StepContext,
+): Promise<void> {
+	if (context.profile !== 'full' || !start_plan.has_push(steps)) return
+
+	const { platform, arch } = process
+
+	console.info(`\n${SCANNER_NOTICE}`)
+	const outcome = await security_audit_provision.report(context.root, platform, arch, true)
+
+	console.info(outcome)
+	if (security_audit.resolve_scanner(context.root, platform) !== undefined) return
+
+	throw new Error(start_plan.scanner_report(outcome))
+}
+
 type StepAction = (context: RunContext) => void | Promise<void>
 
 const STEP_ACTIONS: Readonly<Record<StartStep, StepAction>> = {
@@ -178,6 +205,7 @@ async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext):
 	const labels = start_plan.step_labels(context.init_command)
 
 	run_push_preflight(steps, context)
+	await ensure_audit_scanner(steps, context)
 	const run_context: RunContext = { ...context, baseline: baseline_of(steps, context) }
 
 	for (const [index, step] of steps.entries()) {
