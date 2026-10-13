@@ -342,6 +342,23 @@ pnpm josh sync   # overwrite managed files
 
 See [sync.md](./sync.md) for the full file list.
 
+### `josh uninstall`
+
+Remove what kit added to a project. It prints three lists before it changes anything — what it removes, what it keeps, and what is left for you to review — and removes only the first.
+
+```bash
+pnpm josh uninstall         # show the plan, then ask
+pnpm josh uninstall --yes   # remove without asking
+```
+
+- **Remove:** each distributed file that is still byte for byte what kit writes, the `@joshuafolkken/kit` dependency and the `josh.profile` record in `package.json`, and the git hooks lefthook installed (`lefthook uninstall`, where `lefthook.yml` is one kit wrote or merged into). A directory the last removed file leaves empty goes with it.
+- **Keep:** a distributed file that differs from what kit writes — one you edited, or one of your own that kit merged entries into.
+- **Review by hand:** the `package.json` entries kit merges in (`scripts.josh`, `devDependencies.prettier`, …) that the project still holds, `sonar-project.properties` / `.aikido` when present, and `.gitignore` — deleting it would un-ignore `.env` and `node_modules`. They are never changed: `josh init` kept no record of the values it found.
+
+**Options:** `--yes` skips the question. `--profile basic|full` names the profile whose files are compared, instead of the recorded one. Without a terminal and without `--yes`, the run is a preview that removes nothing.
+
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it removes nothing. Files are compared with the installed kit version, and nothing in `node_modules`, `pnpm-lock.yaml` or on GitHub is touched — see [Remove kit from a project](./how-to/uninstall.md).
+
 ### `josh adopt`
 
 Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each toolkit's managed files, update the other dependencies with [`josh latest`](#josh-latest), verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](josh-commands-automation.md#josh-propagate), sharing its step order with `josh latest` added — propagation carries one exact release and leaves the other dependencies alone.

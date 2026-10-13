@@ -45,6 +45,12 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Project',
 		reference: ['', 'developer', ['files']],
 	},
+	uninstall: {
+		script: 'scripts/uninstall/uninstall.ts',
+		description: 'Remove what kit added to a project and list what is left to review by hand',
+		category: 'Project',
+		reference: [`${PROFILE_ARGUMENTS} [--yes]`, 'developer', ['files', 'processes']],
+	},
 	'registry:migrate': {
 		script: 'scripts/registry-migration/migrate.ts',
 		description: 'Migrate a project from GitHub Packages to public npm',

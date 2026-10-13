@@ -393,6 +393,16 @@ Say whether this change touches a file josh sync distributes
 
 List the screenshot-target routes the current change touches
 
+---
+
+### `josh uninstall` · `josh un`
+
+> **Audience:** developer · **Side effects:** files, processes
+
+`[--profile basic|full] [--yes]`
+
+Remove what kit added to a project and list what is left to review by hand
+
 ## Workflow
 
 ### `josh followup`

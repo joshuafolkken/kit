@@ -325,6 +325,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const init = {
 	copy_ai_file: init_ai_copy.copy_ai_file,
 	apply_package_json_merges,
+	merged_manifest,
 	install_lefthook,
 	resolve_kit_package_manager,
 }
