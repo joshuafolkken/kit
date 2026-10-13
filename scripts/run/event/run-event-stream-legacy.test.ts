@@ -52,8 +52,9 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 		expect(run_board_status.activity_of(events)).toStrictEqual({
 			setup: undefined,
 			setup_ms: undefined,
-			is_preparing: false,
 			last_event_ms: Date.parse(LAUNCHED_AT),
+			latest: { text: LAUNCH, at_ms: Date.parse(LAUNCHED_AT) },
+			idle_ms: Date.parse(LAUNCHED_AT),
 			is_stopped: false,
 		})
 	})

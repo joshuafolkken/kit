@@ -14,8 +14,7 @@ const OPENING_279 = run_event_setup.opening_lane('279')
 const LAUNCH_278: Step = [KIND.CHILD_LAUNCH, '#278 launched']
 const MERGE_278: Step = [KIND.MERGE, '#278 merged']
 const PLAN_278: Step = [KIND.PLAN, 'planned #278']
-const IDLE = { setup: undefined, setup_ms: undefined, is_preparing: false }
-const OPENING_LANE = { ...IDLE, is_preparing: true }
+const IDLE = { setup: undefined, setup_ms: undefined }
 const SECOND = 1000
 const AT_MS = Date.parse(AT)
 const LANE_STAGES_279 = [run_event_setup.installing('279'), run_event_setup.dispatching('279')]
@@ -53,7 +52,6 @@ describe('run_board_setup.read before the first launch', () => {
 		expect(run_board_setup.read(events)).toStrictEqual({
 			setup: STAGE.HANDING_OFF,
 			setup_ms: time_of(2),
-			is_preparing: true,
 		})
 	})
 
@@ -83,7 +81,6 @@ describe('run_board_setup.read — when the run entered its stage', () => {
 		expect(run_board_setup.read(session)).toStrictEqual({
 			setup: STAGE.SESSION,
 			setup_ms: time_of(2),
-			is_preparing: true,
 		})
 	})
 
@@ -97,16 +94,16 @@ describe('run_board_setup.read — when the run entered its stage', () => {
 describe('run_board_setup.read after a drain that came before any launch', () => {
 	const DRAIN: Step = [KIND.DRAIN, 'backlog drained']
 
-	it('reads the hand-off each wake of the idle watch writes as no stage and no preparing', () => {
+	it('reads the hand-off each wake of the idle watch writes as no stage', () => {
 		const events = stream(setup(STAGE.HANDING_OFF), DRAIN, setup(STAGE.HANDING_OFF))
 
 		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
 	})
 
-	it('is preparing again once a lane opens for an issue the watch picked up', () => {
+	it('is at a stage again once a lane opens for an issue the watch picked up', () => {
 		const events = stream(setup(STAGE.HANDING_OFF), DRAIN, setup(OPENING_278))
 
-		expect(run_board_setup.read(events)).toStrictEqual(OPENING_LANE)
+		expect(run_board_setup.read(events)).toStrictEqual({ setup: OPENING_278, setup_ms: time_of(2) })
 	})
 })
 
@@ -117,29 +114,51 @@ describe('run_board_setup.read after the first launch', () => {
 		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
 	})
 
-	it('is preparing again while a lane opens for the next child', () => {
+	it('is at a stage again while a lane opens for the next child', () => {
 		const events = stream(setup(OPENING_278), LAUNCH_278, MERGE_278, setup(OPENING_279))
 
-		expect(run_board_setup.read(events)).toStrictEqual(OPENING_LANE)
+		expect(run_board_setup.read(events)).toStrictEqual({ setup: OPENING_279, setup_ms: time_of(3) })
 	})
 
 	// joshuafolkken/kit#3738: installing into the lane and dispatching its child name the issue too.
-	it.each(LANE_STAGES_279)('is preparing while the next child’s lane is at "%s"', (stage) => {
+	it.each(LANE_STAGES_279)('is at "%s" while the next child’s lane is', (stage) => {
 		const events = stream(setup(OPENING_278), LAUNCH_278, MERGE_278, setup(stage))
 
-		expect(run_board_setup.read(events)).toStrictEqual(OPENING_LANE)
+		expect(run_board_setup.read(events).setup).toBe(stage)
 	})
 
-	it('stops preparing at the launch the opening led to', () => {
+	it('leaves the stage at the launch the opening led to', () => {
 		const events = stream(LAUNCH_278, setup(OPENING_279), [KIND.CHILD_LAUNCH, '#279 launched'])
 
-		expect(run_board_setup.read(events).is_preparing).toBe(false)
+		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
 	})
 
-	it('does not read a hand-off between two children as preparing one', () => {
+	it('does not read a hand-off between two children as a stage', () => {
 		const events = stream(LAUNCH_278, MERGE_278, setup(STAGE.HANDING_OFF))
 
-		expect(run_board_setup.read(events).is_preparing).toBe(false)
+		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
+	})
+})
+
+// joshuafolkken/kit#3749: a hand-back to a session is the run's own work whenever it comes, and only
+// the next hand-off ends it.
+describe('run_board_setup.read at a judgment stage after the first launch', () => {
+	it.each([STAGE.JUDGING, STAGE.SESSION])('reads "%s" as the stage, with its time', (stage) => {
+		const events = stream(LAUNCH_278, MERGE_278, setup(STAGE.HANDING_OFF), setup(stage))
+
+		expect(run_board_setup.read(events)).toStrictEqual({ setup: stage, setup_ms: time_of(3) })
+	})
+
+	it('keeps the session past a position it wrote itself', () => {
+		const events = stream(LAUNCH_278, setup(STAGE.SESSION), MERGE_278)
+
+		expect(run_board_setup.read(events).setup).toBe(STAGE.SESSION)
+	})
+
+	it('ends the session at the next hand-off', () => {
+		const events = stream(LAUNCH_278, setup(STAGE.SESSION), setup(STAGE.HANDING_OFF))
+
+		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
 	})
 })
 

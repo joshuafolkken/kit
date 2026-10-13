@@ -126,7 +126,7 @@ const EVENT_KIND = {
 	// already holds. A trace: it says the run gained room, not where the run is.
 	LANE_LIMIT: 'lane-limit',
 	// One stage of the run's start — the session starting, the plan, the hand-off to the supervisor, a
-	// lane opening (`run-event-setup.ts`). `run:board` draws it until the first child launches, so the
+	// lane opening (`run-event-setup.ts`). `run:board` draws it while the run stands at it, so the
 	// minutes before one read as work rather than as a run that has stopped. A trace: it says the run is
 	// getting ready, not where the run is.
 	SETUP: 'setup',
@@ -153,7 +153,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
 // it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
-// `run:board` draws from that line. A `setup` line is read only until the child it prepares launches,
+// `run:board` draws from that line. Only the newest `setup` line is the stage the run stands at,
 // so every one but the newest goes.
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SHIP_STAGE,
@@ -282,7 +282,7 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 // **Each issue's newest ship-stage is not disposable**: it is the only record `run:board` draws a lane's
 // review-and-later phase from, and on a stream full of positions it would otherwise roll off in its own
 // append. **The newest `setup` stage is kept for the same reason**: it is the stage `run:board` draws
-// until the first child launches, and a run that starts on a full stream would otherwise show none.
+// while the run stands at it, and a run that starts on a full stream would otherwise show none.
 //
 // **A ship-stage `start` outlasts the other disposable lines**: each one is a phase on the lane's track,
 // so it is kept past the `done` lines and the heartbeats.

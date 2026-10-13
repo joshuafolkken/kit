@@ -67,6 +67,10 @@ const WORDS = {
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
+	// What the run is doing now, where no stage of its own says it.
+	watching: 'watching',
+	pool_empty: 'pool empty',
+	on_person: 'waiting on a person',
 	// The session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
 	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',

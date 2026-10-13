@@ -1,0 +1,7 @@
+{
+	"reason": "New run-board-now module renders the third header line (stage, elapsed time, reason, latest-event fallback) required by #3749; review round 1 added the idle-time read so a watch is counted from the stage that ended, not from before a judgment session",
+	"date": "2026-10-13",
+	"growth": {
+		"scripts.code_lines": 68
+	}
+}

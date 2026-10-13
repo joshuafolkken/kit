@@ -27,10 +27,21 @@ interface ItemStatus {
 	track?: ReadonlyArray<Phase> | undefined
 }
 
+interface LatestEvent {
+	text: string
+	at_ms: number
+}
+
 // The run as a whole, read off the same stream. The setup half is `run-board-setup.ts`'s, absent
 // where a stream carries no stage.
 interface RunActivity extends Partial<SetupRead> {
 	last_event_ms: number | undefined
+	// The newest thing the run did — its newest position, or its newest event where it has none yet —
+	// in the event's own words, and when.
+	latest?: LatestEvent | undefined
+	// When the run last did anything of its own — its newest position or stage, whichever is newer. A
+	// stage that has ended still counts: what follows it is counted from its end, not from before it.
+	idle_ms?: number | undefined
 	// The run's last position is a `stop` that names no child — the run itself ended.
 	is_stopped: boolean
 }
@@ -247,6 +258,21 @@ function is_run_stop(event: RunEvent | undefined): boolean {
 	return event?.kind === KIND.STOP && run_event_scope.issue_named(event) === undefined
 }
 
+function latest_of(event: RunEvent | undefined): LatestEvent | undefined {
+	return event === undefined ? undefined : { text: event.text, at_ms: moment(event) }
+}
+
+function is_own(event: RunEvent): boolean {
+	return event.kind === KIND.SETUP || !run_event_stream.TRACE_KINDS.has(event.kind)
+}
+
+// A stream of traces alone has done nothing of its own yet, so its newest event stands in.
+function idle_of(events: ReadonlyArray<RunEvent>): number | undefined {
+	const own = events.findLast((event) => is_own(event)) ?? events.at(-1)
+
+	return own === undefined ? undefined : moment(own)
+}
+
 // `is_ended` is a run `run:carry --end` closed: its record says it stopped, whatever its last event
 // was.
 function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
@@ -256,6 +282,8 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 	return {
 		...run_board_setup.read(events),
 		last_event_ms: last === undefined ? undefined : moment(last),
+		latest: latest_of(position ?? last),
+		idle_ms: idle_of(events),
 		is_stopped: is_ended || is_run_stop(position),
 	}
 }
@@ -263,4 +291,4 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 const run_board_status = { activity_of, settle_closed, statuses_of }
 
 export { run_board_status }
-export type { ItemState, ItemStatus, OpenRead, RunActivity }
+export type { ItemState, ItemStatus, LatestEvent, OpenRead, RunActivity }
