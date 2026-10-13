@@ -99,6 +99,23 @@ describe('run_board_tick.tick before the plan is read', () => {
 	})
 })
 
+// joshuafolkken/kit#3757: the operations the local read carries reach the header's third line.
+describe('run_board_tick.tick with a session’s operation', () => {
+	it('draws the running child’s newest operation on the third line', async () => {
+		const operation = { kind: 'Bash', target: 'pnpm josh gate', at_ms: run_board_fixture.START }
+		const operations = {
+			lanes: [{ issue: CHILD, operation }],
+			owner: undefined,
+			judgment: undefined,
+		}
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH], operations }, [])
+
+		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
+
+		expect(lines_of(frames[0])[2]).toMatch(/^ +#\d+ · Bash pnpm josh gate {2}\d+:\d{2}$/u)
+	})
+})
+
 // The regression: a plan taller than the pane pushed the header off the top of the screen.
 describe('run_board_tick.tick in a short terminal', () => {
 	it('starts the frame with the title line and keeps it within the rows once the plan is read', async () => {
