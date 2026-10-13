@@ -13,6 +13,7 @@ const SHAPE: ProjectShape = {
 	has_github: false,
 }
 const SELF_RUN_REFUSAL = 'Refusing to sync'
+const IDENTITY_REFUSAL = 'run git config'
 const INIT_COMMAND_FLAG = '--init-command'
 const INIT_COMMAND = 'josh-app init'
 const PREFLIGHT_FLAG = '--push-preflight-command'
@@ -33,6 +34,7 @@ beforeEach(() => {
 	vi.spyOn(start_steps, 'read_git_state').mockReturnValue(NO_GIT)
 	vi.spyOn(start_steps, 'self_run_refusal').mockReturnValue(undefined)
 	vi.spyOn(start_steps, 'github_cli_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'git_identity_refusal').mockReturnValue(undefined)
 	vi.spyOn(start_steps, 'run_steps').mockResolvedValue(undefined)
 	vi.spyOn(start_prompt, 'confirm_choices').mockResolvedValue('basic')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -60,6 +62,20 @@ describe('josh start', () => {
 		expect(start_prompt.confirm_choices).toHaveBeenCalledWith(
 			expect.objectContaining({ shape: SHAPE, consent: 'ask' }),
 		)
+	})
+})
+
+describe('josh start and the git author identity (#3754)', () => {
+	it('stops before any step when the planned commit has no author identity', async () => {
+		vi.mocked(start_steps.git_identity_refusal).mockReturnValue(IDENTITY_REFUSAL)
+
+		expect(await start.run(['--yes', '--github'], false)).toBe(1)
+		expect(start_steps.git_identity_refusal).toHaveBeenCalledWith(
+			expect.arrayContaining(['commit']),
+			process.cwd(),
+		)
+		expect(start_steps.run_steps).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(IDENTITY_REFUSAL)
 	})
 })
 

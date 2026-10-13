@@ -106,6 +106,7 @@ function prepare(args: ReadonlyArray<string>, is_tty: boolean, root: string): Pr
 	const consent: Consent = settle(start_plan.github_consent(plan.steps, options, interaction))
 
 	stop_on(start_steps.github_cli_refusal(root))
+	stop_on(start_steps.git_identity_refusal(plan.steps, root))
 
 	return {
 		steps: plan.steps,

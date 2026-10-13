@@ -85,12 +85,14 @@ Run on 2026-10-13 against kit 1.1387.0 — the packed checkout for `init`, the p
 | `kit-test-html-start`   | passed                                               | exit 127         | exit 1          |
 | `kit-test-svelte-start` | stopped in `josh start`, at the push of its branch   | not reached      | not reached     |
 
-- **`kit-test-lua-start` stops until
-  [joshuafolkken/kit#3754](https://github.com/joshuafolkken/kit/issues/3754) is fixed.** A machine
-  that has never committed has no Git author identity, and `josh start` creates the repository and
-  then fails its own first commit. The other two `start` patterns make a first commit before the
-  install, as their starting state asks, and set an identity for it; the Lua pattern starts without
-  Git and is left to fail, because setting an identity there would hide what a person meets.
+- **`kit-test-lua-start` stopped until
+  [joshuafolkken/kit#3754](https://github.com/joshuafolkken/kit/issues/3754) was fixed.** A machine
+  that has never committed has no Git author identity, and `josh start` created the repository and
+  then failed its own first commit. `josh start` now stops before its first write and names the two
+  `git config` commands, and the Lua pattern sets the machine-wide identity the way
+  [the prerequisites' step 4](../setup/prerequisites.md#4-tell-git-who-you-are) has a person do. The
+  other two `start` patterns make a first commit before the install, as their starting state asks,
+  and set a repository identity for it.
 - **`kit-test-svelte-start` stops until
   [joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755) is fixed.** A web
   project's pre-push hook runs `pnpm josh audit`, which needs `osv-scanner`; nothing in the guide

@@ -191,6 +191,19 @@ describe('consent to create the GitHub repository', () => {
 	})
 })
 
+describe('the steps that need a git author identity (#3754)', () => {
+	it.each([[['initialize', 'commit'] as const], [['initialize', 'labels', 'setup_pr'] as const]])(
+		'finds the commit in %j',
+		(steps) => {
+			expect(start_plan.has_commit(steps)).toBe(true)
+		},
+	)
+
+	it('finds none when kit is already committed and only the additive steps run', () => {
+		expect(start_plan.has_commit(['initialize', 'repository', 'labels'])).toBe(false)
+	})
+})
+
 describe('the steps a push preflight guards (#3702)', () => {
 	it.each([[WITH_REPOSITORY], [['initialize', 'labels', 'setup_pr'] as const]])(
 		'finds the push in %j',

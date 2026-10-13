@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { COMMAND_TIMEOUT_MS, GIT_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +23,12 @@ function last_options(): Record<string, unknown> {
 	const options = call.at(2)
 
 	return typeof options === 'object' && options !== null ? { ...options } : {}
+}
+
+function last_environment(): Record<string, unknown> {
+	const { env } = last_options()
+
+	return typeof env === 'object' && env !== null ? { ...env } : {}
 }
 
 beforeEach(() => {
@@ -62,6 +69,36 @@ describe('the git calls josh start makes', () => {
 		expect(() => {
 			start_exec.git_run(['push'], ROOT)
 		}).toThrow('git push did not finish')
+	})
+})
+
+describe('the git author identity josh start asks for (#3754)', () => {
+	it('asks git for the author and the committer identity, in the root', () => {
+		expect(start_exec.lacks_git_identity(ROOT, false)).toBe(false)
+		expect(mocked_execa.mock.calls.map((call) => call[1])).toStrictEqual([
+			['var', 'GIT_AUTHOR_IDENT'],
+			['var', 'GIT_COMMITTER_IDENT'],
+		])
+		expect(last_options()).toMatchObject({ cwd: ROOT, timeout: GIT_TIMEOUT_MS })
+		expect(last_environment()).not.toHaveProperty('GIT_DIR', expect.any(String))
+	})
+
+	it('answers a missing identity when git cannot name one', () => {
+		mocked_execa.mockReturnValue(result(1))
+
+		expect(start_exec.lacks_git_identity(ROOT, false)).toBe(true)
+	})
+
+	it('does not call a git that could not be started a missing identity', () => {
+		mocked_execa.mockReturnValue(result(undefined))
+
+		expect(start_exec.lacks_git_identity(ROOT, false)).toBe(false)
+	})
+
+	it('asks from where the repository will be, so a per-directory identity is seen before git init', () => {
+		start_exec.lacks_git_identity(ROOT, true)
+
+		expect(last_environment()).toMatchObject({ GIT_DIR: path.join(ROOT, '.git') })
 	})
 })
 
