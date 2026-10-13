@@ -137,7 +137,7 @@ The template's `.vscode/settings.json` sets `claudeCode.initialPermissionMode` t
 **This is opt-out, not opt-in — decide before the first session.** Both `.vscode/settings.json` keys are scalars, so the merge never touches a value the project already owns:
 
 - To keep the prompts in the VS Code extension, set `"claudeCode.initialPermissionMode": "default"` and `"claudeCode.allowDangerouslySkipPermissions": false` in your `.vscode/settings.json`. Set the values rather than deleting the keys — `josh sync` adds a missing key back.
-- `josh sync` overwrites `.claude/settings.json`, so on a Claude Code older than v2.1.257 override `permissions.defaultMode` in `.claude/settings.local.json` instead of editing the distributed file; user settings rank below the project file and do not override it. To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` there.
+- `josh sync` merges `.claude/settings.json` and sets the keys kit ships back to kit's values (`docs/sync.md`), so on a Claude Code older than v2.1.257 override `permissions.defaultMode` in `.claude/settings.local.json` instead of editing it in the project file; user settings rank below the project file and do not override it. To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` — kit does not ship that key, so it survives a sync in either file.
 
 ### tsconfig merge strategy
 
