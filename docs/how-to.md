@@ -10,6 +10,7 @@ For anyone who knows what they want to do but not which command does it. Each gu
 | Move between the `basic` and `full` profiles    | [Switch a project's profile](./how-to/switch-profile.md)   |
 | Get a Telegram message when a run needs me      | [Set up notifications](./how-to/set-up-notifications.md)   |
 | Run the project in a cloud session or container | [Run kit in a cloud session](./how-to/run-in-the-cloud.md) |
+| Take kit out of a project again                 | [Remove kit from a project](./how-to/uninstall.md)         |
 
 ## Keep up to date
 

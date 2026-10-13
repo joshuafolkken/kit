@@ -64,4 +64,5 @@ Open `index.html` in a browser and check the layout, links and any interaction a
 
 - Make your first change with an agent: [without GitHub](../tutorial.md#without-github-one-change-checked-locally), or after `josh start` from Issue to merge with [tutorial.md](../tutorial.md).
 - Task guides: [how-to.md](../how-to.md).
+- Not a fit? [Remove kit from a project](../how-to/uninstall.md).
 - Hitting an error? See [troubleshooting.md](../troubleshooting.md).

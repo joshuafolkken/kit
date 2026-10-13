@@ -227,6 +227,7 @@ const sync_ai_files = {
 	sync_ai_file,
 	sync_workspace_yaml,
 	sync_claude_md,
+	ensured_claude_md,
 	sync_directory,
 	sync_ai_copy_all,
 }
