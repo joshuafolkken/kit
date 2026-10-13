@@ -4,6 +4,7 @@ import { repo_origin } from '#scripts/discovery/repo-origin'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { kit_written_paths } from './kit-written-paths'
 
 type ProjectProfile = 'basic' | 'full'
 
@@ -136,18 +137,27 @@ function scan_directory(directory: string, pending: Array<string>): Array<string
 			.map((entry) => path.join(directory, entry.name)),
 	)
 
-	return entries.filter((entry) => entry.isFile()).map((entry) => path.extname(entry.name))
+	return entries.filter((entry) => entry.isFile()).map((entry) => path.join(directory, entry.name))
+}
+
+// A file kit wrote says nothing about the project: counted, the `.pnpmfile.mjs` of the first
+// `josh init` would read as the user's Web file on the second and bring Prettier in
+// (joshuafolkken/kit#3713).
+function is_project_file(root: string, file: string): boolean {
+	const relative_path = path.relative(root, file).split(path.sep).join(path.posix.sep)
+
+	return !kit_written_paths.is_kit_written(relative_path)
 }
 
 function file_extensions(root: string): Array<string> {
 	const pending = [root]
-	const extensions: Array<string> = []
+	const files: Array<string> = []
 
 	for (const directory of pending) {
-		extensions.push(...scan_directory(directory, pending))
+		files.push(...scan_directory(directory, pending))
 	}
 
-	return extensions
+	return files.filter((file) => is_project_file(root, file)).map((file) => path.extname(file))
 }
 
 function scan_files(root: string): { has_web: boolean; has_typescript: boolean } {
