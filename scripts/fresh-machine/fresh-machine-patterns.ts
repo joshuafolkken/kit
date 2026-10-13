@@ -1,0 +1,110 @@
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { fresh_machine_spec, type Scenario } from './fresh-machine-spec'
+
+// kit's own six patterns: three projects (one Lua file, one `index.html`, a minimal TypeScript
+// SvelteKit app from `sv`) by two commands (`josh init`, `josh start`), each from the starting state
+// joshuafolkken/kit#2848 gave it. `josh init` installs the packed checkout, so a fix is retested
+// without a release; `josh start` installs a published version, because its setup pull request
+// would carry a tarball path CI cannot resolve.
+
+const KIT = KIT_PACKAGE_NAME
+const ALLOW_BUILDS = '--allow-build=esbuild --allow-build=unrs-resolver'
+// What `pnpm dlx @joshuafolkken/kit init` writes before it installs kit.
+const BARE_MANIFEST = String.raw`printf '{ "private": true }\n' > package.json`
+const CREATE_SVELTEKIT =
+	'pnpm dlx sv create --template minimal --types ts --no-add-ons --install pnpm .'
+const INSTALL_TARBALL = `pnpm add -D ${ALLOW_BUILDS} "$PACKAGE_TARBALL"`
+// A version published minutes ago is inside pnpm's release-age wait; kit alone is excluded from it
+// (joshuafolkken/kit#2869), so every other dependency keeps the wait.
+const EXCLUDE_RELEASE_AGE = String.raw`printf 'minimumReleaseAgeExclude:\n  - "${KIT}"\n' >> pnpm-workspace.yaml`
+const INSTALL_PUBLISHED = `pnpm add -D ${ALLOW_BUILDS} ${KIT}@"$PACKAGE_VERSION"`
+const GATE = 'pnpm josh gate'
+const INIT_COMMANDS = [INSTALL_TARBALL, 'pnpm exec josh init', GATE]
+// `josh start` leaves the project on its setup branch, where the gate asks for the scoped checks
+// first; this is the line its refusal hands back.
+const SCOPED_CHECKS = 'pnpm josh lint:related && pnpm josh test:related'
+const START_COMMANDS = [
+	EXCLUDE_RELEASE_AGE,
+	INSTALL_PUBLISHED,
+	'pnpm exec josh start --yes --github',
+	SCOPED_CHECKS,
+	GATE,
+]
+
+// `gh auth login` cannot run without a person, and it is what points git at gh for credentials; with
+// the token in the environment this is the same step.
+const SIGN_IN = 'gh auth setup-git'
+// The identity is the repository's own, so the machine stays one nobody has configured git on.
+const FIRST_COMMIT = [
+	'git init --initial-branch main',
+	'git config user.name kit-test && git config user.email kit-test@example.com',
+	'git add --all && git commit --message "Initial commit"',
+]
+const CREATE_REPOSITORY = 'gh repo create "$RUN_NAME" --private --source . --push'
+
+// The two states #3712 was found in: a shell that reads no rc file, and a PATH with `node` on it and
+// no `pnpm`.
+const BARE_SHELL =
+	'env -i HOME="$HOME" PATH=/usr/local/bin:/usr/bin:/bin bash --noprofile --norc -c'
+const NODE_ONLY = '"$HOME/node-only"'
+const PATH_PROBES = [
+	`${BARE_SHELL} '${GATE}'`,
+	`mkdir -p ${NODE_ONLY} && ln -sf "$(command -v node)" ${NODE_ONLY}/node && ${BARE_SHELL} 'PATH="$HOME/node-only:$PATH" ./node_modules/.bin/josh gate'`,
+]
+
+const LUA_FILE = 'main.lua'
+const HTML_FILE = 'index.html'
+const LUA_FILES = { [LUA_FILE]: 'print("Hello")\n' }
+const HTML_FILES = { [HTML_FILE]: '<!doctype html><html><body><h1>Hello</h1></body></html>\n' }
+
+function init_pattern(
+	project: string,
+	files: Record<string, string>,
+	setup: ReadonlyArray<string>,
+): Scenario {
+	return fresh_machine_spec.define({
+		name: `kit-test-${project}-init`,
+		files,
+		commands: [...setup, ...INIT_COMMANDS],
+		probes: PATH_PROBES,
+	})
+}
+
+function start_pattern(
+	project: string,
+	files: Record<string, string>,
+	setup: ReadonlyArray<string>,
+): Scenario {
+	return fresh_machine_spec.define({
+		name: `kit-test-${project}-start`,
+		requires_github: true,
+		package_source: 'published',
+		files,
+		commands: [SIGN_IN, ...setup, ...START_COMMANDS],
+		probes: PATH_PROBES,
+	})
+}
+
+const PATTERNS: ReadonlyArray<Scenario> = [
+	init_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
+	// No Git: `josh start` creates the repository, the first commit and the GitHub repository.
+	start_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
+	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
+	// Git with a first commit on `main`, no GitHub repository.
+	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST]),
+	init_pattern('svelte', {}, [CREATE_SVELTEKIT]),
+	// A GitHub repository with `main` already pushed.
+	start_pattern('svelte', {}, [CREATE_SVELTEKIT, ...FIRST_COMMIT, CREATE_REPOSITORY]),
+]
+
+function names(): Array<string> {
+	return PATTERNS.map((pattern) => pattern.name)
+}
+
+function find(name: string): Scenario | undefined {
+	return PATTERNS.find((pattern) => pattern.name === name)
+}
+
+const fresh_machine_patterns = { names, find }
+
+export { fresh_machine_patterns }

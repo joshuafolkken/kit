@@ -207,6 +207,29 @@ It refuses, changing nothing and exiting `1`, unless the directory:
 - lies outside the kit checkout it is run from;
 - has no commit yet, and is not inside another git repository — a `.git` without history, as `sv create` leaves, is accepted.
 
+### `josh fresh:run`
+
+Run one install scenario in a Docker container of a machine with nothing installed — no Node.js, pnpm, git or gh — and keep every command and its output as a log. Needs Docker on the machine it is run from.
+
+```bash
+pnpm josh fresh:run --list                                # kit's six patterns
+pnpm josh fresh:run kit-test-html-init                    # one pattern, the packed checkout
+pnpm josh fresh:run kit-test-html-start                   # a GitHub pattern, the latest published version
+pnpm josh fresh:run --spec fresh/html-init.json           # a scenario another toolkit wrote
+```
+
+**Options:**
+
+- `--list` — print the pattern names and run nothing.
+- `--spec <file.json>` — run the scenario in this file instead of a named pattern; the path is relative to the project root.
+- `--package-version <version>` — the published version a `package_source: published` scenario installs. Default: the registry's latest version of the package the command is run from.
+- `--log-dir <dir>` — where the log is written. Default: `.claude/tmp/fresh-machine`.
+- `--rebuild` — build the machine image without the layer cache.
+
+**Output / exit codes:** the image build, the pack and the container's session are printed and written to `<log-dir>/<scenario>-<n>.log`, whose path is the last line. Exit status is the container's — `0` when every command of the scenario passed, whatever the probes after them exited with — the build's when the image could not be built, and `1` for an unknown pattern, a named pattern run outside a kit checkout, an invalid spec, a missing Docker, or a GitHub scenario when `gh auth token` prints no token.
+
+A GitHub scenario creates a real private repository named after the run, and no run deletes one. The scenario format, the patterns and the token handling: [maintainers/fresh-machine.md](./maintainers/fresh-machine.md).
+
 ### `josh sonar:hotspots`
 
 Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.

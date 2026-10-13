@@ -14,6 +14,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "eu": "exports:unused",
     "ev": "eval",
     "f": "format",
+    "fr": "fresh:run",
     "g": "git",
     "ga": "gate",
     "gp": "pr",
@@ -369,6 +370,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "files",
+        "processes",
+      ],
+    ],
+    "fresh:run": [
+      "<pattern> | --spec <file.json> [--package-version <version>] [--log-dir <dir>] [--rebuild] | --list",
+      "maintainer",
+      [
+        "files",
+        "network",
         "processes",
       ],
     ],

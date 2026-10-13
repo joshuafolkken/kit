@@ -42,6 +42,9 @@ A project with only `index.html` gets the `basic` profile; the `full` project al
 
 ## The basic profile setup
 
+The container steps below are what `pnpm josh fresh:run kit-test-html-init` runs from the packed
+checkout, with the log kept — [fresh-machine.md](./fresh-machine.md).
+
 [setup/basic.md](../setup/basic.md). The guide is checked by running
 [the prerequisites' step 2](../setup/prerequisites.md#2-install-pnpm-and-nodejs) and steps 2–3 of the
 guide in a fresh container with no Git, no `~/.npmrc` and no Node.js. `buildpack-deps:bookworm-curl`
