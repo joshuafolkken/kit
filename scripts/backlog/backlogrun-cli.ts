@@ -6,6 +6,7 @@ import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { backlogrun_args, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
+import { backlogrun_replace } from './backlogrun-replace'
 import { backlogrun_stop, type StopReport } from './backlogrun-stop'
 
 // `josh backlogrun` — start a `backlogrun` from the terminal and watch it, or stop it with `--stop`. A
@@ -13,16 +14,21 @@ import { backlogrun_stop, type StopReport } from './backlogrun-stop'
 // at `run:add` rather than added behind the person's back. Otherwise the agent is started in the
 // background, its output to a log file, and the board takes over the terminal at once. Closing the
 // board closes only the board.
+//
+// **An idle run gives way to a different invocation.** A run watching with no lane open is stopped as
+// `--stop` stops it and the typed one is started in its place (`backlogrun-replace.ts`); the same
+// invocation only shows the board, so looking at a run never rebuilds it.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlogrun [#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop'
+	'Usage: josh backlogrun [<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop'
 
 interface BacklogrunPorts {
 	repository_directory: () => Promise<string | undefined>
 	is_running: (git_directory: string) => boolean
+	is_replaceable: (invocation: string, git_directory: string) => Promise<boolean>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
 	stop: (git_directory: string) => Promise<StopReport>
 	show_board: () => Promise<number>
@@ -32,6 +38,8 @@ interface BacklogrunPorts {
 const LIVE_PORTS: BacklogrunPorts = {
 	repository_directory: run_carry.repository_directory,
 	is_running: backlogrun_launch.is_running,
+	is_replaceable: async (invocation, git_directory) =>
+		await backlogrun_replace.is_replaceable(invocation, git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	show_board: async () => await run_board_cli.run([]),
@@ -57,17 +65,11 @@ function target_of(git_directory: string): LaunchTarget {
 	return { worktree: path.dirname(git_directory), git_directory }
 }
 
-async function begin(
+async function launch(
 	args: BacklogrunArguments,
 	git_directory: string,
 	ports: BacklogrunPorts,
 ): Promise<number> {
-	if (ports.is_running(git_directory)) {
-		for (const note of running_notes(args.issues)) ports.write(note)
-
-		return await ports.show_board()
-	}
-
 	const result = ports.start(args, target_of(git_directory))
 
 	if (result.kind === 'failed') {
@@ -77,6 +79,40 @@ async function begin(
 	}
 
 	ports.write(launched_note(result))
+
+	return await ports.show_board()
+}
+
+// The idle run is stopped as `--stop` stops it, and a run left with an owner this command may not
+// signal is not replaced: nothing is started beside it.
+async function replace(
+	args: BacklogrunArguments,
+	git_directory: string,
+	ports: BacklogrunPorts,
+): Promise<number> {
+	ports.write(`backlogrun: replacing the idle run with \`${args.invocation}\``)
+
+	const report = await ports.stop(git_directory)
+
+	for (const line of backlogrun_stop.lines_of(report)) ports.write(line)
+
+	if (!backlogrun_stop.is_stopped(report)) return FAILURE_EXIT_CODE
+
+	return await launch(args, git_directory, ports)
+}
+
+async function begin(
+	args: BacklogrunArguments,
+	git_directory: string,
+	ports: BacklogrunPorts,
+): Promise<number> {
+	if (!ports.is_running(git_directory)) return await launch(args, git_directory, ports)
+
+	if (await ports.is_replaceable(args.invocation, git_directory)) {
+		return await replace(args, git_directory, ports)
+	}
+
+	for (const note of running_notes(args.issues)) ports.write(note)
 
 	return await ports.show_board()
 }

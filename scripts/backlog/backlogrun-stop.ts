@@ -50,6 +50,7 @@ interface StopPorts {
 	lanes: () => Promise<Array<string>>
 }
 
+// The issues whose lanes are open — shared with the replace test, which reads a run with none as idle.
 async function open_lanes(): Promise<Array<string>> {
 	const lanes = await lane_registry.list_lanes()
 
@@ -171,7 +172,7 @@ function is_stopped(report: StopReport): boolean {
 	return report.record.kind !== 'held'
 }
 
-const backlogrun_stop = { is_stopped, lines_of, stop }
+const backlogrun_stop = { is_stopped, lines_of, open_lanes, stop }
 
 export type { StopPorts, StopReport }
 export { backlogrun_stop }

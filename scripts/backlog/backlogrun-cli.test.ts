@@ -17,6 +17,11 @@ const STOPPED: StopReport = {
 	record: { kind: 'ended' },
 	lanes: ['3701'],
 }
+const STOPPED_LINES = [
+	'backlogrun: stopped the supervisor (process 4242)',
+	"backlogrun: ended the run's record",
+	'backlogrun: 1 lane(s) still running, not stopped: #3701',
+]
 
 function harness(
 	is_running: boolean,
@@ -26,6 +31,7 @@ function harness(
 	const ports: BacklogrunPorts = {
 		repository_directory: vi.fn(async () => GIT_DIRECTORY),
 		is_running: vi.fn(() => is_running),
+		is_replaceable: vi.fn(async () => false),
 		start: vi.fn(() => started),
 		stop: vi.fn(async () => STOPPED),
 		show_board: vi.fn(async () => 0),
@@ -61,6 +67,58 @@ describe('backlogrun_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#3729: an idle run is stopped and the typed invocation started in its place.
+describe('backlogrun_cli.run replacing an idle run', () => {
+	it('stops the idle run, starts the typed one and says both before the board', async () => {
+		const { ports, lines } = harness(true)
+		const idle = { ...ports, is_replaceable: vi.fn(async () => true) }
+
+		await expect(backlogrun_cli.run(['3724', '--only'], idle)).resolves.toBe(0)
+		expect(idle.is_replaceable).toHaveBeenCalledExactlyOnceWith(
+			'backlogrun #3724 --only',
+			GIT_DIRECTORY,
+		)
+		expect(ports.stop).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY)
+		expect(lines).toStrictEqual([
+			'backlogrun: replacing the idle run with `backlogrun #3724 --only`',
+			...STOPPED_LINES,
+			'backlogrun: started (pid 42, session session-1); log /state/josh-backlogrun-log.log',
+		])
+		expect(ports.show_board).toHaveBeenCalledOnce()
+	})
+})
+
+describe('backlogrun_cli.run keeping a run', () => {
+	it('stops nothing and only shows the board when the run is not replaceable', async () => {
+		const { ports, lines } = harness(true)
+
+		await expect(backlogrun_cli.run(['3724'], ports)).resolves.toBe(0)
+		expect(ports.stop).not.toHaveBeenCalled()
+		expect(ports.start).not.toHaveBeenCalled()
+		expect(lines).toContain('  pnpm josh run:add 3724')
+		expect(ports.show_board).toHaveBeenCalledOnce()
+	})
+
+	it('starts nothing and exits 1 when the owner cannot be stopped', async () => {
+		const { ports, lines } = harness(true)
+		const held: StopReport = { ...STOPPED, record: { kind: 'held', owner: 777 } }
+		const kept = { ...ports, is_replaceable: async () => true, stop: async () => held }
+
+		await expect(backlogrun_cli.run(['3724'], kept)).resolves.toBe(1)
+		expect(lines.join('\n')).toContain('process 777 owns the run')
+		expect(ports.start).not.toHaveBeenCalled()
+		expect(ports.show_board).not.toHaveBeenCalled()
+	})
+
+	it('never asks whether to replace when no run is going', async () => {
+		const { ports } = harness(false)
+
+		await expect(backlogrun_cli.run(['3724'], ports)).resolves.toBe(0)
+		expect(ports.is_replaceable).not.toHaveBeenCalled()
+		expect(ports.stop).not.toHaveBeenCalled()
+	})
+})
+
 describe('backlogrun_cli.run refusal', () => {
 	it('exits 1 without a board when the agent cannot start', async () => {
 		const { ports, lines } = harness(false, { kind: 'failed', note: 'no claude' })
@@ -74,7 +132,7 @@ describe('backlogrun_cli.run refusal', () => {
 		const { ports, lines } = harness(false)
 
 		await expect(backlogrun_cli.run(['--agent', 'gemini'], ports)).resolves.toBe(1)
-		expect(lines[0]).toMatch(/^Usage: josh backlogrun/u)
+		expect(lines[0]).toMatch(/^Usage: josh backlogrun \[<n>\.\.\.\] /u)
 		expect(ports.repository_directory).not.toHaveBeenCalled()
 	})
 
@@ -94,11 +152,7 @@ describe('backlogrun_cli.run --stop', () => {
 
 		await expect(backlogrun_cli.run(['--stop'], ports)).resolves.toBe(0)
 		expect(ports.stop).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY)
-		expect(lines).toStrictEqual([
-			'backlogrun: stopped the supervisor (process 4242)',
-			"backlogrun: ended the run's record",
-			'backlogrun: 1 lane(s) still running, not stopped: #3701',
-		])
+		expect(lines).toStrictEqual(STOPPED_LINES)
 		expect(ports.start).not.toHaveBeenCalled()
 		expect(ports.show_board).not.toHaveBeenCalled()
 	})
