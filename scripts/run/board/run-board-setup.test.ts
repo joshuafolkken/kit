@@ -13,7 +13,12 @@ const OPENING_278 = run_event_setup.opening_lane('278')
 const OPENING_279 = run_event_setup.opening_lane('279')
 const LAUNCH_278: Step = [KIND.CHILD_LAUNCH, '#278 launched']
 const MERGE_278: Step = [KIND.MERGE, '#278 merged']
-const IDLE = { setup: undefined, is_preparing: false }
+const PLAN_278: Step = [KIND.PLAN, 'planned #278']
+const IDLE = { setup: undefined, setup_ms: undefined, is_preparing: false }
+const OPENING_LANE = { ...IDLE, is_preparing: true }
+const SECOND = 1000
+const AT_MS = Date.parse(AT)
+const LANE_STAGES_279 = [run_event_setup.installing('279'), run_event_setup.dispatching('279')]
 
 // One event, as its kind and text.
 type Step = [string, string]
@@ -22,8 +27,18 @@ function setup(text: string): Step {
 	return [KIND.SETUP, text]
 }
 
+// When the step at `index` was written: each one a second after the one before it.
+function time_of(index: number): number {
+	return AT_MS + index * SECOND
+}
+
 function stream(...steps: ReadonlyArray<Step>): Array<RunEvent> {
-	return steps.map(([kind, text], index) => ({ pos: index + 1, at: AT, kind, text }))
+	return steps.map(([kind, text], index) => ({
+		pos: index + 1,
+		at: new Date(time_of(index)).toISOString(),
+		kind,
+		text,
+	}))
 }
 
 describe('run_board_setup.read before the first launch', () => {
@@ -37,6 +52,7 @@ describe('run_board_setup.read before the first launch', () => {
 
 		expect(run_board_setup.read(events)).toStrictEqual({
 			setup: STAGE.HANDING_OFF,
+			setup_ms: time_of(2),
 			is_preparing: true,
 		})
 	})
@@ -51,9 +67,30 @@ describe('run_board_setup.read before the first launch', () => {
 	})
 
 	it('keeps the stage past a position that is not a launch', () => {
-		const events = stream(setup(STAGE.PLANNING), [KIND.PLAN, 'planned #278'])
+		const events = stream(setup(STAGE.PLANNING), PLAN_278)
 
 		expect(run_board_setup.read(events).setup).toBe(STAGE.PLANNING)
+	})
+})
+
+// joshuafolkken/kit#3738: the stage's own time, so the board counts how long the run has stood there.
+describe('run_board_setup.read — when the run entered its stage', () => {
+	it('reads the stage’s time, and a newer stage’s once one follows', () => {
+		const judging = stream(setup(STAGE.HANDING_OFF), setup(STAGE.JUDGING))
+		const session = stream(setup(STAGE.HANDING_OFF), setup(STAGE.JUDGING), setup(STAGE.SESSION))
+
+		expect(run_board_setup.read(judging).setup_ms).toBe(time_of(1))
+		expect(run_board_setup.read(session)).toStrictEqual({
+			setup: STAGE.SESSION,
+			setup_ms: time_of(2),
+			is_preparing: true,
+		})
+	})
+
+	it('keeps the stage’s time past a position written after it', () => {
+		const events = stream(setup(STAGE.PLANNING), PLAN_278)
+
+		expect(run_board_setup.read(events).setup_ms).toBe(time_of(0))
 	})
 })
 
@@ -69,7 +106,7 @@ describe('run_board_setup.read after a drain that came before any launch', () =>
 	it('is preparing again once a lane opens for an issue the watch picked up', () => {
 		const events = stream(setup(STAGE.HANDING_OFF), DRAIN, setup(OPENING_278))
 
-		expect(run_board_setup.read(events)).toStrictEqual({ setup: undefined, is_preparing: true })
+		expect(run_board_setup.read(events)).toStrictEqual(OPENING_LANE)
 	})
 })
 
@@ -83,7 +120,14 @@ describe('run_board_setup.read after the first launch', () => {
 	it('is preparing again while a lane opens for the next child', () => {
 		const events = stream(setup(OPENING_278), LAUNCH_278, MERGE_278, setup(OPENING_279))
 
-		expect(run_board_setup.read(events)).toStrictEqual({ setup: undefined, is_preparing: true })
+		expect(run_board_setup.read(events)).toStrictEqual(OPENING_LANE)
+	})
+
+	// joshuafolkken/kit#3738: installing into the lane and dispatching its child name the issue too.
+	it.each(LANE_STAGES_279)('is preparing while the next child’s lane is at "%s"', (stage) => {
+		const events = stream(setup(OPENING_278), LAUNCH_278, MERGE_278, setup(stage))
+
+		expect(run_board_setup.read(events)).toStrictEqual(OPENING_LANE)
 	})
 
 	it('stops preparing at the launch the opening led to', () => {
@@ -108,6 +152,13 @@ describe('run_board_setup.is_lane_pending', () => {
 
 	it('holds back the lane a stage names, and no other, once a child has launched', () => {
 		const events = stream(setup(OPENING_278), LAUNCH_278, setup(OPENING_279))
+
+		expect(run_board_setup.is_lane_pending(events, 279)).toBe(true)
+		expect(run_board_setup.is_lane_pending(events, 300)).toBe(false)
+	})
+
+	it.each(LANE_STAGES_279)('holds back the lane "%s" names, and no other', (stage) => {
+		const events = stream(setup(OPENING_278), LAUNCH_278, setup(stage))
 
 		expect(run_board_setup.is_lane_pending(events, 279)).toBe(true)
 		expect(run_board_setup.is_lane_pending(events, 300)).toBe(false)

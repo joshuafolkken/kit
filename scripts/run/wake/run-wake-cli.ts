@@ -9,6 +9,7 @@ import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
@@ -166,6 +167,12 @@ function refuse_without_carry(kind: CarryRead['kind']): number {
 	return report(NONE_VERDICT, FAILURE_EXIT_CODE)
 }
 
+// **A session that started is said on the stream.** The driver's `waiting on judgment` is the moment it
+// asked; from here a session is at work on the answer, until the supervisor's next hand-off.
+function say_session_running(context: WakeContext): void {
+	run_event_setup.emit_to(context.event_target, run_event_setup.STAGE.SESSION, new Date())
+}
+
 function wake_session(
 	context: WakeContext,
 	invocation: string,
@@ -181,8 +188,11 @@ function wake_session(
 	// under `claude -p` a turn-end is the process's end (`run-headless.ts`).
 	const environment = run_headless.environment()
 	const target = { cwd: context.worktree, env: environment, log_path: context.log_target }
+	const result = run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
 
-	return run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
+	if (result.kind === 'launched') say_session_running(context)
+
+	return result
 }
 
 // **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record

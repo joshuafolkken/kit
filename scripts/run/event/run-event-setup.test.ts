@@ -21,6 +21,12 @@ const STREAM_GONE = 'the stream is gone'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-setup-'))
 
 const OPENING_278 = run_event_setup.opening_lane('278')
+// The stages of one lane's launch, in the order the launch passes them.
+const LANE_STAGES = [
+	OPENING_278,
+	run_event_setup.installing('278'),
+	run_event_setup.dispatching('278'),
+]
 // The stages the roll-off test writes ahead of its notes: the older one is the stream's one excess line.
 const STAGES_WRITTEN = 2
 
@@ -66,16 +72,22 @@ describe('run_event_setup stages', () => {
 			PLANNING: 'planning',
 			HANDING_OFF: 'handing off',
 			JUDGING: 'waiting on judgment',
+			SESSION: 'judgment session running',
 		})
-		expect(run_event_setup.opening_lane('278')).toBe('opening lane #278')
+		expect(LANE_STAGES).toStrictEqual([
+			'opening lane #278',
+			'installing dependencies #278',
+			'dispatching #278',
+		])
 	})
 
-	it('names an issue only where a lane opens', () => {
-		const named = [...Object.values(run_event_setup.STAGE), run_event_setup.opening_lane('278')]
+	it('names an issue only at the stages of a lane’s launch', () => {
+		const named = [...Object.values(run_event_setup.STAGE), ...LANE_STAGES]
 			.map((text) => ({ pos: 1, at: AT, kind: KIND.SETUP, text }))
 			.map((event) => run_event_scope.issue_named(event))
 
-		expect(named).toStrictEqual([undefined, undefined, undefined, undefined, '278'])
+		expect(named.slice(0, -LANE_STAGES.length).every((issue) => issue === undefined)).toBe(true)
+		expect(named.slice(-LANE_STAGES.length)).toStrictEqual(['278', '278', '278'])
 	})
 })
 
@@ -108,6 +120,31 @@ describe('run_event_setup.emit_in', () => {
 
 		expect(() => {
 			run_event_setup.emit_in(REPOSITORY, run_event_setup.STAGE.STARTING, new Date(AT))
+		}).not.toThrow()
+	})
+})
+
+// joshuafolkken/kit#3738: the supervisor's own append, to the stream path it already resolved.
+describe('run_event_setup.emit_to', () => {
+	it('writes the stage to the stream it is handed, dated the moment it was handed', () => {
+		const target = fresh_target()
+		const resolve = vi.spyOn(run_event_stream, 'target_of')
+
+		run_event_setup.emit_to(target, run_event_setup.STAGE.SESSION, new Date(AT))
+
+		expect(resolve).not.toHaveBeenCalled()
+		expect(run_event_stream.read_events(target)).toStrictEqual([
+			{ pos: 1, at: AT, kind: KIND.SETUP, text: run_event_setup.STAGE.SESSION },
+		])
+	})
+
+	it('swallows a stream that cannot be written rather than failing the session', () => {
+		vi.spyOn(run_event_stream, 'append').mockImplementation(() => {
+			throw new Error(STREAM_GONE)
+		})
+
+		expect(() => {
+			run_event_setup.emit_to(fresh_target(), run_event_setup.STAGE.SESSION, new Date(AT))
 		}).not.toThrow()
 	})
 })

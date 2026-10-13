@@ -4,6 +4,7 @@ import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { session_cite } from '#scripts/issue/session-cite'
 import { file_reader } from '#scripts/lib/read-file'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
 import { lane_install, type InstallResult } from './lane-install'
@@ -172,6 +173,13 @@ function guard_install(lane: LaneInfo, result: InstallResult): void {
 	)
 }
 
+// **The install is said on the run's stream as it starts**: it is the long part of opening a lane, and
+// `run:board` draws it apart from the work tree being made. Best-effort, as every stage is.
+async function fill(lane: LaneInfo): Promise<void> {
+	await run_event_setup.emit(run_event_setup.installing(lane.issue))
+	guard_install(lane, await lane_install.install_dependencies(lane.directory))
+}
+
 function build_plan(
 	repository_root: string,
 	root: string,
@@ -231,7 +239,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 		release_seat_lock(plan.seat_lock)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
 		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)
-		guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
+		await fill(plan.lane)
 	} finally {
 		release_seat_lock(plan.seat_lock)
 	}

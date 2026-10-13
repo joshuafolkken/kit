@@ -1,4 +1,5 @@
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -83,6 +84,8 @@ beforeEach(() => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+	// The stage a launch writes goes to the checkout's own stream, which is a live run's: never from a test.
+	vi.spyOn(run_event_setup, 'emit').mockReset().mockResolvedValue()
 })
 
 describe('lane_launch_cli.run — a refused lane:open never dispatches', () => {
@@ -248,6 +251,82 @@ describe('lane_launch_cli.launch_lane — a leftover lane no child was dispatche
 		})
 		expect(is_vacant_mock).toHaveBeenCalledWith(LEFTOVER)
 		expect(called(CLOSE)).toBe(false)
+	})
+})
+
+const INSTALLING = run_event_setup.installing(ISSUE)
+const DISPATCHING = run_event_setup.dispatching(ISSUE)
+
+const INSTALL = 'pnpm install'
+
+interface Recorded {
+	mock: { invocationCallOrder: ReadonlyArray<number> }
+}
+
+type Step = [label: string, order: number]
+
+// Each label with where its call fell among every mocked call.
+function steps(labels: ReadonlyArray<string>, recorded: Recorded): Array<Step> {
+	return labels.map((label, index) => [label, recorded.mock.invocationCallOrder[index] ?? 0])
+}
+
+function stages(): Array<string> {
+	return vi.mocked(run_event_setup.emit).mock.calls.map(([text]) => text)
+}
+
+function subcommands(): Array<string> {
+	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>)[0] ?? '')
+}
+
+// Every stage the launch said and every step it ran, in the order they happened.
+function timeline(): Array<string> {
+	const installs = mocked_execa.mock.calls.map(() => INSTALL)
+
+	return [
+		...steps(stages(), vi.mocked(run_event_setup.emit)),
+		...steps(subcommands(), josh_run_mock),
+		...steps(installs, mocked_execa),
+	]
+		.toSorted(([, left], [, right]) => left - right)
+		.map(([label]) => label)
+}
+
+// joshuafolkken/kit#3738: the long steps of a launch are stages of their own on the run's stream.
+describe('lane_launch_cli.launch_lane — the stages it says on the run’s stream', () => {
+	it('says the dispatch before it starts, and no install for a lane that pops no stash', async () => {
+		stub({ open: { code: OK, out: DIR }, dispatch: { code: OK, out: PID } })
+
+		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })
+
+		expect(timeline()).toStrictEqual([OPEN, DISPATCHING, DISPATCH])
+	})
+
+	it('says the first lane’s re-install before it runs, then the dispatch', async () => {
+		stub({ open: { code: OK, out: DIR }, dispatch: { code: OK, out: PID } })
+		stub_install(OK)
+
+		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: STASH[1] })
+
+		expect(timeline()).toStrictEqual([OPEN, POP, INSTALLING, INSTALL, DISPATCHING, DISPATCH])
+	})
+
+	it('says nothing when lane:open refuses, or when the stash pop does', async () => {
+		stub({ open: { code: FAILED, out: '' } })
+		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: undefined })
+
+		stub({ open: { code: OK, out: DIR }, pop: { code: FAILED, out: '' } })
+		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: STASH[1] })
+
+		expect(stages()).toStrictEqual([])
+	})
+
+	it('says no dispatch after a re-install that failed', async () => {
+		stub({ open: { code: OK, out: DIR } })
+		stub_install(FAILED)
+
+		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: STASH[1] })
+
+		expect(stages()).toStrictEqual([INSTALLING])
 	})
 })
 

@@ -214,15 +214,30 @@ function elapsed_of(ms: number): string {
 	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
 }
 
-// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
-// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
-function span_of(ms: number): string {
+// A length as its hours, and its minutes and seconds within the hour; a negative span reads as zero.
+function span_fields(ms: number): [hours: number, minutes: number, seconds: number] {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
 	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
 	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-	const tail = [minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
+
+	return [hours, minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
+}
+
+// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
+// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
+function span_of(ms: number): string {
+	const [hours, ...tail] = span_fields(ms)
 
 	return [String(hours), ...tail.map((value) => two_digits(value))].join(':')
+}
+
+// How long the run has stood at its stage, as `M:SS` with the minutes not padded, and as `span_of`'s
+// `H:MM:SS` from an hour on. It stands beside the stage's words, never in the header's time column, so
+// its one separator is not read there as a time of day.
+function stage_span_of(ms: number): string {
+	const [hours, minutes, seconds] = span_fields(ms)
+
+	return hours === 0 ? `${String(minutes)}:${two_digits(seconds)}` : span_of(ms)
 }
 
 function is_shade(color: Paint): color is Shade {
@@ -294,6 +309,7 @@ const run_board_labels = {
 	painted,
 	span_of,
 	spinner_of,
+	stage_span_of,
 }
 
 export { run_board_labels }

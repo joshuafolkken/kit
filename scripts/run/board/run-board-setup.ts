@@ -11,11 +11,14 @@ interface SetupRead {
 	// The newest stage's own words while the run is starting; `undefined` from the first launch — or a
 	// drain before one — on, when the plan's counts say more than a stage does.
 	setup: string | undefined
+	// When the run entered that stage — its event's own time, so how long the run has stood there is
+	// counted from a record; `undefined` wherever `setup` is.
+	setup_ms: number | undefined
 	// The run is getting a child ready: any stage while it is starting, a lane opening after that.
 	is_preparing: boolean
 }
 
-const NO_SETUP: SetupRead = { setup: undefined, is_preparing: false }
+const NO_SETUP: SetupRead = { setup: undefined, setup_ms: undefined, is_preparing: false }
 
 function is_setup(event: RunEvent): boolean {
 	return event.kind === KIND.SETUP
@@ -47,9 +50,12 @@ function read(events: ReadonlyArray<RunEvent>): SetupRead {
 	const stage = events.findLast((event) => is_setup(event))
 
 	if (stage === undefined) return NO_SETUP
-	if (!has_started(events)) return { setup: stage.text, is_preparing: true }
 
-	return { setup: undefined, is_preparing: is_opening(events, stage) }
+	if (!has_started(events)) {
+		return { setup: stage.text, setup_ms: Date.parse(stage.at), is_preparing: true }
+	}
+
+	return { ...NO_SETUP, is_preparing: is_opening(events, stage) }
 }
 
 function names(event: RunEvent, issue: number): boolean {
