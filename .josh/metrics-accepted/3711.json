@@ -1,0 +1,7 @@
+{
+	"reason": "New josh sync migration (#3711): the single list of consumer-resolved tools and its add-when-undeclared merge are new behavior; the list josh init held was moved, not duplicated",
+	"date": "2026-10-13",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}
