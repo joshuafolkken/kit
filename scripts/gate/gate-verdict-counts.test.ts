@@ -4,6 +4,7 @@ import { NOTHING_TO_CHECK_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
+import { project_checks } from './project-checks'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -161,6 +162,16 @@ describe('josh gate — the verdict of a gate that ran some of its checks', () =
 		const [, verdict] = await run_gate(with_first(PARTLY_SKIPPED, STEP_TOTAL))
 
 		expect(verdict).toContain(`✔ verification gate passed (${String(STEP_TOTAL)} checks) in`)
+	})
+
+	// A `basic` project with an ESLint configuration and no Web file: Prettier is skipped and a clean
+	// eslint prints nothing of its own, so what `lint` says for it is the notice that it ran.
+	it('counts a check whose one tool ran clean beside a skipped one as one that ran', async () => {
+		const silent_tool = `${SKIP_NOTICE}\n${project_checks.ran_notice('eslint')}\n`
+		const bodies = GATE_STEPS.map((_step, index) => (index === 0 ? silent_tool : SKIP_NOTICE))
+		const [, verdict] = await run_gate(bodies)
+
+		expect(verdict).toContain(`passed (1 ran, ${String(STEP_TOTAL - 1)} skipped)`)
 	})
 
 	// An ordinary consumer: `exports` has nothing to check on every run, and nothing was skipped.

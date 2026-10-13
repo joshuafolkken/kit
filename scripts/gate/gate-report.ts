@@ -96,7 +96,8 @@ function has_checker_warning(result: GateStepResult): boolean {
 // have the verdict say nothing ran on a gate that checked the formatting. And a check can run with
 // nothing of the project's to look at — `exports` in a consumer, `behavior` with no transcript — which
 // is no skip, and still left an empty `basic` project reading `2 ran`. A line that is neither notice is
-// something a tool printed, so the check ran.
+// something a tool printed, so the check ran. A tool that ran clean and silent beside a skipped one is
+// given a line of its own by the check (`project_checks.ran_notice`), so the reading holds for it too.
 //
 // **pnpm's script header is not something the check printed.** Every check is spawned as
 // `pnpm josh <target>`, and where the project declares a `josh` script — `josh init` writes one — pnpm
