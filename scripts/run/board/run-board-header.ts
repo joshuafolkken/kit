@@ -4,23 +4,24 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
+import { run_board_now } from './run-board-now'
 import { run_board_render_slot } from './run-board-render-slot'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
 // and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
-// events); nothing here guesses one. Lines of symbols rather than sentences: the `⏰` that moves every
-// second is the proof the board is live, so no `updated` line is drawn. **Always two lines, in three
-// columns**: the run's mark and name over its repository's, the run's age over the `💓`, then the
-// progress over the machine the run is on — so the first line reads as how far the run is and the
-// second as what it runs on, a slow run apart from a stuck one. Both are written the same while the
-// run works and while it waits, so a wait is read off the mark and the `💓` rather than off a line
-// that changes shape. A value not read yet is drawn `-`, never `0`, so a header still loading reads
-// as unknown rather than as an empty run.
+// events); nothing here guesses one. Two lines of symbols rather than sentences: the `⏰` that moves
+// every second is the proof the board is live, so no `updated` line is drawn. **Always three lines,
+// the first two in three columns**: the run's mark and name over its repository's, the run's age over
+// the `💓`, then the progress over the machine the run is on — so the first line reads as how far the
+// run is and the second as what it runs on, a slow run apart from a stuck one. The third says in words
+// what the run is doing now (`run-board-now.ts`), under the second column. All three are written the
+// same while the run works and while it waits, so a wait is read off the mark, the `💓` and the third
+// line's words rather than off a line that changes shape. A value not read yet is drawn `-`, never
+// `0`, so a header still loading reads as unknown rather than as an empty run.
 
-const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of, stage_span_of } =
-	run_board_labels
+const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
 const UNKNOWN = '-'
 const BLANK = ' '
@@ -75,7 +76,7 @@ interface BoardCounts {
 	remaining: number
 }
 
-// `setup` is a run with no child running that is getting one ready (`run-board-setup.ts`).
+// `setup` is a run with no child running that is itself at work on a stage (`run-board-setup.ts`).
 type RunMark = 'running' | 'setup' | 'idle' | 'human' | 'stopped'
 
 type TextColor = Parameters<typeof styleText>[0]
@@ -104,18 +105,15 @@ function counts_of(layout: BoardLayout): BoardCounts {
 
 // The marks of a run that is working: they turn the spinner, and only they can go stale.
 const WORKING_MARKS: ReadonlySet<RunMark> = new Set<RunMark>(['running', 'setup'])
-// What follows the stage once the plan is read: how many issues the run is setting up for.
-const STAGE_SEPARATOR = ' · '
-const PLANNED = 'planned'
 
-// Nothing running: the run is waiting on a person when all the plan has left is what
-// `needs-decision` holds; otherwise it is getting a child ready, or idle.
+// Nothing running: the run is at work on a stage of its own; else it is waiting on a person when all
+// the plan has left is what `needs-decision` holds, or idle.
 function quiet_mark(header: BoardHeader): RunMark {
 	const { layout } = header
 
-	if (layout?.waves.length === 0 && layout.people.length > 0) return 'human'
+	if (header.activity.setup !== undefined) return 'setup'
 
-	return header.activity.is_preparing === true ? 'setup' : 'idle'
+	return layout?.waves.length === 0 && layout.people.length > 0 ? 'human' : 'idle'
 }
 
 // The run's state, each state overriding the ones below it.
@@ -256,38 +254,23 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string>
 	]
 }
 
-// How long the run has stood at its stage, after the stage's words: it counts on while the stage holds
-// and starts again at the next one, so a stage that is taking long is told from one just entered. The
-// mark's spinner turns on every redraw whether or not the run moved; this is read from the stage's own
-// event. Nothing where the stream gave the stage no time.
-function stage_age(header: BoardHeader): string {
-	const since = header.activity.setup_ms
-
-	return since === undefined ? '' : ` ${stage_span_of(header.now_ms - since)}`
-}
-
-// The stage a run is at before its first child launches, standing where the progress will: a tally of
-// nothing settled says less than what the run is doing. Only a run marked as setting up is at a stage:
-// a stopped run and one waiting on a person keep their progress.
-function stage_part(counts: BoardCounts, header: BoardHeader, mark: RunMark): string | undefined {
-	const { setup } = header.activity
-
-	if (setup === undefined || mark !== 'setup') return undefined
-
-	const stage = `${setup}${stage_age(header)}`
-
-	if (!is_plan_read(header)) return stage
-
-	return `${stage}${STAGE_SEPARATOR}${String(counts.total)} ${PLANNED}`
-}
-
-// The run's stage or its progress, then what its plan read is doing.
-function progress_part(counts: BoardCounts, header: BoardHeader, mark: RunMark): string {
-	const stage = stage_part(counts, header, mark)
-	const progress = stage === undefined ? progress_parts(counts, header) : [stage]
-	const parts = [...progress, loading_part(header), plan_warning(header)]
+// The run's progress, then what its plan read is doing.
+function progress_part(counts: BoardCounts, header: BoardHeader): string {
+	const parts = [...progress_parts(counts, header), loading_part(header), plan_warning(header)]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
+}
+
+// What the run is doing now, in words (`run-board-now.ts`).
+function now_part(counts: BoardCounts, header: BoardHeader): string {
+	return run_board_now.line_of({
+		now_ms: header.now_ms,
+		ended_ms: header.ended_ms,
+		activity: header.activity,
+		running: counts.running,
+		waiting: is_plan_read(header) ? counts.remaining : undefined,
+		people: layout_of(header).people.length,
+	})
 }
 
 // The gauges the machine line draws: every one on a screen, the memory alone in a chat.
@@ -311,25 +294,25 @@ function machine_part(counts: BoardCounts, header: BoardHeader): string {
 	return run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
 }
 
-// Both lines' cells of one column, the narrower padded to the wider as the terminal counts them.
+// The lines' cells of one column, the narrower padded to the wider as the terminal counts them.
 function column_of(cells: ReadonlyArray<string>): Array<string> {
 	const width = Math.max(...cells.map((cell) => run_board_fit.width_of(cell)))
 
 	return cells.map((cell) => cell_of(cell, width))
 }
 
-// The run's name, age and progress, then its repository, heartbeat and machine under them, in every
+// The run's name, age and progress, then its repository, heartbeat and machine under them, then what
+// it is doing now under the second column — the name's column left blank, with no label — in every
 // state the board can be in.
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
 	const mark = mark_of(header, counts.running)
-	const columns = [
-		column_of([run_part(mark, header.spinner), repo_part(header, mark)]),
-		column_of(time_parts(header, mark)),
-		[progress_part(counts, header, mark), machine_part(counts, header)],
-	]
+	const names = column_of([run_part(mark, header.spinner), repo_part(header, mark), ''])
+	const times = column_of(time_parts(header, mark))
+	const lasts = [progress_part(counts, header), machine_part(counts, header)]
+	const now = [names.at(-1), now_part(counts, header)].join(GAP).trimEnd()
 
-	return [0, 1].map((line) => columns.map((column) => column[line]).join(GAP))
+	return [...lasts.map((last, line) => [names[line], times[line], last].join(GAP)), now]
 }
 
 const run_board_header = { counts_of, header_lines, is_plan_read }

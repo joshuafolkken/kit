@@ -1,24 +1,29 @@
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
-// What the run's `setup` events (`run-event-setup.ts`) tell `run:board`: the stage a run is at before
-// its first child launches, whether it is preparing a launch now, and which lanes are not children yet.
-// The events carry it all — nothing here infers a stage from which records exist.
+// What the run's `setup` events (`run-event-setup.ts`) tell `run:board`: the stage the run is at now,
+// and which lanes are not children yet. The events carry it all — nothing here infers a stage from
+// which records exist.
 
 const KIND = run_event_stream.EVENT_KIND
+const { STAGE } = run_event_setup
 
 interface SetupRead {
-	// The newest stage's own words while the run is starting; `undefined` from the first launch — or a
-	// drain before one — on, when the plan's counts say more than a stage does.
+	// The stage the run itself is working at, in the stage's own words: any stage while the run is
+	// starting; from the first launch — or a drain before one — on, a lane opening or a judgment session.
+	// `undefined` where the run is at none.
 	setup: string | undefined
 	// When the run entered that stage — its event's own time, so how long the run has stood there is
 	// counted from a record; `undefined` wherever `setup` is.
 	setup_ms: number | undefined
-	// The run is getting a child ready: any stage while it is starting, a lane opening after that.
-	is_preparing: boolean
 }
 
-const NO_SETUP: SetupRead = { setup: undefined, setup_ms: undefined, is_preparing: false }
+const NO_SETUP: SetupRead = { setup: undefined, setup_ms: undefined }
+
+// The stages of a hand-back to a session. Only the supervisor's next hand-off ends one, whatever the
+// session writes to the stream meanwhile.
+const JUDGMENT_STAGES: ReadonlySet<string> = new Set([STAGE.JUDGING, STAGE.SESSION])
 
 function is_setup(event: RunEvent): boolean {
 	return event.kind === KIND.SETUP
@@ -46,16 +51,20 @@ function is_opening(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
 	return position === undefined || position.pos < stage.pos
 }
 
+// Whether the run is at `stage` now: at any stage while it is starting; after that only at one it is
+// itself working through.
+function is_standing(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
+	if (!has_started(events) || JUDGMENT_STAGES.has(stage.text)) return true
+
+	return is_opening(events, stage)
+}
+
 function read(events: ReadonlyArray<RunEvent>): SetupRead {
 	const stage = events.findLast((event) => is_setup(event))
 
-	if (stage === undefined) return NO_SETUP
+	if (stage === undefined || !is_standing(events, stage)) return NO_SETUP
 
-	if (!has_started(events)) {
-		return { setup: stage.text, setup_ms: Date.parse(stage.at), is_preparing: true }
-	}
-
-	return { ...NO_SETUP, is_preparing: is_opening(events, stage) }
+	return { setup: stage.text, setup_ms: Date.parse(stage.at) }
 }
 
 function names(event: RunEvent, issue: number): boolean {

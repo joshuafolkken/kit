@@ -3,8 +3,8 @@ import { error_text } from '#scripts/lib/error-message'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 
-// The stages a run passes between `josh backlogrun` and its first child, each written to the stream as
-// one `setup` event by the step that enters it. **The text is the stage's own words**: `run:board` draws
+// The stages a run passes between `josh backlogrun` and its first child, and those of a later hand-back
+// to a session, each written to the stream as one `setup` event by the step that enters it. **The text is the stage's own words**: `run:board` draws
 // it as written, so the message a person reads and the `💓` beside it come from one event and cannot
 // disagree. Only the stages of a lane's launch — opening it, installing into it, dispatching its child —
 // name an issue, which is how a reader tells them from the stages before them.
