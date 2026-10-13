@@ -135,3 +135,15 @@ describe('project file detection', () => {
 		}
 	})
 })
+
+describe('project file detection beside the files kit wrote', () => {
+	it('leaves the files kit wrote out of the Web detection (#3713)', () => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, '.pnpmfile.mjs'), 'export {}')
+		writeFileSync(path.join(root, 'prettier.config.mjs'), 'export default {}')
+		expect(project_profile.inspect_project(root).has_web).toBe(false)
+		writeFileSync(path.join(root, 'app.mjs'), 'export {}')
+		expect(project_profile.inspect_project(root).has_web).toBe(true)
+	})
+})
