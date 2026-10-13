@@ -295,6 +295,16 @@ Make the first commit of a dogfood run's own kit-test-* project
 
 ---
 
+### `josh fresh:run` · `josh fr`
+
+> **Audience:** maintainer · **Side effects:** files, network, processes
+
+`<pattern> | --spec <file.json> [--package-version <version>] [--log-dir <dir>] [--rebuild] | --list`
+
+Run an install scenario in a Docker container of a machine with nothing installed, and keep the log
+
+---
+
 ### `josh init` · `josh i`
 
 > **Audience:** developer · **Side effects:** files, network, processes

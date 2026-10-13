@@ -29,6 +29,17 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<dir>', 'automation', ['files', 'git']],
 		is_kit_only: true,
 	},
+	'fresh:run': {
+		script: 'scripts/fresh-machine/fresh-machine-cli.ts',
+		description:
+			'Run an install scenario in a Docker container of a machine with nothing installed, and keep the log',
+		category: 'Project',
+		reference: [
+			'<pattern> | --spec <file.json> [--package-version <version>] [--log-dir <dir>] [--rebuild] | --list',
+			'maintainer',
+			['files', 'network', 'processes'],
+		],
+	},
 	init: {
 		script: 'scripts/init/init.ts',
 		description: 'Initialize config in a new project',

@@ -2,6 +2,12 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The gh apt repository's paths and bash's flags for a shell that reads no rc file, in the
+  # fresh-machine image and probes (#3714).
+  - keyrings
+  - githubcli
+  - noprofile
+  - norc
   # The GitHub heading anchor of the troubleshooting entry for `bin/pnpm.cjs` not found (#3725).
   - binpnpmcjs
   # The signal a pipe reader that exits early sends a writer, exit 141 under `pipefail` (#3570).

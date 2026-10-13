@@ -80,6 +80,7 @@ const ALIASES: Record<string, string> = {
 	rvf: 'review:findings',
 	ruv: 'rule:value',
 	ev: 'eval',
+	fr: 'fresh:run',
 	lsm: 'lane:sample',
 	lst: 'lane:stats',
 	lli: 'lane:limit',
