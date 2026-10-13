@@ -26,6 +26,7 @@ const PRETTIER_IGNORE = '.prettierignore'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CI_WORKFLOW = '.github/workflows/ci.yml'
 const CODERABBIT = '.coderabbit.yaml'
+const AGENT_POINTERS = ['AGENTS', 'GEMINI']
 // What `josh init` deliberately leaves out of a basic project.
 const FULL_ONLY_FILES = [
 	CI_WORKFLOW,
@@ -49,6 +50,10 @@ function read_project_file(name: string): string {
 
 function read_template(name: string): string {
 	return readFileSync(path.join(REPOSITORY_ROOT, 'templates', name), 'utf8')
+}
+
+function read_repository_file(name: string): string {
+	return readFileSync(path.join(REPOSITORY_ROOT, name), 'utf8')
 }
 
 function prettier_config(preset: string): string {
@@ -100,6 +105,19 @@ describe('josh sync file set in a basic project', () => {
 		expect(read_project_file(WORKSPACE_YAML)).toContain('esbuild: true')
 		expect(read_project_file(WORKSPACE_YAML)).not.toContain('overrides:')
 	})
+
+	it.each(AGENT_POINTERS)(
+		'replaces the full %s.md an earlier init wrote with the basic one',
+		async (name) => {
+			const filename = `${name}.md`
+
+			writeFileSync(project_file(filename), read_repository_file(filename))
+			await run_sync(BASIC)
+
+			expect(read_project_file(filename)).toBe(read_template(`${name}.basic.md`))
+			expect(read_project_file(filename)).not.toContain('prompts/')
+		},
+	)
 })
 
 describe('josh sync path migration in a basic project', () => {
@@ -157,8 +175,16 @@ describe('josh sync AI files in a full project', () => {
 		expect(existsSync(project_file(CI_WORKFLOW))).toBe(true)
 		expect(existsSync(project_file(CODERABBIT))).toBe(true)
 		expect(read_project_file(CLAUDE_MD)).toContain(FULL_IMPORT)
-		expect(read_project_file(PRETTIER_IGNORE)).toBe(
-			readFileSync(path.join(REPOSITORY_ROOT, PRETTIER_IGNORE), 'utf8'),
-		)
+		expect(read_project_file(PRETTIER_IGNORE)).toBe(read_repository_file(PRETTIER_IGNORE))
+	})
+
+	it.each(AGENT_POINTERS)('still writes the %s.md that names the hook rules', async (name) => {
+		write_manifest('full')
+		const { sync_ai_files } = await import('./sync-ai-files')
+
+		sync_ai_files.sync_ai_copy_all(false)
+
+		expect(read_project_file(`${name}.md`)).not.toBe(read_template(`${name}.basic.md`))
+		expect(read_project_file(`${name}.md`)).toContain('collaboration-workflow/principles.md')
 	})
 })

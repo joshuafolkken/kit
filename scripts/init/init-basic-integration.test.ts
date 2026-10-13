@@ -143,6 +143,21 @@ describe('Git-free basic initialization', () => {
 	})
 })
 
+describe('basic initialization of the agent pointers', () => {
+	it.each([
+		['AGENTS.md', 'CLAUDE.md'],
+		['GEMINI.md', '@CLAUDE.md'],
+	])('writes a %s that names %s and no file a basic project lacks', async (filename, target) => {
+		write_index_html()
+		await run_init()
+		const pointer = readFileSync(path.join(paths_mock.root, filename), 'utf8')
+
+		// What a basic project does not have, so its agent pointers must not send a reader there.
+		expect(pointer).not.toMatch(/\.codex|\.claude\/|prompts\//u)
+		expect(pointer).toContain(target)
+	})
+})
+
 describe('Git-free Web and node initialization', () => {
 	it('uses a module-safe Prettier config for a CommonJS site', async () => {
 		writeFileSync(path.join(paths_mock.root, PACKAGE_JSON), '{"type":"commonjs"}')

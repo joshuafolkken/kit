@@ -25,9 +25,11 @@ const PRETTIER_IGNORE = '.prettierignore'
 const GIT_ATTRIBUTES = '.gitattributes'
 const CODE_OF_CONDUCT = 'CODE_OF_CONDUCT.md'
 const { SECURITY_MD } = security_policy
+const AGENTS_MD = 'AGENTS.md'
+const GEMINI_MD = 'GEMINI.md'
 const BASIC_AI_FILES = [
-	'AGENTS.md',
-	'GEMINI.md',
+	AGENTS_MD,
+	GEMINI_MD,
 	PRETTIER_IGNORE,
 	GIT_ATTRIBUTES,
 	CODE_OF_CONDUCT,
@@ -36,6 +38,8 @@ const BASIC_AI_FILES = [
 ]
 // A basic project gets its own template for these, not kit's development copy.
 const BASIC_SOURCES: Readonly<Record<string, string>> = {
+	[AGENTS_MD]: 'templates/AGENTS.basic.md',
+	[GEMINI_MD]: 'templates/GEMINI.basic.md',
 	[PRETTIER_IGNORE]: 'templates/prettierignore.basic',
 	[WORKSPACE_YAML]: 'templates/pnpm-workspace.basic.yaml',
 }

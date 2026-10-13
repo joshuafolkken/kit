@@ -51,3 +51,17 @@ describe('profile-specific AI files', () => {
 		expect(init_ai_copy.ai_file_source('AGENTS.md')).toBe('AGENTS.md')
 	})
 })
+
+describe('profile-specific agent pointers', () => {
+	it.each(['AGENTS', 'GEMINI'])(
+		'writes %s.md from the basic template on basic and from kit on full',
+		(name) => {
+			const filename = `${name}.md`
+
+			expect(init_ai_copy.ai_file_source(filename, BASIC_SHAPE)).toBe(`templates/${name}.basic.md`)
+			expect(init_ai_copy.ai_file_source(filename, { ...BASIC_SHAPE, profile: 'full' })).toBe(
+				filename,
+			)
+		},
+	)
+})
