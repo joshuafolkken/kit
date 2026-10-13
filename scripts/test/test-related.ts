@@ -22,11 +22,12 @@ import { test_unit_guard } from './test-unit-guard'
 // project with no unit suite the record would say the tests were green over a run in which none
 // executed, and `josh review:brief` would stop refusing on the strength of it. **The guard's own
 // decision is asked again rather than re-derived here**, so the two can never disagree; it is asked
-// only when a record is otherwise due, since the question costs a project-wide glob.
+// only when a record is otherwise due, since the question costs a project-wide glob. A basic project's
+// own test script counts as a run: it executes the whole suite, which covers any narrowing.
 function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 	if (before === undefined) return undefined
 
-	return test_unit_guard.guard_action(process.cwd()) === 'run' ? before : undefined
+	return test_unit_guard.is_running(process.cwd()) ? before : undefined
 }
 
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {

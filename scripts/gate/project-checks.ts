@@ -181,6 +181,7 @@ const project_checks = {
 	prettier_skip_reason,
 	project_root,
 	ran_notice,
+	read_manifest,
 	skip_notice,
 	type_check_skip_reason,
 }
