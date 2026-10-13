@@ -368,6 +368,21 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 	it('carries no stale hard-coded threshold', () => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).not.toContain('200,000')
 	})
+
+	// joshuafolkken/kit#3734: the refusal carried the held run's instruction beside the lane child's, and
+	// a lane child sent the ⏸️ confirmation for a cut that resumes itself.
+	it('owes no Telegram for a cut that resumes itself', () => {
+		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain('no Telegram is owed')
+	})
+
+	// **The held run's half is `run:cut --impl`'s own to print**, where it has relaunched nothing — so a
+	// lane child is never handed an instruction that is not its own.
+	it.each([['`confirmation`'], ['fullrun #'], ['keep the hold']])(
+		'leaves %j to the command that relaunched nothing',
+		(marker) => {
+			expect(implementation_cut.IMPLEMENTATION_CUT_REASON).not.toContain(marker)
+		},
+	)
 })
 
 describe('decide — fires per crossing, lets a reissue through', () => {

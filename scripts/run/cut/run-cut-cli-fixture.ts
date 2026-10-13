@@ -67,8 +67,15 @@ const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const info = vi.spyOn(console, 'info').mockReturnValue()
 
+const errors = vi.spyOn(console, 'error').mockReturnValue()
+
 function verdict(): string {
 	return String(info.mock.calls.at(-1)?.[0])
+}
+
+// Everything the command wrote to standard error — where it tells the run what to do beside the verdict.
+function printed_errors(): string {
+	return errors.mock.calls.flat().join('\n')
 }
 
 // **The relaunch starts the child at the effort of the phase it resumes into**, so
@@ -99,7 +106,6 @@ function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
 function install(): void {
 	// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-	vi.spyOn(console, 'error').mockReturnValue()
 	writeFileSync(HANDOFF_PATH, JSON.stringify(HANDOFF))
 
 	beforeEach(() => {
@@ -141,6 +147,7 @@ const run_cut_cli_fixture = {
 	session_verdict,
 	emit,
 	verdict,
+	printed_errors,
 	worker_argv,
 	WITH_HANDOFF,
 	existing_cut,
