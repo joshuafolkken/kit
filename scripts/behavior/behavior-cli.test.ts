@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { NOTHING_TO_CHECK_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { behavior_cli } from './behavior-cli'
 import { behavior_test_fixture } from './behavior-test-fixture'
@@ -71,7 +72,16 @@ describe('behavior_cli.check_session', () => {
 		const code = behavior_cli.check_session(missing_file())
 
 		expect(code).toBe(PASS_EXIT_CODE)
-		expect(output.info.join('\n')).not.toContain('skipping')
+		expect(output.info.join('\n')).not.toContain(SKIP_MARKER)
+	})
+
+	// The gate's verdict reads this marker so a run with no transcript is not counted as a check that ran.
+	it('says an unreadable transcript left it nothing to check', () => {
+		const output = capture()
+
+		behavior_cli.check_session(missing_file())
+
+		expect(output.info.join('\n')).toContain(NOTHING_TO_CHECK_MARKER)
 	})
 })
 

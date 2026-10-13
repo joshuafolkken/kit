@@ -6,7 +6,8 @@ import { josh_verdict } from './josh-verdict'
 // the line `josh time` matches are built from one prefix, so a reworded verdict cannot leave the
 // detector matching a string nothing prints any more.
 
-const STEP_COUNT = '4'
+const ALL_RAN = { ran: 4, skipped: 0 }
+const SKIPPED = 6
 const TOTAL = '15.1s'
 const FAILED_LABELS = 'lint, cspell'
 const STEP_HEADER = '✗ lint (pnpm josh lint) 4.2s'
@@ -16,7 +17,7 @@ const CORES = 10
 
 describe('the verdict line a josh command prints about itself', () => {
 	it('reads back the passed line it formats', () => {
-		const line = josh_verdict.format_gate_passed(STEP_COUNT, TOTAL)
+		const line = josh_verdict.format_gate_passed(ALL_RAN, TOTAL)
 
 		expect(josh_verdict.read_verdict(line)).toBe(josh_verdict.PASSED_VERDICT)
 	})
@@ -28,7 +29,7 @@ describe('the verdict line a josh command prints about itself', () => {
 	})
 
 	it('keeps the wording the documented output shows', () => {
-		expect(josh_verdict.format_gate_passed(STEP_COUNT, TOTAL)).toBe(
+		expect(josh_verdict.format_gate_passed(ALL_RAN, TOTAL)).toBe(
 			'✔ verification gate passed (4 checks) in 15.1s.',
 		)
 		expect(josh_verdict.format_gate_failed(FAILED_LABELS, TOTAL)).toBe(
@@ -48,6 +49,29 @@ describe('the verdict line a josh command prints about itself', () => {
 		expect(josh_verdict.read_verdict(STEP_HEADER)).toBeUndefined()
 		expect(josh_verdict.read_verdict('  ✗ eslint')).toBeUndefined()
 		expect(josh_verdict.read_verdict('')).toBeUndefined()
+	})
+})
+
+// A gate's planned number of checks said nothing about how many ran: a `basic` project whose every
+// check skipped printed the line a gate that ran them all prints.
+describe('the verdict line of a gate that skipped checks', () => {
+	it('names how many ran and how many were skipped', () => {
+		expect(josh_verdict.format_gate_passed({ ran: 2, skipped: 4 }, TOTAL)).toBe(
+			'✔ verification gate passed (2 ran, 4 skipped) in 15.1s.',
+		)
+	})
+
+	it('does not say passed when no check ran', () => {
+		expect(josh_verdict.format_gate_unverified(SKIPPED, TOTAL)).toBe(
+			'⚠ verification gate not verified (0 ran, 6 skipped) in 15.1s.',
+		)
+	})
+
+	it('reads the not-verified line back as its own verdict, never as passed', () => {
+		const line = josh_verdict.format_gate_unverified(SKIPPED, TOTAL)
+
+		expect(josh_verdict.read_verdict(line)).toBe(josh_verdict.UNVERIFIED_VERDICT)
+		expect(josh_verdict.read_verdict(line)).not.toBe(josh_verdict.PASSED_VERDICT)
 	})
 })
 
@@ -74,7 +98,7 @@ describe('the opening line a gate prints before its checks', () => {
 	// The narrowness is the safety: a forwarded body read as the opening line would start the region
 	// above the lines the bound exists to keep readable.
 	it('is silent about the verdict, a step header and a line that merely plans something', () => {
-		expect(josh_verdict.is_gate_opening(josh_verdict.format_gate_passed(STEP_COUNT, TOTAL))).toBe(
+		expect(josh_verdict.is_gate_opening(josh_verdict.format_gate_passed(ALL_RAN, TOTAL))).toBe(
 			false,
 		)
 		expect(josh_verdict.is_gate_opening(STEP_HEADER)).toBe(false)

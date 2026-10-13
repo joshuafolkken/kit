@@ -27,6 +27,7 @@ const GREEN_GATE_FORWARDING_WARNING = [
 	THIRD_PARTY_WARNING,
 	GATE_PASSED_BODY,
 ].join('\n')
+const GATE_UNVERIFIED_LINE = '⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.'
 const RED_GATE_FORWARDING_WARNING = [
 	'',
 	LINT_STEP_FAILED,
@@ -112,6 +113,14 @@ describe('reading a failure line out of what a josh command printed', () => {
 
 	it('leaves a green gate alone', () => {
 		expect(time_reported_failure.has_failure_line(GATE_PASSED_BODY)).toBe(false)
+	})
+
+	// A gate that ran no check states `not verified`: not a pass, and not a failed call either, so a
+	// line a skip notice forwarded in front of it is discarded as it is in front of `passed`.
+	it('leaves a gate that ran no check alone when it forwarded a line opening with the icon', () => {
+		const unverified = [GATE_OPENING, THIRD_PARTY_WARNING, GATE_UNVERIFIED_LINE].join('\n')
+
+		expect(time_reported_failure.has_failure_line(unverified)).toBe(false)
 	})
 })
 

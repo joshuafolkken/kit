@@ -180,6 +180,38 @@ describe('basic project lint', () => {
 	})
 })
 
+describe('basic project lint — a tool that ran clean beside a skipped one', () => {
+	it('says ESLint ran when it is clean beside a skipped Prettier', async () => {
+		basic_project()
+		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
+		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(undefined)
+		mocked_execa.mockResolvedValue(fake_result(0))
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_parallel_checks()).toBe(0)
+		expect(stdout).toHaveBeenCalledWith(`${project_checks.ran_notice('eslint')}\n`)
+	})
+
+	it('adds no notice for a failing tool beside a skipped one', async () => {
+		basic_project()
+		mocked_execa.mockResolvedValue(fake_result(1))
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_parallel_checks()).toBe(1)
+		expect(stdout).not.toHaveBeenCalledWith(expect.stringContaining('ran and reported'))
+	})
+
+	it('adds no notice when neither tool is skipped', async () => {
+		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(undefined)
+		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(undefined)
+		mock_exit_codes(0, 0)
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_parallel_checks()).toBe(0)
+		expect(stdout).not.toHaveBeenCalled()
+	})
+})
+
 describe('basic project lint over the changed files', () => {
 	it('skips the same tools the whole-tree run skips', async () => {
 		basic_project()

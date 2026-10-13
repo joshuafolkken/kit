@@ -35,7 +35,7 @@ import { status_icons } from '#scripts/lib/status-icons'
 // gate's plan line is what says "the gate starts here", and it is single-sourced for the reason the
 // verdict is: the printer builds it and the detector matches it from one place.
 
-const { FAIL_ICON, PASS_ICON } = status_icons
+const { FAIL_ICON, PASS_ICON, WARN_ICON } = status_icons
 const GATE_SUBJECT = 'verification gate'
 
 // The prefixes are what the detector matches **and** what the printer builds its line from, so a
@@ -43,16 +43,41 @@ const GATE_SUBJECT = 'verification gate'
 // this module exists to prevent.
 const GATE_PASSED_PREFIX = `${PASS_ICON} ${GATE_SUBJECT} passed`
 const GATE_FAILED_PREFIX = `${FAIL_ICON} ${GATE_SUBJECT} failed`
+// **A gate that ran no check has not passed, and it has not failed either.** Every check of a `basic`
+// project with nothing to check exits 0 with a skip notice, which is a legitimate state — the exit code
+// stays 0, or such a project could never commit — but a line reading `passed` made it indistinguishable
+// from a gate that ran every check. It opens with neither icon and neither word, so no reader of the
+// other two prefixes can take it for one of them.
+const GATE_UNVERIFIED_PREFIX = `${WARN_ICON} ${GATE_SUBJECT} not verified`
 
-type JoshVerdict = 'passed' | 'failed'
+type JoshVerdict = 'passed' | 'failed' | 'unverified'
 
 // Typed rather than left to inference: the namespace object widens a bare literal to `string`, and a
 // caller comparing `read_verdict(line)` against it would then be comparing two unrelated types.
 const PASSED_VERDICT: JoshVerdict = 'passed'
 const FAILED_VERDICT: JoshVerdict = 'failed'
+const UNVERIFIED_VERDICT: JoshVerdict = 'unverified'
 
-function format_gate_passed(step_count: string, total: string): string {
-	return `${GATE_PASSED_PREFIX} (${step_count} checks) in ${total}.`
+// How many of a gate's checks ran, and how many passed without running.
+interface GateCounts {
+	ran: number
+	skipped: number
+}
+
+// The split is printed only when there is one. A gate that skipped nothing — kit's own, and an ordinary
+// consumer's — keeps the line it always printed.
+function format_counts(counts: GateCounts): string {
+	if (counts.skipped === 0) return `${String(counts.ran)} checks`
+
+	return `${String(counts.ran)} ran, ${String(counts.skipped)} skipped`
+}
+
+function format_gate_passed(counts: GateCounts, total: string): string {
+	return `${GATE_PASSED_PREFIX} (${format_counts(counts)}) in ${total}.`
+}
+
+function format_gate_unverified(skipped: number, total: string): string {
+	return `${GATE_UNVERIFIED_PREFIX} (0 ran, ${String(skipped)} skipped) in ${total}.`
 }
 
 function format_gate_failed(failed_labels: string, total: string): string {
@@ -91,14 +116,18 @@ function read_verdict(line: string): JoshVerdict | undefined {
 
 	if (trimmed.startsWith(GATE_PASSED_PREFIX)) return PASSED_VERDICT
 
+	if (trimmed.startsWith(GATE_UNVERIFIED_PREFIX)) return UNVERIFIED_VERDICT
+
 	return undefined
 }
 
 const josh_verdict = {
 	PASSED_VERDICT,
 	FAILED_VERDICT,
+	UNVERIFIED_VERDICT,
 	format_gate_passed,
 	format_gate_failed,
+	format_gate_unverified,
 	GATE_OPENING_MARK,
 	GATE_OPENING_PREFIX,
 	is_gate_opening,

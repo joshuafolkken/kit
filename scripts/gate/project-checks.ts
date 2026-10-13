@@ -130,6 +130,13 @@ function skip_notice(check: string, reason: string): string {
 	return `josh ${check}: ${reason} ${SKIP_MARKER} ${check}.`
 }
 
+// **A tool that ran clean beside a skipped one says that it ran.** A clean eslint prints nothing, so a
+// `lint` whose Prettier was skipped read as nothing but a skip notice — the same output as a `lint`
+// that ran neither — and the gate's verdict counted a check that linted the whole tree as skipped.
+function ran_notice(check: string): string {
+	return `josh ${check}: ran and reported no problems.`
+}
+
 // Shared by `josh check` and the gate's type-check step, so neither reaches `tsc` on a basic
 // project that has nothing to type-check.
 function type_check_skip_reason(directory: string): string | undefined {
@@ -173,6 +180,7 @@ const project_checks = {
 	is_kit_repository,
 	prettier_skip_reason,
 	project_root,
+	ran_notice,
 	read_manifest,
 	skip_notice,
 	type_check_skip_reason,
