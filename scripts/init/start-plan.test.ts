@@ -211,6 +211,16 @@ describe('the steps a push preflight guards (#3702)', () => {
 	})
 })
 
+describe('the report of a run stopped for want of the audit scanner (#3755)', () => {
+	it('says nothing was changed, names the cause and how to run again', () => {
+		const report = start_plan.scanner_report('fetch failed')
+
+		expect(report).toContain('osv-scanner, which the pre-push audit needs')
+		expect(report).toContain('Nothing was changed.\nCause: fetch failed')
+		expect(report).toContain('then run josh start again')
+	})
+})
+
 describe('the progress report of a failed run', () => {
 	it('names the failed step, the completed ones and the cause', () => {
 		const report = start_plan.progress_report('repository', ['git_init', 'initialize'], 'boom')

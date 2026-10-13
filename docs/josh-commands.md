@@ -293,6 +293,8 @@ pnpm exec josh start --yes --github --profile basic    # unattended, including t
 
 **Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
 
+The `full` profile's pre-push hook runs `josh audit`, which needs `osv-scanner`. A run that pushes fetches the pinned scanner itself before its first step (the same fetch as `pnpm josh audit:provision --force`), so nothing has to be installed by hand; where the fetch fails and no scanner is on `PATH`, `josh start` stops before changing anything and prints the cause.
+
 **Steps**, printed as `[n/N]` while they run:
 
 1. `git init` on `main` — skipped when Git already exists

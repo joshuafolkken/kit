@@ -167,6 +167,12 @@ function preflight_report(command: string, cause: string): string {
 	return `josh start stopped before its first step: the push preflight (${command}) failed. Nothing was changed.\nCause: ${cause}`
 }
 
+// What a run prints when the scanner the pre-push audit needs could not be put in place: every push
+// the plan makes would be refused by that hook, so it stops while nothing has changed (#3755).
+function scanner_report(cause: string): string {
+	return `josh start stopped before its first step: osv-scanner, which the pre-push audit needs, is not installed and could not be fetched. Nothing was changed.\nCause: ${cause}\nInstall osv-scanner (https://google.github.io/osv-scanner/) or restore the network, then run josh start again.`
+}
+
 function plan_summary(
 	steps: ReadonlyArray<StartStep>,
 	labels: Readonly<Record<StartStep, string>> = STEP_LABELS,
@@ -183,6 +189,7 @@ const start_plan = {
 	github_consent,
 	progress_report,
 	preflight_report,
+	scanner_report,
 	plan_summary,
 	step_labels,
 	STEP_LABELS,
