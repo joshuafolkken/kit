@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs'
 import { execa } from 'execa'
+import { pnpm_reach } from './pnpm-reach'
 import { SUITE_TIMEOUT_MS } from './timeouts'
 
 // One definition of "run a check, keep its output, never throw".
@@ -9,7 +11,7 @@ import { SUITE_TIMEOUT_MS } from './timeouts'
 // (so one failing check does not abort its siblings), and a bound on how long a child may hang.
 // They had the same code twice, which is how a fix to one of them missed the other.
 
-const PNPM = 'pnpm'
+const { PNPM } = pnpm_reach
 const FORCE_COLOR = '1'
 const FAIL_EXIT_CODE = 1
 
@@ -35,6 +37,38 @@ interface BufferedProcessOptions {
 	timeout_ms?: number
 }
 
+// What execa reports about a child that produced no exit code. Declared here because execa's own
+// result type does not carry `code` or `shortMessage` on the non-rejecting path, though both are
+// there at runtime whenever the child did not exit by itself.
+interface UnfinishedChild {
+	exitCode?: number | undefined
+	code?: string | undefined
+	shortMessage?: string | undefined
+}
+
+// A missing working directory is reported with the same code as a missing executable, so the code
+// alone would blame pnpm for a lane directory that was removed.
+function is_pnpm_missing(result: UnfinishedChild, cwd: string | undefined): boolean {
+	return pnpm_reach.is_not_found(result) && existsSync(cwd ?? process.cwd())
+}
+
+// Why a child has no exit code: it could not be started, it ran past its bound, or a signal ended
+// it. The child cannot say so itself — in the first case there is no child — and without this a
+// check that never ran reads as a check that failed with nothing to report.
+function unfinished_reason(result: UnfinishedChild, cwd: string | undefined): Array<string> {
+	if (result.exitCode !== undefined) return []
+	const reason = [result.shortMessage ?? '']
+	if (is_pnpm_missing(result, cwd)) reason.push(pnpm_reach.NOT_ON_PATH_NOTICE)
+
+	return reason
+}
+
+// The reason follows whatever the child wrote before it stopped: a timed-out suite's last lines
+// are the evidence, and the reason is what explains them.
+function collect_output(all: string, reason: ReadonlyArray<string>): string {
+	return [all, ...reason].filter((part) => part !== '').join('\n')
+}
+
 async function run_buffered_process(
 	command_args: ReadonlyArray<string>,
 	options: BufferedProcessOptions = {},
@@ -58,7 +92,7 @@ async function run_buffered_process(
 	})
 
 	return {
-		output: result.all,
+		output: collect_output(result.all, unfinished_reason(result, options.cwd)),
 		exit_code: result.exitCode,
 		elapsed_ms: performance.now() - started_at,
 	}
