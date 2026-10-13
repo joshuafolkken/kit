@@ -8,6 +8,7 @@ import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
+import { run_board_reason } from './run-board-reason'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
@@ -88,17 +89,17 @@ function titles_of(state: BoardState): Titles {
 	return with_closed(state.plan, state.closed).context.titles
 }
 
-// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-// Before the plan is read, the run's own children alone.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout {
-	const { plan, closed } = state
+// A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
+function activity_here(local: LocalRead): RunActivity {
+	return run_board_status.activity_of(
+		local.events,
+		local.ended_ms !== undefined || local.is_stranded,
+	)
+}
 
-	if (plan === undefined) {
-		return run_board_layout.local_layout_of(
-			run_board_status.statuses_of(local.events, local.lanes, new Set()),
-		)
-	}
-
+// The plan laid under its statuses, each waiting row saying why it waits.
+function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
+	const { closed } = state
 	const read = {
 		open_numbers: plan.context.open_numbers,
 		read_ms: state.fetched_ms,
@@ -106,22 +107,31 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 		labels: plan.labels,
 	}
 	const statuses = run_board_status.settle_closed(statuses_for(plan, local), read)
+	const reason_of = run_board_reason.reader({
+		plan,
+		statuses,
+		events: local.events,
+		free_lanes: local.free_lanes,
+		is_stopped: activity_here(local).is_stopped,
+	})
 
-	return run_board_layout.layout_of(with_closed(plan, closed), statuses)
+	return run_board_layout.layout_of(with_closed(plan, closed), statuses, reason_of)
+}
+
+// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
+// Before the plan is read, the run's own children alone.
+function layout_for(state: BoardState, local: LocalRead): BoardLayout {
+	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
+
+	return run_board_layout.local_layout_of(
+		run_board_status.statuses_of(local.events, local.lanes, new Set()),
+	)
 }
 
 // What one redraw draws with.
 interface Redraw {
 	ports: BoardPorts
 	now_ms: number
-}
-
-// A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
-function activity_here(local: LocalRead): RunActivity {
-	return run_board_status.activity_of(
-		local.events,
-		local.ended_ms !== undefined || local.is_stranded,
-	)
 }
 
 function header_of(

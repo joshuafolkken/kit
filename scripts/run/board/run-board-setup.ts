@@ -82,7 +82,38 @@ function is_lane_pending(events: ReadonlyArray<RunEvent>, issue: number): boolea
 	return !has_launched(events) || stages.some((stage) => names(stage, issue))
 }
 
-const run_board_setup = { is_lane_pending, read }
+// A stage of one lane's launch, as its event wrote it, and when the lane entered it.
+interface LaneStage {
+	text: string
+	at_ms: number
+}
+
+// What the run did for `issue`: a stage of its lane's launch, or a position naming it.
+function is_step_for(event: RunEvent, issue: number): boolean {
+	if (!names(event, issue)) return false
+
+	return is_setup(event) || !run_event_stream.TRACE_KINDS.has(event.kind)
+}
+
+// A stage that names no issue: a hand-off to the driver, or a hand-back to a session. A lane's launch
+// runs inside one driver pass, so a newer one of these says that launch has returned.
+function is_run_stage(event: RunEvent): boolean {
+	return is_setup(event) && run_event_scope.issue_named(event) === undefined
+}
+
+// The stage `issue`'s own lane is at: the newest stage naming it, until the run does anything else for
+// that issue — its launch, or whatever ended the attempt — or hands off or back, which is all a launch
+// that failed after its lane opened leaves on the stream. Read per issue, so two lanes opened side by
+// side each stand at their own stage whatever the other has reached.
+function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage | undefined {
+	const step = events.findLast((event) => is_run_stage(event) || is_step_for(event, issue))
+
+	if (step === undefined || !is_setup(step) || !names(step, issue)) return undefined
+
+	return { text: step.text, at_ms: Date.parse(step.at) }
+}
+
+const run_board_setup = { is_lane_pending, lane_stage, read }
 
 export { run_board_setup }
-export type { SetupRead }
+export type { LaneStage, SetupRead }

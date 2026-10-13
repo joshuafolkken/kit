@@ -18,6 +18,8 @@ const THIRD = 3303
 const RUNNING = 3304
 const SHARED = 'scripts/run/ship/run-ship.ts'
 const IDLE: BusyRead = { kind: 'idle' }
+// The directory the glob `scripts/lines/**` names.
+const LINES_DIRECTORY = 'scripts/lines/'
 
 // The paths joshuafolkken/kit#3582 and joshuafolkken/kit#3586 declared, abridged.
 const LIMITS_BODY = [
@@ -80,7 +82,7 @@ describe('backlog_overlap.declared_paths', () => {
 		const body = '`scripts/lines/**`, `scripts/metrics/*.ts` and `.github/workflows/`'
 
 		expect(backlog_overlap.declared_paths(body)).toStrictEqual(
-			new Set(['scripts/lines/', 'scripts/metrics/', '.github/workflows/']),
+			new Set([LINES_DIRECTORY, 'scripts/metrics/', '.github/workflows/']),
 		)
 	})
 
@@ -173,5 +175,36 @@ describe('backlog_rank.select — the overlap separation', () => {
 		})
 
 		expect(numbers(selection.offered)).toStrictEqual([FIRST])
+	})
+})
+
+// joshuafolkken/kit#3750: `run:board` names the running issues itself and asks for the same clash.
+describe('backlog_overlap.running_clash', () => {
+	const DECLARED = backlog_overlap.declared_of([
+		{ number: RUNNING, body: LINT_BODY },
+		{ number: FIRST, body: LIMITS_BODY },
+		{ number: SECOND, body: RUN_BODY },
+	])
+	const HOLDING = { holders: [RUNNING], repo: REPO }
+
+	it('answers the path a candidate declares inside what a running issue declares', () => {
+		expect(backlog_overlap.running_clash(child(FIRST), DECLARED, HOLDING)).toStrictEqual({
+			path: 'scripts/lines/effective-limit.ts',
+			claimed: LINES_DIRECTORY,
+			holder: RUNNING,
+		})
+	})
+
+	it('answers none for a candidate on a directory of its own, or with nothing running', () => {
+		const idle = { holders: [], repo: REPO }
+
+		expect(backlog_overlap.running_clash(child(SECOND), DECLARED, HOLDING)).toBeUndefined()
+		expect(backlog_overlap.running_clash(child(FIRST), DECLARED, idle)).toBeUndefined()
+	})
+
+	it('answers none for a candidate in another repository', () => {
+		const elsewhere = { ...child(FIRST), repo: 'joshuafolkken/other' }
+
+		expect(backlog_overlap.running_clash(elsewhere, DECLARED, HOLDING)).toBeUndefined()
 	})
 })

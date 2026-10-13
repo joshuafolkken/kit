@@ -28,6 +28,8 @@ const STAGE = {
 const OPENING = 'opening lane'
 const INSTALLING = 'installing dependencies'
 const DISPATCHING = 'dispatching'
+// The stages of one lane's launch, in the order a lane passes them.
+const LANE_STAGE = { OPENING, INSTALLING, DISPATCHING } as const
 
 // The driver is about to open a lane for `issue` — for every child, not only the first.
 function opening_lane(issue: string): string {
@@ -73,6 +75,7 @@ function emit_to(target: string, text: string, at: Date): void {
 }
 
 const run_event_setup = {
+	LANE_STAGE,
 	STAGE,
 	dispatching,
 	emit,

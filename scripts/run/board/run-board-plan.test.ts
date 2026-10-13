@@ -122,3 +122,41 @@ describe('run_board_plan.read_plan', () => {
 		expect(await run_board_plan.read_plan({ issues: [SINGLE], only: true }, read)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#3750: the paths each body declares, which a waiting row is checked against.
+describe('run_board_plan.read_plan declared paths', () => {
+	const NAMED_PATHS = new Set(['named.ts'])
+	const POOL_ONLY_PATHS = new Set(['pool-only.ts'])
+	const NAMED_DECLARED = new Map([[EPIC, NAMED_PATHS]])
+	const POOL_DECLARED = new Map([
+		[EPIC, new Set(['pool.ts'])],
+		[SINGLE, POOL_ONLY_PATHS],
+	])
+
+	// The pool's classification declares one set of paths, the named issues' another.
+	async function declaring(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<Plan> {
+		const plan = plan_of(opted_in, exclude)
+		const declared = opted_in.issues.length === POOL.length ? POOL_DECLARED : NAMED_DECLARED
+
+		return { ...plan, scope: { ...plan.scope, declared } }
+	}
+
+	it('carries the paths the classification read', async () => {
+		const read = { ...ports(), classify: vi.fn(declaring) }
+		const plan = await run_board_plan.read_plan({ issues: [], only: false }, read)
+
+		expect(plan?.declared).toBe(POOL_DECLARED)
+	})
+
+	it('joins the named plan’s paths to the pool’s, the named plan’s own winning', async () => {
+		const read = { ...ports(), classify: vi.fn(declaring) }
+		const plan = await run_board_plan.read_plan({ issues: [EPIC], only: false }, read)
+
+		expect(plan?.declared).toStrictEqual(
+			new Map([
+				[EPIC, NAMED_PATHS],
+				[SINGLE, POOL_ONLY_PATHS],
+			]),
+		)
+	})
+})
