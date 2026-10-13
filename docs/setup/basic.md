@@ -43,6 +43,17 @@ pnpm josh gate
 
 `josh gate` is not part of `josh init`, so a lint error in your own code is never mistaken for a failed setup. The `josh format` that `josh init` ran uses Prettier over every file type it supports — HTML, CSS and JavaScript, and also Markdown, JSON and YAML such as `CLAUDE.md` and `package.json`; running it again changes nothing. `josh gate` runs Prettier's check and skips each check the project does not have, printing why — for example `josh eslint: no ESLint configuration was found — skipping eslint.` A project with no Web files has no Prettier, so both commands skip it with `josh prettier: no HTML, CSS or JavaScript files were found`.
 
+**The unit check runs the tests your project declares.** A `basic` project has no Vitest, so `josh gate` and `josh test:unit` run the `test` script in `package.json` instead — `pnpm run test` — whatever runner it starts (`node --test`, jest, mocha), and a failing test fails the gate:
+
+| `package.json`                                                    | The unit check                                                                                                     |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A `test` script                                                   | Runs it, and fails when it fails                                                                                   |
+| No `test` script, an empty one, or the one `npm init` writes      | Skips: `josh test:unit: vitest is not installed and package.json declares no test script — skipping unit tests.`   |
+| A `test` script that calls `josh test:unit` or `josh gate` itself | Skips inside that call, so the script does not start itself again                                                  |
+| Vitest installed                                                  | Runs Vitest over `*.{test,spec}.{ts,js}` as in a `full` project; with no such file it skips, and `test` is not run |
+
+`josh test:unit`'s filter arguments belong to Vitest, so your `test` script always runs whole.
+
 Re-running `pnpm exec josh init` later leaves the files unchanged. **If the project will use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`), run `pnpm exec josh start` now — it needs the [gh CLI](https://cli.github.com/), signed in. It leaves this setup as it is and carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start).
 
 ## 4. Check the page in a browser

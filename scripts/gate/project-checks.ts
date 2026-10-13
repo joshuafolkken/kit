@@ -173,6 +173,7 @@ const project_checks = {
 	is_kit_repository,
 	prettier_skip_reason,
 	project_root,
+	read_manifest,
 	skip_notice,
 	type_check_skip_reason,
 }
