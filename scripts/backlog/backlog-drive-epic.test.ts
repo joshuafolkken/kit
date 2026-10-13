@@ -1,8 +1,9 @@
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { josh_command } from '#scripts/josh/josh-run'
 import { afterEach, expect, test, vi } from 'vitest'
-import { backlog_drive, type OfferRead } from './backlog-drive'
+import { backlog_drive, type DriveState, type OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
+import { backlog_drive_fixture } from './backlog-drive-fixture'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_offer } from './backlog-offer'
 
@@ -12,6 +13,7 @@ const CHILD = '3556'
 const REPO = 'joshuafolkken/kit'
 const OWNER = String(process.pid)
 const HANDED_BACK = 'epic #3406'
+const TRIAGE = 'triage'
 
 function answer(out: string, code = 0): void {
 	vi.spyOn(git_gh_repo, 'repo_get_name_with_owner').mockResolvedValue(REPO)
@@ -95,6 +97,37 @@ test('hands the epic to a judgment session when only a person can move it', asyn
 	answer('stop\n')
 
 	expect(await verdict_of()).toBe(HANDED_BACK)
+})
+
+// joshuafolkken/kit#3731: `epic:next --lanes` answers `triage` with exit 0 on every pass, so waiting on
+// it never ends and nobody is told.
+// It is `triage` and not `epic #N`: the session woken on `epic #N` runs the epic's children, and would
+// launch the untriaged child rather than label it.
+test('hands triage to a judgment session under its own word when a child is untriaged', async () => {
+	answer('triage\n')
+
+	expect(await offer_of()).toMatchObject({ verdict: TRIAGE, issues: [] })
+})
+
+// The pass itself, with the epic's own offer wired in: it ends on the hand-back instead of continuing
+// to wait, and the child already running is left in flight — the pool path's `triage` handling.
+test('ends a drive pass on triage for an untriaged epic, leaving a running child', async () => {
+	answer('triage\n')
+	const { ports, calls } = backlog_drive_fixture.harness({})
+	const epic_ports = {
+		...ports,
+		offer: async (state: DriveState) => await backlog_drive_epic.offer(EPIC, state, OWNER),
+	}
+	const before = backlog_drive_fixture.state([CHILD])
+	const result = await backlog_drive.run_pass(before, true, epic_ports)
+
+	expect(result.kind === 'end' && result.end).toStrictEqual({
+		reason: TRIAGE,
+		token: TRIAGE,
+		issue: undefined,
+	})
+	expect(result.state.in_flight).toStrictEqual([CHILD])
+	expect(calls).toStrictEqual([])
 })
 
 test('waits for the next pass when epic:next cannot be read, counting the failure', async () => {

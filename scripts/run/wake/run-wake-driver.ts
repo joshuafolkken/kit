@@ -184,6 +184,15 @@ async function run_driver(
 	return await run_driver(target, args, wait, remaining - 1)
 }
 
+// **A result handed to a session is said on the stream first.** The driver has stopped asking, so
+// without it the board keeps the `handing off` this pass wrote and a run waiting on a session's
+// judgment reads as one still getting ready.
+async function announced(result: DriveResult): Promise<DriveResult> {
+	if (result.kind === 'judgment') await run_event_setup.emit(run_event_setup.STAGE.JUDGING)
+
+	return result
+}
+
 async function drive(target: string, wait: Pause = pause): Promise<DriveResult> {
 	const read = run_carry.read_carry(target)
 	if (read.kind !== 'carried') return { kind: 'failed', note: 'The carry record changed.' }
@@ -197,10 +206,8 @@ async function drive(target: string, wait: Pause = pause): Promise<DriveResult> 
 
 	await run_event_setup.emit(run_event_setup.STAGE.HANDING_OFF)
 
-	return read_result(
-		await run_driver(target, args, wait, RERUN_LIMIT),
-		target,
-		read.carry.invocation,
+	return await announced(
+		read_result(await run_driver(target, args, wait, RERUN_LIMIT), target, read.carry.invocation),
 	)
 }
 

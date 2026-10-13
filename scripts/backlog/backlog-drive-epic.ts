@@ -1,3 +1,4 @@
+import { epic_triage } from '#scripts/epic/epic-triage'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -12,7 +13,12 @@ import { backlog_offer } from './backlog-offer'
 // is runnable, without `run:add` and without waking a parent session.
 //
 // **Only what needs a person is handed back.** `stop` means every child left waits on a person, which a
-// judgment session reads. A failed `epic:next` is either a network blip or a broken graph (a cycle, an
+// judgment session reads. `triage` means a child carries neither `run:solo` nor `run:lane`, so
+// `epic:next --lanes` offers nothing until a session judges it — it exits 0 and repeats on every pass,
+// so waiting on it would never end. It is handed back under its own word, as the pool path's is, never
+// as `epic #N`: that verdict sends the session to run the epic's children, and the single-child
+// `epic:next` it asks there is not triage-gated, so it would launch the untriaged child instead of
+// labelling it. A failed `epic:next` is either a network blip or a broken graph (a cycle, an
 // undeclared order, an unreadable child), and its exit code does not tell them apart — so a failure is
 // a `wait` that retries on the next pass, and `backlog:offer`'s consecutive-retry limit of them hands the
 // epic back too, rather than waiting out the idle budget on an anomaly nobody is shown.
@@ -21,6 +27,7 @@ const NO_RETRIES = 0
 const SUCCESS_EXIT_CODE = 0
 const FIRST_LINE = 0
 const WAIT: OfferRead = { verdict: 'wait', issues: [], retries: NO_RETRIES }
+const TRIAGE: OfferRead = { ...WAIT, verdict: epic_triage.TRIAGE_VERDICT }
 
 // `--lanes` lists every child a free lane could take, so one the loop already knows about is passed
 // over rather than standing in front of the rest. `undefined` is an answer that could not be read.
@@ -53,19 +60,24 @@ function child_offer(children: ReadonlyArray<string>, state: DriveState): OfferR
 	return child === undefined ? WAIT : { verdict: 'run', issues: [child], retries: NO_RETRIES }
 }
 
+// The answers only a judgment session can move.
+function judgment_offer(epic: string, token: string): OfferRead | undefined {
+	if (token === 'stop') return handed_back(epic)
+
+	return token === epic_triage.TRIAGE_VERDICT ? TRIAGE : undefined
+}
+
 async function answered_offer(
 	epic: string,
 	answers: ReadonlyArray<string>,
 	state: DriveState,
 	owner: string,
 ): Promise<OfferRead> {
-	const token = answers[FIRST_LINE]
+	const token = answers[FIRST_LINE] ?? ''
 
-	if (token !== undefined && issue_number_shape.ISSUE_NUMBER_PATTERN.test(token)) {
-		return child_offer(answers, state)
-	}
-
-	if (token === 'stop') return handed_back(epic)
+	if (issue_number_shape.ISSUE_NUMBER_PATTERN.test(token)) return child_offer(answers, state)
+	const judgment = judgment_offer(epic, token)
+	if (judgment !== undefined) return judgment
 
 	if (token === 'complete') {
 		await backlog_drive_named.mark_done(epic, { outcome: 'merged', code: 0, token: 'none' }, owner)

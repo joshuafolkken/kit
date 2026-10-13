@@ -11,6 +11,8 @@ import { run_wake_driver } from './run-wake-driver'
 const INVOCATION = 'backlogrun #2509 --max 5 --only'
 const OUTPUT = 'merge over #2509\nresume: --owner 1 --exclude 2509'
 const LONG_STDERR_REPEAT = 1000
+// The claim's stage and the driver's run, ahead of whatever the result adds.
+const HAND_OFF_STEPS = 2
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const WINDOW_OUTPUT = 'window\nresume: --owner 1'
 const CUT_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
@@ -77,7 +79,29 @@ test('says the run is handing off once the claim holds, before the driver runs',
 
 	await run_wake_driver.drive(scratch.target)
 
-	expect(order).toStrictEqual([run_event_setup.STAGE.HANDING_OFF, 'driver'])
+	expect(order.slice(0, HAND_OFF_STEPS)).toStrictEqual([
+		run_event_setup.STAGE.HANDING_OFF,
+		'driver',
+	])
+})
+
+// joshuafolkken/kit#3731: a result only a session can act on is drawn as that, not as a run still
+// handing off.
+test('says the run waits on judgment once the driver hands an epic back', async () => {
+	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: EPIC_OUTPUT })
+
+	expect(await run_wake_driver.drive(scratch.target)).toMatchObject({ kind: 'judgment' })
+	expect(vi.mocked(run_event_setup.emit).mock.calls).toStrictEqual([
+		[run_event_setup.STAGE.HANDING_OFF],
+		[run_event_setup.STAGE.JUDGING],
+	])
+})
+
+test('says nothing of a judgment when the driver failed', async () => {
+	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 1, out: 'error boom' })
+
+	expect(await run_wake_driver.drive(scratch.target)).toMatchObject({ kind: 'failed' })
+	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
 })
 
 test('says nothing of a hand-off the driver could not claim', async () => {
@@ -95,6 +119,7 @@ test('finishes without a judgment when the driver ends the carry record', async 
 	})
 
 	expect(await run_wake_driver.drive(scratch.target)).toStrictEqual({ kind: 'finished' })
+	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
 })
 
 test('hands on only the tail of a long stderr, after the verdict, resume line and epic note', () => {
