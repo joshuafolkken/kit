@@ -82,6 +82,14 @@ describe('backlog_drive_launch.launch setup stage', () => {
 		)
 	})
 
+	it.each(['unopened', 'failed'] as const)('ends an %s launch with a stage', async (kind) => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([])
+		vi.mocked(lane_launch_cli.launch_lane).mockResolvedValue({ kind })
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe(kind)
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(run_event_setup.STAGE.NO_CHILD)
+	})
+
 	it('says nothing once the driver lost its owner', async () => {
 		vi.mocked(backlog_drive_owner.assert_current).mockRejectedValue(new Error(LOST_OWNER))
 

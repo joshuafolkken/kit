@@ -1,7 +1,7 @@
 {
-	"reason": "run:board waiting reasons and per-lane launch stage (#3750): a new reason reader, the title narrowing that keeps the reason on a narrow pane, the free-lane and declared-path reads they need, and the review fix that ends a lane's stage at a newer stage naming no issue",
+	"reason": "run:board waiting reasons and per-lane launch stage (#3750): a new reason reader, the title narrowing that keeps the reason on a narrow pane, the free-lane and declared-path reads they need, the review fix that ends a lane's stage at a newer stage naming no issue, and the 'no child launched' stage the driver writes when a launch returns without a child",
 	"date": "2026-10-13",
 	"growth": {
-		"scripts.code_lines": 200
+		"scripts.code_lines": 202
 	}
 }

@@ -2,9 +2,9 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
-// A row's title and the reason it makes room for — pure, split from `run-board-render.ts` when the
-// reason was added. A title is cut to the title column; a row that says why it waits keeps saying it
-// on a narrow pane, its title giving up the columns the line runs over, where every other row wraps.
+// A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
+// that says why it waits keeps saying it on a narrow pane, its title giving up the columns the line
+// runs over, where every other row wraps.
 
 // The columns a terminal row gives its title: a longer one is cut to an ellipsis.
 const TITLE_LIMIT = 48

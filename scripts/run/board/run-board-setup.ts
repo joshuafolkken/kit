@@ -95,16 +95,18 @@ function is_step_for(event: RunEvent, issue: number): boolean {
 	return is_setup(event) || !run_event_stream.TRACE_KINDS.has(event.kind)
 }
 
-// A stage that names no issue: a hand-off to the driver, or a hand-back to a session. A lane's launch
-// runs inside one driver pass, so a newer one of these says that launch has returned.
+// A stage that names no issue: a hand-off to the driver, a hand-back to a session, or a launch that
+// returned without a child. A lane's launch runs inside one driver pass, so a newer one of these says
+// that launch has returned.
 function is_run_stage(event: RunEvent): boolean {
 	return is_setup(event) && run_event_scope.issue_named(event) === undefined
 }
 
 // The stage `issue`'s own lane is at: the newest stage naming it, until the run does anything else for
-// that issue — its launch, or whatever ended the attempt — or hands off or back, which is all a launch
-// that failed after its lane opened leaves on the stream. Read per issue, so two lanes opened side by
-// side each stand at their own stage whatever the other has reached.
+// that issue — its launch, or whatever ended the attempt — or writes a stage naming none, which is all
+// a launch that left no child puts on the stream: the driver says so itself, since a refusal it waits
+// out is followed by no hand-off. Read per issue, so two lanes opened side by side each stand at their
+// own stage whatever the other has reached.
 function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage | undefined {
 	const step = events.findLast((event) => is_run_stage(event) || is_step_for(event, issue))
 

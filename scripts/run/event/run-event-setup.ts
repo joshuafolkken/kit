@@ -23,6 +23,9 @@ const STAGE = {
 	// The supervisor started that session, which is now acting on the driver's answer. It is detached, so
 	// its end is the supervisor's next hand-off, which replaces this.
 	SESSION: 'judgment session running',
+	// The driver's launch of a lane returned without a child: no lane was free to open, or a step after
+	// the open failed. It names no issue, so the lane's own stage ends here whatever the driver does next.
+	NO_CHILD: 'no child launched',
 } as const
 
 const OPENING = 'opening lane'

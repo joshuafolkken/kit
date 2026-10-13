@@ -235,13 +235,14 @@ describe('run_board_setup.lane_stage', () => {
 	})
 })
 
-// A launch that fails after its lane opened writes nothing naming the issue; the run's next stage does.
+// A launch that leaves no child writes nothing naming the issue, so a stage naming none ends the lane's.
 describe('run_board_setup.lane_stage after the launch returned', () => {
 	const INSTALLING_278 = run_event_setup.installing('278')
 
 	it.each([
 		['a hand-back to a session', STAGE.JUDGING],
 		['the next hand-off', STAGE.HANDING_OFF],
+		['a launch that left no child', STAGE.NO_CHILD],
 	])('ends the lane’s stage at %s', (_step, stage) => {
 		const events = stream(setup(OPENING_278), setup(INSTALLING_278), setup(stage))
 
