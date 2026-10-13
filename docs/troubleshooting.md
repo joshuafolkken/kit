@@ -25,6 +25,18 @@ which josh   # should now print a path
 
 `pnpm setup` registers `PNPM_HOME` and appends it to `PATH` via your shell rc. If `which josh` is still empty, open a new terminal so the updated `PATH` takes effect. You can print the directory to add manually with `pnpm bin -g`.
 
+## pnpm does not start — `bin/pnpm.cjs` not found
+
+Every `pnpm` command, `pnpm -v` included, stops with an error that `bin/pnpm.cjs` cannot be found. The Corepack bundled with Node.js is launching pnpm for you, and it may fail to launch pnpm 12 — the pnpm kit requires, and the one a `full` project pins in `packageManager`. `josh` cannot report this, because it runs through pnpm.
+
+Take pnpm away from Corepack, then install the standalone release:
+
+```bash
+corepack disable pnpm
+```
+
+Then follow [Install pnpm and Node.js](./setup/prerequisites.md#2-install-pnpm-and-nodejs) and check `pnpm -v` in a new terminal.
+
 ## Wrong Node or pnpm version
 
 kit needs the Node.js and pnpm versions [Install the prerequisites](./setup/prerequisites.md) lists. A `full` project that ran `josh init` pins pnpm exactly in `packageManager` and `devEngines.packageManager.version`; use that version there. Check:
