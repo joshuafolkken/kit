@@ -174,17 +174,22 @@ function has_github_remote(root: string): boolean {
 	return url !== undefined && repo_origin.parse_origin_url(url) !== undefined
 }
 
+function has_git(root: string): boolean {
+	return existsSync(path.join(root, '.git'))
+}
+
 function inspect_project(root: string, requested?: ProjectProfile): ProjectShape {
 	const profile = resolve_profile(root, requested)
 	const files = scan_files(root)
-	const has_git = existsSync(path.join(root, '.git'))
+	const is_git = has_git(root)
 
-	return { ...profile, ...files, has_git, has_github: has_git && has_github_remote(root) }
+	return { ...profile, ...files, has_git: is_git, has_github: is_git && has_github_remote(root) }
 }
 
 const project_profile = {
 	parse_profile,
 	resolve_profile,
+	has_git,
 	inspect_project,
 	requested_profile,
 	with_legacy_profile_names,

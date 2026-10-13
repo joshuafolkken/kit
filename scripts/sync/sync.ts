@@ -192,6 +192,19 @@ function sync_secretlint_development_deps(destination_path: string): void {
 	)
 }
 
+// A tool `josh init` started adding after a consumer was initialized never reached it: `lefthook.yml`
+// was synced, the lefthook that runs it was not. Only the tools the consumer resolves itself are
+// added, and only where the manifest declares them nowhere; an existing range is left as it is.
+function sync_consumer_resolved_development_deps(destination_path: string): void {
+	const has_git = project_profile.has_git(path.dirname(destination_path))
+
+	sync_package_json_with(
+		destination_path,
+		(existing) => init_logic.merge_consumer_resolved_development_deps(existing, has_git),
+		'  ✔ synced    toolchain devDependencies (run `pnpm install`)',
+	)
+}
+
 // `lefthook install` fails silently when `core.hooksPath` is set, leaving a consumer with no hooks
 // and no message. `josh init` rewrites the clause it wrote so the failure
 // is reported; this covers everyone already initialized, who never re-runs `josh init`.
@@ -219,6 +232,7 @@ function sync_package_json_migrations(destination_path: string): void {
 	sync_package_manager_version(destination_path)
 	sync_package_manager_on_fail(destination_path)
 	sync_secretlint_development_deps(destination_path)
+	sync_consumer_resolved_development_deps(destination_path)
 	sync_prepare_lefthook_warning(destination_path)
 	sync_safe_chain_preinstall(destination_path)
 }
@@ -300,6 +314,7 @@ const sync = {
 	sync_package_manager_version,
 	sync_package_manager_on_fail,
 	sync_secretlint_development_deps,
+	sync_consumer_resolved_development_deps,
 	sync_prepare_lefthook_warning,
 	sync_safe_chain_preinstall,
 	sync_package_json_migrations,

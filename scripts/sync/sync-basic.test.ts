@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,6 +16,7 @@ vi.mock('#scripts/init/init-paths', () => ({
 }))
 
 const BASIC = 'basic'
+const PACKAGE_JSON = 'package.json'
 const CLAUDE_MD = 'CLAUDE.md'
 const BASIC_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md'
 const STATIC_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.static.md'
@@ -61,7 +62,7 @@ function prettier_config(preset: string): string {
 }
 
 function write_manifest(profile: string): void {
-	writeFileSync(project_file('package.json'), JSON.stringify({ private: true, josh: { profile } }))
+	writeFileSync(project_file(PACKAGE_JSON), JSON.stringify({ private: true, josh: { profile } }))
 }
 
 async function run_sync(profile: string): Promise<void> {
@@ -96,6 +97,14 @@ describe('josh sync file set in a basic project', () => {
 			for (const name of FULL_ONLY_FILES) expect(existsSync(project_file(name)), name).toBe(false)
 		},
 	)
+
+	// `josh init` adds the full toolchain to no basic project, so `josh sync` adds none later either.
+	it('adds no toolchain devDependencies, Git repository or not', async () => {
+		mkdirSync(project_file('.git'))
+		await run_sync(BASIC)
+
+		expect(read_project_file(PACKAGE_JSON)).not.toContain('devDependencies')
+	})
 
 	it('writes the basic templates rather than the full copies', async () => {
 		await run_sync(BASIC)
