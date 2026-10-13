@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { read_spawn_stdout } from '#scripts/lib/spawn-exit'
-import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { COMMAND_TIMEOUT_MS, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { doctor_logic } from './doctor-logic'
 
@@ -19,27 +20,73 @@ const AUTO_MERGE_WORKFLOW_PATH = '.github/workflows/dependabot-auto-merge.yml'
 // consumer's own auto-merge workflow which does creates the same one kit's does.
 const AUTO_MERGE_COMMAND = 'gh pr merge --auto'
 const YAML_COMMENT_PREFIX = '#'
+const UNKNOWN_PNPM: PnpmProbe = { state: 'unknown' }
 
-// Resolve the `josh` that the shell would run — the first match on PATH, via the platform's
-// lookup command (`where` on Windows, `which` elsewhere). Undefined when the lookup fails or
-// prints nothing (no `josh` on PATH, e.g. inside the kit repo where only `pnpm josh` runs).
-function resolve_path_josh(): string | undefined {
+// What the platform's lookup command said about a name: whether the command itself could be
+// started, and the first match it printed.
+interface PathLookup {
+	did_run: boolean
+	first_path: string | undefined
+}
+
+// Ask the platform's lookup command (`where` on Windows, `which` elsewhere) for `bin` on PATH.
+function look_up_on_path(bin: string): PathLookup {
 	const lookup = doctor_logic.path_lookup_command(process.platform)
-	const result = execaSync(lookup, [JOSH_BIN], { reject: false })
+	const result = execaSync(lookup, [bin], { reject: false })
 
-	return doctor_logic.first_path_line(read_spawn_stdout(result))
+	return {
+		did_run: !pnpm_reach.is_not_found(result),
+		first_path: doctor_logic.first_path_line(read_spawn_stdout(result)),
+	}
+}
+
+// Resolve the `josh` that the shell would run — the first match on PATH. Undefined when the lookup
+// fails or prints nothing (no `josh` on PATH, e.g. inside the kit repo where only `pnpm josh` runs).
+function resolve_path_josh(): string | undefined {
+	return look_up_on_path(JOSH_BIN).first_path
+}
+
+// Whether the lookup command ran and found no `bin`. A lookup command that is itself absent proves
+// nothing about `bin`, so it is not an answer.
+function is_off_path(bin: string): boolean {
+	const { did_run, first_path } = look_up_on_path(bin)
+
+	return did_run && first_path === undefined
 }
 
 // Resolve the pnpm-global `josh` bin path. Undefined when pnpm is missing or the global bin does
 // not contain a `josh` (kit not installed globally). `pnpm bin -g` prepends a `[WARN]` line to
 // stdout inside a project, so the bin directory is extracted via first_path_line.
 function resolve_pnpm_global_josh(): string | undefined {
-	const result = execaSync('pnpm', ['bin', '-g'], { reject: false })
+	const result = execaSync(pnpm_reach.PNPM, ['bin', '-g'], { reject: false })
 	const bin_directory = doctor_logic.first_path_line(read_spawn_stdout(result))
 	if (bin_directory === undefined) return undefined
 	const candidate = path.join(bin_directory, JOSH_BIN)
 
 	return existsSync(candidate) ? candidate : undefined
+}
+
+// A spawn that found no executable proves pnpm is off PATH, but Windows never reports one: an
+// unresolved `pnpm` is handed to `cmd.exe`, which starts, prints "'pnpm' is not recognized" and exits
+// 1. So a pnpm that did not answer is also looked up by name, which says the same thing everywhere.
+function is_pnpm_missing(result: { code?: string | undefined }): boolean {
+	return pnpm_reach.is_not_found(result) || is_off_path(pnpm_reach.PNPM)
+}
+
+// Whether this process can start `pnpm`, and which one answers. `josh` runs its checks as
+// `pnpm josh <check>` children, so a `pnpm` this process cannot see fails every one of them before
+// it starts; asking here is what lets a user learn it before a gate does. `missing` is
+// kept apart from `unknown`: a pnpm that is on PATH and failed is a different fault with a
+// different fix.
+function probe_pnpm(): PnpmProbe {
+	const result = execaSync(pnpm_reach.PNPM, ['--version'], {
+		reject: false,
+		timeout: COMMAND_TIMEOUT_MS,
+	})
+	const version = read_spawn_stdout(result).trim()
+	if (version !== '' && result.exitCode === 0) return { state: 'found', version }
+
+	return is_pnpm_missing(result) ? { state: 'missing' } : UNKNOWN_PNPM
 }
 
 // Whether the working directory is provably *outside* a git work tree. Purely local — no network,
@@ -192,7 +239,11 @@ function has_auto_merge_workflow(start: string, boundary?: string): boolean {
 type GitTopLevel =
 	{ state: 'inside'; top_level: string } | { state: 'outside' } | { state: 'undetermined' }
 
+// What asking `pnpm --version` from this process established.
+type PnpmProbe = { state: 'found'; version: string } | { state: 'missing' } | { state: 'unknown' }
+
 const doctor_io = {
+	probe_pnpm,
 	resolve_path_josh,
 	resolve_pnpm_global_josh,
 	has_distributed_dependabot_config,
@@ -200,5 +251,5 @@ const doctor_io = {
 	resolve_git_top_level,
 }
 
-export type { GitTopLevel }
+export type { GitTopLevel, PnpmProbe }
 export { doctor_io }

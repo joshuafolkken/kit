@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { ruleset_check } from '#scripts/repo/ruleset-check'
 import { security_updates } from '#scripts/security/security-updates'
 import { running_binary } from '#scripts/version/running-binary'
 import { doctor_consumer } from './doctor-consumer'
-import { doctor_io, type GitTopLevel } from './doctor-io'
+import { doctor_io, type GitTopLevel, type PnpmProbe } from './doctor-io'
 import { doctor_logic } from './doctor-logic'
 import { doctor_ports } from './doctor-ports'
 
@@ -43,10 +44,12 @@ interface DoctorContext {
 	running_path: string
 	path_josh: string | undefined
 	global_josh: string | undefined
+	pnpm: PnpmProbe
 }
 
 function gather_context(): DoctorContext {
 	return {
+		pnpm: doctor_io.probe_pnpm(),
 		running_version: running_binary.read_running_version(SELF_DIR),
 		running_path: running_binary.running_package_directory(SELF_DIR),
 		path_josh: doctor_io.resolve_path_josh(),
@@ -54,11 +57,26 @@ function gather_context(): DoctorContext {
 	}
 }
 
+function describe_pnpm(probe: PnpmProbe): string {
+	if (probe.state === 'found') return probe.version
+
+	return probe.state === 'missing' ? NOT_ON_PATH : UNKNOWN
+}
+
 function print_report(ctx: DoctorContext): void {
 	console.info('josh doctor')
 	console.info(`  Running:     ${ctx.running_version ?? UNKNOWN}  (${ctx.running_path})`)
 	console.info(`  On PATH:     ${ctx.path_josh ?? NOT_ON_PATH}`)
+	console.info(`  pnpm:        ${describe_pnpm(ctx.pnpm)}`)
 	console.info(`  pnpm global: ${ctx.global_josh ?? UNKNOWN}`)
+}
+
+// Said here rather than left to the gate: every check `josh` runs is a `pnpm` child, so without
+// pnpm on this process's PATH each of them fails before it starts.
+function report_pnpm_reach(ctx: DoctorContext): void {
+	if (ctx.pnpm.state !== 'missing') return
+	console.info('')
+	console.info(`⚠ ${pnpm_reach.NOT_ON_PATH_NOTICE}`)
 }
 
 // Remove a confirmed stale kit shim so the pnpm-global josh reclaims PATH precedence. Any other
@@ -207,6 +225,7 @@ function consumer_root(git: GitTopLevel): string {
 function run_reports(ctx: DoctorContext, git: GitTopLevel, options: DoctorOptions): void {
 	print_report(ctx)
 	report_path_diagnosis(ctx, options.is_fix)
+	report_pnpm_reach(ctx)
 	doctor_consumer.report_consumer_setup(consumer_root(git))
 	report_repository_map(git)
 	if (options.show_ports) report_port_seeds(git)

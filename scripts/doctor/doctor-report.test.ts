@@ -1,5 +1,6 @@
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
+import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import type { RequiredChecksReport } from '#scripts/repo/required-checks-report'
 import { ruleset_check } from '#scripts/repo/ruleset-check'
@@ -14,6 +15,7 @@ import { doctor_logic } from './doctor-logic'
 // report actually executes — an early return or a conditional that skipped it would fail here while
 // leaving the text guard green (joshuafolkken/kit#805).
 const JOSH_PATH = '/Users/example/Library/pnpm/bin/josh'
+const PNPM_VERSION = '12.11.2'
 const REPO = 'joshuafolkken/kit'
 const TOP_LEVEL = '/Users/example/project'
 const INSIDE: GitTopLevel = { state: 'inside', top_level: TOP_LEVEL }
@@ -34,6 +36,7 @@ const UNREADABLE_CHECKS: RequiredChecksReport = {
 function stub_doctor_io(): void {
 	vi.spyOn(doctor_io, 'resolve_path_josh').mockReturnValue(JOSH_PATH)
 	vi.spyOn(doctor_io, 'resolve_pnpm_global_josh').mockReturnValue(JOSH_PATH)
+	vi.spyOn(doctor_io, 'probe_pnpm').mockReturnValue({ state: 'found', version: PNPM_VERSION })
 	vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(INSIDE)
 	// The gate is the distributed `.github/dependabot.yml`; present unless a case says otherwise.
 	vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(true)
@@ -97,6 +100,45 @@ describe('josh doctor', () => {
 		doctor.main()
 
 		expect(order).toStrictEqual(['path', 'network'])
+	})
+})
+
+function printed_lines(): Array<string> {
+	const lines: Array<string> = []
+
+	vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+		lines.push(String(line))
+	})
+	doctor.main()
+
+	return lines
+}
+
+// joshuafolkken/kit#3712: a gate run without `pnpm` on its PATH failed every check with nothing
+// printed; `doctor` is where a user can learn it first.
+describe('josh doctor — whether pnpm can be started', () => {
+	it('prints the version of the pnpm this process reaches, and no warning', () => {
+		const lines = printed_lines()
+
+		expect(lines).toContain(`  pnpm:        ${PNPM_VERSION}`)
+		expect(lines).not.toContain(`⚠ ${pnpm_reach.NOT_ON_PATH_NOTICE}`)
+	})
+
+	it('warns, with where to fix it, when pnpm is not on PATH', () => {
+		vi.spyOn(doctor_io, 'probe_pnpm').mockReturnValue({ state: 'missing' })
+		const lines = printed_lines()
+
+		expect(lines).toContain('  pnpm:        (not on PATH)')
+		expect(lines).toContain(`⚠ ${pnpm_reach.NOT_ON_PATH_NOTICE}`)
+	})
+
+	// Only a spawn that found no executable proves pnpm is off PATH.
+	it('does not claim pnpm is off PATH when it started and failed', () => {
+		vi.spyOn(doctor_io, 'probe_pnpm').mockReturnValue({ state: 'unknown' })
+		const lines = printed_lines()
+
+		expect(lines).toContain('  pnpm:        (unknown)')
+		expect(lines).not.toContain(`⚠ ${pnpm_reach.NOT_ON_PATH_NOTICE}`)
 	})
 })
 

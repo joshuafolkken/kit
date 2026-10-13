@@ -1,5 +1,6 @@
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { describe, expect, it } from 'vitest'
 import { josh_harness } from './josh-harness'
 import { josh_harness_fixture } from './josh-harness-fixture'
@@ -24,6 +25,26 @@ describe('josh harness — scenarios from past defects', () => {
 		SCENARIO_TIMEOUT_MS,
 	)
 })
+
+// Every other scenario hands the child this suite's PATH, which has `pnpm` on it because the suite
+// was started by one — so the machine where a gate cannot start its checks never existed here.
+it(
+	'says why no check could start when `pnpm` is not on the PATH the gate runs with (#3712)',
+	async () => {
+		const consumer = environment('consumer')
+		const { executable, leading_arguments } = consumer.launcher
+		const result = await josh_harness.run_command(executable, [...leading_arguments, 'gate'], {
+			cwd: consumer.root,
+			env: { PATH: josh_harness_fixture.path_without_pnpm(consumer.workspace) },
+			timeout_ms: SCENARIO_TIMEOUT_MS,
+		})
+
+		expect(result.exit_code, result.stderr).toBe(1)
+		expect(result.stdout).toContain('spawn pnpm ENOENT')
+		expect(result.stdout).toContain(pnpm_reach.NOT_ON_PATH_NOTICE)
+	},
+	SCENARIO_TIMEOUT_MS,
+)
 
 it('keeps transient files outside the consumer lint scope (#2851)', async () => {
 	const consumer = environment('consumer')
