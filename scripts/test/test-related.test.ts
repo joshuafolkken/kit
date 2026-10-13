@@ -11,7 +11,7 @@ vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: {
-		guard_action: vi.fn(),
+		is_running: vi.fn(),
 		run_guarded_vitest: vi.fn(),
 	},
 }))
@@ -27,7 +27,7 @@ const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
-const mocked_action = vi.mocked(test_unit_guard.guard_action)
+const mocked_running = vi.mocked(test_unit_guard.is_running)
 
 // Real paths in this repository, because the CLI drops a path the tree does not hold — a fixture
 // name would be filtered out before the assertion could see it.
@@ -64,7 +64,7 @@ beforeEach(() => {
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])
 	mocked_run.mockResolvedValue(0)
 	mocked_before.mockResolvedValue(BEFORE_TREE)
-	mocked_action.mockReturnValue('run')
+	mocked_running.mockReturnValue(true)
 })
 
 describe('test_related.run_related_tests — the green record', () => {
@@ -92,7 +92,7 @@ describe('test_related.run_related_tests — the green record', () => {
 
 	// The skip branch exits 0 having run nothing, so a zero from it must vouch for no tree.
 	it('vouches for no tree when the guard would skip vitest rather than run it', async () => {
-		mocked_action.mockReturnValue('skip-missing-package')
+		mocked_running.mockReturnValue(false)
 
 		await test_related.run_related_tests([])
 

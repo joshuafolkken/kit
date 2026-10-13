@@ -20,7 +20,7 @@ For anyone deciding whether kit fits their project: what it sets up for each pro
 | CI/CD          | GitHub Actions                           | No workflows; PR template and release-notes config when a GitHub origin exists    | Workflow templates for CI, tagging, and SonarQube  |
 | Security       | SonarQube + `pnpm audit`                 | —                                                                                 | `sonar-project.properties` template + audit script |
 
-In a `basic` project, `josh gate`, `josh lint` and the other checks skip each tool that has nothing to run and print the reason. kit ships no linter or test runner for languages other than JavaScript and TypeScript.
+In a `basic` project, `josh gate`, `josh lint` and the other checks skip each tool that has nothing to run and print the reason. kit ships no linter or test runner for languages other than JavaScript and TypeScript; the unit check of a `basic` project without Vitest runs the `test` script its `package.json` declares ([setup/basic.md → Verify](./setup/basic.md#3-verify)).
 
 ## How it works
 
