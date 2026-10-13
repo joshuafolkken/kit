@@ -33,9 +33,10 @@ describe('fresh_machine_image.dockerfile', () => {
 	it('runs the guide as a normal user, after the user is created', () => {
 		const lines = fresh_machine_image.dockerfile(false).split('\n')
 		const user_line = lines.indexOf('USER dev')
+		const [first_command = ''] = guide_commands()
 
 		expect(user_line).toBeGreaterThan(0)
-		expect(lines.findIndex((line) => line.includes('get.pnpm.io'))).toBeGreaterThan(user_line)
+		expect(lines.indexOf(`RUN ${first_command}`)).toBeGreaterThan(user_line)
 	})
 
 	it('sets SHELL, which a container build leaves unset', () => {
