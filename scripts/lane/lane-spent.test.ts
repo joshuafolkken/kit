@@ -219,4 +219,20 @@ describe('lane_spent.lanes_in_use', () => {
 			lane_spent.lanes_in_use(probes_of({ process_trace: () => 'unknown' })),
 		).resolves.toStrictEqual({ working: [], unread: [LANE.issue] })
 	})
+
+	// A probe that times out and then answers: bucketed on two samples, the lane was in neither list.
+	it('probes each lane once, so a probe that changes its answer still names the lane', async () => {
+		const process_trace = vi
+			.fn<SpentProbes['process_trace']>()
+			.mockReturnValueOnce('unknown')
+			.mockReturnValue('alive')
+
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([LANE])
+
+		await expect(lane_spent.lanes_in_use(probes_of({ process_trace }))).resolves.toStrictEqual({
+			working: [],
+			unread: [LANE.issue],
+		})
+		expect(process_trace).toHaveBeenCalledExactlyOnceWith(LANE.issue)
+	})
 })

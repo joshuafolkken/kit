@@ -52,6 +52,10 @@ interface LaneUse {
 	unread: Array<string>
 }
 
+// One probe answer per lane: a second sample can disagree with the first, and a lane bucketed on
+// two answers can land in neither list.
+type TracedLane = readonly [issue: string, trace: ProcessTrace]
+
 interface SpentSort {
 	spent: Array<LaneInfo>
 	kept: Array<KeptLane>
@@ -170,21 +174,18 @@ async function sort_lanes(
 	return sorted
 }
 
-function issues_traced(
-	lanes: ReadonlyArray<LaneInfo>,
-	probes: SpentProbes,
-	trace: ProcessTrace,
-): Array<string> {
-	return lanes.filter((lane) => trace_of(lane, probes) === trace).map((lane) => lane.issue)
+function issues_traced(traced: ReadonlyArray<TracedLane>, trace: ProcessTrace): Array<string> {
+	return traced.filter(([, answer]) => answer === trace).map(([issue]) => issue)
 }
 
 /** The lanes in use — what a run being replaced must not be stopped over. */
 async function lanes_in_use(probes: SpentProbes = LIVE_PROBES): Promise<LaneUse> {
 	const lanes = await lane_registry.list_lanes()
+	const traced = lanes.map((lane): TracedLane => [lane.issue, trace_of(lane, probes)])
 
 	return {
-		working: issues_traced(lanes, probes, PROCESS_ALIVE),
-		unread: issues_traced(lanes, probes, PROCESS_UNKNOWN),
+		working: issues_traced(traced, PROCESS_ALIVE),
+		unread: issues_traced(traced, PROCESS_UNKNOWN),
 	}
 }
 
