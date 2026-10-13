@@ -4,6 +4,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { git_stash, type Selection } from '#scripts/git/stash/git-stash'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_close } from './lane-close'
 import { lane_install } from './lane-install'
@@ -154,6 +155,8 @@ function stub_what_the_fixture_cannot_do(): void {
 	})
 	vi.spyOn(git_worktree, 'ls_remote_branch').mockResolvedValue('')
 	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
+	// The stage an open writes is a run's, and this fixture is no run.
+	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
 }
 
 async function build_repository(root: string): Promise<void> {

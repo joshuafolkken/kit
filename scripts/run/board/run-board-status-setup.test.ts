@@ -61,6 +61,7 @@ describe('run_board_status.activity_of during setup', () => {
 
 		expect(activity).toStrictEqual({
 			setup: STAGE.STARTING,
+			setup_ms: Date.parse(AT),
 			is_preparing: true,
 			last_event_ms: Date.parse(AT),
 			is_stopped: false,

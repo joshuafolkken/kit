@@ -121,6 +121,54 @@ describe('run_board_header.header_lines before the first child launches', () => 
 	})
 })
 
+// joshuafolkken/kit#3738: how long the run has stood at its stage, counted from the stage's own event.
+const STAGE_AGE_MS = 151 * SECOND
+
+// The run at a stage it entered `age_ms` ago.
+function standing(setup: string, age_ms: number): RunActivity {
+	return { ...preparing(setup), setup_ms: NOW - age_ms }
+}
+
+describe('run_board_header.header_lines beside the stage', () => {
+	it('writes how long the run has stood at the stage, before the planned count', () => {
+		const first = planned_title(ONE_PLANNED, standing(STAGE.JUDGING, STAGE_AGE_MS))
+
+		expect(first).toMatch(/ {2}waiting on judgment 2:31 · 1 planned$/u)
+	})
+
+	it('writes it where the plan is not read yet', () => {
+		const activity = standing(STAGE.STARTING, STAGE_AGE_MS)
+
+		expect(title_of(header({ activity }))).toMatch(/ {2}starting session 2:31$/u)
+	})
+
+	it('counts again from the time of the stage that replaced it', () => {
+		const first = planned_title(ONE_PLANNED, standing(STAGE.SESSION, SECOND))
+
+		expect(first).toMatch(/ {2}judgment session running 0:01 · 1 planned$/u)
+	})
+
+	it('writes the same in the chat form', () => {
+		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, STAGE_AGE_MS))
+
+		expect(title_of({ ...board, form: 'chat' })).toContain('waiting on judgment 2:31 · 1 planned')
+	})
+
+	it('writes the hours once the stage has stood for one', () => {
+		const hour = 60 * backlog_budget.MS_PER_MINUTE
+		const first = planned_title(ONE_PLANNED, standing(STAGE.JUDGING, hour + STAGE_AGE_MS))
+
+		expect(first).toContain('waiting on judgment 1:02:31 · 1 planned')
+	})
+
+	it('writes no time once a child has launched, whatever the stream last said', () => {
+		const first = planned_title(ONE_RUNNING, { ...LAUNCHED, setup_ms: NOW - STAGE_AGE_MS })
+
+		expect(first).toMatch(/^⠋ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/1 /u)
+		expect(first).not.toContain('2:31')
+	})
+})
+
 describe('run_board_header.header_lines once a child has launched', () => {
 	it('draws the progress again from the first launch', () => {
 		const first = planned_title(ONE_RUNNING, LAUNCHED)

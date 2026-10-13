@@ -19,7 +19,8 @@ import type { LaneUsages } from './run-board-usage'
 // that changes shape. A value not read yet is drawn `-`, never `0`, so a header still loading reads
 // as unknown rather than as an empty run.
 
-const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
+const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of, stage_span_of } =
+	run_board_labels
 const { cell_of } = run_board_render_slot
 const UNKNOWN = '-'
 const BLANK = ' '
@@ -255,6 +256,16 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string>
 	]
 }
 
+// How long the run has stood at its stage, after the stage's words: it counts on while the stage holds
+// and starts again at the next one, so a stage that is taking long is told from one just entered. The
+// mark's spinner turns on every redraw whether or not the run moved; this is read from the stage's own
+// event. Nothing where the stream gave the stage no time.
+function stage_age(header: BoardHeader): string {
+	const since = header.activity.setup_ms
+
+	return since === undefined ? '' : ` ${stage_span_of(header.now_ms - since)}`
+}
+
 // The stage a run is at before its first child launches, standing where the progress will: a tally of
 // nothing settled says less than what the run is doing. Only a run marked as setting up is at a stage:
 // a stopped run and one waiting on a person keep their progress.
@@ -262,9 +273,12 @@ function stage_part(counts: BoardCounts, header: BoardHeader, mark: RunMark): st
 	const { setup } = header.activity
 
 	if (setup === undefined || mark !== 'setup') return undefined
-	if (!is_plan_read(header)) return setup
 
-	return `${setup}${STAGE_SEPARATOR}${String(counts.total)} ${PLANNED}`
+	const stage = `${setup}${stage_age(header)}`
+
+	if (!is_plan_read(header)) return stage
+
+	return `${stage}${STAGE_SEPARATOR}${String(counts.total)} ${PLANNED}`
 }
 
 // The run's stage or its progress, then what its plan read is doing.
