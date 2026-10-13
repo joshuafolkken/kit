@@ -20,6 +20,7 @@ const OPEN_JSON = '{"state":"OPEN","labels":[]}'
 const REPO = 'owner/repo'
 const READ_CLOSED = { kind: 'read', json: CLOSED_JSON }
 const READ_OPEN = { kind: 'read', json: OPEN_JSON }
+const NOT_AN_ISSUE = { kind: 'read', json: '{"message":"Not Found"}' }
 // The one-number report, spelled out rather than composed from the formatter: this is the shape
 // `.claude/skills/workflow-commands/needs-human-review.md` and `.claude/skills/diag/SKILL.md` read verbatim,
 // so a test that built it the same way the code does would agree with any change to either.
@@ -117,8 +118,26 @@ describe('issue_state_cli.run — a read that produced no state', () => {
 		expect(error_mock).toHaveBeenCalledWith(expect.stringContaining('is not "the issue is open"'))
 	})
 
+	// joshuafolkken/kit#3739: `backlog:drive` names why a named issue's state did not read.
+	it('keeps why the request failed on the read', async () => {
+		const failure = { kind: 'unreadable', reason: 'unreachable', status: 502 }
+
+		classified_mock.mockResolvedValue(failure)
+
+		expect(await issue_state_cli.read_issue(ISSUE)).toEqual(failure)
+	})
+
+	it('reads a response that is not an issue as malformed', async () => {
+		classified_mock.mockResolvedValue(NOT_AN_ISSUE)
+
+		expect(await issue_state_cli.read_issue(ISSUE)).toEqual({
+			kind: 'unreadable',
+			reason: 'malformed',
+		})
+	})
+
 	it('does not print a state when the response is not an issue', async () => {
-		classified_mock.mockResolvedValue({ kind: 'read', json: '{"message":"Not Found"}' })
+		classified_mock.mockResolvedValue(NOT_AN_ISSUE)
 
 		expect(await issue_state_cli.run([ISSUE])).toBe(FAILURE)
 		expect(info_mock).not.toHaveBeenCalled()

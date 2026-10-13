@@ -10,6 +10,7 @@ import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
+import { backlog_drive_unread } from './backlog-drive-unread'
 
 interface NamedContext {
 	is_only: boolean
@@ -67,7 +68,7 @@ async function classify(
 ): Promise<OfferRead> {
 	const result = await issue_state_cli.read_issue(issue)
 
-	if (result.kind !== 'state') return { verdict: 'issue-state', issues: [], retries: NO_RETRIES }
+	if (result.kind !== 'state') return backlog_drive_unread.offer(issue, result, state.retries)
 
 	const outcome = settled_outcome(result.state)
 

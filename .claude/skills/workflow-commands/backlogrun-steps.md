@@ -130,7 +130,7 @@ section the row names:
 | Handed back | What the session does | Read |
 | --- | --- | --- |
 | `triage` | Label each issue stderr names `run:solo` or `run:lane` (`blocked-by` where one must land first) | "Resolve what the plan can resolve, before starting" above |
-| `offer` | Report what stderr printed; **never pick an issue by hand** | — |
+| `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** | — |
 | `launch #N` | Read the lane's log and park `#N` | `backlogrun-park.md` → "park and continue" |
 | `merge [<token>] #N` | `environment` ends the run; the others re-read the child | `backlogrun-progress.md` → "Running a named epic's children" |
 | `epic #N` | A named epic's turn | "The session cut is inside the invocation" above |

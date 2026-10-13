@@ -436,5 +436,5 @@ const git_gh_issue_read = {
 	issue_list_comments,
 }
 
-export type { IssueRead, IssueReadFailure }
+export type { IssueRead, IssueReadFailure, IssueReadReason }
 export { git_gh_issue_read, read_blocked_by, NOT_FOUND_STATUS }
