@@ -175,6 +175,9 @@ importers:
       cli-spinners:
         specifier: ^3.4.0
         version: 3.4.0
+      csv-parse:
+        specifier: ^7.0.3
+        version: 7.0.3
       execa:
         specifier: ^10.1.0
         version: 10.1.0
@@ -1631,6 +1634,9 @@ packages:
     resolution: {integrity: sha512-RZDeSxy1L82U7I+cF00pG2Bh3nBy0UoNRJF3Xbq4xbbKMZHwQRYrwospDyuIvsYmKjqDSAAciNvAjHOeEhP+5A==}
     engines: {node: '>=22.18.0'}
     hasBin: true
+
+  csv-parse@7.0.3:
+    resolution: {integrity: sha512-YFd3QM/yo17vH91L1IOZuvl09zM0zEEtdfTcOCKWcMdM++MNaQSyp09slXyFCLaPXvHstQFx/xC8myiFHSMUvw==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -3984,6 +3990,8 @@ snapshots:
       flatted: 3.4.4
       semver: 7.8.5
       tinyglobby: 0.2.17
+
+  csv-parse@7.0.3: {}
 
   debug@4.4.3(supports-color@10.2.2):
     dependencies:
