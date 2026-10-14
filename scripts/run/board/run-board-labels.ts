@@ -184,8 +184,9 @@ const HEADER_ICONS = {
 
 // The kind of what the header's third line says, under the `⚡` (joshuafolkken/kit#3767): a call a
 // session made, the run watching its pool, the run ended, or each of the run's own stages, keyed by the
-// stage's words before any issue. A child's event draws its row's phase icon instead.
-const NOW_ICONS = { operation: '🔧', watching: '🔭', ended: STATE_ICONS.done } as const
+// stage's words before any issue. A child's event draws its row's phase icon instead. The run ended
+// draws the header's own end mark — 🏁 is already a done row's state icon.
+const NOW_ICONS = { operation: '🔧', watching: '🔭', ended: HEADER_ICONS.ended } as const
 const { STAGE, LANE_STAGE } = run_event_setup
 const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.STARTING]: '🚀',

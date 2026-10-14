@@ -8,7 +8,7 @@ import type { RunActivity } from './run-board-status'
 
 // joshuafolkken/kit#3696: the header while the run is at a stage of its own. joshuafolkken/kit#3767:
 // the mark stands still; the spinner turns on the third line, before the stage's time and icon.
-// joshuafolkken/kit#3749: the stage stands on the third line, under the second column, whenever the run
+// joshuafolkken/kit#3749: the stage stands on the third line, its time under the second column, whenever the run
 // is at one; the first line is the progress in every state.
 
 const SECOND = 1000
@@ -199,7 +199,7 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const board = planned(ONE_PLANNED, activity)
 
 		expect(title_of(board)).toMatch(/^■ backlogrun .*✅ +0\/1 /u)
-		expect(now_of(board)).toBe('0:00:01  🏁 #278 merged')
+		expect(now_of(board)).toBe('0:00:01  🔚 #278 merged')
 	})
 
 	it('draws a plan left only to people as waiting on a person', () => {

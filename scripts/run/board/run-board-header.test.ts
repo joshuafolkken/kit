@@ -19,7 +19,7 @@ const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
 const TIME_BLANK = ' '.repeat('⏰ 0:30:00'.length + 1)
 const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
 // joshuafolkken/kit#3749: the third line — blank where the stream holds no event, else what the run is
-// doing now, under the second column.
+// doing now: its time under the second column, its icon and words under the third.
 const NOW_BLANK = ''
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const STALE_BEAT = '💓 0:40:00'

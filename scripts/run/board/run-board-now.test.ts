@@ -16,7 +16,7 @@ const { STAGE } = run_event_setup
 const JAPANESE = /[぀-ヿ一-鿿]/u
 const LABEL = /^now\b/iu
 const WATCHED_MS = 24 * MINUTE + 10 * SECOND
-const DRAINED_LINE = '0:24:10 🏁 backlog drained'
+const DRAINED_LINE = '0:24:10 🔚 backlog drained'
 
 // The run at no stage, the newest thing it did `text`, `age_ms` ago.
 function after(text: string, age_ms: number): RunActivity {
@@ -134,7 +134,7 @@ describe('run_board_now.line_of once the run has stopped', () => {
 
 	it('stops the age at the run’s end', () => {
 		expect(line_of({ activity: STOPPED, ended_ms: NOW - WATCHED_MS + MINUTE })).toBe(
-			'0:01:00 🏁 backlog drained',
+			'0:01:00 🔚 backlog drained',
 		)
 	})
 
@@ -147,6 +147,14 @@ describe('run_board_now.line_of once the run has stopped', () => {
 	it('names the end’s icon in the legend, which a watch’s words already name', () => {
 		expect(run_board_now.line_of(read({ activity: STOPPED }))?.legend).toBe('ended')
 		expect(run_board_now.line_of(read())?.legend).toBeUndefined()
+	})
+
+	it('draws the end under the header’s own end mark, never a done row’s 🏁', () => {
+		const { HEADER_ICONS, STATE_ICONS } = run_board_labels
+		const icon = run_board_now.line_of(read({ activity: STOPPED }))?.icon
+
+		expect(icon).toBe(HEADER_ICONS.ended)
+		expect(icon).not.toBe(STATE_ICONS.done)
 	})
 })
 

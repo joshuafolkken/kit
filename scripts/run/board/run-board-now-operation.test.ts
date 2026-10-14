@@ -243,7 +243,7 @@ describe('run_board_now.line_of where no session’s operation is written', () =
 		const activity = { ...MERGED, is_stopped: true }
 		const line = line_of({ activity, operations: EVERY, running: 1, children: new Set([7]) })
 
-		expect(line).toBe('0:01:00 🏁 #5 merged')
+		expect(line).toBe('0:01:00 🔚 #5 merged')
 	})
 })
 
