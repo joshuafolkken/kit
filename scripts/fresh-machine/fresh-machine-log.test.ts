@@ -4,6 +4,7 @@ import { fresh_machine_log } from './fresh-machine-log'
 const SCENARIO = 'kit-test-html-start'
 const FIRST_NAME = 'kit-test-html-start-1'
 const TOKEN = 'gho_exampleTokenValue'
+const CLAUDE_TOKEN = 'sk-ant-oat01-exampleTokenValue'
 const PLAIN_LINE = 'pnpm josh gate'
 
 function next_name(logs: Array<string>, repositories: Array<string> = []): string {
@@ -61,15 +62,13 @@ describe('fresh_machine_log.redact', () => {
 		)
 	})
 
-	it('replaces every secret it is given, not only the first', () => {
-		const agent_secret = 'sk-ant-exampleValue'
+	it('replaces each of several secrets', () => {
+		const line = `${TOKEN} ${CLAUDE_TOKEN}`
 
-		expect(fresh_machine_log.redact(`${TOKEN} ${agent_secret}`, [TOKEN, agent_secret])).toBe(
-			'[REDACTED] [REDACTED]',
-		)
+		expect(fresh_machine_log.redact(line, [TOKEN, CLAUDE_TOKEN])).toBe('[REDACTED] [REDACTED]')
 	})
 
-	it.each([[[]], [['']]])('leaves the line as it is for the secrets %j', (secrets) => {
+	it.each([[[]], [['']]])('leaves the line as it is when the secrets are %j', (secrets) => {
 		expect(fresh_machine_log.redact(PLAIN_LINE, secrets)).toBe(PLAIN_LINE)
 	})
 })

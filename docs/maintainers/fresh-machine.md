@@ -144,7 +144,7 @@ pnpm josh fresh:run --spec fresh/html-init.json
 | `files`           | `{}`      | Path → content, relative to the project directory, written before the first command                                 |
 | `package_source`  | `tarball` | `tarball` packs the checkout the command is run from; `published` resolves a version from the registry              |
 | `requires_github` | `false`   | Use the image with git and gh, and pass the host's GitHub token                                                     |
-| `secrets`         | `[]`      | Host environment variables passed into the container by name, as the token is (see "GitHub")                        |
+| `requires_claude` | `false`   | Pass the host's Claude Code token as `CLAUDE_CODE_OAUTH_TOKEN` (see "Claude Code")                                  |
 
 An unknown field, an absolute path or one that leaves the project directory is refused with the field
 named, before Docker is started.
@@ -164,18 +164,15 @@ first backlogrun" section as written, on the packed checkout: `josh start` on a 
 repository, a check that the labels a run needs exist, Claude Code from its installer, one Issue
 filed with `auto-ok` and `run:lane`, and `pnpm josh backlogrun`. It passes when
 `backlogrun: started` is printed and the run's first event, `starting session`, is on the stream; it
-then lets the agent work for two minutes, prints the end of its log and stops the run with
-`pnpm josh backlogrun --stop`.
+then lets the agent work for two minutes and stops the run with `pnpm josh backlogrun --stop`. Its
+probes print the end of the agent's log and how many of its commands asked for an approval.
 
 ```bash
-claude setup-token                                # once; prints a long-lived token
-export CLAUDE_CODE_OAUTH_TOKEN=<the token>
 pnpm josh fresh:run --spec scripts/fresh-machine/specs/kit-test-backlogrun.json
 ```
 
-- **The agent's credential is a secret** (`"secrets": ["CLAUDE_CODE_OAUTH_TOKEN"]`): passed by name,
-  removed from the log, written into no image. Without it in the environment the command refuses
-  before Docker starts.
+- **The agent signs in with the saved token** (`"requires_claude": true`): run `pnpm josh auth:setup`
+  once first (see "Claude Code"). Without a saved token the command refuses before Docker starts.
 - **Starting the agent spends tokens** of the account the credential belongs to, for the two
   minutes the scenario lets it run.
 - **It leaves a repository** like the other GitHub scenarios — `kit-test-backlogrun-<n>`, with the
@@ -199,8 +196,7 @@ repository of an earlier run, wherever that run was started.
 - **The token** is what `gh auth token` prints on the host. It is put in the environment of the
   `docker run` client and named — not valued — in its arguments (`--env GH_TOKEN`), so it is in no
   argument list, no image layer and no printed command. Every line is passed through a replacement of
-  the token's value before it reaches the console or the log. A variable a spec lists under
-  `secrets` takes the same route.
+  the token's value before it reaches the console or the log.
 - **Signing in** is `gh auth setup-git`: `gh auth login` cannot run without a person, and pointing git
   at gh for credentials is the part of it a run needs.
 - **A GitHub scenario creates a real private repository** under the account the token belongs to, and
@@ -214,3 +210,37 @@ repository of an earlier run, wherever that run was started.
 - **Deleting the logs does not free a repository name.** The number of a GitHub scenario also counts
   the account's repositories (see "The log"), so the next run takes the number after them. The
   repositories stay until they are deleted by hand, with or without their logs.
+
+## Claude Code
+
+A scenario with `requires_claude: true` runs Claude Code in the container, which signs in with a
+long-lived token. The token is saved once on the host, and the human steps are these:
+
+1. In a terminal at the kit repository, run:
+
+   ```bash
+   pnpm josh auth:setup
+   ```
+
+2. A browser opens: sign in with your Claude account and press "Authorize".
+3. Done when the terminal prints `saved: CLAUDE_CODE_OAUTH_TOKEN (macOS keychain)`. There is no
+   token to copy or write into a file.
+4. To check, run `pnpm josh auth:setup --check`: it prints `ok` and the day it was saved.
+5. When the token expires (about a year), Claude Code inside the container fails to sign in — run
+   `pnpm josh auth:setup` again. `fresh:run` checks only that a token is saved, not that it is
+   still valid.
+
+- **Where the token is kept.** `auth:setup` runs `claude setup-token` and writes the token it prints
+  to the macOS keychain through `security`'s stdin, so it is in no argument list. The command's
+  output is shown as it arrives up to the token — a sign-in URL or prompt included — and the rest once
+  it ends, with the token replaced, so the token reaches neither the screen nor a file. On a machine
+  without a keychain nothing is run.
+- **No shell profile is touched.** Nothing exports `CLAUDE_CODE_OAUTH_TOKEN` from `~/.zshrc` or any
+  other profile, so every other Claude Code on the host keeps signing in as it did. The host's own
+  sign-in is not copied into the container either: a container that refreshed it would sign the
+  host out.
+- **How `fresh:run` reads it.** The keychain first, then `CLAUDE_CODE_OAUTH_TOKEN` in the
+  environment — the route on a machine without a keychain, such as Linux. When neither holds a
+  token, the run stops before Docker starts and names `pnpm josh auth:setup`.
+- **How it reaches the container** is the GitHub token's way: named, not valued, in the `docker run`
+  arguments (`--env CLAUDE_CODE_OAUTH_TOKEN`), and replaced in every line of the console and the log.

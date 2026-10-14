@@ -13,6 +13,10 @@ const ALLOW_BUILDS = '--allow-build=esbuild --allow-build=unrs-resolver'
 const BARE_MANIFEST = String.raw`printf '{ "private": true }\n' > package.json`
 const CREATE_SVELTEKIT =
 	'pnpm dlx sv create --template minimal --types ts --no-add-ons --install pnpm .'
+// The `sv` that created the project is the one `pnpm dlx` resolved, so its version is recorded.
+const SV_VERSION = 'pnpm dlx sv --version'
+// The app builds and type-checks before kit is installed and still does after it.
+const SVELTEKIT_CHECKS = 'pnpm build && pnpm check'
 const INSTALL_TARBALL = `pnpm add -D ${ALLOW_BUILDS} "$PACKAGE_TARBALL"`
 // A version published minutes ago is inside pnpm's release-age wait; kit alone is excluded from it
 // (joshuafolkken/kit#2869), so every other dependency keeps the wait.
@@ -56,6 +60,17 @@ const PATH_PROBES = [
 	`mkdir -p ${NODE_ONLY} && ln -sf "$(command -v node)" ${NODE_ONLY}/node && ${BARE_SHELL} 'PATH="$HOME/node-only:$PATH" ./node_modules/.bin/josh gate'`,
 ]
 
+// What a `josh init` run is checked against after the gate: the profile it chose, the files it left
+// (a `./.git` line is a repository it should not have made), and a second run that changes nothing.
+const PROJECT_FILES =
+	'find . -name node_modules -prune -o -name .git -prune -o -type f -print | sort'
+const CHECKSUMS = `${PROJECT_FILES} | xargs sha256sum`
+const INIT_PROBES = [
+	'pnpm josh profile',
+	'find . -name node_modules -prune -o -print | sort',
+	`${CHECKSUMS} > "$HOME/before-second-init.sha" && pnpm exec josh init && ${CHECKSUMS} | diff "$HOME/before-second-init.sha" -`,
+]
+
 const LUA_FILE = 'main.lua'
 const HTML_FILE = 'index.html'
 const LUA_FILES = { [LUA_FILE]: 'print("Hello")\n' }
@@ -65,12 +80,13 @@ function init_pattern(
 	project: string,
 	files: Record<string, string>,
 	setup: ReadonlyArray<string>,
+	project_probes: ReadonlyArray<string> = [],
 ): Scenario {
 	return fresh_machine_spec.define({
 		name: `kit-test-${project}-init`,
 		files,
 		commands: [...setup, ...INIT_COMMANDS],
-		probes: PATH_PROBES,
+		probes: [...INIT_PROBES, ...project_probes, ...PATH_PROBES],
 	})
 }
 
@@ -96,7 +112,7 @@ const PATTERNS: ReadonlyArray<Scenario> = [
 	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
 	// Git with a first commit on `main`, no GitHub repository.
 	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST]),
-	init_pattern('svelte', {}, [CREATE_SVELTEKIT]),
+	init_pattern('svelte', {}, [CREATE_SVELTEKIT, SV_VERSION, SVELTEKIT_CHECKS], [SVELTEKIT_CHECKS]),
 	// A GitHub repository with `main` already pushed.
 	start_pattern('svelte', {}, [CREATE_SVELTEKIT, ...FIRST_COMMIT, CREATE_REPOSITORY]),
 ]

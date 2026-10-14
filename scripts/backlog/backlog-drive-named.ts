@@ -55,7 +55,9 @@ function is_done(result: MergeResult): boolean {
 		return result.code === 0 && result.token !== MERGE_TOKEN.BUSY
 	}
 
-	return result.outcome === 'failed' && result.code === 0 && result.token !== MERGE_TOKEN.STOP
+	return (
+		result.outcome === 'failed' && result.code === 0 && !run_merge_token.is_control_stop(result)
+	)
 }
 
 function can_mark(carry: RunCarry, issue: string, owner: string): boolean {
@@ -125,7 +127,7 @@ async function reconcile(
 		const outcome = parked.has(issue) ? 'parked' : 'merged'
 
 		// eslint-disable-next-line no-await-in-loop -- each mark rewrites the same carry file
-		await mark_done(String(issue), { outcome, code: 0, token: 'none' }, owner)
+		await mark_done(String(issue), { outcome, code: 0, token: 'none', is_offer: true }, owner)
 	}
 }
 

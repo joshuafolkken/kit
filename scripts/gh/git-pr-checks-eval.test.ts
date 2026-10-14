@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { evaluate_pr_state, read_required_statuses, REQUIRED_CHECKS } from './git-pr-checks-eval'
+import {
+	evaluate_pr_state,
+	is_coderabbit_rate_limited,
+	read_required_statuses,
+	REQUIRED_CHECKS,
+} from './git-pr-checks-eval'
 import { CODE_RABBIT, make_pr_snapshot, PASSING_ROLLUP, SONAR_QUBE } from './git-pr-checks-fixture'
 import { parse_pr_state_snapshot, type RollupCheck } from './git-pr-checks-parse'
 
@@ -241,5 +246,37 @@ describe('REQUIRED_CHECKS — JOSH_REQUIRED_CHECKS env var not set', () => {
 
 		expect(checks).not.toContain(CODE_RABBIT)
 		expect(checks).toContain(SONAR_QUBE)
+	})
+})
+
+describe('is_coderabbit_rate_limited', () => {
+	it('is true for a CodeRabbit check whose description says the review was rate limited', () => {
+		const check: RollupCheck = {
+			name: CODE_RABBIT,
+			status: 'pass',
+			description: 'Review rate limited',
+		}
+
+		expect(is_coderabbit_rate_limited(check)).toBe(true)
+	})
+
+	it('is false for a finished CodeRabbit review', () => {
+		const check: RollupCheck = {
+			name: CODE_RABBIT,
+			status: 'pass',
+			description: 'Review completed',
+		}
+
+		expect(is_coderabbit_rate_limited(check)).toBe(false)
+	})
+
+	it('is false for another check that mentions a rate limit', () => {
+		const check: RollupCheck = {
+			name: SONAR_QUBE,
+			status: 'pass',
+			description: 'Rate limit reached',
+		}
+
+		expect(is_coderabbit_rate_limited(check)).toBe(false)
 	})
 })

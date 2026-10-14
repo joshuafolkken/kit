@@ -14,6 +14,7 @@ import {
 } from './run-board-operation-read'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
+import { run_board_usual, type UsualTimes } from './run-board-usual'
 
 // What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
 // The run is the running one, or the one that last ended until the next run begins.
@@ -35,6 +36,8 @@ interface LocalRead {
 	// How many more lanes the limit allows beside the live ones; `undefined` where the limit could not
 	// be read, so nothing is said about it.
 	free_lanes?: number | undefined
+	// How long each phase usually takes, from the repository's lane ledger.
+	usual?: UsualTimes | undefined
 }
 
 async function free_lanes_of(lanes: ReadonlyArray<LaneInfo>): Promise<number | undefined> {
@@ -102,6 +105,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		free_lanes: await free_lanes_of(lanes),
+		usual: run_board_usual.read(repository),
 	}
 }
 

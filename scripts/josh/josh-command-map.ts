@@ -81,9 +81,11 @@ const ALIASES: Record<string, string> = {
 	ruv: 'rule:value',
 	ev: 'eval',
 	fr: 'fresh:run',
+	as: 'auth:setup',
 	lsm: 'lane:sample',
 	lst: 'lane:stats',
 	lli: 'lane:limit',
+	lrs: 'lane:restart',
 	blr: 'backlogrun',
 }
 

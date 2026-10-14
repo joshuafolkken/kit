@@ -25,3 +25,13 @@ describe('run_merge_token.MERGE_TOKEN', () => {
 		expect(token).toMatch(/^[a-z]+(?:-[a-z]+)*$/u)
 	})
 })
+
+describe('run_merge_token.is_control_stop', () => {
+	it.each([
+		['the control stop', MERGE_TOKEN.STOP, false, true],
+		['the stop an offer passed through, left to backlog:budget', MERGE_TOKEN.STOP, true, false],
+		['any other control verdict', MERGE_TOKEN.OVER, false, false],
+	])('reads %s', (_label, token, is_offer, expected) => {
+		expect(run_merge_token.is_control_stop({ token, is_offer })).toBe(expected)
+	})
+})

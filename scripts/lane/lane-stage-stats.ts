@@ -112,11 +112,15 @@ function stage_row(stage: string, measured: Measured): string {
 	])
 }
 
+function measured_of(entries: ReadonlyArray<LedgerEntry>): Measured {
+	const stages = entries.filter(is_stage)
+
+	return { implement: implement_durations(entries.filter(is_dispatch), stages), stages }
+}
+
 // The period's table: `entries` is the whole ledger, filtered here to `window`.
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
-	const period = lane_stats.in_window(entries, window)
-	const stages = period.filter(is_stage)
-	const measured = { implement: implement_durations(period.filter(is_dispatch), stages), stages }
+	const measured = measured_of(lane_stats.in_window(entries, window))
 
 	return [
 		lane_stats.to_row(COLUMNS),
@@ -125,10 +129,25 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
+// Each stage's median over every entry given, a stage nothing recorded left out rather than read as
+// `0` — how long a stage usually takes, which `run:board` measures a running child's phase against.
+function medians(entries: ReadonlyArray<LedgerEntry>): ReadonlyMap<string, number> {
+	const measured = measured_of(entries)
+
+	return new Map(
+		STAGES.flatMap((stage) => {
+			const median = lane_stats.median(durations_of(stage, measured))
+
+			return median === undefined ? [] : [[stage, median] as const]
+		}),
+	)
+}
+
 const lane_stage_stats = {
 	IMPLEMENT,
 	NOT_MEASURED,
 	STAGES,
+	medians,
 	table,
 }
 

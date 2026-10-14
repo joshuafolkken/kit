@@ -1,14 +1,16 @@
 import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { run_board_fit } from './run-board-fit'
+import { run_board_fresh } from './run-board-fresh'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
-import { run_board_now } from './run-board-now'
+import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_render_slot } from './run-board-render-slot'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
+import type { UsualTimes } from './run-board-usual'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
 // and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
@@ -16,14 +18,17 @@ import type { LaneUsages } from './run-board-usage'
 // every second is the proof the board is live, so no `updated` line is drawn. **Always three lines,
 // the first two in three columns**: the run's mark and name over its repository's, the run's age over
 // the `💓`, then the progress over the machine the run is on — so the first line reads as how far the
-// run is and the second as what it runs on, a slow run apart from a stuck one. The third says in words
-// what the run is doing now (`run-board-now.ts`), under the second column. All three are written the
+// run is and the second as what it runs on, a slow run apart from a stuck one. The third says what the
+// run is doing now (`run-board-now.ts`): the spinner, its time and its kind's icon under the second and
+// third columns' icons and digits, so the mark itself never turns. All three are written the
 // same while the run works and while it waits, so a wait is read off the mark, the `💓` and the third
 // line's words rather than off a line that changes shape. A value not read yet is drawn `-`, never
 // `0`, so a header still loading reads as unknown rather than as an empty run.
 
 const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
+const { padded } = run_board_fresh
+const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
 const BLANK = ' '
 const REPO_SEPARATOR = '/'
@@ -60,6 +65,8 @@ interface BoardHeader {
 	machine: MachineGauges | undefined
 	// Each running lane's CPU and memory, `undefined` where none could be read.
 	usages?: LaneUsages | undefined
+	// How long each phase usually takes; a running row's phase time is colored against it.
+	usual?: UsualTimes | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
@@ -126,12 +133,11 @@ function mark_of(header: BoardHeader, running: number): RunMark {
 	return running > 0 ? 'running' : quiet_mark(header)
 }
 
-// A working run turns the spinner in place of ▶, both one column wide; every other mark stands still.
-function run_part(mark: RunMark, spinner: string | undefined): string {
+// The mark stands still in every state: the spinner turns on the third line.
+function run_part(mark: RunMark): string {
 	const { glyph, color } = RUN_MARKS[mark]
-	const shown = WORKING_MARKS.has(mark) ? (spinner ?? glyph) : glyph
 
-	return styleText(color, `${shown} ${RUN_NAME}`)
+	return styleText(color, `${glyph} ${RUN_NAME}`)
 }
 
 // The repository's own name — `kit` of `owner/kit` — under the run's, past the mark's columns, so a
@@ -143,6 +149,8 @@ function repo_part(header: BoardHeader, mark: RunMark): string {
 	return `${BLANK.repeat(indent)}${name}`
 }
 
+// A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
+// (`run-board-render-tail.ts`).
 function aged(part: string, age_ms: number): string {
 	if (age_ms > ALARM_MS) return styleText('red', part)
 
@@ -168,25 +176,75 @@ function ended_part(header: BoardHeader): string {
 
 // The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
 // only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
-// the minute it ended.
+// the minute it ended. Its digits are emphasized for a few seconds after a new event resets them
+// (`run-board-fresh.ts`).
 function beat_part(header: BoardHeader, mark: RunMark, width: number): string {
 	const age = age_of(header)
 
 	if (age === undefined) return ended_part(header)
 
-	const part = `${HEADER_ICONS.heartbeat} ${span_of(age).padStart(width)}`
+	const span = span_of(age)
+	const part = `${HEADER_ICONS.heartbeat} ${padded(span, width, aged_fresh(span, age, header))}`
 
 	return WORKING_MARKS.has(mark) ? aged(part, age) : part
 }
 
-// A run's age over the `💓`, or over the minute an ended run ended: the shorter of the two lengths is
-// right-aligned to the longer, so the digits stand in one column when only one has passed ten hours.
-function time_parts(header: BoardHeader, mark: RunMark): Array<string> {
-	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
-	const age = age_of(header)
-	const width = Math.max(elapsed.length, age === undefined ? 0 : span_of(age).length)
+// How long ago what the third line says happened, blank where no event gave it a time.
+function now_age(now: NowLine | undefined): string {
+	const age = now?.age_ms
 
-	return [`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`, beat_part(header, mark, width)]
+	return age === undefined ? '' : span_of(age)
+}
+
+// How long ago what the third line says happened, counted to now: an ended run's age stops at its end,
+// so its last words would otherwise stay fresh on every frame after it.
+function fresh_age(now: NowLine | undefined, header: BoardHeader): number | undefined {
+	const age = now?.age_ms
+
+	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
+}
+
+// The `💓`'s digits, blank where it draws none.
+function beat_span(header: BoardHeader): string {
+	const age = age_of(header)
+
+	return age === undefined ? '' : span_of(age)
+}
+
+// The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
+// works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
+// the line says is fresh.
+function now_time(
+	header: BoardHeader,
+	mark: RunMark,
+	now: NowLine | undefined,
+	width: number,
+): string {
+	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
+	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
+	const age = now_age(now)
+
+	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
+}
+
+// What the third line says, emphasized while it is fresh.
+function now_text(now: NowLine, header: BoardHeader): string {
+	return `${now.icon} ${aged_fresh(now.text, fresh_age(now, header), header)}`
+}
+
+// A run's age over the `💓` — or over the minute an ended run ended — over the third line's age: the
+// shorter lengths are right-aligned to the longest, so the digits stand in one column when only one has
+// passed ten hours.
+function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined): Array<string> {
+	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
+	const age = now_age(now)
+	const width = Math.max(...[elapsed, beat_span(header), age].map((span) => span.length))
+
+	return [
+		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
+		beat_part(header, mark, width),
+		now_time(header, mark, now, width),
+	]
 }
 
 // A plan fetch is said only when it failed — the board otherwise keeps quiet about a routine read.
@@ -271,8 +329,8 @@ function running_issues(layout: BoardLayout): ReadonlySet<number> {
 	return new Set(running.map((row) => row.number))
 }
 
-// What the run is doing now, in words (`run-board-now.ts`).
-function now_part(counts: BoardCounts, header: BoardHeader): string {
+// What the run is doing now (`run-board-now.ts`).
+function now_line(counts: BoardCounts, header: BoardHeader): NowLine | undefined {
 	return run_board_now.line_of({
 		now_ms: header.now_ms,
 		ended_ms: header.ended_ms,
@@ -314,20 +372,29 @@ function column_of(cells: ReadonlyArray<string>): Array<string> {
 }
 
 // The run's name, age and progress, then its repository, heartbeat and machine under them, then what
-// it is doing now under the second column — the name's column left blank, with no label — in every
-// state the board can be in.
+// it is doing now — its time under theirs, its kind's icon under the `⚡`, the name's column left blank
+// and no label — in every state the board can be in. A stream with no event yet leaves it blank.
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
 	const mark = mark_of(header, counts.running)
-	const names = column_of([run_part(mark, header.spinner), repo_part(header, mark), ''])
-	const times = column_of(time_parts(header, mark))
+	const now = now_line(counts, header)
+	const names = column_of([run_part(mark), repo_part(header, mark), ''])
+	const times = column_of(time_parts(header, mark, now))
 	const lasts = [progress_part(counts, header), machine_part(counts, header)]
-	const now = [names.at(-1), now_part(counts, header)].join(GAP).trimEnd()
+	const third =
+		now === undefined ? '' : [names.at(-1), times.at(-1), now_text(now, header)].join(GAP)
 
-	return [...lasts.map((last, line) => [names[line], times[line], last].join(GAP)), now]
+	return [...lasts.map((last, line) => [names[line], times[line], last].join(GAP)), third]
 }
 
-const run_board_header = { counts_of, header_lines, is_plan_read }
+// The third line's kind as the legend names it, `undefined` where the line's own words name it.
+function now_legend(header: BoardHeader): string | undefined {
+	const now = now_line(counts_of(layout_of(header)), header)
+
+	return now?.legend === undefined ? undefined : `${now.icon} ${now.legend}`
+}
+
+const run_board_header = { aged, counts_of, header_lines, is_plan_read, now_legend }
 
 export { run_board_header }
 export type { BoardCounts, BoardForm, BoardHeader }

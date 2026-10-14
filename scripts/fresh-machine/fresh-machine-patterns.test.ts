@@ -5,12 +5,15 @@ import type { Scenario } from './fresh-machine-spec'
 const LUA_START = 'kit-test-lua-start'
 const HTML_START = 'kit-test-html-start'
 const SVELTE_START = 'kit-test-svelte-start'
-const INIT_NAMES = ['kit-test-lua-init', 'kit-test-html-init', 'kit-test-svelte-init']
+const SVELTE_INIT = 'kit-test-svelte-init'
+const INIT_NAMES = ['kit-test-lua-init', 'kit-test-html-init', SVELTE_INIT]
 const START_NAMES = [LUA_START, HTML_START, SVELTE_START]
 const GIT_INIT = 'git init --initial-branch main'
 const CREATE_REPOSITORY = 'gh repo create "$RUN_NAME" --private --source . --push'
 const START = 'pnpm exec josh start --yes --github'
 const MACHINE_IDENTITY = 'git config --global user.name'
+const TARBALL = '"$PACKAGE_TARBALL"'
+const SVELTEKIT_CHECKS = 'pnpm build && pnpm check'
 
 function pattern(name: string): Scenario {
 	const found = fresh_machine_patterns.find(name)
@@ -37,7 +40,7 @@ describe('fresh_machine_patterns', () => {
 		const commands = scenario.commands.join('\n')
 
 		expect(scenario).toMatchObject({ package_source: 'tarball', requires_github: false })
-		expect(commands).toContain('"$PACKAGE_TARBALL"')
+		expect(commands).toContain(TARBALL)
 		expect(commands).not.toMatch(/\bgit\b|\bgh\b/u)
 	})
 
@@ -67,12 +70,45 @@ describe('fresh_machine_patterns gate', () => {
 	})
 
 	it.each([...INIT_NAMES, ...START_NAMES])('%s records the gate from both PATH states', (name) => {
+		const path_probes = pattern(name).probes.slice(-2)
+
+		expect(path_probes[0]).toContain("bash --noprofile --norc -c 'pnpm josh gate'")
+		expect(path_probes[1]).toContain('./node_modules/.bin/josh gate')
+	})
+
+	it.each(START_NAMES)('%s records nothing but the PATH states', (name) => {
+		expect(pattern(name).probes).toHaveLength(2)
+	})
+
+	it.each(INIT_NAMES)('%s records the profile, the files and a second init', (name) => {
 		const { probes } = pattern(name)
 
-		expect(probes).toHaveLength(2)
-		expect(probes[0]).toContain("bash --noprofile --norc -c 'pnpm josh gate'")
-		expect(probes[1]).toContain('./node_modules/.bin/josh gate')
+		expect(probes[0]).toBe('pnpm josh profile')
+		expect(probes[1]).toContain('-name node_modules -prune -o -print')
+		expect(probes[2]).toMatch(
+			/sha256sum > (?<file>\S+) && pnpm exec josh init && .+\| diff \k<file> -$/u,
+		)
 	})
+})
+
+describe('fresh_machine_patterns SvelteKit init', () => {
+	it('records the sv version and builds and checks the app before kit is installed', () => {
+		const { commands } = pattern(SVELTE_INIT)
+		const install = commands.findIndex((command) => command.includes(TARBALL))
+
+		expect(commands.slice(1, install)).toStrictEqual(['pnpm dlx sv --version', SVELTEKIT_CHECKS])
+	})
+
+	it('builds and checks the app again after josh init', () => {
+		expect(pattern(SVELTE_INIT).probes).toContain(SVELTEKIT_CHECKS)
+	})
+
+	it.each(INIT_NAMES.filter((name) => name !== SVELTE_INIT))(
+		'%s records only the init and PATH probes',
+		(name) => {
+			expect(pattern(name).probes).toHaveLength(5)
+		},
+	)
 })
 
 // The starting states of joshuafolkken/kit#2848: what exists before `josh start` runs.

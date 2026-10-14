@@ -38,7 +38,7 @@ interface RunRequest {
 	run_name: string
 	log_path: string
 	package_version: string | undefined
-	// Variable name → value: the GitHub token of a GitHub scenario and every secret its spec names.
+	// Variable name → value, each passed into the container by name and replaced in every line.
 	secrets: Readonly<Record<string, string>>
 	is_rebuild: boolean
 }
@@ -52,8 +52,10 @@ interface Stage {
 type Write = (line: string) => void
 
 function logger(request: RunRequest): Write {
+	const secrets = Object.values(request.secrets)
+
 	return function write(line: string): void {
-		const safe = fresh_machine_log.redact(line, Object.values(request.secrets))
+		const safe = fresh_machine_log.redact(line, secrets)
 
 		console.info(safe)
 		appendFileSync(request.log_path, `${safe}\n`)

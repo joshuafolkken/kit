@@ -12,6 +12,7 @@ const CODE_RABBIT = 'CodeRabbit'
 const SONAR_QUBE = 'SonarQube'
 const AUTO_MERGE = 'auto-merge'
 const NON_STRING_VALUE = 'not a string'
+const RATE_LIMITED = 'Review rate limited'
 
 describe('read_string', () => {
 	it('returns the trimmed string for a non-empty value', () => {
@@ -163,6 +164,21 @@ describe('parse_rollup_checks — StatusContext items', () => {
 		const checks = parse_rollup_checks(raw)
 
 		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+})
+
+describe('parse_rollup_checks — StatusContext description', () => {
+	// CodeRabbit says `Review rate limited` under a SUCCESS state, so the words must survive the parse
+	// (joshuafolkken/kit#3770).
+	it('keeps a StatusContext description and omits one the item lacks', () => {
+		const described = { ...status_context_item(CODE_RABBIT, 'SUCCESS'), description: RATE_LIMITED }
+		const raw = JSON.stringify({
+			statusCheckRollup: [described, status_context_item(SONAR_QUBE, 'SUCCESS')],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.description).toBe(RATE_LIMITED)
+		expect(checks[1]).not.toHaveProperty('description')
 	})
 })
 

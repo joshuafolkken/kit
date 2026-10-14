@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_error } from '#scripts/git/git-error'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { cli_body } from '#scripts/josh/cli-body'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
@@ -151,9 +152,11 @@ async function assert_review_attested(should_merge: boolean): Promise<void> {
 
 	const verdict = await review_attest.check_here()
 
-	if (is_merge_permitted(verdict.status)) return
+	if (!is_merge_permitted(verdict.status)) throw new Error(review_attest.refusal_message(verdict))
 
-	throw new Error(review_attest.refusal_message(verdict))
+	const refusal = await issue_watch_gate.review_refusal_here()
+
+	if (refusal !== undefined) throw new Error(refusal)
 }
 
 // Recording a review round as a prose request leaves the recurrence ledger blind whenever it is

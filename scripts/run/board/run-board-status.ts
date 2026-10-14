@@ -3,9 +3,12 @@ import {
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 } from '#scripts/issue/issue-labels'
+import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_checks } from './run-board-checks'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_setup, type SetupRead } from './run-board-setup'
 
@@ -25,6 +28,8 @@ interface ItemStatus {
 	lane?: string | undefined
 	// Every phase the child passed while running, in order (`run-board-phase.ts`) — kept once it settles.
 	track?: ReadonlyArray<Phase> | undefined
+	// When a running child entered the phase its track ends on — the event that moved it there.
+	phase_ms?: number | undefined
 }
 
 interface LatestEvent {
@@ -42,6 +47,10 @@ interface RunActivity extends Partial<SetupRead> {
 	// When the run last did anything of its own — its newest position or stage, whichever is newer. A
 	// stage that has ended still counts: what follows it is counted from its end, not from before it.
 	idle_ms?: number | undefined
+	// Each child's newest `lane-phase` or `ship-stage`, by issue (`run-board-lane-event.ts`).
+	lane_events?: ReadonlyMap<number, LaneEvent> | undefined
+	// Each child's newest `pr-checks`, by issue (`run-board-checks.ts`).
+	pr_checks?: ReadonlyMap<number, PrChecks> | undefined
 	// The run's last position is a `stop` that names no child — the run itself ended.
 	is_stopped: boolean
 }
@@ -55,13 +64,30 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 }
 // A cut or a resume says the child is still running, on whatever phase it had reached.
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
+// A person's restart starts the child over in a fresh session, so its track starts over too.
+const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTART])
 
 function moment(event: RunEvent): number {
 	return Date.parse(event.at)
 }
 
 function launched(event: RunEvent): ItemStatus {
-	return { state: 'running', started_ms: moment(event), track: [run_board_phase.LAUNCHED_PHASE] }
+	const at_ms = moment(event)
+
+	return {
+		state: 'running',
+		started_ms: at_ms,
+		track: [run_board_phase.LAUNCHED_PHASE],
+		phase_ms: at_ms,
+	}
+}
+
+// The status with its track moved on by `event`. The phase's start moves only where the phase the
+// track ends on changes, so a second session's first edit does not restart the time of its phase.
+function moved(previous: ItemStatus, track: ReadonlyArray<Phase>, event: RunEvent): ItemStatus {
+	const is_same = previous.phase_ms !== undefined && track.at(-1) === previous.track?.at(-1)
+
+	return { ...previous, track, phase_ms: is_same ? previous.phase_ms : moment(event) }
 }
 
 // The status a child settles into: its start and the track it had reached, so a settled row still
@@ -77,7 +103,9 @@ function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEve
 }
 
 function continued(previous: ItemStatus | undefined): ItemStatus {
-	return { state: 'running', started_ms: previous?.started_ms, track: previous?.track }
+	const { started_ms, track, phase_ms } = previous ?? {}
+
+	return { state: 'running', started_ms, track, phase_ms }
 }
 
 // A stage line carrying its attempt redraws the track of any child launched on this stream — a settled
@@ -86,11 +114,12 @@ function continued(previous: ItemStatus | undefined): ItemStatus {
 function replayed(
 	previous: ItemStatus | undefined,
 	attempt: ReadonlyArray<Phase>,
+	event: RunEvent,
 ): ItemStatus | undefined {
 	if (previous === undefined) return previous
 	if (previous.track === undefined && previous.state !== 'running') return previous
 
-	return { ...previous, track: run_board_phase.replayed(previous.track ?? [], attempt) }
+	return moved(previous, run_board_phase.replayed(previous.track ?? [], attempt), event)
 }
 
 // A phase moves only a running child, so a three-word `report` stage after its merge — or a `plan`
@@ -100,18 +129,18 @@ function phased(previous: ItemStatus | undefined, event: RunEvent): ItemStatus |
 
 	if (phase === undefined || previous?.state !== 'running') return previous
 
-	return { ...previous, track: run_board_phase.history_after(previous.track ?? [], phase) }
+	return moved(previous, run_board_phase.history_after(previous.track ?? [], phase), event)
 }
 
 function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
 	const attempt = run_board_phase.attempt_of(event)
 
-	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt)
+	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt, event)
 }
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.
 function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
-	if (event.kind === KIND.CHILD_LAUNCH) return launched(event)
+	if (LAUNCH_KINDS.has(event.kind)) return launched(event)
 
 	const ending = ENDING_STATES[event.kind]
 
@@ -284,6 +313,8 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 		last_event_ms: last === undefined ? undefined : moment(last),
 		latest: latest_of(position ?? last),
 		idle_ms: idle_of(events),
+		lane_events: run_board_lane_event.newest_of(events),
+		pr_checks: run_board_checks.newest_of(events),
 		is_stopped: is_ended || is_run_stop(position),
 	}
 }

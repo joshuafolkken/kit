@@ -7,7 +7,7 @@ import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role
 // the nearest ancestor holding a `package.json` — which, inside a linked work tree, is the lane's
 // own directory — so a lane with no `.env` runs on seed 0 and a lane handed a verbatim copy of the
 // root's runs on the root's exact offset; either way every lane lands on one pair of ports, and a
-// busy port fails without retrying on another. At the default six lanes that turns E2E from "fails
+// busy port fails without retrying on another. At six lanes that turns E2E from "fails
 // sometimes" into "fails nearly always". So the lane's `.env` keeps the project's `PORT_SEED`
 // unchanged and adds `JOSH_LANE_SEAT`, and `ports/index.js` combines them as `seed × 10 + seat`:
 // the file plainly shows which number is the project's and which is the

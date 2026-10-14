@@ -49,6 +49,7 @@ const WARNING_RECOVERY =
 // The discriminant for a dispatch refused because the `in-progress` marker could not be applied, named
 // once rather than inlined at each use.
 const LABEL_UNSET_KIND = 'label-unset'
+const RESTART_START = 'restart'
 // The role a lane child runs under, resolved once so the fresh and resume builders read the same one.
 const RESOLVED_ROLE = agent_role_profile.WORKER
 
@@ -281,13 +282,15 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 // **The re-dispatch decides resume-or-fresh from the lane's own exit record**.
 // The record is read from the log the previous dispatch of this lane wrote — a first dispatch finds
 // none and starts fresh, an `outage` ending with a session id resumes it. The provider is resolved
-// first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh.
-function prepared(lane: LaneInfo): Prepared {
+// first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh. **A
+// fresh dispatch never reads the record**: a person restarting a child (`lane:restart`) wants a new
+// session that reads the Issue from the start, whatever the previous one ended on.
+function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
 	const resolved = agent_role_profile.resolve(RESOLVED_ROLE)
 
 	if (resolved.kind === 'rejected') return resolved
 
-	const record = run_ending.read_exit(default_log_path(lane))
+	const record = is_fresh ? undefined : run_ending.read_exit(default_log_path(lane))
 	const plan = lane_resume.plan(lane.issue, record, resolved.profile.provider)
 	const built = built_for(plan, resolved.profile, lane)
 
@@ -333,8 +336,23 @@ async function record_started(issue: string): Promise<void> {
 	await lane_ledger.record_dispatch(Number(issue))
 }
 
-async function finish_dispatch(issue: string, request: StartRequest): Promise<DispatchOutcome> {
-	const mark = await mark_in_progress(issue)
+// How a dispatch begins. A `resumable` one claims the marker itself and resumes an `outage` session; a
+// `restart` is a person's (`lane:restart`): its caller claimed the marker before stopping the old child,
+// so no GitHub round-trip sits between that stop and this launch, and the session starts fresh.
+type DispatchStart = 'resumable' | typeof RESTART_START
+
+async function claimed(issue: string, start: DispatchStart): Promise<LabelWrite> {
+	if (start === RESTART_START) return { is_applied: true }
+
+	return await mark_in_progress(issue)
+}
+
+async function finish_dispatch(
+	issue: string,
+	request: StartRequest,
+	start: DispatchStart,
+): Promise<DispatchOutcome> {
+	const mark = await claimed(issue, start)
 
 	if (!mark.is_applied) return { kind: LABEL_UNSET_KIND, reason: mark.reason }
 	const outcome = await started(request)
@@ -346,14 +364,21 @@ async function finish_dispatch(issue: string, request: StartRequest): Promise<Di
 	return outcome
 }
 
-/** Start `fullrun #<N>` detached in the lane for `#<N>`, recording where it writes as it does so. */
-async function dispatch_child(issue: string): Promise<DispatchOutcome> {
+/**
+ * Start `fullrun #<N>` detached in the lane for `#<N>`, recording where it writes as it does so.
+ * A `restart` start expects the marker already claimed and starts a new session even where the lane's
+ * last ending would resume one.
+ */
+async function dispatch_child(
+	issue: string,
+	start: DispatchStart = 'resumable',
+): Promise<DispatchOutcome> {
 	issue_number_shape.require_issue_number(issue)
 
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: 'no-lane' }
-	const built = prepared(lane)
+	const built = prepared(lane, start === RESTART_START)
 	const log_path = default_log_path(lane)
 
 	if (built.kind === 'rejected') return { kind: 'failed', lane, log_path, note: built.note }
@@ -362,7 +387,7 @@ async function dispatch_child(issue: string): Promise<DispatchOutcome> {
 
 	if (log.kind !== 'ready') return log
 
-	return await finish_dispatch(issue, { lane, log_path: log.path, ...built })
+	return await finish_dispatch(issue, { lane, log_path: log.path, ...built }, start)
 }
 
 // **A launch whose log could not be opened is still a launch, and the reader has to hear both halves.**
@@ -438,6 +463,7 @@ async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise
 
 const lane_dispatch = {
 	child_invocation,
+	claim_marker: mark_in_progress,
 	default_log_path,
 	describe,
 	dispatch_child,
@@ -446,5 +472,5 @@ const lane_dispatch = {
 	warn_of_problem,
 }
 
-export type { DispatchOutcome }
+export type { DispatchOutcome, DispatchStart }
 export { lane_dispatch }

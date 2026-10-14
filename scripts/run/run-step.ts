@@ -222,6 +222,8 @@ const FULL_INPUT_ACTIONS: Record<string, (input: StepInput) => StepAction> = {
 	[KIND.STOP]: stop_action,
 	[KIND.DRAIN]: drain_action,
 	[KIND.CHILD_LAUNCH]: child_launch_action,
+	// A person's restart re-dispatched the child, so the parent's position is a launch's.
+	[KIND.RESTART]: child_launch_action,
 }
 
 // An event the table does not name leaves the position unknown rather than guessing a next step. A

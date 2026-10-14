@@ -10,7 +10,7 @@ import type { ItemState } from './run-board-status'
 
 const { STATE_ICONS } = run_board_labels
 
-// joshuafolkken/kit#3526: the track's twelve marks in its order, six to a line.
+// joshuafolkken/kit#3526: the twelve phases in the order a run passes them, six to a line.
 const PHASE_LEGEND = [
 	'🔍 investigate  📝 plan  🔨 implement  🚢 ship  👀 review  🚦 gate',
 	'🔀 sync  📦 commit  🔂 round-2  ⚓ followup  📣 report  💥 failed',
@@ -84,5 +84,26 @@ describe('run_board_render_legend.legend_of', () => {
 		for (const icon of ['⚡', '🧠', '💾', '🔚']) {
 			expect(legend.join('\n')).not.toContain(icon)
 		}
+	})
+})
+
+// joshuafolkken/kit#3767: the header's third line's kind leads the line it shares with the states.
+const OPERATION = '🔧 operation'
+
+function last_line(named: ReadonlyArray<string>): string | undefined {
+	return run_board_render_legend
+		.legend_of([row(1)], new Set([STATE_ICONS.waiting]), [], named)
+		.map((line) => stripVTControlCharacters(line))
+		.at(-1)
+}
+
+describe('run_board_render_legend.legend_of with the third line’s kind', () => {
+	it('names the kind first where the line’s own words do not name it', () => {
+		expect(last_line([OPERATION])).toBe(`${OPERATION}  ⏳ waiting`)
+	})
+
+	// joshuafolkken/kit#3769: the header and a row's tail can both draw 🔧, named once.
+	it('names a kind the header and a row both draw once', () => {
+		expect(last_line([OPERATION, OPERATION])).toBe(`${OPERATION}  ⏳ waiting`)
 	})
 })

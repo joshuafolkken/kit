@@ -17,6 +17,16 @@ pnpm josh issue:read 1715 1567 1605          # several numbers, read concurrentl
 
 Attribute each block by its `issue:` line, never by position. Output past the Bash cap is written as part files under it, and only their paths are printed — read every part with the Read tool in one turn. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
 
+### `josh issue:ack`
+
+Record that the run has read a person's update to its issue, printing the update it acknowledges.
+
+```bash
+pnpm josh issue:ack 3773
+```
+
+`josh run:entry` records the issue as the run's baseline per checkout, so a lane child and a `fullrun` in your own checkout behave alike. The PreToolUse hook polls at most every three minutes with a conditional request and shows a person's body edit or new comment once; josh's own `<!-- josh:run -->`-marked comments and bot comments do not count. `issue:ack` prints what it takes in and makes that read the new baseline. Not detected: comment edits, and the seconds between `josh followup`'s last check and the merge.
+
 ### `josh issue:state`
 
 Print each issue's state, labels and whether a run must stop on it, in the spelling the workflow documents compare against.
@@ -310,7 +320,7 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 **Options:**
 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
-- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 6. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in [`josh backlog:next`](#josh-backlognext)).
+- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 4. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in [`josh backlog:next`](#josh-backlognext)).
 
 With `--repo`, the occupancy line names each `in-progress` holder with its label age read from the issue timeline — `in-progress for <n> min`, marked `stale` past 90 minutes or when the label predates the timeline, `label age unread` when the timeline could not be read.
 
@@ -472,7 +482,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). A `stop` from `run:merge` is read like the offer's: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
+An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). Only `run:merge`'s control `stop` (the failure guard, or a failed child left unparked) stops the run: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. The offer `run:merge` passes through is never read, so its `stop` after a merge is decided by `backlog:offer` on the next pass, as after any other. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are described, with their creation commands, in [Labels and run states](./labels-and-run-states.md).
 
@@ -545,7 +555,7 @@ pnpm josh review:attest --check   # run by the run, before it acts on the review
 - `<nonce>` — attest the checkout the review read.
 - `--check` — verify before acting; `josh followup` asks again before merging.
 
-Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded and nothing attested it — a refusal, not a pass), `mismatch` (a different root, branch or HEAD), `not-required` (no brief recorded in this checkout inside a run's lifetime). All three fields are checked; scoped to a checkout that briefed a review, expiring after eight hours.
+Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded and nothing attested it — a refusal, not a pass), `mismatch` (a different root, branch or HEAD), `not-required` (no brief recorded in this checkout inside a run's lifetime). All three fields are checked; scoped to a checkout that briefed a review, expiring after eight hours. An `ok` is still refused on a person's issue update unread or taken in after the brief ([`josh issue:ack`](#josh-issueack)).
 
 ### `josh delegate`
 

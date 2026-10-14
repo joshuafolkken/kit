@@ -140,6 +140,7 @@ describe('run_merge_cli.run — a parked child', () => {
 			outcome: 'parked',
 			token: NEXT,
 			code: SUCCESS,
+			is_offer: true,
 		})
 		expect(info_mock).not.toHaveBeenCalled()
 	})

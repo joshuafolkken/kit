@@ -9,6 +9,7 @@ import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
+import { lane_preserve } from '#scripts/lane/lane-preserve'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
@@ -167,18 +168,8 @@ async function close_lane(child: string): Promise<void> {
 	await josh(['lane:close', child])
 }
 
-function preserved_comment(message: string): string {
-	return [
-		'The lane held uncommitted work when `run:merge` closed it, so it was stashed before the close:',
-		`- recover with \`pnpm josh stash:pop "${message}"\``,
-	].join('\n')
-}
-
 async function stash_work(child: string, directory: string): Promise<void> {
-	const message = git_stash.work_message(child, LANE_CLOSE_OCCASION)
-
-	await git_stash.push(message, directory)
-	await git_gh_issue_write.issue_try_comment(child, preserved_comment(message))
+	await lane_preserve.stash_work(child, directory, LANE_CLOSE_OCCASION, '`run:merge` closed it')
 }
 
 // Stash whatever the lane still holds uncommitted before its tree is removed: `lane:close` deletes by

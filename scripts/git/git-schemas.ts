@@ -10,6 +10,7 @@ const rollup_item_schema = z.looseObject({
 	conclusion: z.string().optional(),
 	name: z.string().optional(),
 	context: z.string().optional(),
+	description: z.string().nullish(),
 })
 
 const pr_raw_schema = z.object({

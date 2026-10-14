@@ -79,7 +79,7 @@ describe('run_merge_cli.merge_child — a child waiting on an open blocker', () 
 
 		const result = await run_merge_cli.merge_child(context())
 
-		expect(result).toStrictEqual({ outcome: 'failed', token: '2039', code: 0 })
+		expect(result).toStrictEqual({ outcome: 'failed', token: '2039', code: 0, is_offer: true })
 		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} waiting on #3501`)
 	})
 })

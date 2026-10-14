@@ -627,6 +627,19 @@ pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies agai
 
 **Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
 
+### `josh lane:restart`
+
+Stop a running lane child and start its issue over in a fresh session — after correcting the Issue mid-run.
+
+```bash
+pid=$(pnpm josh lane:restart 3769) || exit 1
+```
+
+- In order: it claims the `in-progress` marker, stops the child's process tree, ends any cut it carried, stashes the lane's uncommitted work as `<N>: uncommitted work at lane restart`, dispatches a fresh `fullrun #<N>` that never resumes the stopped session, then comments the `stash:pop` line on the Issue. A `restart` event follows its `child-launch`.
+- It is not a recovery: with no GitHub call between them, the stop and the dispatch fall inside `lane:await`'s 15 s re-confirm window, so `run:merge` never classifies the child — nothing is parked, and neither the failure count nor `CONSECUTIVE_OUTAGE_LIMIT` moves.
+
+**Output / exit codes:** the fresh child's pid on stdout, exit 0. No lane, no running child or a refused marker: child untouched, exit 1. Work that cannot be stashed, or a failed dispatch, leaves the stopped child for `run:merge` and exits 1.
+
 ### `josh rule:value`
 
 Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered — followed by `rewritten N` on a rule whose hook rewrote the call instead of refusing it.

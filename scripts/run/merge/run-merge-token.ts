@@ -24,7 +24,21 @@ const MERGE_TOKEN = {
 
 type MergeToken = (typeof MERGE_TOKEN)[keyof typeof MERGE_TOKEN]
 
-const run_merge_token = { MERGE_TOKEN }
+// Where the token came from: `run:merge`'s own control verdict, or the next offer (`backlog:next` /
+// `epic:next`) passed through as it was read. The offer has a `stop` of its own — nothing ready to start
+// is left — spelled like the control `stop`, so the source travels beside the token.
+interface MergeTokenRead {
+	token: string
+	is_offer: boolean
+}
 
-export type { MergeToken }
+// The single reading of "this merge stopped the run": the control `stop` alone. An offer's `stop` is a
+// parked backlog, which `backlog:budget` decides — a watch while the idle budget lasts — never the merge.
+function is_control_stop(read: MergeTokenRead): boolean {
+	return !read.is_offer && read.token === MERGE_TOKEN.STOP
+}
+
+const run_merge_token = { MERGE_TOKEN, is_control_stop }
+
+export type { MergeToken, MergeTokenRead }
 export { run_merge_token }

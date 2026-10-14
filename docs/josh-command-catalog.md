@@ -285,6 +285,16 @@ Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR
 
 ---
 
+### `josh auth:setup` · `josh as`
+
+> **Audience:** maintainer · **Side effects:** network, processes
+
+`[--check]`
+
+Save the long-lived Claude Code token `claude setup-token` prints in the macOS keychain, for josh fresh:run
+
+---
+
 ### `josh dogfood:commit`
 
 > **Audience:** automation · **Side effects:** files, git · **kit only**
@@ -1015,6 +1025,16 @@ Claude Code hook: refuse a read once the unedited-read threshold is reached agai
 
 ---
 
+### `josh issue:ack`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Record that the run read a person's update to its issue, printing the update it acknowledges
+
+---
+
 ### `josh issue:backlinks`
 
 > **Audience:** automation · **Side effects:** network
@@ -1212,6 +1232,16 @@ Record, or read back, where the unit running a lane’s child writes
 _No arguments._
 
 Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root
+
+---
+
+### `josh lane:restart` · `josh lrs`
+
+> **Audience:** developer · **Side effects:** files, git, processes, network
+
+`<issue>`
+
+Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure
 
 ---
 

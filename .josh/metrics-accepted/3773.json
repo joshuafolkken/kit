@@ -1,0 +1,8 @@
+{
+	"reason": "#3773 adds the issue-watch modules, the issue:ack command and its docs: a new capability (watching a person's issue edits mid-run and before merge), not growth in existing code",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 488,
+		"ai_cost.on_demand_bytes": 306
+	}
+}

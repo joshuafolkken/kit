@@ -16,8 +16,8 @@ describe('fresh_machine_spec.parse', () => {
 		expect(fresh_machine_spec.parse(spec({}))).toStrictEqual({
 			name: NAME,
 			requires_github: false,
+			requires_claude: false,
 			package_source: 'tarball',
-			secrets: [],
 			files: {},
 			commands: [COMMAND],
 			probes: [],
@@ -25,11 +25,11 @@ describe('fresh_machine_spec.parse', () => {
 	})
 
 	// joshuafolkken/kit#3760: the README's Quick start through its first `backlogrun`, run as written.
-	it('reads the backlogrun spec kit keeps, which passes the agent credential by name', () => {
+	it('reads the backlogrun spec kit keeps, which starts Claude Code with the saved token', () => {
 		const file = path.join(import.meta.dirname, 'specs', 'kit-test-backlogrun.json')
 		const scenario = fresh_machine_spec.parse(readFileSync(file, 'utf8'))
 
-		expect(scenario.secrets).toStrictEqual(['CLAUDE_CODE_OAUTH_TOKEN'])
+		expect(scenario.requires_claude).toBe(true)
 		expect(scenario.commands).toContain('pnpm exec josh start --yes --github')
 		expect(scenario.commands.at(-1)).toBe('pnpm josh backlogrun --stop')
 	})
@@ -54,12 +54,6 @@ describe('fresh_machine_spec.parse refusals', () => {
 	it('refuses a name that could not be a directory and repository name', () => {
 		expect(() => fresh_machine_spec.parse(spec({ name: 'App Kit' }))).toThrow(
 			/Invalid scenario spec — name:/u,
-		)
-	})
-
-	it('refuses a secret that could not be an environment variable name', () => {
-		expect(() => fresh_machine_spec.parse(spec({ secrets: ['token=value'] }))).toThrow(
-			/Invalid scenario spec — secrets\.0:/u,
 		)
 	})
 

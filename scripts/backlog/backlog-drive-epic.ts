@@ -80,7 +80,11 @@ async function answered_offer(
 	if (judgment !== undefined) return judgment
 
 	if (token === 'complete') {
-		await backlog_drive_named.mark_done(epic, { outcome: 'merged', code: 0, token: 'none' }, owner)
+		await backlog_drive_named.mark_done(
+			epic,
+			{ outcome: 'merged', code: 0, token: 'none', is_offer: true },
+			owner,
+		)
 	}
 
 	return WAIT

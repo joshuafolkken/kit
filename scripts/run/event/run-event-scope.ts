@@ -93,6 +93,7 @@ const KIND = run_event_stream.EVENT_KIND
 // so a lane child never reads one as its own.
 const BATCH_RECORD_KINDS: ReadonlySet<string> = new Set([
 	KIND.CHILD_LAUNCH,
+	KIND.RESTART,
 	KIND.PARK,
 	KIND.SPLIT,
 	KIND.RETROSPECTIVE,

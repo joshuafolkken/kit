@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { review_attest, type AttestVerdict } from './review-attest'
 import { review_checkout } from './review-checkout'
 
@@ -51,6 +52,22 @@ async function run_attest(nonce: string): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
+// An attested review still describes the issue as it read it: a person's update it has not taken in,
+// or one taken in after the brief, makes its verdict stale (`issue-watch-gate.ts`).
+async function report_issue_watch(verdict: AttestVerdict): Promise<number> {
+	const refusal = await issue_watch_gate.review_refusal_here()
+
+	if (refusal !== undefined) {
+		console.error(refusal)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(attested_line(verdict))
+
+	return 0
+}
+
 // **`check_here`, not `check`** — the pointer is keyed on the repository root, and `check`'s default
 // is `PROJECT_ROOT`, which is `process.cwd()`. Run from a subdirectory, or from the session checkout
 // rather than the lane's, the two hash different keys: no pointer is found, the command prints "no
@@ -65,15 +82,13 @@ async function run_check(): Promise<number> {
 		return 0
 	}
 
-	if (verdict.status === 'ok') {
-		console.info(attested_line(verdict))
+	if (verdict.status !== 'ok') {
+		console.error(review_attest.refusal_message(verdict))
 
-		return 0
+		return FAILURE_EXIT_CODE
 	}
 
-	console.error(review_attest.refusal_message(verdict))
-
-	return FAILURE_EXIT_CODE
+	return await report_issue_watch(verdict)
 }
 
 // Anything unrecognized is a usage error rather than a default. A misspelled flag that fell through

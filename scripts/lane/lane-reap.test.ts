@@ -97,6 +97,30 @@ describe('lane_reap.reap_child — what it spares', () => {
 	})
 })
 
+// joshuafolkken/kit#3772: `lane:restart` asks before it claims the marker, so the probe must signal
+// nothing and must not count the caller's own ancestry as the child.
+describe('lane_reap.is_child_running', () => {
+	it('answers true for a matched child without signalling it', () => {
+		const signalled: Array<number> = []
+		const probes = probes_over(
+			{ matching: [CHILD], children: {}, parents: own_ancestry() },
+			signalled,
+		)
+
+		expect(lane_reap.is_child_running(ISSUE, probes)).toBe(true)
+		expect(signalled).toStrictEqual([])
+	})
+
+	it('answers false when only the caller itself matches', () => {
+		const probes = probes_over(
+			{ matching: [process.pid], children: {}, parents: own_ancestry() },
+			[],
+		)
+
+		expect(lane_reap.is_child_running(ISSUE, probes)).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#2472: the Stop hook matches a carry record's owner against this chain.
 describe('lane_reap.own_ancestry', () => {
 	it('holds this process and every process above it', () => {

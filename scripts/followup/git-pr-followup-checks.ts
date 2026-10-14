@@ -4,9 +4,11 @@ import {
 	DEFAULT_STABLE_READS,
 	git_pr_checks,
 	WATCH_CONFIRMED_STABLE_READS,
+	type SnapshotObserver,
 } from '#scripts/gh/git-pr-checks'
 import { is_coderabbit_check } from '#scripts/gh/git-pr-checks-eval'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { json_value } from '#scripts/lib/json-value'
 
 // The check wait and the notes read off its snapshot — split out of `git-pr-followup.ts` when it
@@ -75,12 +77,15 @@ async function handle_watch_failure(branch_name: string, error: unknown): Promis
 // reads the wait still needs. A timed-out watch (`timed_out: true`) never spanned the pending→settled
 // window, so it must keep the full stable-read window rather than claim the confirmation. A rethrown
 // failure — the empty-rollup case — never reaches a caller, so it needs no answer here.
-async function watch_before_polling(branch_name: string): Promise<boolean> {
+async function watch_before_polling(
+	branch_name: string,
+	observe: SnapshotObserver | undefined,
+): Promise<boolean> {
 	console.info('')
 	console.info('📊 Watching PR checks...')
 
 	try {
-		const result = await git_gh_command.pr_checks_watch(branch_name)
+		const result = await git_gh_command.pr_checks_watch(branch_name, observe)
 
 		return !result.timed_out
 	} catch (error) {
@@ -95,14 +100,23 @@ async function watch_before_polling(branch_name: string): Promise<boolean> {
 // once rather than twice — which removes the extra interval `followup` spent re-proving a settled run.
 // A skipped or fallen-through watch keeps `DEFAULT_STABLE_READS`, and a check that turned red is still
 // caught: the poll evaluates the full merge gate and throws on failure before any stable read counts.
+// `observe` is shown each poll's snapshot, the watch's included — the run's `pr-checks` line
+// (joshuafolkken/kit#3770).
 async function run_checks(input: {
 	branch_name: string
 	is_skip_watch: boolean
+	observe?: SnapshotObserver
 }): Promise<PrStateSnapshot> {
-	const is_watch_confirmed = !input.is_skip_watch && (await watch_before_polling(input.branch_name))
+	const is_watch_confirmed =
+		!input.is_skip_watch && (await watch_before_polling(input.branch_name, input.observe))
 	const stable_reads = is_watch_confirmed ? WATCH_CONFIRMED_STABLE_READS : DEFAULT_STABLE_READS
 
-	return await git_pr_checks.wait_for_pr_success(input.branch_name, stable_reads)
+	return await git_pr_checks.wait_for_pr_success(
+		input.branch_name,
+		stable_reads,
+		issue_watch_gate.assert_read_here,
+		input.observe,
+	)
 }
 
 // Temporary: record every CodeRabbit check that was not passing when the merge gate

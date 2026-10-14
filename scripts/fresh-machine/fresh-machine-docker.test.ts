@@ -44,11 +44,11 @@ describe('fresh_machine_docker.run_arguments', () => {
 		expect(fresh_machine_docker.run_arguments(BASE).join(' ')).not.toContain(TOKEN)
 	})
 
-	it('names no secret for a scenario without any', () => {
+	it('names no token variable for a scenario without secrets', () => {
 		expect(variables({ ...BASE, secret_names: [] })).not.toContain('GH_TOKEN')
 	})
 
-	it('passes every secret a spec names by name, after the token', () => {
+	it('names every secret of the scenario, each by name only', () => {
 		const container = { ...BASE, secret_names: ['GH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'] }
 
 		expect(variables(container).slice(-2)).toStrictEqual(['GH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'])

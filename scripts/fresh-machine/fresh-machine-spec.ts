@@ -21,10 +21,9 @@ const SCENARIO_SCHEMA = z.strictObject({
 	name: z.string().regex(/^[a-z0-9][a-z0-9-]*$/u),
 	// A GitHub scenario runs on the image that also has git and gh, and receives the host's token.
 	requires_github: z.boolean().default(false),
+	// A Claude Code scenario receives the host's long-lived token as `CLAUDE_CODE_OAUTH_TOKEN`.
+	requires_claude: z.boolean().default(false),
 	package_source: z.enum(['tarball', 'published']).default('tarball'),
-	// Host environment variables the container receives the way it receives the GitHub token: by name,
-	// and with every value removed from the log — an agent's credential, for a scenario that starts one.
-	secrets: z.array(z.string().regex(/^[A-Z_][A-Z0-9_]*$/u)).default([]),
 	files: z.record(z.string().refine(is_project_relative), z.string()).default({}),
 	// A failing command ends the run; a failing probe is only recorded.
 	commands: z.array(COMMAND_SCHEMA).min(1),

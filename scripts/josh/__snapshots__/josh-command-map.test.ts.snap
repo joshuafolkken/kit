@@ -5,6 +5,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
   "aliases": {
     "a": "audit",
     "ad": "adopt",
+    "as": "auth:setup",
     "bh": "behavior",
     "blr": "backlogrun",
     "bp": "bump",
@@ -24,6 +25,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lli": "lane:limit",
     "ln": "lines",
     "lr": "lint:related",
+    "lrs": "lane:restart",
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
@@ -81,6 +83,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "network",
+      ],
+    ],
+    "auth:setup": [
+      "[--check]",
+      "maintainer",
+      [
+        "network",
+        "processes",
       ],
     ],
     "auto-ok:next": [
@@ -414,6 +424,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "issue:ack": [
+      "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "issue:backlinks": [
       "<issue>",
       "automation",
@@ -558,6 +575,16 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "git",
+      ],
+    ],
+    "lane:restart": [
+      "<issue>",
+      "developer",
+      [
+        "files",
+        "git",
+        "processes",
+        "network",
       ],
     ],
     "lane:sample": [

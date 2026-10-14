@@ -119,6 +119,18 @@ function is_coderabbit_check(check_name: string): boolean {
 	return is_required_match(check_name, CODERABBIT_CHECK_NAME)
 }
 
+// CodeRabbit reports a rate-limited review as a *passing* status whose description says so
+// (`Review rate limited`), so only the description tells it from a finished review
+// (joshuafolkken/kit#3770).
+const CODERABBIT_RATE_LIMIT_DESCRIPTION = /rate limit/iu
+
+function is_coderabbit_rate_limited(check: RollupCheck): boolean {
+	return (
+		is_coderabbit_check(check.name) &&
+		CODERABBIT_RATE_LIMIT_DESCRIPTION.test(check.description ?? '')
+	)
+}
+
 // Temporary: a pending or failing CodeRabbit check makes GitHub report UNSTABLE even
 // though CodeRabbit is not required. Accept that state only when CodeRabbit checks are the
 // sole non-passing ones — any other non-passing check keeps the gate strict.
@@ -249,6 +261,7 @@ export {
 	is_review_decision_decisive,
 	read_required_statuses,
 	is_coderabbit_check,
+	is_coderabbit_rate_limited,
 	collect_blocking_failures,
 	describe_pr_failure,
 	REQUIRED_CHECKS,
