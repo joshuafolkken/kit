@@ -10,6 +10,9 @@ import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_read } from './run-board-read'
+import { run_board_usual } from './run-board-usual'
+
+const MINUTE_MS = 60_000
 
 // joshuafolkken/kit#3439: the board reads the running run, else the one that last ended, and keeps the
 // next run's events off an ended run's board.
@@ -94,6 +97,7 @@ describe('run_board_read.read_local', () => {
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			free_lanes: FREE_LANES,
+			usual: new Map(),
 		})
 	})
 
@@ -117,6 +121,18 @@ describe('run_board_read.read_local', () => {
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 
 		await expect(run_board_read.read_local()).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3769: how long each phase usually takes is read off the repository's ledger.
+describe('run_board_read.read_local usual times', () => {
+	it('reads each phase’s usual time from the repository', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const usual = new Map([['review' as const, MINUTE_MS]])
+		const read = vi.spyOn(run_board_usual, 'read').mockReturnValue(usual)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ usual })
+		expect(read).toHaveBeenCalledWith(REPOSITORY)
 	})
 })
 

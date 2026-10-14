@@ -26,6 +26,8 @@ interface ItemStatus {
 	lane?: string | undefined
 	// Every phase the child passed while running, in order (`run-board-phase.ts`) — kept once it settles.
 	track?: ReadonlyArray<Phase> | undefined
+	// When a running child entered the phase its track ends on — the event that moved it there.
+	phase_ms?: number | undefined
 }
 
 interface LatestEvent {
@@ -64,7 +66,22 @@ function moment(event: RunEvent): number {
 }
 
 function launched(event: RunEvent): ItemStatus {
-	return { state: 'running', started_ms: moment(event), track: [run_board_phase.LAUNCHED_PHASE] }
+	const at_ms = moment(event)
+
+	return {
+		state: 'running',
+		started_ms: at_ms,
+		track: [run_board_phase.LAUNCHED_PHASE],
+		phase_ms: at_ms,
+	}
+}
+
+// The status with its track moved on by `event`. The phase's start moves only where the phase the
+// track ends on changes, so a second session's first edit does not restart the time of its phase.
+function moved(previous: ItemStatus, track: ReadonlyArray<Phase>, event: RunEvent): ItemStatus {
+	const is_same = previous.phase_ms !== undefined && track.at(-1) === previous.track?.at(-1)
+
+	return { ...previous, track, phase_ms: is_same ? previous.phase_ms : moment(event) }
 }
 
 // The status a child settles into: its start and the track it had reached, so a settled row still
@@ -80,7 +97,9 @@ function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEve
 }
 
 function continued(previous: ItemStatus | undefined): ItemStatus {
-	return { state: 'running', started_ms: previous?.started_ms, track: previous?.track }
+	const { started_ms, track, phase_ms } = previous ?? {}
+
+	return { state: 'running', started_ms, track, phase_ms }
 }
 
 // A stage line carrying its attempt redraws the track of any child launched on this stream — a settled
@@ -89,11 +108,12 @@ function continued(previous: ItemStatus | undefined): ItemStatus {
 function replayed(
 	previous: ItemStatus | undefined,
 	attempt: ReadonlyArray<Phase>,
+	event: RunEvent,
 ): ItemStatus | undefined {
 	if (previous === undefined) return previous
 	if (previous.track === undefined && previous.state !== 'running') return previous
 
-	return { ...previous, track: run_board_phase.replayed(previous.track ?? [], attempt) }
+	return moved(previous, run_board_phase.replayed(previous.track ?? [], attempt), event)
 }
 
 // A phase moves only a running child, so a three-word `report` stage after its merge — or a `plan`
@@ -103,13 +123,13 @@ function phased(previous: ItemStatus | undefined, event: RunEvent): ItemStatus |
 
 	if (phase === undefined || previous?.state !== 'running') return previous
 
-	return { ...previous, track: run_board_phase.history_after(previous.track ?? [], phase) }
+	return moved(previous, run_board_phase.history_after(previous.track ?? [], phase), event)
 }
 
 function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
 	const attempt = run_board_phase.attempt_of(event)
 
-	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt)
+	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt, event)
 }
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.

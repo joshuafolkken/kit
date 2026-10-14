@@ -1,0 +1,7 @@
+{
+	"reason": "#3769 replaces the phase track with a per-phase usual-time median (lane ledger, floored at 2 min so seconds-long stages are not drawn as alarming), a colored current-phase time and a newest-activity tail; the new readers outweigh the deleted track renderer",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 116
+	}
+}

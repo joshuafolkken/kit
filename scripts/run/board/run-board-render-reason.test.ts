@@ -12,6 +12,7 @@ const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header } = run_board_render_fixture
 const SECOND = 1000
 const ISSUE = 3720
 const BLOCKER = '3409'
+const SHORT_TITLE = 'Short title'
 const LONG_TITLE = 'Verify josh start end-to-end on a fresh machine with nothing installed'
 const TITLE_START = 'Verify j'
 const UNTRIAGED: RowReason = { text: 'untriaged' }
@@ -24,7 +25,7 @@ const JAPANESE = /[぀-ヿ一-鿿]/u
 function waiting(extra: Partial<BoardRow> = {}): BoardRow {
 	return {
 		number: ISSUE,
-		title: 'Short title',
+		title: SHORT_TITLE,
 		kind: undefined,
 		state: 'waiting',
 		status: undefined,
@@ -51,8 +52,12 @@ function line_of(row: BoardRow, columns?: number): string {
 }
 
 describe('run_board_render.render — why a waiting row waits', () => {
-	it('draws the reason at the end of the row', () => {
-		expect(line_of(waiting({ reason: UNTRIAGED }))).toMatch(/Short title {2}untriaged$/u)
+	it('draws the reason at the end of the row, past the title column', () => {
+		const line = line_of(waiting({ reason: UNTRIAGED }))
+		const title_column = line.indexOf(SHORT_TITLE)
+
+		expect(line).toMatch(/Short title +untriaged$/u)
+		expect(line.indexOf('untriaged')).toBe(title_column + run_board_render.TITLE_LIMIT + 2)
 	})
 
 	it('draws the reason after the row’s blockers, which stay as they were', () => {
@@ -88,8 +93,11 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  overlaps 3701`)
 	})
 
-	it('leaves a title that already fits the pane whole', () => {
-		expect(line_of(waiting({ reason: UNTRIAGED }), NARROW)).toMatch(/Short title {2}untriaged$/u)
+	it('leaves a title that already fits the pane whole, giving up the blanks after it first', () => {
+		const line = line_of(waiting({ reason: UNTRIAGED }), NARROW)
+
+		expect(line).toMatch(/Short title +untriaged$/u)
+		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
 	})
 
 	it('draws a row with no reason as it did, in a pane and out of one', () => {
