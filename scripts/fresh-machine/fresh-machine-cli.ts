@@ -8,6 +8,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { fresh_machine_docker } from './fresh-machine-docker'
 import { fresh_machine_log } from './fresh-machine-log'
 import { fresh_machine_patterns } from './fresh-machine-patterns'
 import { fresh_machine_run, type RunRequest } from './fresh-machine-run'
@@ -25,6 +26,8 @@ const USAGE =
 const DEFAULT_LOG_DIRECTORY = '.claude/tmp/fresh-machine'
 const NO_TOKEN =
 	'This scenario uses GitHub and `gh auth token` printed no token. Run `gh auth login` on this machine first.'
+const NO_SECRET =
+	'This scenario passes secrets into the container by name, and this environment does not set them. Export them first: '
 // The patterns install kit by name, while the tarball and the published version are those of the
 // checkout the command is run from — in a toolkit's checkout the two would be different packages.
 const NOT_A_KIT_CHECKOUT = `The named patterns install ${KIT_PACKAGE_NAME} and run from its checkout only. Write this package's scenario as a JSON file and pass it with --spec.`
@@ -83,7 +86,11 @@ function repositories_of(scenario: Scenario): Array<string> {
 	return names.split('\n').filter((name) => name !== '')
 }
 
-function request_of(scenario: Scenario, values: CliValues, token: string | undefined): RunRequest {
+function request_of(
+	scenario: Scenario,
+	values: CliValues,
+	secrets: Readonly<Record<string, string>>,
+): RunRequest {
 	const log_directory = path.resolve(PROJECT_ROOT, values['log-dir'] ?? DEFAULT_LOG_DIRECTORY)
 
 	mkdirSync(log_directory, { recursive: true })
@@ -98,7 +105,7 @@ function request_of(scenario: Scenario, values: CliValues, token: string | undef
 		run_name,
 		log_path: path.join(log_directory, fresh_machine_log.file_name(run_name)),
 		package_version: values['package-version'],
-		token,
+		secrets,
 		is_rebuild: values.rebuild === true,
 	}
 }
@@ -109,12 +116,35 @@ function refuse(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
+// `undefined` when the scenario uses GitHub and gh has no token to give it.
+function github_secret(scenario: Scenario): Record<string, string> | undefined {
+	if (!scenario.requires_github) return {}
+
+	const token = gh_cli_token.get()
+
+	return token === undefined ? undefined : { [fresh_machine_docker.TOKEN_VARIABLE]: token }
+}
+
+function missing_secrets(scenario: Scenario): Array<string> {
+	return scenario.secrets.filter((name) => (process.env[name] ?? '') === '')
+}
+
+function spec_secrets(scenario: Scenario): Record<string, string> {
+	return Object.fromEntries(scenario.secrets.map((name) => [name, process.env[name] ?? '']))
+}
+
+// Every secret is read before anything runs, so a missing one stops the run before Docker starts
+// rather than after a container has created a repository.
 async function run_scenario(scenario: Scenario, values: CliValues): Promise<number> {
-	const token = scenario.requires_github ? gh_cli_token.get() : undefined
+	const github = github_secret(scenario)
 
-	if (token === undefined && scenario.requires_github) return refuse(NO_TOKEN)
+	if (github === undefined) return refuse(NO_TOKEN)
 
-	const request = request_of(scenario, values, token)
+	const missing = missing_secrets(scenario)
+
+	if (missing.length > 0) return refuse(`${NO_SECRET}${missing.join(', ')}`)
+
+	const request = request_of(scenario, values, { ...github, ...spec_secrets(scenario) })
 	const exit_code = await fresh_machine_run.run(request)
 
 	console.info(`Log: ${request.log_path}`)

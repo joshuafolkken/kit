@@ -1,5 +1,5 @@
-// The two rules a `josh fresh:run` log follows: a run never reuses a name, and the GitHub token
-// never reaches the file.
+// The two rules a `josh fresh:run` log follows: a run never reuses a name, and no secret the
+// container receives — the GitHub token or one a spec names — reaches the file.
 
 const LOG_EXTENSION = '.log'
 const FIRST_RUN = 1
@@ -44,10 +44,14 @@ function file_name(run_name: string): string {
 	return `${run_name}${LOG_EXTENSION}`
 }
 
-function redact(line: string, secret: string | undefined): string {
-	if (secret === undefined || secret === '') return line
+function redact(line: string, secrets: ReadonlyArray<string>): string {
+	let redacted = line
 
-	return line.replaceAll(secret, '[REDACTED]')
+	for (const secret of secrets) {
+		if (secret !== '') redacted = redacted.replaceAll(secret, '[REDACTED]')
+	}
+
+	return redacted
 }
 
 const fresh_machine_log = { next_name, file_name, redact }

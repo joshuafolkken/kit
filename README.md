@@ -35,6 +35,16 @@ pnpm exec josh start
 
 Next: [tutorial](./docs/tutorial.md)
 
+### Your first backlogrun
+
+Tell the agent the change you want, then type `kickoff new auto ok` to it (or add the `auto-ok` label to an existing Issue).
+
+```bash
+pnpm josh backlogrun
+```
+
+Details: [Run the backlog unattended](./docs/how-to/run-backlog.md)
+
 ### AI assistant only — no GitHub account needed
 
 Requires [Node.js and pnpm](./docs/setup/prerequisites.md).

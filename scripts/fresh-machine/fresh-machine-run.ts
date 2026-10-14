@@ -38,7 +38,8 @@ interface RunRequest {
 	run_name: string
 	log_path: string
 	package_version: string | undefined
-	token: string | undefined
+	// Variable name → value: the GitHub token of a GitHub scenario and every secret its spec names.
+	secrets: Readonly<Record<string, string>>
 	is_rebuild: boolean
 }
 
@@ -52,7 +53,7 @@ type Write = (line: string) => void
 
 function logger(request: RunRequest): Write {
 	return function write(line: string): void {
-		const safe = fresh_machine_log.redact(line, request.token)
+		const safe = fresh_machine_log.redact(line, Object.values(request.secrets))
 
 		console.info(safe)
 		appendFileSync(request.log_path, `${safe}\n`)
@@ -161,7 +162,7 @@ async function container_run(
 		pack_directory: staged.pack_directory,
 		tarball: is_tarball ? await pack(staged.pack_directory, write) : undefined,
 		package_version: is_tarball ? undefined : await published_version(request.package_version),
-		requires_github: scenario.requires_github,
+		secret_names: Object.keys(request.secrets),
 	}
 }
 
@@ -178,7 +179,6 @@ async function build_image(request: RunRequest, write: Write): Promise<number> {
 
 async function run_container(request: RunRequest, staged: Stage, write: Write): Promise<number> {
 	const container = await container_run(request, staged, write)
-	const environment = { [fresh_machine_docker.TOKEN_VARIABLE]: request.token }
 
 	share(staged.root)
 	write(`$ ${DOCKER} run ${container.image} — ${request.run_name}`)
@@ -187,7 +187,7 @@ async function run_container(request: RunRequest, staged: Stage, write: Write): 
 	return await stream(
 		DOCKER,
 		fresh_machine_docker.run_arguments(container),
-		{ env: environment },
+		{ env: request.secrets },
 		write,
 	)
 }

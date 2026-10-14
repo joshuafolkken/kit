@@ -98,13 +98,13 @@ describe('fresh_machine_cli.run — the GitHub token', () => {
 		await fresh_machine_cli.run([INIT_PATTERN])
 
 		expect(gh_cli_token.get).not.toHaveBeenCalled()
-		expect(request()?.token).toBeUndefined()
+		expect(request()?.secrets).toStrictEqual({})
 	})
 
 	it('passes the token of this machine to a GitHub pattern', async () => {
 		await fresh_machine_cli.run([START_PATTERN, '--package-version', '1.2.3'])
 
-		expect(request()).toMatchObject({ token: TOKEN, package_version: '1.2.3' })
+		expect(request()).toMatchObject({ secrets: { GH_TOKEN: TOKEN }, package_version: '1.2.3' })
 	})
 
 	it('refuses a GitHub pattern when gh has no token, before anything runs', async () => {
@@ -112,6 +112,34 @@ describe('fresh_machine_cli.run — the GitHub token', () => {
 
 		await expect(fresh_machine_cli.run([START_PATTERN])).resolves.toBe(1)
 		expect(printed(console.error)).toContain('gh auth login')
+		expect(fresh_machine_run.run).not.toHaveBeenCalled()
+	})
+})
+
+describe('fresh_machine_cli.run — the secrets a spec names', () => {
+	const SECRET = 'AGENT_SECRET'
+	const SECRET_VALUE = 'agent-value'
+
+	it('reads each one from this environment and passes it with the token', async () => {
+		vi.stubEnv(SECRET, SECRET_VALUE)
+		write_spec({
+			name: SPEC_NAME,
+			requires_github: true,
+			secrets: [SECRET],
+			commands: [SPEC_COMMAND],
+		})
+
+		await fresh_machine_cli.run([SPEC_FLAG, SPEC_FILE])
+
+		expect(request()?.secrets).toStrictEqual({ GH_TOKEN: TOKEN, [SECRET]: SECRET_VALUE })
+	})
+
+	it.each([undefined, ''])('refuses before anything runs when one is %j', async (value) => {
+		vi.stubEnv(SECRET, value)
+		write_spec({ name: SPEC_NAME, secrets: [SECRET], commands: [SPEC_COMMAND] })
+
+		await expect(fresh_machine_cli.run([SPEC_FLAG, SPEC_FILE])).resolves.toBe(1)
+		expect(printed(console.error)).toContain(SECRET)
 		expect(fresh_machine_run.run).not.toHaveBeenCalled()
 	})
 })

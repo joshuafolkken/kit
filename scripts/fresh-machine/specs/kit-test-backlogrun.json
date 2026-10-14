@@ -1,0 +1,23 @@
+{
+	"name": "kit-test-backlogrun",
+	"requires_github": true,
+	"package_source": "tarball",
+	"secrets": ["CLAUDE_CODE_OAUTH_TOKEN"],
+	"files": {
+		"index.html": "<!doctype html><html><body><h1>Hello</h1></body></html>\n"
+	},
+	"commands": [
+		"gh auth setup-git",
+		"git config --global user.name kit-test && git config --global user.email kit-test@example.com",
+		"printf '{ \"private\": true }\\n' > package.json",
+		"pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver \"$PACKAGE_TARBALL\"",
+		"pnpm exec josh start --yes --github",
+		"gh label list --limit 100 --json name --jq '.[].name' | grep -xE 'auto-ok|needs-decision|needs-human-review|already-done|review-round2-skipped|bug'",
+		"curl -fsSL https://claude.ai/install.sh | bash && export PATH=\"$HOME/.local/bin:$PATH\" && claude --version",
+		"gh issue create --title 'Add a heading to index.html' --body 'Add an h2 under the h1.' --label auto-ok --label run:lane",
+		"timeout 60 pnpm josh backlogrun > \"$HOME/backlogrun.out\" 2>&1; cat \"$HOME/backlogrun.out\"; grep -q '^backlogrun: started' \"$HOME/backlogrun.out\"",
+		"pnpm josh run:event --from 0 | grep 'starting session'",
+		"sleep 120 && tail -n 40 \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\"",
+		"pnpm josh backlogrun --stop"
+	]
+}

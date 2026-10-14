@@ -56,12 +56,20 @@ describe('fresh_machine_log.redact', () => {
 	it('replaces every occurrence of the token', () => {
 		const line = `https://x-access-token:${TOKEN}@github.com/ ${TOKEN}`
 
-		expect(fresh_machine_log.redact(line, TOKEN)).toBe(
+		expect(fresh_machine_log.redact(line, [TOKEN])).toBe(
 			'https://x-access-token:[REDACTED]@github.com/ [REDACTED]',
 		)
 	})
 
-	it.each([undefined, ''])('leaves the line as it is when the token is %s', (secret) => {
-		expect(fresh_machine_log.redact(PLAIN_LINE, secret)).toBe(PLAIN_LINE)
+	it('replaces every secret it is given, not only the first', () => {
+		const agent_secret = 'sk-ant-exampleValue'
+
+		expect(fresh_machine_log.redact(`${TOKEN} ${agent_secret}`, [TOKEN, agent_secret])).toBe(
+			'[REDACTED] [REDACTED]',
+		)
+	})
+
+	it.each([[[]], [['']]])('leaves the line as it is for the secrets %j', (secrets) => {
+		expect(fresh_machine_log.redact(PLAIN_LINE, secrets)).toBe(PLAIN_LINE)
 	})
 })

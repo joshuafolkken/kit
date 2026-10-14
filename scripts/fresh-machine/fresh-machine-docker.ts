@@ -1,6 +1,6 @@
 import { fresh_machine_script } from './fresh-machine-script'
 
-// The two docker invocations of `josh fresh:run`, as argument lists. The token is passed by name
+// The two docker invocations of `josh fresh:run`, as argument lists. A secret is passed by name
 // only (`--env GH_TOKEN`): docker reads its value from the environment of the client, so it is in no
 // argument, no image layer and no printed command.
 
@@ -17,7 +17,8 @@ interface ContainerRun {
 	// The packed checkout's file name inside `pack_directory`, for a tarball scenario.
 	tarball: string | undefined
 	package_version: string | undefined
-	requires_github: boolean
+	// The variables whose values the `docker run` client's environment carries.
+	secret_names: ReadonlyArray<string>
 }
 
 // The Dockerfile arrives on stdin (`-`), so the build has no context to copy a host file from.
@@ -34,7 +35,7 @@ function variables(container: ContainerRun): Array<string> {
 		`RUN_NAME=${container.run_name}`,
 		`PACKAGE_TARBALL=${tarball_path}`,
 		`PACKAGE_VERSION=${container.package_version ?? ''}`,
-		...(container.requires_github ? [TOKEN_VARIABLE] : []),
+		...container.secret_names,
 	]
 
 	return assignments.flatMap((assignment) => [ENV_FLAG, assignment])

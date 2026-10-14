@@ -67,7 +67,7 @@ for argument in "$@"; do
 	case "$argument" in *:ro) ls -ld "$${'{'}argument%%:*}" >> "$FAKE_DIR/${MOUNT_MODES}" ;; esac
 	case "$argument" in *:/seed:ro) ls -ld "$${'{'}argument%%/seed:*}" > "$FAKE_DIR/${ROOT_MODES}" ;; esac
 done
-printf '%s\n' '${CONTAINER_LINE}' "token $GH_TOKEN"
+printf '%s\n' '${CONTAINER_LINE}' "token $GH_TOKEN" "agent $AGENT_SECRET"
 exit "$FAKE_RUN_EXIT"
 `
 const PNPM = String.raw`#!/bin/sh
@@ -98,7 +98,7 @@ function request(overrides: Partial<RunRequest>): RunRequest {
 		run_name: RUN_NAME,
 		log_path: scratch.log,
 		package_version: undefined,
-		token: undefined,
+		secrets: {},
 		is_rebuild: false,
 		...overrides,
 	}
@@ -259,16 +259,25 @@ describe('fresh_machine_run.run — a machine that cannot be built', () => {
 	})
 })
 
-describe('fresh_machine_run.run — the GitHub token', () => {
+describe('fresh_machine_run.run — the secrets', () => {
 	it('reaches the container through the environment and no argument', async () => {
-		await fresh_machine_run.run(request({ token: TOKEN }))
+		await fresh_machine_run.run(request({ secrets: { GH_TOKEN: TOKEN } }))
 
 		expect(recorded(RUN_ARGV)).not.toContain(TOKEN)
+		expect(recorded(RUN_ARGV).split('\n')).toContain('GH_TOKEN')
 		expect(log()).toContain('token [REDACTED]')
 	})
 
+	it('passes a secret a spec names the same way as the token', async () => {
+		await fresh_machine_run.run(request({ secrets: { GH_TOKEN: 'unused', AGENT_SECRET: TOKEN } }))
+
+		expect(recorded(RUN_ARGV).split('\n')).toContain('AGENT_SECRET')
+		expect(recorded(RUN_ARGV)).not.toContain(TOKEN)
+		expect(log()).toContain('agent [REDACTED]')
+	})
+
 	it('is in neither the log nor the console', async () => {
-		await fresh_machine_run.run(request({ token: TOKEN }))
+		await fresh_machine_run.run(request({ secrets: { GH_TOKEN: TOKEN } }))
 
 		const printed = vi.mocked(console.info).mock.calls.flat().join('\n')
 

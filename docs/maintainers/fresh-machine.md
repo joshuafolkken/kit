@@ -144,6 +144,7 @@ pnpm josh fresh:run --spec fresh/html-init.json
 | `files`           | `{}`      | Path → content, relative to the project directory, written before the first command                                 |
 | `package_source`  | `tarball` | `tarball` packs the checkout the command is run from; `published` resolves a version from the registry              |
 | `requires_github` | `false`   | Use the image with git and gh, and pass the host's GitHub token                                                     |
+| `secrets`         | `[]`      | Host environment variables passed into the container by name, as the token is (see "GitHub")                        |
 
 An unknown field, an absolute path or one that leaves the project directory is refused with the field
 named, before Docker is started.
@@ -155,6 +156,30 @@ A command reads three variables inside the container:
 | `RUN_NAME`        | The numbered name of this run, also the name of the project directory           |
 | `PACKAGE_TARBALL` | The packed checkout's path under `/pack`; empty for `package_source: published` |
 | `PACKAGE_VERSION` | The published version; empty for `package_source: tarball`                      |
+
+## The README's first backlogrun
+
+`scripts/fresh-machine/specs/kit-test-backlogrun.json` runs the README's Quick start and its "Your
+first backlogrun" section as written, on the packed checkout: `josh start` on a project with no Git
+repository, a check that the labels a run needs exist, Claude Code from its installer, one Issue
+filed with `auto-ok` and `run:lane`, and `pnpm josh backlogrun`. It passes when
+`backlogrun: started` is printed and the run's first event, `starting session`, is on the stream; it
+then lets the agent work for two minutes, prints the end of its log and stops the run with
+`pnpm josh backlogrun --stop`.
+
+```bash
+claude setup-token                                # once; prints a long-lived token
+export CLAUDE_CODE_OAUTH_TOKEN=<the token>
+pnpm josh fresh:run --spec scripts/fresh-machine/specs/kit-test-backlogrun.json
+```
+
+- **The agent's credential is a secret** (`"secrets": ["CLAUDE_CODE_OAUTH_TOKEN"]`): passed by name,
+  removed from the log, written into no image. Without it in the environment the command refuses
+  before Docker starts.
+- **Starting the agent spends tokens** of the account the credential belongs to, for the two
+  minutes the scenario lets it run.
+- **It leaves a repository** like the other GitHub scenarios — `kit-test-backlogrun-<n>`, with the
+  setup Issue and pull request and the Issue the run picked up.
 
 ## The log
 
@@ -174,7 +199,8 @@ repository of an earlier run, wherever that run was started.
 - **The token** is what `gh auth token` prints on the host. It is put in the environment of the
   `docker run` client and named — not valued — in its arguments (`--env GH_TOKEN`), so it is in no
   argument list, no image layer and no printed command. Every line is passed through a replacement of
-  the token's value before it reaches the console or the log.
+  the token's value before it reaches the console or the log. A variable a spec lists under
+  `secrets` takes the same route.
 - **Signing in** is `gh auth setup-git`: `gh auth login` cannot run without a person, and pointing git
   at gh for credentials is the part of it a run needs.
 - **A GitHub scenario creates a real private repository** under the account the token belongs to, and

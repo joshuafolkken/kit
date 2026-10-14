@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fresh_machine_spec } from './fresh-machine-spec'
 
@@ -15,10 +17,21 @@ describe('fresh_machine_spec.parse', () => {
 			name: NAME,
 			requires_github: false,
 			package_source: 'tarball',
+			secrets: [],
 			files: {},
 			commands: [COMMAND],
 			probes: [],
 		})
+	})
+
+	// joshuafolkken/kit#3760: the README's Quick start through its first `backlogrun`, run as written.
+	it('reads the backlogrun spec kit keeps, which passes the agent credential by name', () => {
+		const file = path.join(import.meta.dirname, 'specs', 'kit-test-backlogrun.json')
+		const scenario = fresh_machine_spec.parse(readFileSync(file, 'utf8'))
+
+		expect(scenario.secrets).toStrictEqual(['CLAUDE_CODE_OAUTH_TOKEN'])
+		expect(scenario.commands).toContain('pnpm exec josh start --yes --github')
+		expect(scenario.commands.at(-1)).toBe('pnpm josh backlogrun --stop')
 	})
 
 	it('keeps the files a toolkit places before its install command', () => {
@@ -41,6 +54,12 @@ describe('fresh_machine_spec.parse refusals', () => {
 	it('refuses a name that could not be a directory and repository name', () => {
 		expect(() => fresh_machine_spec.parse(spec({ name: 'App Kit' }))).toThrow(
 			/Invalid scenario spec — name:/u,
+		)
+	})
+
+	it('refuses a secret that could not be an environment variable name', () => {
+		expect(() => fresh_machine_spec.parse(spec({ secrets: ['token=value'] }))).toThrow(
+			/Invalid scenario spec — secrets\.0:/u,
 		)
 	})
 
