@@ -274,6 +274,18 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 	return { target, done, state, started }
 }
 
+// Every stop goes to the lane ledger — supervised, in an agent's own turn, or a lane child's preflight
+// before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason.
+async function record_stop(
+	args: ShipArguments,
+	stage: Stage,
+	conflicts?: ReadonlyArray<string>,
+): Promise<void> {
+	const reason = run_ship_stage.stop_reason(stage, conflicts)
+
+	await lane_ledger.record_stop({ issue: Number(args.number), reason })
+}
+
 // A detached supervisor hands the stopped stage back (`run-ship-return.ts`); a
 // ship in an agent's own turn has its report in front of that agent already. The `ship-stop` ends the
 // attempt, so the record's started stages go with it.
@@ -283,8 +295,11 @@ async function stopped(
 	step: Step,
 	context: ShipContext,
 ): Promise<ReadonlyArray<ShipSection>> {
+	const conflicts = sections.at(-1)?.conflicts
+
+	await record_stop(args, step.stage, conflicts)
+
 	if (run_ship_detach.is_supervised()) {
-		const conflicts = sections.at(-1)?.conflicts
 		const resume = run_ship_next.resume_of(args)
 
 		record(context.target, run_ship_stage.end_attempt)
@@ -371,7 +386,12 @@ function should_detach(args: ShipArguments): boolean {
 // supervisor's gate runs them again rather than passing over them.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
-	if (preflight.code !== SUCCESS_EXIT_CODE) return [preflight]
+
+	if (preflight.code !== SUCCESS_EXIT_CODE) {
+		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage)
+
+		return [preflight]
+	}
 
 	const result = await run_ship_pre_detach.checks()
 

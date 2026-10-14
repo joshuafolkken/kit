@@ -5,8 +5,8 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
-// lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch and per finished
-// `josh ship` stage, read back by `josh lane:stats`.
+// lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
+// `josh ship` stage and per stopped `josh ship`, read back by `josh lane:stats`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -35,6 +35,7 @@ const KIND = {
 	LOAD: 'load',
 	DISPATCH: 'dispatch',
 	STAGE: 'stage',
+	STOP: 'stop',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -79,12 +80,22 @@ const stage_schema = z.object({
 	elapsed_ms: z.number(),
 	issue: z.number().optional(),
 })
+// A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
+// retrospective's stop reason. How long it stayed stopped is derived from the next ship stage, not
+// recorded, so a resumed ship never has to know the stop it ends.
+const stop_schema = z.object({
+	kind: z.literal(KIND.STOP),
+	at: z.string(),
+	issue: z.number(),
+	reason: z.string(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
 	load_schema,
 	dispatch_schema,
 	stage_schema,
+	stop_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -93,9 +104,11 @@ type GateEntry = z.infer<typeof gate_schema>
 type LoadEntry = z.infer<typeof load_schema>
 type DispatchEntry = z.infer<typeof dispatch_schema>
 type StageEntry = z.infer<typeof stage_schema>
+type StopEntry = z.infer<typeof stop_schema>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
 type StageRecord = Omit<StageEntry, 'kind' | 'at'>
+type StopRecord = Omit<StopEntry, 'kind' | 'at'>
 
 function target_of(repository: string): string {
 	return stamp_file.stamp_path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -168,6 +181,10 @@ async function record_stage(stage: StageRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.STAGE, at: now_iso(), ...stage }, path)
 }
 
+async function record_stop(stop: StopRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.STOP, at: now_iso(), ...stop }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -199,9 +216,10 @@ const lane_ledger = {
 	record_gate,
 	record_merge,
 	record_stage,
+	record_stop,
 	target,
 	target_of,
 }
 
-export type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry, StageEntry }
+export type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry, StageEntry, StopEntry }
 export { lane_ledger }

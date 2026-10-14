@@ -7,12 +7,14 @@ import { lane_ledger } from './lane-ledger'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats } from './lane-stats'
+import { lane_stop_stats } from './lane-stop-stats'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
 //
 // `lane:sample` appends one machine-load sample to the ledger, or one every `--every <seconds>` until it
 // is stopped; `lane:stats` reduces a period of the ledger to the one table row #3347 records per lane
-// limit, and under it the per-stage durations of the period's lanes. Every entry writes itself during
+// limit, under it the per-stage durations of the period's lanes, and under those how long a stopped
+// ship waited for each stop reason. Every entry writes itself during
 // a `backlogrun` — the merges, the gates, the stages, and the load `backlog:drive` samples while it
 // runs — so a person only closes the period with `lane:stats`; `lane:sample` is for a load reading
 // outside one. The procedure is `docs/maintainers/lane-limit-measurement.md`.
@@ -112,7 +114,13 @@ async function stats_command(
 	const entries = await read_ledger(context)
 	const row = lane_stats.row(entries, window, label)
 
-	console.info(`${lane_stats.header()}\n${row}\n\n${lane_stage_stats.table(entries, window)}`)
+	console.info(
+		[
+			`${lane_stats.header()}\n${row}`,
+			lane_stage_stats.table(entries, window),
+			lane_stop_stats.table(entries, window),
+		].join('\n\n'),
+	)
 
 	return 0
 }

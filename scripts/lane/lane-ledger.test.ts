@@ -137,6 +137,17 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'dispatch', issue: 7 }])
 	})
+
+	// joshuafolkken/kit#3789: a stopped ship is an entry of its own, so `lane:stats` can time the wait.
+	it('records a stopped ship naming the issue and the stop reason', async () => {
+		const target = ledger('stop')
+
+		await lane_ledger.record_stop({ issue: 7, reason: 'conflict' }, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: 'stop', issue: 7, reason: 'conflict' },
+		])
+	})
 })
 
 describe('lane_ledger.target', () => {

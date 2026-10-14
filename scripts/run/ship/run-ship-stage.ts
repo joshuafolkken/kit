@@ -201,6 +201,7 @@ function stop_reason(stage: Stage, conflicts: ReadonlyArray<string> = []): strin
 }
 
 const run_ship_stage = {
+	CONFLICT,
 	PHASE,
 	STAGE,
 	clear,
