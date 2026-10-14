@@ -5,6 +5,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
   "aliases": {
     "a": "audit",
     "ad": "adopt",
+    "as": "auth:setup",
     "bh": "behavior",
     "blr": "backlogrun",
     "bp": "bump",
@@ -82,6 +83,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "network",
+      ],
+    ],
+    "auth:setup": [
+      "[--check]",
+      "maintainer",
+      [
+        "network",
+        "processes",
       ],
     ],
     "auto-ok:next": [

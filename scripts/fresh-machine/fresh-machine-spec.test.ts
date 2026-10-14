@@ -14,6 +14,7 @@ describe('fresh_machine_spec.parse', () => {
 		expect(fresh_machine_spec.parse(spec({}))).toStrictEqual({
 			name: NAME,
 			requires_github: false,
+			requires_claude: false,
 			package_source: 'tarball',
 			files: {},
 			commands: [COMMAND],

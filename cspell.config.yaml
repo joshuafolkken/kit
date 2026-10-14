@@ -8,6 +8,10 @@ words:
   - githubcli
   - noprofile
   - norc
+  # The modification-date attribute `security find-generic-password` prints for a keychain item
+  # (#3778).
+  - mdat
+  - timedate
   # The GitHub heading anchor of the troubleshooting entry for `bin/pnpm.cjs` not found (#3725).
   - binpnpmcjs
   # The signal a pipe reader that exits early sends a writer, exit 141 under `pipefail` (#3570).

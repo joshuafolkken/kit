@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { claude_token } from '#scripts/auth/claude-token'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,12 +16,20 @@ vi.mock('#scripts/init/init-paths', () => ({
 	},
 }))
 vi.mock('#scripts/gh/gh-cli-token', () => ({ gh_cli_token: { get: vi.fn() } }))
+vi.mock('#scripts/auth/claude-token', () => ({
+	claude_token: {
+		read: vi.fn(),
+		VARIABLE: 'CLAUDE_CODE_OAUTH_TOKEN',
+		SETUP_HINT: 'Run `pnpm josh auth:setup` to save one.',
+	},
+}))
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api_sync: vi.fn() } }))
 vi.mock('./fresh-machine-run', () => ({ fresh_machine_run: { run: vi.fn() } }))
 
 const INIT_PATTERN = 'kit-test-html-init'
 const START_PATTERN = 'kit-test-html-start'
 const TOKEN = 'gho_exampleTokenValue'
+const CLAUDE_TOKEN = 'sk-ant-oat01-exampleTokenValue'
 const LOG_DIRECTORY = 'logs'
 const SPEC_FILE = 'scenario.json'
 const SPEC_FLAG = '--spec'
@@ -51,6 +60,7 @@ beforeEach(() => {
 	write_manifest(KIT)
 	vi.mocked(fresh_machine_run.run).mockResolvedValue(0)
 	vi.mocked(gh_cli_token.get).mockReturnValue(TOKEN)
+	vi.mocked(claude_token.read).mockReturnValue(CLAUDE_TOKEN)
 	vi.mocked(git_gh_exec.exec_gh_api_sync).mockReturnValue('')
 	vi.spyOn(console, 'info').mockReturnValue()
 	vi.spyOn(console, 'error').mockReturnValue()
@@ -98,13 +108,13 @@ describe('fresh_machine_cli.run — the GitHub token', () => {
 		await fresh_machine_cli.run([INIT_PATTERN])
 
 		expect(gh_cli_token.get).not.toHaveBeenCalled()
-		expect(request()?.token).toBeUndefined()
+		expect(request()?.secrets).toStrictEqual({})
 	})
 
 	it('passes the token of this machine to a GitHub pattern', async () => {
 		await fresh_machine_cli.run([START_PATTERN, '--package-version', '1.2.3'])
 
-		expect(request()).toMatchObject({ token: TOKEN, package_version: '1.2.3' })
+		expect(request()).toMatchObject({ secrets: { GH_TOKEN: TOKEN }, package_version: '1.2.3' })
 	})
 
 	it('refuses a GitHub pattern when gh has no token, before anything runs', async () => {
@@ -112,6 +122,43 @@ describe('fresh_machine_cli.run — the GitHub token', () => {
 
 		await expect(fresh_machine_cli.run([START_PATTERN])).resolves.toBe(1)
 		expect(printed(console.error)).toContain('gh auth login')
+		expect(fresh_machine_run.run).not.toHaveBeenCalled()
+	})
+})
+
+describe('fresh_machine_cli.run — the Claude Code token', () => {
+	const claude_spec = { name: SPEC_NAME, requires_claude: true, commands: [SPEC_COMMAND] }
+
+	it('never reads a token for a scenario without Claude Code', async () => {
+		await fresh_machine_cli.run([INIT_PATTERN])
+
+		expect(claude_token.read).not.toHaveBeenCalled()
+	})
+
+	it('passes the token the host holds to a Claude Code scenario', async () => {
+		write_spec(claude_spec)
+
+		await expect(fresh_machine_cli.run([SPEC_FLAG, SPEC_FILE])).resolves.toBe(0)
+		expect(request()?.secrets).toStrictEqual({ CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_TOKEN })
+	})
+
+	it('passes both tokens to a scenario that uses GitHub and Claude Code', async () => {
+		write_spec({ ...claude_spec, requires_github: true })
+
+		await fresh_machine_cli.run([SPEC_FLAG, SPEC_FILE])
+
+		expect(Object.keys(request()?.secrets ?? {})).toStrictEqual([
+			'GH_TOKEN',
+			'CLAUDE_CODE_OAUTH_TOKEN',
+		])
+	})
+
+	it('stops before Docker and names auth:setup when the host holds no token', async () => {
+		vi.mocked(claude_token.read).mockReturnValue(undefined)
+		write_spec(claude_spec)
+
+		await expect(fresh_machine_cli.run([SPEC_FLAG, SPEC_FILE])).resolves.toBe(1)
+		expect(printed(console.error)).toContain('pnpm josh auth:setup')
 		expect(fresh_machine_run.run).not.toHaveBeenCalled()
 	})
 })

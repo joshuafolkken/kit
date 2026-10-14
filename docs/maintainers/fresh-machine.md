@@ -144,6 +144,7 @@ pnpm josh fresh:run --spec fresh/html-init.json
 | `files`           | `{}`      | Path → content, relative to the project directory, written before the first command                                 |
 | `package_source`  | `tarball` | `tarball` packs the checkout the command is run from; `published` resolves a version from the registry              |
 | `requires_github` | `false`   | Use the image with git and gh, and pass the host's GitHub token                                                     |
+| `requires_claude` | `false`   | Pass the host's Claude Code token as `CLAUDE_CODE_OAUTH_TOKEN` (see "Claude Code")                                  |
 
 An unknown field, an absolute path or one that leaves the project directory is refused with the field
 named, before Docker is started.
@@ -188,3 +189,37 @@ repository of an earlier run, wherever that run was started.
 - **Deleting the logs does not free a repository name.** The number of a GitHub scenario also counts
   the account's repositories (see "The log"), so the next run takes the number after them. The
   repositories stay until they are deleted by hand, with or without their logs.
+
+## Claude Code
+
+A scenario with `requires_claude: true` runs Claude Code in the container, which signs in with a
+long-lived token. The token is saved once on the host, and the human steps are these:
+
+1. In a terminal at the kit repository, run:
+
+   ```bash
+   pnpm josh auth:setup
+   ```
+
+2. A browser opens: sign in with your Claude account and press "Authorize".
+3. Done when the terminal prints `saved: CLAUDE_CODE_OAUTH_TOKEN (macOS keychain)`. There is no
+   token to copy or write into a file.
+4. To check, run `pnpm josh auth:setup --check`: it prints `ok` and the day it was saved.
+5. When the token expires (about a year), Claude Code inside the container fails to sign in — run
+   `pnpm josh auth:setup` again. `fresh:run` checks only that a token is saved, not that it is
+   still valid.
+
+- **Where the token is kept.** `auth:setup` runs `claude setup-token` and writes the token it prints
+  to the macOS keychain through `security`'s stdin, so it is in no argument list. The command's
+  output is shown as it arrives up to the token — a sign-in URL or prompt included — and the rest once
+  it ends, with the token replaced, so the token reaches neither the screen nor a file. On a machine
+  without a keychain nothing is run.
+- **No shell profile is touched.** Nothing exports `CLAUDE_CODE_OAUTH_TOKEN` from `~/.zshrc` or any
+  other profile, so every other Claude Code on the host keeps signing in as it did. The host's own
+  sign-in is not copied into the container either: a container that refreshed it would sign the
+  host out.
+- **How `fresh:run` reads it.** The keychain first, then `CLAUDE_CODE_OAUTH_TOKEN` in the
+  environment — the route on a machine without a keychain, such as Linux. When neither holds a
+  token, the run stops before Docker starts and names `pnpm josh auth:setup`.
+- **How it reaches the container** is the GitHub token's way: named, not valued, in the `docker run`
+  arguments (`--env CLAUDE_CODE_OAUTH_TOKEN`), and replaced in every line of the console and the log.

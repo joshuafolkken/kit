@@ -28,6 +28,8 @@ vi.mock('#scripts/init/init-paths', () => ({
 const PACKAGE_NAME = '@example/toolkit'
 const RUN_NAME = 'toolkit-test-html-init-3'
 const TOKEN = 'gho_exampleTokenValue'
+const CLAUDE_TOKEN = 'sk-ant-oat01-exampleTokenValue'
+const SECRETS = { GH_TOKEN: TOKEN, CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_TOKEN }
 const TARBALL = 'toolkit-1.0.0.tgz'
 const LATEST_VERSION = '9.9.9'
 const PINNED_VERSION = '1.2.3'
@@ -67,7 +69,7 @@ for argument in "$@"; do
 	case "$argument" in *:ro) ls -ld "$${'{'}argument%%:*}" >> "$FAKE_DIR/${MOUNT_MODES}" ;; esac
 	case "$argument" in *:/seed:ro) ls -ld "$${'{'}argument%%/seed:*}" > "$FAKE_DIR/${ROOT_MODES}" ;; esac
 done
-printf '%s\n' '${CONTAINER_LINE}' "token $GH_TOKEN"
+printf '%s\n' '${CONTAINER_LINE}' "token $GH_TOKEN claude $CLAUDE_CODE_OAUTH_TOKEN"
 exit "$FAKE_RUN_EXIT"
 `
 const PNPM = String.raw`#!/bin/sh
@@ -98,7 +100,7 @@ function request(overrides: Partial<RunRequest>): RunRequest {
 		run_name: RUN_NAME,
 		log_path: scratch.log,
 		package_version: undefined,
-		token: undefined,
+		secrets: {},
 		is_rebuild: false,
 		...overrides,
 	}
@@ -259,22 +261,27 @@ describe('fresh_machine_run.run — a machine that cannot be built', () => {
 	})
 })
 
-describe('fresh_machine_run.run — the GitHub token', () => {
-	it('reaches the container through the environment and no argument', async () => {
-		await fresh_machine_run.run(request({ token: TOKEN }))
+describe('fresh_machine_run.run — the secrets', () => {
+	it('reach the container through the environment, named in the arguments only', async () => {
+		await fresh_machine_run.run(request({ secrets: SECRETS }))
 
-		expect(recorded(RUN_ARGV)).not.toContain(TOKEN)
-		expect(log()).toContain('token [REDACTED]')
+		const run_argv = recorded(RUN_ARGV)
+
+		expect(run_argv).not.toContain(TOKEN)
+		expect(run_argv).not.toContain(CLAUDE_TOKEN)
+		expect(run_argv.split('\n')).toContain('CLAUDE_CODE_OAUTH_TOKEN')
+		expect(log()).toContain('token [REDACTED] claude [REDACTED]')
 	})
 
-	it('is in neither the log nor the console', async () => {
-		await fresh_machine_run.run(request({ token: TOKEN }))
+	it('are in neither the log nor the console', async () => {
+		await fresh_machine_run.run(request({ secrets: SECRETS }))
 
 		const printed = vi.mocked(console.info).mock.calls.flat().join('\n')
 
 		expect(log()).not.toContain(TOKEN)
+		expect(log()).not.toContain(CLAUDE_TOKEN)
 		expect(printed).toContain(CONTAINER_LINE)
-		expect(printed).not.toContain(TOKEN)
+		expect(printed).not.toContain(CLAUDE_TOKEN)
 	})
 })
 

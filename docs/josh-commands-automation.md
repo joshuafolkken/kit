@@ -226,9 +226,20 @@ pnpm josh fresh:run --spec fresh/html-init.json           # a scenario another t
 - `--log-dir <dir>` — where the log is written. Default: `.claude/tmp/fresh-machine`.
 - `--rebuild` — build the machine image without the layer cache.
 
-**Output / exit codes:** the image build, the pack and the container's session are printed and written to `<log-dir>/<scenario>-<n>.log`, whose path is the last line. Exit status is the container's — `0` when every command of the scenario passed, whatever the probes after them exited with — the build's when the image could not be built, and `1` for an unknown pattern, a named pattern run outside a kit checkout, an invalid spec, a missing Docker, or a GitHub scenario when `gh auth token` prints no token.
+**Output / exit codes:** the image build, the pack and the container's session are printed and written to `<log-dir>/<scenario>-<n>.log`, whose path is the last line. Exit status is the container's — `0` when every command of the scenario passed, whatever the probes after them exited with — the build's when the image could not be built, and `1` for an unknown pattern, a named pattern run outside a kit checkout, an invalid spec, a missing Docker, a GitHub scenario when `gh auth token` prints no token, or a `requires_claude` scenario with no Claude token (see `josh auth:setup`).
 
 A GitHub scenario creates a real private repository named after the run, and no run deletes one. The scenario format, the patterns and the token handling: [maintainers/fresh-machine.md](./maintainers/fresh-machine.md).
+
+### `josh auth:setup`
+
+Run `claude setup-token` (a browser sign-in) and save the token to the macOS keychain — never shown, never in a file — for `fresh:run`'s `requires_claude` scenarios.
+
+```bash
+pnpm josh auth:setup           # sign in and save the token
+pnpm josh auth:setup --check   # ok: … saved on <date>, or missing: … and exit 1
+```
+
+**Exit codes:** `0` once saved; `1` on no token or no keychain (then set `CLAUDE_CODE_OAUTH_TOKEN`). Full handling: [maintainers/fresh-machine.md](./maintainers/fresh-machine.md#claude-code).
 
 ### `josh sonar:hotspots`
 
