@@ -58,6 +58,9 @@ const STEP_LABELS: Readonly<Record<StartStep, string>> = {
 // so they are also the steps a caller's push preflight guards (#3702).
 const GITHUB_WRITE_STEPS: ReadonlySet<StartStep> = new Set(['repository', 'setup_pr'])
 
+// The steps that create a commit, which git refuses without an author identity (#3754).
+const COMMIT_STEPS: ReadonlySet<StartStep> = new Set(['commit', 'setup_pr'])
+
 function refused(refusal: string): StepPlan {
 	return { steps: [], refusal }
 }
@@ -111,6 +114,10 @@ function plan_steps(state: GitState): StepPlan {
 
 function has_push(steps: ReadonlyArray<StartStep>): boolean {
 	return steps.some((step) => GITHUB_WRITE_STEPS.has(step))
+}
+
+function has_commit(steps: ReadonlyArray<StartStep>): boolean {
+	return steps.some((step) => COMMIT_STEPS.has(step))
 }
 
 function interaction_of(options: StartOptions, is_tty: boolean): Verdict<Interaction> {
@@ -185,6 +192,7 @@ function plan_summary(
 const start_plan = {
 	plan_steps,
 	has_push,
+	has_commit,
 	interaction_of,
 	github_consent,
 	progress_report,

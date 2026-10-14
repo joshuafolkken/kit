@@ -61,4 +61,15 @@ gh auth login
 gh auth status
 ```
 
-`josh start` and the workflow keywords call GitHub through `gh`, so they stop with an error until `gh auth status` reports a signed-in account. Hitting an error? See [troubleshooting.md](../troubleshooting.md).
+`josh start` and the workflow keywords call GitHub through `gh`, so they stop with an error until `gh auth status` reports a signed-in account.
+
+## 4. Tell Git who you are
+
+Skip this step when `git config user.name` and `git config user.email` each print a value. A machine Git was just installed on has neither, and Git refuses to commit without them:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
+`josh start` creates a commit — the first one of a new repository, or the one its setup pull request carries — so it stops before changing anything until Git has an author identity. Hitting an error? See [troubleshooting.md](../troubleshooting.md).

@@ -34,6 +34,10 @@ const START_COMMANDS = [
 // `gh auth login` cannot run without a person, and it is what points git at gh for credentials; with
 // the token in the environment this is the same step.
 const SIGN_IN = 'gh auth setup-git'
+// What the prerequisites guide has a person run once per machine. Only the pattern with no repository
+// uses it: `josh start` makes the first commit there, and stops before writing without it (#3754).
+const MACHINE_IDENTITY =
+	'git config --global user.name kit-test && git config --global user.email kit-test@example.com'
 // The identity is the repository's own, so the machine stays one nobody has configured git on.
 const FIRST_COMMIT = [
 	'git init --initial-branch main',
@@ -88,7 +92,7 @@ function start_pattern(
 const PATTERNS: ReadonlyArray<Scenario> = [
 	init_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
 	// No Git: `josh start` creates the repository, the first commit and the GitHub repository.
-	start_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
+	start_pattern('lua', LUA_FILES, [MACHINE_IDENTITY, BARE_MANIFEST]),
 	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
 	// Git with a first commit on `main`, no GitHub repository.
 	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST]),

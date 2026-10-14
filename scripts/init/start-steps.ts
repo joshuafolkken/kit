@@ -31,6 +31,8 @@ const GH_INSTALL_HINT =
 	'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/, run gh auth login, then run josh start again. Nothing was changed.'
 const GH_AUTH_HINT =
 	'GitHub CLI is not signed in. Run gh auth login, then run josh start again. Nothing was changed.'
+const GIT_IDENTITY_HINT =
+	'Git has no author identity, which the commit josh start creates needs. Run git config --global user.name "Your Name" and git config --global user.email "you@example.com", then run josh start again. Nothing was changed.'
 // Printed before the scanner is looked for: a first run downloads tens of megabytes, and a terminal
 // that says nothing for minutes reads as a hang the user interrupts (#3755).
 const SCANNER_NOTICE =
@@ -67,6 +69,17 @@ function github_cli_refusal(root: string): string | undefined {
 	if (!start_exec.is_gh_signed_in(root)) return GH_AUTH_HINT
 
 	return undefined
+}
+
+// A machine Git was just installed on has no author identity, and the commit that needs one comes
+// after the repository and kit's files are written. It is asked for before the first write, and only
+// when the plan commits — a re-run with nothing left to commit is not stopped by it (#3754).
+function git_identity_refusal(steps: ReadonlyArray<StartStep>, root: string): string | undefined {
+	if (!start_plan.has_commit(steps)) return undefined
+
+	return start_exec.lacks_git_identity(root, steps.includes('git_init'))
+		? GIT_IDENTITY_HINT
+		: undefined
 }
 
 // `josh init` refuses to run inside the kit source repository by printing and setting the exit code
@@ -220,6 +233,7 @@ async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext):
 const start_steps = {
 	read_git_state,
 	github_cli_refusal,
+	git_identity_refusal,
 	self_run_refusal,
 	run_steps,
 }

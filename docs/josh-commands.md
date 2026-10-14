@@ -291,7 +291,7 @@ pnpm exec josh start                                    # asks for the profile a
 pnpm exec josh start --yes --github --profile basic    # unattended, including the GitHub repository
 ```
 
-**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
+**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything. A run that creates a commit (the first commit, or the setup pull request) also needs a Git author identity — [Tell Git who you are](./setup/prerequisites.md#4-tell-git-who-you-are); without one it stops before changing anything and prints the two `git config` commands that set it.
 
 The `full` profile's pre-push hook runs `josh audit`, which needs `osv-scanner`. A run that pushes fetches the pinned scanner itself before its first step (the same fetch as `pnpm josh audit:provision --force`), so nothing has to be installed by hand; where the fetch fails and no scanner is on `PATH`, `josh start` stops before changing anything and prints the cause.
 

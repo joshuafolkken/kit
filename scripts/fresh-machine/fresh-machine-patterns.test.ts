@@ -10,6 +10,7 @@ const START_NAMES = [LUA_START, HTML_START, SVELTE_START]
 const GIT_INIT = 'git init --initial-branch main'
 const CREATE_REPOSITORY = 'gh repo create "$RUN_NAME" --private --source . --push'
 const START = 'pnpm exec josh start --yes --github'
+const MACHINE_IDENTITY = 'git config --global user.name'
 
 function pattern(name: string): Scenario {
 	const found = fresh_machine_patterns.find(name)
@@ -78,6 +79,15 @@ describe('fresh_machine_patterns gate', () => {
 describe('fresh_machine_patterns starting states', () => {
 	it('starts the Lua project without Git', () => {
 		expect(pattern(LUA_START).commands).not.toContain(GIT_INIT)
+	})
+
+	// `josh start` makes the first commit there, so the machine needs the identity the guide sets (#3754).
+	it('sets the machine-wide git identity before josh start in the Lua project', () => {
+		const { commands } = pattern(LUA_START)
+		const identity = commands.findIndex((command) => command.includes(MACHINE_IDENTITY))
+
+		expect(identity).toBeGreaterThan(-1)
+		expect(identity).toBeLessThan(commands.indexOf(START))
 	})
 
 	it('starts the HTML project with a first commit and no GitHub repository', () => {
