@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_child_invocation } from './lane-child-invocation'
+import { process_tools } from './process-tools'
 
 // Ending a lane child that did not end itself.
 //
@@ -42,7 +43,9 @@ function parse_pids(printed: string): Array<number> {
 		.filter((pid) => Number.isSafeInteger(pid) && pid >= LOWEST_CHILD_PID)
 }
 
-// `pgrep` exits 1 when nothing matches, which `execFileSync` throws — the empty list either way.
+// `pgrep` exits 1 when nothing matches, which `execFileSync` throws — the empty list either way. A
+// probe that is not installed is refused by name: reading it as "nothing there" is how a missing `ps`
+// left the owner check answering `unknown`.
 function run_probe(command: string, args: ReadonlyArray<string>): string {
 	try {
 		return execFileSync(command, [...args], {
@@ -50,7 +53,9 @@ function run_probe(command: string, args: ReadonlyArray<string>): string {
 			timeout: PROBE_TIMEOUT_MS,
 			stdio: ['ignore', 'pipe', 'ignore'],
 		})
-	} catch {
+	} catch (error) {
+		process_tools.throw_if_missing(command, error)
+
 		return ''
 	}
 }

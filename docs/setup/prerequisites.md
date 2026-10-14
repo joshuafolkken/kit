@@ -1,6 +1,6 @@
 # Install the prerequisites
 
-The tools the [Quick start](../../README.md#quick-start) needs: **Node.js 22.19.0 or later in the 22 line, any 24 release, or 26 and later (Node 25 is not supported)** and **pnpm 12 or later** for every project, and the **gh CLI** for the GitHub Issue workflow (`josh start`, `kickoff`, `fullrun`, `backlogrun`). Then continue with [Set up the full profile](./full.md) for a JavaScript / TypeScript project or [Set up the basic profile](./basic.md) for anything else.
+The tools the [Quick start](../../README.md#quick-start) needs: **Node.js 22.19.0 or later in the 22 line, any 24 release, or 26 and later (Node 25 is not supported)** and **pnpm 12 or later** for every project, and the **gh CLI** for the GitHub Issue workflow (`josh start`, `kickoff`, `fullrun`, `backlogrun`). `backlogrun`'s lanes also read processes with `ps` and `pgrep`: macOS and most Linux desktops have them, but a slim container image may not — on Debian or Ubuntu install them with `apt-get install procps`. Then continue with [Set up the full profile](./full.md) for a JavaScript / TypeScript project or [Set up the basic profile](./basic.md) for anything else.
 
 ## 1. Check what you have
 

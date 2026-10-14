@@ -50,11 +50,11 @@ describe('fresh_machine_image.dockerfile', () => {
 		expect(dockerfile).not.toContain('git')
 	})
 
-	it('installs git and gh as root, before the user exists, for a GitHub scenario', () => {
+	it('installs git, procps and gh as root, before the user exists, for a GitHub scenario', () => {
 		const lines = fresh_machine_image.dockerfile(true).split('\n')
 		const tools_line = lines.findIndex((line) => line.includes('apt-get install -y gh'))
 
-		expect(lines[tools_line]).toContain('apt-get install -y git')
+		expect(lines[tools_line]).toContain('apt-get install -y git procps')
 		expect(tools_line).toBeLessThan(lines.indexOf('USER dev'))
 	})
 
