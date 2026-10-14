@@ -5,14 +5,17 @@ import { run_board_labels } from './run-board-labels'
 // A live `run:board` frame kept within the terminal. A frame taller than the pane scrolls the
 // alternate screen as it is written, and the header — the lines that say whether the run moves and
 // how far it is — is what scrolls off. So the parts below it give way instead, least wanted first:
-// the reviewers thanked above the legend, the footer, the legend, the finished rows, the notes, the rows not yet started, the parked rows
-// and, last, the running rows — what a person keeps the board open to see. Each stage stops once the
+// the footer, the legend, the oldest notes until three are left, the finished rows, the rest of the
+// notes, the reviewers thanked above the legend, the rows not yet started, the parked rows and, last,
+// the running rows — what a person keeps the board open to see. Each stage stops once the
 // frame fits, a cut row is counted on its section's `more N` line, and the order a row is drawn in
 // never changes. A line wider than the pane wraps, so every line is counted by the rows it takes on
 // screen, not as one.
 
 const { WORDS } = run_board_labels
 const INDENT = '  '
+// The newest notes kept until the finished rows are gone; the older ones give way before them.
+const NOTES_KEPT = 3
 
 interface TerminalSize {
 	rows: number
@@ -158,13 +161,15 @@ function order_of(parts: FrameParts): Array<Yielder> {
 		.map((line, index) => ({ line, index }))
 		.filter((entry) => entry.line.row !== undefined)
 	const notes = parts.notes.lines.map((): Yielder => 'note')
+	const surplus = Math.max(0, notes.length - NOTES_KEPT)
 
 	return [
-		'thanks',
 		'footer',
 		'legend',
+		...notes.slice(0, surplus),
 		...yielding(rows, 'finished'),
-		...notes,
+		...notes.slice(surplus),
+		'thanks',
 		...yielding(rows, 'pending'),
 		...yielding(rows, 'parked'),
 		...yielding(rows, 'running'),

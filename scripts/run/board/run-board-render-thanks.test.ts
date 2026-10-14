@@ -5,6 +5,7 @@ import type { Thanks } from './run-board-thanks-csv'
 
 // joshuafolkken/kit#3809: the reviewers are drawn as names alone on one line, a name with a page
 // wrapped in an OSC 8 link, and wrapped between names where the pane is too narrow.
+// joshuafolkken/kit#3815: one 🙏 leads the first line, and a wrapped line carries none.
 
 const { thanks_lines } = run_board_render_thanks
 const KITTEN_URL = 'https://x.com/KittenLab'
@@ -18,10 +19,10 @@ function osc8(text: string, url: string): string {
 }
 
 describe('run_board_render_thanks.thanks_lines', () => {
-	it('draws every name on one line under a blank, linking only a name with a page', () => {
+	it('draws every name on one line under a blank and one 🙏, linking a name with a page', () => {
 		expect(thanks_lines(THANKS, osc8, undefined)).toStrictEqual([
 			'',
-			`  fish  ${osc8('KittenLab', KITTEN_URL)}`,
+			`  🙏 fish  ${osc8('KittenLab', KITTEN_URL)}`,
 		])
 	})
 
@@ -29,14 +30,18 @@ describe('run_board_render_thanks.thanks_lines', () => {
 		expect(thanks_lines([], osc8, undefined)).toStrictEqual([])
 	})
 
-	it('wraps between names, counting a linked name by the columns it shows', () => {
+	it('wraps between names, counting a linked name and the 🙏 by the columns they show', () => {
 		const names: Thanks = ['aaaa', 'bbbb', 'cccc'].map((name) => ({
 			name,
 			url: `https://example.com/${name}`,
 		}))
-		const lines = thanks_lines(names, osc8, 12).map((line) => stripVTControlCharacters(line))
 
-		expect(lines).toStrictEqual(['', '  aaaa  bbbb', '  cccc'])
+		function shown(columns: number): Array<string> {
+			return thanks_lines(names, osc8, columns).map((line) => stripVTControlCharacters(line))
+		}
+
+		expect(shown(15)).toStrictEqual(['', '  🙏 aaaa  bbbb', '  cccc'])
+		expect(shown(14)).toStrictEqual(['', '  🙏 aaaa', '  bbbb  cccc'])
 	})
 
 	it('gives a name wider than the pane a line of its own', () => {
@@ -45,6 +50,6 @@ describe('run_board_render_thanks.thanks_lines', () => {
 			{ name: 'x'.repeat(20), url: undefined },
 		]
 
-		expect(thanks_lines(names, osc8, 10)).toStrictEqual(['', '  a', `  ${'x'.repeat(20)}`])
+		expect(thanks_lines(names, osc8, 10)).toStrictEqual(['', '  🙏 a', `  ${'x'.repeat(20)}`])
 	})
 })
