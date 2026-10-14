@@ -1261,7 +1261,7 @@ Record the machine load (load average, swap, free memory, working lanes) to the 
 
 `--period <days> [--limit <lane-limit>]`
 
-Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, and the wait after each ship stop reason under those
 
 ---
 

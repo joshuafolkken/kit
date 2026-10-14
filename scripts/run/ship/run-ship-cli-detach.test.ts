@@ -76,6 +76,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 
 const { run_ship_cli } = await import('./run-ship-cli')
+const { lane_ledger } = await import('#scripts/lane/lane-ledger')
 
 // joshuafolkken/kit#2428: the CLI side of the detached supervisor — `--detach` hands the region over and
 // runs nothing itself, `--log <N>` prints what a stopped supervisor left, `--cite` carries follow-ups so
@@ -190,6 +191,17 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
 		expect(detach_mock).not.toHaveBeenCalled()
 		expect(pre_detach_mock).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
+	it('records the preflight stop of a lane child to the lane ledger', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+
+		is_lane_child_mock.mockReturnValue(true)
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		await run_ship_cli.run([TITLE])
+
+		expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'preflight' }]])
 	})
 })
 

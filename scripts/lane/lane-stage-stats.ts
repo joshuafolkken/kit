@@ -147,7 +147,12 @@ const lane_stage_stats = {
 	IMPLEMENT,
 	NOT_MEASURED,
 	STAGES,
+	cell,
+	is_dispatch,
+	is_number,
+	is_stage,
 	medians,
+	started_ms,
 	table,
 }
 
