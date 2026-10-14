@@ -58,6 +58,8 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 }
 // A cut or a resume says the child is still running, on whatever phase it had reached.
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
+// A person's restart starts the child over in a fresh session, so its track starts over too.
+const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTART])
 
 function moment(event: RunEvent): number {
 	return Date.parse(event.at)
@@ -114,7 +116,7 @@ function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.
 function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
-	if (event.kind === KIND.CHILD_LAUNCH) return launched(event)
+	if (LAUNCH_KINDS.has(event.kind)) return launched(event)
 
 	const ending = ENDING_STATES[event.kind]
 

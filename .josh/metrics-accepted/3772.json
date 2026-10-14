@@ -1,0 +1,7 @@
+{
+	"reason": "lane:restart claims the in-progress marker before the stop and comments the stash after the dispatch, so no GitHub round-trip sits inside lane:await's re-confirm window; this adds a restart dispatch start, a non-killing child probe and a split stash/announce in lane-preserve",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 195
+	}
+}
