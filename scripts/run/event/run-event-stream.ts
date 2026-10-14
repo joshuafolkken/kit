@@ -60,6 +60,10 @@ const EVENT_KIND = {
 	// resume clears the cut record, so without this the `cut` would stay the newest position and
 	// `run:step` would keep answering the resume command it had just run.
 	RESUME: 'resume',
+	// A person stopped a running lane child and re-dispatched its issue in a fresh session
+	// (`lane:restart`). It follows the fresh dispatch's `CHILD_LAUNCH`, so it is a launch to the parent and
+	// the board, and — like that launch — a batch record a lane child never reads as its own position.
+	RESTART: 'restart',
 	// The backlog emptied while nothing of the run's own was in flight — the drain. It marks the position
 	// at which the end-of-run retrospective is owed, *before* the idle watch opens, so `run:step` fires
 	// the retrospective at the drain rather than after the watch runs its course. It is not itself a

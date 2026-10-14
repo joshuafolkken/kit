@@ -111,6 +111,12 @@ function tree_of(roots: ReadonlyArray<number>, probes: ReapProbes): Array<number
 	return tree
 }
 
+function roots_of(issue: string, own: Set<number>, probes: ReapProbes): Array<number> {
+	const pattern = lane_child_invocation.process_pattern(issue)
+
+	return probes.matching(pattern).filter((pid) => !own.has(pid))
+}
+
 /**
  * Terminate every process of the lane child for `issue` and everything under it, sparing the caller's
  * own ancestry. Returns the pids that were signalled — the empty list is the healthy case, a child
@@ -118,14 +124,18 @@ function tree_of(roots: ReadonlyArray<number>, probes: ReapProbes): Array<number
  */
 function reap_child(issue: string, probes: ReapProbes = SYSTEM_PROBES): Array<number> {
 	const own = own_ancestry(probes)
-	const pattern = lane_child_invocation.process_pattern(issue)
-	const roots = probes.matching(pattern).filter((pid) => !own.has(pid))
-	const doomed = tree_of(roots, probes).filter((pid) => !own.has(pid))
+	const doomed = tree_of(roots_of(issue, own, probes), probes).filter((pid) => !own.has(pid))
 
 	return doomed.filter((pid) => probes.terminate(pid))
 }
 
+/** Whether a lane child for `issue` is running, by the same match `reap_child` would end. */
+function is_child_running(issue: string, probes: ReapProbes = SYSTEM_PROBES): boolean {
+	return roots_of(issue, own_ancestry(probes), probes).length > 0
+}
+
 const lane_reap = {
+	is_child_running,
 	own_ancestry,
 	parse_pids,
 	reap_child,

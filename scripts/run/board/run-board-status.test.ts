@@ -121,6 +121,13 @@ describe('run_board_status.statuses_of phases', () => {
 		expect(phase_after(IMPLEMENT_3409, cut, [KIND.RESUME, '#3409'])).toBe('implement')
 	})
 
+	// joshuafolkken/kit#3772: a person's restart starts the child over in a fresh session.
+	it('starts the track over when a person restarts the child', () => {
+		const restart: Step = [KIND.RESTART, '#3409 restarted in a fresh session by a person']
+
+		expect(track_after(IMPLEMENT_3409, restart)).toStrictEqual(['investigate'])
+	})
+
 	it('takes no phase from another issue', () => {
 		expect(phase_after([KIND.LANE_PHASE, '#3415 implement'])).toBe('investigate')
 	})

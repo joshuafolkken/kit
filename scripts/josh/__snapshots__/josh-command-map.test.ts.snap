@@ -24,6 +24,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lli": "lane:limit",
     "ln": "lines",
     "lr": "lint:related",
+    "lrs": "lane:restart",
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
@@ -565,6 +566,16 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "git",
+      ],
+    ],
+    "lane:restart": [
+      "<issue>",
+      "developer",
+      [
+        "files",
+        "git",
+        "processes",
+        "network",
       ],
     ],
     "lane:sample": [

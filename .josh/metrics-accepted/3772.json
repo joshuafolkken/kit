@@ -1,0 +1,7 @@
+{
+	"reason": "Export the harness CHILD_ENVIRONMENT so the #3712 no-pnpm scenario overlays PATH on it instead of inheriting a git hook's GIT_DIR, which failed the pre-push unit run",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 199
+	}
+}

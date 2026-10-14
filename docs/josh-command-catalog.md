@@ -1225,6 +1225,16 @@ Close every lane an interruption left without its work tree and every spent lane
 
 ---
 
+### `josh lane:restart` · `josh lrs`
+
+> **Audience:** developer · **Side effects:** files, git, processes, network
+
+`<issue>`
+
+Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure
+
+---
+
 ### `josh lane:sample` · `josh lsm`
 
 > **Audience:** maintainer · **Side effects:** files
