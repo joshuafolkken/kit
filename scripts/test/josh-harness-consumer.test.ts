@@ -35,7 +35,10 @@ it(
 		const { executable, leading_arguments } = consumer.launcher
 		const result = await josh_harness.run_command(executable, [...leading_arguments, 'gate'], {
 			cwd: consumer.root,
-			env: { PATH: josh_harness_fixture.path_without_pnpm(consumer.workspace) },
+			env: {
+				...josh_harness.CHILD_ENVIRONMENT,
+				PATH: josh_harness_fixture.path_without_pnpm(consumer.workspace),
+			},
 			timeout_ms: SCENARIO_TIMEOUT_MS,
 		})
 
