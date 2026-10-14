@@ -67,11 +67,25 @@ describe('fresh_machine_patterns gate', () => {
 	})
 
 	it.each([...INIT_NAMES, ...START_NAMES])('%s records the gate from both PATH states', (name) => {
+		const path_probes = pattern(name).probes.slice(-2)
+
+		expect(path_probes[0]).toContain("bash --noprofile --norc -c 'pnpm josh gate'")
+		expect(path_probes[1]).toContain('./node_modules/.bin/josh gate')
+	})
+
+	it.each(START_NAMES)('%s records nothing but the PATH states', (name) => {
+		expect(pattern(name).probes).toHaveLength(2)
+	})
+
+	it.each(INIT_NAMES)('%s records the profile, the files and a second init', (name) => {
 		const { probes } = pattern(name)
 
-		expect(probes).toHaveLength(2)
-		expect(probes[0]).toContain("bash --noprofile --norc -c 'pnpm josh gate'")
-		expect(probes[1]).toContain('./node_modules/.bin/josh gate')
+		expect(probes).toHaveLength(5)
+		expect(probes[0]).toBe('pnpm josh profile')
+		expect(probes[1]).toContain('-name node_modules -prune -o -print')
+		expect(probes[2]).toMatch(
+			/sha256sum > (?<file>\S+) && pnpm exec josh init && .+\| diff \k<file> -$/u,
+		)
 	})
 })
 

@@ -56,6 +56,17 @@ const PATH_PROBES = [
 	`mkdir -p ${NODE_ONLY} && ln -sf "$(command -v node)" ${NODE_ONLY}/node && ${BARE_SHELL} 'PATH="$HOME/node-only:$PATH" ./node_modules/.bin/josh gate'`,
 ]
 
+// What a `josh init` run is checked against after the gate: the profile it chose, the files it left
+// (a `./.git` line is a repository it should not have made), and a second run that changes nothing.
+const PROJECT_FILES =
+	'find . -name node_modules -prune -o -name .git -prune -o -type f -print | sort'
+const CHECKSUMS = `${PROJECT_FILES} | xargs sha256sum`
+const INIT_PROBES = [
+	'pnpm josh profile',
+	'find . -name node_modules -prune -o -print | sort',
+	`${CHECKSUMS} > "$HOME/before-second-init.sha" && pnpm exec josh init && ${CHECKSUMS} | diff "$HOME/before-second-init.sha" -`,
+]
+
 const LUA_FILE = 'main.lua'
 const HTML_FILE = 'index.html'
 const LUA_FILES = { [LUA_FILE]: 'print("Hello")\n' }
@@ -70,7 +81,7 @@ function init_pattern(
 		name: `kit-test-${project}-init`,
 		files,
 		commands: [...setup, ...INIT_COMMANDS],
-		probes: PATH_PROBES,
+		probes: [...INIT_PROBES, ...PATH_PROBES],
 	})
 }
 
