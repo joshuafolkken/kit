@@ -91,3 +91,9 @@ never the comment text.
 **`pnpm josh rule:guard` refuses the body-only read** and hands over the reissue and the conflict rule
 at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`). **This file is the rule,
 not the hook** — a session that runs no hooks still owes the read.
+
+## A person's update mid-run
+
+When the hook, `review:attest --check` or `followup` shows an Issue update, read it as above — the
+later text is in force — fix what it changes, then `pnpm josh issue:ack <N>`. The watch and what it
+does not catch: `docs/josh-commands-backlog.md` → "`josh issue:ack`".

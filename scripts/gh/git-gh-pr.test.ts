@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { issue_watch_diff } from '#scripts/issue/issue-watch-diff'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { git_gh_pr } from './git-gh-pr'
@@ -240,7 +241,9 @@ describe('pr_comment', () => {
 	it('posts to the issue comment endpoint of the resolved number', async () => {
 		await git_gh_pr.pr_comment(PR_BRANCH, BODY)
 
-		expect(parsed_body(PR_COMMENTS_PATH)).toStrictEqual({ body: BODY })
+		expect(parsed_body(PR_COMMENTS_PATH)).toStrictEqual({
+			body: `${BODY}\n\n${issue_watch_diff.RUN_MARKER}`,
+		})
 		expect(request_to(PR_COMMENTS_PATH).jq_filter).toBe(HTML_URL_FILTER)
 	})
 

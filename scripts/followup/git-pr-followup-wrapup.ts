@@ -1,5 +1,6 @@
 import { epic_close } from '#scripts/epic/epic-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { git_followup_cleanup } from './git-followup-cleanup'
 import { git_followup_issue_close } from './git-followup-issue-close'
@@ -232,8 +233,12 @@ async function run_tail_steps(input: WrapupInput): Promise<void> {
 	])
 }
 
+// The last look at the issue before the merge: the CI poll checked it on every iteration, but a
+// person's update can land between that poll and this step, and only the seconds after this read are
+// left unwatched.
 async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
 	if (input.should_merge && input.is_merged !== true) {
+		await issue_watch_gate.assert_read_here()
 		await git_gh_command.pr_merge(input.branch_name)
 		lap(log, STAGE.merge)
 	}

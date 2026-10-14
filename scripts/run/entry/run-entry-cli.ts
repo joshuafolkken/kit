@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_watch } from '#scripts/issue/issue-watch'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -253,6 +254,10 @@ async function mark_planned(issue_number: string, state: StageState): Promise<vo
 async function proceed(issue_number: string, hold: string, cost: string): Promise<number> {
 	await run_label.mark(issue_number)
 	const reads = await gather_reads(issue_number)
+
+	// The issue the report prints is the one the run has read, so it is the baseline a person's later
+	// update is measured against (`issue-watch.ts`).
+	await issue_watch.record_baseline_here(issue_number)
 
 	return emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
 }

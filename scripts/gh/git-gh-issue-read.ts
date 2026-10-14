@@ -350,11 +350,14 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 // No `repo` parameter, unlike the reads above: the auto-close lists its candidate epics from the
 // repository it runs in, so the epic whose comments are read is always a local one. The path builder
 // takes one when a caller that needs it appears.
-async function issue_list_comments(issue_number: string): Promise<string | undefined> {
+async function issue_list_comments(
+	issue_number: string,
+	timeout_ms?: number,
+): Promise<string | undefined> {
 	const path = `${git_gh_api_path.issue_comments_api_path(issue_number)}${git_gh_api_path.FULL_PAGE_QUERY}`
 
 	try {
-		return await git_gh_exec.exec_gh_api({ path, should_paginate: true })
+		return await git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms })
 	} catch {
 		return undefined
 	}

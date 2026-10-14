@@ -1,0 +1,152 @@
+import { describe, expect, it } from 'vitest'
+import {
+	issue_watch_diff,
+	type WatchBaseline,
+	type WatchComment,
+	type WatchSnapshot,
+} from './issue-watch-diff'
+
+// joshuafolkken/kit#3773: the one line between "a person updated the issue" and noise. A run's own
+// marked comment, a bot's comment and a comment the baseline already read must never stop a run; a
+// body edit and a person's new comment always must.
+
+const BASELINE_COMMENT_ID = 10
+const NEWER_COMMENT_ID = 11
+const PERSON = 'joshuafolkken'
+const CREATED_AT = '2026-10-14T00:00:00Z'
+const BODY = 'first line\nsecond line'
+const ONE_LINE_EDIT = 'Body edited:\n- second line\n+ changed line'
+
+function comment(overrides: Partial<WatchComment>): WatchComment {
+	return {
+		id: NEWER_COMMENT_ID,
+		author: PERSON,
+		is_automated: false,
+		created_at: CREATED_AT,
+		body: 'please also cover X',
+		...overrides,
+	}
+}
+
+function baseline(): WatchBaseline {
+	return { body: BODY, last_comment_id: BASELINE_COMMENT_ID }
+}
+
+function snapshot(overrides: Partial<WatchSnapshot> = {}): WatchSnapshot {
+	return { body: BODY, comments: [], ...overrides }
+}
+
+function parsed(raw: unknown): ReadonlyArray<WatchComment> | undefined {
+	return issue_watch_diff.parse_comments(JSON.stringify(raw))
+}
+
+describe('issue_watch_diff.unread_diff', () => {
+	it('returns undefined when nothing changed', () => {
+		const comments = [comment({ id: BASELINE_COMMENT_ID })]
+
+		expect(issue_watch_diff.unread_diff(baseline(), snapshot({ comments }))).toBeUndefined()
+	})
+
+	it('lists the removed and the added lines of a body edit', () => {
+		const diff = issue_watch_diff.unread_diff(
+			baseline(),
+			snapshot({ body: 'first line\nchanged line' }),
+		)
+
+		expect(diff).toBe(ONE_LINE_EDIT)
+	})
+
+	it('shows a person comment newer than the baseline', () => {
+		const diff = issue_watch_diff.unread_diff(baseline(), snapshot({ comments: [comment({})] }))
+
+		expect(diff).toBe(`New comment by ${PERSON} at ${CREATED_AT}\nplease also cover X`)
+	})
+
+	it('ignores automated comments and comments at or below the baseline id', () => {
+		const comments = [
+			comment({ is_automated: true }),
+			comment({ id: BASELINE_COMMENT_ID }),
+			comment({ id: BASELINE_COMMENT_ID - 1 }),
+		]
+
+		expect(issue_watch_diff.unread_diff(baseline(), snapshot({ comments }))).toBeUndefined()
+	})
+
+	it('joins a body edit and a new comment into one text', () => {
+		const diff = issue_watch_diff.unread_diff(
+			baseline(),
+			snapshot({ body: `${BODY}\nthird line`, comments: [comment({})] }),
+		)
+
+		expect(diff).toContain('+ third line\n\nNew comment by')
+	})
+})
+
+// A body josh wrote over the API has LF endings; one saved in GitHub's web editor comes back CRLF.
+describe('issue_watch_diff.unread_diff — line endings', () => {
+	it('lists only the edited line when the web editor rewrote the body with CRLF endings', () => {
+		const diff = issue_watch_diff.unread_diff(
+			baseline(),
+			snapshot({ body: 'first line\r\nchanged line' }),
+		)
+
+		expect(diff).toBe(ONE_LINE_EDIT)
+	})
+
+	it('returns undefined when only the line endings changed', () => {
+		const crlf_body = BODY.replaceAll('\n', '\r\n')
+
+		expect(issue_watch_diff.unread_diff(baseline(), snapshot({ body: crlf_body }))).toBeUndefined()
+	})
+})
+
+describe('issue_watch_diff.parse_comments', () => {
+	it('marks a comment carrying the run marker as automated', () => {
+		const body = `${issue_watch_diff.RUN_MARKER}\nplan`
+		const comments = parsed([{ id: NEWER_COMMENT_ID, user: { login: PERSON }, body }])
+
+		expect(comments?.[0]?.is_automated).toBe(true)
+	})
+
+	it('marks a Bot-typed user and a [bot] login as automated', () => {
+		const comments = parsed([
+			{ id: NEWER_COMMENT_ID, user: { login: 'helper', type: 'Bot' }, body: 'x' },
+			{ id: NEWER_COMMENT_ID, user: { login: 'coderabbitai[bot]' }, body: 'x' },
+		])
+
+		expect(comments?.map((row) => row.is_automated)).toStrictEqual([true, true])
+	})
+
+	it('keeps an unmarked person comment as a person update', () => {
+		const comments = parsed([
+			{
+				id: NEWER_COMMENT_ID,
+				user: { login: PERSON, type: 'User' },
+				created_at: CREATED_AT,
+				body: 'x',
+			},
+		])
+
+		expect(comments).toStrictEqual([comment({ body: 'x' })])
+	})
+
+	it('returns undefined for an unread listing, never an empty one', () => {
+		expect(issue_watch_diff.parse_comments(undefined)).toBeUndefined()
+		expect(issue_watch_diff.parse_comments('not json')).toBeUndefined()
+	})
+})
+
+describe('issue_watch_diff.baseline_of', () => {
+	it('takes the body and the highest comment id', () => {
+		const comments = [comment({ id: NEWER_COMMENT_ID }), comment({ id: BASELINE_COMMENT_ID })]
+
+		expect(issue_watch_diff.baseline_of(snapshot({ comments }))).toStrictEqual({
+			body: BODY,
+			last_comment_id: NEWER_COMMENT_ID,
+		})
+	})
+
+	it('uses zero when the issue has no comments', () => {
+		expect(issue_watch_diff.baseline_of(snapshot()).last_comment_id).toBe(0)
+	})
+})
