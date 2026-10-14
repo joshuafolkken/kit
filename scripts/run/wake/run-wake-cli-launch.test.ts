@@ -45,6 +45,8 @@ const CLAUDE_KEY = 'CLAUDE_CODE_CHILD_SESSION'
 const SUPERVISOR_SESSION = 'run-wake-supervisor'
 const SUPERVISOR_PID = 4343
 const INTERVAL_MS = 1
+const STALE_WAKES = 3
+const DEAD_START = 'a start time no live process has'
 const REFUSED = { kind: 'refused', carry_kind: 'none' }
 const PROFILE = {
 	provider: 'anthropic',
@@ -206,6 +208,30 @@ describe('run_wake_await.claim_run beside another live run', () => {
 			invocation: ANOTHER_INVOCATION,
 			...process_identity.own_fields(),
 		})
+	})
+
+	it('re-points the record without the wake state an earlier run of the pending launch left', async () => {
+		run_wake.write_wake(CONTEXT.wake_target, {
+			...run_wake.fresh_wake(INVOCATION, new Date()),
+			woke: STALE_WAKES,
+			woke_at: new Date().toISOString(),
+			attempts: STALE_WAKES,
+			pid: 0,
+			process_start: DEAD_START,
+		})
+
+		await run_wake_await.claim_run(
+			CONTEXT,
+			PROFILE,
+			INTERVAL_MS,
+			ports(() => true, another_begins),
+		)
+
+		const supervised = run_wake.read_wake(CONTEXT.wake_target)
+
+		expect(supervised).toMatchObject({ invocation: ANOTHER_INVOCATION, woke: 0, profile: PROFILE })
+		expect(supervised?.woke_at).toBeUndefined()
+		expect(supervised?.attempts).toBeUndefined()
 	})
 })
 

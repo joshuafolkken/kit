@@ -84,12 +84,18 @@ function supervised_carry(
 }
 
 // **The record is re-pointed at the run it now supervises**, because the loop wakes sessions for the
-// record's invocation. A refused write means the record is no longer this process's, which the loop's
-// first pass reads as the stop it is.
-function held_for(target: string, wake: RunWake, carry: RunCarry): ClaimResult {
+// record's invocation. **It carries the state a claim for that run would**, not the state the claim
+// inherited for the pending launch's invocation — that run's wakes are not this one's. A refused write
+// means the record is no longer this process's, which the loop's first pass reads as the stop it is.
+function held_for(
+	target: string,
+	wake: RunWake,
+	carry: RunCarry,
+	profile: AgentProfile,
+): ClaimResult {
 	if (carry.invocation === wake.invocation) return { kind: 'claimed', wake, carry }
 
-	const supervised = { ...wake, invocation: carry.invocation }
+	const supervised = run_wake.fresh_wake(carry.invocation, new Date(), profile)
 
 	run_wake.update_wake(target, supervised)
 
@@ -111,7 +117,7 @@ async function claim_run(
 	if (wake === undefined) return { kind: 'running' }
 	const read = await await_carry(ports, interval_ms)
 	const carry = supervised_carry(read, invocation, ports)
-	if (carry !== undefined) return held_for(context.wake_target, wake, carry)
+	if (carry !== undefined) return held_for(context.wake_target, wake, carry, profile)
 
 	run_wake.tidy_own_wake(context.wake_target)
 
