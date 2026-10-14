@@ -87,6 +87,8 @@ pnpm josh run:wake --stop                  # stop the supervisor alone
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
 
+**A run started by [`pnpm josh backlogrun`](./josh-commands.md#josh-backlogrun) already has its supervisor**: the command starts it beside the parent, where it inherits the credential the parent's Bash tool does not pass on, and it claims its record before the parent's `run:carry --begin`. The parent's `--start` then answers `running`. Until the record is carried, `--loop` waits while the launched parent is alive and exits without a record once it is gone.
+
 **To stop a `backlogrun`, use [`pnpm josh backlogrun --stop`](./josh-commands.md#josh-backlogrun)**: it stops this supervisor and ends the run's record together. `run:wake --stop` alone leaves the record behind with no owner, and the next `pnpm josh backlogrun` answers `standing` on it rather than starting.
 
 `scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local

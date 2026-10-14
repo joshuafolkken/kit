@@ -26,6 +26,7 @@ const CONTEXT: WakeContext = {
 	wake_target: '/stub/wake.json',
 	log_target: LOG_TARGET,
 	event_target: '/stub/events.jsonl',
+	git_directory: '/stub/repo/.git',
 	worktree: '/stub/repo',
 }
 

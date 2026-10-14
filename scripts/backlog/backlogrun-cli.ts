@@ -1,9 +1,12 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { AgentProvider } from '#scripts/agent/agent-role-profile'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import type { LaunchResult } from '#scripts/run/detached-launch'
+import { run_wake_cli } from '#scripts/run/wake/run-wake-cli'
 import { backlogrun_args, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
 import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
@@ -31,6 +34,7 @@ interface BacklogrunPorts {
 	is_running: (git_directory: string) => boolean
 	replacement: (invocation: string, git_directory: string) => Promise<ReplaceVerdict>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
+	start_supervisor: (git_directory: string, provider: AgentProvider) => LaunchResult
 	stop: (git_directory: string) => Promise<StopReport>
 	show_board: () => Promise<number>
 	write: (line: string) => void
@@ -42,6 +46,7 @@ const LIVE_PORTS: BacklogrunPorts = {
 	replacement: async (invocation, git_directory) =>
 		await backlogrun_replace.decide(invocation, git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
+	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	show_board: async () => await run_board_cli.run([]),
 	write: (line) => process.stdout.write(`${line}\n`),
@@ -67,6 +72,16 @@ function launched_note(result: Extract<StartResult, { kind: 'launched' }>): stri
 	return `backlogrun: started (pid ${String(pid)}${session_part}); log ${log_path}`
 }
 
+// **The supervisor is started here, beside the parent, never from the parent's own shell**: Claude
+// Code removes its token from what its Bash tool starts, so only this process can hand a token-only
+// credential on to the sessions the supervisor wakes (joshuafolkken/kit#3804). A supervisor that does
+// not start leaves the parent's own `run:wake --start` to try, so the run is still shown.
+function supervisor_note(result: LaunchResult): string {
+	if (result.kind === 'failed') return `backlogrun: could not start the supervisor: ${result.note}`
+
+	return `backlogrun: supervisor started (pid ${String(result.pid)})`
+}
+
 // The agent starts in the main checkout, the parent of the common git directory every record is keyed on.
 function target_of(git_directory: string): LaunchTarget {
 	return { worktree: path.dirname(git_directory), git_directory }
@@ -86,6 +101,7 @@ async function launch(
 	}
 
 	ports.write(launched_note(result))
+	ports.write(supervisor_note(ports.start_supervisor(git_directory, args.provider)))
 
 	return await ports.show_board()
 }

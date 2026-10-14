@@ -1,4 +1,5 @@
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
+import type { LaunchResult } from '#scripts/run/detached-launch'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it, vi } from 'vitest'
 import { backlogrun_cli, type BacklogrunPorts } from './backlogrun-cli'
@@ -36,6 +37,8 @@ const REPLACE: ReplaceVerdict = { kind: 'replace' }
 const REPLACING_LINE = 'backlogrun: replacing the idle run with `backlogrun #3724 --only`'
 const STARTED_LINE =
 	'backlogrun: started (pid 42, session session-1); log /state/josh-backlogrun-log.log'
+const SUPERVISED: LaunchResult = { kind: 'launched', pid: 4343 }
+const SUPERVISED_LINE = 'backlogrun: supervisor started (pid 4343)'
 const STOPPED_LINES = [
 	'backlogrun: stopped the supervisor (process 4242)',
 	"backlogrun: ended the run's record",
@@ -52,6 +55,7 @@ function harness(
 		is_running: vi.fn(() => is_running),
 		replacement: vi.fn(async () => SAME),
 		start: vi.fn(() => started),
+		start_supervisor: vi.fn((): LaunchResult => SUPERVISED),
 		stop: vi.fn(async () => STOPPED),
 		show_board: vi.fn(async () => 0),
 		write: (line) => {
@@ -86,6 +90,35 @@ describe('backlogrun_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#3804: the parent's Bash tool passes no token on, so the supervisor is started here.
+describe('backlogrun_cli.run starting the supervisor', () => {
+	it('starts the supervisor from this process once the parent is launched', async () => {
+		const { ports, lines } = harness(false)
+
+		await expect(backlogrun_cli.run(['3804'], ports)).resolves.toBe(0)
+		expect(ports.start_supervisor).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY, 'anthropic')
+		expect(ports.start).toHaveBeenCalledBefore(vi.mocked(ports.start_supervisor))
+		expect(lines).toStrictEqual([STARTED_LINE, SUPERVISED_LINE])
+	})
+
+	it('says a supervisor that did not start and still shows the board', async () => {
+		const { ports, lines } = harness(false)
+		const failed: LaunchResult = { kind: 'failed', note: 'claude is not on PATH' }
+		const unsupervised = { ...ports, start_supervisor: vi.fn(() => failed) }
+
+		await expect(backlogrun_cli.run(['3804'], unsupervised)).resolves.toBe(0)
+		expect(lines[1]).toBe('backlogrun: could not start the supervisor: claude is not on PATH')
+		expect(ports.show_board).toHaveBeenCalledOnce()
+	})
+
+	it('starts no supervisor when the parent could not be launched', async () => {
+		const { ports } = harness(false, { kind: 'failed', note: 'no agent' })
+
+		await expect(backlogrun_cli.run(['3804'], ports)).resolves.toBe(1)
+		expect(ports.start_supervisor).not.toHaveBeenCalled()
+	})
+})
+
 // joshuafolkken/kit#3729: an idle run is stopped and the typed invocation started in its place.
 describe('backlogrun_cli.run replacing an idle run', () => {
 	it('stops the idle run, starts the typed one and says both before the board', async () => {
@@ -98,7 +131,7 @@ describe('backlogrun_cli.run replacing an idle run', () => {
 			GIT_DIRECTORY,
 		)
 		expect(ports.stop).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY)
-		expect(lines).toStrictEqual([REPLACING_LINE, ...STOPPED_LINES, STARTED_LINE])
+		expect(lines).toStrictEqual([REPLACING_LINE, ...STOPPED_LINES, STARTED_LINE, SUPERVISED_LINE])
 		expect(ports.show_board).toHaveBeenCalledOnce()
 	})
 })
@@ -129,7 +162,7 @@ describe('backlogrun_cli.run beside a leftover lane', () => {
 
 		await expect(backlogrun_cli.run(['3724', '--only'], idle)).resolves.toBe(0)
 		expect(ports.stop).toHaveBeenCalledBefore(vi.mocked(ports.start))
-		expect(lines).toStrictEqual([REPLACING_LINE, ...STOPPED_LINES, STARTED_LINE])
+		expect(lines).toStrictEqual([REPLACING_LINE, ...STOPPED_LINES, STARTED_LINE, SUPERVISED_LINE])
 	})
 
 	it('keeps the run and names the lane a child is working in, above the board', async () => {

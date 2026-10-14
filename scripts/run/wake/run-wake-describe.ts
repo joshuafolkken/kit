@@ -1,10 +1,13 @@
+import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { run_wake, type RunWake, type WakeDecision, type WakeDecisionInput } from './run-wake'
+import { run_wake_session } from './run-wake-session'
 
 // The `--list` presentation of a wake record. What the command *does* stays in `run-wake-cli.ts`; how
 // a supervisor's record reads back to a person lives here, one cohesive block.
@@ -32,6 +35,8 @@ interface WakeContext {
 	// side uses. `--list` relays the newest event from here: the report surface belongs to the run, and
 	// `--list` is the degenerate last-event read of the same stream the attached session follows.
 	event_target: string
+	// The common git directory every record is keyed on — what finds the launch `josh backlogrun` made.
+	git_directory: string
 	worktree: string
 }
 
@@ -158,7 +163,32 @@ function describe_wake_cited(wake: RunWake, context: WakeContext): string {
 	return cite_description(describe_wake(wake, context), repo)
 }
 
-const run_wake_describe = { STOP_COMMAND, cite_description, describe_wake, describe_wake_cited }
+function context_of(directory: string, note: (line: string) => void): WakeContext {
+	const log_target = run_wake.wake_log_path(directory)
+
+	// Every verb reaches this one function, so creating the log here is what makes the path each of
+	// them prints a path that exists — including `--list` and the already-running branch of `--start`,
+	// neither of which launches anything.
+	run_wake_session.ensure_log(log_target, note)
+
+	return {
+		carry_target: run_carry.carry_path(directory),
+		ended_target: run_carry_ended.ended_path(directory),
+		wake_target: run_wake.wake_path(directory),
+		log_target,
+		event_target: run_event_stream.target_of(directory),
+		git_directory: directory,
+		worktree: path.dirname(directory),
+	}
+}
+
+const run_wake_describe = {
+	STOP_COMMAND,
+	cite_description,
+	context_of,
+	describe_wake,
+	describe_wake_cited,
+}
 
 export type { WakeContext }
 export { run_wake_describe }

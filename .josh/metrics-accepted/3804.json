@@ -1,0 +1,8 @@
+{
+	"reason": "Supervisor launched by josh backlogrun, plus round-2 fix: a claim held for a pending launch re-points to a live run another invocation began first instead of leaving it unsupervised",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 122,
+		"ai_cost.on_demand_bytes": 35
+	}
+}
