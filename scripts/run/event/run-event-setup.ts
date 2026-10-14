@@ -23,11 +23,16 @@ const STAGE = {
 	// The supervisor started that session, which is now acting on the driver's answer. It is detached, so
 	// its end is the supervisor's next hand-off, which replaces this.
 	SESSION: 'judgment session running',
+	// The driver's launch of a lane returned without a child: no lane was free to open, or a step after
+	// the open failed. It names no issue, so the lane's own stage ends here whatever the driver does next.
+	NO_CHILD: 'no child launched',
 } as const
 
 const OPENING = 'opening lane'
 const INSTALLING = 'installing dependencies'
 const DISPATCHING = 'dispatching'
+// The stages of one lane's launch, in the order a lane passes them.
+const LANE_STAGE = { OPENING, INSTALLING, DISPATCHING } as const
 
 // The driver is about to open a lane for `issue` — for every child, not only the first.
 function opening_lane(issue: string): string {
@@ -73,6 +78,7 @@ function emit_to(target: string, text: string, at: Date): void {
 }
 
 const run_event_setup = {
+	LANE_STAGE,
 	STAGE,
 	dispatching,
 	emit,

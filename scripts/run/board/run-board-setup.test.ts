@@ -188,3 +188,70 @@ describe('run_board_setup.is_lane_pending', () => {
 		expect(run_board_setup.is_lane_pending(stream(MERGE_278), 278)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#3750: each lane's own stage, so its row says it while another lane is elsewhere.
+describe('run_board_setup.lane_stage', () => {
+	const INSTALLING_278 = run_event_setup.installing('278')
+
+	it('reads the newest stage naming the issue, with the time the lane entered it', () => {
+		const events = stream(setup(OPENING_278), setup(INSTALLING_278))
+
+		expect(run_board_setup.lane_stage(events, 278)).toStrictEqual({
+			text: INSTALLING_278,
+			at_ms: time_of(1),
+		})
+	})
+
+	it('reads each of two lanes opened side by side at its own stage', () => {
+		const events = stream(setup(OPENING_278), setup(OPENING_279), setup(INSTALLING_278))
+
+		expect(run_board_setup.lane_stage(events, 278)?.text).toBe(INSTALLING_278)
+		expect(run_board_setup.lane_stage(events, 279)).toStrictEqual({
+			text: OPENING_279,
+			at_ms: time_of(1),
+		})
+	})
+
+	it('keeps a lane’s stage past what the run did for another issue', () => {
+		const events = stream(setup(OPENING_279), LAUNCH_278, MERGE_278)
+
+		expect(run_board_setup.lane_stage(events, 279)?.text).toBe(OPENING_279)
+	})
+
+	it.each([
+		['its launch', LAUNCH_278],
+		['a later position naming it', MERGE_278],
+	])('reads no stage after %s', (_step, step) => {
+		const events = stream(setup(OPENING_278), step)
+
+		expect(run_board_setup.lane_stage(events, 278)).toBeUndefined()
+	})
+
+	it('reads no stage for an issue no stage names', () => {
+		const events = stream(setup(STAGE.HANDING_OFF))
+
+		expect(run_board_setup.lane_stage(events, 278)).toBeUndefined()
+		expect(run_board_setup.lane_stage([], 278)).toBeUndefined()
+	})
+})
+
+// A launch that leaves no child writes nothing naming the issue, so a stage naming none ends the lane's.
+describe('run_board_setup.lane_stage after the launch returned', () => {
+	const INSTALLING_278 = run_event_setup.installing('278')
+
+	it.each([
+		['a hand-back to a session', STAGE.JUDGING],
+		['the next hand-off', STAGE.HANDING_OFF],
+		['a launch that left no child', STAGE.NO_CHILD],
+	])('ends the lane’s stage at %s', (_step, stage) => {
+		const events = stream(setup(OPENING_278), setup(INSTALLING_278), setup(stage))
+
+		expect(run_board_setup.lane_stage(events, 278)).toBeUndefined()
+	})
+
+	it('reads the stage of a lane opened after a hand-off', () => {
+		const events = stream(setup(STAGE.HANDING_OFF), setup(OPENING_278))
+
+		expect(run_board_setup.lane_stage(events, 278)?.text).toBe(OPENING_278)
+	})
+})

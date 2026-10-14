@@ -236,6 +236,11 @@ async function has_lanes_in_flight(): Promise<boolean> {
 	return lanes.some((lane) => !lane.is_stranded)
 }
 
+/** The lanes in use: the open work trees an interruption has not stranded. */
+function live_count(lanes: ReadonlyArray<LaneInfo>): number {
+	return lanes.filter((lane) => !lane.is_stranded).length
+}
+
 /** The seats live lanes hold — what a new lane's seat has to avoid. */
 function used_seats(lanes: ReadonlyArray<LaneInfo>): Array<number> {
 	return lanes.map((lane) => lane.seat).filter((seat): seat is number => seat !== undefined)
@@ -267,6 +272,7 @@ const lane_registry = {
 	find_open_lane,
 	has_lanes_in_flight,
 	list_lanes,
+	live_count,
 	main_repository_root,
 	parse_block,
 	read_environment,

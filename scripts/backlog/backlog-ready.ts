@@ -25,9 +25,7 @@ interface ReadyPorts {
 
 // The lanes in use: the open worktrees an interruption has not stranded. `josh lane:limit` prints it.
 async function live_lane_count(): Promise<number> {
-	const lanes = await lane_registry.list_lanes()
-
-	return lanes.filter((lane) => !lane.is_stranded).length
+	return lane_registry.live_count(await lane_registry.list_lanes())
 }
 
 async function free_under(limit: number): Promise<number> {

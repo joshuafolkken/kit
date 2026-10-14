@@ -21,6 +21,7 @@ import type { Phase } from './run-board-phase'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
+import { run_board_render_title } from './run-board-render-title'
 import type { ItemState } from './run-board-status'
 import { run_board_track } from './run-board-track'
 
@@ -36,9 +37,7 @@ const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAIT
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
-// The columns a terminal row gives its title: a longer one is cut to an ellipsis.
-const TITLE_LIMIT = 48
-const ELLIPSIS = '…'
+const { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of } = run_board_render_title
 const GAP = '  '
 const INDENT = '  '
 const BRANCH = '     ├ '
@@ -69,11 +68,10 @@ interface RowFrame {
 	time_width: number
 	usage: UsageSlot | undefined
 	slot_width: number
-}
-
-// A title cut to the title column, so every time after it starts in one column.
-function title_of(title = ''): string {
-	return title.length > TITLE_LIMIT ? `${title.slice(0, TITLE_LIMIT - 1)}${ELLIPSIS}` : title
+	// The columns a row's title is cut to: the title column's, or fewer where a row gives some up.
+	title_limit: number
+	// The pane's width where the frame is kept within one.
+	columns: number | undefined
 }
 
 // A row drawn before the plan is read has no title yet, and says so.
@@ -133,7 +131,7 @@ function timed_parts(
 ): Array<string | undefined> {
 	const time = time_of(row, frame.header.now_ms)
 
-	const title = title_of(row_title(row, frame.header))
+	const title = title_of(row_title(row, frame.header), frame.title_limit)
 
 	if (time === undefined && !is_slotted) return [title]
 
@@ -191,7 +189,10 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 // Every row carries its state's icon, a waiting one ⏳ too; a row with nothing
 // after its padded columns ends where its text does.
 function row_text(row: BoardRow, frame: RowFrame): string {
-	return joined([head_text(row, frame), track_text(row), waits_of(row, frame.header)]).trimEnd()
+	const { header } = frame
+	const notes = [waits_of(row, header), reason_text(row, header.now_ms)]
+
+	return joined([head_text(row, frame), track_text(row), ...notes]).trimEnd()
 }
 
 // The stage each state's row gives way in when the pane is short.
@@ -218,7 +219,12 @@ function yield_of(row: BoardRow): RowYield {
 
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
 function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
-	const text = `${indent_of(prefix, row, frame.header)}${row_text(row, frame)}`
+	const indent = indent_of(prefix, row, frame.header)
+	const text = fitted(
+		row,
+		frame.columns,
+		(title_limit) => `${indent}${row_text(row, { ...frame, title_limit })}`,
+	)
 
 	return { text, row: yield_of(row) }
 }
@@ -309,6 +315,8 @@ function frame_of(
 		time_width: time_width(header),
 		usage,
 		slot_width: usage === undefined ? 0 : column_width(rows, usage, header.now_ms),
+		title_limit: TITLE_LIMIT,
+		columns: size?.columns,
 	}
 
 	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usage: undefined }

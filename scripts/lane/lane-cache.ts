@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { cpSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { hook_launch } from '#scripts/init/hook-launch'
 import {
@@ -29,6 +37,8 @@ import {
 // **Warming is best-effort: a lane with a cold cache is still a usable lane.** A cache the main
 // checkout never produced is skipped, and a copy that fails is skipped rather than thrown — so
 // seeding can never be the reason an open fails, unlike the `.env` write the lane cannot run without.
+
+const STAGING_SEGMENTS = ['node_modules', '.cache', 'josh-lane-cache'] as const
 
 function replace_root(value: unknown, source_prefix: string, destination_root: string): unknown {
 	if (typeof value !== 'string') return value
@@ -61,16 +71,36 @@ function portable_content(
 	return content
 }
 
-function write_atomically(destination_path: string, content: string): void {
-	const temporary_path = `${destination_path}.${String(process.pid)}.${randomUUID()}.tmp`
+// The staging file lives under `node_modules/.cache`, never beside the cache it replaces: prettier
+// runs in parallel with the tool whose cache is being copied, and a temporary name in the checkout
+// root is listed by its tree walk and gone by the time it is read (#3763). `node_modules` is skipped
+// by every tree scan and sits on the checkout's own filesystem, so the rename stays atomic.
+function stage_path(destination_root: string, cache_file: string): string {
+	const staging_directory = path.join(destination_root, ...STAGING_SEGMENTS)
 
+	mkdirSync(staging_directory, { recursive: true })
+
+	return path.join(staging_directory, `${cache_file}.${String(process.pid)}.${randomUUID()}.tmp`)
+}
+
+function publish_staged(temporary_path: string, destination_path: string, content: string): void {
 	try {
 		writeFileSync(temporary_path, content, { flag: 'wx' })
 		renameSync(temporary_path, destination_path)
-	} catch {
-		// Best-effort: a cache that could not be published simply leaves the destination unchanged.
 	} finally {
 		rmSync(temporary_path, { force: true })
+	}
+}
+
+function write_atomically(destination_root: string, cache_file: string, content: string): void {
+	if (!existsSync(destination_root)) return
+
+	try {
+		const temporary_path = stage_path(destination_root, cache_file)
+
+		publish_staged(temporary_path, path.join(destination_root, cache_file), content)
+	} catch {
+		// Best-effort: a cache that could not be published simply leaves the destination unchanged.
 	}
 }
 
@@ -86,7 +116,7 @@ function copy_if_present(source_root: string, destination: string, spec: GateCac
 			destination,
 		)
 
-		write_atomically(path.join(destination, spec.cache_file), content)
+		write_atomically(destination, spec.cache_file, content)
 	} catch {
 		// A missing, changing, or malformed cache is a miss, never a failed lane or gate.
 	}
@@ -130,6 +160,6 @@ function sync_cache(source_root: string, destination: string, cache_file: string
 	copy_if_present(source_root, destination, spec)
 }
 
-const lane_cache = { seed_caches, seed_hook_bundles, sync_cache }
+const lane_cache = { STAGING_SEGMENTS, seed_caches, seed_hook_bundles, sync_cache }
 
 export { lane_cache }

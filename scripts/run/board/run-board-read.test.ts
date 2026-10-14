@@ -1,4 +1,5 @@
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
@@ -44,6 +45,9 @@ const CARRY: RunCarry = {
 }
 const TRANSCRIPT = '/home/.claude/projects/kit/session.jsonl'
 const LANE_LOG = '/logs/josh-lane-dispatch-3432.log'
+// Three lanes allowed and one open: two more may open.
+const LANE_LIMIT = 3
+const FREE_LANES = 2
 
 function lane(issue: string): LaneInfo {
 	return {
@@ -66,6 +70,8 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
 	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, AFTER])
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane('3432')])
+	// The limit is read off the environment and a live run's override: never a real one from a test.
+	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
 	// Every log is read off the machine: never a real one from a test.
 	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
 }
@@ -87,6 +93,7 @@ describe('run_board_read.read_local', () => {
 			resume: undefined,
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
+			free_lanes: FREE_LANES,
 		})
 	})
 
@@ -172,5 +179,24 @@ describe('run_board_read.read_local operations', () => {
 			owner: { log: TRANSCRIPT, root },
 			judgment: { log: run_wake.wake_log_path(REPOSITORY), root },
 		})
+	})
+})
+
+// joshuafolkken/kit#3750: a waiting row says no lane is free, so the count is read beside the lanes.
+describe('run_board_read.read_local free lanes', () => {
+	it('counts the lanes the limit still allows, a stranded lane holding none', async () => {
+		const stranded = { ...lane('3433'), is_stranded: true }
+
+		arrange(NONE, STOPPED)
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3432'), stranded])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: FREE_LANES })
+	})
+
+	it('reads no count where the limit is not a number anyone set', async () => {
+		arrange(NONE, STOPPED)
+		vi.mocked(lane_capacity.lane_limit).mockResolvedValue({ kind: 'problem', problem: 'bad' })
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: undefined })
 	})
 })

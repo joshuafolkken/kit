@@ -122,6 +122,52 @@ describe('run_board_layout.layout_of release kinds', () => {
 	})
 })
 
+// joshuafolkken/kit#3750: a waiting row carries why it waits; a row the run has touched never does.
+describe('run_board_layout.layout_of waiting reasons', () => {
+	const REASON = { text: 'untriaged' }
+
+	function reason_of(): typeof REASON {
+		return REASON
+	}
+
+	it('gives every waiting row what the reader says of it, in the waves and outside them', () => {
+		const plan = plan_of([[child(1)]], [child(2)])
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES, reason_of)
+
+		expect(run_board_layout.rows_of(layout).map((row) => row.reason)).toStrictEqual([
+			REASON,
+			REASON,
+		])
+	})
+
+	it('asks nothing of a row waiting on a person, or of one the run has touched', () => {
+		const statuses = new Map<number, ItemStatus>([[1, { state: 'running', started_ms: 100 }]])
+		const plan = plan_of([[child(1), child(2, [], [NEEDS_DECISION_LABEL])]])
+		const layout = run_board_layout.layout_of(plan, statuses, reason_of)
+
+		expect(run_board_layout.rows_of(layout).filter((row) => 'reason' in row)).toStrictEqual([])
+	})
+
+	it('leaves the key off a row the reader says nothing of, and off every row read without one', () => {
+		const plan = plan_of([[child(1)]])
+		const silent = run_board_layout.layout_of(plan, NO_STATUSES, () => undefined)
+		const unread = run_board_layout.layout_of(plan, NO_STATUSES)
+
+		expect(run_board_layout.rows_of(silent)[0]).not.toHaveProperty('reason')
+		expect(run_board_layout.rows_of(unread)[0]).not.toHaveProperty('reason')
+	})
+})
+
+describe('run_board_layout.waiting_children', () => {
+	it('answers the children the run has not touched and no person is asked about', () => {
+		const statuses = new Map<number, ItemStatus>([[1, { state: 'merged' }]])
+		const plan = plan_of([[child(1), child(2)]], [child(3, [], [NEEDS_DECISION_LABEL]), child(4)])
+		const waiting = run_board_layout.waiting_children({ plan, statuses })
+
+		expect(waiting.map((item) => item.number)).toStrictEqual([2, 4])
+	})
+})
+
 describe('run_board_layout.layout_of outside the waves', () => {
 	it('drops a blocker from the waiting note once the stream has seen it merge', () => {
 		const plan = plan_of([], [child(20, [3409, 3415])])
