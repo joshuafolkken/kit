@@ -6,7 +6,8 @@ import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { RunActivity } from './run-board-status'
 
-// joshuafolkken/kit#3696: the header while the run is at a stage of its own — the mark turns.
+// joshuafolkken/kit#3696: the header while the run is at a stage of its own. joshuafolkken/kit#3767:
+// the mark stands still; the spinner turns on the third line, before the stage's time and icon.
 // joshuafolkken/kit#3749: the stage stands on the third line, under the second column, whenever the run
 // is at one; the first line is the progress in every state.
 
@@ -20,9 +21,9 @@ const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached
 const STALE_MS = 40 * backlog_budget.MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
 // The third line's blank under the run's mark and name, then the gap before its words.
-const NOW_INDENT = ' '.repeat('⠋ backlogrun'.length + 2)
-const PROGRESS_0_OF_1 = /^⠋ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/1 /u
-const JUDGING_LINE = 'waiting on judgment 2:31 — 1 waiting'
+const NOW_INDENT = ' '.repeat('▶ backlogrun'.length + 2)
+const PROGRESS_0_OF_1 = /^▶ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/1 /u
+const JUDGING_LINE = '⠋  0:02:31  🤔 waiting on judgment — 1 waiting'
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -96,13 +97,13 @@ afterEach(() => {
 })
 
 describe('run_board_header.header_lines before the first child launches', () => {
-	it('turns the spinner, draws the progress, and writes the stage on the third line', () => {
+	it('draws the progress, and turns the spinner beside the stage on the third line', () => {
 		const [first, second, third] = lines_of(header())
 
-		expect(first).toMatch(/^⠋ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/- /u)
+		expect(first).toMatch(/^▶ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/- /u)
 		expect(first).not.toContain(STAGE.STARTING)
 		expect(second).toMatch(/^ {2}app-kit {5}💓 /u)
-		expect(third).toBe(`${NOW_INDENT}starting session 0:00`)
+		expect(third).toBe(`${NOW_INDENT}⠋  0:00:00  🚀 starting session`)
 	})
 
 	it('draws the still mark of a working run where the frame has no spinner', () => {
@@ -113,7 +114,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 		const board = planned(ONE_PLANNED, standing(STAGE.HANDING_OFF))
 
 		expect(title_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe('handing off 0:00 — 1 waiting')
+		expect(now_of(board)).toBe('⠋  0:00:00  🤝 handing off — 1 waiting')
 	})
 
 	it('keeps the first two lines where they are whatever the stage’s length', () => {
@@ -128,7 +129,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 		const board = header({ plan_failed_ms: NOW })
 
 		expect(title_of(board)).toMatch(/ {2}⚠ /u)
-		expect(now_of(board)).toBe('starting session 0:00')
+		expect(now_of(board)).toBe('⠋  0:00:00  🚀 starting session')
 	})
 })
 
@@ -143,20 +144,22 @@ describe('run_board_header.header_lines beside the stage', () => {
 	it('writes no reason where the plan is not read yet', () => {
 		const activity = standing(STAGE.STARTING, STAGE_AGE_MS)
 
-		expect(now_of(header({ activity }))).toBe('starting session 2:31')
+		expect(now_of(header({ activity }))).toBe('⠋  0:02:31  🚀 starting session')
 	})
 
-	it('writes the same in the chat form', () => {
+	// A chat is no terminal, so it draws no spinner: its place stands blank.
+	it('writes the same in the chat form, the spinner’s place blank', () => {
 		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, STAGE_AGE_MS))
+		const chat = { ...board, form: 'chat', spinner: undefined } as const
 
-		expect(now_of({ ...board, form: 'chat' })).toBe(JUDGING_LINE)
+		expect(lines_of(chat)[2]).toBe(`${NOW_INDENT}${JUDGING_LINE.replace(SPINNER, ' ')}`)
 	})
 
 	it('writes the hours once the stage has stood for one', () => {
 		const hour = 60 * backlog_budget.MS_PER_MINUTE
 		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, hour + STAGE_AGE_MS))
 
-		expect(now_of(board)).toBe('waiting on judgment 1:02:31 — 1 waiting')
+		expect(now_of(board)).toBe('⠋  1:02:31  🤔 waiting on judgment — 1 waiting')
 	})
 })
 
@@ -165,28 +168,28 @@ describe('run_board_header.header_lines once a child has launched', () => {
 		const board = planned(ONE_RUNNING, merged())
 
 		expect(title_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe('1 running')
+		expect(now_of(board)).toBe(`⠋${' '.repeat(11)}🔄 1 running`)
 	})
 
 	it('turns the spinner and writes the stage while a lane opens for a later child', () => {
 		const board = planned(NEXT_OPENING, standing(OPENING, SECOND))
 
-		expect(title_of(board)).toMatch(/^⠋ backlogrun {2}⏰ 0:00:10 {2}✅ +1\/2 /u)
-		expect(now_of(board)).toBe('opening lane #278 0:01 — 1 waiting')
+		expect(title_of(board)).toMatch(/^▶ backlogrun {2}⏰ 0:00:10 {2}✅ +1\/2 /u)
+		expect(now_of(board)).toBe('⠋  0:00:01  🚪 opening lane #278 — 1 waiting')
 	})
 
 	it('turns the spinner and writes the stage while a judgment session runs', () => {
 		const board = planned(NEXT_OPENING, standing(STAGE.SESSION, 72 * SECOND))
 
-		expect(title_of(board)).toMatch(/^⠋ backlogrun /u)
-		expect(now_of(board)).toBe('judgment session running 1:12 — 1 waiting')
+		expect(title_of(board)).toMatch(/^▶ backlogrun /u)
+		expect(now_of(board)).toBe('⠋  0:01:12  💭 judgment session running — 1 waiting')
 	})
 
 	it('stands idle between children, and writes how long it has watched and why', () => {
 		const board = planned(NEXT_OPENING, merged(STAGE_AGE_MS))
 
 		expect(title_of(board)).toMatch(/^⏸ backlogrun .*✅ +1\/2 /u)
-		expect(now_of(board)).toBe('watching 2:31 — 1 waiting')
+		expect(now_of(board)).toBe('0:02:31  🔭 watching — 1 waiting')
 	})
 })
 
@@ -196,20 +199,20 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const board = planned(ONE_PLANNED, activity)
 
 		expect(title_of(board)).toMatch(/^■ backlogrun .*✅ +0\/1 /u)
-		expect(now_of(board)).toBe('#278 merged 0:01')
+		expect(now_of(board)).toBe('0:00:01  🏁 #278 merged')
 	})
 
 	it('draws a plan left only to people as waiting on a person', () => {
 		const board = planned(PEOPLE, merged(SECOND))
 
 		expect(title_of(board)).toMatch(/^✋ backlogrun/u)
-		expect(now_of(board)).toBe('watching 0:01 — 1 waiting on a person')
+		expect(now_of(board)).toBe('0:00:01  🔭 watching — 1 waiting on a person')
 	})
 
 	it('draws a run at a stage as working, though all its plan has left waits on a person', () => {
 		const board = planned(PEOPLE, standing(STAGE.SESSION))
 
-		expect(title_of(board)).toMatch(/^⠋ backlogrun .*✅ /u)
+		expect(title_of(board)).toMatch(/^▶ backlogrun .*✅ /u)
 	})
 
 	it('colors the heartbeat of a setup that has gone quiet, as a running run’s', () => {

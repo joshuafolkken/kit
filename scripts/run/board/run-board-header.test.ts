@@ -21,7 +21,7 @@ const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
 // joshuafolkken/kit#3749: the third line — blank where the stream holds no event, else what the run is
 // doing now, under the second column.
 const NOW_BLANK = ''
-const ONE_RUNNING = `${NAME_BLANK}  1 running`
+const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const STALE_BEAT = '💓 0:40:00'
 const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = backlog_budget.MS_PER_MINUTE
@@ -148,14 +148,18 @@ describe('run_board_header.header_lines shape', () => {
 			`${NAME_BLANK}  ${TIME_BLANK}  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
 		)
 	})
+})
 
-	// joshuafolkken/kit#3452
-	it('turns the spinner in place of ▶ for a running run only, every other mark standing still', () => {
-		const stopped = { last_event_ms: undefined, is_stopped: true }
+describe('run_board_header.header_lines spinner', () => {
+	// joshuafolkken/kit#3452, joshuafolkken/kit#3767: the mark stands still in every state; the spinner
+	// turns on the third line, under the `⏰`.
+	it('turns the spinner on the third line of a running run, never in place of its mark', () => {
+		const board = header({ layout: RUNNING_LAYOUT, spinner: '⠙' })
 
-		expect(title_of(header({ layout: RUNNING_LAYOUT, spinner: '⠙' }))).toMatch(/^⠙ backlogrun/u)
-		expect(title_of(header({ spinner: '⠙' }))).toMatch(/^⏸ backlogrun/u)
-		expect(title_of(header({ activity: stopped, spinner: '⠙' }))).toMatch(/^■ backlogrun/u)
+		expect(title_of(board)).toMatch(/^▶ backlogrun/u)
+		expect(lines_of(board)[2]).toBe(
+			`${NAME_BLANK}  ⠙${' '.repeat(TIME_BLANK.length - 1)}  🔄 1 running`,
+		)
 	})
 })
 

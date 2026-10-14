@@ -9,6 +9,7 @@ import { run_board_phase, type Phase } from './run-board-phase'
 const KIND = run_event_stream.EVENT_KIND
 const { PHASE, STAGE } = run_ship_stage
 const { history_after, phase_of } = run_board_phase
+const IMPLEMENT_TEXT = '#3444 implement'
 
 function event_of(kind: string, text: string): RunEvent {
 	return { pos: 1, at: '2026-10-08T09:00:00.000Z', kind, text }
@@ -33,7 +34,7 @@ function history_of(...phases: ReadonlyArray<Phase>): Array<Phase> {
 describe('run_board_phase.phase_of', () => {
 	it('reads plan, implement, the ship launch and its stop from their own records', () => {
 		expect(phase_of(event_of(KIND.PLAN, 'planned #3444'))).toBe('plan')
-		expect(phase_of(event_of(KIND.LANE_PHASE, '#3444 implement'))).toBe('implement')
+		expect(phase_of(event_of(KIND.LANE_PHASE, IMPLEMENT_TEXT))).toBe('implement')
 		expect(phase_of(event_of(KIND.SHIP_LAUNCH, '#3444 ship supervisor launched'))).toBe('ship')
 		expect(phase_of(event_of(KIND.SHIP_STOP, '#3444 review failed'))).toBe('failed')
 	})
@@ -152,5 +153,22 @@ describe('run_board_phase.replayed', () => {
 			'ship',
 			'review',
 		])
+	})
+})
+
+describe('run_board_phase.stage_phase_of', () => {
+	const { stage_phase_of } = run_board_phase
+
+	it('reads the phase of a ship stage whether it started or finished', () => {
+		expect(stage_phase_of(ship(STAGE.GATE))).toBe('gate')
+		expect(stage_phase_of(ship(STAGE.REVIEW, PHASE.DONE))).toBe('review')
+	})
+
+	it('reads a lane phase from its own word', () => {
+		expect(stage_phase_of(event_of(KIND.LANE_PHASE, IMPLEMENT_TEXT))).toBe('implement')
+	})
+
+	it('reads a failed ship stage as the ship failure', () => {
+		expect(stage_phase_of(ship(STAGE.GATE, PHASE.FAILED))).toBe('failed')
 	})
 })

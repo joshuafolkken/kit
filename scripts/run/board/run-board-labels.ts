@@ -1,6 +1,7 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import cli_spinners from 'cli-spinners'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
@@ -71,6 +72,8 @@ const WORDS = {
 	watching: 'watching',
 	pool_empty: 'pool empty',
 	on_person: 'waiting on a person',
+	operation: 'operation',
+	ended: 'ended',
 	// The session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
 	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
@@ -178,6 +181,23 @@ const HEADER_ICONS = {
 	elapsed: '⏰',
 	heartbeat: '💓',
 } as const
+
+// The kind of what the header's third line says, under the `⚡` (joshuafolkken/kit#3767): a call a
+// session made, the run watching its pool, the run ended, or each of the run's own stages, keyed by the
+// stage's words before any issue. A child's event draws its row's phase icon instead.
+const NOW_ICONS = { operation: '🔧', watching: '🔭', ended: STATE_ICONS.done } as const
+const { STAGE, LANE_STAGE } = run_event_setup
+const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
+	[STAGE.STARTING]: '🚀',
+	[STAGE.PLANNING]: '📝',
+	[STAGE.HANDING_OFF]: '🤝',
+	[STAGE.JUDGING]: '🤔',
+	[STAGE.SESSION]: '💭',
+	[STAGE.NO_CHILD]: '🚫',
+	[LANE_STAGE.OPENING]: '🚪',
+	[LANE_STAGE.INSTALLING]: '📥',
+	[LANE_STAGE.DISPATCHING]: '📤',
+}
 
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red
 // in the system's dark-mode values. A palette's `green` draws blue and its `red` orange in a VSCode
@@ -300,9 +320,11 @@ const run_board_labels = {
 	KIND_WORDS,
 	NOTES_ICON,
 	NOTE_ICONS,
+	NOW_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	SPINNER_INTERVAL_MS,
+	STAGE_ICONS,
 	STATE_ICONS,
 	WAITS_ICON,
 	WORDS,
