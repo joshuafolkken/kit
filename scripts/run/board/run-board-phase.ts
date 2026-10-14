@@ -149,6 +149,7 @@ function replayed(track: ReadonlyArray<Phase>, attempt: ReadonlyArray<Phase>): A
 const run_board_phase = {
 	LAUNCHED_PHASE,
 	PHASES,
+	SHIP_PHASES,
 	attempt_of,
 	history_after,
 	phase_of,
