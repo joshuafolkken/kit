@@ -1,4 +1,5 @@
 import { git_next_issues } from '#scripts/issue/git-next-issues'
+import { issue_watch } from '#scripts/issue/issue-watch'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_hold } from '#scripts/run/hold/run-hold'
@@ -67,11 +68,24 @@ async function clear_review_target(should_merge: boolean): Promise<void> {
 	}
 }
 
-// The two review records are one step of the tail: both are cleared by a merged run and neither is
-// worth reporting on its own.
+// The issue watch ends with the run it watched: a record left behind would make the next run's hook
+// poll an issue that is no longer its own.
+async function clear_issue_watch(should_merge: boolean): Promise<void> {
+	if (!should_merge) return
+
+	try {
+		await issue_watch.clear_here()
+	} catch {
+		/* the next `josh run:entry` replaces the record */
+	}
+}
+
+// The review records and the issue watch are one step of the tail: all are cleared by a merged run
+// and none is worth reporting on its own.
 async function clear_review_records(should_merge: boolean): Promise<void> {
 	clear_round_one_snapshot(should_merge)
 	await clear_review_target(should_merge)
+	await clear_issue_watch(should_merge)
 }
 
 // The working-tree hold a typed entry point claims before it starts is released here, on the one seam every `fullrun` — and every child of an `epicrun` or a `queue` —

@@ -43,7 +43,7 @@ describe('git_pr_checks.wait_for_pr_success — observer', () => {
 			observed.push(snapshot)
 		}
 
-		const result = await git_pr_checks.wait_for_pr_success(BRANCH, 1, observe)
+		const result = await git_pr_checks.wait_for_pr_success(BRANCH, 1, undefined, observe)
 
 		expect(observed).toStrictEqual([result])
 	})

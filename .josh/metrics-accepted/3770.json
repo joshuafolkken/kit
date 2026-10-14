@@ -1,7 +1,7 @@
 {
-	"reason": "pr-checks event text and board row rendering for followup checks/CodeRabbit state; the event's issue number goes through issue_cite.plain (+1 import line)",
+	"reason": "pr-checks event text and board row rendering for followup checks/CodeRabbit state; the event's issue number goes through issue_cite.plain (+1 import line); merging main's before_poll with this branch's observe puts both on wait_for_pr_success (+1 line)",
 	"date": "2026-10-14",
 	"growth": {
-		"scripts.code_lines": 234
+		"scripts.code_lines": 235
 	}
 }

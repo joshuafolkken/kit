@@ -128,6 +128,9 @@ interface WaitForPrSuccessOptions {
 	max_attempts: number
 	required_stable_reads: number
 	evaluator?: PrStateEvaluator
+	// Asked before every poll; a throw ends the wait with that error. `josh followup` stops here on a
+	// person's unread issue update (`issue-watch-gate.ts`).
+	before_poll?: (() => Promise<void>) | undefined
 }
 
 function parse_repo_name_from_package(package_json_content: string): string {
@@ -272,6 +275,8 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 
 	for (let attempt = 0; attempt < options.max_attempts; attempt += 1) {
 		console.info(`Checking PR status… (${String(attempt + 1)}/${String(options.max_attempts)})`)
+		// eslint-disable-next-line no-await-in-loop -- polling: the check belongs to this poll, not to all of them at once
+		await options.before_poll?.()
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		carried = await attempt_pr_success_poll({
 			options,
@@ -333,6 +338,7 @@ function observed_fetcher(observe: SnapshotObserver | undefined): PrStateFetcher
 async function wait_for_pr_success_default(
 	branch_name: string,
 	required_stable_reads: number = DEFAULT_STABLE_READS,
+	before_poll?: () => Promise<void>,
 	observe?: SnapshotObserver,
 ): Promise<PrStateSnapshot> {
 	return await wait_for_pr_success({
@@ -341,6 +347,7 @@ async function wait_for_pr_success_default(
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: CHECK_MAX_ATTEMPTS,
 		required_stable_reads,
+		before_poll,
 	})
 }
 

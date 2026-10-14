@@ -19,6 +19,7 @@ const ISSUE_NUMBER = '1039'
 const COMMENTS_PATH = `${CURRENT_REPO_ISSUES}/${ISSUE_NUMBER}/comments`
 const COMMENT_LISTING = '[{"body":"a plan comment"}]'
 const READ_FAILED = 'API rate limit exceeded'
+const WATCH_TIMEOUT_MS = 5000
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -36,7 +37,17 @@ describe('issue_list_comments', () => {
 		expect(mocked_api.mock.calls[0]?.[0]).toStrictEqual({
 			path: `${COMMENTS_PATH}?per_page=100`,
 			should_paginate: true,
+			timeout_ms: undefined,
 		})
+	})
+
+	// joshuafolkken/kit#3773: the issue watch runs inside a hook, so its read carries a short timeout.
+	it('passes a timeout through to the read', async () => {
+		mocked_api.mockResolvedValueOnce(COMMENT_LISTING)
+
+		await git_gh_issue_read.issue_list_comments(ISSUE_NUMBER, WATCH_TIMEOUT_MS)
+
+		expect(mocked_api.mock.calls[0]?.[0]).toMatchObject({ timeout_ms: WATCH_TIMEOUT_MS })
 	})
 
 	// `undefined` rather than `'[]'`: the caller has to tell "no announcement is there" from "nobody

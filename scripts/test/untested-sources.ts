@@ -109,7 +109,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/release/publish-tag-cli.ts',
 	'scripts/repo/required-checks-report.ts',
 	'scripts/report/report-lint-cli.ts',
-	'scripts/review/review-attest-cli.ts',
 	'scripts/review/review-brief-cli.ts',
 	'scripts/review/review-checkout.ts',
 	'scripts/rules/bash-triggers.ts',

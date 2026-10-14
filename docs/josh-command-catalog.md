@@ -1015,6 +1015,16 @@ Claude Code hook: refuse a read once the unedited-read threshold is reached agai
 
 ---
 
+### `josh issue:ack`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Record that the run read a person's update to its issue, printing the update it acknowledges
+
+---
+
 ### `josh issue:backlinks`
 
 > **Audience:** automation · **Side effects:** network
