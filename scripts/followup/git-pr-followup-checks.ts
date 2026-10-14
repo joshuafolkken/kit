@@ -7,6 +7,7 @@ import {
 } from '#scripts/gh/git-pr-checks'
 import { is_coderabbit_check } from '#scripts/gh/git-pr-checks-eval'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { json_value } from '#scripts/lib/json-value'
 
 // The check wait and the notes read off its snapshot — split out of `git-pr-followup.ts` when it
@@ -102,7 +103,11 @@ async function run_checks(input: {
 	const is_watch_confirmed = !input.is_skip_watch && (await watch_before_polling(input.branch_name))
 	const stable_reads = is_watch_confirmed ? WATCH_CONFIRMED_STABLE_READS : DEFAULT_STABLE_READS
 
-	return await git_pr_checks.wait_for_pr_success(input.branch_name, stable_reads)
+	return await git_pr_checks.wait_for_pr_success(
+		input.branch_name,
+		stable_reads,
+		issue_watch_gate.assert_read_here,
+	)
 }
 
 // Temporary: record every CodeRabbit check that was not passing when the merge gate

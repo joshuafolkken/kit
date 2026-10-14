@@ -21,6 +21,7 @@ const PID = 4242
 const CUT_TARGET = path.join(DIRECTORY, 'cut.json')
 const LOCK_ERROR = 'index.lock exists'
 const EMPTY_CUT: Partial<RunCut> = {}
+const NOT_RUNNING = { kind: 'not-running' }
 
 const LANE: LaneInfo = {
 	issue: ISSUE,
@@ -140,10 +141,19 @@ describe('lane_restart.restart — refusals', () => {
 		is_child_running.mockReturnValue(false)
 		const outcome = await lane_restart.restart(ISSUE)
 
-		expect(outcome).toStrictEqual({ kind: 'not-running' })
+		expect(outcome).toStrictEqual(NOT_RUNNING)
 		expect(claim_marker).not.toHaveBeenCalled()
 		expect(dispatch_child).not.toHaveBeenCalled()
 		expect(lane_restart.describe(outcome, ISSUE)).toContain('run:merge')
+	})
+
+	it('re-dispatches nothing when the child ended on its own during the claim', async () => {
+		reap_child.mockReturnValue([])
+		const outcome = await lane_restart.restart(ISSUE)
+
+		expect(outcome).toStrictEqual(NOT_RUNNING)
+		expect(push_work).not.toHaveBeenCalled()
+		expect(dispatch_child).not.toHaveBeenCalled()
 	})
 })
 

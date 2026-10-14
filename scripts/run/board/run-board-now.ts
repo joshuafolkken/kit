@@ -1,6 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_board_labels } from './run-board-labels'
+import type { LaneEvent } from './run-board-lane-event'
 import { run_board_operation, type Operation } from './run-board-operation'
 import type { SessionOperations } from './run-board-operation-read'
 import type { RunActivity } from './run-board-status'
@@ -149,8 +150,16 @@ function child_said(issue: number, words: string): string {
 	return `${issue_cite.plain(issue)}${OPERATION_SEPARATOR}${words}`
 }
 
+// What the running children's newest activity is read from: each session's newest operation and each
+// child's newest event, kept to the children named.
+interface ChildSources {
+	operations?: SessionOperations | undefined
+	lane_events?: ReadonlyMap<number, LaneEvent> | undefined
+	children?: ReadonlySet<number> | undefined
+}
+
 // The running children's newest operations, each named by its issue.
-function operation_lines(read: NowRead): Array<TimedLine> {
+function operation_lines(read: ChildSources): Array<TimedLine> {
 	const lanes = read.operations?.lanes.filter((lane) => read.children?.has(lane.issue)) ?? []
 
 	return lanes.map(({ issue, operation }) => ({
@@ -162,8 +171,8 @@ function operation_lines(read: NowRead): Array<TimedLine> {
 }
 
 // The running children's newest events, each in its row's phase icon and its own words.
-function event_lines(read: NowRead): Array<TimedLine> {
-	const events = [...(read.activity.lane_events ?? [])]
+function event_lines(read: ChildSources): Array<TimedLine> {
+	const events = [...(read.lane_events ?? [])]
 
 	return events
 		.filter(([issue]) => read.children?.has(issue))
@@ -178,10 +187,18 @@ function newest_first(left: TimedLine, right: TimedLine): number {
 	return (right.since_ms ?? 0) - (left.since_ms ?? 0)
 }
 
-// The newest of the running children's operations and events — an operation where the two are as new.
-// `undefined` where neither could be read, and the line counts the children instead.
+// The newest of the children's operations and events — an operation where the two are as new.
+// `undefined` where neither could be read. A row reads its own child's the same way
+// (joshuafolkken/kit#3769), so the header and the row never disagree on what is newest.
+function newest_of(sources: ChildSources): TimedLine | undefined {
+	return [...operation_lines(sources), ...event_lines(sources)].toSorted(newest_first).at(0)
+}
+
+// The running children's newest, or `undefined`, and the line counts the children instead.
 function child_line(read: NowRead): TimedLine | undefined {
-	return [...operation_lines(read), ...event_lines(read)].toSorted(newest_first).at(0)
+	const { operations, children, activity } = read
+
+	return newest_of({ operations, children, lane_events: activity.lane_events })
 }
 
 function quiet_line(read: NowRead): TimedLine | undefined {
@@ -211,7 +228,7 @@ function line_of(read: NowRead): NowLine | undefined {
 	return { ...rest, age_ms: since_ms === undefined ? undefined : until_ms - since_ms }
 }
 
-const run_board_now = { line_of }
+const run_board_now = { line_of, newest_of }
 
 export { run_board_now }
-export type { NowLine, NowRead }
+export type { ChildSources, NowLine, NowRead, TimedLine }

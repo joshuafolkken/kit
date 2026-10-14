@@ -7,7 +7,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
 import type { LaneUsages } from './run-board-usage'
 
-// joshuafolkken/kit#3554: the column between a row's time and its track — a running row's usage, a
+// joshuafolkken/kit#3554: the column between a row's time and its tail — a running row's usage, a
 // finished row's finish time, blanks on any other — one width on every row.
 
 const { GAUGE_SHADES, painted } = run_board_labels

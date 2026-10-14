@@ -19,6 +19,11 @@ vi.mock('#scripts/run/run-parent-cut-hook', () => ({
 	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
 }))
 
+// The issue watch polls GitHub; its composition is pinned in `pretool-guard-issue-watch.test.ts`.
+vi.mock('#scripts/issue/issue-watch-hook', () => ({
+	issue_watch_hook: { watch_reason: vi.fn().mockResolvedValue(undefined) },
+}))
+
 vi.mock('#scripts/lane/lane-phase', () => ({
 	lane_phase: { mark_implement: vi.fn().mockResolvedValue(undefined) },
 }))

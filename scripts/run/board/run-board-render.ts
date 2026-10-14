@@ -17,13 +17,12 @@ import {
 	type WaveEntry,
 } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
-import type { Phase } from './run-board-phase'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
+import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_title } from './run-board-render-title'
 import type { ItemState } from './run-board-status'
-import { run_board_track } from './run-board-track'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
 // terminal. The header says where the run is; the sections below it follow the plan's order; the
@@ -32,8 +31,9 @@ import { run_board_track } from './run-board-track'
 // what differs between rows. Every word is English whatever the session language: one set of words
 // reads the same on every board.
 
-const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, PHASE_ICONS, STATE_ICONS, WAITS_ICON, WORDS } =
+const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, NOW_ICONS, PHASE_ICONS, STATE_ICONS } =
 	run_board_labels
+const { WAITS_ICON, WORDS } = run_board_labels
 const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
@@ -103,45 +103,25 @@ function time_of(row: BoardRow, now_ms: number): string | undefined {
 	return elapsed === undefined ? undefined : elapsed_of(elapsed)
 }
 
-// The phases a row's track draws — every one the child passed while running, kept once it settles.
-function drawn_phases(row: BoardRow): ReadonlyArray<Phase> {
-	return row.status?.track ?? []
-}
-
-// A row's phases as its track, drawn last: it grows with every round, so the
-// columns before it stay where they are whatever its length. A settled row's ends on its state icon.
-function track_text(row: BoardRow): string | undefined {
-	const phases = drawn_phases(row)
-
-	return phases.length === 0 ? undefined : run_board_track.track_of(phases, row.state)
-}
-
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 	if (row.waits.length === 0) return undefined
 
 	return `${WAITS_ICON} ${row.waits.map((reference) => header.link(reference)).join(', ')}`
 }
 
-// The title is padded to the title column where a time or the usage column follows it, so the times
-// form one column; a row with no time draws blanks in its place before the usage column.
-function timed_parts(
-	row: BoardRow,
-	frame: RowFrame,
-	is_slotted: boolean,
-): Array<string | undefined> {
-	const time = time_of(row, frame.header.now_ms)
-
+// The title padded to the title column and the time to the time column — blanks where a row has none —
+// so the times form one column, and what follows them starts in one column on every row.
+function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
+	const time = time_of(row, frame.header.now_ms) ?? ''
 	const title = title_of(row_title(row, frame.header), frame.title_limit)
 
-	if (time === undefined && !is_slotted) return [title]
-
-	return [title.padEnd(TITLE_LIMIT), (time ?? '').padStart(frame.time_width)]
+	return [title.padEnd(frame.title_limit), time.padStart(frame.time_width)]
 }
 
-// A running row leads with the icon of the phase it is in now — the rightmost
-// icon of its track — and with 🔄 while its track draws none yet.
+// A running row leads with the icon of the phase it is in now — the last its track reached — and
+// with 🔄 while it has reached none yet.
 function state_icon(row: BoardRow): string {
-	const current = row.state === 'running' ? drawn_phases(row).at(-1) : undefined
+	const current = row.state === 'running' ? row.status?.track?.at(-1) : undefined
 
 	return current === undefined ? STATE_ICONS[row.state] : PHASE_ICONS[current]
 }
@@ -154,13 +134,14 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
-// A row's usage column where the frame draws one, padded to one width on every row so every track
-// starts in one column. A plan row the run has not touched has no time, usage or track to align, so it
-// draws none and what it waits on stays beside its title.
+// A row's usage column where the frame draws one, padded to one width on every row so every tail
+// starts in one column. A plan row the run has not touched draws blanks in its place, so what it waits
+// on starts in the tail's column.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	const { usage, slot_width } = frame
 
-	if (usage === undefined || slot_width === 0 || row.status === undefined) return undefined
+	if (usage === undefined || slot_width === 0) return undefined
+	if (row.status === undefined) return ' '.repeat(slot_width)
 
 	return cell_of(slot_of(row, usage, frame.header.now_ms), slot_width)
 }
@@ -178,21 +159,21 @@ function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 	return title === '' ? lead : `${lead} ${title}`
 }
 
-// A row up to its usage column — the columns that stay where they are whatever the track's length.
+// A row up to its usage column — the columns that stay where they are on every row.
 function head_text(row: BoardRow, frame: RowFrame): string {
-	const cell = cell_text(row, frame)
-	const [title = '', ...time] = timed_parts(row, frame, cell !== undefined)
+	const [title = '', time] = timed_parts(row, frame)
 
-	return joined([lead_of(row, frame.header, title), ...time, cell])
+	return joined([lead_of(row, frame.header, title), time, cell_text(row, frame)])
 }
 
-// Every row carries its state's icon, a waiting one ⏳ too; a row with nothing
-// after its padded columns ends where its text does.
+// Every row carries its state's icon, a waiting one ⏳ too; a running row ends on its tail
+// (`run-board-render-tail.ts`), and a row with nothing after its padded columns ends where its text does.
 function row_text(row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
+	const tail = run_board_render_tail.tail_of(row, header)
 	const notes = [waits_of(row, header), reason_text(row, header.now_ms)]
 
-	return joined([head_text(row, frame), track_text(row), ...notes]).trimEnd()
+	return joined([head_text(row, frame), ...tail, ...notes]).trimEnd()
 }
 
 // The stage each state's row gives way in when the pane is short.
@@ -287,8 +268,8 @@ function time_width(header: BoardHeader): number {
 }
 
 // Whether every row's usage column still fits one terminal line — measured as the deepest, an epic's
-// child — where a frame is kept within a terminal. The track after it is left out: it grows without
-// bound, so one long history would otherwise take the usage column off every row.
+// child — where a frame is kept within a terminal. The tail and the notes after it are left out: a
+// row's reason makes room for itself, so one long reason would otherwise take the column off every row.
 function is_usage_fitting(
 	rows: ReadonlyArray<BoardRow>,
 	frame: RowFrame,
@@ -360,6 +341,15 @@ function resume_lines(resume: string | undefined): Array<string> {
 	return ['', `${STATE_ICONS.human} ${WORDS.resume}${GAP}claude --resume ${resume}`]
 }
 
+// The activity kinds the legend names: the header's third line's, and 🔧 where a row's tail draws it.
+function activity_named(header: BoardHeader, rows: ReadonlyArray<BoardRow>): Array<string> {
+	const now = run_board_header.now_legend(header)
+	const is_drawn = rows.some((row) => run_board_render_tail.is_operation_drawn(row, header))
+	const operation = is_drawn ? [`${NOW_ICONS.operation} ${WORDS.operation}`] : []
+
+	return [...(now === undefined ? [] : [now]), ...operation]
+}
+
 // No legend is drawn before a plan is read: there are no rows whose symbols it would name.
 function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
 	const { layout } = header
@@ -368,9 +358,9 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 
 	const rows = run_board_layout.rows_of(layout)
 	const drawn = new Set(rows.map((row) => state_icon(row)))
-	const now = run_board_header.now_legend(header)
+	const named = activity_named(header, rows)
 
-	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes, now)]
+	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes, named)]
 }
 
 // A live frame is kept within its terminal; any other is drawn whole.

@@ -15,7 +15,7 @@ const { FILED_KIND_ICONS, KIND_WORDS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAI
 	run_board_labels
 const GAP = '  '
 
-// Every phase a run passes through, in the track's own order and whatever is on screen: a row's phase
+// Every phase a run passes through, in the order a run passes them and whatever is on screen: a row's phase
 // moves between redraws, so fixed lines keep each icon where the eye last found it — six to a line, so
 // the twelve fit a narrow pane.
 const PHASES_PER_LINE = 6
@@ -59,21 +59,21 @@ function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 
 // The phases on their lines and what the screen draws on one more, drawn only when it names something.
 // The header's gauges and marks read by their place, so the legend leaves them.
-// `drawn` is the icons the rows lead with; `now` the header's third line's kind, named where its own
-// words do not name it (joshuafolkken/kit#3767).
+// `drawn` is the icons the rows lead with; `named` the activity kinds the header's third line and the
+// rows' tails draw, each named once, where their own words do not name them (joshuafolkken/kit#3767,
+// joshuafolkken/kit#3769).
 function legend_of(
 	rows: ReadonlyArray<BoardRow>,
 	drawn: ReadonlySet<string>,
 	notes: ReadonlyArray<BoardNote>,
-	now?: string,
+	named: ReadonlyArray<string> = [],
 ): Array<string> {
 	const kinds = kinds_of(rows)
 	const kind_icons = kinds.map((kind) => FILED_KIND_ICONS[kind])
 	const notes_named = run_board_render_notes.notes_legend(notes, new Set([...drawn, ...kind_icons]))
 	const kind_named = kinds.map((kind) => `${FILED_KIND_ICONS[kind]} ${WORDS[KIND_WORDS[kind]]}`)
-	const now_named = now === undefined ? [] : [now]
 	const shown = [
-		...now_named,
+		...new Set(named),
 		...state_legend(drawn),
 		...kind_named,
 		...waits_legend(rows),

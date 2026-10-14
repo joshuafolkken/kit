@@ -415,6 +415,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "issue:ack": [
+      "<issue>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "issue:backlinks": [
       "<issue>",
       "automation",

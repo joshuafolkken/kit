@@ -37,6 +37,10 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	},
 }))
 
+vi.mock('#scripts/issue/issue-watch-gate', () => ({
+	issue_watch_gate: { assert_read_here: vi.fn() },
+}))
+
 vi.mock('#scripts/gh/git-pr-checks', () => ({
 	git_pr_checks: { wait_for_pr_success: vi.fn() },
 	DEFAULT_STABLE_READS: 2,

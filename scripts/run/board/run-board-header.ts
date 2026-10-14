@@ -9,6 +9,7 @@ import type { SessionOperations } from './run-board-operation-read'
 import { run_board_render_slot } from './run-board-render-slot'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
+import type { UsualTimes } from './run-board-usual'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
 // and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
@@ -61,6 +62,8 @@ interface BoardHeader {
 	machine: MachineGauges | undefined
 	// Each running lane's CPU and memory, `undefined` where none could be read.
 	usages?: LaneUsages | undefined
+	// How long each phase usually takes; a running row's phase time is colored against it.
+	usual?: UsualTimes | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
@@ -143,6 +146,8 @@ function repo_part(header: BoardHeader, mark: RunMark): string {
 	return `${BLANK.repeat(indent)}${name}`
 }
 
+// A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
+// (`run-board-render-tail.ts`).
 function aged(part: string, age_ms: number): string {
 	if (age_ms > ALARM_MS) return styleText('red', part)
 
@@ -364,7 +369,7 @@ function now_legend(header: BoardHeader): string | undefined {
 	return now?.legend === undefined ? undefined : `${now.icon} ${now.legend}`
 }
 
-const run_board_header = { counts_of, header_lines, is_plan_read, now_legend }
+const run_board_header = { aged, counts_of, header_lines, is_plan_read, now_legend }
 
 export { run_board_header }
 export type { BoardCounts, BoardForm, BoardHeader }

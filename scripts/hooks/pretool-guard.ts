@@ -1,5 +1,6 @@
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_refusal } from '#scripts/delegation/investigation-guard'
+import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_phase } from '#scripts/lane/lane-phase'
 import { json_value } from '#scripts/lib/json-value'
@@ -104,8 +105,9 @@ async function mark_phase(outcome: GuardOutcome): Promise<void> {
 // surfaced first.
 async function async_reason(raw_payload: string): Promise<string | undefined> {
 	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload)
+	const cut = watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload))
 
-	return watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload))
+	return cut ?? (await issue_watch_hook.watch_reason())
 }
 
 async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {

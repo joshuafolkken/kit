@@ -104,6 +104,14 @@ async function relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 	return { kind: 'restarted', dispatch, stash: saved.stash }
 }
 
+// A child that ended on its own during the claim (say, right after merging its PR) is a finished child
+// for `run:merge` to collect — relaunching it would re-run a done issue inside the re-confirm window.
+async function stop_and_relaunch(lane: LaneInfo): Promise<RestartOutcome> {
+	if (lane_reap.reap_child(lane.issue).length === 0) return { kind: NOT_RUNNING_KIND }
+
+	return await relaunch(lane)
+}
+
 /** Stop the running child of `#<N>`'s lane and re-dispatch the issue there in a fresh session. */
 async function restart(issue: string): Promise<RestartOutcome> {
 	issue_number_shape.require_issue_number(issue)
@@ -114,9 +122,8 @@ async function restart(issue: string): Promise<RestartOutcome> {
 	const claim = await lane_dispatch.claim_marker(issue)
 
 	if (!claim.is_applied) return { kind: UNCLAIMED_KIND, reason: claim.reason }
-	lane_reap.reap_child(issue)
 
-	return await relaunch(lane)
+	return await stop_and_relaunch(lane)
 }
 
 function stash_sentence(stash: string | undefined): string {

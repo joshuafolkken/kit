@@ -149,5 +149,6 @@ describe('re-dispatching a restarted child in a fresh session', () => {
 		const outcome = await lane_dispatch.dispatch_child(RELEASED_CHILD, 'restart')
 
 		expect(lane_dispatch.describe(outcome, RELEASED_CHILD)).toContain('Started fresh')
+		expect(apply_label).not.toHaveBeenCalled()
 	})
 })

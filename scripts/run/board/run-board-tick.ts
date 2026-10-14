@@ -134,6 +134,22 @@ interface Redraw {
 	now_ms: number
 }
 
+// What the header reads off the local read.
+type LocalHeader = Pick<
+	BoardHeader,
+	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual'
+>
+
+function local_header(local: LocalRead): LocalHeader {
+	return {
+		started_ms: local.started_ms,
+		ended_ms: local.ended_ms,
+		activity: activity_here(local),
+		operations: local.operations,
+		usual: local.usual,
+	}
+}
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
@@ -142,10 +158,7 @@ function header_of(
 ): BoardHeader {
 	return {
 		now_ms: redraw.now_ms,
-		started_ms: local.started_ms,
-		ended_ms: local.ended_ms,
-		activity: activity_here(local),
-		operations: local.operations,
+		...local_header(local),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
