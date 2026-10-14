@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { git_spawn_sync, type GitSyncOptions } from '#scripts/git/git-spawn-sync'
@@ -36,7 +35,7 @@ function git_read(args: ReadonlyArray<string>, root: string): string | undefined
 // the identity git can detect all count (#3754).
 //
 // **Only an answer from git counts as a missing identity.** A git that could not be started or never
-// answered is a different failure, which the first step reports as what it is.
+// answered is a different failure, which the first step that runs git reports as what it is.
 function is_identity_refused(variable: string, options: GitSyncOptions): boolean {
 	const { exit_code } = git_spawn_sync.run(['var', variable], options)
 
@@ -45,9 +44,11 @@ function is_identity_refused(variable: string, options: GitSyncOptions): boolean
 
 // A plan that creates the repository asks from where it will be: an identity given per directory
 // (`includeIf "gitdir:…"`) is matched against the git directory, which no `cwd` supplies before
-// `git init` has run.
+// `git init` has run. The path stays relative to `root` so git resolves it as its commit will — by
+// the path the user reached the directory through as well as the physical one, which is what a
+// `gitdir:` under a symlinked parent is written against.
 function lacks_git_identity(root: string, is_new_repository: boolean): boolean {
-	const location = is_new_repository ? { GIT_DIR: path.join(root, GIT_DIRECTORY) } : {}
+	const location = is_new_repository ? { GIT_DIR: GIT_DIRECTORY } : {}
 	const options = { cwd: root, env: { ...root_environment(), ...location } }
 
 	return IDENTITY_VARIABLES.some((variable) => is_identity_refused(variable, options))

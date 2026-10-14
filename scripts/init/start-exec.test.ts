@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { COMMAND_TIMEOUT_MS, GIT_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -98,7 +97,8 @@ describe('the git author identity josh start asks for (#3754)', () => {
 	it('asks from where the repository will be, so a per-directory identity is seen before git init', () => {
 		start_exec.lacks_git_identity(ROOT, true)
 
-		expect(last_environment()).toMatchObject({ GIT_DIR: path.join(ROOT, '.git') })
+		expect(last_options()).toMatchObject({ cwd: ROOT })
+		expect(last_environment()).toMatchObject({ GIT_DIR: '.git' })
 	})
 })
 
