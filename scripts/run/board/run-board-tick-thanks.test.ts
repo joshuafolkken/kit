@@ -16,7 +16,7 @@ const THANKS: Thanks = [
 	{ name: 'fish', url: undefined },
 	{ name: 'KittenLab', url: 'https://x.com/KittenLab' },
 ]
-const NAMES = '  fish  KittenLab'
+const NAMES = '  🙏 fish  KittenLab'
 
 async function flush(): Promise<void> {
 	await new Promise((resolve) => {

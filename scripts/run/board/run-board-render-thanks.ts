@@ -2,13 +2,14 @@ import { run_board_fit } from './run-board-fit'
 import type { Link } from './run-board-link'
 import type { Thanks } from './run-board-thanks-csv'
 
-// The reviewers who helped kit, drawn above the legend as names alone — no label, no dimming. A name
+// The reviewers who helped kit, drawn above the legend as names led by one 🙏 — no label, no dimming. A name
 // with a page opens it on Cmd+click through the same OSC 8 link the issue numbers use; one without
 // is plain text. The names run on one line and wrap onto the next where the pane is too narrow,
 // always between two names; a frame no terminal bounds draws them on one line.
 
 const GAP = '  '
 const INDENT = '  '
+const MARK = '🙏 '
 
 function named(thanker: Thanks[number], link: Link): string {
 	return thanker.url === undefined ? thanker.name : link(thanker.name, thanker.url)
@@ -39,9 +40,9 @@ function wrapped(names: ReadonlyArray<string>, columns: number): Array<string> {
 function thanks_lines(thanks: Thanks, link: Link, columns: number | undefined): Array<string> {
 	if (thanks.length === 0) return []
 
-	const names = thanks.map((thanker) => named(thanker, link))
+	const [first = '', ...rest] = thanks.map((thanker) => named(thanker, link))
 
-	return ['', ...wrapped(names, columns ?? Infinity)]
+	return ['', ...wrapped([`${MARK}${first}`, ...rest], columns ?? Infinity)]
 }
 
 const run_board_render_thanks = { thanks_lines }
