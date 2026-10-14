@@ -384,9 +384,9 @@ Print the next opted-in standalone issue an unattended run may pick up outside a
 ```bash
 pnpm josh auto-ok:next
 pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
-# create the label once, where wanted:
-gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
 ```
+
+`josh start` creates the `auto-ok` label, and `josh sync` adds it to a repository that lacks it.
 
 - `--exclude <N>` — drop issues from the answer; comma-separated, repeatable.
 

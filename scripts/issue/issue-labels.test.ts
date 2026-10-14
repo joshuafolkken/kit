@@ -1,10 +1,13 @@
 import { CLASSIFICATION_LABELS } from '#scripts/ci/pr-classification'
 import { describe, expect, it } from 'vitest'
 import {
+	ALL_LABELS,
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
+	BUG_LABEL,
 	DEPTH_LABELS,
 	EPIC_LABEL,
+	EXEMPT_FROM_PROVISIONING,
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	has_label_name,
@@ -20,6 +23,7 @@ import {
 	RELEASE_LABEL,
 	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
+	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
@@ -96,8 +100,8 @@ describe('FILING_ROUTE_LABELS', () => {
 })
 
 describe('WORKFLOW_LABELS', () => {
-	// What josh start provisions: every label a run applies on its own, never one only a person may.
-	it('carries epic, in-progress, run:planned, run:solo, run:lane, priority:high, release, every route and depth label', () => {
+	// What josh start provisions: every label a run applies, and every one a person applies too.
+	it('carries the workflow, opt-in, parking, review and bug labels, then every route and depth label', () => {
 		expect(WORKFLOW_LABELS.map((label) => label.name)).toStrictEqual([
 			EPIC_LABEL,
 			IN_PROGRESS_LABEL,
@@ -106,16 +110,42 @@ describe('WORKFLOW_LABELS', () => {
 			RUN_LANE_LABEL,
 			PRIORITY_HIGH_LABEL,
 			RELEASE_LABEL,
+			AUTO_OK_LABEL,
+			NEEDS_DECISION_LABEL,
+			NEEDS_HUMAN_REVIEW_LABEL,
+			ALREADY_DONE_LABEL,
+			REVIEW_ROUND2_SKIPPED_LABEL,
+			BUG_LABEL,
 			...FILING_ROUTE_LABELS.map((label) => label.name),
 			...DEPTH_LABELS.map((label) => label.name),
 		])
 	})
+})
 
-	it('leaves out the labels only a person applies', () => {
-		const names = WORKFLOW_LABELS.map((label) => label.name)
+describe('REPOSITORY_LABELS', () => {
+	// A managed label that is never provisioned cannot be applied in a repository `josh start` set
+	// up — the gap joshuafolkken/kit#3760 found for `auto-ok`.
+	it('provisions every managed label not exempted with a reason', () => {
+		const provisioned = new Set(REPOSITORY_LABELS.map((label) => label.name))
+		const missing = [...ALL_LABELS].filter(
+			(name) => !provisioned.has(name) && !EXEMPT_FROM_PROVISIONING.has(name),
+		)
 
-		expect(names).not.toContain(AUTO_OK_LABEL)
-		expect(names).not.toContain(NEEDS_HUMAN_REVIEW_LABEL)
+		expect(missing).toStrictEqual([])
+	})
+
+	it('exempts only managed labels, each with a reason', () => {
+		for (const [name, reason] of EXEMPT_FROM_PROVISIONING) {
+			expect(ALL_LABELS.has(name)).toBe(true)
+			expect(reason.length).toBeGreaterThan(0)
+		}
+	})
+
+	it('gives every provisioned label a six-digit hex color and a description', () => {
+		for (const label of REPOSITORY_LABELS) {
+			expect(label.color).toMatch(/^[0-9a-f]{6}$/u)
+			expect(label.description.length).toBeGreaterThan(0)
+		}
 	})
 })
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fresh_machine_spec } from './fresh-machine-spec'
 
@@ -20,6 +22,16 @@ describe('fresh_machine_spec.parse', () => {
 			commands: [COMMAND],
 			probes: [],
 		})
+	})
+
+	// joshuafolkken/kit#3760: the README's Quick start through its first `backlogrun`, run as written.
+	it('reads the backlogrun spec kit keeps, which starts Claude Code with the saved token', () => {
+		const file = path.join(import.meta.dirname, 'specs', 'kit-test-backlogrun.json')
+		const scenario = fresh_machine_spec.parse(readFileSync(file, 'utf8'))
+
+		expect(scenario.requires_claude).toBe(true)
+		expect(scenario.commands).toContain('pnpm exec josh start --yes --github')
+		expect(scenario.commands.at(-1)).toBe('pnpm josh backlogrun --stop')
 	})
 
 	it('keeps the files a toolkit places before its install command', () => {

@@ -157,6 +157,27 @@ A command reads three variables inside the container:
 | `PACKAGE_TARBALL` | The packed checkout's path under `/pack`; empty for `package_source: published` |
 | `PACKAGE_VERSION` | The published version; empty for `package_source: tarball`                      |
 
+## The README's first backlogrun
+
+`scripts/fresh-machine/specs/kit-test-backlogrun.json` runs the README's Quick start and its "Your
+first backlogrun" section as written, on the packed checkout: `josh start` on a project with no Git
+repository, a check that the labels a run needs exist, Claude Code from its installer, one Issue
+filed with `auto-ok` and `run:lane`, and `pnpm josh backlogrun`. It passes when
+`backlogrun: started` is printed and the run's first event, `starting session`, is on the stream; it
+then lets the agent work for two minutes and stops the run with `pnpm josh backlogrun --stop`. Its
+probes print the end of the agent's log and how many of its commands asked for an approval.
+
+```bash
+pnpm josh fresh:run --spec scripts/fresh-machine/specs/kit-test-backlogrun.json
+```
+
+- **The agent signs in with the saved token** (`"requires_claude": true`): run `pnpm josh auth:setup`
+  once first (see "Claude Code"). Without a saved token the command refuses before Docker starts.
+- **Starting the agent spends tokens** of the account the credential belongs to, for the two
+  minutes the scenario lets it run.
+- **It leaves a repository** like the other GitHub scenarios — `kit-test-backlogrun-<n>`, with the
+  setup Issue and pull request and the Issue the run picked up.
+
 ## The log
 
 `<log-dir>/<scenario>-<n>.log`, by default under `.claude/tmp/fresh-machine`, which kit's distributed

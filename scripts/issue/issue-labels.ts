@@ -70,6 +70,9 @@ const ALREADY_DONE_LABEL = 'already-done'
 // it; **`auto-ok` never rides on it** — `issue-auto-ok.ts` refuses the default for it on every path,
 // since a release is Tier C — and only a person opts it into unattended execution.
 const RELEASE_LABEL = 'release'
+// Applied to an Issue whose second review round was skipped, so the condition stays auditable
+// (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not").
+const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 
 // The four labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
@@ -205,8 +208,11 @@ interface LabelDefinition {
 }
 
 // What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
-// applies with its intended color. The `epic` and `in-progress` metadata is
-// the one the workflow documents create them with; the labels only a person applies are left out.
+// applies with its intended color. The metadata is the one the workflow documents create each label
+// with. **The labels only a person applies are provisioned too**: a person cannot apply a label the
+// repository does not have, so leaving one out made the first `auto-ok` a manual creation step.
+// `bug` is GitHub's default label, kept because `issue:file` applies it to a bug fix and a
+// repository may have been created without the defaults.
 const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	{
 		name: EPIC_LABEL,
@@ -235,6 +241,32 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		color: 'fef2c0',
 		description: 'Tracks the next release; its blockers are the merged work it publishes',
 	},
+	{
+		name: AUTO_OK_LABEL,
+		color: '0e8a16',
+		description: 'Opted in to unattended execution outside an epic',
+	},
+	{
+		name: NEEDS_DECISION_LABEL,
+		color: 'd93f0b',
+		description: 'Parked: needs a decision before it can run',
+	},
+	{
+		name: NEEDS_HUMAN_REVIEW_LABEL,
+		color: 'd93f0b',
+		description: 'Implement and verify, but stop before committing so a person can look',
+	},
+	{
+		name: ALREADY_DONE_LABEL,
+		color: '6f42c1',
+		description: 'Verified already merged — a person closes it',
+	},
+	{
+		name: REVIEW_ROUND2_SKIPPED_LABEL,
+		color: 'c5def5',
+		description: 'Review round 2 was skipped under the condition in prompts/review.md',
+	},
+	{ name: BUG_LABEL, color: 'd73a4a', description: "Something isn't working" },
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
 ]
@@ -329,12 +361,6 @@ function depth_label_of(labels: ReadonlyArray<LabelReference> | undefined): stri
 // document operates on a label name that does not exist here — a stale or mistyped `labels[]=…`
 // otherwise fails silently at run time. One source, so a label added above joins the scan without a
 // second edit.
-// Applied to an Issue whose second review round was skipped, so the condition stays auditable
-// (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not"). Provisioned inline
-// by the run that applies it rather than through `FILING_ROUTE_LABELS`, but still a managed label the
-// documents operate on, so the label-reference scan has to know it.
-const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
-
 const ALL_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	BUG_LABEL,
@@ -363,6 +389,11 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	IGNORE_FOR_RELEASE_LABEL,
 ])
 
+// The managed labels `REPOSITORY_LABELS` deliberately does not provision, each with its reason. Every
+// other member of `ALL_LABELS` is provisioned — `issue-labels.test.ts` fails on one that is in
+// neither list, so a label added above cannot silently become one a repository lacks. Empty today.
+const EXEMPT_FROM_PROVISIONING: ReadonlyMap<string, string> = new Map<string, string>()
+
 export type { LabelDefinition, ReleaseClassification }
 export {
 	ALL_LABELS,
@@ -379,6 +410,7 @@ export {
 	DEPTH_LABELS,
 	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
+	EXEMPT_FROM_PROVISIONING,
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	has_label_name,
