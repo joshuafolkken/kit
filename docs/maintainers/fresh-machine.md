@@ -163,9 +163,16 @@ A command reads three variables inside the container:
 first backlogrun" section as written, on the packed checkout: `josh start` on a project with no Git
 repository, a check that the labels a run needs exist, Claude Code from its installer, one Issue
 filed with `auto-ok` and `run:lane`, and `pnpm josh backlogrun`. It passes when
-`backlogrun: started` is printed and the run's first event, `starting session`, is on the stream; it
-then lets the agent work for two minutes and stops the run with `pnpm josh backlogrun --stop`. Its
-probes print the end of the agent's log and how many of its commands asked for an approval.
+`backlogrun: started` is printed, the run's first event, `starting session`, is on the stream, and a
+`dispatching` event shows a lane opened within fifteen minutes; it then waits up to twenty minutes
+for the lane's child to open a pull request, prints `pnpm josh run:board --chat` and stops the run
+with `pnpm josh backlogrun --stop`. Its probes print the end of the parent's log and of the lane
+child's (`/tmp/josh-lane-dispatch-*.log`), how many commands in each asked for an approval, and the
+repository's pull requests.
+
+- **kit is installed from a copy of the tarball inside the project**, which the first commit
+  carries: pnpm records a `file:` tarball relative to the lockfile, so one left under `/pack`
+  resolves to another path from a lane a directory deeper, and the lane's install fails.
 
 ```bash
 pnpm josh fresh:run --spec scripts/fresh-machine/specs/kit-test-backlogrun.json
@@ -173,8 +180,8 @@ pnpm josh fresh:run --spec scripts/fresh-machine/specs/kit-test-backlogrun.json
 
 - **The agent signs in with the saved token** (`"requires_claude": true`): run `pnpm josh auth:setup`
   once first (see "Claude Code"). Without a saved token the command refuses before Docker starts.
-- **Starting the agent spends tokens** of the account the credential belongs to, for the two
-  minutes the scenario lets it run.
+- **Starting the agent spends tokens** of the account the credential belongs to, for up to
+  thirty-five minutes — the parent and the lane's child both run until the pull request opens.
 - **It leaves a repository** like the other GitHub scenarios — `kit-test-backlogrun-<n>`, with the
   setup Issue and pull request and the Issue the run picked up.
 
