@@ -288,7 +288,7 @@ interface GhApiRequest {
 	// second argument for the reason recorded beside that constant. `0` is
 	// execa's own "no budget", kept for the one reader whose caller's writes depend on the answer
 	// (`gh-spawn.ts`).
-	timeout_ms?: number
+	timeout_ms?: number | undefined
 	// The checkout gh runs in, which is what `{owner}/{repo}` in `path` resolves against. Absent means
 	// the process's own directory.
 	cwd?: string

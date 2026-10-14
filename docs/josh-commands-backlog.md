@@ -17,6 +17,16 @@ pnpm josh issue:read 1715 1567 1605          # several numbers, read concurrentl
 
 Attribute each block by its `issue:` line, never by position. Output past the Bash cap is written as part files under it, and only their paths are printed — read every part with the Read tool in one turn. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any number went unanswered. Any non-numeric token refuses the whole call.
 
+### `josh issue:ack`
+
+Record that the run has read a person's update to its issue, printing the update it acknowledges.
+
+```bash
+pnpm josh issue:ack 3773
+```
+
+`josh run:entry` records the issue as the run's baseline per checkout, so a lane child and a `fullrun` in your own checkout behave alike. The PreToolUse hook polls at most every three minutes with a conditional request and shows a person's body edit or new comment once; josh's own `<!-- josh:run -->`-marked comments and bot comments do not count. `issue:ack` prints what it takes in and makes that read the new baseline. Not detected: comment edits, and the seconds between `josh followup`'s last check and the merge.
+
 ### `josh issue:state`
 
 Print each issue's state, labels and whether a run must stop on it, in the spelling the workflow documents compare against.
@@ -545,7 +555,7 @@ pnpm josh review:attest --check   # run by the run, before it acts on the review
 - `<nonce>` — attest the checkout the review read.
 - `--check` — verify before acting; `josh followup` asks again before merging.
 
-Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded and nothing attested it — a refusal, not a pass), `mismatch` (a different root, branch or HEAD), `not-required` (no brief recorded in this checkout inside a run's lifetime). All three fields are checked; scoped to a checkout that briefed a review, expiring after eight hours.
+Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded and nothing attested it — a refusal, not a pass), `mismatch` (a different root, branch or HEAD), `not-required` (no brief recorded in this checkout inside a run's lifetime). All three fields are checked; scoped to a checkout that briefed a review, expiring after eight hours. An `ok` is still refused on a person's issue update unread or taken in after the brief ([`josh issue:ack`](#josh-issueack)).
 
 ### `josh delegate`
 

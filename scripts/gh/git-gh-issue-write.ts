@@ -1,3 +1,4 @@
+import { issue_watch_diff } from '#scripts/issue/issue-watch-diff'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
@@ -64,10 +65,13 @@ async function issue_edit_body(issue_number: string, body: string): Promise<stri
 	})
 }
 
+// **Every comment josh posts carries `RUN_MARKER`**, an HTML comment GitHub does not render. A run
+// posts under the person's own `gh` login, so the marker is the only thing that tells the issue watch
+// (`issue-watch-diff.ts`) a run's comment from a person's update.
 async function issue_comment(issue_number: string, body: string): Promise<string> {
 	return await git_gh_exec.exec_gh_api({
 		path: `${git_gh_api_path.issue_api_path(issue_number)}${COMMENTS_SEGMENT}`,
-		body: JSON.stringify({ body }),
+		body: JSON.stringify({ body: `${body}\n\n${issue_watch_diff.RUN_MARKER}` }),
 		jq_filter: HTML_URL_FILTER,
 	})
 }

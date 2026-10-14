@@ -11,6 +11,13 @@ const ISSUES_WITH_REPO = '<issue...> [--repo <owner/repo>]'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const ISSUE_COMMANDS: Record<string, CommandEntry> = {
+	'issue:ack': {
+		script: 'scripts/issue/issue-ack-cli.ts',
+		description:
+			"Record that the run read a person's update to its issue, printing the update it acknowledges",
+		category: 'AI tools',
+		reference: ['<issue>', 'automation', ['network']],
+	},
 	'issue:read': {
 		script: 'scripts/issue/issue-read-cli.ts',
 		description: "Print each issue's title, body and every comment on it, in one call",

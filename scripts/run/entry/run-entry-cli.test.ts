@@ -14,6 +14,11 @@ const read_issue_mock = vi.hoisted(() => vi.fn())
 const confirm_mock = vi.hoisted(() => vi.fn())
 const mark_mock = vi.hoisted(() => vi.fn())
 const emit_plan_mock = vi.hoisted(() => vi.fn())
+const record_baseline_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/issue/issue-watch', () => ({
+	issue_watch: { record_baseline_here: record_baseline_mock },
+}))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
@@ -82,6 +87,7 @@ function reset_resume_mocks(): void {
 	read_issue_mock.mockReset().mockResolvedValue(issue_read('OPEN'))
 	mark_mock.mockReset().mockResolvedValue(true)
 	emit_plan_mock.mockReset().mockResolvedValue(undefined)
+	record_baseline_mock.mockReset().mockResolvedValue(true)
 }
 
 beforeEach(() => {
@@ -116,6 +122,8 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		])
 		expect(gather_mock).toHaveBeenCalledTimes(1)
 		expect(mark_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
+		// joshuafolkken/kit#3773: the issue the report prints is the issue watch's baseline.
+		expect(record_baseline_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
 		expect(emit_plan_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([
 			stage_line('fresh', 'fullrun', 'plan'),
