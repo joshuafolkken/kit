@@ -150,7 +150,7 @@ worked form.
 
 **An `in-progress` issue occupies a lane rather than the whole repository.** The occupancy is counted
 from that repository's own `in-progress` listing — never from anything the session remembers — and
-what is left of `JOSH_LANE_LIMIT` (**default 6**) is what gets offered. At zero the answer is `wait`
+what is left of `JOSH_LANE_LIMIT` (**default 4**) is what gets offered. At zero the answer is `wait`
 and the holders are named on standard error. A parked child releases its lane; one stopped by
 `needs-human-review` goes on holding one, because its uncommitted work is still in that checkout.
 
