@@ -12,7 +12,7 @@ const BASE: ContainerRun = {
 	pack_directory: '/stage/pack',
 	tarball: undefined,
 	package_version: '1.1387.0',
-	requires_github: true,
+	secret_names: ['GH_TOKEN'],
 }
 
 function variables(container: ContainerRun): Array<string> {
@@ -44,8 +44,14 @@ describe('fresh_machine_docker.run_arguments', () => {
 		expect(fresh_machine_docker.run_arguments(BASE).join(' ')).not.toContain(TOKEN)
 	})
 
-	it('names no token variable for a scenario without GitHub', () => {
-		expect(variables({ ...BASE, requires_github: false })).not.toContain('GH_TOKEN')
+	it('names no token variable for a scenario without secrets', () => {
+		expect(variables({ ...BASE, secret_names: [] })).not.toContain('GH_TOKEN')
+	})
+
+	it('names every secret of the scenario, each by name only', () => {
+		const container = { ...BASE, secret_names: ['GH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'] }
+
+		expect(variables(container).slice(-2)).toStrictEqual(['GH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'])
 	})
 
 	it('names the run and the published version', () => {

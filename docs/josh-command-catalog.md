@@ -285,6 +285,16 @@ Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR
 
 ---
 
+### `josh auth:setup` · `josh as`
+
+> **Audience:** maintainer · **Side effects:** network, processes
+
+`[--check]`
+
+Save the long-lived Claude Code token `claude setup-token` prints in the macOS keychain, for josh fresh:run
+
+---
+
 ### `josh dogfood:commit`
 
 > **Audience:** automation · **Side effects:** files, git · **kit only**

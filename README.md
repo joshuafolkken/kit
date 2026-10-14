@@ -45,6 +45,21 @@ pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 
 Next: [tutorial](./docs/tutorial.md#without-github-one-change-checked-locally)
 
+## Claude Code in a fresh-machine run
+
+A [`josh fresh:run`](./docs/maintainers/fresh-machine.md) scenario that runs Claude Code needs a sign-in, saved once:
+
+1. In a terminal at the kit repository, run:
+
+   ```bash
+   pnpm josh auth:setup
+   ```
+
+2. A browser opens: sign in with your Claude account and press "Authorize".
+3. Done when the terminal prints `saved: CLAUDE_CODE_OAUTH_TOKEN (macOS keychain)`. There is no token to copy or write into a file.
+4. To check, run `pnpm josh auth:setup --check`: it prints `ok` and the day it was saved.
+5. When the token expires, Claude Code in the container fails to sign in — start again from step 1.
+
 ## Docs
 
 [How-to](./docs/how-to.md) · [All docs](./docs/overview.md)

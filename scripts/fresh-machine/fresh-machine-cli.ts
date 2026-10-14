@@ -3,11 +3,13 @@ import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { claude_token } from '#scripts/auth/claude-token'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { fresh_machine_docker } from './fresh-machine-docker'
 import { fresh_machine_log } from './fresh-machine-log'
 import { fresh_machine_patterns } from './fresh-machine-patterns'
 import { fresh_machine_run, type RunRequest } from './fresh-machine-run'
@@ -23,8 +25,9 @@ const USAGE =
 // The scratch directory kit's distributed `.gitignore` already ignores, so a log is never committed
 // from kit or from a consumer toolkit.
 const DEFAULT_LOG_DIRECTORY = '.claude/tmp/fresh-machine'
-const NO_TOKEN =
+const NO_GITHUB_TOKEN =
 	'This scenario uses GitHub and `gh auth token` printed no token. Run `gh auth login` on this machine first.'
+const NO_CLAUDE_TOKEN = `This scenario uses Claude Code and neither the macOS keychain nor ${claude_token.VARIABLE} holds a token. ${claude_token.SETUP_HINT}`
 // The patterns install kit by name, while the tarball and the published version are those of the
 // checkout the command is run from — in a toolkit's checkout the two would be different packages.
 const NOT_A_KIT_CHECKOUT = `The named patterns install ${KIT_PACKAGE_NAME} and run from its checkout only. Write this package's scenario as a JSON file and pass it with --spec.`
@@ -83,7 +86,11 @@ function repositories_of(scenario: Scenario): Array<string> {
 	return names.split('\n').filter((name) => name !== '')
 }
 
-function request_of(scenario: Scenario, values: CliValues, token: string | undefined): RunRequest {
+function request_of(
+	scenario: Scenario,
+	values: CliValues,
+	secrets: Record<string, string>,
+): RunRequest {
 	const log_directory = path.resolve(PROJECT_ROOT, values['log-dir'] ?? DEFAULT_LOG_DIRECTORY)
 
 	mkdirSync(log_directory, { recursive: true })
@@ -98,7 +105,7 @@ function request_of(scenario: Scenario, values: CliValues, token: string | undef
 		run_name,
 		log_path: path.join(log_directory, fresh_machine_log.file_name(run_name)),
 		package_version: values['package-version'],
-		token,
+		secrets,
 		is_rebuild: values.rebuild === true,
 	}
 }
@@ -109,12 +116,55 @@ function refuse(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
+// One secret a scenario asks for: where its value is read on the host, and what to say when there is
+// none. Every one is read before Docker starts, so a missing token stops the run with nothing built.
+interface Secret {
+	variable: string
+	is_required: (scenario: Scenario) => boolean
+	read: () => string | undefined
+	missing: string
+}
+
+const SECRETS: ReadonlyArray<Secret> = [
+	{
+		variable: fresh_machine_docker.TOKEN_VARIABLE,
+		is_required: (scenario) => scenario.requires_github,
+		read: gh_cli_token.get,
+		missing: NO_GITHUB_TOKEN,
+	},
+	{
+		variable: claude_token.VARIABLE,
+		is_required: (scenario) => scenario.requires_claude,
+		read: claude_token.read,
+		missing: NO_CLAUDE_TOKEN,
+	},
+]
+
+// The values found, by variable name, and the message of the first secret that has none.
+interface Secrets {
+	values: Record<string, string>
+	missing: string | undefined
+}
+
+function secrets_of(scenario: Scenario): Secrets {
+	const required = SECRETS.filter((secret) => secret.is_required(scenario))
+	const read = required.map((secret) => ({ secret, value: secret.read() }))
+	const found = read.flatMap(({ secret, value }) =>
+		value === undefined ? [] : [[secret.variable, value] as const],
+	)
+
+	return {
+		values: Object.fromEntries(found),
+		missing: read.find(({ value }) => value === undefined)?.secret.missing,
+	}
+}
+
 async function run_scenario(scenario: Scenario, values: CliValues): Promise<number> {
-	const token = scenario.requires_github ? gh_cli_token.get() : undefined
+	const secrets = secrets_of(scenario)
 
-	if (token === undefined && scenario.requires_github) return refuse(NO_TOKEN)
+	if (secrets.missing !== undefined) return refuse(secrets.missing)
 
-	const request = request_of(scenario, values, token)
+	const request = request_of(scenario, values, secrets.values)
 	const exit_code = await fresh_machine_run.run(request)
 
 	console.info(`Log: ${request.log_path}`)

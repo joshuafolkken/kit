@@ -4,6 +4,7 @@ import { fresh_machine_log } from './fresh-machine-log'
 const SCENARIO = 'kit-test-html-start'
 const FIRST_NAME = 'kit-test-html-start-1'
 const TOKEN = 'gho_exampleTokenValue'
+const CLAUDE_TOKEN = 'sk-ant-oat01-exampleTokenValue'
 const PLAIN_LINE = 'pnpm josh gate'
 
 function next_name(logs: Array<string>, repositories: Array<string> = []): string {
@@ -56,12 +57,18 @@ describe('fresh_machine_log.redact', () => {
 	it('replaces every occurrence of the token', () => {
 		const line = `https://x-access-token:${TOKEN}@github.com/ ${TOKEN}`
 
-		expect(fresh_machine_log.redact(line, TOKEN)).toBe(
+		expect(fresh_machine_log.redact(line, [TOKEN])).toBe(
 			'https://x-access-token:[REDACTED]@github.com/ [REDACTED]',
 		)
 	})
 
-	it.each([undefined, ''])('leaves the line as it is when the token is %s', (secret) => {
-		expect(fresh_machine_log.redact(PLAIN_LINE, secret)).toBe(PLAIN_LINE)
+	it('replaces each of several secrets', () => {
+		const line = `${TOKEN} ${CLAUDE_TOKEN}`
+
+		expect(fresh_machine_log.redact(line, [TOKEN, CLAUDE_TOKEN])).toBe('[REDACTED] [REDACTED]')
+	})
+
+	it.each([[[]], [['']]])('leaves the line as it is when the secrets are %j', (secrets) => {
+		expect(fresh_machine_log.redact(PLAIN_LINE, secrets)).toBe(PLAIN_LINE)
 	})
 })

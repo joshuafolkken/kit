@@ -40,6 +40,13 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 			['files', 'network', 'processes'],
 		],
 	},
+	'auth:setup': {
+		script: 'scripts/auth/auth-setup-cli.ts',
+		description:
+			'Save the long-lived Claude Code token `claude setup-token` prints in the macOS keychain, for josh fresh:run',
+		category: 'Project',
+		reference: ['[--check]', 'maintainer', ['network', 'processes']],
+	},
 	init: {
 		script: 'scripts/init/init.ts',
 		description: 'Initialize config in a new project',
