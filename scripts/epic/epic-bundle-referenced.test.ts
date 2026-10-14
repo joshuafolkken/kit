@@ -105,7 +105,15 @@ describe('epic_bundle_referenced.collect_referenced', () => {
 		)
 
 		expect(found.issues).toEqual([
-			{ number: 891, repo: REPO, body: '', blocked_by: [], is_epic: false, epic: 893 },
+			{
+				number: 891,
+				repo: REPO,
+				body: '',
+				blocked_by: [],
+				is_epic: false,
+				is_release: false,
+				epic: 893,
+			},
 		])
 		expect(found.unreadable).toEqual([])
 	})

@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { has_label_name, RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { epic_audit_logic } from './epic-audit'
 import { epic_graph } from './epic-graph'
 import type { DependencyLink } from './epic-parse'
@@ -31,6 +32,11 @@ interface BacklogIssue {
 	// its parent, so without this every child would find its own epic as a candidate and be told to
 	// bundle with it.
 	is_epic?: boolean
+	// Whether this issue is the release issue. `issue:file --release` records every change awaiting
+	// publication as its blocker, so the relation is mechanical and says nothing about the work
+	// belonging together — read as a signal, it proposed one epic for the release and every
+	// unrelated change waiting on it.
+	is_release?: boolean
 	// Repository-qualified, not bare numbers. Issue numbers are unique per
 	// repository, so a blocker read as `40` alone matched any candidate numbered 40 — including one in
 	// a different repository entirely. That produced a bundle nobody's data supported, and, through
@@ -79,6 +85,36 @@ function has_recorded_dependency(subject: BacklogIssue, other: BacklogIssue): bo
 	return names_as_blocker(subject, other) || names_as_blocker(other, subject)
 }
 
+// The epic view an issue is placed against: which epic tracks each issue, and the epics themselves.
+interface MembershipContext {
+	epics: ReadonlyMap<number, number>
+	epic_numbers: ReadonlySet<number>
+}
+
+type Membership = Pick<BacklogIssue, 'epic' | 'is_epic' | 'is_release'>
+
+// The fields that decide whether and where an issue takes part in a bundle. Single-sourced so the
+// listing read and the per-reference read cannot disagree about which issue is an epic or the
+// release one.
+function membership_of(
+	number: number,
+	labels: ReadonlyArray<string>,
+	context: MembershipContext,
+): Membership {
+	const epic = context.epics.get(number)
+
+	return {
+		is_epic: context.epic_numbers.has(number),
+		is_release: has_label_name(labels, RELEASE_LABEL),
+		...(epic !== undefined && { epic }),
+	}
+}
+
+// Neither an epic nor the release issue takes part in a bundle, on either side.
+function is_excluded(issue: BacklogIssue): boolean {
+	return issue.is_epic === true || issue.is_release === true
+}
+
 // A strong signal, and only a strong signal.
 //
 // Similar titles are deliberately not one. "Related" expands without limit, and a threshold is what
@@ -87,9 +123,7 @@ function has_recorded_dependency(subject: BacklogIssue, other: BacklogIssue): bo
 function is_strong_signal(subject: BacklogIssue, other: BacklogIssue): boolean {
 	// Neither side. Asked about an epic, the one-sided check found every one of its children through
 	// their own `parent: #N` line and proposed bundling a container with its contents.
-	if (subject.number === other.number || subject.is_epic === true || other.is_epic === true) {
-		return false
-	}
+	if (subject.number === other.number || is_excluded(subject) || is_excluded(other)) return false
 
 	return has_mutual_reference(subject, other) || has_recorded_dependency(subject, other)
 }
@@ -295,10 +329,11 @@ const epic_bundle = {
 	already_tracked_reason,
 	has_recorded_dependency,
 	is_strong_signal,
+	membership_of,
 	decide_bundle,
 	bundle_dependency_links,
 	bundle_children,
 }
 
-export type { BacklogIssue, BundleAction, BundleDecision }
+export type { BacklogIssue, BundleAction, BundleDecision, MembershipContext }
 export { epic_bundle }

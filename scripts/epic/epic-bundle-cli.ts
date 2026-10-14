@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_label_schema } from '#scripts/git/git-schemas'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -14,6 +15,7 @@ import {
 	type BacklogIssue,
 	type BundleAction,
 	type BundleDecision,
+	type MembershipContext,
 } from './epic-bundle'
 import { epic_bundle_evidence } from './epic-bundle-evidence'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
@@ -53,6 +55,7 @@ const UNKNOWN_REPO_MESSAGE =
 // describing one it does.
 const backlog_schema = epic_schema.extend({
 	title: z.string().nullable(),
+	labels: z.array(issue_label_schema).default([]),
 	blocked_by_count: z.number().nullish(),
 })
 
@@ -61,10 +64,6 @@ type BacklogRow = z.infer<typeof backlog_schema>
 // The epic index is `epic-index.ts`'s, shared with the `auto-ok` pickup: both commands ask which epic tracks an issue, and a second copy of the
 // task-list read would answer differently the first time that shape moved.
 const { build_epic_index } = epic_index
-
-function to_epic_field(epic: number | undefined): { epic?: number } {
-	return epic === undefined ? {} : { epic }
-}
 
 // Undefined when the read failed, which the caller reports — as opposed to an issue that genuinely
 // declares no relations, which is an empty array.
@@ -139,18 +138,19 @@ interface FetchedBacklog {
 // One listing row as the bundler reads it. Split from the fetch so that function stays a list of
 // requests rather than a request list plus a row mapping.
 function to_backlog_issue(
-	row: { number: number; title?: string | null; body?: string | null },
-	context: { repo: string; epics: Map<number, number>; epic_numbers: ReadonlySet<number> },
+	row: Pick<BacklogRow, 'number' | 'title' | 'body' | 'labels'>,
+	context: MembershipContext & { repo: string },
 	blocked_by: ReadonlyArray<IssueReference>,
 ): BacklogIssue {
+	const labels = row.labels.map((label) => label.name)
+
 	return {
 		number: row.number,
 		repo: context.repo,
 		title: row.title ?? '',
 		body: row.body ?? '',
 		blocked_by,
-		is_epic: context.epic_numbers.has(row.number),
-		...to_epic_field(context.epics.get(row.number)),
+		...epic_bundle.membership_of(row.number, labels, context),
 	}
 }
 

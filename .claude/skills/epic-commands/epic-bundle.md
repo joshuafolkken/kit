@@ -9,6 +9,11 @@ settle. `Nothing to bundle.` needs neither.
 already recorded between them. **A similar title never counts on its own** — "related" expands
 without limit, and the threshold is what keeps an unrelated issue out.
 
+**The release issue is neither a candidate nor a subject**, like an epic. `issue:file --release` records
+every change awaiting publication as its blocker, so that relation is mechanical, not a sign of shared
+work. Counted as a signal, it would put the release and an unrelated change in one epic. A
+`blocked-by` or a prose reference between any other two issues still counts.
+
 **The search is not limited to the open backlog.** Every issue number the subject's body names is read
 on its own, whatever its state. A **closed** reference counts only when an open epic already tracks
 it, since the answer worth recovering is `add_to_epic`; an epic created over a closed issue has

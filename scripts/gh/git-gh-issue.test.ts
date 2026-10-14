@@ -85,6 +85,20 @@ describe('issue_list_open_bodies', () => {
 			}),
 		)
 	})
+
+	// joshuafolkken/kit#3810: the backlog schema defaults a missing `labels` to none, so a field list
+	// without it would read every row as not the release issue and nothing downstream would fail.
+	it('asks for the labels that mark the release issue', async () => {
+		mocked_open.mockResolvedValue(CAPPED)
+
+		await git_gh_issue.issue_list_open_bodies(LIMIT)
+
+		expect(mocked_open).toHaveBeenCalledWith(
+			expect.objectContaining({
+				json_fields: expect.stringMatching(/(?:^|,)labels(?:,|$)/u) as string,
+			}),
+		)
+	})
 })
 
 describe('the issue listings', () => {
