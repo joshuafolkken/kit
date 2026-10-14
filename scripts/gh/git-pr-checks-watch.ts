@@ -4,9 +4,11 @@ import {
 	default_fetch_pr_state,
 	DEFAULT_STABLE_READS,
 	is_pr_checks_timeout,
+	observed_fetcher,
 	SECONDS_TO_MS,
 	wait_for_pr_success,
 	type PrStateEvaluator,
+	type SnapshotObserver,
 } from './git-pr-checks'
 import { is_coderabbit_check, is_required_check, type PrEvaluation } from './git-pr-checks-eval'
 import {
@@ -125,10 +127,12 @@ const CHECKS_SETTLED_EVALUATOR: PrStateEvaluator = {
 	should_read_review_decision: should_never_read_review_decision,
 }
 
-async function watch_until_settled(branch_name: string): Promise<void> {
+// `observe` sees the watch's polls too, so a red wait's checks line is replaced while the new CI is
+// still pending rather than only after the watch (joshuafolkken/kit#3770).
+async function watch_until_settled(branch_name: string, observe?: SnapshotObserver): Promise<void> {
 	await wait_for_pr_success({
 		branch_name,
-		fetcher: default_fetch_pr_state,
+		fetcher: observed_fetcher(observe),
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: compute_max_attempts(
 			PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
@@ -154,9 +158,12 @@ async function fail_when_no_checks(branch_name: string): Promise<void> {
 // Everything else — a failing check, an unreadable read, a branch with no checks — is rethrown, which
 // is what the caller already handles: `git-pr-followup.ts` swallows it and falls through to its own
 // poll.
-async function pr_checks_watch(branch_name: string): Promise<WatchResult> {
+async function pr_checks_watch(
+	branch_name: string,
+	observe?: SnapshotObserver,
+): Promise<WatchResult> {
 	try {
-		await watch_until_settled(branch_name)
+		await watch_until_settled(branch_name, observe)
 
 		return { timed_out: false }
 	} catch (error) {

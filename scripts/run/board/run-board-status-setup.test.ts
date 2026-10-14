@@ -72,6 +72,7 @@ describe('run_board_status.activity_of during setup', () => {
 			idle_ms: Date.parse(AT),
 			is_stopped: false,
 			lane_events: new Map(),
+			pr_checks: new Map(),
 		})
 	})
 

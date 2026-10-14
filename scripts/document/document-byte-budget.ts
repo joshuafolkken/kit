@@ -74,7 +74,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	{ path: 'docs/josh-commands-automation.md', bytes: 53_248 },
-	{ path: 'docs/josh-commands-run.md', bytes: 73_728 },
+	{ path: 'docs/josh-commands-run.md', bytes: 77_824 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 61_440 },
 	{ path: 'docs/josh-commands.md', bytes: 53_248 },
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },

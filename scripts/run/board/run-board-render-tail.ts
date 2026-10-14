@@ -1,10 +1,12 @@
 import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels, type TextColor } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_now, type TimedLine } from './run-board-now'
 import type { Phase } from './run-board-phase'
+import { run_board_render_checks } from './run-board-render-checks'
 
 // The end of a running row (joshuafolkken/kit#3769): how long the child has stood at the phase its row
 // leads with, then the kind and the age of the newest thing it did. Both are `H:MM:SS`, one width on
@@ -78,20 +80,37 @@ function activity_part(row: BoardRow, header: BoardHeader): string | undefined {
 	return run_board_header.aged(`${newest.icon} ${span_of(age)}`, age)
 }
 
+// A row in followup with its pull request's checks on the stream (joshuafolkken/kit#3770), whose end
+// draws them in place of its newest activity.
+function checks_of(row: BoardRow, header: BoardHeader): PrChecks | undefined {
+	if (row.state !== 'running' || current_of(row)?.phase !== 'followup') return undefined
+
+	return header.activity.pr_checks?.get(row.number)
+}
+
 // A running row's end, nothing for any other.
 function tail_of(row: BoardRow, header: BoardHeader): Array<string | undefined> {
 	if (row.state !== 'running') return []
 
-	return [phase_part(row, header), activity_part(row, header)]
+	const checks = checks_of(row, header)
+	const last =
+		checks === undefined ? activity_part(row, header) : run_board_render_checks.checks_part(checks)
+
+	return [phase_part(row, header), last]
+}
+
+// Whether a row draws its pull request's checks, so the legend names them.
+function is_checks_drawn(row: BoardRow, header: BoardHeader): boolean {
+	return checks_of(row, header) !== undefined
 }
 
 // Whether a row draws the operation's icon, so the legend names it.
 function is_operation_drawn(row: BoardRow, header: BoardHeader): boolean {
-	if (row.state !== 'running') return false
+	if (row.state !== 'running' || is_checks_drawn(row, header)) return false
 
 	return newest_of(row, header)?.icon === NOW_ICONS.operation
 }
 
-const run_board_render_tail = { is_operation_drawn, tail_of }
+const run_board_render_tail = { is_checks_drawn, is_operation_drawn, tail_of }
 
 export { run_board_render_tail }

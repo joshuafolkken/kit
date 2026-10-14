@@ -1,0 +1,7 @@
+{
+	"reason": "Feature lines for the run board PR checks/CodeRabbit row, plus exposing josh_harness.CHILD_ENVIRONMENT so the #3712 scenario stops inheriting a git hook's GIT_DIR and failing every pre-push",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 236
+	}
+}

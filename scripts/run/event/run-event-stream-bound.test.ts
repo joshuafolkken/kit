@@ -120,3 +120,37 @@ describe('run_event_stream.append — the bound keeps a shipped track', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#3770: only a child's newest `pr-checks` is drawn, so a superseded one rolls off
+// before any position and the newest is kept.
+describe('run_event_stream.append — the bound drops a superseded pr-checks line', () => {
+	const position = `${ISSUE} launched`
+	const older = `${ISSUE} PR 3765 pass 1 pending 2 fail 0 coderabbit running`
+	const newest = `${ISSUE} PR 3765 pass 3 pending 0 fail 0 coderabbit done`
+
+	function checks_stream(filler_count: number): ReadonlyArray<string> {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.CHILD_LAUNCH, position, AT)
+		run_event_stream.append(target, KIND.PR_CHECKS, older, AT)
+		run_event_stream.append(target, KIND.PR_CHECKS, newest, AT)
+		append_many(target, KIND.LANE_PHASE, filler_count)
+
+		return texts_of(target)
+	}
+
+	it('drops an older pr-checks line before an older position', () => {
+		const texts = checks_stream(run_event_stream.EVENT_CAP - 2)
+
+		expect(texts.slice(0, 2)).toStrictEqual([position, newest])
+		expect(texts).toHaveLength(run_event_stream.EVENT_CAP)
+	})
+
+	it('keeps the newest pr-checks line past a position once the stream rolls again', () => {
+		const texts = checks_stream(run_event_stream.EVENT_CAP - 1)
+
+		expect(texts[0]).toBe(newest)
+		expect(texts).not.toContain(older)
+		expect(texts).toHaveLength(run_event_stream.EVENT_CAP)
+	})
+})

@@ -17,6 +17,7 @@ import {
 	type WaveEntry,
 } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
+import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
@@ -341,13 +342,16 @@ function resume_lines(resume: string | undefined): Array<string> {
 	return ['', `${STATE_ICONS.human} ${WORDS.resume}${GAP}claude --resume ${resume}`]
 }
 
-// The activity kinds the legend names: the header's third line's, and 🔧 where a row's tail draws it.
+// The activity kinds the legend names: the header's third line's, 🔧 where a row's tail draws it, and
+// a followup row's checks (joshuafolkken/kit#3770).
 function activity_named(header: BoardHeader, rows: ReadonlyArray<BoardRow>): Array<string> {
 	const now = run_board_header.now_legend(header)
 	const is_drawn = rows.some((row) => run_board_render_tail.is_operation_drawn(row, header))
 	const operation = is_drawn ? [`${NOW_ICONS.operation} ${WORDS.operation}`] : []
+	const is_checks = rows.some((row) => run_board_render_tail.is_checks_drawn(row, header))
+	const checks = is_checks ? run_board_render_checks.LEGEND : []
 
-	return [...(now === undefined ? [] : [now]), ...operation]
+	return [...(now === undefined ? [] : [now]), ...operation, ...checks]
 }
 
 // No legend is drawn before a plan is read: there are no rows whose symbols it would name.

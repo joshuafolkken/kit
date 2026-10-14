@@ -60,6 +60,15 @@ async function run_with_watch(is_skip_watch = false): Promise<unknown> {
 	return await run_checks({ branch_name: BRANCH_NAME, is_skip_watch })
 }
 
+function expect_polled_with(stable_reads: number, observe?: unknown): void {
+	expect(wait).toHaveBeenCalledWith(
+		BRANCH_NAME,
+		stable_reads,
+		issue_watch_gate.assert_read_here,
+		observe,
+	)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	watch.mockReset()
@@ -74,17 +83,24 @@ describe('run_checks — the watch never decides the outcome', () => {
 		watch_fails()
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
-		expect(wait).toHaveBeenCalledWith(
-			BRANCH_NAME,
-			DEFAULT_STABLE_READS,
-			issue_watch_gate.assert_read_here,
-		)
+		expect_polled_with(DEFAULT_STABLE_READS)
 	})
 
 	it('still reaches the evaluator when the watch succeeds', async () => {
 		watch.mockResolvedValue({ timed_out: false })
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
+	})
+
+	// joshuafolkken/kit#3770: the run's checks line must follow the watch's polls as well as the wait's.
+	it('hands the same observer to the watch and to the poll', async () => {
+		watch.mockResolvedValue({ timed_out: false })
+		const observe = vi.fn()
+
+		await run_checks({ branch_name: BRANCH_NAME, is_skip_watch: false, observe })
+
+		expect(watch).toHaveBeenCalledWith(BRANCH_NAME, observe)
+		expect_polled_with(WATCH_CONFIRMED_STABLE_READS, observe)
 	})
 
 	// `--skip-watch` must not start one, and must still poll.
@@ -103,11 +119,7 @@ describe('run_checks — a confirmed watch shortens the wait', () => {
 
 		await run_with_watch()
 
-		expect(wait).toHaveBeenCalledWith(
-			BRANCH_NAME,
-			WATCH_CONFIRMED_STABLE_READS,
-			issue_watch_gate.assert_read_here,
-		)
+		expect_polled_with(WATCH_CONFIRMED_STABLE_READS)
 	})
 
 	// A timed-out watch gave up with checks still pending, so it never spanned the pending→settled
@@ -117,22 +129,14 @@ describe('run_checks — a confirmed watch shortens the wait', () => {
 
 		await run_with_watch()
 
-		expect(wait).toHaveBeenCalledWith(
-			BRANCH_NAME,
-			DEFAULT_STABLE_READS,
-			issue_watch_gate.assert_read_here,
-		)
+		expect_polled_with(DEFAULT_STABLE_READS)
 	})
 
 	// No watch ran, so nothing confirmed completion and the full stable-read window stands.
 	it('keeps the default stable reads when the watch is skipped', async () => {
 		await run_with_watch(true)
 
-		expect(wait).toHaveBeenCalledWith(
-			BRANCH_NAME,
-			DEFAULT_STABLE_READS,
-			issue_watch_gate.assert_read_here,
-		)
+		expect_polled_with(DEFAULT_STABLE_READS)
 	})
 
 	// The single poll still evaluates the full merge gate, so a check that turned red after the watch
@@ -186,11 +190,7 @@ describe('run_checks — a pull request with no checks still fails fast', () => 
 		watch_fails()
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
-		expect(wait).toHaveBeenCalledWith(
-			BRANCH_NAME,
-			DEFAULT_STABLE_READS,
-			issue_watch_gate.assert_read_here,
-		)
+		expect_polled_with(DEFAULT_STABLE_READS)
 	})
 
 	// The read refines the swallow; it is not a gate of its own, so a read that fails must not turn

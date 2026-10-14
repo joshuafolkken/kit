@@ -57,6 +57,7 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 			idle_ms: Date.parse(LAUNCHED_AT),
 			is_stopped: false,
 			lane_events: new Map(),
+			pr_checks: new Map(),
 		})
 	})
 
