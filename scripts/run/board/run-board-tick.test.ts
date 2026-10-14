@@ -232,11 +232,12 @@ describe('run_board_tick.tick spinner', () => {
 		clock.now_ms += REDRAW_MS
 		await tick(first, ports)
 
-		const titles = frames.map((frame) => stripVTControlCharacters(frame).split('\n', 1)[0])
+		// joshuafolkken/kit#3767: the header's spinner turns on its third line, the mark standing still.
+		const nows = frames.map((frame) => stripVTControlCharacters(frame).split('\n', 3)[2] ?? '')
 
-		expect(titles[0]).toMatch(new RegExp(`^${spinner_of(START)} backlogrun`, 'u'))
-		expect(titles[1]).toMatch(new RegExp(`^${spinner_of(START + REDRAW_MS)} backlogrun`, 'u'))
-		expect(titles[0]).not.toBe(titles[1])
+		expect(nows[0]).toMatch(new RegExp(`^ +${spinner_of(START)} `, 'u'))
+		expect(nows[1]).toMatch(new RegExp(`^ +${spinner_of(START + REDRAW_MS)} `, 'u'))
+		expect(nows[0]).not.toBe(nows[1])
 	})
 
 	// joshuafolkken/kit#3495: the frame keeps where it drew its spinners, for the turns between redraws.
@@ -246,13 +247,11 @@ describe('run_board_tick.tick spinner', () => {
 		const plain = await tick(FRESH_STATE, { ...ports, is_tty: false })
 		const turning = stripVTControlCharacters(frames[0] ?? '')
 			.split('\n')
-			.map((line, index) => (line.startsWith(spinner_of(START)) ? index + 1 : 0))
-			.filter((row) => row > 0)
+			.map((line, index): [number, number] => [index + 1, line.indexOf(spinner_of(START)) + 1])
+			.filter(([, column]) => column > 0)
 
 		expect(turning).toHaveLength(2)
-		expect(live.spots.map(({ row, column }) => [row, column])).toStrictEqual(
-			turning.map((row) => [row, 1]),
-		)
+		expect(live.spots.map(({ row, column }) => [row, column])).toStrictEqual(turning)
 		expect(plain.spots).toHaveLength(0)
 	})
 

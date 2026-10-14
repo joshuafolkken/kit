@@ -332,6 +332,7 @@ describe('run_board_status.activity_of', () => {
 			latest: { text: MERGE_3409, at_ms: Date.parse(T2) },
 			idle_ms: Date.parse(T2),
 			is_stopped: false,
+			lane_events: new Map(),
 		})
 	})
 

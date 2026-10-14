@@ -86,3 +86,14 @@ describe('run_board_render_legend.legend_of', () => {
 		}
 	})
 })
+
+// joshuafolkken/kit#3767: the header's third line's kind leads the line it shares with the states.
+describe('run_board_render_legend.legend_of with the third line’s kind', () => {
+	it('names the kind first where the line’s own words do not name it', () => {
+		const legend = run_board_render_legend
+			.legend_of([row(1)], new Set([STATE_ICONS.waiting]), [], '🔧 operation')
+			.map((line) => stripVTControlCharacters(line))
+
+		expect(legend.at(-1)).toBe('🔧 operation  ⏳ waiting')
+	})
+})

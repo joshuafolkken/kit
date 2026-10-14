@@ -368,8 +368,9 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 
 	const rows = run_board_layout.rows_of(layout)
 	const drawn = new Set(rows.map((row) => state_icon(row)))
+	const now = run_board_header.now_legend(header)
 
-	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes)]
+	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes, now)]
 }
 
 // A live frame is kept within its terminal; any other is drawn whole.

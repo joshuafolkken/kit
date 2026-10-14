@@ -6,6 +6,7 @@ import {
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_setup, type SetupRead } from './run-board-setup'
 
@@ -42,6 +43,8 @@ interface RunActivity extends Partial<SetupRead> {
 	// When the run last did anything of its own — its newest position or stage, whichever is newer. A
 	// stage that has ended still counts: what follows it is counted from its end, not from before it.
 	idle_ms?: number | undefined
+	// Each child's newest `lane-phase` or `ship-stage`, by issue (`run-board-lane-event.ts`).
+	lane_events?: ReadonlyMap<number, LaneEvent> | undefined
 	// The run's last position is a `stop` that names no child — the run itself ended.
 	is_stopped: boolean
 }
@@ -284,6 +287,7 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 		last_event_ms: last === undefined ? undefined : moment(last),
 		latest: latest_of(position ?? last),
 		idle_ms: idle_of(events),
+		lane_events: run_board_lane_event.newest_of(events),
 		is_stopped: is_ended || is_run_stop(position),
 	}
 }
