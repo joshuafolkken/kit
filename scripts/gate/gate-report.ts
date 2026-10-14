@@ -2,7 +2,7 @@ import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { status_icons } from '#scripts/lib/status-icons'
-import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
+import { NOT_USED_MARKER, NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
@@ -89,9 +89,18 @@ function has_checker_warning(result: GateStepResult): boolean {
 	)
 }
 
+// The record's counterpart to `is_skip_notice`, narrower for the reason `has_checker_warning` is
+// narrower than `has_warnings`: a skip of a tool the project does not use (`NOT_USED_MARKER`) left
+// nothing unverified, so only another skip line withholds the green record.
+function is_unverified_skip(result: GateStepResult): boolean {
+	return checker_lines(result).some(
+		(line) => line.includes(test_unit_guard.SKIP_MARKER) && !line.includes(NOT_USED_MARKER),
+	)
+}
+
 // **A check the verdict counts as skipped said nothing but that it checked nothing.** `is_skip_notice`
-// asks whether a check carries a skip notice, which is the right question for printing its body and for
-// withholding the green record; it is the wrong one for a count, twice over. A check can skip half of
+// asks whether a check carries a skip notice, which is the right question for printing its body; it is
+// the wrong one for a count, twice over. A check can skip half of
 // itself — a `basic` project's `lint` runs Prettier and skips eslint — and calling it skipped would
 // have the verdict say nothing ran on a gate that checked the formatting. And a check can run with
 // nothing of the project's to look at — `exports` in a consumer, `behavior` with no transcript — which
@@ -259,7 +268,7 @@ const gate_report = {
 	format_failure_actions,
 	has_checker_warning,
 	is_gate_step_failed,
-	is_skip_notice,
+	is_unverified_skip,
 	report_gate_steps,
 }
 
