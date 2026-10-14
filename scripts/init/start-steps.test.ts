@@ -40,6 +40,7 @@ const SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: true,
 	has_github: false,
+	has_workflow: false,
 }
 
 function result(exit_code: number, stdout = ''): ReturnType<typeof execaSync> {
@@ -190,6 +191,21 @@ describe('the steps josh start runs', () => {
 
 		expect(init_main).toHaveBeenCalledWith(['--profile', 'full'])
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+
+	// The mark reaches the setup as a variable, which a handed-off kit or `--init-command` inherits.
+	it('tells the setup it runs for the GitHub Issue workflow (#3796)', async () => {
+		vi.stubEnv('JOSH_WORKFLOW', undefined)
+		vi.mocked(init_main).mockImplementation(() => {
+			expect(process.env['JOSH_WORKFLOW']).toBe('github')
+
+			return true
+		})
+
+		await start_steps.run_steps(['initialize'], CONTEXT)
+
+		expect(init_main).toHaveBeenCalledOnce()
+		vi.unstubAllEnvs()
 	})
 
 	// The initialize step installs, so the commit after it carries the lockfile (#2766).

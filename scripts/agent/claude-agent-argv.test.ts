@@ -53,6 +53,25 @@ describe('Claude argv construction', () => {
 	})
 })
 
+// joshuafolkken/kit#3796: an untrusted lane worktree ignores the project's mode and allow list.
+describe('Claude permission mode', () => {
+	it.each([
+		[
+			'a new session',
+			claude_agent_argv.build(INVOCATION, agent_role_profile.DEFAULT_PROFILES.worker),
+		],
+		[
+			'a resumed session',
+			claude_agent_argv.build_resume(INVOCATION, agent_role_profile.DEFAULT_PROFILES.worker, 'id'),
+		],
+	])('passes the bypassPermissions mode on the command line for %s', (_label, argv) => {
+		const index = argv.args.indexOf('--permission-mode')
+
+		expect(index).toBeGreaterThan(-1)
+		expect(argv.args[index + 1]).toBe('bypassPermissions')
+	})
+})
+
 // **The resume build carries `--resume <session_id>`** (joshuafolkken/kit#2317), so an outage
 // re-dispatch continues the disconnected child's stored session rather than opening a new one.
 describe('Claude resume argv construction', () => {

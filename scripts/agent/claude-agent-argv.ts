@@ -8,7 +8,19 @@ import {
 } from './agent-role-profile'
 
 const AGENT_COMMAND = 'claude'
-const AGENT_FLAGS: ReadonlyArray<string> = ['-p', '--verbose', '--output-format', 'stream-json']
+// **The permission mode is passed, not left to the checkout's `.claude/settings.json`.** Claude Code
+// ignores a project's `defaultMode: bypassPermissions` (since v2.1.257) and its `permissions.allow` in
+// a workspace whose trust dialog was never accepted — every fresh clone and every new lane worktree — so
+// a headless child stopped on approvals nobody could give. The flag sets the mode that file declares;
+// its `deny` list stays in effect (#3796).
+const PERMISSION_FLAGS: ReadonlyArray<string> = ['--permission-mode', 'bypassPermissions']
+const AGENT_FLAGS: ReadonlyArray<string> = [
+	'-p',
+	'--verbose',
+	'--output-format',
+	'stream-json',
+	...PERMISSION_FLAGS,
+]
 const MODEL_FLAG = '--model'
 const EFFORT_FLAG = '--effort'
 // Resumes a stored session by id. An `outage` re-dispatch passes the

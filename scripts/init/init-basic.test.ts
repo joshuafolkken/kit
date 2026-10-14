@@ -10,6 +10,7 @@ const SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
+	has_workflow: false,
 }
 const VERSIONS = { kit: '1.0.0', prettier: '^3.0.0' }
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -45,5 +46,22 @@ describe('basic project manifest', () => {
 
 		expect(twice).toBe(once)
 		expect(once).toContain('"prettier"')
+	})
+})
+
+describe('the GitHub workflow mark in a basic manifest', () => {
+	it('is recorded only for a project josh start set up (#3796)', () => {
+		const initial = init_basic.initial_manifest()
+		const marked = init_basic.merge_basic_manifest(
+			initial,
+			{ ...SHAPE, has_workflow: true },
+			VERSIONS,
+		)
+		const unmarked = init_basic.merge_basic_manifest(initial, SHAPE, VERSIONS)
+
+		expect(JSON.parse(marked)).toMatchObject({ josh: { profile: 'basic', workflow: 'github' } })
+		expect(JSON.parse(unmarked)).toMatchObject({ josh: { profile: 'basic' } })
+		expect(unmarked).not.toContain('workflow')
+		expect(init_basic.merge_basic_manifest(marked, SHAPE, VERSIONS)).toBe(marked)
 	})
 })

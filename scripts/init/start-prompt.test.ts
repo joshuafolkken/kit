@@ -19,6 +19,7 @@ const SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
+	has_workflow: false,
 }
 const OPTIONS: StartOptions = {
 	profile: undefined,

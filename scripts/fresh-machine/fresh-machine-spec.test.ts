@@ -6,6 +6,7 @@ import { fresh_machine_spec } from './fresh-machine-spec'
 const COMMAND = 'pnpm exec josh-app init'
 const NAME = 'app-kit-test-html-init'
 const CONFIG_FILE = 'josh-app.config.json'
+const STOP_COMMAND = 'pnpm josh backlogrun --stop'
 
 function spec(overrides: Record<string, unknown>): string {
 	return JSON.stringify({ name: NAME, commands: [COMMAND], ...overrides })
@@ -31,7 +32,19 @@ describe('fresh_machine_spec.parse', () => {
 
 		expect(scenario.requires_claude).toBe(true)
 		expect(scenario.commands).toContain('pnpm exec josh start --yes --github')
-		expect(scenario.commands.at(-1)).toBe('pnpm josh backlogrun --stop')
+		expect(scenario.commands.at(-1)).toBe(STOP_COMMAND)
+	})
+
+	// joshuafolkken/kit#3796: a basic (non-Node) project reaches its first lane without approval prompts.
+	it('reads the basic backlogrun spec kit keeps, which checks the distributed settings', () => {
+		const file = path.join(import.meta.dirname, 'specs', 'kit-test-backlogrun-python.json')
+		const scenario = fresh_machine_spec.parse(readFileSync(file, 'utf8'))
+
+		expect(Object.keys(scenario.files)).toStrictEqual(['pyproject.toml', 'main.py'])
+		expect(scenario.commands).toContain(
+			'grep -q \'"workflow": "github"\' package.json && test -f .claude/settings.json',
+		)
+		expect(scenario.commands.at(-1)).toBe(STOP_COMMAND)
 	})
 
 	it('keeps the files a toolkit places before its install command', () => {

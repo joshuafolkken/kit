@@ -11,6 +11,7 @@ const SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
+	has_workflow: false,
 }
 const SELF_RUN_REFUSAL = 'Refusing to sync'
 const IDENTITY_REFUSAL = 'run git config'

@@ -141,6 +141,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
 | `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |
 | `JOSH_INIT_HANDED_OFF`     | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                     |
+| `JOSH_WORKFLOW`            | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                   |
 | `JOSH_UNIT_RUN_MARKED`     | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                        |
 | `JOSH_UNIT_GUARD_LOG`      | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                     |
 | `JOSH_PROJECT_TEST_SCRIPT` | `josh test:unit`               | A `basic` project's own `test` script is running, so a call back into the unit check from inside it skips instead of starting it again. |

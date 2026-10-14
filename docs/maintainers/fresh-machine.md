@@ -178,6 +178,12 @@ pnpm josh fresh:run --spec scripts/fresh-machine/specs/kit-test-backlogrun.json
 - **It leaves a repository** like the other GitHub scenarios — `kit-test-backlogrun-<n>`, with the
   setup Issue and pull request and the Issue the run picked up.
 
+`scripts/fresh-machine/specs/kit-test-backlogrun-python.json` runs the same path on a project with no
+Node.js code — a `pyproject.toml` and a `main.py` — so `josh start` sets it up on the `basic`
+profile. It also checks that `josh start` recorded `josh.workflow` and placed `.claude/settings.json`,
+and a third probe counts how often the agent reached `run:carry --begin`. Its repository is
+`kit-test-backlogrun-python-<n>`.
+
 ## The log
 
 `<log-dir>/<scenario>-<n>.log`, by default under `.claude/tmp/fresh-machine`, which kit's distributed

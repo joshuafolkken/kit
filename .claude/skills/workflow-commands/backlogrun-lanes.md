@@ -113,9 +113,10 @@ The bullets below describe that dispatch:
   trace alone**, because its log will never grow.
 - **The child is started as `fullrun #<N>` with the lane as its working directory.** The batch a
   person approved by typing `backlogrun` covers the child.
-- **It does not pass `--dangerously-skip-permissions`.** What the child may do is the checkout's own
-  `.claude/settings.json` to decide; a headless child reaches `gh` and merges through `pnpm josh
-  followup` without the flag, and the run reports what stopped rather than loosening it.
+- **It passes `--permission-mode bypassPermissions`, never `--dangerously-skip-permissions`.** A
+  current Claude Code ignores the mode `.claude/settings.json` declares, and a new lane worktree is
+  never a trusted workspace; that file's `deny` list still refuses what it names, so the run reports
+  what stopped rather than loosening it.
 
 **Start each child without blocking on it, and poll them all** — a silent one is
 `backlogrun-recovery.md` → "A delegated unit that stopped without reporting", read in that child's

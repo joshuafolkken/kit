@@ -28,10 +28,12 @@ const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CI_WORKFLOW = '.github/workflows/ci.yml'
 const CODERABBIT = '.coderabbit.yaml'
 const AGENT_POINTERS = ['AGENTS', 'GEMINI']
-// What `josh init` deliberately leaves out of a basic project.
+const CLAUDE_SETTINGS = '.claude/settings.json'
+const OWN_PERMISSION = 'Bash(python -m unittest)'
+// What `josh init` deliberately leaves out of a basic project `josh start` did not set up.
 const FULL_ONLY_FILES = [
 	CI_WORKFLOW,
-	'.claude/settings.json',
+	CLAUDE_SETTINGS,
 	'.codex/hooks.json',
 	'.codex/config.toml',
 	CODERABBIT,
@@ -65,6 +67,17 @@ function write_manifest(profile: string): void {
 	writeFileSync(project_file(PACKAGE_JSON), JSON.stringify({ private: true, josh: { profile } }))
 }
 
+// A basic project `josh start` set up, whose `.claude/settings.json` holds a permission of its own.
+function write_workflow_project(): void {
+	const manifest = { private: true, josh: { profile: BASIC, workflow: 'github' } }
+	const settings_path = project_file(CLAUDE_SETTINGS)
+
+	writeFileSync(project_file(PACKAGE_JSON), JSON.stringify(manifest))
+	mkdirSync(project_file('.git'))
+	mkdirSync(path.dirname(settings_path))
+	writeFileSync(settings_path, JSON.stringify({ permissions: { allow: [OWN_PERMISSION] } }))
+}
+
 async function run_sync(profile: string): Promise<void> {
 	write_manifest(profile)
 	const { main } = await import('./sync')
@@ -86,6 +99,21 @@ beforeEach(() => {
 afterEach(() => {
 	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
+})
+
+describe('josh sync in a basic project josh start set up (#3796)', () => {
+	it('merges .claude/settings.json, keeping what the project added', async () => {
+		write_workflow_project()
+		const { main } = await import('./sync')
+
+		main()
+		const settings = read_project_file(CLAUDE_SETTINGS)
+
+		expect(settings).toContain(OWN_PERMISSION)
+		expect(settings).toContain('Bash(*)')
+		expect(settings).toContain('enabledPlugins')
+		expect(existsSync(project_file(CI_WORKFLOW))).toBe(false)
+	})
 })
 
 describe('josh sync file set in a basic project', () => {
