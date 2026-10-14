@@ -5,6 +5,7 @@ import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan } from './gate-plan'
 import { gate_test_fixture } from './gate-test-fixture'
+import { project_checks } from './project-checks'
 import { verification_gate, type GateStepResult } from './verification-gate'
 
 // joshuafolkken/kit#2318: a green gate whose `test:unit` step merely forwarded a Vite config
@@ -93,6 +94,33 @@ describe('record_green_gate — a consumer exports notice does not withhold the 
 		await record_with([
 			plain(gate_plan.LINT_LABEL),
 			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
+			green_saying(gate_plan.UNIT_LABEL, UNIT_SKIP_NOTICE),
+		])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3820: a `josh start` html project has no ESLint configuration, so its lint printed
+// the eslint skip notice and no green record was ever written — the detached ship then read its green
+// gate as red at the review stage and stopped before the pull request.
+const ESLINT_NOT_USED = project_checks.skip_notice('eslint', 'no ESLint configuration was found')
+
+describe('record_green_gate — a skip of a tool the project does not use', () => {
+	it('writes the record when lint skipped eslint for a project with no ESLint configuration', async () => {
+		await record_with([
+			green_saying(gate_plan.LINT_LABEL, `Checking formatting...\n${ESLINT_NOT_USED}\n`),
+			plain(gate_plan.TYPE_CHECK_LABEL),
+			plain(CSPELL_LABEL),
+			plain(gate_plan.UNIT_LABEL),
+		])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
+	})
+
+	it('still withholds the record when the unit suite skipped beside it', async () => {
+		await record_with([
+			green_saying(gate_plan.LINT_LABEL, ESLINT_NOT_USED),
 			green_saying(gate_plan.UNIT_LABEL, UNIT_SKIP_NOTICE),
 		])
 

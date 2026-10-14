@@ -63,7 +63,9 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // passed *without running* — `test-unit-guard` exits 0 with a notice when vitest is absent or the
 // project has no tests — must not become "the unit tests all passed": the gate keeps that skip
 // visible on the console, and a record erasing it would have the brief tell a review agent not to
-// re-run tests that never ran. A step that passed **with a checker's warnings** is withheld for the
+// re-run tests that never ran. A skip of a tool the project does not use (`NOT_USED_MARKER` — eslint
+// with no ESLint configuration) is not one: nothing went unverified, so it withholds nothing
+// (`gate_report.is_unverified_skip`). A step that passed **with a checker's warnings** is withheld for the
 // same reason one place further on: since the record is reused instead of the checks being re-run, a
 // warning printed once would never be printed again on that tree, and hiding an eslint or
 // svelte-check finding is the same failure as hiding a skip. It is `has_checker_warning`, not
@@ -80,7 +82,7 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // The destination is a parameter so a test can exercise the record without overwriting the one a
 // real run may be relying on — `josh gate` and `josh review:brief` share one path by design.
 function has_nothing_to_say(result: GateStepResult): boolean {
-	return !gate_report.is_skip_notice(result) && !gate_report.has_checker_warning(result)
+	return !gate_report.is_unverified_skip(result) && !gate_report.has_checker_warning(result)
 }
 
 async function record_green_gate(

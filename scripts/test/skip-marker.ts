@@ -7,4 +7,10 @@ const SKIP_MARKER = '— skipping'
 // that did. Shared for the reason the skip marker is: the notice and its reader cannot drift apart.
 const NOTHING_TO_CHECK_MARKER = 'nothing to check'
 
-export { NOTHING_TO_CHECK_MARKER, SKIP_MARKER }
+// **A skip of a tool the project does not use carries this beside the skip marker.** A `basic`
+// project with no ESLint configuration skips eslint, and the notice stays a visible skip the verdict
+// counts — but nothing the project asked for went unverified, so it must not withhold the gate's
+// green record the way a unit suite that did not run does.
+const NOT_USED_MARKER = 'which this project does not use'
+
+export { NOT_USED_MARKER, NOTHING_TO_CHECK_MARKER, SKIP_MARKER }

@@ -5,7 +5,7 @@ import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { project_profile } from '#scripts/init/project-profile'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
-import { SKIP_MARKER } from '#scripts/test/skip-marker'
+import { NOT_USED_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { z } from 'zod'
 
 const PACKAGE_JSON = 'package.json'
@@ -126,8 +126,10 @@ function missing_tool_reason(
 	return `${package_name} is not installed`
 }
 
+// Every skip reason here names a tool the project does not use — undeclared, or with no files or no
+// configuration to read — so the notice says so (`NOT_USED_MARKER`).
 function skip_notice(check: string, reason: string): string {
-	return `josh ${check}: ${reason} ${SKIP_MARKER} ${check}.`
+	return `josh ${check}: ${reason} ${SKIP_MARKER} ${check}, ${NOT_USED_MARKER}.`
 }
 
 // **A tool that ran clean beside a skipped one says that it ran.** A clean eslint prints nothing, so a
