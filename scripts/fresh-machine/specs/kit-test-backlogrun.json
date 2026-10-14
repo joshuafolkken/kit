@@ -10,18 +10,22 @@
 		"gh auth setup-git",
 		"git config --global user.name kit-test && git config --global user.email kit-test@example.com",
 		"printf '{ \"private\": true }\\n' > package.json",
-		"pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver \"$PACKAGE_TARBALL\"",
+		"cp \"$PACKAGE_TARBALL\" . && pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver \"./$(basename \"$PACKAGE_TARBALL\")\"",
 		"pnpm exec josh start --yes --github",
 		"gh label list --limit 100 --json name --jq '.[].name' > \"$HOME/labels.txt\"; grep -xE 'auto-ok|needs-decision|needs-human-review|already-done|review-round2-skipped|bug' \"$HOME/labels.txt\"; test \"$(grep -cxE 'auto-ok|needs-decision|needs-human-review|already-done|review-round2-skipped|bug' \"$HOME/labels.txt\")\" -eq 6",
 		"curl -fsSL https://claude.ai/install.sh | bash && export PATH=\"$HOME/.local/bin:$PATH\" && claude --version",
 		"gh issue create --title 'Add a heading to index.html' --body 'Add an h2 under the h1.' --label auto-ok --label run:lane",
 		"timeout 60 pnpm josh backlogrun > \"$HOME/backlogrun.out\" 2>&1; cat \"$HOME/backlogrun.out\"; grep -q '^backlogrun: started' \"$HOME/backlogrun.out\"",
 		"pnpm josh run:event --from 0 | grep 'starting session'",
-		"sleep 120",
+		"for i in $(seq 1 90); do pnpm josh run:event --from 0 | grep -q 'dispatching' && break; sleep 10; done; pnpm josh run:event --from 0 | grep 'dispatching'",
+		"for i in $(seq 1 120); do test \"$(gh pr list --state all --json number --jq length)\" -gt 0 && break; sleep 10; done; pnpm josh run:board --chat",
 		"pnpm josh backlogrun --stop"
 	],
 	"probes": [
 		"tail -n 40 \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\" | cut -c1-400",
-		"grep -c 'requires approval' \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\""
+		"grep -c 'requires approval' \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\"",
+		"tail -n 40 /tmp/josh-lane-dispatch-*.log | cut -c1-400",
+		"cat /tmp/josh-lane-dispatch-*.log | grep -c 'requires approval'",
+		"gh pr list --state all"
 	]
 }
