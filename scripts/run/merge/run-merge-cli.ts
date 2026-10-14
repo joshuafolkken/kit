@@ -25,7 +25,7 @@ import { run_merge_token, type MergeToken } from './run-merge-token'
 // The contract is `run:carry`'s: **standard output carries one token** (or the newline-separated
 // offer `epic:next --lanes` prints), and everything else is a captured subprocess or a quiet
 // in-process call. The verdicts this command adds to the offer are `over` (hand off), `human-review`
-// (stop — the child's own ending), `stop` (the consecutive-failure guard tripped) and `retry` (the
+// (stop — the child's own ending), `stop` (the consecutive-failure guard tripped, or a failed child could not be parked) and `retry` (the
 // child's state could not be read; re-read before deciding).
 
 const ARGV_OFFSET = 2
@@ -163,13 +163,16 @@ function parse(argv: ReadonlyArray<string>): MergeContext | undefined {
 interface ControlVerdict {
 	token: MergeToken
 	code: number
+	is_offer: false
 }
 
 // The next child offered in the collected one's place: the text `backlog:next` or `epic:next --lanes`
-// printed, passed through as it was read, so no narrower type holds it.
+// printed, passed through as it was read, so no narrower type holds it. `is_offer` keeps its `stop`
+// apart from the control one (`run_merge_token.is_control_stop`).
 interface OfferVerdict {
 	token: string
 	code: number
+	is_offer: true
 }
 
 type MergeVerdict = ControlVerdict | OfferVerdict
@@ -179,11 +182,11 @@ type MergeVerdict = ControlVerdict | OfferVerdict
 type MergeResult = MergeVerdict & { outcome: ChildOutcome }
 
 function emit(token: MergeToken, code: number): ControlVerdict {
-	return { token, code }
+	return { token, code, is_offer: false }
 }
 
 async function offered(ctx: MergeContext): Promise<OfferVerdict> {
-	return { token: await run_merge_steps.ask_next(ctx), code: SUCCESS_EXIT_CODE }
+	return { token: await run_merge_steps.ask_next(ctx), code: SUCCESS_EXIT_CODE, is_offer: true }
 }
 
 // Whether the child's exit record shows it could not reach the API — read only when `--output` named
