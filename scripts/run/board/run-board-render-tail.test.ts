@@ -14,7 +14,12 @@ import type { UsualTimes } from './run-board-usual'
 // every row; a waiting row's blockers start in that column too.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
-const PHASE_TIME = '0:10:00'
+const PHASE_TIME = '10:00'
+const SECOND = MINUTE / 60
+const SECONDS_40 = 40 * SECOND
+const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
+// A phase three digits of minutes long, as a run past 100 minutes reaches.
+const LONG_PHASE = 125 * MINUTE
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 
 function running(number: number, title = `Issue ${String(number)}`): BoardRow {
@@ -26,6 +31,11 @@ function running(number: number, title = `Issue ${String(number)}`): BoardRow {
 	}
 
 	return { number, title, kind: undefined, state: 'running', status, waits: [] }
+}
+
+// A row that reached its phase `ago_ms` before now.
+function phased(row: BoardRow, ago_ms: number): BoardRow {
+	return { ...row, status: { ...row.status, state: 'running', phase_ms: NOW - ago_ms } }
 }
 
 function board(extra: Partial<BoardHeader> = {}): BoardHeader {
@@ -52,6 +62,11 @@ function tail(row: BoardRow, extra: Partial<BoardHeader> = {}): Array<string | u
 	return run_board_render_tail.tail_of(row, board(extra))
 }
 
+// The phase time of a row that reached its phase `ago_ms` before now.
+function phase_time(ago_ms: number): string | undefined {
+	return tail(phased(running(1), ago_ms))[0]
+}
+
 // Row 2 has no event of its own, so its newest activity is the operation `minutes` old.
 function operated_activity(minutes: number): string | undefined {
 	return tail(running(2), { operations: operations(2, NOW - minutes * MINUTE) })[1]
@@ -62,7 +77,7 @@ afterEach(() => {
 })
 
 describe('run_board_render_tail.tail_of phase time', () => {
-	it('draws how long the child has stood at its phase as H:MM:SS, plain without a usual time', () => {
+	it('draws how long the child has stood at its phase as MM:SS, plain without a usual time', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
 		expect(tail(running(1))[0]).toBe(PHASE_TIME)
@@ -86,9 +101,9 @@ describe('run_board_render_tail.tail_of phase time', () => {
 			return tail({ ...row, status }, { usual: usual(0) })[0]
 		}
 
-		expect(at(3)).toBe('0:03:00')
-		expect(at(5)).toBe(styleText('yellow', '0:05:00'))
-		expect(at(7)).toBe(styleText('red', '0:07:00'))
+		expect(at(3)).toBe('03:00')
+		expect(at(5)).toBe(styleText('yellow', '05:00'))
+		expect(at(7)).toBe(styleText('red', '07:00'))
 	})
 
 	it('draws blanks where no event said when the child got to its phase', () => {
@@ -97,23 +112,28 @@ describe('run_board_render_tail.tail_of phase time', () => {
 
 		expect(tail({ ...row, status }, { usual: usual(1) })[0]).toBe(' '.repeat(PHASE_TIME.length))
 	})
+
+	it('draws seconds as MM:SS and never carries the minutes into hours', () => {
+		expect(phase_time(SECONDS_40)).toBe('00:40')
+		expect(phase_time(MINUTES_61_SECONDS_5)).toBe('61:05')
+	})
 })
 
 describe('run_board_render_tail.tail_of activity', () => {
 	it('draws the newest event’s phase icon and its age', () => {
-		expect(tail(running(1))[1]).toBe('👀 0:03:00')
+		expect(tail(running(1))[1]).toBe('👀 03:00')
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {
-		expect(tail(running(1), { operations: operations(1, NOW - MINUTE) })[1]).toBe('🔧 0:01:00')
+		expect(tail(running(1), { operations: operations(1, NOW - MINUTE) })[1]).toBe('🔧 01:00')
 	})
 
 	it('ages the activity as the 💓 is: plain, yellow past 15 minutes, red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(operated_activity(10)).toBe('🔧 0:10:00')
-		expect(operated_activity(20)).toBe(styleText('yellow', '🔧 0:20:00'))
-		expect(operated_activity(40)).toBe(styleText('red', '🔧 0:40:00'))
+		expect(operated_activity(10)).toBe('🔧 10:00')
+		expect(operated_activity(20)).toBe(styleText('yellow', '🔧 20:00'))
+		expect(operated_activity(40)).toBe(styleText('red', '🔧 40:00'))
 	})
 
 	it('draws nothing after a settled or a waiting row', () => {
@@ -160,6 +180,19 @@ describe('run_board_render.render tail column', () => {
 		const lines = tail_lines()
 
 		expect(column_of(lines, 'Short', PHASE_TIME)).toBe(column_of(lines, 'A much', PHASE_TIME))
+	})
+
+	it('starts every running row’s activity in one column where one phase time has three digits of minutes', () => {
+		const long = phased(running(2, 'Long'), LONG_PHASE)
+		const layout = { ...EMPTY_LAYOUT, active: [running(1, 'Short'), long] }
+		const lane_events = new Map([
+			[1, EVENT],
+			[2, EVENT],
+		])
+		const lines = lines_of(board({ layout, activity: { ...board().activity, lane_events } }))
+
+		expect(column_of(lines, 'Long', '👀')).toBe(column_of(lines, 'Short', '👀'))
+		expect(column_of(lines, 'Long', '125:00')).toBe(column_of(lines, 'Short', PHASE_TIME) - 1)
 	})
 
 	it('starts a waiting row’s 🔗 in the tail’s column', () => {

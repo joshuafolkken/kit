@@ -1,0 +1,3 @@
+- rf:assumptions | low | eslint/base.js:95 | 2026-10-10 | #3653
+- rf:assumptions | low | eslint/base.js:95 | 2026-10-10 | #3653
+- rf:project-conventions | low | scripts/package/verify-optional-eslint-install.ts:45 | 2026-10-10 | #3653

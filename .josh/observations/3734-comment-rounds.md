@@ -1,0 +1,3 @@
+- rf:tests | low | scripts/run/cut/run-cut-cli-impl.test.ts:83 | 2026-10-13 | #3734
+- rf:bug-risks | low | scripts/rules/implementation-cut.ts:179 | 2026-10-13 | #3734
+- rf:tests | low | scripts/rules/implementation-cut.test.ts:380 | 2026-10-13 | #3734

@@ -376,7 +376,7 @@ Count a `- k:<key>` sighting across `.josh/observations/`, append it, and print 
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane), under a distinct `- rf:` prefix the observation lines' `- k:` grammar never reads. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
@@ -385,7 +385,7 @@ pnpm josh review:record --issue 2325 --comment  # a round that passed after the 
 pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
 ```
 
-**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused with the usage and the accepted categories and severities, listed from the ledger's own constants. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round that passed after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Both the append and `--check` use the primary checkout's ledger, even when run in a lane — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. A category outside the nine review-rubric ones or a severity other than `high` / `medium` / `low` is refused with the usage and the accepted values. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a clean round differs from an unreviewed one. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Once the issue closes, the next ledger round carries those lines into `.josh/observations/<N>-comment-rounds.md` on its own commit, for `josh review:findings` and the retrospective, from `OWNER` / `MEMBER` / `COLLABORATOR` comments only; a carry that cannot read GitHub only warns. Both the append and `--check` use the running work tree's ledger — a lane's inside a lane. `pnpm josh observations:flush` commits them like any ledger change.
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 

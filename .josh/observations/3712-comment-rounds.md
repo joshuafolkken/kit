@@ -1,0 +1,4 @@
+- rf:comments | low | scripts/doctor/doctor.ts:23 | 2026-10-13 | #3712
+- rf:tests | low | scripts/doctor/doctor-io.test.ts:106 | 2026-10-13 | #3712
+- rf:assumptions | low | scripts/lib/buffered-process.ts:51 | 2026-10-13 | #3712
+- rf:comments | low | docs/troubleshooting.md:42 | 2026-10-13 | #3712

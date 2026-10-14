@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/run/board/run-board-machine.ts:191 | 2026-10-12 | #3692
+- rf:assumptions | low | scripts/run/board/run-board-header.ts:289 | 2026-10-12 | #3692
+- rf:confidence | low | scripts/run/board/run-board-header.ts:84 | 2026-10-12 | #3692

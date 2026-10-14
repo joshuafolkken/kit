@@ -4,6 +4,7 @@ import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
 
@@ -19,8 +20,18 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_comment: issue_comment_mock },
 }))
 
+const carry_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./review-comment-round', async (original) => {
+	const actual = await original<{ review_comment_round: typeof review_comment_round }>()
+
+	return { review_comment_round: { ...actual.review_comment_round, carry: carry_mock } }
+})
+
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
+const COMMENT_URL = 'https://example.test/comment\n'
+const GH_REFUSED = new Error('gh refused')
 
 afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
@@ -218,24 +229,24 @@ describe('review_record_cli.run --comment', () => {
 	it('posts the lines as an issue comment and appends nothing', async () => {
 		const root = root_of('comment')
 
-		issue_comment_mock.mockReset().mockResolvedValue('https://example.test/comment\n')
+		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
 		const argv = ['--issue', '3645', '--comment', 'tests:low:b.ts']
 		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root))
 
 		expect(code).toBe(0)
 		expect(issue_comment_mock).toHaveBeenCalledWith(
 			'3645',
-			review_record_cli.comment_body(['- rf:tests | low | b.ts | 2026-09-22 | #3645']),
+			review_comment_round.body_of(['- rf:tests | low | b.ts | 2026-09-22 | #3645']),
 		)
 		expect(existsSync(issue_file(root, 3645))).toBe(false)
 	})
 
 	it('keeps the ledger grammar readable inside the comment', () => {
-		expect(review_record_cli.comment_body([ZERO_LINE]).split('\n')).toContain(ZERO_LINE)
+		expect(review_comment_round.body_of([ZERO_LINE]).split('\n')).toContain(ZERO_LINE)
 	})
 
 	it('exits 1 when the comment could not be posted, the round being recorded nowhere', async () => {
-		issue_comment_mock.mockReset().mockRejectedValue(new Error('gh refused'))
+		issue_comment_mock.mockReset().mockRejectedValue(GH_REFUSED)
 		const argv = ['--issue', '3645', '--comment']
 		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root_of('lost')))
 
@@ -259,5 +270,34 @@ describe('review_record_cli.run — default ledger', () => {
 			'- rf:none | none | - | 2026-09-22 | #2419\n',
 		)
 		expect(code).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#3811: a round recorded to the ledger carries the closed issues' comment rounds with
+// it, and a carry that fails leaves the round recorded.
+describe('review_record_cli.run — carrying the comment rounds', () => {
+	it('carries them into the tree a ledger round is recorded in, and not from a comment round', async () => {
+		const root = root_of('carry')
+
+		carry_mock.mockReset().mockResolvedValue(2)
+		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
+		await quietly(async () => await review_record_cli.run(['--issue', '3811'], NOW, root))
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '3811', '--comment'], NOW, root),
+		)
+
+		expect(carry_mock).toHaveBeenCalledExactlyOnceWith(root)
+	})
+
+	it('records the round and exits 0 when the carry fails', async () => {
+		const root = root_of('carry-failed')
+
+		carry_mock.mockReset().mockRejectedValue(GH_REFUSED)
+		const code = await quietly(
+			async () => await review_record_cli.run(['--issue', '3811'], NOW, root),
+		)
+
+		expect(code).toBe(0)
+		expect(existsSync(issue_file(root, 3811))).toBe(true)
 	})
 })

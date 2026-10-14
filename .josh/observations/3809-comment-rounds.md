@@ -1,0 +1,3 @@
+- rf:project-conventions | low | scripts/run/board/run-board-thanks-read.ts:105 | 2026-10-14 | #3809
+- rf:security | low | scripts/run/board/run-board-thanks-read.ts:36 | 2026-10-14 | #3809
+- rf:tests | low | scripts/run/board/run-board-row-yield.test.ts:34 | 2026-10-14 | #3809

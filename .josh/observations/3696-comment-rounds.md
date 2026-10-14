@@ -1,0 +1,2 @@
+- rf:assumptions | low | scripts/run/event/run-event-stream.ts:257 | 2026-10-12 | #3696
+- rf:confidence | low | scripts/run/board/run-board-setup.ts:32 | 2026-10-12 | #3696

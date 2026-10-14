@@ -1,0 +1,8 @@
+{
+	"reason": "Review round 1 fix: comment rounds are carried only from OWNER/MEMBER/COLLABORATOR authors, via a trust check shared with measure:rerun (gh-author-association.ts) and its tests",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 98,
+		"ai_cost.on_demand_bytes": 139
+	}
+}

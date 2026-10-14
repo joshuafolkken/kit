@@ -76,9 +76,9 @@ describe('run_board_render.render running rows', () => {
 	it('leads every running row with the last phase it reached, and draws no track after it', () => {
 		const lines = board_lines()
 
-		expect(row_line(lines, 1)).toMatch(/^ {2}📝 1 .*0:02:00$/u)
-		expect(row_line(lines, 3)).toMatch(/^ {2}💥 3 .*0:02:00$/u)
-		expect(row_line(lines, 4)).toMatch(/^ {2}📣 4 .*0:02:00$/u)
+		expect(row_line(lines, 1)).toMatch(/^ {2}📝 1 .* 02:00$/u)
+		expect(row_line(lines, 3)).toMatch(/^ {2}💥 3 .* 02:00$/u)
+		expect(row_line(lines, 4)).toMatch(/^ {2}📣 4 .* 02:00$/u)
 		expect(lines.join('\n')).not.toContain('🔍📝')
 	})
 
@@ -100,7 +100,7 @@ describe('run_board_render.render running rows', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2    ${title}  05:00  ⚡  8% 🧠0.5G  0:02:00  🚦 0:01:00`,
+			`  🚦 2    ${title}  05:00  ⚡  8% 🧠0.5G  02:00  🚦 01:00`,
 		)
 	})
 })

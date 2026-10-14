@@ -1,0 +1,1 @@
+- rf:bug-risks | low | .claude/skills/workflow-commands/chain-rule.md:17 | 2026-10-14 | #3786
