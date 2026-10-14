@@ -4,6 +4,8 @@ const emit_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 const find_lane_mock = vi.hoisted(() => vi.fn())
 const relaunch_mock = vi.hoisted(() => vi.fn())
+const serving_mock = vi.hoisted(() => vi.fn())
+const request_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -15,6 +17,9 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 	lane_registry: { find_open_lane: find_lane_mock },
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
+vi.mock('#scripts/lane/lane-session-broker', () => ({
+	lane_session_broker: { is_serving: serving_mock, request: request_mock },
+}))
 
 const { run_ship_return } = await import('./run-ship-return')
 
@@ -32,6 +37,8 @@ beforeEach(() => {
 	is_child_mock.mockReset().mockReturnValue(true)
 	find_lane_mock.mockReset().mockResolvedValue(LANE)
 	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
+	serving_mock.mockReset().mockReturnValue(false)
+	request_mock.mockReset().mockResolvedValue(true)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
@@ -76,6 +83,29 @@ describe('run_ship_return.return_control', () => {
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME)).toBe('recorded')
 		expect(emit_mock).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#3817: this supervisor descends from the child's Bash tool and so has no token; a lane
+// the supervisor's broker serves is relaunched by that broker instead.
+describe('run_ship_return.return_control on a served lane', () => {
+	it('asks the broker to relaunch the child and starts none itself', async () => {
+		serving_mock.mockReturnValue(true)
+
+		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME)).toBe('relaunched')
+		expect(request_mock).toHaveBeenCalledWith(LANE.directory, ISSUE, {
+			kind: 'relaunch',
+			stop: { stage: 'gate', ...RESUME },
+		})
+		expect(relaunch_mock).not.toHaveBeenCalled()
+	})
+
+	it('records the stop when the broker could not relaunch the child', async () => {
+		serving_mock.mockReturnValue(true)
+		request_mock.mockResolvedValue(false)
+
+		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME)).toBe('recorded')
+		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 })
 

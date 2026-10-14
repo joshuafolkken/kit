@@ -12,7 +12,7 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { openai_review_broker } from '#scripts/lane/openai-review-broker'
+import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
@@ -150,7 +150,7 @@ function record_round_one(
 // was written by the brief the pointer names: one left by an earlier brief is not the tree the
 // finished review read, so the resume reads the whole change instead.
 function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
-	const { findings } = openai_review_broker.review_paths(PROJECT_ROOT)
+	const { findings } = lane_session_broker.review_paths(PROJECT_ROOT)
 	const briefed = review_stamps.briefed_stamp.read()
 
 	if (briefed === undefined || !review_attest.is_briefed_since(briefed.taken_at, checkout.root)) {

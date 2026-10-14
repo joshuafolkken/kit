@@ -85,4 +85,5 @@ const lane_child_invocation = {
 	ship_stop_invocation,
 }
 
+export type { ShipStop }
 export { lane_child_invocation }

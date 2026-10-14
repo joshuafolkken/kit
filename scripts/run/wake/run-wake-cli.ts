@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -18,9 +17,9 @@ import { run_wake_describe, type WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
-import { run_wake_restart, type RestartPorts } from './run-wake-restart'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 import { run_wake_stop } from './run-wake-stop'
+import { run_wake_supervise } from './run-wake-supervise'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
 // `backlogrun` or `queue` without a person retyping the keyword. **Which invocations it may continue
@@ -362,19 +361,9 @@ function tidy_up(target: string): void {
 	if (run_wake.tidy_own_wake(target) === SUPERSEDED_RESULT) note_to_stderr(SUPERSEDED_NOTE)
 }
 
-function restart_ports(context: WakeContext, ports: LoopPorts, interval_ms: number): RestartPorts {
-	return {
-		pass: async () => await run_wake_loop.run_loop(context.wake_target, ports, interval_ms),
-		is_resumable: () => run_carry.read_carry(context.carry_target).kind === 'carried',
-		pause: async () => {
-			await poll.sleep(interval_ms)
-		},
-		note: note_to_stderr,
-	}
-}
-
 // A failed pass is restarted while the carry record is still resumable (`run-wake-restart.ts`), so
-// only a failure past the restart bound reaches `finish` and its warning.
+// only a failure past the restart bound reaches `finish` and its warning; the Claude lanes are brokered
+// for as long as it supervises (`run-wake-supervise.ts`).
 // **The record is claimed once and held across every restart**, so a `--stop` landing in the pause
 // between two passes still finds it, signals this process, and the next pass reads the removal as the
 // person's stop rather than claiming a fresh record and resuming.
@@ -388,7 +377,12 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 	if (claimed.kind === 'refused') return refuse_without_carry(claimed.carry_kind)
 
 	const ports = ports_for(context, claimed.wake.profile ?? profile)
-	const stop = await run_wake_restart.supervise(restart_ports(context, ports, interval_ms))
+	const stop = await run_wake_supervise.supervise({
+		context,
+		ports,
+		interval_ms,
+		note: note_to_stderr,
+	})
 
 	tidy_up(context.wake_target)
 

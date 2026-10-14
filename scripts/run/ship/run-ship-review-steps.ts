@@ -4,7 +4,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { openai_review_broker } from '#scripts/lane/openai-review-broker'
+import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
@@ -66,7 +66,7 @@ function failure(out: string): JoshResult {
 }
 
 function paths(): { brief: string; findings: string; log: string } {
-	return openai_review_broker.review_paths(PROJECT_ROOT)
+	return lane_session_broker.review_paths(PROJECT_ROOT)
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
@@ -94,6 +94,16 @@ async function run_direct_session(
 	return { code: SUCCESS_EXIT_CODE, out: '' }
 }
 
+// A lane child's reviewer is started by the lane's broker: an OpenAI lane's always, since a nested Codex
+// cannot write outside its sandbox, and a Claude lane's whenever the `run:wake` supervisor serves it, since this
+// ship was started from the child's Bash tool and so never received a token-only credential
+// (joshuafolkken/kit#3817). A Claude lane nobody serves starts the reviewer itself, as before.
+function is_brokered(profile: AgentProfile, issue: string): boolean {
+	if (!lane_child_marker.is_child_of(PROJECT_ROOT)) return false
+
+	return profile.provider === 'openai' || lane_session_broker.is_serving(PROJECT_ROOT, issue)
+}
+
 async function run_session(
 	prompt: string,
 	log_path: string,
@@ -103,11 +113,14 @@ async function run_session(
 	const built = agent_argv.resolve_in(prompt, agent_role_profile.REVIEWER, PROJECT_ROOT)
 	if (built.kind === 'rejected') return failure(`reviewer profile rejected: ${built.note}`)
 
-	if (built.profile.provider !== 'openai' || !lane_child_marker.is_child_of(PROJECT_ROOT)) {
+	if (!is_brokered(built.profile, issue)) {
 		return await run_direct_session(built.argv, built.profile, log_path)
 	}
 
-	const is_success = await openai_review_broker.request(PROJECT_ROOT, issue, round)
+	const is_success = await lane_session_broker.request(PROJECT_ROOT, issue, {
+		kind: 'review',
+		round,
+	})
 
 	return is_success ? { code: SUCCESS_EXIT_CODE, out: '' } : failure('isolated reviewer failed')
 }

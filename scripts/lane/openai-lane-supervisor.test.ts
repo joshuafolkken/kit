@@ -11,9 +11,9 @@ import { run_cut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
+import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
-import { openai_review_broker } from './openai-review-broker'
 
 const ISSUE = '2084'
 const BRANCH = '2084-lane'
@@ -33,7 +33,7 @@ const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 const common_directory = path.join(scratch, 'repository with spaces', '.git')
 const ship_current = vi.spyOn(openai_lane_ship, 'current')
 const ship_wait = vi.spyOn(openai_lane_ship, 'wait_for_ship')
-const with_server = vi.spyOn(openai_review_broker, 'with_server')
+const with_server = vi.spyOn(lane_session_broker, 'with_server')
 
 function lane(): LaneInfo {
 	return {
