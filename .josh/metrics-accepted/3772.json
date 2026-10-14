@@ -1,7 +1,7 @@
 {
-	"reason": "lane:restart refuses to relaunch a child that ended on its own during the in-progress claim (round-2 review fix)",
+	"reason": "Export the harness CHILD_ENVIRONMENT so the #3712 no-pnpm scenario overlays PATH on it instead of inheriting a git hook's GIT_DIR, which failed the pre-push unit run",
 	"date": "2026-10-14",
 	"growth": {
-		"scripts.code_lines": 198
+		"scripts.code_lines": 199
 	}
 }
