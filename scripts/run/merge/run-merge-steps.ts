@@ -25,6 +25,7 @@ import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversatio
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge } from './run-merge'
+import { run_merge_ship } from './run-merge-ship'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
 // callers surface the refusal as a hard failure rather than silently continuing on a carry that was
@@ -335,13 +336,14 @@ async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResu
 }
 
 // A child that ended unfinished: waiting when it records an open blocker (`do_waiting`), parked
-// otherwise (`park_failed`) — an order already recorded is never a decision for a person.
-async function do_failed(ctx: MergeContext, cause: string = FAILED_CAUSE): Promise<FailedResult> {
+// otherwise (`park_failed`) — an order already recorded is never a decision for a person. Without a
+// cause of the caller's, a child whose detached ship ended is parked for the ship's stop.
+async function do_failed(ctx: MergeContext, cause?: string): Promise<FailedResult> {
 	const blockers = await open_blockers(ctx.child)
 
 	if (blockers.length > 0) return await do_waiting(ctx, blockers)
 
-	return await park_failed(ctx, cause)
+	return await park_failed(ctx, cause ?? run_merge_ship.cause(ctx.child) ?? FAILED_CAUSE)
 }
 
 // The outcome of counting an outage: the record to read the streak against, and whether the count was
