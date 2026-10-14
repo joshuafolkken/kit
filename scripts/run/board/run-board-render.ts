@@ -8,6 +8,7 @@ import {
 	type TerminalSize,
 	type YieldStage,
 } from './run-board-fit'
+import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import {
@@ -39,6 +40,7 @@ const { clock_of, elapsed_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
 const { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of } = run_board_render_title
+const { padded } = run_board_fresh
 const GAP = '  '
 const INDENT = '  '
 const BRANCH = '     ├ '
@@ -110,13 +112,25 @@ function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
 	return `${WAITS_ICON} ${row.waits.map((reference) => header.link(reference)).join(', ')}`
 }
 
+// A running row's part that changed at `at_ms`, emphasized while fresh (`run-board-fresh.ts`) — its
+// start and its phase; a settled row's are long past.
+function running_fresh(
+	row: BoardRow,
+	text: string,
+	at_ms: number | undefined,
+	header: BoardHeader,
+): string {
+	return row.state === 'running' ? run_board_fresh.since(text, at_ms, header) : text
+}
+
 // The title padded to the title column and the time to the time column — blanks where a row has none —
 // so the times form one column, and what follows them starts in one column on every row.
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	const time = time_of(row, frame.header.now_ms) ?? ''
 	const title = title_of(row_title(row, frame.header), frame.title_limit)
+	const fresh = running_fresh(row, time, row.status?.started_ms, frame.header)
 
-	return [title.padEnd(frame.title_limit), time.padStart(frame.time_width)]
+	return [title.padEnd(frame.title_limit), padded(time, frame.time_width, fresh)]
 }
 
 // A running row leads with the icon of the phase it is in now — the last its track reached — and
@@ -135,6 +149,14 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
+// A row's usage column as drawn: a settled row's finish time emphasized while it is fresh.
+function slot_text(row: BoardRow, usage: UsageSlot, header: BoardHeader): string | undefined {
+	const slot = slot_of(row, usage, header.now_ms)
+	const ended = row.state === 'running' ? undefined : row.status?.ended_ms
+
+	return slot === undefined ? slot : run_board_fresh.since(slot, ended, header)
+}
+
 // A row's usage column where the frame draws one, padded to one width on every row so every tail
 // starts in one column. A plan row the run has not touched draws blanks in its place, so what it waits
 // on starts in the tail's column.
@@ -144,7 +166,7 @@ function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	if (usage === undefined || slot_width === 0) return undefined
 	if (row.status === undefined) return ' '.repeat(slot_width)
 
-	return cell_of(slot_of(row, usage, frame.header.now_ms), slot_width)
+	return cell_of(slot_text(row, usage, frame.header), slot_width)
 }
 
 function joined(parts: ReadonlyArray<string | undefined>): string {
@@ -155,7 +177,8 @@ function joined(parts: ReadonlyArray<string | undefined>): string {
 // ends at its icon, so what follows keeps its usual gap.
 function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
-	const lead = `${state_icon(row)} ${header.link(String(row.number))} ${kind}`
+	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
+	const lead = `${icon} ${header.link(String(row.number))} ${kind}`
 
 	return title === '' ? lead : `${lead} ${title}`
 }
