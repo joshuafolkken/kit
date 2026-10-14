@@ -5,6 +5,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { kit_written_paths } from './kit-written-paths'
+import { workflow_mark } from './workflow-mark'
 
 type ProjectProfile = 'basic' | 'full'
 
@@ -18,6 +19,8 @@ interface ProjectShape extends ProfileResult {
 	has_typescript: boolean
 	has_git: boolean
 	has_github: boolean
+	// Set up by `josh start` for the GitHub Issue workflow (`workflow-mark.ts`).
+	has_workflow: boolean
 }
 
 const IGNORED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'build', '.svelte-kit'])
@@ -178,12 +181,23 @@ function has_git(root: string): boolean {
 	return existsSync(path.join(root, '.git'))
 }
 
+// The run is asked first, so a `josh start` whose setup has not written `package.json` yet reads it.
+function has_workflow(root: string): boolean {
+	return workflow_mark.is_requested() || workflow_mark.is_recorded(read_manifest(root))
+}
+
 function inspect_project(root: string, requested?: ProjectProfile): ProjectShape {
 	const profile = resolve_profile(root, requested)
 	const files = scan_files(root)
 	const is_git = has_git(root)
 
-	return { ...profile, ...files, has_git: is_git, has_github: is_git && has_github_remote(root) }
+	return {
+		...profile,
+		...files,
+		has_git: is_git,
+		has_github: is_git && has_github_remote(root),
+		has_workflow: has_workflow(root),
+	}
 }
 
 const project_profile = {

@@ -21,6 +21,7 @@ function widest_shape(profile: ProjectProfile): ProjectShape {
 		has_typescript: true,
 		has_git: true,
 		has_github: true,
+		has_workflow: true,
 	}
 }
 

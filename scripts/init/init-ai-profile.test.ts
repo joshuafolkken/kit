@@ -9,9 +9,11 @@ const BASIC_SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
+	has_workflow: false,
 }
 const GIT_ATTRIBUTES = '.gitattributes'
 const SECURITY_MD = 'SECURITY.md'
+const CLAUDE_SETTINGS = '.claude/settings.json'
 
 describe('profile-specific AI files', () => {
 	it('keeps Git-free, Web-free basic files to pointers', () => {
@@ -38,7 +40,7 @@ describe('profile-specific AI files', () => {
 	it('keeps node development settings without GitHub distribution', () => {
 		const files = init_ai_copy.ai_files({ ...BASIC_SHAPE, profile: 'full' })
 
-		expect(files).not.toContain('.claude/settings.json')
+		expect(files).not.toContain(CLAUDE_SETTINGS)
 		expect(files).not.toContain(GIT_ATTRIBUTES)
 		expect(files).not.toContain(SECURITY_MD)
 	})
@@ -64,4 +66,14 @@ describe('profile-specific agent pointers', () => {
 			)
 		},
 	)
+})
+
+describe('AI files of a basic project josh start set up (#3796)', () => {
+	it('adds .claude/settings.json in a Git repository', () => {
+		const workflow = { ...BASIC_SHAPE, has_workflow: true }
+
+		expect(init_ai_copy.ai_files({ ...workflow, has_git: true })).toContain(CLAUDE_SETTINGS)
+		expect(init_ai_copy.ai_files({ ...BASIC_SHAPE, has_git: true })).not.toContain(CLAUDE_SETTINGS)
+		expect(init_ai_copy.ai_files(workflow)).not.toContain(CLAUDE_SETTINGS)
+	})
 })

@@ -221,6 +221,9 @@ function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 	}
 
 	actions.push(...build_basic_vscode_actions(shape))
+	// The `.claude/settings.json` a `josh start` project receives wires the `session:lang` hook, whose
+	// unset default is `ja`, so the language is seeded from the locale as on `full`.
+	if (shape.has_workflow) actions.push(...session_language_environment.build_session_lang_actions())
 
 	return actions
 }

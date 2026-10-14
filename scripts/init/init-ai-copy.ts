@@ -47,6 +47,9 @@ const BASIC_SOURCES: Readonly<Record<string, string>> = {
 const CONSUMER_SOURCES: Readonly<Record<string, string>> = {
 	[SECURITY_MD]: security_policy.SECURITY_TEMPLATE,
 }
+// A basic project `josh start` set up for the GitHub Issue workflow runs its agents unattended, on the
+// permissions, hooks and plugin this file declares (#3796).
+const BASIC_WORKFLOW_AI_FILES = [...BASIC_AI_FILES, '.claude/settings.json']
 const GITHUB_FILES = new Set([CODE_OF_CONDUCT, SECURITY_MD])
 const BASIC_POINTER_MAPPING = { src: 'templates/cursorrules.basic', dest: '.cursorrules' }
 const PULL_REQUEST_TEMPLATE = '.github/pull_request_template.md'
@@ -356,8 +359,12 @@ function should_copy_ai_file(filename: string, shape?: ProjectShape): boolean {
 	)
 }
 
+function basic_ai_files(shape: ProjectShape): ReadonlyArray<string> {
+	return shape.has_workflow ? BASIC_WORKFLOW_AI_FILES : BASIC_AI_FILES
+}
+
 function ai_files(shape?: ProjectShape): ReadonlyArray<string> {
-	const files = shape?.profile === 'basic' ? BASIC_AI_FILES : init_logic.get_ai_copy_files()
+	const files = shape?.profile === 'basic' ? basic_ai_files(shape) : init_logic.get_ai_copy_files()
 
 	return files.filter((filename) => should_copy_ai_file(filename, shape))
 }

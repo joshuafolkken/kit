@@ -14,6 +14,7 @@ import type { ProjectProfile, ProjectShape } from './project-profile'
 import { start_exec } from './start-exec'
 import { start_plan, type GitState, type StartStep, type Visibility } from './start-plan'
 import { start_setup_pr } from './start-setup-pr'
+import { workflow_mark } from './workflow-mark'
 
 interface StepContext {
 	root: string
@@ -104,7 +105,10 @@ function create_git_repository(context: StepContext): void {
 // A toolkit that layers its files over kit's (`josh-app init`) names its own setup instead, so every
 // other step and guard stays here rather than in a copy of this command (#2872). That command runs
 // without a shell, is given the same profile, and a non-zero exit stops the run before the commit.
+// Either one is told the project is set up for the GitHub Issue workflow (`workflow-mark.ts`).
 function initialize(context: StepContext): void {
+	workflow_mark.request()
+
 	if (context.init_command === undefined) {
 		init_main(['--profile', context.profile])
 

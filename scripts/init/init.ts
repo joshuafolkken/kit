@@ -127,6 +127,7 @@ function merged_manifest(existing: string, shape: ProjectShape): string {
 	return init_basic.with_recorded_profile(
 		apply_package_json_merges(existing, shape.has_git),
 		shape.profile,
+		shape.has_workflow,
 	)
 }
 
