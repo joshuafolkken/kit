@@ -1,20 +1,19 @@
 #!/usr/bin/env tsx
 import { randomUUID } from 'node:crypto'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { poll } from '#scripts/lib/poll'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
-import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect, type WatchedRun } from '#scripts/run/run-stranded-detect'
 import { run_wake, type WakeStopReason, type WakeTidyResult } from './run-wake'
+import { run_wake_await } from './run-wake-await'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
@@ -88,6 +87,7 @@ const STOP_BODIES: Record<WakeStopReason, string | undefined> = {
 	unreadable:
 		'The carry record could not be read, so the supervisor stopped rather than guess at it.',
 }
+const NO_PROFILE_NOTE = 'the scheduler profile could not be resolved'
 const SUPERSEDED_RESULT: WakeTidyResult = 'superseded'
 const SUPERSEDED_NOTE =
 	'another supervisor now holds the record, so it was left alone; this loop is the superseded one'
@@ -136,26 +136,14 @@ function group_count(values: ParsedValues): number {
 	return verbs.filter((flag) => flag === true).length
 }
 
+function context_of(directory: string): WakeContext {
+	return run_wake_describe.context_of(directory, note_to_stderr)
+}
+
 async function resolve_context(): Promise<WakeContext | undefined> {
 	const directory = await run_carry.repository_directory()
 
-	if (directory === undefined) return undefined
-
-	const log_target = run_wake.wake_log_path(directory)
-
-	// Every verb reaches this one function, so creating the log here is what makes the path each of
-	// them prints a path that exists — including `--list` and the already-running branch of `--start`,
-	// neither of which launches anything.
-	run_wake_session.ensure_log(log_target, note_to_stderr)
-
-	return {
-		carry_target: run_carry.carry_path(directory),
-		ended_target: run_carry_ended.ended_path(directory),
-		wake_target: run_wake.wake_path(directory),
-		log_target,
-		event_target: run_event_stream.target_of(directory),
-		worktree: path.dirname(directory),
-	}
+	return directory === undefined ? undefined : context_of(directory)
 }
 
 // There is nothing to supervise unless a run is actually carrying a budget. Refusing here rather than
@@ -298,14 +286,18 @@ async function finish(stop: LoopStop, context: WakeContext, started_at: string):
 	return report(stop.reason, exit_code_of(stop.reason))
 }
 
-function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
-	const profile = run_wake_session.scheduler_profile()
-	if (profile === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
+function launch_supervisor(
+	context: WakeContext,
+	interval: string | undefined,
+	profile: AgentProfile | undefined,
+): LaunchResult {
+	if (profile === undefined) return { kind: 'failed', note: NO_PROFILE_NOTE }
 	const argv = run_wake_session.supervisor_argv(SCRIPT_PATH, interval)
+
 	// **The supervisor's own output goes to the same file as the sessions it starts.** It is detached
 	// with the same call, so otherwise its `console.error` — the launch note that says the agent CLI is
 	// not on `PATH`, and the stop note behind every warning — would go nowhere at all.
-	const result = run_wake_session.launch(
+	return run_wake_session.launch(
 		{
 			argv,
 			cwd: context.worktree,
@@ -314,6 +306,20 @@ function spawn_supervisor(context: WakeContext, interval: string | undefined): n
 		},
 		note_to_stderr,
 	)
+}
+
+// The supervisor `josh backlogrun` starts beside its launched parent, on the parent's provider, from its
+// own process so it inherits the credential the parent's Bash tool does not pass on (kit#3804). No carry
+// record stands yet, so `start`'s check is skipped; its `--loop` waits for the parent to claim one.
+function start_for_launch(git_directory: string, provider: AgentProvider): LaunchResult {
+	const resolved = run_wake_session.chosen_profile(provider)
+	if (resolved.kind === 'rejected') return { kind: 'failed', note: resolved.note }
+
+	return launch_supervisor(context_of(git_directory), undefined, resolved.profile)
+}
+
+function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
+	const result = launch_supervisor(context, interval, run_wake_session.scheduler_profile())
 
 	if (result.kind === 'failed') {
 		console.error(`Could not start the supervisor: ${result.note}`)
@@ -373,23 +379,20 @@ function restart_ports(context: WakeContext, ports: LoopPorts, interval_ms: numb
 // between two passes still finds it, signals this process, and the next pass reads the removal as the
 // person's stop rather than claiming a fresh record and resuming.
 async function loop(context: WakeContext, interval_ms: number): Promise<number> {
-	const read = run_carry.read_carry(context.carry_target)
-
-	if (read.kind !== 'carried') return refuse_without_carry(read.kind)
-
 	const profile = run_wake_session.scheduler_profile()
 	if (profile === undefined) return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 
-	const claimed = run_wake.claim(context.wake_target, read.carry.invocation, new Date(), profile)
+	const claimed = await run_wake_await.claim_run(context, profile, interval_ms)
 
-	if (claimed === undefined) return report(RUNNING_VERDICT)
+	if (claimed.kind === 'running') return report(RUNNING_VERDICT)
+	if (claimed.kind === 'refused') return refuse_without_carry(claimed.carry_kind)
 
-	const ports = ports_for(context, claimed.profile ?? profile)
+	const ports = ports_for(context, claimed.wake.profile ?? profile)
 	const stop = await run_wake_restart.supervise(restart_ports(context, ports, interval_ms))
 
 	tidy_up(context.wake_target)
 
-	return await finish(stop, context, read.carry.started_at)
+	return await finish(stop, context, claimed.carry.started_at)
 }
 
 // **The verdict tracks whether the supervisor is actually running, not merely whether a record is
@@ -456,6 +459,7 @@ const run_wake_cli = {
 	ports_for,
 	record_failure,
 	run,
+	start_for_launch,
 	stop_body,
 	warning_body,
 }

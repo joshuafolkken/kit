@@ -32,6 +32,7 @@ function context(): WakeContext {
 		wake_target: path.join(scratch.directory, 'wake.json'),
 		log_target: path.join(scratch.directory, 'wake.log'),
 		event_target: path.join(scratch.directory, 'events.jsonl'),
+		git_directory: path.join(scratch.directory, '.git'),
 		worktree: scratch.directory,
 	}
 }

@@ -61,7 +61,7 @@ resumed session runs `remaining` from `--json`. The contract is `docs/josh-comma
 ```bash
 pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"
 pnpm josh run:carry --json                                                   # read it back in a resumed session
-pnpm josh run:wake --start                                                   # same turn as --begin
+pnpm josh run:wake --start                                                   # same turn as --begin; `running` under `josh backlogrun`
 ```
 
 **Always pass `--owner "$PPID"`**, and ask it before the plan, in the same turn as the first `pnpm josh
