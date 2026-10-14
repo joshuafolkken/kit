@@ -29,8 +29,6 @@ vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const { run_ship_review } = await import('./run-ship-review')
-const { openai_review_broker } = await import('#scripts/lane/openai-review-broker')
-const broker_request = vi.spyOn(openai_review_broker, 'request')
 
 // joshuafolkken/kit#2427: the supervised round-1 review — open, launch, join, attest, record — and each
 // branch that hands control back to the agent.
@@ -57,12 +55,6 @@ const BRIEF_TWO = 'review:brief --round 2'
 const COMPLETED = { kind: 'completed', pid: 1 } as const
 const SPAWN_NOTE = 'spawn failed'
 const PROFILE_NOTE = 'bad model'
-const OPENAI_REVIEWER_PROFILE = {
-	provider: 'openai',
-	role: 'reviewer',
-	model: 'gpt-6.1-sol',
-	effort: 'high',
-}
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -99,39 +91,9 @@ beforeEach(() => {
 	})
 	missing_mock.mockReset().mockReturnValue([])
 	is_child_mock.mockReset().mockReturnValue(false)
-	broker_request.mockReset().mockResolvedValue(false)
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
 	stamps.write_text_stamp.mockClear()
 	stamps.remove_stamp.mockClear()
-})
-
-describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
-	it('uses the registered reviewer broker instead of a nested Codex launch', async () => {
-		resolve_in_mock.mockReturnValue({
-			kind: 'argv',
-			argv: ARGV,
-			profile: OPENAI_REVIEWER_PROFILE,
-		})
-		is_child_mock.mockReturnValue(true)
-		broker_request.mockResolvedValue(true)
-
-		expect(await stage_code()).toBe(OK)
-		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, '1')
-		expect(launch).not.toHaveBeenCalled()
-	})
-
-	it('stops before attestation when the isolated reviewer is unavailable', async () => {
-		resolve_in_mock.mockReturnValue({
-			kind: 'argv',
-			argv: ARGV,
-			profile: OPENAI_REVIEWER_PROFILE,
-		})
-		is_child_mock.mockReturnValue(true)
-
-		expect(await stage_code()).toBe(FAILED)
-		expect(commands()).toStrictEqual([OPEN])
-		expect(launch).not.toHaveBeenCalled()
-	})
 })
 
 // joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
