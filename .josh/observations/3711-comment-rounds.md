@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/sync/sync-basic.test.ts:102 | 2026-10-13 | #3711
+- rf:confidence | low | scripts/init/init-logic-toolchain.ts:49 | 2026-10-13 | #3711

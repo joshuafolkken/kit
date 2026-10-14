@@ -4,6 +4,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger, type Finding } from './review-finding-ledger'
 import { review_record, type RecordVerdict } from './review-record'
 
@@ -16,7 +17,8 @@ import { review_record, type RecordVerdict } from './review-record'
 // **`--comment` records a round that ran after the pull request opened**: the same lines go to the
 // issue as a comment and nothing is appended. A line written to the tree then has no commit of the
 // run's left to ride, so `pnpm josh followup` would push it onto the open pull request and its CI
-// would start over.
+// would start over. The next round recorded to the ledger carries it there once the issue is closed
+// (`review-comment-round.ts`).
 //
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
 // merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
@@ -31,10 +33,10 @@ const CHECK_USAGE = 'Usage: josh review:record --check --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const COMMENT_HEADING = '### Review round recorded after the pull request opened'
-const COMMENT_NOTE =
-	'Kept here rather than in the observation ledger: a line appended after the commit would be pushed onto the open pull request and restart its CI.'
-const CODE_FENCE = '```'
+const CARRIED_LINE =
+	'review-finding line(s) recorded on closed issues after their pull requests opened into the ledger.'
+const CARRY_FAILED_LINE =
+	'Could not carry the closed issues’ comment rounds into the ledger; the next round retries:'
 const OPTIONS = {
 	issue: { type: 'string' },
 	check: { type: 'boolean' },
@@ -161,15 +163,14 @@ async function run_check(issue: string | undefined, root: string): Promise<numbe
 	return FAILURE_EXIT_CODE
 }
 
-function comment_body(lines: ReadonlyArray<string>): string {
-	return [COMMENT_HEADING, '', COMMENT_NOTE, '', CODE_FENCE, ...lines, CODE_FENCE].join('\n')
-}
-
 // **A comment that could not be posted fails the record**: it is the round's only copy, so a
 // swallowed refusal would read as a recorded round that exists nowhere.
 async function post_comment(issue: number, lines: ReadonlyArray<string>): Promise<number> {
 	try {
-		const url = await git_gh_issue_write.issue_comment(String(issue), comment_body(lines))
+		const url = await git_gh_issue_write.issue_comment(
+			String(issue),
+			review_comment_round.body_of(lines),
+		)
 
 		console.info(`Recorded ${String(lines.length)} review-finding line(s) in ${url.trim()}.`)
 
@@ -181,8 +182,35 @@ async function post_comment(issue: number, lines: ReadonlyArray<string>): Promis
 	}
 }
 
+// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`). **A carry
+// that fails never fails the record**: this round is recorded, and the comment rounds wait for the
+// next run's.
+async function carry_comment_rounds(root: string): Promise<void> {
+	try {
+		const count = await review_comment_round.carry(root)
+
+		if (count > 0) console.info(`Carried ${String(count)} ${CARRIED_LINE}`)
+	} catch (error) {
+		console.warn(`${CARRY_FAILED_LINE} ${error instanceof Error ? error.message : String(error)}`)
+	}
+}
+
 // The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
+async function append_round(
+	issue: number,
+	lines: ReadonlyArray<string>,
+	root: string,
+): Promise<number> {
+	const ledger_path = observation_ledger_home.issue_path(issue, root)
+
+	await observation_ledger_home.append(ledger_path, lines)
+	console.info(confirmation(lines.length, ledger_path))
+	await carry_comment_rounds(root)
+
+	return 0
+}
+
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
 	const request = to_request(parsed)
 
@@ -196,12 +224,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 
 	if (parsed.comment) return await post_comment(request.issue, lines)
 
-	const ledger_path = observation_ledger_home.issue_path(request.issue, root)
-
-	await observation_ledger_home.append(ledger_path, lines)
-	console.info(confirmation(lines.length, ledger_path))
-
-	return 0
+	return await append_round(request.issue, lines, root)
 }
 
 // **The default is the work tree the command runs in, a lane's inside a lane**.
@@ -232,7 +255,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const review_record_cli = {
 	accepted_values,
 	build_lines,
-	comment_body,
 	parse_finding,
 	run,
 	usage_text,

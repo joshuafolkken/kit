@@ -12,7 +12,10 @@ type UsualTimes = ReadonlyMap<Phase, number>
 
 const IMPLEMENT_PHASE: Phase = 'implement'
 
-// Each phase's ledger stage, from the stage-to-phase names a row's phase is drawn with.
+// Each phase's ledger stage, from the stage-to-phase names a row's phase is drawn with. The ledger's
+// `implement` runs from the dispatch, so it also holds the investigation and the plan the row draws
+// before its `implement` phase: the usual time is the longer, which can only draw a phase as long
+// later, never sooner.
 const PHASE_STAGES: ReadonlyArray<readonly [string, Phase | undefined]> = [
 	[lane_stage_stats.IMPLEMENT, IMPLEMENT_PHASE],
 	...Object.entries(run_board_phase.SHIP_PHASES),

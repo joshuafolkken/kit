@@ -1,0 +1,5 @@
+- rf:bug-risks | low | scripts/version/peer-floor.ts:36 | 2026-10-11 | #3680
+- rf:bug-risks | low | scripts/version/publishable-range-check.ts:95 | 2026-10-11 | #3680
+- rf:tests | low | scripts/version/publishable-range-check.ts:105 | 2026-10-11 | #3680
+- rf:assumptions | low | scripts/version/publishable-range-check.ts:92 | 2026-10-11 | #3680
+- rf:confidence | low | .josh/observations/3680.md | 2026-10-11 | #3680

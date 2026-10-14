@@ -1,0 +1,3 @@
+- rf:tests | low | scripts/uninstall/uninstall-basic-integration.test.ts:164 | 2026-10-13 | #3727
+- rf:project-conventions | low | scripts/uninstall/uninstall-report.ts:3 | 2026-10-13 | #3727
+- rf:confidence | low | .josh/observations/3727.md | 2026-10-13 | #3727

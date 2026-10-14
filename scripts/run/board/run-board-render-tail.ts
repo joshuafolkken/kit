@@ -9,14 +9,13 @@ import type { Phase } from './run-board-phase'
 import { run_board_render_checks } from './run-board-render-checks'
 
 // The end of a running row (joshuafolkken/kit#3769): how long the child has stood at the phase its row
-// leads with, then the kind and the age of the newest thing it did. Both are `H:MM:SS`, one width on
-// every row, so the two start in one column whichever row they are on — where the phase track before
-// them grew with every round. A settled or a waiting row draws neither.
+// leads with, then the kind and the age of the newest thing it did. Both are the row's own `MM:SS`, the
+// minutes never carried into hours (`61:05`). The phase's time is right-aligned to the widest any
+// running row draws, so a three-digit `125:30` and a `00:40` end in one column and the age after them
+// starts in one column whichever row it is on — where the phase track before them grew with every
+// round. A settled or a waiting row draws neither.
 
-const { NOW_ICONS, span_of } = run_board_labels
-// `H:MM:SS` under ten hours, the width a phase's time is right-aligned to.
-const SPAN_WIDTH = span_of(0).length
-const SPAN_BLANK = ' '.repeat(SPAN_WIDTH)
+const { NOW_ICONS, elapsed_of } = run_board_labels
 // A phase past twice its usual time is drawn as long, past three times as alarming.
 const LONG_FACTOR = 2
 const ALARM_FACTOR = 3
@@ -46,15 +45,28 @@ function current_of(row: BoardRow): { phase: Phase; since_ms: number } | undefin
 	return phase === undefined || phase_ms === undefined ? undefined : { phase, since_ms: phase_ms }
 }
 
+// The phase column's width: the widest phase time any running row draws in this frame, and `MM:SS`'s
+// at the least, so a row with none still blanks a column's width.
+function phase_width(header: BoardHeader): number {
+	const spans = (header.layout?.active ?? []).map((row) => {
+		const current = row.state === 'running' ? current_of(row) : undefined
+
+		return current === undefined ? 0 : elapsed_of(header.now_ms - current.since_ms).length
+	})
+
+	return Math.max(elapsed_of(0).length, ...spans)
+}
+
 // How long the child has stood at its phase, colored against the phase's usual time; blanks where no
 // event said when it got there, so the age after it still starts in its column.
 function phase_part(row: BoardRow, header: BoardHeader): string {
 	const current = current_of(row)
+	const width = phase_width(header)
 
-	if (current === undefined) return SPAN_BLANK
+	if (current === undefined) return ' '.repeat(width)
 
 	const elapsed = header.now_ms - current.since_ms
-	const text = span_of(elapsed).padStart(SPAN_WIDTH)
+	const text = elapsed_of(elapsed).padStart(width)
 
 	return tinted(text, phase_color(elapsed, header.usual?.get(current.phase)))
 }
@@ -77,7 +89,7 @@ function activity_part(row: BoardRow, header: BoardHeader): string | undefined {
 
 	const age = header.now_ms - newest.since_ms
 
-	return run_board_header.aged(`${newest.icon} ${span_of(age)}`, age)
+	return run_board_header.aged(`${newest.icon} ${elapsed_of(age)}`, age)
 }
 
 // A row in followup with its pull request's checks on the stream (joshuafolkken/kit#3770), whose end

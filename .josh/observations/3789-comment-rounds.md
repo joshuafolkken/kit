@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/run/ship/run-ship-cli.ts:396 | 2026-10-14 | #3789
+- rf:project-conventions | low | scripts/lane/lane-stop-stats.ts:52 | 2026-10-14 | #3789
+- rf:assumptions | low | scripts/lane/lane-stop-stats.ts:41 | 2026-10-14 | #3789

@@ -1,0 +1,6 @@
+- rf:bug-risks | low | scripts/init/project-profile.ts:149 | 2026-10-13 | #3713
+- rf:performance | low | scripts/init/project-profile.ts:7 | 2026-10-13 | #3713
+- rf:comments | low | scripts/init/kit-written-paths.ts:22 | 2026-10-13 | #3713
+- rf:tests | low | scripts/init/project-profile.test.ts:140 | 2026-10-13 | #3713
+- rf:assumptions | low | scripts/init/project-profile.ts:149 | 2026-10-13 | #3713
+- rf:confidence | low | scripts/init/init-rerun.test.ts:83 | 2026-10-13 | #3713

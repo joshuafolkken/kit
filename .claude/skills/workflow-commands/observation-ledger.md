@@ -106,8 +106,9 @@ could not.
   and appends nothing. That round reads only, so no commit of the run's follows it; a line in the tree
   would be pushed onto the open pull request and its CI would start over. `pnpm josh ship --review`
   does this for a passing round 2. **A round 2 that blocks records in the tree as before** — the fix it
-  stops for is pushed anyway and carries the lines. The comment's lines are outside the count
-  `pnpm josh review:findings` and the retrospective read.
+  stops for is pushed anyway and carries the lines. Once the Issue is closed, the next round recorded
+  to the ledger carries the comment's lines into `<N>-comment-rounds.md` with its own commit, so
+  `pnpm josh review:findings` and the retrospective count them (`review-comment-round.ts`).
 - **`pnpm josh followup` commits any other line appended after the run's commit onto the pull request,
   before the merge** — the residual path, for an observation recorded between the commit and the
   merge. After the merge gates and before the CI wait, `followup` reads the tree and, **only when the
