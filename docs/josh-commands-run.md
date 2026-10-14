@@ -512,7 +512,7 @@ pnpm josh lane:prune
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
-- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 6); applied by `josh epic:next`.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`.
 
 **Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
 

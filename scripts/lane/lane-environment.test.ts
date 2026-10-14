@@ -5,7 +5,7 @@ import { lane_environment } from './lane-environment'
 // joshuafolkken/kit#1490: the acceptance condition this file carries is that a lane gets **its own**
 // `PORT_SEED` while everything else in the root's `.env` reaches it unchanged. A lane that inherited
 // the seed verbatim would put every lane on one pair of ports, and a busy port fails without
-// retrying — at the default six lanes that is E2E failing nearly always, not occasionally.
+// retrying — at six lanes that is E2E failing nearly always, not occasionally.
 
 const COMMENT = '# personal, non-committed'
 const BOT_TOKEN = 'TELEGRAM_BOT_TOKEN=abc:123'
