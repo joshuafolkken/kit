@@ -16,12 +16,13 @@ const NEW_TERMINAL_COMMANDS = ['pnpm runtime set node 22 -g', 'node --version']
 
 // The guide sends a Linux reader to the gh installation page; these are that page's Debian steps,
 // run as root in place of `sudo`, with the curl the image already has. git comes from the same
-// package manager. Only a GitHub scenario's machine has either.
+// package manager, and so does procps: kit's lane commands read processes with its ps and pgrep, which
+// the slim base image does not ship. Only a GitHub scenario's machine has any of them.
 const KEYRING = '/etc/apt/keyrings/githubcli-archive-keyring.gpg'
 const APT_UPDATE = 'apt-get update'
 const GITHUB_TOOLS = [
 	APT_UPDATE,
-	'apt-get install -y git',
+	'apt-get install -y git procps',
 	'mkdir -p -m 755 /etc/apt/keyrings',
 	`curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o ${KEYRING}`,
 	`chmod go+r ${KEYRING}`,

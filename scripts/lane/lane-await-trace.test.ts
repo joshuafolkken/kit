@@ -53,4 +53,19 @@ describe('process_trace_default', () => {
 
 		expect(lane_await.process_trace_default(ISSUE)).toBe(PROCESS_ALIVE)
 	})
+
+	// joshuafolkken/kit#3799 — a pgrep that is not installed never looked, and says so by name.
+	it('refuses a pgrep that is not installed, naming it', () => {
+		vi.mocked(spawnSync).mockReturnValue({
+			error: Object.assign(new Error('spawnSync pgrep ENOENT'), { code: 'ENOENT' }),
+			output: [],
+			pid: 0,
+			signal: KILLED,
+			status: KILLED,
+			stderr: '',
+			stdout: '',
+		})
+
+		expect(() => lane_await.process_trace_default(ISSUE)).toThrow('`pgrep` is not installed')
+	})
 })
