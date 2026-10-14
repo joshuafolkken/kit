@@ -1,6 +1,7 @@
 import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { run_board_fit } from './run-board-fit'
+import { run_board_fresh } from './run-board-fresh'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
@@ -26,6 +27,8 @@ import type { UsualTimes } from './run-board-usual'
 
 const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
+const { padded } = run_board_fresh
+const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
 const BLANK = ' '
 const REPO_SEPARATOR = '/'
@@ -173,13 +176,15 @@ function ended_part(header: BoardHeader): string {
 
 // The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
 // only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
-// the minute it ended.
+// the minute it ended. Its digits are emphasized for a few seconds after a new event resets them
+// (`run-board-fresh.ts`).
 function beat_part(header: BoardHeader, mark: RunMark, width: number): string {
 	const age = age_of(header)
 
 	if (age === undefined) return ended_part(header)
 
-	const part = `${HEADER_ICONS.heartbeat} ${span_of(age).padStart(width)}`
+	const span = span_of(age)
+	const part = `${HEADER_ICONS.heartbeat} ${padded(span, width, aged_fresh(span, age, header))}`
 
 	return WORKING_MARKS.has(mark) ? aged(part, age) : part
 }
@@ -191,6 +196,14 @@ function now_age(now: NowLine | undefined): string {
 	return age === undefined ? '' : span_of(age)
 }
 
+// How long ago what the third line says happened, counted to now: an ended run's age stops at its end,
+// so its last words would otherwise stay fresh on every frame after it.
+function fresh_age(now: NowLine | undefined, header: BoardHeader): number | undefined {
+	const age = now?.age_ms
+
+	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
+}
+
 // The `💓`'s digits, blank where it draws none.
 function beat_span(header: BoardHeader): string {
 	const age = age_of(header)
@@ -199,12 +212,24 @@ function beat_span(header: BoardHeader): string {
 }
 
 // The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
-// works, so a watch or an end stands blank — then its age, digits under theirs.
-function now_time(header: BoardHeader, mark: RunMark, age: string, width: number): string {
+// works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
+// the line says is fresh.
+function now_time(
+	header: BoardHeader,
+	mark: RunMark,
+	now: NowLine | undefined,
+	width: number,
+): string {
 	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
 	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
+	const age = now_age(now)
 
-	return `${icon} ${age.padStart(width)}`
+	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
+}
+
+// What the third line says, emphasized while it is fresh.
+function now_text(now: NowLine, header: BoardHeader): string {
+	return `${now.icon} ${aged_fresh(now.text, fresh_age(now, header), header)}`
 }
 
 // A run's age over the `💓` — or over the minute an ended run ended — over the third line's age: the
@@ -218,7 +243,7 @@ function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined
 	return [
 		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
 		beat_part(header, mark, width),
-		now_time(header, mark, age, width),
+		now_time(header, mark, now, width),
 	]
 }
 
@@ -357,7 +382,7 @@ function header_lines(header: BoardHeader): Array<string> {
 	const times = column_of(time_parts(header, mark, now))
 	const lasts = [progress_part(counts, header), machine_part(counts, header)]
 	const third =
-		now === undefined ? '' : [names.at(-1), times.at(-1), `${now.icon} ${now.text}`].join(GAP)
+		now === undefined ? '' : [names.at(-1), times.at(-1), now_text(now, header)].join(GAP)
 
 	return [...lasts.map((last, line) => [names[line], times[line], last].join(GAP)), third]
 }
