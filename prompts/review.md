@@ -27,6 +27,28 @@ is a verification pass over the fixes, not the first review again
 
 ---
 
+## Before round 1 — the implementer's self-check
+
+**Answer these five over your own diff before the scoped pair that precedes round 1.** A round-1
+High/Medium makes round 2 due, and most of them are of a kind the implementer clears more cheaply
+than a reviewer finds: in a sample of 135 round-1 High/Medium findings, about two in three fell under one of these questions. Fix what an answer turns up; the review, its
+severity tests and the round cap are unchanged.
+
+1. **Tests pin the change** — for each condition, branch or call you added or changed, name the test
+   that turns red when it is deleted or inverted, and check its fixture actually reaches that branch
+   (no assert on a string the code never draws, no comparison against a literal copy).
+2. **Prose matches the code** — grep the docs, prompts and comments for the old wording of every
+   behavior, constant, command and heading you changed, moved or removed, `"the table above"` and
+   rewritten sentences included.
+3. **Failure is not a negative answer** — every timeout, non-zero exit or `gh` failure on a path you
+   touched returns something a caller can tell apart from `false`, `undefined` or "nothing found".
+4. **Every caller moved with it** — grep every reference to a function, list or command you changed,
+   and update each sibling path (the other CLI, the registry, the consumer side) in the same change.
+5. **The Issue is met on HEAD** — the premises you relied on hold on the current tree, and each
+   acceptance criterion is checked off one by one against the diff.
+
+---
+
 ## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
 
 **Run `pnpm josh review:brief --level-only` and use what it prints** — `low` or `medium`, from the

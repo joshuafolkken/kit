@@ -5,7 +5,8 @@
 This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` up to the pull request: a `prrun` never issues `pnpm josh ship` or a merging `pnpm josh followup` — it opens the pull request with `pnpm josh git -y` and ends by `prrun.md` → "The difference — the end of the run". The record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
-0. **A lane child**: `pnpm josh main:merge`, the scoped pair, `pnpm josh ship --detach --review
+0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
+   the implementer's self-check"), the scoped pair, `pnpm josh ship --detach --review
    "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. A stop relaunches a child
    whose prompt names `pnpm josh ship --log <N>` and (Anthropic lane) the re-detach to run after
    the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
@@ -13,7 +14,8 @@ Review results and successful pushes are never turn boundaries.
    `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
    rather than refused.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
-   the gate** — the pre-gate cut (a no-op outside a lane). Then run the final scoped lint/test pair and
+   the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
+   (`prompts/review.md` → "Before round 1 — the implementer's self-check"), run the final scoped lint/test pair and
    `pnpm josh run:review`: it starts `pnpm josh gate` in the background and prints the `/code-review`
    brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
    agent type with that brief (every tool, so `--fix` applies; never a guessed type name).

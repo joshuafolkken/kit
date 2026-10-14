@@ -1,0 +1,8 @@
+{
+	"reason": "#3786 adds the implementer's pre-round-1 self-check section to prompts/review.md and its document-rule test, so round-1 High/Medium findings the implementer can clear stop making round 2 due",
+	"date": "2026-10-14",
+	"growth": {
+		"rules.lines": 22,
+		"ai_cost.on_demand_bytes": 1763
+	}
+}
