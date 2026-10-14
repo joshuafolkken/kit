@@ -273,6 +273,9 @@ or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit reco
 reach the API) has its stale `in-progress` dropped but is **not** parked and
 **not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
 stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
+A failed child whose detached `josh ship` has ended is parked for the ship's stop: the park comment's
+`Why` names the newest `ship-stop` line since the ship's launch, or the ship's result and
+`pnpm josh ship --log <N>` when it ended without one.
 A **cut** child (OPEN, unparked, its lane holding a declared cut with its handoff that no successor
 adopted) is neither parked nor counted: its successor is relaunched in the same
 lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
