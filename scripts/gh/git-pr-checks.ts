@@ -311,13 +311,33 @@ async function default_fetch_pr_state(
 // **`required_stable_reads` is a parameter, not a constant, so the caller can lower it** — `run_checks`
 // passes `WATCH_CONFIRMED_STABLE_READS` when the watch already confirmed completion. It defaults to
 // `DEFAULT_STABLE_READS`, so every caller that names only the branch is exactly where it was.
+// What a caller is shown of each poll it waits on — `followup` reports the checks to the run's event
+// stream from it (joshuafolkken/kit#3770). It decides nothing: the wait reads the same snapshot.
+type SnapshotObserver = (snapshot: PrStateSnapshot) => Promise<void>
+
+function observed_fetcher(observe: SnapshotObserver | undefined): PrStateFetcher {
+	if (observe === undefined) return default_fetch_pr_state
+
+	return async function fetch_observed(
+		branch_name: string,
+		should_read_review_decision: ReviewDecisionPredicate,
+	): Promise<PrStateSnapshot> {
+		const snapshot = await default_fetch_pr_state(branch_name, should_read_review_decision)
+
+		await observe(snapshot)
+
+		return snapshot
+	}
+}
+
 async function wait_for_pr_success_default(
 	branch_name: string,
 	required_stable_reads: number = DEFAULT_STABLE_READS,
+	observe?: SnapshotObserver,
 ): Promise<PrStateSnapshot> {
 	return await wait_for_pr_success({
 		branch_name,
-		fetcher: default_fetch_pr_state,
+		fetcher: observed_fetcher(observe),
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: CHECK_MAX_ATTEMPTS,
 		required_stable_reads,
@@ -383,10 +403,17 @@ export {
 	SECONDS_TO_MS,
 	is_pr_checks_timeout,
 	default_fetch_pr_state,
+	observed_fetcher,
 	MERGE_GATE_EVALUATOR,
 	should_always_read_review_decision,
 }
-export type { MergeProgress, PrStateFetcher, PrStateEvaluator, ReviewDecisionPredicate }
+export type {
+	MergeProgress,
+	PrStateFetcher,
+	PrStateEvaluator,
+	ReviewDecisionPredicate,
+	SnapshotObserver,
+}
 export {
 	collect_blocking_failures,
 	describe_pr_failure,

@@ -3,8 +3,10 @@ import {
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 } from '#scripts/issue/issue-labels'
+import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_checks } from './run-board-checks'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import { run_board_phase, type Phase } from './run-board-phase'
@@ -47,6 +49,8 @@ interface RunActivity extends Partial<SetupRead> {
 	idle_ms?: number | undefined
 	// Each child's newest `lane-phase` or `ship-stage`, by issue (`run-board-lane-event.ts`).
 	lane_events?: ReadonlyMap<number, LaneEvent> | undefined
+	// Each child's newest `pr-checks`, by issue (`run-board-checks.ts`).
+	pr_checks?: ReadonlyMap<number, PrChecks> | undefined
 	// The run's last position is a `stop` that names no child — the run itself ended.
 	is_stopped: boolean
 }
@@ -308,6 +312,7 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 		latest: latest_of(position ?? last),
 		idle_ms: idle_of(events),
 		lane_events: run_board_lane_event.newest_of(events),
+		pr_checks: run_board_checks.newest_of(events),
 		is_stopped: is_ended || is_run_stop(position),
 	}
 }

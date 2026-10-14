@@ -1,0 +1,7 @@
+{
+	"reason": "pr-checks event text and board row rendering for followup checks/CodeRabbit state; the event's issue number goes through issue_cite.plain (+1 import line)",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 234
+	}
+}
