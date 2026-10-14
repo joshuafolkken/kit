@@ -13,6 +13,10 @@ const ALLOW_BUILDS = '--allow-build=esbuild --allow-build=unrs-resolver'
 const BARE_MANIFEST = String.raw`printf '{ "private": true }\n' > package.json`
 const CREATE_SVELTEKIT =
 	'pnpm dlx sv create --template minimal --types ts --no-add-ons --install pnpm .'
+// The `sv` that created the project is the one `pnpm dlx` resolved, so its version is recorded.
+const SV_VERSION = 'pnpm dlx sv --version'
+// The app builds and type-checks before kit is installed and still does after it.
+const SVELTEKIT_CHECKS = 'pnpm build && pnpm check'
 const INSTALL_TARBALL = `pnpm add -D ${ALLOW_BUILDS} "$PACKAGE_TARBALL"`
 // A version published minutes ago is inside pnpm's release-age wait; kit alone is excluded from it
 // (joshuafolkken/kit#2869), so every other dependency keeps the wait.
@@ -76,12 +80,13 @@ function init_pattern(
 	project: string,
 	files: Record<string, string>,
 	setup: ReadonlyArray<string>,
+	project_probes: ReadonlyArray<string> = [],
 ): Scenario {
 	return fresh_machine_spec.define({
 		name: `kit-test-${project}-init`,
 		files,
 		commands: [...setup, ...INIT_COMMANDS],
-		probes: [...INIT_PROBES, ...PATH_PROBES],
+		probes: [...INIT_PROBES, ...project_probes, ...PATH_PROBES],
 	})
 }
 
@@ -107,7 +112,7 @@ const PATTERNS: ReadonlyArray<Scenario> = [
 	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
 	// Git with a first commit on `main`, no GitHub repository.
 	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST]),
-	init_pattern('svelte', {}, [CREATE_SVELTEKIT]),
+	init_pattern('svelte', {}, [CREATE_SVELTEKIT, SV_VERSION, SVELTEKIT_CHECKS], [SVELTEKIT_CHECKS]),
 	// A GitHub repository with `main` already pushed.
 	start_pattern('svelte', {}, [CREATE_SVELTEKIT, ...FIRST_COMMIT, CREATE_REPOSITORY]),
 ]
