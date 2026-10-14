@@ -109,7 +109,7 @@ describe('backlog_drive_cli.merge', () => {
 		vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
 		const merge_child = vi
 			.spyOn(run_merge_cli, 'merge_child')
-			.mockResolvedValue({ token: '2600', code: 0, outcome: 'merged' })
+			.mockResolvedValue({ token: '2600', code: 0, outcome: 'merged', is_offer: true })
 
 		await backlog_drive_cli.merge('2500', '4242')
 

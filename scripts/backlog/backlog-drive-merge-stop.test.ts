@@ -67,6 +67,68 @@ describe('backlog_drive.run_loop — a merge that answers stop', () => {
 	})
 })
 
+// The offer `run:merge` passes through answers `stop` when only person-waiting issues are left. That is
+// the idle watch's to decide through `backlog:offer`, never a stop of the merge (joshuafolkken/kit#3781).
+const OFFERED_STOP = { merges: new Map([[FIRST_CHILD, STOP]]), offered: [FIRST_CHILD] }
+
+describe('backlog_drive.run_pass — an offer stop passed through a merge', () => {
+	it('asks backlog:offer instead of ending, and keeps the run on its watch', async () => {
+		const { ports, calls } = harness({
+			...OFFERED_STOP,
+			finished: [FIRST_CHILD],
+			offers: [offer('watch')],
+		})
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer'])
+		expect(result.kind).toBe('continue')
+		expect(result.state.is_stopping).toBe(false)
+		expect(result.state.stopped_by).toBeUndefined()
+	})
+
+	it('collects the child when the offer answers retry instead of handing the merge back', async () => {
+		const { ports, calls } = harness({
+			merges: new Map([[FIRST_CHILD, 'retry']]),
+			offered: [FIRST_CHILD],
+			finished: [FIRST_CHILD],
+			offers: [offer('watch')],
+		})
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer'])
+		expect(result.kind).toBe('continue')
+		expect(result.state.in_flight).toStrictEqual([])
+	})
+})
+
+describe('backlog_drive — the watch an offer stop leaves to backlog:budget', () => {
+	it('ends when backlog:budget answers stop — the watch off or the maximum reached', async () => {
+		const budget_stop = { ...offer(STOP), reason: 'idle' }
+		const { ports, calls } = harness({
+			...OFFERED_STOP,
+			finished: [FIRST_CHILD],
+			offers: [budget_stop],
+		})
+		const end = await backlog_drive.run_loop(state([FIRST_CHILD]), CONFIG, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'finish'])
+		expect(end).toMatchObject({ reason: STOP, detail: 'idle' })
+	})
+
+	it('launches the issue a person released while the run was watching', async () => {
+		const { ports, calls } = harness({
+			...OFFERED_STOP,
+			finished: [FIRST_CHILD],
+			offers: [offer('watch'), offer('run', [OFFERED])],
+		})
+		const watching = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+		const released = await backlog_drive.run_pass(watching.state, true, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer', `launch ${OFFERED}`])
+		expect(released.state.in_flight).toStrictEqual([OFFERED])
+	})
+})
+
 describe('backlog_drive.run_loop — the children a merge stop waits on', () => {
 	it('collects a child that finishes on a later pass before finishing', async () => {
 		const { ports, calls } = harness({

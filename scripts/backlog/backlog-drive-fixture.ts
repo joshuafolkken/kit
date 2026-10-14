@@ -1,4 +1,5 @@
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+import type { MergeTokenRead } from '#scripts/run/merge/run-merge-token'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
 
@@ -28,7 +29,10 @@ interface Harness {
 
 interface Script {
 	finished?: ReadonlyArray<string>
+	// A scripted token is `run:merge`'s control verdict unless the child is in `offered`, whose token is
+	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
+	offered?: ReadonlyArray<string>
 	// Children `run:merge` handled as parked rather than merged; every other reads as merged.
 	parked?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
@@ -41,6 +45,14 @@ interface Script {
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
 	return { verdict, issues, retries: 0 }
+}
+
+function merge_token(script: Script, issue: string): MergeTokenRead {
+	const token = script.merges?.get(issue)
+
+	if (token === undefined) return { token: NEXT_TOKEN, is_offer: true }
+
+	return { token, is_offer: script.offered?.includes(issue) === true }
 }
 
 // The child-facing ports: a finished child is merged once and then reads as gone.
@@ -58,7 +70,7 @@ function child_ports(
 
 			const outcome = script.parked?.includes(issue) === true ? 'parked' : 'merged'
 
-			return { token: script.merges?.get(issue) ?? NEXT_TOKEN, outcome }
+			return { ...merge_token(script, issue), outcome }
 		},
 	}
 }

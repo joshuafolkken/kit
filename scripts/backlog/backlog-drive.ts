@@ -26,10 +26,14 @@ const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
 // How the loop reads each `run:merge` token — keyed by the producer's own type, so a token added there
 // is a type error here until it is classified. `hand-back` ends the loop at once: a hand-off, a person's
-// stop, the environment down, a foreign owner, an unreadable state. `stop` — a parked backlog or the
-// failure guard — is the offer's `stop` reached through a merge: the child is collected, nothing more
-// starts, and the children still in flight are collected before the loop ends. `await` is a cut resumed
-// in place: the same lane is awaited again.
+// stop, the environment down, a foreign owner, an unreadable state. `stop` — the failure guard, or a
+// failed child left unparked — collects the child, starts nothing more, and collects the children still
+// in flight before the loop ends. `await` is a cut resumed in place: the same lane is awaited again.
+//
+// **The offer `run:merge` passes through is never read here** (joshuafolkken/kit#3781): its `stop` —
+// only person-waiting issues left — is spelled like the control one, and acting on it ended the run
+// without the idle watch. The loop asks `backlog:offer` on the next pass instead, so whether a parked
+// backlog waits or ends is `backlog:budget`'s alone, after a merge as after any other pass.
 type TokenHandling = 'hand-back' | 'stop' | 'await'
 const TOKEN_HANDLING: Readonly<Record<MergeToken, TokenHandling>> = {
 	[MERGE_TOKEN.OVER]: 'hand-back',
@@ -103,7 +107,7 @@ interface DriveEnd {
 	is_finish?: boolean | undefined
 }
 
-type Collected = Pick<MergeResult, 'token' | 'outcome'>
+type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer'>
 
 interface DrivePorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
@@ -209,15 +213,19 @@ function collected_state(
 // One finished child: handed back on an immediate token, otherwise collected.
 async function collect(issue: string, state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const collected = await ports.merge(issue)
-	const { token } = collected
+	const { token, is_offer } = collected
 
 	// An empty first line is a `run:merge` that failed before printing one: never read as a collection.
+	// An offer's `retry` is `backlog:next`'s transport answer, left to the next `backlog:offer`.
 	if (token === '') return ended('merge', state, undefined, issue)
-	if (IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
+	if (!is_offer && IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
 
 	const next = collected_state(issue, collected, state, ports.now().toISOString())
 
-	return { kind: 'continue', state: token === MERGE_TOKEN.STOP ? merge_stopped(issue, next) : next }
+	return {
+		kind: 'continue',
+		state: run_merge_token.is_control_stop(collected) ? merge_stopped(issue, next) : next,
+	}
 }
 
 async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {

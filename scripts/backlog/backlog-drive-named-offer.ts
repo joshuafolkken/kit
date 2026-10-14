@@ -73,7 +73,11 @@ async function classify(
 	const outcome = settled_outcome(result.state)
 
 	if (outcome !== undefined) {
-		await backlog_drive_named.mark_done(issue, { outcome, code: 0, token: 'none' }, owner)
+		await backlog_drive_named.mark_done(
+			issue,
+			{ outcome, code: 0, token: 'none', is_offer: true },
+			owner,
+		)
 
 		return { verdict: 'wait', issues: [], retries: NO_RETRIES }
 	}

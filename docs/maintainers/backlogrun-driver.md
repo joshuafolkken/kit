@@ -97,7 +97,11 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **`--only` ends the run once the named list is done** — it never enters the pool loop.
 - **`pnpm josh backlog:budget` answering `stop`** — an idle watch running out, the maximum reached,
   and, only with the watch turned off by `--idle 0`, an empty backlog, a parked backlog or an
-  unreadable listing. With the watch on, all three wait instead.
+  unreadable listing. With the watch on, all three wait instead — **right after a merge too**: the
+  offer `run:merge` passes through is never read by the driver, so its `stop` (only person-waiting
+  issues left) is not a stop; the next pass asks `backlog:offer`, and `backlog:budget` decides
+  (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — the failure guard, or a failed
+  child left unparked — ends the run there (`run_merge_token.is_control_stop`).
 - **The guards in `backlogrun.md` → "Guards"**, counted over the whole `backlogrun`; whichever binds
   first ends the run.
 - **A `needs-human-review` child stops the whole run** before its commit (`needs-human-review.md`).

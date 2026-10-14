@@ -74,7 +74,11 @@ function ports(world_state: World): LoopPorts {
 		merge: async (issue) => {
 			merge(world_state, issue)
 
-			return { token: 'none', outcome: world_state.parked.has(issue) ? 'parked' : 'merged' }
+			return {
+				token: 'none',
+				is_offer: true,
+				outcome: world_state.parked.has(issue) ? 'parked' : 'merged',
+			}
 		},
 		offer: async (state) => offer(world_state, state),
 		launch: async (issue) => {
