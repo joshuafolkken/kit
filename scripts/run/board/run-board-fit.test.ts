@@ -79,6 +79,16 @@ describe('run_board_fit.fit', () => {
 		expect(lines.at(-1)).toBe('  more 3')
 	})
 
+	// joshuafolkken/kit#3809: the reviewers thanked above the legend are the first to give way.
+	it('drops the thanks before the footer and the legend, and draws them right above the legend', () => {
+		const thanks = ['', '  fish  KittenLab']
+		const parts = parts_of([issues(2)], { thanks, footer: FOOTER })
+		const shown = [...HEADER, '', '  1', '  2']
+
+		expect(fit_wide(parts, 11)).toStrictEqual([...shown, ...thanks, ...LEGEND, ...FOOTER])
+		expect(fit_wide(parts, 10)).toStrictEqual([...shown, ...LEGEND, ...FOOTER])
+	})
+
 	it('keeps the top of a frame when even the header is taller than the pane', () => {
 		const parts = parts_of([issues(3)])
 

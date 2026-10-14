@@ -15,6 +15,7 @@ import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
+import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_tick } from './run-board-tick'
 import { run_board_usage_read } from './run-board-usage-read'
 
@@ -52,6 +53,7 @@ const LIVE_PORTS: BoardPorts = {
 	read_machine: machine_capacity.read_sample,
 	read_usage: run_board_usage_read.usage_reader(),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
+	read_thanks: async () => await run_board_thanks_read.read_thanks(),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.

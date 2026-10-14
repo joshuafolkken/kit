@@ -13,6 +13,7 @@ import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type RunActivity } from './run-board-status'
+import { run_board_thanks } from './run-board-thanks'
 import { run_board_usage } from './run-board-usage'
 
 // One `run:board` redraw. **Three speeds**: the frame is redrawn once a second, on the second, so
@@ -31,6 +32,7 @@ const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
 const { FRESH_STATE, is_due } = run_board_state
 const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
+const { gather_thanks } = run_board_thanks
 
 async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
 	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
@@ -185,6 +187,8 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 		header: header_of(state, local, layout, redraw),
 		notes: run_board_notes.notes_of(local.events, titles_of(state)),
 		resume: local.resume,
+		thanks: state.thanks,
+		link: redraw.ports.link,
 		...bounds,
 	})
 
@@ -227,8 +231,9 @@ async function tick(
 	}
 
 	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
+	const thanked = await gather_thanks(gathered, ports, now_ms, pace)
 
-	return draw_run(await resample(gathered, ports, now_ms), local, { ports, now_ms })
+	return draw_run(await resample(thanked, ports, now_ms), local, { ports, now_ms })
 }
 
 const run_board_tick = {

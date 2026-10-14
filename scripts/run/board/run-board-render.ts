@@ -4,9 +4,7 @@ import {
 	type NotesPart,
 	type PlanLine,
 	type PlanSection,
-	type RowYield,
 	type TerminalSize,
-	type YieldStage,
 } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -17,14 +15,17 @@ import {
 	type BoardRow,
 	type WaveEntry,
 } from './run-board-layout'
+import type { Link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
 import { run_board_render_tail } from './run-board-render-tail'
+import { run_board_render_thanks } from './run-board-render-thanks'
 import { run_board_render_title } from './run-board-render-title'
-import type { ItemState } from './run-board-status'
+import { run_board_row_yield } from './run-board-row-yield'
+import type { Thanks } from './run-board-thanks-csv'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
 // terminal. The header says where the run is; the sections below it follow the plan's order; the
@@ -61,6 +62,9 @@ interface BoardView extends FrameBounds {
 	notes: ReadonlyArray<BoardNote>
 	// The session a stopped run resumes from.
 	resume?: string | undefined
+	// The reviewers thanked above the legend, and the link a name with a page is wrapped in.
+	thanks?: Thanks | undefined
+	link?: Link | undefined
 }
 
 // What every row of one frame is drawn with: the header, how wide the time column is, so a three-digit
@@ -200,28 +204,6 @@ function row_text(row: BoardRow, frame: RowFrame): string {
 	return joined([head_text(row, frame), ...tail, ...notes]).trimEnd()
 }
 
-// The stage each state's row gives way in when the pane is short.
-const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
-	merged: 'finished',
-	done: 'finished',
-	waiting: 'pending',
-	human: 'pending',
-	parked: 'parked',
-	stopped: 'parked',
-	running: 'running',
-}
-
-// A running row is as old as its start; a settled one as its end, or its start where it has none.
-function aged_ms(row: BoardRow): number | undefined {
-	const started = row.status?.started_ms
-
-	return row.state === 'running' ? started : (row.status?.ended_ms ?? started)
-}
-
-function yield_of(row: BoardRow): RowYield {
-	return { stage: YIELD_STAGES[row.state], at_ms: aged_ms(row) }
-}
-
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
 function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
 	const indent = indent_of(prefix, row, frame.header)
@@ -231,7 +213,7 @@ function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
 		(title_limit) => `${indent}${row_text(row, { ...frame, title_limit })}`,
 	)
 
-	return { text, row: yield_of(row) }
+	return { text, row: run_board_row_yield.yield_of(row) }
 }
 
 function bare(text: string): PlanLine {
@@ -390,6 +372,13 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 	return ['', ...run_board_render_legend.legend_of(rows, drawn, notes, named)]
 }
 
+// Names with no link where no terminal opens one: a frame with no `link` draws them plain.
+function thanks_part(view: BoardView): Array<string> {
+	const link = view.link ?? ((text: string): string => text)
+
+	return run_board_render_thanks.thanks_lines(view.thanks ?? [], link, view.size?.columns)
+}
+
 // A live frame is kept within its terminal; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size } = bounds
@@ -404,6 +393,7 @@ function render(view: BoardView): Array<string> {
 		above,
 		plan: plan_sections(header, view.size),
 		notes: notes_part(notes, header),
+		thanks: thanks_part(view),
 		legend: legend_lines(header, notes),
 		footer: view.footer ?? [],
 	}

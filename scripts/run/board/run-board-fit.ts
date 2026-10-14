@@ -5,7 +5,7 @@ import { run_board_labels } from './run-board-labels'
 // A live `run:board` frame kept within the terminal. A frame taller than the pane scrolls the
 // alternate screen as it is written, and the header — the lines that say whether the run moves and
 // how far it is — is what scrolls off. So the parts below it give way instead, least wanted first:
-// the footer, the legend, the finished rows, the notes, the rows not yet started, the parked rows
+// the reviewers thanked above the legend, the footer, the legend, the finished rows, the notes, the rows not yet started, the parked rows
 // and, last, the running rows — what a person keeps the board open to see. Each stage stops once the
 // frame fits, a cut row is counted on its section's `more N` line, and the order a row is drawn in
 // never changes. A line wider than the pane wraps, so every line is counted by the rows it takes on
@@ -52,21 +52,24 @@ interface FrameParts {
 	above: ReadonlyArray<string>
 	plan: ReadonlyArray<PlanSection>
 	notes: NotesPart
+	// The reviewers thanked, drawn right above the legend; none where nobody is.
+	thanks?: ReadonlyArray<string> | undefined
 	legend: ReadonlyArray<string>
 	footer: ReadonlyArray<string>
 }
 
 // One thing that gives way: a part as a whole, one note (the oldest shown), or one issue row.
-type Yielder = 'footer' | 'legend' | 'note' | PlanLine
+type Yielder = 'thanks' | 'footer' | 'legend' | 'note' | PlanLine
 
 interface Cut {
+	thanks: boolean
 	footer: boolean
 	legend: boolean
 	notes: number
 	rows: ReadonlySet<PlanLine>
 }
 
-const NO_CUT: Cut = { footer: false, legend: false, notes: 0, rows: new Set() }
+const NO_CUT: Cut = { thanks: false, footer: false, legend: false, notes: 0, rows: new Set() }
 
 // The columns a line takes on screen: its color escapes take none, an emoji two.
 function width_of(line: string): number {
@@ -117,6 +120,7 @@ function compose(parts: FrameParts, cut: Cut): Array<string> {
 		...parts.above,
 		...plan_lines(parts.plan, cut.rows),
 		...notes_lines(parts.notes, cut.notes),
+		...(cut.thanks ? [] : (parts.thanks ?? [])),
 		...(cut.legend ? [] : parts.legend),
 		...(cut.footer ? [] : parts.footer),
 	]
@@ -156,6 +160,7 @@ function order_of(parts: FrameParts): Array<Yielder> {
 	const notes = parts.notes.lines.map((): Yielder => 'note')
 
 	return [
+		'thanks',
 		'footer',
 		'legend',
 		...yielding(rows, 'finished'),
@@ -175,6 +180,7 @@ function cut_of(order: ReadonlyArray<Yielder>, count: number): Cut {
 	const gone = order.slice(0, count)
 
 	return {
+		thanks: gone.includes('thanks'),
 		footer: gone.includes('footer'),
 		legend: gone.includes('legend'),
 		notes: gone.filter((item) => item === 'note').length,

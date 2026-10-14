@@ -15,7 +15,8 @@ interface ChatFrame {
 	local: LocalRead | undefined
 }
 
-// One frame in the chat's form, with every escape stripped because a chat shows them as text.
+// One frame in the chat's form, with every escape stripped because a chat shows them as text. The
+// reviewers are thanked on the terminal's board alone, so the chat reads no roster.
 async function chat_frame(ports: BoardPorts): Promise<ChatFrame> {
 	let text = ''
 	const chat_ports: BoardPorts = {
@@ -23,6 +24,7 @@ async function chat_frame(ports: BoardPorts): Promise<ChatFrame> {
 		is_tty: false,
 		size: undefined,
 		form: 'chat',
+		read_thanks: undefined,
 		write: (frame) => {
 			text += stripVTControlCharacters(frame)
 		},
