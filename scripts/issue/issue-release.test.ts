@@ -37,6 +37,10 @@ describe('issue_release — the filed release Issue', () => {
 		expect(issue_release.body_of(REPO)).toContain('pnpm josh release')
 	})
 
+	it('says closing it hands back the Issues that wait on the release', () => {
+		expect(issue_release.body_of(REPO)).toContain('issue:release <N> --wait')
+	})
+
 	// joshuafolkken/kit#3825: the release closes it, so the body no longer asks a person to.
 	it('says the release closes it once published', () => {
 		expect(issue_release.body_of(REPO)).toContain(

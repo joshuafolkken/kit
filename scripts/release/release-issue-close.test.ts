@@ -12,6 +12,8 @@ const VERSION = '1.1435.0'
 const MERGED_BLOCKER = 3800
 const OPEN_BLOCKER = 3801
 const SECOND_OPEN_BLOCKER = 3802
+const FOREIGN_BLOCKER = 50
+const FOREIGN_REPO_URL = 'https://api.github.com/repos/joshuafolkken/josh'
 
 type OpenAnswer = Awaited<ReturnType<typeof issue_release_cli.find_open>>
 
@@ -108,6 +110,7 @@ describe('release_issue_close.close_published — the unmerged blockers', () => 
 	it.each([
 		['unreadable', undefined],
 		['malformed', '{"blockedBy":{"nodes":"none"}}'],
+		['not JSON', 'not json'],
 	])('leaves it open and warns when its blockers are %s', async (_label, json) => {
 		given(REPO, RELEASE_ISSUE)
 		given_relations(json)
@@ -115,5 +118,24 @@ describe('release_issue_close.close_published — the unmerged blockers', () => 
 
 		expect(git_gh_command.issue_close).not.toHaveBeenCalled()
 		expect(console.warn).toHaveBeenCalledOnce()
+	})
+})
+
+// A release Issue tracks its own repository's changes; the same number elsewhere is a different Issue.
+describe('release_issue_close.close_published — a blocker in another repository', () => {
+	it('names it instead of linking its number here', async () => {
+		const foreign = { number: FOREIGN_BLOCKER, state: 'OPEN', repository_url: FOREIGN_REPO_URL }
+		const nodes = [{ number: OPEN_BLOCKER, state: 'OPEN' }, foreign]
+
+		given(REPO, RELEASE_ISSUE)
+		given_relations(
+			JSON.stringify({ state: 'OPEN', blockedBy: { nodes, totalCount: nodes.length } }),
+		)
+		await release_issue_close.close_published(VERSION)
+
+		expect(vi.mocked(issue_release_cli.link).mock.calls).toStrictEqual([[OPEN_BLOCKER, REPO]])
+		expect(console.warn).toHaveBeenCalledWith(
+			expect.stringContaining(`joshuafolkken/josh/issues/${String(FOREIGN_BLOCKER)}`),
+		)
 	})
 })

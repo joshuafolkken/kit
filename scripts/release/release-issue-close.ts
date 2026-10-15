@@ -1,4 +1,6 @@
+import { epic_issue } from '#scripts/epic/epic-issue'
 import { epic_parse } from '#scripts/epic/epic-parse'
+import type { IssueReference } from '#scripts/epic/epic-reference'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_child_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
@@ -17,32 +19,61 @@ function published_comment(version: string): string {
 	return `Published in \`v${version}\` by \`pnpm josh release\`.`
 }
 
-function open_numbers_of(json: string | undefined): Array<number> | undefined {
+// Resolved through `epic_issue.blocker_references_of`, so a blocker in another repository keeps that
+// repository instead of reading as the same number here.
+function open_references_of(
+	json: string | undefined,
+	repo: string,
+): Array<IssueReference> | undefined {
 	if (json === undefined) return undefined
-	const nodes = parse_json_object_or_undefined(json, epic_child_schema)?.blockedBy?.nodes ?? []
+	const parsed = parse_json_object_or_undefined(json, epic_child_schema)
 
-	return nodes.filter((node) => !epic_parse.is_state_closed(node.state)).map((node) => node.number)
+	if (parsed === undefined) return undefined
+
+	return epic_issue
+		.blocker_references_of(parsed, repo)
+		.filter((reference) => !epic_parse.is_state_closed(reference.state))
 }
 
 // The blockers still open at publish have not merged, so this release did not carry them.
 // `undefined` when the relations are unreadable: closing then could strand a blocker on a closed
 // release Issue that no open one tracks.
-async function open_blockers_of(issue_number: number): Promise<Array<number> | undefined> {
+async function open_blockers_of(
+	repo: string,
+	issue_number: number,
+): Promise<Array<IssueReference> | undefined> {
 	const json = await git_gh_command.issue_get_state_and_relations(String(issue_number))
 
 	try {
-		return open_numbers_of(json)
+		return open_references_of(json, repo)
 	} catch {
 		return undefined
 	}
 }
 
+// A release Issue tracks only its own repository's changes, so a blocker elsewhere is named for a
+// person to carry rather than linked under a number that means a different Issue here.
+function warn_foreign(repo: string, foreign: ReadonlyArray<IssueReference>): void {
+	for (const reference of foreign) {
+		const cite = session_cite.issue(reference.number, undefined, reference.repo)
+
+		console.warn(`⚠ ${cite} is not in ${repo}, so it was not carried — carry it by hand`)
+	}
+}
+
 // Each unmerged blocker joins the next release Issue — the first link files it, the rest find it
 // open — so an open release Issue still names every change no release has published.
-async function carry_forward(repo: string, blockers: ReadonlyArray<number>): Promise<void> {
-	for (const blocker of blockers) {
+async function carry_forward(repo: string, blockers: ReadonlyArray<IssueReference>): Promise<void> {
+	const own = blockers.filter((blocker) => blocker.repo === repo)
+
+	warn_foreign(
+		repo,
+		blockers.filter((blocker) => blocker.repo !== repo),
+	)
+
+	for (const blocker of own) {
 		// eslint-disable-next-line no-await-in-loop -- the first link files the Issue the rest join
-		await issue_release_cli.link(blocker, repo)
+		await issue_release_cli.link(blocker.number, repo)
 	}
 }
 
@@ -50,7 +81,7 @@ async function close_and_carry(
 	repo: string,
 	issue_number: number,
 	version: string,
-	blockers: ReadonlyArray<number>,
+	blockers: ReadonlyArray<IssueReference>,
 ): Promise<void> {
 	const cite = `release Issue ${session_cite.issue(issue_number, undefined, repo)}`
 	const is_closed = await git_gh_command.issue_close(
@@ -69,7 +100,7 @@ async function close_and_carry(
 }
 
 async function close_issue(repo: string, issue_number: number, version: string): Promise<void> {
-	const blockers = await open_blockers_of(issue_number)
+	const blockers = await open_blockers_of(repo, issue_number)
 
 	if (blockers === undefined) {
 		const cite = session_cite.issue(issue_number, undefined, repo)

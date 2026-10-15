@@ -44,6 +44,8 @@ function body_of(repo: string): string {
 		'',
 		'`pnpm josh release` closes this Issue once that release is published: the next blocker files a new one, so an open release Issue names only unreleased work.',
 		'',
+		'Every Issue this one blocks needs the published version (`pnpm josh issue:release <N> --wait`); closing this Issue hands each of them back to the backlog.',
+		'',
 		'`auto-ok` is never applied to this Issue by a run; a person may apply it.',
 		'',
 	].join('\n')

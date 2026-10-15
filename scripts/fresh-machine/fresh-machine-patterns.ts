@@ -27,13 +27,15 @@ const INIT_COMMANDS = [INSTALL_TARBALL, 'pnpm exec josh init', GATE]
 // `josh start` leaves the project on its setup branch, where the gate asks for the scoped checks
 // first; this is the line its refusal hands back.
 const SCOPED_CHECKS = 'pnpm josh lint:related && pnpm josh test:related'
-const START_COMMANDS = [
-	EXCLUDE_RELEASE_AGE,
-	INSTALL_PUBLISHED,
-	'pnpm exec josh start --yes --github',
-	SCOPED_CHECKS,
-	GATE,
-]
+const START = 'pnpm exec josh start --yes --github'
+
+// An agent names the profile rather than leaving it to detection, so a pattern that knows its
+// profile passes it.
+function start_commands(profile: string | undefined): Array<string> {
+	const start = profile === undefined ? START : `${START} --profile ${profile}`
+
+	return [EXCLUDE_RELEASE_AGE, INSTALL_PUBLISHED, start, SCOPED_CHECKS, GATE]
+}
 
 // `gh auth login` cannot run without a person, and it is what points git at gh for credentials; with
 // the token in the environment this is the same step.
@@ -60,13 +62,29 @@ const PATH_PROBES = [
 	`mkdir -p ${NODE_ONLY} && ln -sf "$(command -v node)" ${NODE_ONLY}/node && ${BARE_SHELL} 'PATH="$HOME/node-only:$PATH" ./node_modules/.bin/josh gate'`,
 ]
 
+// What a `josh start` run is checked against before the PATH states: the profile it recorded, the
+// repository's visibility and branch, its labels, and the files the first commit on `main` holds. Where
+// `main` already had a commit, `josh start` opens a setup Issue and pull request instead of pushing to
+// it; the last four record those, the files the pull request carries and the `main` GitHub holds.
+const PROFILE = 'pnpm josh profile'
+const START_PROBES = [
+	PROFILE,
+	'gh repo view --json visibility,defaultBranchRef',
+	'gh label list --limit 100',
+	'git show --name-only --format= "$(git rev-list --max-parents=0 main)"',
+	'gh issue list --state all --json number,title,state,labels',
+	'gh pr list --state all --json number,title,state,headRefName,labels,closingIssuesReferences',
+	'gh pr diff --name-only',
+	'git log --oneline origin/main',
+]
+
 // What a `josh init` run is checked against after the gate: the profile it chose, the files it left
 // (a `./.git` line is a repository it should not have made), and a second run that changes nothing.
 const PROJECT_FILES =
 	'find . -name node_modules -prune -o -name .git -prune -o -type f -print | sort'
 const CHECKSUMS = `${PROJECT_FILES} | xargs sha256sum`
 const INIT_PROBES = [
-	'pnpm josh profile',
+	PROFILE,
 	'find . -name node_modules -prune -o -print | sort',
 	`${CHECKSUMS} > "$HOME/before-second-init.sha" && pnpm exec josh init && ${CHECKSUMS} | diff "$HOME/before-second-init.sha" -`,
 ]
@@ -94,24 +112,25 @@ function start_pattern(
 	project: string,
 	files: Record<string, string>,
 	setup: ReadonlyArray<string>,
+	profile?: string,
 ): Scenario {
 	return fresh_machine_spec.define({
 		name: `kit-test-${project}-start`,
 		requires_github: true,
 		package_source: 'published',
 		files,
-		commands: [SIGN_IN, ...setup, ...START_COMMANDS],
-		probes: PATH_PROBES,
+		commands: [SIGN_IN, ...setup, ...start_commands(profile)],
+		probes: [...START_PROBES, ...PATH_PROBES],
 	})
 }
 
 const PATTERNS: ReadonlyArray<Scenario> = [
 	init_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
 	// No Git: `josh start` creates the repository, the first commit and the GitHub repository.
-	start_pattern('lua', LUA_FILES, [MACHINE_IDENTITY, BARE_MANIFEST]),
+	start_pattern('lua', LUA_FILES, [MACHINE_IDENTITY, BARE_MANIFEST], 'basic'),
 	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
 	// Git with a first commit on `main`, no GitHub repository.
-	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST]),
+	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST], 'basic'),
 	init_pattern('svelte', {}, [CREATE_SVELTEKIT, SV_VERSION, SVELTEKIT_CHECKS], [SVELTEKIT_CHECKS]),
 	// A GitHub repository with `main` already pushed.
 	start_pattern('svelte', {}, [CREATE_SVELTEKIT, ...FIRST_COMMIT, CREATE_REPOSITORY]),

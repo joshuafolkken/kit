@@ -1,7 +1,7 @@
 {
-	"reason": "Closing the release Issue on publish needs a module that reads its blockers and carries the unmerged ones to the next release Issue, so none is stranded on a closed one (#3825 review)",
+	"reason": "Round-2 fix: resolve release-Issue blockers through epic_issue.blocker_references_of so a cross-repository blocker is named, not linked as a same-numbered local Issue",
 	"date": "2026-10-15",
 	"growth": {
-		"scripts.code_lines": 72
+		"scripts.code_lines": 94
 	}
 }
