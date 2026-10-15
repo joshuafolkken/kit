@@ -62,6 +62,18 @@ describe('lane_ledger.read_entries on a load sample memory', () => {
 		])
 	})
 
+	// joshuafolkken/kit#3874: the process breakdown reads back with the sample it was taken in.
+	it('keeps the process kinds a load sample carries', () => {
+		const target = ledger('process-kinds')
+		const processes = [{ kind: 'eslint', cpu_percent: 180, rss_mb: 2048, count: 3 }]
+
+		lane_ledger.append(target, { kind: 'load', at: AT, load: 9, processes })
+
+		expect(lane_ledger.read_entries(target)).toStrictEqual([
+			{ kind: 'load', at: AT, load: 9, processes },
+		])
+	})
+
 	// joshuafolkken/kit#3593: a row measured before the rename keeps its load and loses its memory.
 	it('reads a pre-rename load sample without its memory fields', () => {
 		const target = ledger('pre-rename')

@@ -1,0 +1,8 @@
+{
+	"reason": "#3874 adds the per-kind process load sampler and its lane:stats table (two new modules with tests) and documents the new ledger field and table",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 160,
+		"prose.long_paragraphs": 1
+	}
+}
