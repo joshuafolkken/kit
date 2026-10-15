@@ -12,6 +12,7 @@ const FIXTURE_METRICS: Metrics = {
 	rules: { files: 2, lines: 5 },
 	guards: 2,
 	ai_cost: { resident_bytes: 120, on_demand_bytes: 4000 },
+	prose: { long_paragraphs: 3, excess_bold: 7 },
 }
 // The default session language prints nothing (joshuafolkken/kit#3398).
 const PER_TURN_HOOK_BYTES = 0
@@ -92,6 +93,7 @@ describe('metrics_logic.render', () => {
 				'rules    2 files · 5 lines',
 				'guards   2',
 				'ai cost  120 resident bytes · 4000 on-demand bytes',
+				'prose    3 long paragraphs · 7 excess bold spans',
 			].join('\n'),
 		)
 	})

@@ -103,6 +103,7 @@ pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and 
 
 - **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
 - **kit only**: it counts kit's own rule documents and guards, so a consumer's gate leaves the step out.
+- The prose density is held too, over `README.md`, `docs/`, `prompts/` and `.claude/skills/`. It counts paragraphs over 400 characters, and bold spans beyond the first in each section.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
 - **Durations** fail past +10% of this machine's baseline; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
 
