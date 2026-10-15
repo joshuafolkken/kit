@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { process_identity } from './process-identity'
 import { process_identity_fixture } from './process-identity-fixture'
 
@@ -56,6 +56,13 @@ function fail_binding(): never {
 	throw new Error('bind denied')
 }
 
+// The kernel's answer to a sandboxed caller that found the process but may not signal it.
+function refuse_signals(): void {
+	vi.spyOn(process, 'kill').mockImplementation(() => {
+		throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+	})
+}
+
 describe('process_identity.is_same_process — a pid is not a process identity', () => {
 	it.skipIf(!has_start_probe)('recognizes this process by its own pid and start time', () => {
 		expect(process_identity.is_same_process(process.pid, process_identity.own_start())).toBe(true)
@@ -84,6 +91,59 @@ describe('process_identity.is_same_process — a pid is not a process identity',
 	// callers resolve that in opposite directions, so it must reach them intact.
 	it('answers undefined for a live pid whose record carries no start time', () => {
 		expect(process_identity.is_same_process(process.pid, undefined)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3840: a Codex lane's ship probes its supervisor from inside a sandbox that may
+// only signal its own processes, so a refusal must not read as a process that is gone.
+describe('process_identity.is_present_pid — whether a pid names any process', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('answers true for this process', () => {
+		expect(process_identity.is_present_pid(process.pid)).toBe(true)
+	})
+
+	it.each([DEAD_PID, GROUP_PID, NEGATIVE_PID])('answers false for %i', (pid) => {
+		expect(process_identity.is_present_pid(pid)).toBe(false)
+	})
+
+	it('answers true for a process the caller is refused permission to signal', () => {
+		refuse_signals()
+
+		expect(process_identity.is_present_pid(process.pid)).toBe(true)
+	})
+})
+
+describe('process_identity.is_present_process — a pid is not a process identity, signalled or not', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it.skipIf(!has_start_probe)('recognizes this present process by its pid and start time', () => {
+		const own_start = process_identity.own_start()
+
+		expect(process_identity.is_present_process(process.pid, own_start)).toBe(true)
+	})
+
+	it.skipIf(!has_native_start_probe)('refuses a present pid the record did not name', () => {
+		expect(process_identity.is_present_process(process.pid, FOREIGN_START)).toBe(false)
+	})
+
+	it('answers false for a pid no process holds', () => {
+		expect(process_identity.is_present_process(DEAD_PID, FOREIGN_START)).toBe(false)
+	})
+
+	it('compares the start time of a process the caller is refused permission to signal', () => {
+		refuse_signals()
+
+		expect(process_identity.is_present_process(process.pid, FOREIGN_START, () => 'own')).toBe(false)
+		expect(process_identity.is_present_process(process.pid, 'own', () => 'own')).toBe(true)
+	})
+
+	it('answers undefined for a present pid whose record carries no start time', () => {
+		expect(process_identity.is_present_process(process.pid, undefined)).toBeUndefined()
 	})
 })
 

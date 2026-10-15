@@ -52,6 +52,7 @@ const PROBE_ENVIRONMENT = { TZ: 'UTC', LC_ALL: 'C' }
 // `process.kill(pid, 0)` runs every permission check and delivers nothing, so it is the standard
 // liveness probe: it throws `ESRCH` where the process is gone.
 const LIVENESS_SIGNAL = 0
+const NO_SUCH_PROCESS = 'ESRCH'
 // Below this a pid is not a process: `0` addresses the caller's own process group and anything
 // negative addresses another group, so a truncated or hand-edited record carrying either would
 // otherwise answer "alive" forever.
@@ -79,16 +80,26 @@ interface StartProbes {
 	read_ps_start: (pid: number) => string | undefined
 }
 
-function is_live_pid(pid: number): boolean {
-	if (pid < LOWEST_REAL_PID) return false
-
+// The code the liveness probe was refused with, or nothing where the caller may signal the process.
+function signal_refusal(pid: number): string | undefined {
 	try {
 		process.kill(pid, LIVENESS_SIGNAL)
 
-		return true
-	} catch {
-		return false
+		return undefined
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code ?? NO_SUCH_PROCESS
 	}
+}
+
+function is_live_pid(pid: number): boolean {
+	return pid >= LOWEST_REAL_PID && signal_refusal(pid) === undefined
+}
+
+// **Whether a pid names any process at all, for a reader that may not be allowed to signal it.** Only
+// `ESRCH` proves the process gone: `EPERM` is the kernel refusing a signal to a process it has just
+// found — one under another user, or outside a sandbox that may only signal its own — so it is present.
+function is_present_pid(pid: number): boolean {
+	return pid >= LOWEST_REAL_PID && signal_refusal(pid) !== NO_SUCH_PROCESS
 }
 
 // Linux exposes field 22 as the process start time in clock ticks since boot. The command name in
@@ -315,6 +326,19 @@ function is_same_process(
 	return matches_recorded_start(pid, recorded_start, read)
 }
 
+// `is_same_process` for a reader that may not be allowed to signal the writer (`is_present_pid`): a
+// refused signal still compares the start time, so a reissued pid separates from its writer here too.
+function is_present_process(
+	pid: number,
+	recorded_start: string | undefined,
+	read: (pid: number) => string | undefined = read_start,
+): boolean | undefined {
+	if (!is_present_pid(pid)) return false
+	if (recorded_start === undefined) return undefined
+
+	return matches_recorded_start(pid, recorded_start, read)
+}
+
 // **Whether a record is the caller's own, which is a different question from whether its writer is
 // alive**. `is_same_process` asks about the recorded process; this asks
 // whether that process *is this one*. A supervisor that has been replaced reads its successor's
@@ -339,6 +363,8 @@ const process_identity = {
 	is_live_beacon,
 	is_live_pid,
 	is_own_process,
+	is_present_pid,
+	is_present_process,
 	is_same_process,
 	open_beacon,
 	own_fields,
