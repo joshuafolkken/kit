@@ -2,54 +2,38 @@
 
 ## 規則
 
-**GitHub への操作は `gh api`（REST）で書く。`gh issue …` / `gh pr …` / `gh repo …` といったサブコマンド
-形は使わない。** クラウドセッション（エージェントのコンテナ）では GitHub の GraphQL エンドポイントへの
-egress が `403` で拒否されるため、GraphQL を経由するサブコマンドはそこで一切動かない。
+**GitHub への操作は `gh api`（REST）で書く。** `gh issue …` / `gh pr …` / `gh repo …` のサブコマンド形は使わない —
+クラウドセッションでは GraphQL への egress が `403` で拒否される。
 
-例外は 2 つだけである。
+例外は 2 つだけ:
 
-- **`gh auth token`** — ローカルの CLI が既に持っている認証情報を返すだけで、どのエンドポイントにも
-  接続しない。REST で書き換えられる呼び出しが存在しない。読み出すのはローカルの認証情報だけである。
-- **GitHub Actions のワークフロー** — ランナー上では `gh` が通常どおり動き、`gh pr merge --auto` が使う
-  API は GraphQL にしか存在しない。
+- `gh auth token` — ローカルの認証情報を返すだけで、どのエンドポイントにも接続しない
+- GitHub Actions のワークフロー — ランナー上では `gh` が動き、`gh pr merge --auto` の API は GraphQL にしか無い
 
 ## 認証は環境によって別物である
 
-**手元では `gh auth login` を一度実行すれば足り、`GH_TOKEN` は要らない。** 認証情報は OS のキーチェーンに
-入り、`gh auth status` が読めるのはそれである。
-
-**CI とクラウドセッションにはそのキーチェーンが無いので、`GH_TOKEN` を設定する。** どちらか一方しか書かない
-説明は、もう一方の環境で誤った案内になる —— 手元で `gh auth login` 済みの機械に `GH_TOKEN` を設定させたり、
-クラウドで存在しないキーチェーンを探させたりする。
+**手元では `gh auth login` を一度実行すれば足り、`GH_TOKEN` は要らない**（認証情報は OS のキーチェーン）。
+**CI とクラウドセッションにはキーチェーンが無いので、`GH_TOKEN` を設定する。** 説明を書くときは両方を書く。
 
 ## 散文でも「指示の形」なら REST で書く
 
-**この規則はフェンス付きコードブロックの中だけの話ではない。文書の散文に書かれたコマンドでも、読み手に
-実行を指示する形であれば REST で書く。**
+**文書の散文に書いたコマンドでも、読み手に実行を指示する形なら REST で書く。**
 
-- **指示の形**（REST で書く）— 「数えるのはコマンド 1 つで済む: `…`」「各子 Issue に `…` でコメントを
-  書く」のように、読み手がそのまま打つことを期待している書き方。
-- **引用の形**（そのままでよい）— 「`gh issue create` は使わない」のような禁止の引用や、「このサブコマンドは
-  GraphQL を経由する」のような CLI の対応状況の記録。書き換えると、何を禁じているのかが読めなくなる。
+- 指示の形（REST で書く）— 「数えるのはコマンド 1 つで済む: `…`」「各子 Issue に `…` でコメントを書く」のように、
+  読み手がそのまま打つ書き方
+- 引用の形（そのままでよい）— 「`gh issue create` は使わない」のような禁止の引用や、CLI の対応状況の記録
 
-**この区別は機械には引けない** — 文書ガードはフェンス付きコードブロックだけを走査するので、散文の側は
-書き手がこの区別で守る（`docs/maintainers/gh-rest-rationale.md` → "Why the document guard scans fences only"）。
+文書ガードはフェンス付きコードブロックだけを走査するので、散文は書き手がこの区別で守る
+（`docs/maintainers/gh-rest-rationale.md` → "Why the document guard scans fences only"）。
 
-**書き換えるときは `pnpm josh` のコマンドで置き換えられないかを先に見る。** 例えば Issue の状態を読むのは
-`gh issue view` ではなく `pnpm josh issue:state <N>` で、これはラベルと `human_review` まで一度に返す。
+書き換えるときは先に `pnpm josh` のコマンドで置き換えられないかを見る（例: `gh issue view` ではなく
+`pnpm josh issue:state <N>`）。
 
 ## REST 化は `gh` を不要にしない
 
-**すべての REST 呼び出しは今も `execa('gh', ['api', …])` である。** サブコマンドをやめたことで消えたのは
-GraphQL への依存であって、バイナリへの依存ではない。**`gh` が入っていないコンテナは実在する** — その環境
-では `pnpm josh epic:next` も `pnpm josh pr` も `pnpm josh followup` も完了できず、`fullrun`
-は GitHub に一切到達しない。`git push` が通り `GH_TOKEN` が効いていても、である。
+REST 呼び出しも `execa('gh', ['api', …])` なので、`gh` が無いコンテナでは `pnpm josh epic:next` /
+`pnpm josh pr` / `pnpm josh followup` も完了しない。`epic:next` / `epic:bundle` / `issue:scout` / `epic --add` が
+「Could not read this repository from `git remote`, so the children cannot be keyed by repository — check
+`gh auth status` and that this is a checkout with an `origin` remote.」と出したら、**まず `gh` の有無を確かめる。**
 
-`check_gh_installed` は `gh CLI is not installed` と明示するが、git remote からリポジトリを読む側の
-コマンド（`epic:next` / `epic:bundle` / `issue:scout` / `epic --add`）は「Could not read this
-repository from `git remote`, so the children cannot be keyed by repository — check `gh auth status`
-and that this is a checkout with an `origin` remote.」と出るため、原因が `gh` の不在であることが読み取り
-にくい。**そのメッセージを見たら、まず `gh` の有無を確かめる。**
-
-環境ごとの前提と、開けるべきホストの一覧は
-[`docs/cloud-session.md`](https://github.com/joshuafolkken/kit/blob/main/docs/cloud-session.md) にある。
+環境ごとの前提とホストは [`docs/cloud-session.md`](https://github.com/joshuafolkken/kit/blob/main/docs/cloud-session.md)。

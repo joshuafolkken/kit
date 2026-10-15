@@ -129,10 +129,12 @@ function is_expired(hold: RunHold, now: Date): boolean {
 // nothing. Only a recorded session that is provably gone counts — no owner, or a live pid whose start
 // cannot be read, leaves the age as the whole test. **A stop-marked record is exempt**: a `halfrun` or
 // `prrun` stop is held across a person's latency on purpose, long after its session ends.
-function is_owner_gone(hold: RunHold): boolean {
-	const is_stop_mark = hold.is_halfrun_stop === true || hold.prrun_stop_head !== undefined
+function is_stop_marked(hold: RunHold): boolean {
+	return hold.is_halfrun_stop === true || hold.prrun_stop_head !== undefined
+}
 
-	if (is_stop_mark || hold.owner_pid === undefined) return false
+function is_owner_gone(hold: RunHold): boolean {
+	if (is_stop_marked(hold) || hold.owner_pid === undefined) return false
 
 	return process_identity.is_same_process(hold.owner_pid, hold.owner_start) === false
 }
@@ -317,6 +319,7 @@ function unknown_message(): string {
 }
 
 const run_hold = {
+	is_stop_marked,
 	FORCE_RELEASE_COMMAND,
 	HOLD_MAX_AGE_HOURS,
 	HOLD_MAX_AGE_MS,

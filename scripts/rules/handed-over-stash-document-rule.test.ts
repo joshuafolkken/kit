@@ -32,17 +32,17 @@ const MARKERS: ReadonlyArray<Marker> = [
 	},
 	{ document_path: OPERATING_RULES, statement: '`needs-decision` では止まらない' },
 	{ document_path: OPERATING_RULES, statement: '持ち主が計画に理由を書き' },
-	{ document_path: PLAN_COMMENT, statement: `復元手順には ${STASH_POP} だけを書く` },
-	{
-		document_path: PLAN_COMMENT,
-		statement: '`git stash apply` / `git stash pop` と「drop しない」という条件は書かない',
-	},
+	// joshuafolkken/kit#3870: the plan-comment rule is a pointer to the one statement above, not a copy.
 	{ document_path: PLAN_COMMENT, statement: '`operating-rules.md` → "no-self-staging"' },
 ]
 
 describe('the handed-over stash rule', () => {
 	it.each(MARKERS)('$document_path states $statement', ({ document_path, statement }) => {
 		expect(read_unwrapped(document_path)).toContain(statement)
+	})
+
+	it('plan-comment.md does not restate the refused forms the pointer leads to', () => {
+		expect(read_unwrapped(PLAN_COMMENT)).not.toContain('「drop しない」')
 	})
 
 	// The plan-comment pointer is only correct while the heading it names still exists.

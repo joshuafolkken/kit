@@ -1,5 +1,5 @@
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
-import { investigation_refusal } from '#scripts/delegation/investigation-guard'
+import { investigation_outcome } from '#scripts/delegation/investigation-guard'
 import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_phase } from '#scripts/lane/lane-phase'
@@ -25,35 +25,30 @@ import { step_zero_notice } from './step-zero-notice'
 // union matcher (`Bash|Edit|Read|Write|AskUserQuestion`) refuses exactly what the three separate
 // entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask row,
 // and the batching and investigation guards self-gate away from it. A
-// refusal from any guard wins first; only when none refuses is the batch guard's non-blocking notice
-// (the whole-file-write notice) emitted. Each guard still honours its own
+// refusal from any guard wins first; only when none refuses is a guard's non-blocking notice or fault
+// (the whole-file-write notice, a lane child's investigation notice) emitted. Each guard still honours its own
 // switch (`JOSH_BATCH_GUARD` / `JOSH_INVESTIGATION_GUARD` / `JOSH_RULE_GUARD`) internally, so this
 // process needs no switch of its own.
 
-// Fold the guards' verdicts into one. A refusal wins over everything else, and the batch guard's
-// reason is shown first to match the entry order the separate hooks had. When nothing refuses,
-// whatever the batch guard reported (a notice, a fault, or nothing) passes through untouched.
-function combine_outcomes(batch: GuardOutcome, extra_reason: string | undefined): GuardOutcome {
-	if (batch.reason !== undefined) return batch
-
-	if (extra_reason !== undefined) {
-		return { reason: extra_reason, notice: undefined, fault: undefined }
-	}
-
-	return batch
-}
+const CLEAR: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
 
 function is_clear(outcome: GuardOutcome): boolean {
 	return outcome.reason === undefined && outcome.notice === undefined && outcome.fault === undefined
 }
 
-// The duplicate-read guard is `notice`-mode in a lane child, so it is the second guard that can raise a
-// non-refusal notice. Its notice is surfaced only where nothing else spoke —
-// a refusal from any guard, or the batch guard's own notice, wins first.
-function with_duplicate_notice(combined: GuardOutcome, notice: string | undefined): GuardOutcome {
-	if (notice === undefined || !is_clear(combined)) return combined
+// Fold the guards' verdicts into one. A refusal wins over everything else, in the entry order the
+// separate hooks had: the outcomes in the order given, then the rule guard's reason. When nothing
+// refuses, the first guard that spoke passes its notice or fault through untouched — so a lane child's
+// `notice`-mode guidance reaches the model rather than only spending its stamp (joshuafolkken/kit#3877).
+function combine_outcomes(
+	outcomes: ReadonlyArray<GuardOutcome>,
+	rule_reason: string | undefined,
+): GuardOutcome {
+	const reason = outcomes.find((outcome) => outcome.reason !== undefined)?.reason ?? rule_reason
 
-	return { reason: undefined, notice, fault: undefined }
+	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
+
+	return outcomes.find((outcome) => !is_clear(outcome)) ?? CLEAR
 }
 
 // The Step 0 reminder is the last word: asked only where every guard stayed
@@ -70,14 +65,13 @@ function with_step_zero_notice(outcome: GuardOutcome, raw_payload: string): Guar
 // once-per-run stamp, so short-circuiting on the first refusal would change which guard is allowed to
 // fire on a later call.
 function guard_outcome(raw_payload: string): GuardOutcome {
-	const batch = batch_outcome(raw_payload)
-	const investigation = investigation_refusal(raw_payload)
-	const duplicate = duplicate_read_outcome(raw_payload)
-	const rule = delivered_rules.delivery(raw_payload)
-	const duplicate_refusal = duplicate.reason
-	const combined = combine_outcomes(batch, investigation ?? duplicate_refusal ?? rule)
+	const outcomes = [
+		batch_outcome(raw_payload),
+		investigation_outcome(raw_payload),
+		duplicate_read_outcome(raw_payload),
+	]
 
-	return with_duplicate_notice(combined, duplicate.notice)
+	return combine_outcomes(outcomes, delivered_rules.delivery(raw_payload))
 }
 
 // The synchronous verdict the Codex adapter asks for, with the Step 0 reminder as its last layer.

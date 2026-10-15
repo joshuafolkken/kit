@@ -8,6 +8,8 @@ interface ShipStop extends ShipResume {
 }
 
 const CHILD_INVOCATION = 'fullrun'
+// What a brokered reviewer's prompt ends with, so the one pattern below finds it too.
+const REVIEW_INVOCATION = 'the reviewer of lane'
 const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 // What a detached `josh ship --detach` supervisor's command line carries. It ends
 // with the `"<title> #<N>"` title on purpose, so the liveness pattern below finds it by the same trailing
@@ -31,10 +33,20 @@ function child_invocation(issue: string): string {
 // pattern stopped matching as finished — parking an issue that was still shipping. The supervisor's
 // command line ends with its `#<N>` title, so the one extended pattern covers both, and the wait, the
 // liveness read and the reaper keep searching with a single pattern.
+//
+// **A brokered reviewer counts as the child too** (joshuafolkken/kit#3878). The lane's broker starts it
+// for a ship and it outlives a ship that stopped waiting: unmatched, the lane read as finished, the
+// run parked the issue under it, and the reap left it running checks in the parked lane.
 function process_pattern(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
 
-	return `(${CHILD_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain(issue)}$`
+	return `(${CHILD_INVOCATION}|${REVIEW_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain(issue)}$`
+}
+
+function review_invocation(issue: string): string {
+	issue_number_shape.require_issue_number(issue)
+
+	return `${REVIEW_INVOCATION} ${issue_cite.plain(issue)}`
 }
 
 function resume_invocation(issue: string): string {
@@ -82,6 +94,7 @@ const lane_child_invocation = {
 	outage_resume_invocation,
 	process_pattern,
 	resume_invocation,
+	review_invocation,
 	ship_stop_invocation,
 }
 

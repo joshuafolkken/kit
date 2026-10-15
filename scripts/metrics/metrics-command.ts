@@ -14,6 +14,7 @@ import { metrics_duration_probe } from './metrics-duration-probe'
 import { metrics_durations, type Durations } from './metrics-durations'
 import { metrics_logic, type AiCostTotals, type Metrics, type ScriptFile } from './metrics-logic'
 import { metrics_ratchet, type Verdict } from './metrics-ratchet'
+import { prose_density, type ProseTotals } from './prose-density'
 
 // `josh metrics [--accept --reason "<why>"]` — the I/O around `metrics-logic.ts` and
 // `metrics-ratchet.ts`: enumerate the files, count them, print the totals, and hold them to the same
@@ -46,6 +47,9 @@ const RESIDENT_RULES = 'CLAUDE.md'
 // The instruction files an agent loads at the start of every session — Claude Code, Codex, Gemini.
 const RESIDENT_DOCUMENTS: ReadonlyArray<string> = [RESIDENT_RULES, 'AGENTS.md', 'GEMINI.md']
 const RULES_DIR = 'prompts'
+// The prose whose density is held: the landing page, the docs, the rules and the skills.
+const PROSE_DOCUMENT = 'README.md'
+const PROSE_DIRS: ReadonlyArray<string> = ['docs', RULES_DIR, skill_meta.SKILL_ROOT]
 const MARKDOWN_EXTENSION = '.md'
 const ENCODING = 'utf8'
 // `YYYY-MM-DD` — the first ten characters of an ISO timestamp.
@@ -147,6 +151,12 @@ function ai_cost(root: string, prompts: ReadonlyArray<string>): AiCostTotals {
 	)
 }
 
+function prose(root: string): ProseTotals {
+	const directories = PROSE_DIRS.flatMap((directory) => markdown_paths(path.join(root, directory)))
+
+	return prose_density.totals(read_texts([path.join(root, PROSE_DOCUMENT), ...directories]))
+}
+
 // A tree that holds no command map names no guard: the gate's kit fixture carries no `scripts/`.
 async function command_names(root: string): Promise<ReadonlyArray<string>> {
 	const file = path.join(root, COMMAND_MAP_FILE)
@@ -169,6 +179,7 @@ async function measure(root: string): Promise<Metrics> {
 		rules: metrics_logic.rule_totals(rule_texts),
 		guards,
 		ai_cost: ai_cost(root, prompts),
+		prose: prose(root),
 	}
 }
 

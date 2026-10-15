@@ -20,6 +20,28 @@ function read_exit_record(transcript: string): ClaudeResultEvent | undefined {
 		.findLast((record) => record !== undefined)
 }
 
-const agent_exit_record = { read_exit_record }
+function event_type(line: string): unknown {
+	const value = json_value.parse_or_undefined(line)
+
+	return typeof value === 'object' && value !== null && 'type' in value ? value.type : undefined
+}
+
+// The Claude stream events a turn is made of — a Codex transcript's own (`turn.completed`, `error`)
+// are none of these, so one never reads as killed.
+const TURN_TYPES: ReadonlySet<unknown> = new Set(['system', 'assistant', 'user', 'stream_event'])
+
+// Whether a Claude session was killed inside a turn: its last event is a turn's, not a `result`. A
+// finished turn ends on a result; a background task can wake the session for another turn, and a
+// process killed before that turn's result leaves other events last.
+function is_mid_turn(transcript: string): boolean {
+	const last = transcript
+		.split('\n')
+		.map((line) => event_type(line))
+		.findLast((type) => type !== undefined)
+
+	return TURN_TYPES.has(last)
+}
+
+const agent_exit_record = { is_mid_turn, read_exit_record }
 
 export { agent_exit_record }

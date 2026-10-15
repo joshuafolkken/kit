@@ -13,9 +13,8 @@ point-of-use document, never an entry read, and the single source of the heartbe
 pnpm josh run:progress --wait --output <the transcript path of each delegated unit>   # in the background
 ```
 
-**Start it once; it reports by itself.** Each silence interval appends the
-five labelled lines to the run's event stream as a heartbeat and to the ambient log, prints nothing to
-standard output and keeps running — so a scheduled report never wakes the session, and the session
+**Start it once; it reports by itself.** Each silence interval appends the five labelled lines to the
+event stream and the ambient log, prints nothing to standard output and keeps running — the session
 relays none. **It exits only on one of three, and the command computes which:**
 
 | Exit                                                    | What the session does                                                  |
@@ -27,22 +26,20 @@ relays none. **It exits only on one of three, and the command computes which:**
 **A report is not an exit, and neither is a decline** — with no run recorded it keeps waiting, and the
 `--hours` exit says so on standard error.
 
-**`pnpm josh run:watcher:guard` detects a missed restart**: wired into
-`pretool-guard`, it refuses the next tool call while lane children are in
-flight and the watcher's life record has gone stale — once per run, so the restart is not blocked.
+**`pnpm josh run:watcher:guard` detects a missed restart** — via `pretool-guard` it refuses the next
+tool call while lane children are in flight and the watcher's record is stale, once per run.
 
-**`--mark` at every real report.** Whenever the run reports something of its own, run
-`pnpm josh run:progress --mark` in the same turn to restart the silence clock. The clock is silence,
-never a timer (`docs/josh-commands-run.md` → "`josh run:progress`").
+**`--mark` at every real report** — `pnpm josh run:progress --mark` in the same turn restarts the
+silence clock (`docs/josh-commands-run.md` → "`josh run:progress`").
 
-**Do not keep a progress clock of your own** — the hook refuses the arm rather than asking
+**Do not keep a progress clock of your own** — the hook refuses the arm
 (`scripts/rules/early-heartbeat.ts` → `decide`), though a single correctly-spaced arm is allowed.
 `--wait` is not a wait timer.
 
 **The default interval is twenty minutes, overridable — by the person, not the run.**
-`JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides (the guard reads it through the watcher's reader);
-`josh` → `progress_interval_minutes` in `package.json` sits one step below the variable. **`--interval`
-moves the watcher alone** — it makes the watcher quieter than the floor, never the guard stricter.
+`JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides; `josh` → `progress_interval_minutes` in
+`package.json` sits one step below it. **`--interval` moves the watcher alone** — quieter, never the
+guard stricter.
 Rationale: `docs/maintainers/progress-watcher-rationale.md` → "Why the heartbeat reads as it does".
 
 ### What a report says
@@ -75,21 +72,19 @@ signal tiers are split this way".
 `JOSH_LANE_CHILD` mark** — it still runs `--mark` for the parent's clock, but every reporting form
 (`--wait`, `--once`, the default watch) exits at once with a notice.
 
-**It is started in the target repository's checkout, and `--mark` is run there too.** A heartbeat is
-emitted from the moment a run has started — a registered lane, a held work tree or a carried budget —
-even before any child carries `in-progress`; only a checkout with no run recorded stays silent.
+**It is started in the target repository's checkout, and `--mark` is run there too.** It beats from the
+moment a run has started — a registered lane, a held work tree or a carried budget; only a checkout
+with no run recorded stays silent.
 
 **In a single-issue run, a real report is any turn that puts a progress statement in front of the
-person** — four of them, `--mark` run in the same turn as each: **the Step 0 work summary, the pull
-request opening, each review round's verdict, and any `confirmation` / `failure` / `completion`
-notification or stop.** **A tool result only you read is not one** — a gate run, a `gh` read, an edit.
-`--output` is omitted there, and `record` reads `unread`. In a `backlogrun`, a child merged, parked or
-stopped is the report.
+person** — `--mark` in the same turn as each: **the Step 0 work summary, the pull request opening, each
+review round's verdict, and any `confirmation` / `failure` / `completion` notification or stop.** **A
+tool result only you read is not one.** `--output` is omitted there, and `record` reads `unread`. In a
+`backlogrun`, a child merged, parked or stopped is the report.
 
-**A run that merges needs no teardown; a run that stops has to end the reporting itself.** A stop
-keeps the `in-progress` label on purpose, so **no further `--wait` is started** after the stop
-notification, and the running `--wait` is stopped in the same turn, since no report ends it. That
-covers `halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and a
+**A run that merges needs no teardown; a run that stops has to end the reporting itself** — **no
+further `--wait` is started** after the stop notification, and the running one is stopped in the same
+turn: `halfrun`'s stop before commit, a `needs-human-review`, split or prerequisite stop, a
 `backlogrun` named issue's failure stop. Rationale: `docs/maintainers/progress-watcher-rationale.md` →
 "Why the watcher runs where it does".
 

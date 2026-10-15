@@ -1,0 +1,7 @@
+{
+	"reason": "Prose-density ratchet: a measurement module and its wiring into josh metrics (#3866)",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 83
+	}
+}

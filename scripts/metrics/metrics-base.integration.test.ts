@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { josh_harness, type HarnessResult, type JoshEnvironment } from '#scripts/test/josh-harness'
@@ -6,6 +6,7 @@ import { josh_harness_fixture } from '#scripts/test/josh-harness-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { metrics_base } from './metrics-base'
 import { metrics_ratchet } from './metrics-ratchet'
+import { prose_density } from './prose-density'
 
 // Runs the real `josh metrics` in a kit-shaped repository (joshuafolkken/kit#3644):
 // that the totals are held to the merge-base's, measured in a throwaway tree, is a property of the
@@ -21,6 +22,9 @@ const ISSUE = 7
 const ISSUE_BRANCH = '7-lane'
 const RULE_LINES = 'rules.lines'
 const ON_DEMAND_BYTES = 'ai_cost.on_demand_bytes'
+const LONG_PARAGRAPHS = 'prose.long_paragraphs'
+const LONG_PARAGRAPH_FILE = 'docs/dense.md'
+const LONG_PARAGRAPH = `${'word '.repeat(prose_density.LONG_PARAGRAPH_CHARACTERS)}\n`
 // Past anything the two added lines can reach: what is asked is that an approval covers the growth.
 const APPROVED_GROWTH = 10_000
 const APPROVAL = {
@@ -104,6 +108,26 @@ describe('josh metrics --totals-only against the merge-base', () => {
 			expect(result.stderr).toContain(RULE_LINES)
 			expect(result.exit_code).toBe(1)
 			expect(await worktrees()).toBe(before)
+		},
+		SCENARIO_TIMEOUT_MS,
+	)
+})
+
+// The prose totals read `docs/` as well as the rules, so a page no rule total counts is held too.
+describe('josh metrics --totals-only on a denser document', () => {
+	it(
+		'fails a branch that adds a long paragraph under docs/, naming the prose total',
+		async () => {
+			await git(['switch', '-c', ISSUE_BRANCH])
+			const file = path.join(kit().root, LONG_PARAGRAPH_FILE)
+
+			mkdirSync(path.dirname(file), { recursive: true })
+			writeFileSync(file, LONG_PARAGRAPH)
+
+			const result = await check()
+
+			expect(result.stderr).toContain(LONG_PARAGRAPHS)
+			expect(result.exit_code).toBe(1)
 		},
 		SCENARIO_TIMEOUT_MS,
 	)

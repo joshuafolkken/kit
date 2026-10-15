@@ -74,3 +74,23 @@ describe('the process pattern read as the extended regex pgrep applies', () => {
 		expect(prompt.endsWith(`fullrun #${ISSUE}`)).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#3878: a brokered reviewer outlives a ship that stopped waiting, so the pattern the
+// liveness read and the reaper share finds it by the tail its prompt ends with.
+describe('the review invocation', () => {
+	const pattern = new RegExp(lane_child_invocation.process_pattern(ISSUE), 'u')
+
+	it('is matched by the process pattern at the end of a reviewer prompt', () => {
+		const tail = lane_child_invocation.review_invocation(ISSUE)
+		const line = `claude -p Run a /code-review ... This is ${tail}`
+
+		expect(pattern.test(line)).toBe(true)
+	})
+
+	it('is not matched for another issue', () => {
+		const other = `${ISSUE}0`
+		const line = `claude -p ... ${lane_child_invocation.review_invocation(other)}`
+
+		expect(pattern.test(line)).toBe(false)
+	})
+})

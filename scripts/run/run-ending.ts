@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { agent_exit_record } from '#scripts/agent/agent-exit-record'
 import { api_outage } from '#scripts/agent/api-outage'
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
@@ -179,7 +179,7 @@ async function read_cut_taken(issue: string): Promise<boolean> {
 	return read.kind === 'carried' && read.cut.invocation === run_cut.invocation_for(issue)
 }
 
-function read_exit(output_path: string): ClaudeResultEvent | undefined {
+function read_transcript(output_path: string): string | undefined {
 	const safe_path = run_liveness.to_safe_path(output_path)
 
 	if (safe_path === undefined) return undefined
@@ -188,10 +188,36 @@ function read_exit(output_path: string): ClaudeResultEvent | undefined {
 		// Validated by `run_liveness.to_safe_path` — normalized, required absolute, confined to the
 		// allowed roots — the same check `josh lane:output` gates a transcript path with, reused rather
 		// than re-spelled so the two cannot disagree.
-		return agent_exit_record.read_exit_record(readFileSync(safe_path, 'utf8')) // NOSONAR
+		return readFileSync(safe_path, 'utf8') // NOSONAR
 	} catch {
 		return undefined
 	}
+}
+
+function read_exit(output_path: string): ClaudeResultEvent | undefined {
+	const transcript = read_transcript(output_path)
+
+	return transcript === undefined ? undefined : agent_exit_record.read_exit_record(transcript)
+}
+
+// When the child's transcript was last written, in epoch milliseconds — `undefined` when unreadable.
+function written_at(output_path: string): number | undefined {
+	const safe_path = run_liveness.to_safe_path(output_path)
+
+	if (safe_path === undefined) return undefined
+
+	try {
+		return statSync(safe_path).mtimeMs // NOSONAR — validated as `read_transcript` validates it
+	} catch {
+		return undefined
+	}
+}
+
+// The child's session was killed inside a turn rather than finishing it.
+function ended_mid_turn(output_path: string): boolean {
+	const transcript = read_transcript(output_path)
+
+	return transcript !== undefined && agent_exit_record.is_mid_turn(transcript)
 }
 
 async function read_traces(request: EndingRequest): Promise<EndingTraces> {
@@ -218,7 +244,9 @@ async function check(request: EndingRequest): Promise<EndingDecision> {
 const run_ending = {
 	check,
 	decide,
+	ended_mid_turn,
 	read_exit,
+	written_at,
 }
 
 export type { EndingDecision, EndingRequest, EndingTraces, EndingVerdict }

@@ -5,6 +5,7 @@ import { backlog_drive_restore } from './backlog-drive-restore'
 const CHILD = '2508'
 const CHILD_LAUNCH = 'child-launch'
 const CHILD_DISPATCHED = '#2508 dispatched'
+const PARKED_2509 = '#2509 parked'
 
 function event(pos: number, kind: string, text: string): RunEvent {
 	return { pos, kind, text, at: '2026-09-24T00:00:00.000Z' }
@@ -14,10 +15,22 @@ it('restores only live lanes launched by this invocation', () => {
 	const events = [
 		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
 		event(2, CHILD_LAUNCH, '#2509 dispatched'),
-		event(3, 'park', '#2509 parked'),
+		event(3, 'park', PARKED_2509),
 	]
 
 	expect(backlog_drive_restore.restore(['2504', CHILD, '2509'], events, [])).toStrictEqual([CHILD])
+})
+
+it('restores a dispatched lane carried in from an earlier invocation', () => {
+	const events = [event(1, CHILD_LAUNCH, CHILD_DISPATCHED), event(2, 'park', PARKED_2509)]
+	const restored = backlog_drive_restore.restore(
+		['2504', '2509', '2510'],
+		events,
+		[],
+		['2504', '2509'],
+	)
+
+	expect(restored).toStrictEqual(['2504'])
 })
 
 it('does not merge a child whose count was committed before its event', () => {

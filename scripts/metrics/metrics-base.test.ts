@@ -36,6 +36,7 @@ const METRICS: Metrics = {
 	rules: { files: 3, lines: 200 },
 	guards: 5,
 	ai_cost: { resident_bytes: 9000, on_demand_bytes: 300_000 },
+	prose: { long_paragraphs: 800, excess_bold: 2100 },
 }
 
 function root(): string {

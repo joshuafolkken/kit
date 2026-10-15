@@ -37,6 +37,7 @@ function ports_with(launch: DrivePorts['launch']): DrivePorts {
 		offer: async (state) => await backlog_drive_cli.read_offer(state, CONTEXT),
 		launch,
 		free_lanes: async () => ROOMY_POOL,
+		has_lane: async () => false,
 		judgement_owed: async () => 0,
 		now: () => new Date(),
 	}
