@@ -65,6 +65,8 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 ])
 const NO_RETRIES = 0
 const NO_FREE_LANES = 0
+const EXHAUSTED_ANSWER = 'exhausted'
+const JUDGE_REASON = 'judge'
 const LAUNCHED = 'launched'
 const UNOPENED = 'unopened'
 
@@ -98,7 +100,8 @@ interface DriveState {
 }
 
 interface DriveEnd {
-	// Why the loop handed control back: `merge`, `launch`, `offer`, `watch`, `stop`, `window` or a verdict.
+	// Why the loop handed control back: `merge`, `launch`, `offer`, `judge`, `watch`, `stop`, `window`
+	// or a verdict.
 	reason: string
 	// The token the parent reads, where one command printed it.
 	token: string | undefined
@@ -121,6 +124,9 @@ interface DrivePorts {
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
 	free_lanes: () => Promise<number>
+	// How many open issues lacking `auto-ok` still owe a judgement — `auto_ok_judge_read.owed` in
+	// production, `0` when the read failed.
+	judgement_owed: () => Promise<number>
 	now: () => Date
 }
 
@@ -149,7 +155,7 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 function is_drain(read: OfferRead, state: DriveState): boolean {
 	return (
 		read.verdict === WATCH_VERDICT &&
-		read.answer === 'exhausted' &&
+		read.answer === EXHAUSTED_ANSWER &&
 		state.in_flight.length === 0 &&
 		read.is_retrospective_owed === true
 	)
@@ -158,7 +164,7 @@ function is_drain(read: OfferRead, state: DriveState): boolean {
 function needs_retrospective(read: OfferRead, state: DriveState): boolean {
 	return (
 		read.verdict === STOP_VERDICT &&
-		read.answer === 'exhausted' &&
+		read.answer === EXHAUSTED_ANSWER &&
 		state.in_flight.length === 0 &&
 		read.is_retrospective_owed === true
 	)
@@ -318,6 +324,18 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	return { kind: 'continue', state }
 }
 
+// **A free lane with nothing opted in is the open backlog's turn to be judged**
+// (joshuafolkken/kit#3854): a watch over an exhausted pool hands back `judge` while an open issue
+// lacking `auto-ok` still owes a judgement, ahead of the drain it would otherwise be. Once every one
+// carries its judgement comment the count is zero and the watch is the driver's again.
+async function is_judgement_owed(read: OfferRead, ports: DrivePorts): Promise<boolean> {
+	const is_exhausted = read.verdict === WATCH_VERDICT && read.answer === EXHAUSTED_ANSWER
+
+	if (!is_exhausted || (await ports.free_lanes()) <= NO_FREE_LANES) return false
+
+	return (await ports.judgement_owed()) > 0
+}
+
 async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const read = await ports.offer(state)
 
@@ -326,6 +344,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	const next = { ...state, retries: read.retries }
 
 	if (read.verdict === RUN_VERDICT) return await launch_all(read.issues, next, ports)
+	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
 	return on_verdict(read, next)
 }

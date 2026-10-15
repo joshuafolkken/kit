@@ -150,6 +150,14 @@ async function issue_list_by_label_in_repo(
 	return await issue_list({ json_fields: SUMMARY_FIELDS, limit, label, repo })
 }
 
+// Every open issue with what `josh auto-ok:judge` judges it by — its labels and body — and `updatedAt`,
+// so the backlog driver's resident check reads an issue's comments again only once it has moved.
+const JUDGEMENT_FIELDS = 'number,title,body,labels,updatedAt'
+
+async function issue_list_open_for_judgement(limit: number): Promise<IssueListOutcome> {
+	return await issue_list({ json_fields: JUDGEMENT_FIELDS, limit })
+}
+
 const git_gh_issue = {
 	...git_gh_issue_read,
 	...git_gh_issue_write,
@@ -159,6 +167,7 @@ const git_gh_issue = {
 	issue_list_by_label_summary,
 	issue_search_body,
 	issue_list_open_bodies,
+	issue_list_open_for_judgement,
 	issue_list_recently_closed,
 }
 

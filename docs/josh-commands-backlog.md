@@ -399,6 +399,24 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 stdout is one token — the issue number, or `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
 
+### `josh auto-ok:judge`
+
+List the open issues a `backlogrun` still owes an `auto-ok` judgement, or record one. `backlog:drive` hands back `judge` when its watch finds the opted-in pool exhausted, a lane free and at least one such issue.
+
+```bash
+pnpm josh auto-ok:judge                                    # the issues that still owe a judgement
+pnpm josh auto-ok:judge --apply 912 --lane                 # opt it in, with its run label
+pnpm josh auto-ok:judge --decline 913 --reason "<why>"     # record why it stays out
+```
+
+A candidate is an open issue without `auto-ok` that carries none of the labels [`josh issue:file`](#josh-issuefile) refuses `auto-ok` on. Whether it needs a policy decision, an external account or a person's visual check is read from its body and comments by the agent, never by this command.
+
+- Bare — one number per line on stdout, or `none`, with each title on stderr; exit 1 if the listing could not be read.
+- `--apply <N> --lane|--solo` — checks the exclusions again against the labels as they stand, applies the run label and then `auto-ok`, and notes it on the progress board.
+- `--decline <N> --reason <text>` — applies nothing.
+
+Both answers post a judgement comment carrying a digest of the body. An issue is listed again only once its body changes or a person comments after that comment.
+
 ### `josh backlog:next`
 
 Order the whole opted-in backlog in one command — standalone `auto-ok` issues plus the descendants of every epic whose root carries `auto-ok`, followed transitively through nested epics. Read-only. Tokens are bare numbers scoped to the repository.
@@ -489,7 +507,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). Only `run:merge`'s control `stop` (the failure guard, or a failed child left unparked) stops the run: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. The offer `run:merge` passes through is never read, so its `stop` after a merge is decided by `backlog:offer` on the next pass, as after any other. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
+An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). Only `run:merge`'s control `stop` (the failure guard, or a failed child left unparked) stops the run: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. The offer `run:merge` passes through is never read, so its `stop` after a merge is decided by `backlog:offer` on the next pass, as after any other. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are described, with their creation commands, in [Labels and run states](./labels-and-run-states.md).
 
