@@ -54,6 +54,7 @@ vi.mock('#scripts/agent/agent-argv', () => ({
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
+vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: vi.fn().mockResolvedValue(false) } }))
 
 const state = { directory: '' }
 
