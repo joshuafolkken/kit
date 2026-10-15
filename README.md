@@ -6,7 +6,7 @@ kit gives Claude Code or Codex your project's rules and checks.
 
 ## The workflow
 
-Type `backlogrun` and the agent takes the Issues you name from plan to merged PR — in parallel, unattended. A live board shows where each one stands:
+`backlogrun` takes your Issues to merged PRs — in parallel, unattended:
 
 ![The backlogrun board: ten Issues in one run, three already merged and the rest moving through their stages or waiting for a free lane, with recent findings and decisions below](./docs/images/backlogrun-board.png)
 
@@ -23,7 +23,9 @@ Type `backlogrun` and the agent takes the Issues you name from plan to merged PR
 
 ## Quick start
 
-### With the GitHub workflow
+Pick one setup ([A or B: what differs](./docs/setup/choose.md)):
+
+### A. With GitHub — Issues, PRs and unattended runs
 
 Requires [Node.js, pnpm and the gh CLI](./docs/setup/prerequisites.md).
 
@@ -35,7 +37,7 @@ pnpm exec josh start
 
 Next: [tutorial](./docs/tutorial.md)
 
-### Your first backlogrun
+#### Your first backlogrun
 
 Tell the agent the change you want, then type `kickoff new auto ok` to it (or add the `auto-ok` label to an existing Issue).
 
@@ -45,9 +47,7 @@ pnpm josh backlogrun
 
 Details: [Run the backlog unattended](./docs/how-to/run-backlog.md)
 
-### AI assistant only — no GitHub account needed
-
-Adds the AI assistant rules, editor settings and a `josh` script, plus Git, GitHub and TypeScript settings where the project has them. It also adds Prettier for HTML, CSS or JavaScript, unless the project already formats with Biome or dprint ([what it adds](./docs/setup/basic.md)).
+### B. Without GitHub — AI assistant only
 
 Requires [Node.js and pnpm](./docs/setup/prerequisites.md).
 
@@ -66,18 +66,7 @@ Next: [tutorial](./docs/tutorial.md#without-github-one-change-checked-locally)
 
 ## Claude Code in a fresh-machine run
 
-A [`josh fresh:run`](./docs/maintainers/fresh-machine.md) scenario that runs Claude Code needs a sign-in, saved once:
-
-1. In a terminal at the kit repository, run:
-
-   ```bash
-   pnpm josh auth:setup
-   ```
-
-2. A browser opens: sign in with your Claude account and press "Authorize".
-3. Done when the terminal prints `saved: CLAUDE_CODE_OAUTH_TOKEN (macOS keychain)`. There is no token to copy or write into a file.
-4. To check, run `pnpm josh auth:setup --check`: it prints `ok` and the day it was saved.
-5. When the token expires, Claude Code in the container fails to sign in — start again from step 1.
+A `josh fresh:run` scenario that runs Claude Code needs a sign-in saved once with `pnpm josh auth:setup` ([steps](./docs/maintainers/fresh-machine.md#claude-code)).
 
 ## Docs
 

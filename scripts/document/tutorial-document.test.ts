@@ -37,7 +37,7 @@ const PATTERNS: ReadonlyArray<Pattern> = [
 const VERIFICATION_RECORD = 'docs/maintainers/guide-verification.md'
 const VERIFYING_HEADING = '## Verifying this guide'
 // Both patterns need GitHub, so a reader who ran `josh init` without it is routed to the one section
-// that needs neither `gh` nor an Issue — from the README's "AI assistant only" path and both guides.
+// that needs neither `gh` nor an Issue — from the README's path B, "Without GitHub", and both guides.
 const LOCAL_HEADING = '## Without GitHub: one change, checked locally'
 const LOCAL_ANCHOR = 'tutorial.md#without-github-one-change-checked-locally'
 const LOCAL_ENTRY_DOCUMENTS: ReadonlyArray<string> = ['README.md', BASIC_GUIDE, FULL_GUIDE]
