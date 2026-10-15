@@ -180,9 +180,7 @@ function held_block(hold: RunHold, issue: string): string | undefined {
 // a child killed and re-dispatched into its lane — so the claim adopts it with the work it left. A
 // stopped `halfrun` or `prrun` keeps its own adopt path.
 function is_own_unstopped(hold: RunHold, issue: string): boolean {
-	const is_stopped = hold.is_halfrun_stop === true || hold.prrun_stop_head !== undefined
-
-	return run_hold.is_reentry(hold, issue) && !is_stopped
+	return run_hold.is_reentry(hold, issue) && !run_hold.is_stop_marked(hold)
 }
 
 async function stale_block(hold: RunHold, issue: string): Promise<string | undefined> {

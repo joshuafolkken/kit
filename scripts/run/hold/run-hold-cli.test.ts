@@ -313,17 +313,23 @@ describe('an expired record', () => {
 
 // A stopped run's record is left for its own adopt path, so its stop mark survives the claim.
 describe('an expired stop-marked record', () => {
-	it('still stops a claim for its own issue while the tree is dirty', async () => {
-		const target = run_hold.hold_path(WORKTREE)
+	it.each([
+		['halfrun', { is_halfrun_stop: true }],
+		['prrun', { prrun_stop_head: 'abc123' }],
+	])(
+		'still stops a claim for its own issue at a %s stop while the tree is dirty',
+		async (_, mark) => {
+			const target = run_hold.hold_path(WORKTREE)
 
-		run_hold.create_halfrun_stop_hold(target, ISSUE, EXPIRED_AT)
-		git_status.mockResolvedValue(DIRTY_TREE)
+			run_hold.create_stop_hold(target, ISSUE, mark, EXPIRED_AT)
+			git_status.mockResolvedValue(DIRTY_TREE)
 
-		await run_hold_cli.run([ISSUE])
+			await run_hold_cli.run([ISSUE])
 
-		expect(out).toEqual([run_hold_cli.BUSY_VERDICT])
-		expect(run_hold.read_hold(target)).toMatchObject({ hold: { is_halfrun_stop: true } })
-	})
+			expect(out).toEqual([run_hold_cli.BUSY_VERDICT])
+			expect(run_hold.read_hold(target)).toMatchObject({ hold: mark })
+		},
+	)
 })
 
 // Two sessions typing an entry point in the same second both read a free tree. The exclusive create
