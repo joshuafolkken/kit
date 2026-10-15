@@ -17,7 +17,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Set a project up for the GitHub Issue workflow, from git init to the setup PR',
 		category: 'Project',
 		reference: [
-			`${PROFILE_ARGUMENTS} [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]`,
+			`${PROFILE_ARGUMENTS} [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]`,
 			'developer',
 			['files', 'git', 'network', 'processes'],
 		],
@@ -52,7 +52,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Initialize config in a new project',
 		category: 'Project',
 		reference: [
-			`${PROFILE_ARGUMENTS} [--no-install]`,
+			`${PROFILE_ARGUMENTS} [--no-install] [--dry-run]`,
 			'developer',
 			['files', 'network', 'processes'],
 		],

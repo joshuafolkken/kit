@@ -10,7 +10,20 @@ pnpm josh init --profile basic
 
 # Write the files only — skip the install and format it ends with
 pnpm josh init --no-install
+
+# Print what the setup would change, and change nothing
+pnpm josh init --dry-run
 ```
+
+## Preview with `--dry-run`
+
+`josh init --dry-run` prints the plan and writes nothing to the project. It runs the real setup on a temporary copy of the project — without `.git`, `node_modules` and build output, but with a repository and the same `origin` when the project has one — and reports what that run changed there, so the plan comes from the same decisions as a real run. The copy is removed afterwards. The plan lists:
+
+- **Files** — each path with what the setup would do to it: `create` (new), `merge` (every line, or for a JSON file every value, the project had is kept), `overwrite` (something the project had is replaced or removed) or `delete`.
+- **`package.json`** — under its `merge` / `overwrite` line, each field and each script or dependency entry it would add (`+`), change (`~`) or remove (`-`).
+- **Dependencies** — whether it would run `pnpm install` and `josh format`, and whether it would first install kit into the project and hand the setup to that copy's `josh init`. `--no-install --dry-run` reports that both are skipped.
+
+`--dry-run` combines with `--profile` and `--no-install`. It is refused on the same uncommitted changes as a real run, since that is what the run would do. `josh start --dry-run` prints the same plan for its setup step, after the GitHub steps (see [josh-commands.md → `josh start`](./josh-commands.md#josh-start)).
 
 ## Project profiles
 

@@ -90,3 +90,23 @@ describe('the entry points that provision labels', () => {
 		expect(source).not.toMatch(/\/labels['`]/u)
 	})
 })
+
+describe('repository_labels.planned_labels (#3830)', () => {
+	it('names the labels the repository lacks without creating any', () => {
+		mocked_api.mockReturnValueOnce(ALL_NAMES.slice(1).join('\n'))
+
+		expect(repository_labels.planned_labels(REPO)).toStrictEqual([ALL_NAMES[0]])
+		expect(mocked_api).toHaveBeenCalledTimes(1)
+	})
+
+	it('names every label for a repository that does not exist yet, without a request', () => {
+		expect(repository_labels.planned_labels(undefined)).toStrictEqual(ALL_NAMES)
+		expect(mocked_api).not.toHaveBeenCalled()
+	})
+
+	it('answers undefined, not every label, when the listing cannot be read', () => {
+		mocked_api.mockImplementation(fail)
+
+		expect(repository_labels.planned_labels(REPO)).toBeUndefined()
+	})
+})

@@ -86,6 +86,16 @@ function ensure_labels(repo: string | undefined): ReadonlyArray<string> {
 	return create_missing(missing_labels(existing), repo)
 }
 
-const repository_labels = { ensure_labels }
+// The label names `ensure_labels` would create, read without creating any — every one when the
+// repository does not exist yet (`josh start --dry-run`). Undefined when the listing cannot be read,
+// so an unread repository is not reported as one with no labels.
+function planned_labels(repo: string | undefined): ReadonlyArray<string> | undefined {
+	if (repo === undefined) return label_names(REPOSITORY_LABELS)
+	const existing = read_existing(repo)
+
+	return existing === undefined ? undefined : label_names(missing_labels(existing))
+}
+
+const repository_labels = { ensure_labels, planned_labels }
 
 export { repository_labels }

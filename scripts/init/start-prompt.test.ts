@@ -25,6 +25,7 @@ const OPTIONS: StartOptions = {
 	profile: undefined,
 	is_yes: false,
 	is_github: false,
+	is_dry_run: false,
 	visibility: 'private',
 	init_command: undefined,
 	push_preflight_command: undefined,

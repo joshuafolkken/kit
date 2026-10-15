@@ -104,5 +104,5 @@ function hand_off(
 	return undefined
 }
 
-const init_bootstrap = { is_project_kit, kit_build_flags, hand_off, is_handed_off }
+const init_bootstrap = { HANDOFF_ENV, is_project_kit, kit_build_flags, hand_off, is_handed_off }
 export { init_bootstrap }

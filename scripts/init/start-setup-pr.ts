@@ -143,6 +143,11 @@ async function open(root: string, baseline?: ReadonlyArray<string>): Promise<voi
 	await git_pr.create_with_issue_info(issue)
 }
 
-const start_setup_pr = { open, changed_paths: working_tree.changed_paths, is_setup_branch }
+const start_setup_pr = {
+	SETUP_TITLE,
+	open,
+	changed_paths: working_tree.changed_paths,
+	is_setup_branch,
+}
 
 export { start_setup_pr }

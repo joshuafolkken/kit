@@ -1,0 +1,7 @@
+{
+	"reason": "Dry-run snapshots compare file digests and clone the scratch copy, so a large project is planned without holding its files in memory (review finding #3830)",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 335
+	}
+}

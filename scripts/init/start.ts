@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { error_text } from '#scripts/lib/error-message'
+import { init_dry_run } from './init-dry-run'
 import { project_profile, type ProjectProfile } from './project-profile'
+import { start_dry_run } from './start-dry-run'
 import {
 	start_plan,
 	type Consent,
@@ -15,13 +17,14 @@ import { start_steps } from './start-steps'
 const ARGUMENT_START_INDEX = 2
 const READY_MESSAGE = 'GitHub workflow ready. Use kickoff new in your assistant to plan an Issue.'
 const START_USAGE =
-	'josh start [--profile basic|full] [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]'
+	'josh start [--profile basic|full] [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]'
 const INIT_COMMAND_FLAG = '--init-command'
 const PUSH_PREFLIGHT_COMMAND_FLAG = '--push-preflight-command'
 const YES_FLAG = '--yes'
 const GITHUB_FLAG = '--github'
 const PUBLIC_FLAG = '--public'
-const SWITCHES: ReadonlySet<string> = new Set([YES_FLAG, GITHUB_FLAG, PUBLIC_FLAG])
+const { DRY_RUN_FLAG } = init_dry_run
+const SWITCHES: ReadonlySet<string> = new Set([YES_FLAG, GITHUB_FLAG, PUBLIC_FLAG, DRY_RUN_FLAG])
 
 interface Prepared {
 	steps: ReadonlyArray<StartStep>
@@ -67,6 +70,7 @@ function parse_start_options(args: ReadonlyArray<string>): StartOptions {
 		profile: project_profile.requested_profile(profile_args, START_USAGE),
 		is_yes: rest.includes(YES_FLAG),
 		is_github: rest.includes(GITHUB_FLAG),
+		is_dry_run: rest.includes(DRY_RUN_FLAG),
 		visibility: rest.includes(PUBLIC_FLAG) ? 'public' : 'private',
 		init_command: init.command,
 		push_preflight_command,
@@ -115,18 +119,30 @@ function prepare(args: ReadonlyArray<string>, is_tty: boolean, root: string): Pr
 	}
 }
 
-async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void> {
-	const { steps, interaction, choices } = prepare(args, is_tty, process.cwd())
-
+async function run_steps({ steps, interaction, choices }: Prepared): Promise<void> {
 	const { root, options } = choices
 	const { visibility, init_command, push_preflight_command } = options
-
-	console.info(start_plan.plan_summary(steps, start_plan.step_labels(init_command)))
 	const profile = await resolve_profile(choices, interaction)
 	const context = { root, profile, visibility, init_command, push_preflight_command }
 
 	await start_steps.run_steps(steps, context)
 	console.info(`\n${READY_MESSAGE}`)
+}
+
+// A dry run stops after the plan, adding what each step would create, before the first write.
+async function main(args: ReadonlyArray<string>, is_tty: boolean): Promise<void> {
+	const prepared = prepare(args, is_tty, process.cwd())
+	const { steps, choices } = prepared
+
+	console.info(start_plan.plan_summary(steps, start_plan.step_labels(choices.options.init_command)))
+
+	if (choices.options.is_dry_run) {
+		console.info(start_dry_run.report(choices))
+
+		return
+	}
+
+	await run_steps(prepared)
 }
 
 async function run(args: ReadonlyArray<string>, is_tty: boolean): Promise<number> {
