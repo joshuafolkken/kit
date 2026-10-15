@@ -39,7 +39,7 @@ Next: [tutorial](./docs/tutorial.md)
 
 #### Your first backlogrun
 
-Tell the agent the change you want, then type `kickoff new` to it. The Issue gets the `auto-ok` label when it needs no judgement from you (or add the label to an existing Issue).
+File Issues with `kickoff new`, then run:
 
 ```bash
 pnpm josh backlogrun
@@ -59,14 +59,7 @@ Next: [tutorial](./docs/tutorial.md#without-github-one-change-checked-locally)
 
 ### Adding kit to an existing project
 
-- **Files written:** settings per profile, including Prettier — always on `full`, and on `basic` only when the project has web files and no formatter of its own ([per profile](./docs/init.md#project-profiles)); `--dry-run` previews them.
-- **Overwritten by `josh sync`:** the managed files, such as `.github/workflows/ci.yml` and `AGENTS.md` ([the list](./docs/sync.md#ai-files-overwritten)).
-- **Permissions:** the Claude Code settings kit writes (with `josh start`, or on `full`) set `bypassPermissions` with `Bash(*)`, guarded by a deny list and a hook ([how to opt out](./docs/init.md#claude-code-permission-mode)).
-- **On GitHub:** `josh start` adds labels, and on an existing `main` an Issue and a setup PR that you merge yourself ([the steps](./docs/init.md#josh-init-or-josh-start)).
-
-## Claude Code in a fresh-machine run
-
-A `josh fresh:run` scenario that runs Claude Code needs a sign-in saved once with `pnpm josh auth:setup` ([steps](./docs/maintainers/fresh-machine.md#claude-code)).
+Check first: [what kit changes in your project](./docs/how-to/add-kit.md#what-kit-changes-in-your-project)
 
 ## Docs
 
