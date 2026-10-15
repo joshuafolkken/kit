@@ -1,7 +1,10 @@
 import { josh_command } from '#scripts/josh/josh-run'
-import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_cli } from '#scripts/run/merge/run-merge-cli'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
@@ -241,6 +244,49 @@ it('reports before ending the carry record', async () => {
 	])
 	run.mockRestore()
 	error.mockRestore()
+})
+
+// joshuafolkken/kit#3884: a run handed to a new invocation lost every lane the previous one launched —
+// the restore read only this invocation's events — so their dead units were never collected.
+const PREVIOUS_RUN = {
+	invocation: CARRY.invocation,
+	started_at: '2026-09-22T23:00:00.000Z',
+	ended_at: '2026-09-23T12:00:00.000Z',
+}
+const INHERITED = '3865'
+const BY_HAND = '3866'
+
+function carried_here(): void {
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/repo/.git')
+	vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: CARRY })
+	vi.spyOn(run_carry_ended, 'read_ended').mockReturnValue(PREVIOUS_RUN)
+	vi.spyOn(run_event_stream_emit, 'current_events').mockResolvedValue([])
+	vi.spyOn(backlog_drive_named, 'reconcile').mockResolvedValue()
+}
+
+function launch_at(pos: number, issue: string, at: string): RunEvent {
+	return { pos, kind: 'child-launch', text: `#${issue} dispatched`, at }
+}
+
+function lane_of(issue: string): LaneInfo {
+	return { issue, is_stranded: false } as unknown as LaneInfo
+}
+
+// The launch by hand falls between the previous run's end and this one's start, so no run owns it.
+it('seeds a lane the previous run launched, not one dispatched by hand between runs', async () => {
+	const launches = [
+		launch_at(1, INHERITED, '2026-09-23T00:00:00.000Z'),
+		launch_at(2, BY_HAND, '2026-09-23T18:00:00.000Z'),
+	]
+
+	carried_here()
+	vi.spyOn(run_event_stream_emit, 'all_events').mockResolvedValue(launches)
+	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane_of(INHERITED), lane_of(BY_HAND)])
+
+	const context = backlog_drive_cli.parse(['--owner', '4242'])
+
+	expect(context && (await backlog_drive_cli.seeded_lanes(context))).toStrictEqual([INHERITED])
+	vi.restoreAllMocks()
 })
 
 it('keeps the window bound in the resume command', () => {

@@ -77,6 +77,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/event/run-event-scope.ts', 1],
 	['run/event/run-event-setup.ts', 3],
 	['run/merge/run-merge-cli.ts', 7],
+	['run/merge/run-merge-interrupt.ts', 1],
 	['run/merge/run-merge.ts', 1],
 	['run/ship/run-ship-detach.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],

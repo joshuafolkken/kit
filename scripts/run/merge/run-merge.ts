@@ -43,6 +43,9 @@ const ONE = 1
 // - `cut`         — OPEN and carrying neither, but its lane holds a declared cut no successor adopted;
 //                   the child ended its session on purpose, so it is resumed rather than parked and
 //                   counts nothing.
+// - `interrupted` — OPEN and carrying neither, and its transcript's last session wrote no exit record:
+//                   the unit was killed with the session that ran it, not failed by the child, so it is
+//                   released to be dispatched again and counts nothing — once per invocation.
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `unresolved`  — the state could not be read; re-read before deciding.
 type ChildOutcome =
@@ -52,6 +55,7 @@ type ChildOutcome =
 	| 'split'
 	| 'cut'
 	| 'outage'
+	| 'interrupted'
 	| 'failed'
 	| 'unresolved'
 	| 'shipping'
@@ -61,6 +65,9 @@ type ChildOutcome =
 interface EndingSignals {
 	is_outage: boolean
 	is_cut: boolean
+	// The transcript's last session ended without an exit record, and this invocation has not already
+	// released the child once for it.
+	is_interrupted?: boolean
 	// The merged pull request whose `closes #N` names the child, when GitHub left the child OPEN after
 	// merging it.
 	merged_pr?: string | undefined
@@ -93,7 +100,9 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 
 	if (signals.is_cut) return 'cut'
 
-	return signals.is_outage ? 'outage' : 'failed'
+	if (signals.is_outage) return 'outage'
+
+	return signals.is_interrupted === true ? 'interrupted' : 'failed'
 }
 
 function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {

@@ -1,5 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { lane_await } from '#scripts/lane/lane-await'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -26,6 +27,8 @@ interface LocalRead {
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
 	lanes: ReadonlyArray<string>
+	// The open lanes no process runs in — pgrep's own "no match", never a probe that could not look.
+	idle_lanes?: ReadonlySet<number> | undefined
 	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
 	// The run is carried but nothing drives it — its owner and its supervisor are both gone
@@ -46,6 +49,14 @@ async function free_lanes_of(lanes: ReadonlyArray<LaneInfo>): Promise<number | u
 	if (choice.kind !== 'limit') return undefined
 
 	return lane_capacity.free_lanes(choice.limit, lane_registry.live_count(lanes))
+}
+
+// The same process probe `lane:await` collects a finished lane by, so the board and the driver agree on
+// which lanes are dead (joshuafolkken/kit#3884).
+function idle_lanes_of(lanes: ReadonlyArray<LaneInfo>): ReadonlySet<number> {
+	const idle = lanes.filter((lane) => lane_await.process_trace_default(lane.issue) === 'none')
+
+	return new Set(idle.map((lane) => Number(lane.issue)))
 }
 
 const NO_SPAN: SpanHere = { span: undefined, resume: undefined, transcript: undefined }
@@ -101,6 +112,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		scope: run_board_scope.scope_of(span.invocation),
 		events: run_board_span.events_of(events, span),
 		lanes: lanes.map((lane) => lane.issue),
+		idle_lanes: idle_lanes_of(lanes),
 		resume,
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),

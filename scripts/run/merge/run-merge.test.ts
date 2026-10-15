@@ -125,6 +125,31 @@ describe('classify_child — a declared cut', () => {
 	})
 })
 
+// joshuafolkken/kit#3884: a child whose unit was killed mid-turn is released, not failed — but an outage
+// or a cut is still read first.
+describe('classify_child — an interrupted unit', () => {
+	const INTERRUPTED = { is_outage: false, is_cut: false, is_interrupted: true }
+
+	it('reads an OPEN unparked child as interrupted when its transcript was cut short', () => {
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), INTERRUPTED)).toBe(
+			'interrupted',
+		)
+	})
+
+	it.each([
+		{ signals: { ...INTERRUPTED, is_outage: true }, expected: 'outage' },
+		{ signals: { ...INTERRUPTED, is_cut: true }, expected: 'cut' },
+	])('reads $expected before an interruption', ({ signals, expected }) => {
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), signals)).toBe(
+			expected,
+		)
+	})
+
+	it('counts nothing for an interrupted child', () => {
+		expect(run_merge.change_of('interrupted')).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#2769: a child whose pull request merged while GitHub left the issue OPEN is not a
 // failure — its work landed — so it is `merged`, and the failure streak is reset rather than grown.
 describe('classify_child — merged while the issue stayed OPEN', () => {

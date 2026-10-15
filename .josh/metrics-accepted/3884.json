@@ -1,0 +1,8 @@
+{
+	"reason": "#3884 adds the interrupted run:merge outcome with its release step and the board's idle-lane probe, and bounds the driver's cross-invocation lane restore to the previous ended run's window; the docs describe the new outcome in the same bold form as its sibling outcomes",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 113,
+		"prose.excess_bold": 2
+	}
+}

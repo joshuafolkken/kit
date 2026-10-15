@@ -389,6 +389,7 @@ const run_liveness = {
 	check,
 	decide,
 	describe_agent_state,
+	read_agent_state,
 	read_child_settled,
 	read_output_frozen,
 	sample_output,

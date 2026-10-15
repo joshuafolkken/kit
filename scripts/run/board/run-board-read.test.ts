@@ -1,4 +1,5 @@
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { lane_await } from '#scripts/lane/lane-await'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -77,6 +78,8 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
 	// Every log is read off the machine: never a real one from a test.
 	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
+	// Every process is probed off the machine: never a real pgrep from a test.
+	vi.spyOn(lane_await, 'process_trace_default').mockReturnValue('alive')
 }
 
 afterEach(() => {
@@ -93,6 +96,7 @@ describe('run_board_read.read_local', () => {
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
 			lanes: ['3432'],
+			idle_lanes: new Set(),
 			resume: undefined,
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
@@ -121,6 +125,18 @@ describe('run_board_read.read_local', () => {
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 
 		await expect(run_board_read.read_local()).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3884: a lane whose unit was killed is read idle by the probe `lane:await` uses.
+describe('run_board_read.read_local idle lanes', () => {
+	it('reads a lane no process runs in as idle', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		vi.spyOn(lane_await, 'process_trace_default').mockReturnValue('none')
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({
+			idle_lanes: new Set([Number('3432')]),
+		})
 	})
 })
 

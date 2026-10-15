@@ -175,13 +175,27 @@ function is_running_lane(
 	return in_run.has(issue) && !run_board_setup.is_lane_pending(events, issue)
 }
 
+// A lane no process runs in is not running, whatever its stream last said: its unit was killed with the
+// session that ran it (joshuafolkken/kit#3884), so it is drawn stopped until it is collected.
+function lane_status(
+	lane: string,
+	status: ItemStatus | undefined,
+	idle: ReadonlySet<number>,
+): ItemStatus {
+	if (idle.has(Number(lane))) return settled_as(status, 'stopped')
+
+	return { state: 'running', ...status, lane: `lane ${lane}` }
+}
+
 // Every child the run has touched, with the lane each running child holds. A lane the stream never saw
 // launched — a run restored after the stream rolled — still reads as running while its issue is in the
-// run's plan (`in_run`); one the run is still setting up for stays waiting until its launch.
+// run's plan (`in_run`); one the run is still setting up for stays waiting until its launch. A lane in
+// `idle` has no process left.
 function statuses_of(
 	events: ReadonlyArray<RunEvent>,
 	lanes: ReadonlyArray<string>,
 	in_run: ReadonlySet<number>,
+	idle: ReadonlySet<number> = new Set(),
 ): ReadonlyMap<number, ItemStatus> {
 	const statuses = fold_events(events)
 
@@ -190,7 +204,7 @@ function statuses_of(
 		const status = statuses.get(issue)
 
 		if (is_running_lane(issue, status, events, in_run)) {
-			statuses.set(issue, { state: 'running', ...status, lane: `lane ${lane}` })
+			statuses.set(issue, lane_status(lane, status, idle))
 		}
 	}
 
