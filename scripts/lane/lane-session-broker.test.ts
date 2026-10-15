@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ import { lane_session_broker } from './lane-session-broker'
 const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
+const parked_mock = vi.hoisted(() => vi.fn())
 const ISSUE = '2654'
 const MISSING_RESPONSE = 'response path is missing'
 const ROUND_ONE = { kind: 'review', round: '1' } as const
@@ -42,6 +43,7 @@ const LANE: LaneInfo = {
 	profile: OPENAI_PROFILE,
 }
 const CLAUDE_LANE: LaneInfo = { ...LANE, profile: undefined }
+const REJECTED = { kind: 'rejected', note: 'no profile' } as const
 
 vi.mock('#scripts/git/git-common-directory', () => ({
 	git_common_directory: { resolve: resolve_mock },
@@ -50,6 +52,7 @@ vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: argv_moc
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
+vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: parked_mock } }))
 
 const state = { directory: '' }
 
@@ -64,6 +67,7 @@ beforeEach(() => {
 		profile: OPENAI_PROFILE,
 	})
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
+	parked_mock.mockReset().mockResolvedValue(false)
 })
 
 afterEach(() => {
@@ -226,8 +230,46 @@ describe('lane_session_broker — the relaunch action', () => {
 	})
 
 	it('answers a failure when the relaunch is rejected', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue({ kind: 'rejected', note: 'no profile' })
+		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
 
 		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3878: a parked lane got a reviewer and then a relaunch from requests read late.
+describe('lane_session_broker — a parked issue and a finished request', () => {
+	it('ends the reviewer prompt with the review invocation the liveness pattern matches', async () => {
+		await lane_session_broker.with_server(
+			LANE,
+			async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
+		)
+
+		expect(argv_mock).toHaveBeenCalledWith(
+			expect.stringMatching(/the reviewer of lane #2654$/u),
+			'reviewer',
+			LANE.directory,
+		)
+	})
+
+	it('starts neither a reviewer nor a relaunch for a parked issue', async () => {
+		parked_mock.mockResolvedValue(true)
+		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
+		const is_review = await lane_session_broker.with_server(
+			LANE,
+			async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
+		)
+
+		expect(is_review).toBe(false)
+		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
+		expect(parked_mock).toHaveBeenCalledWith(ISSUE)
+		expect(launch_mock).not.toHaveBeenCalled()
+		expect(relaunch).not.toHaveBeenCalled()
+	})
+
+	it('withdraws its request once answered, so no server acts on it later', async () => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
+
+		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
+		expect(existsSync(lane_session_broker.request_path(LANE.directory, ISSUE))).toBe(false)
 	})
 })
