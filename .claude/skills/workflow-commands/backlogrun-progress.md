@@ -41,10 +41,9 @@ provenance of each rule: `docs/maintainers/backlogrun-progress-rationale.md` →
 ## After a named epic completes
 
 **When a named epic's children are all processed — merged or parked — the run advances to the next
-named item, and then drains the opted-in backlog** (unless `--only`, which stops after the named
-list). A completed epic is one step of the invocation, never its end. A named item that is a bare,
-non-epic Issue reaches the same point when it merges. The epic's own completion summary is sent by the
-session standing in the repository that owns it ("Who sends the summary, and who propagates" below).
+named item, and then drains the opted-in backlog** (unless `--only`). A completed epic — or a merged
+bare named Issue — is one step of the invocation, never its end. Its summary is sent per "Who sends the
+summary, and who propagates" below.
 
 ## The hand-off — one session does not have to run the whole batch
 
@@ -88,13 +87,12 @@ park** — nothing is labelled, stashed or filed.
 
 ### Picking the lanes up in the fresh session
 
-**Start no child again and open no lane already open.** In one turn: `pnpm josh lane:list` (every line
+**Start no child again and open no lane already open.** In one turn: `pnpm josh lane:list` (a line
 with a path is a handed-over child, polled per `backlogrun-recovery.md` → "A delegated unit that stopped
 without reporting"), `pnpm josh run:progress --wait --output <handed-over paths>` in the background
-(the `run:watcher:guard` enforces it), `pnpm josh run:liveness`, and
-`epic:next --lanes` with a lane for each child it offers. **A carried-over child finishes in its own
-unit — never run its `followup` yourself**; one that did not survive the cut is re-dispatched with
-`pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`, never adopted.
+(`run:watcher:guard`), `pnpm josh run:liveness`, and `epic:next --lanes`, a lane per child it offers.
+**A carried-over child finishes in its own unit — never run its `followup` yourself**; one lost in the
+cut is re-dispatched with `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`.
 
 ### What carries over
 

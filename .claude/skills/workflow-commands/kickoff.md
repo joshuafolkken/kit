@@ -1,92 +1,83 @@
 # `kickoff` — Planning phase only (plan → Issue → Telegram notify → stop)
 
 - `kickoff #<N>`: **First `pnpm josh run:entry <N> --to kickoff`** (`docs/how-to/run-issues.md`) — it claims
-  nothing and prints the stage line alone; `start: reached` means the Issue is already planned or further
-  up the ladder, so report the stage line and **stop**. Otherwise read existing Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; a
-  decision recorded after the body was written lives only in a comment, and the later text is the
-  agreement in force (`issue-comments.md`, which also carries the two answers that stop the run instead) →
-  **normalize the title**: if the title is not in English or can be phrased more clearly, derive a
-  better English title and run `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` →
-  analyze requirements → **scope assessment per `split-assessment.md`** → post the plan to the Issue (if
-  body is blank, `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`; otherwise
-  `pnpm josh issue:comment <N> --body-file <path>`) → **apply the `run:planned` label** — the mark the next
-  command's `run:entry` reads to start at the implementation, provisioned by `josh sync` (`gh api
-  repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=run:planned' --silent`) → send Telegram
-  notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` → **stop**
-  (do not implement). **When the assessment finds two or more separately-mergeable deliverables**, take
-  the split path instead of posting a plan: create the children as in `kickoff new`, then either
-  **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2> ... [--ordered] [--rationale-file
-  <path|->]` — the right choice when `#N` is a request, a discussion or a container — or, when `#N` is
-  itself one of the deliverables, keep `#N` as a child and create a new epic with `pnpm josh epic`. That
-  branch is Tier A: choose it and record the reasoning on the Issue without asking. Present `backlogrun #<E> --only` and stop. Plan comments are written in the session language (`JOSH_SESSION_LANG`, default `ja`).
-  Telegram notification: `pnpm josh notify --task-type planning --issue-url "<issue-url>" --body=$'-
-  <bullet1>\n- <bullet2>\n...'`. `--task-type` controls the header icon (`planning` 📋 / `completion` ✅
-  / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️). `--repo-name` and `--issue-title` are
-  auto-fetched from `gh` when not supplied. The Issue URL must be included.
+  nothing and prints the stage line alone; on `start: reached` report the stage line and **stop**. Then:
+  1. Read Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; the later text is the
+     agreement in force (`issue-comments.md`, which also carries the answers that stop the run).
+  2. **Normalize the title** to clear English: `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`.
+  3. Analyze requirements → **scope assessment per `split-assessment.md`**.
+  4. Post the plan — a blank body takes `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`,
+     otherwise `pnpm josh issue:comment <N> --body-file <path>` — in the session language
+     (`JOSH_SESSION_LANG`, default `ja`).
+  5. **Apply the `run:planned` label** — the next command's `run:entry` starts at the implementation
+     (`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=run:planned' --silent`).
+  6. Send the Telegram notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` →
+     **stop** (do not implement).
+
+  **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
+  children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
+  ... [--ordered] [--rationale-file <path|->]` (when `#N` is a request, a discussion or a container), or
+  keep `#N` as a child and create a new epic with `pnpm josh epic`. That branch is Tier A: choose and
+  record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.
+
+  Telegram: `pnpm josh notify --task-type planning --issue-url "<issue-url>" --body=$'-
+  <bullet1>\n- <bullet2>\n...'`. `--task-type` sets the icon (`planning` 📋 / `completion` ✅ /
+  `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️); `--repo-name` and `--issue-title` are
+  auto-fetched. The Issue URL must be included.
 
 **`kickoff` does not claim the working-tree hold, and does not release one** — it touches GitHub, never
-the tree. `working-tree-hold.md` is the single source.
+the tree (`working-tree-hold.md`).
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#<N>`. The definition is `target-repository.md`. `kickoff` is the entry that needs
-no checkout: name the target repository in the path of every `gh api` call — reads included — and never
-clone. The one exception is the split path's epic, since `pnpm josh epic` writes only the repository it
-runs in — and the promote arm has no remote fallback at all, so it stops when that repository is not
-checked out here. A target whose owner is not this session's is third-party: Tier C, so it stops rather
-than filing.
+`kickoff joshuafolkken/kit#<N>` (`target-repository.md`). `kickoff` needs no checkout: name the target in
+every `gh api` path, reads included, and never clone. The exception is the split path's epic — `pnpm josh
+epic` writes only the repository it runs in, and the promote arm stops when that repository is not
+checked out here. A third-party owner is Tier C: stop rather than file.
 
 **Read `split-assessment.md` → "The question" first** — `kickoff #N` assesses scope exactly as
-`kickoff new` does. Its default is not to split: separability and a scope that clearly exceeds what one
-verification gate can confirm in one pass have to hold **together**. The rest of `split-assessment.md`
-is read on demand when a split is found.
+`kickoff new` does. The default is not to split: separability and a scope clearly over one verification
+gate must hold **together**. The rest of `split-assessment.md` is read when a split is found.
 
-- `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (0) **Scope assessment** per
-  `split-assessment.md`. If multiple → the **multi-issue split path**; if single → the **single-issue
-  path**. **Single-issue path**: (1) Derive an English title from the conversation, or use the provided
-  title. (2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>` plus the labels the words typed after `new` name ("Words typed after `new`", below) (body
-  per `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a
-  candidate that covers the same work stops the run rather than filing a second Issue (`SKILL.md` →
-  `issue-scout.md`). Capture `<N>`. (3)
-  Post the plan in the session language, using the same body/comment logic as `kickoff #<N>`. (4) Send
-  Telegram notification. (5) **Stop** — do not implement. **Multi-issue split path**: (1) For each
-  independent deliverable, derive a focused English title and create a separate Issue with the
-  `route:split` label (its duplicate scan is read per `issue-scout.md`): `pnpm josh issue:file
-  "<sub-title>" --body-file <body-file> --depth <n> --route split` plus the labels the words typed after `new` name. Capture each Issue number. **When the split is filed into a repository other than
-  the one this session is running in**, every child body gets the `## Origin` backlink described in the
-  cross-package rule the AI documents keep resident, the epic body carries the same link as prose or a
-  plain bullet (never as a checkbox row, which would disable its auto-close), and the originating Issue
-  lists the children and the epic under `## Upstream issues`. (2) **Epic — always, for every split into
-  two or more Issues.** There is no count or ordering condition. **Create it with `pnpm josh epic
-  "<epic-title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]`**,
-  capturing its number `<E>` from the printed URL. The command satisfies the epic's four mechanical
-  requirements by construction — the `epic` label, the task-list rows (`- [ ] #N`), the machine-readable
-  `Dependencies`, and the printed `backlogrun` line. Check an epic you wrote or edited by hand with `pnpm
-  josh epic:check <E>`. Only where `josh` is unavailable, fall back to the manual procedure: ensure the
-  label exists (`gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks
-  a batch of child issues from one split" --silent 2>/dev/null || true`), then create the epic with `gh
-  api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file>`. Its body
-  follows the epic format in `prompts/collaboration-workflow/issue-template.md` — split rationale,
-  dependencies, the `backlogrun` command, and a child task list in task-list syntax (`- [ ] #N`). The epic
-  exists as the **non-closing home for the split rationale**. When the children have no required order,
-  write `None — the children are independent; any execution order works.` under `Dependencies`. **The
-  epic itself is never implemented** — a `backlogrun` takes a named epic and runs its *children*. `pnpm josh
-  followup` closes it automatically once every child is closed. **Only when the execution order
-  matters** — the criterion is `execution-waves.md` → "When a wave may be declared" — record it natively: `pnpm josh epic --ordered` treats the argument order as the dependency
-  order; on the manual fallback path, after the child Issues exist, `gh api
-  repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api
-  repos/{owner}/{repo}/issues/<N1> --jq .id)"` for each dependent pair (the endpoint takes the blocker's
-  **database id**, not its issue number; a failure here is non-fatal). Never fold the relation into the
-  creation call. (3) Send Telegram notification listing all created issues. (4) Present the command
-  `backlogrun #<E> --only`. (5) **Stop** — do not implement.
+- `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
+  deliverable takes the **single-issue path**, several the **multi-issue split path**.
+  - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
+    "<title>" --body-file <body-file> --depth <n>` plus the labels the words typed after `new` name
+    ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
+    its duplicate scan runs first, and a candidate covering the same work stops the run (`SKILL.md` →
+    `issue-scout.md`). Capture `<N>`. (3) Post the plan as `kickoff #<N>` does. (4) Telegram. (5)
+    **Stop**.
+  - **Multi-issue split path**: (1) Per deliverable, `pnpm josh issue:file "<sub-title>" --body-file
+    <body-file> --depth <n> --route split` plus the labels the words after `new` name (duplicate scan
+    per `issue-scout.md`). A split filed into another repository gives every child body the `## Origin`
+    backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
+    the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
+    every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... [--ordered]
+    [--rationale-file <path|->] [--origin <owner/repo#N>]`, capturing `<E>`. It builds the `epic` label,
+    the task-list rows (`- [ ] #N`), the machine-readable `Dependencies` and the `backlogrun` line; check
+    a hand-edited epic with `pnpm josh epic:check <E>`. (3) Telegram listing every created Issue. (4)
+    Present `backlogrun #<E> --only`. (5) **Stop**.
 
-`pnpm josh issue:file` lints the body and applies the classification labels it declares, following `prompts/collaboration-workflow/issue-template.md` for classification (`docs/josh-commands-backlog.md` → `josh issue:file`).
+  **The epic itself is never implemented** — `backlogrun` runs its *children*, and `pnpm josh followup`
+  closes it once every child is closed. Children with no required order take `None — the children are
+  independent; any execution order works.` under `Dependencies`. **Only when the execution order
+  matters** (`execution-waves.md` → "When a wave may be declared") pass `--ordered`, which treats the
+  argument order as the dependency order.
+
+  **Only where `josh` is unavailable**, the manual fallback: `gh api repos/{owner}/{repo}/labels -f
+  name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent
+  2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f
+  'labels[]=epic' -F body=@<body-file>` with the epic format of `issue-template.md`; an order is
+  recorded per pair with `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F
+  issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"` (the blocker's **database id**; a
+  failure is non-fatal), never folded into the creation call.
+
+`pnpm josh issue:file` lints the body and applies the classification labels it declares (`issue-template.md`; `docs/josh-commands-backlog.md` → `josh issue:file`).
 An Issue a consumer can use only once it is published is filed with `--release` (`kickoff new`), or linked with `pnpm josh issue:release <N>` (`kickoff #N`) — either makes it a blocker of the repository's `release` Issue, which never gets `auto-ok` on its own.
 
 ## Words typed after `new`
 
-**`auto-ok` is judged by `pnpm josh issue:file`, never typed** — by the same criteria as every
-filing: the excluded labels and the body's `- 人の判断:` declaration, and a `不要` declaration also needs a run label
-(`issue-template.md`).
+**`auto-ok` is judged by `pnpm josh issue:file`, never typed** — the excluded labels and the body's
+`- 人の判断:` declaration; a `不要` declaration also needs a run label (`issue-template.md`).
 `auto ok` typed after `new` adds nothing.
 
 **Words after `new`** (`kickoff new high`) are read like `into <target>`, never inferred. Each adds its

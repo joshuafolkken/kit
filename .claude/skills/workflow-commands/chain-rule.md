@@ -58,42 +58,32 @@ These are the gate → review → PR → merge facts other documents cite; this 
 rule came from and why it holds: `docs/maintainers/chain-rule-rationale.md` → "Where each rule came
 from", `docs/maintainers/chain-rule-rationale.md` → "Why the orchestration facts hold".
 
-- **The gate runs beside this review, not in front of it** — `pnpm josh gate` is started when the review
-  starts and joined before the commit. A red gate is fixed and re-run whatever the review concluded, and
-  there is no path to a commit on a gate nobody read.
-- **origin/main is merged in before the gate** — `pnpm josh main:merge` merges `origin/<default>` into
-  the branch before the gate and the review start. It is the last edit, so the scoped pair and the gate
-  run once over it. A conflict here fires `backlogrun-recovery.md` → "Conflicts are not predicted"
-  early. **This is the one place a conflicted merge's procedure is written**:
-  `main:merge` refuses before merging when uncommitted changes touch a path the default branch also
-  changed, or when the index still holds unresolved or staged paths — commit the work first with
-  `pnpm josh git -y`, then rerun it, and **never stash around the merge**. A merge that stops on a
-  conflict is finished the same way: remove the markers, then `pnpm josh git -y` stages the resolution
-  and records the merge commit. That commit is the sanctioned flow, so it is **Tier A** — a lane child
-  never stops to ask a person for `git add`, and the `Stop` hook sends back a reply that does.
-- **A single check answers once per tree** — while implementing, re-run a single check by name
-  (`pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`, or the project's type
-  check) after every edit; a repeat of the same command with the same arguments over a tree nothing has
-  touched since buys only a copy of the answer already in hand. In kit a detached `pnpm josh ship` also
-  checks the metrics totals before the hand-off, so the implementing session accepts a grown total with
-  its reason, as the ship's output names.
-- **The pull request opens between the rounds, so CI runs beside round 2** — `pnpm josh git -y` sits
-  between the two review rounds. Round 1 runs on the uncommitted tree and its High/Medium findings are
-  fixed before anything is committed; the verification pass over those fixes then runs against the open
-  pull request, beside the CI the commit started.
-- **The round-2 fix commit is pushed before its gate** — a fix the second round makes in place is
-  pushed (`pnpm josh git -y` again, a follow-up commit) before its `pnpm josh gate`, so the gate runs
-  inside the CI wait and is joined before `pnpm josh followup` rather than in front of it.
-- **A clean second round issues the merge in the same turn** — the turn that reads a clean second round
-  issues `pnpm josh followup`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a turn
-  of its own. Clean has two halves: no confirmed High is standing, and nothing was routed to branch 1 of
-  the disposition.
-- **The review runs in a subagent, never a main-line skill load** — `/code-review` is spawned through
-  the `Agent` tool in its own context, as the agent type step 1 names.
+- **The gate runs beside this review, not in front of it** — started with the review, joined before the
+  commit. A red gate is fixed and re-run whatever the review concluded.
+- **origin/main is merged in before the gate** — `pnpm josh main:merge` is the last edit, so the scoped
+  pair and the gate run once over it; a conflict fires `backlogrun-recovery.md` → "Conflicts are not
+  predicted" early. **This is the one place a conflicted merge's procedure is written**: `main:merge`
+  refuses when uncommitted changes touch a path the default branch also changed, or the index holds
+  unresolved or staged paths — commit first with `pnpm josh git -y`, rerun, and **never stash around the
+  merge**. A merge stopped on a conflict: remove the markers, then `pnpm josh git -y` stages the
+  resolution and records the merge commit — **Tier A**; a lane child never asks a person for `git add`.
+- **A single check answers once per tree** — re-run one check by name (`pnpm josh lint:related`,
+  `pnpm josh cspell:dot`, `pnpm josh test:related`, or the type check) after every edit, never twice
+  over an untouched tree. In kit a detached `pnpm josh ship` also checks the metrics totals; accept a
+  grown total with its reason, as its output names.
+- **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
+  uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
+  the open pull request.
+- **The round-2 fix commit is pushed before its gate** — `pnpm josh git -y` again, so the gate runs
+  inside the CI wait and is joined before `pnpm josh followup`.
+- **A clean second round issues the merge in the same turn** — `pnpm josh followup`, after any branch-2
+  filing and `pnpm josh epic:bundle`. Clean: no confirmed High standing, nothing routed to branch 1.
+- **The review runs in a subagent, never a main-line skill load** — `/code-review` through the `Agent`
+  tool, as the agent type step 1 names.
 - **The brief names the checkout, and a review that read another one is refused** — `pnpm josh
-  review:brief` prints the checkout root, branch and HEAD and a nonce; the review runs `pnpm josh
+  review:brief` prints the checkout root, branch, HEAD and a nonce; the review runs `pnpm josh
   review:attest <nonce>` from the tree it read, and `pnpm josh review:attest --check` must answer `ok`
-  before the run or `pnpm josh followup` acts on the verdict, or it is discarded.
+  before anything acts on the verdict.
 
 This file is the single source of the gate → review → PR → merge chain rule; other documents reference
 it rather than restating it. `prompts/collaboration-workflow/plan-comment.md` keeps Step 3.
