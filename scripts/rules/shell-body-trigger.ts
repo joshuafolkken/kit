@@ -6,7 +6,8 @@
 
 // A body handed to a command as an inline double-quoted argument, in the spellings a run reaches for:
 // `gh`'s field flags (`-f` / `-F` / `--field` / `--raw-field` with `body=`), `gh`'s own `--body`, and
-// `josh`'s `--body` and `--notify-message`. The value is captured so the decision can be made on what
+// `josh`'s `--body` and `--notify-message`, and `josh notify`'s `--recommended` / `--alternative` —
+// free text every confirmation carries, naming the very commands a backtick would run. The value is captured so the decision can be made on what
 // the body actually contains rather than on the flag alone.
 //
 // **`-b` is deliberately absent.** It is `gh`'s short `--body`, but it is also `git checkout -b`, and
@@ -14,7 +15,7 @@
 // spellings end in `-` where this pattern needs whitespace or `=`, so `--body-file <path>` and
 // `--notify-message-file <path>` cannot match it.
 const FIELD_FLAGS = '(?:-f|-F|--field|--raw-field)'
-const MESSAGE_FLAGS = '(?:--body|--notify-message)'
+const MESSAGE_FLAGS = '(?:--body|--notify-message|--recommended|--alternative)'
 
 // **The opening quote sits on either side of `body=`, and both spellings are the same command.** zsh
 // strips the quotes before `gh` is started, so `-f body="… \`pnpm josh ms\` …"` and

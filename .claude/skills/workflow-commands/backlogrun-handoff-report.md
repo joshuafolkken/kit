@@ -24,6 +24,6 @@ structure and the label translations are `prompts/collaboration-workflow/report-
 - One sentence per line, no internal identifiers, every child named by number. **Never omit
   `Remaining`** — it is the one line that tells this report from a completion report
 - Telegram uses the same format and is **sent with `--task-type confirmation`** (`completion` would
-  announce an unfinished epic as done)
+  announce an unfinished epic as done), `--recommended` naming the resume command
 - **Write it only when the run stops.** While a run carries on past the threshold it writes none; the
   epic progress comment is the record

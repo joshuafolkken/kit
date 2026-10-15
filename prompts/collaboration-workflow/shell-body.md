@@ -25,7 +25,7 @@ zsh は `pnpm josh ms` を実行し、その標準出力を本文に埋め込む
 pnpm josh issue:comment <N> --body-file <path>
 gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>
 pnpm josh followup "<title> #<N>" --notify-message-file <path>
-pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
+pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path> --recommended "<choice>"
 ```
 
 **PR コメントも同じ経路である** — REST では pull request のコメントは issue のコメントであり、`pnpm josh issue:comment <N> --body-file <path>` がそのまま使える。`gh issue comment` / `gh pr comment` は使わない（GraphQL 経由。理由は `docs/maintainers/shell-body-rationale.md` → "Why no `gh` subcommand is written in an executable block"）。

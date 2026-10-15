@@ -1,6 +1,8 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { z } from 'zod'
+import { confirmation_options, type ConfirmationOptions } from './confirmation-options'
+import { notify_opt_in } from './notify-opt-in'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org'
 // `sendMessage` refuses a text longer than this.
@@ -42,6 +44,9 @@ interface TelegramSendInput {
 	repo_name: string | undefined
 	issue_title: string | undefined
 	body: string | undefined
+	// A confirmation's recommended choice and the others — set beside the body rather than inside it
+	// so a body cut to the length limit never takes the choices with it.
+	choices?: string | undefined
 	issue_url: string | undefined
 	pr_url: string | undefined
 }
@@ -149,6 +154,16 @@ function is_notify_disabled(): boolean {
 	return parse_environment_string(process.env[NOTIFY_SWITCH_KEY]).toLowerCase() === NOTIFY_OFF_VALUE
 }
 
+// The line a skipped send prints, or `undefined` for a send that goes out. The blanket opt-out wins
+// over the per-type opt-in, so `off` stays the one switch that silences everything.
+function skip_line(task_type: TelegramTaskType): string | undefined {
+	if (is_notify_disabled()) {
+		return `🔕 Telegram notifications are disabled (${NOTIFY_SWITCH_KEY}=${NOTIFY_OFF_VALUE}).`
+	}
+
+	return notify_opt_in.is_skipped(task_type) ? notify_opt_in.skip_line(task_type) : undefined
+}
+
 function build_header(task_type: TelegramTaskType, repo_name: string | undefined): string {
 	const { icon, label } = TASK_DEFINITIONS[task_type]
 	if (repo_name === undefined || repo_name.length === 0) return `${icon} ${label}`
@@ -185,6 +200,7 @@ function build_blocks(input: TelegramSendInput): Array<string> {
 	const blocks: Array<string> = [build_title_block(input)]
 
 	push_if_present(blocks, input.body)
+	push_if_present(blocks, input.choices)
 	blocks.push(...build_url_parts(input))
 
 	return blocks
@@ -243,13 +259,13 @@ function build_send_failure(error: unknown, config: TelegramConfig): Error {
 //
 // The failure it throws carries a `cause`, and that cause is redacted too — see `build_send_failure`.
 //
-// The opt-out is checked here, before `load_config`, so every caller — the tolerant form included —
-// skips the same way and none has to repeat the check.
+// The opt-out and the per-type opt-in are checked here, before `load_config`, so every caller — the
+// tolerant form included — skips the same way and none has to repeat the check.
 async function send(input: TelegramSendInput): Promise<void> {
-	if (is_notify_disabled()) {
-		console.info(
-			`🔕 Telegram notifications are disabled (${NOTIFY_SWITCH_KEY}=${NOTIFY_OFF_VALUE}).`,
-		)
+	const skipped = skip_line(input.task_type)
+
+	if (skipped !== undefined) {
+		console.info(skipped)
 
 		return
 	}
@@ -341,7 +357,7 @@ async function warn(input: WarningInput): Promise<boolean> {
 	)
 }
 
-interface ConfirmInput {
+interface ConfirmInput extends ConfirmationOptions {
 	issue_title: string
 	body: string
 	recovery: string
@@ -365,6 +381,7 @@ async function confirm(input: ConfirmInput): Promise<boolean> {
 			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
 			issue_title: input.issue_title,
 			body: input.body,
+			choices: confirmation_options.block(input),
 			issue_url: undefined,
 			pr_url: undefined,
 		},
@@ -463,4 +480,4 @@ const telegram_notify = {
 }
 
 export { telegram_notify, build_text, TASK_DEFINITIONS, telegram_environment_schema }
-export type { TelegramSendInput, TelegramTaskType }
+export type { ConfirmInput, TelegramSendInput, TelegramTaskType }

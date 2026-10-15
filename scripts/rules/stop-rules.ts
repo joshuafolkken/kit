@@ -103,7 +103,8 @@ const STOP_NOTIFY_REASON =
 	'⛔ mid-workflow stop notification: this working tree is still held by a run and no `confirmation` ' +
 	'Telegram was sent this turn, so a person is being left to wait off-screen without knowing the run ' +
 	'paused. `CLAUDE.md` → "Mid-workflow stop notification" requires ' +
-	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\'` before any ' +
+	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\' ' +
+	'--recommended "<choice>" --alternative "<choice>"` before any ' +
 	'mid-workflow pause. Send it, then end with a one-line confirmation that it was sent — do not repeat ' +
 	'your previous reply. This fires only while the hold is held and no notify is on the transcript, and ' +
 	'`stop_hook_active` lets a second stop through so a run is never wedged.'

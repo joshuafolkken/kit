@@ -28,6 +28,7 @@ All of them are optional except the two Telegram credentials, which notification
 | `TELEGRAM_BOT_TOKEN` | Yes, unless `JOSH_NOTIFY=off` | —                                              | Every notification a workflow sends ([how to get it](./how-to/set-up-notifications.md#telegram_bot_token)).                                                          |
 | `TELEGRAM_CHAT_ID`   | Yes, unless `JOSH_NOTIFY=off` | —                                              | The chat that receives them ([how to get it](./how-to/set-up-notifications.md#telegram_chat_id)).                                                                    |
 | `JOSH_NOTIFY`        | No                            | on                                             | `off` skips every notification with exit code 0 and makes the two credentials unnecessary ([details](#notification-behavior)).                                       |
+| `JOSH_NOTIFY_OPT_IN` | No                            | — (neither)                                    | Comma-separated optional types to send, e.g. `planning,completion`; an optional type not listed is skipped with exit code 0 ([details](#notification-behavior)).     |
 | `JOSH_SESSION_LANG`  | No                            | `ja` (`josh init` seeds it from the OS locale) | The language of session dialogue, Issue bodies, comments and notification bodies, e.g. `en` ([`josh session:lang`](./josh-commands-automation.md#josh-sessionlang)). |
 
 #### Notification behavior
@@ -35,6 +36,8 @@ All of them are optional except the two Telegram credentials, which notification
 **A notification that reached nobody is a failure, not a skip.** Missing credentials and a refused request are treated the same way, and what happens next depends only on whose job the notification was.
 
 An explicit `JOSH_NOTIFY=off` is the one exception: it records that nobody is meant to be notified, so every send is skipped with one `🔕 Telegram notifications are disabled` line and exit code 0, and nothing below applies. Only `off` (case-insensitive) disables them: unset or any other value keeps the behavior below, so a forgotten setup still fails rather than passing quietly.
+
+`planning` and `completion` are optional: neither needs anyone to act, so each is sent only when `JOSH_NOTIFY_OPT_IN` names it, and is otherwise skipped with one `🔕 <type> notifications are not opted in` line and exit code 0. Every other type is always sent. To keep receiving both, add `JOSH_NOTIFY_OPT_IN=planning,completion`.
 
 When `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is missing or empty, or the send itself fails:
 

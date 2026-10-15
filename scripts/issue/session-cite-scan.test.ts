@@ -69,7 +69,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// answers with it inside one code block, where nothing is linked.
 	['run/board/run-board-now.ts', 1],
 	['run/cut/run-cut-cli.ts', 3],
-	['run/entry/run-entry-stop.ts', 3],
+	['run/entry/run-entry-stop.ts', 4],
 	['run/event/run-event-checks.ts', 1],
 	['run/event/run-event-filed.ts', 1],
 	['run/event/run-event-plan.ts', 1],

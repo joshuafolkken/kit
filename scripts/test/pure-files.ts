@@ -44,7 +44,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/epic/epic-remove-plan.test.ts',
 	'scripts/epic/epic-sections.test.ts',
 	'scripts/epic/epic-validate.test.ts',
-	'scripts/notify/telegram-test-logic.test.ts',
 	'scripts/agent/agent-event.test.ts',
 	'scripts/agent/agent-exit-record.test.ts',
 	'scripts/agent/agent-role-profile-documents.test.ts',
