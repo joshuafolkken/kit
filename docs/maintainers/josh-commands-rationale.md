@@ -31,6 +31,8 @@ The totals are held to the same totals measured on the merge-base, not to a reco
 - **Only an approval this branch wrote counts.** A file whose text the merge-base already holds approved an earlier branch's growth. The files stay on the default branch as the readable history of every accepted growth; a re-opened issue rewrites its own.
 - **`JOSH_METRICS_BASE` names the commit where no merge-base can be asked for.** CI checks a pull request out as a shallow merge commit with no default-branch ref; the workflow fetches two commits and names `HEAD^1`. A name that does not resolve is an error — reading it as "nothing to compare" would turn the ratchet off where nobody watches.
 - **Rejected: one writer updating the tracked file after each merge.** It needs a bot commit to the default branch and leaves a window in which the file is stale.
+- Prose density is two more totals on this ratchet, not a per-document ceiling table like `document-byte-budget.ts` (joshuafolkken/kit#3866). A shortened document lowers the limit by merging, with no record to edit.
+- A paragraph is measured rather than a line, so a column-wrapped document reads the same as an unwrapped one. Bold counts past one per section, so more emphasis in an already-bold section still grows the total.
 
 ## `josh metrics`' durations
 
