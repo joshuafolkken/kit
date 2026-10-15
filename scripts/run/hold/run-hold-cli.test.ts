@@ -259,9 +259,9 @@ describe('releasing', () => {
 
 // A record can expire while the work it was guarding is still sitting in the tree — `halfrun`'s stop
 // before commit is exactly that — so the age alone never decides.
-describe('an expired record', () => {
-	const EXPIRED_AT = new Date(Date.now() - (run_hold.HOLD_MAX_AGE_HOURS + 1) * 3_600_000)
+const EXPIRED_AT = new Date(Date.now() - (run_hold.HOLD_MAX_AGE_HOURS + 1) * 3_600_000)
 
+describe('an expired record', () => {
 	beforeEach(() => {
 		run_hold.write_hold(run_hold.hold_path(WORKTREE), ISSUE, EXPIRED_AT)
 		reset_output()
@@ -282,6 +282,16 @@ describe('an expired record', () => {
 		expect(errors.join('\n')).toContain('uncommitted changes')
 	})
 
+	// A child of the same issue re-dispatched into its lane resumes the work its killed run left.
+	it('is adopted with the work it guarded by a claim for its own issue', async () => {
+		git_status.mockResolvedValue(DIRTY_TREE)
+
+		await run_hold_cli.run([ISSUE])
+
+		expect(out).toEqual([run_hold_cli.HOLD_VERDICT])
+		expect(run_hold.read_hold(run_hold.hold_path(WORKTREE))).toMatchObject({ kind: 'held' })
+	})
+
 	// Replacing an expired record is still a race between everyone who found it expired, so the
 	// replacement goes through the same exclusive create the free path does.
 	it('answers busy to the replacement that lost the exclusive create', async () => {
@@ -298,6 +308,21 @@ describe('an expired record', () => {
 		await run_hold_cli.run([OTHER_ISSUE])
 
 		expect(out).toEqual([run_hold_cli.BUSY_VERDICT])
+	})
+})
+
+// A stopped run's record is left for its own adopt path, so its stop mark survives the claim.
+describe('an expired stop-marked record', () => {
+	it('still stops a claim for its own issue while the tree is dirty', async () => {
+		const target = run_hold.hold_path(WORKTREE)
+
+		run_hold.create_halfrun_stop_hold(target, ISSUE, EXPIRED_AT)
+		git_status.mockResolvedValue(DIRTY_TREE)
+
+		await run_hold_cli.run([ISSUE])
+
+		expect(out).toEqual([run_hold_cli.BUSY_VERDICT])
+		expect(run_hold.read_hold(target)).toMatchObject({ hold: { is_halfrun_stop: true } })
 	})
 })
 

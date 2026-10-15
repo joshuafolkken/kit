@@ -176,14 +176,27 @@ function held_block(hold: RunHold, issue: string): string | undefined {
 	return run_hold.is_reentry(hold, issue) ? undefined : run_hold.held_message(hold)
 }
 
+// An expired record of the claimant's own issue that no stop marked is the earlier run of the same work —
+// a child killed and re-dispatched into its lane — so the claim adopts it with the work it left. A
+// stopped `halfrun` or `prrun` keeps its own adopt path.
+function is_own_unstopped(hold: RunHold, issue: string): boolean {
+	const is_stopped = hold.is_halfrun_stop === true || hold.prrun_stop_head !== undefined
+
+	return run_hold.is_reentry(hold, issue) && !is_stopped
+}
+
+async function stale_block(hold: RunHold, issue: string): Promise<string | undefined> {
+	if (is_own_unstopped(hold, issue)) return undefined
+
+	return (await run_hold.is_tree_dirty()) ? run_hold.uncommitted_message(hold) : undefined
+}
+
 async function blocking_message(read: HoldRead, issue: string): Promise<string | undefined> {
 	if (read.kind === 'held') return held_block(read.hold, issue)
 
 	if (read.kind === 'unreadable') return run_hold.unreadable_message()
 
-	const is_expired_over_work = read.kind === 'stale' && (await run_hold.is_tree_dirty())
-
-	return is_expired_over_work ? run_hold.uncommitted_message(read.hold) : undefined
+	return read.kind === 'stale' ? await stale_block(read.hold, issue) : undefined
 }
 
 // A record already here is never overwritten by a claim: overwriting is what the guard exists to
