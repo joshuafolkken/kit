@@ -216,6 +216,18 @@ profile. It also checks that `josh start` recorded `josh.workflow` and placed `.
 and a third probe counts how often the agent reached `run:carry --begin`. Its repository is
 `kit-test-backlogrun-python-<n>`.
 
+On 2026-10-15 the commands of `kit-test-backlogrun.json` passed against the published 1.1435.0,
+which carries both [joshuafolkken/kit#3760](https://github.com/joshuafolkken/kit/issues/3760) and
+[joshuafolkken/kit#3796](https://github.com/joshuafolkken/kit/issues/3796), from a copy of the spec
+with `package_source: published` that installs `@joshuafolkken/kit@"$PACKAGE_VERSION"` behind the
+release-age exclusion the `start` patterns write. `josh start` added all six labels the check names,
+`backlogrun: started` was printed, `starting session` was the run's first event, the lane was
+dispatched about two minutes later, and its child opened its pull request about nine minutes in.
+Neither the parent's log nor the lane child's held a `requires approval` line
+([joshuafolkken/kit#3797](https://github.com/joshuafolkken/kit/issues/3797)). It left the private
+`kit-test-backlogrun-3` with the Issue `Add a heading to index.html` and the lane's open pull request;
+`kit-test-backlogrun-1` and `kit-test-backlogrun-2`, also private, are left from earlier runs.
+
 ## The log
 
 `<log-dir>/<scenario>-<n>.log`, by default under `.claude/tmp/fresh-machine`, which kit's distributed
