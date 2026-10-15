@@ -31,13 +31,20 @@ const NO_GIT = {
 	has_kit_committed: false,
 }
 
+// Every prerequisite the real machine or checkout would answer passes, so each test sets only the one
+// it is about.
+function pass_prerequisites(): void {
+	vi.spyOn(start_steps, 'self_run_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'github_cli_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'git_identity_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'uncommitted_refusal').mockReturnValue(undefined)
+}
+
 beforeEach(() => {
 	vi.restoreAllMocks()
 	vi.spyOn(project_profile, 'inspect_project').mockReturnValue(SHAPE)
 	vi.spyOn(start_steps, 'read_git_state').mockReturnValue(NO_GIT)
-	vi.spyOn(start_steps, 'self_run_refusal').mockReturnValue(undefined)
-	vi.spyOn(start_steps, 'github_cli_refusal').mockReturnValue(undefined)
-	vi.spyOn(start_steps, 'git_identity_refusal').mockReturnValue(undefined)
+	pass_prerequisites()
 	vi.spyOn(start_steps, 'run_steps').mockResolvedValue(undefined)
 	vi.spyOn(start_prompt, 'confirm_choices').mockResolvedValue('basic')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)

@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { error_text } from '#scripts/lib/error-message'
 import { init_dry_run } from './init-dry-run'
-import { project_profile, type ProjectProfile } from './project-profile'
+import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 import { start_dry_run } from './start-dry-run'
 import {
 	start_plan,
@@ -98,25 +98,29 @@ async function resolve_profile(
 	return await start_prompt.confirm_choices(choices)
 }
 
+function planned_steps(root: string, shape: ProjectShape): ReadonlyArray<StartStep> {
+	const state = start_steps.read_git_state(root, shape)
+	const plan = start_plan.plan_steps(state)
+
+	stop_on(plan.refusal)
+	stop_on(start_steps.uncommitted_refusal(root, state))
+
+	return plan.steps
+}
+
 // Every refusal is raised here, before the first write, so a run that stops here changed nothing.
 function prepare(args: ReadonlyArray<string>, is_tty: boolean, root: string): Prepared {
 	stop_on(start_steps.self_run_refusal(root))
 	const options = parse_start_options(args)
 	const interaction = settle(start_plan.interaction_of(options, is_tty))
 	const shape = project_profile.inspect_project(root, options.profile)
-	const plan = start_plan.plan_steps(start_steps.read_git_state(root, shape))
-
-	stop_on(plan.refusal)
-	const consent: Consent = settle(start_plan.github_consent(plan.steps, options, interaction))
+	const steps = planned_steps(root, shape)
+	const consent: Consent = settle(start_plan.github_consent(steps, options, interaction))
 
 	stop_on(start_steps.github_cli_refusal(root))
-	stop_on(start_steps.git_identity_refusal(plan.steps, root))
+	stop_on(start_steps.git_identity_refusal(steps, root))
 
-	return {
-		steps: plan.steps,
-		interaction,
-		choices: { options, shape, consent, root, steps: plan.steps },
-	}
+	return { steps, interaction, choices: { options, shape, consent, root, steps } }
 }
 
 async function run_steps({ steps, interaction, choices }: Prepared): Promise<void> {

@@ -306,7 +306,7 @@ The `full` profile's pre-push hook runs `josh audit`, which needs `osv-scanner`.
 
 **Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required. `--init-command "<command>"` runs that command as step 2 instead of kit's setup — for a toolkit layered over kit, e.g. `"josh-app init"`. It runs without a shell, with `--profile <confirmed profile>` appended; its non-zero exit stops before the commit, and step 6 also commits every file changed since it ran. `--push-preflight-command "<command>"` runs that command before step 1, after every refusal, and only when step 4 or 6 is planned — for a check the toolkit's own pre-push hook depends on, e.g. `"josh-app start:preflight"`. It runs without a shell; its non-zero exit stops the run with nothing changed. A run that pushes nothing never runs it. `--dry-run` prints what each planned step would create or write ([init.md → Preview with `--dry-run`](./init.md#preview-with---dry-run)) and stops before step 1; it needs no terminal, `--yes` or `--github`, and an `--init-command` is named, not simulated.
 
-**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change.
+**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change. In a repository with at least one commit, the working tree must be clean: uncommitted changes — modified, staged or untracked files that are not ignored — are listed and refused before any change, so the setup commit holds only what kit wrote; commit or stash them (`git stash push -u -- .`) first. The setup branch a failed commit left is exempt, since its uncommitted files are that run's own output.
 
 **Output / exit codes:** exits 0 when every step has run. A failed step exits 1 and prints the step it stopped at, the completed steps and the cause.
 
@@ -318,7 +318,7 @@ Initialize project config, selecting a profile and reporting applicable reposito
 pnpm josh init   # create/merge config files, install and format (--no-install skips both, --dry-run only prints the plan)
 ```
 
-**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails. In Git, while the checked-out commit lacks kit, it ends by pointing at [`josh start`](#josh-start).
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails.
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 
