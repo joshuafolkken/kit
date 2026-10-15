@@ -106,6 +106,8 @@ interface CutState {
 	is_held: boolean
 	// The issue a `fullrun` hold names, absent when the tree is not held by one.
 	held_issue?: string | undefined
+	// When the hold standing over the tree was taken — what keys a declined cut to the run it answered.
+	hold_taken_at?: string | undefined
 }
 
 // The fields a cut is written from, bundled so `begin_cut` stays within the parameter limit. `phase`
@@ -402,7 +404,13 @@ async function current_state(): Promise<CutState> {
 	const is_dirty = await run_hold.is_tree_dirty()
 	const hold = hold_of(await worktree_directory())
 
-	return { branch, is_dirty, is_held: hold !== undefined, held_issue: fullrun_issue(hold) }
+	return {
+		branch,
+		is_dirty,
+		is_held: hold !== undefined,
+		held_issue: fullrun_issue(hold),
+		hold_taken_at: hold?.taken_at,
+	}
 }
 
 function describe_cut(cut: RunCut): string {
@@ -466,6 +474,7 @@ const run_cut = {
 	handed_off_message,
 	has_required_handoff,
 	held_issue_sync,
+	hold_of,
 	incomplete_message,
 	invocation_for,
 	is_expired,

@@ -7,7 +7,9 @@ import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
+import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
+import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
@@ -62,6 +64,16 @@ interface LaneCostState {
 	// held outside a lane is told apart from a person's tree.
 	held_issue: () => string | undefined
 	verdict: () => CostVerdict
+	// Whether `run:cut --impl` could take the cut for this issue now — see `can_cut_sync`.
+	can_cut: (issue: string) => boolean
+}
+
+// **The guard asks for a cut only where `run:cut --impl` could take one** (joshuafolkken/kit#3881).
+// A run held on the default branch, or one whose cut was already answered `not-a-lane` / `unready`
+// under this hold, can only be refused again, so each refusal was a round trip that cut nothing. The
+// decline record is a file read and comes first; the tree read spawns git and comes second.
+function can_cut_sync(issue: string): boolean {
+	return !run_cut_decline.is_declined_sync(issue) && run_cut_ready.is_ready_sync()
 }
 
 function current_state(): LaneCostState {
@@ -75,6 +87,7 @@ function current_state(): LaneCostState {
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
 		verdict: (): CostVerdict =>
 			implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict()),
+		can_cut: can_cut_sync,
 	}
 }
 
@@ -140,14 +153,19 @@ function warrants_the_cut(state: LaneCostState): boolean {
 // **The unmeasurable direction matches the pre-gate cut**. A session that
 // cannot be priced reads as warranting the cut, the same safety-net direction `pre-gate-cut.ts`'s
 // `warrants_the_cut` takes (`verdict !== UNDER_VERDICT`): the two rules read one statistic against one
-// threshold, so they must not disagree about whether an unmeasurable session is due a cut.
+// threshold, so they must not disagree about whether an unmeasurable session is due a cut. Whether the
+// cut could be taken is asked only once it is warranted, so an under-threshold edit spawns no git.
 function is_over_threshold_edit(
 	call: GuardedCall,
 	state: LaneCostState = current_state(),
 ): boolean {
-	if (!is_edit_tool(call.name) || uncut_run_issue(state) === undefined) return false
+	if (!is_edit_tool(call.name)) return false
 
-	return warrants_the_cut(state)
+	const issue = uncut_run_issue(state)
+
+	if (issue === undefined) return false
+
+	return warrants_the_cut(state) && state.can_cut(issue)
 }
 
 // **The threshold in the refusal text is assembled from the constant, never spelled**.
@@ -184,7 +202,8 @@ const IMPLEMENTATION_CUT_REASON =
 	'names this issue; a person working here carries no mark and holds no run, so sees no refusal, so there is no human-or-child judgement left to make. The ' +
 	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue this edit once the cut has ' +
 	'answered — an edit reissued right after this refusal passes, so `busy` / `failed` cannot wedge the ' +
-	'run edit after edit; this fires again on the next threshold crossing rather than once per run.'
+	'run edit after edit. Past that window it asks again while the cut can still be taken; a ' +
+	'`not-a-lane` or `unready` answer silences it for the rest of this hold.'
 
 // **A refusal younger than this window is this edit's own refusal being answered**.
 // A `decide` row that refused every over-threshold edit would wedge a run whose cut came back `busy` /
@@ -201,7 +220,8 @@ function is_reissued_refusal(now_ms: number, delivered_at_ms: number): boolean {
 // silenced the row for the rest of a process the moment its first refusal landed — and a `busy` /
 // `failed` / `unready` verdict, or an edit reissued unchanged, left the context to grow unwatched to
 // 282,747 tokens with the cut never taken. `decide` re-asks on every over-threshold edit; the reissue
-// window is what keeps that from wedging a run that genuinely cannot cut. `delivered_at_ms` is this
+// window keeps that from wedging a run whose cut came back `busy` / `failed`, and a run that cannot
+// cut at all never reaches here — `can_cut_sync` keeps the trigger silent for it. `delivered_at_ms` is this
 // row's own last refusal, written by `fire_once` only when a refusal actually fired, so a passed
 // reissue does not move it.
 function decide(
@@ -213,8 +233,8 @@ function decide(
 	return !is_reissued_refusal(run.now_ms, delivered_at_ms)
 }
 
-// The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing;
-// `keeps` is the implementation cut command, read from a `Bash` call the same
+// The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
+// in a run that can cut; `keeps` is the implementation cut command, read from a `Bash` call the same
 // way `pre-gate-cut`'s is.
 const ROW = {
 	id: 'implementation-cut',
