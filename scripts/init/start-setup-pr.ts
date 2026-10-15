@@ -15,7 +15,7 @@ const SETUP_TITLE = `Set up ${KIT_PACKAGE_NAME}`
 const SETUP_BODY = [
 	`Adds the files \`josh start\` wrote while setting up ${KIT_PACKAGE_NAME}, so main carries the`,
 	'rules, settings and workflows every later Issue is run with. Only the files the setup wrote are in',
-	'the pull request; anything else in the working tree is left as it was.',
+	'the pull request: `josh start` runs only on a working tree with nothing uncommitted.',
 ].join('\n')
 const NAME_ONLY = '--name-only'
 const NOTHING_TO_COMMIT = 'The kit setup has no changes to commit, so no pull request was opened.'
@@ -106,7 +106,9 @@ function commit_kit_paths(paths: ReadonlyArray<string>, issue: IssueInfo, root: 
 
 // A caller's initialize command writes files kit cannot name, so with a `baseline` — what was already
 // changed before that command ran — everything changed since joins kit's own files, while a change
-// the user had made before the run still stays out (#2872).
+// the user had made before the run still stays out (#2872). `josh start` refuses a dirty tree on
+// `main` (#3835), so the baseline there is empty; it still keeps the two apart on the setup branch a
+// failed commit left, where the re-run starts with that run's output uncommitted.
 function setup_paths(
 	root: string,
 	baseline: ReadonlyArray<string> | undefined,

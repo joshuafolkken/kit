@@ -24,7 +24,6 @@ import { init_file_action } from './init-file-action'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
-import { kit_setup_state } from './kit-setup-state'
 import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 import { working_tree } from './working-tree'
@@ -313,16 +312,6 @@ function main(args: ReadonlyArray<string> = []): boolean {
 	return request.is_dry_run ? print_dry_run(request) : did_set_up_here(request, args)
 }
 
-// Only the command a person typed points onward to `josh start`: `josh start` calls `main` itself and
-// is already the next step.
-// A setup that failed after writing, such as a failed install, sets the exit code and points nowhere.
-function print_start_hint(): void {
-	if (process.exitCode !== undefined && process.exitCode !== 0) return
-	const hint = kit_setup_state.start_hint(PROJECT_ROOT)
-
-	if (hint !== undefined) console.info(`${hint}\n`)
-}
-
 // Only the command a person typed is refused, before anything is written or installed. `josh start`
 // calls `main` itself and decides about its own tree (#3835); a handed-off run follows the check
 // its caller already passed, on a tree the kit install it just made has changed.
@@ -341,7 +330,7 @@ function did_refuse_dirty_tree(): boolean {
 function run_cli(args: ReadonlyArray<string>): void {
 	try {
 		if (did_refuse_dirty_tree()) return
-		if (main(args)) print_start_hint()
+		main(args)
 	} catch (error) {
 		console.error(`\n✖ ${error_text.message_of(error)}\n`)
 		process.exitCode = 1
