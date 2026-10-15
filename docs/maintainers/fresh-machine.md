@@ -66,7 +66,17 @@ Three projects by two commands, each from the state its row names:
   other dependency keeps the wait.
 - **`start` runs the scoped checks before the gate.** `josh start` leaves the project on its setup
   branch, where `pnpm josh gate` refuses until `pnpm josh lint:related && pnpm josh test:related` has
-  passed; the pattern runs the line that refusal hands back.
+  passed; the pattern runs the line that refusal hands back. Every pattern names its profile, the way
+  an agent does: `kit-test-lua-start` and `kit-test-html-start` pass `--profile basic`,
+  `kit-test-svelte-start` passes `--profile full`, records the repository's labels before the install,
+  and runs `pnpm build && pnpm check` on the setup branch after the gate.
+- **`start` records what it left on GitHub** before the PATH probes: `pnpm josh profile`,
+  `gh repo view --json visibility,defaultBranchRef`, `gh label list --limit 100`, the files of the
+  first commit on `main`, then every Issue and pull request, the files the setup pull request
+  carries (`gh pr diff --name-only`) and the commits on `origin/main`. A project whose `main` already
+  had a commit gets kit's files through a setup Issue and pull request in place of a commit to `main`,
+  and these show the pull request was opened, left unmerged, and touched nothing else.
+  `kit-test-svelte-start` then waits for the setup pull request's CI (`gh pr checks --watch`).
 - **Every pattern ends with two probes**, recorded whatever they exit with: `pnpm josh gate` from
   `bash --noprofile --norc` with an environment of `HOME` and the system `PATH` only, and `josh gate`
   from a `PATH` that has `node` on it and no `pnpm`.
@@ -93,11 +103,12 @@ Run on 2026-10-13 against kit 1.1387.0 — the packed checkout for `init`, the p
   [the prerequisites' step 4](../setup/prerequisites.md#4-tell-git-who-you-are) has a person do. The
   other two `start` patterns make a first commit before the install, as their starting state asks,
   and set a repository identity for it.
-- **`kit-test-svelte-start` stops until
-  [joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755) is fixed.** A web
+- **`kit-test-svelte-start` stopped until
+  [joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755) was fixed.** A web
   project's pre-push hook runs `pnpm josh audit`, which needs `osv-scanner`; nothing in the guide
-  installs it and `josh start` does not provision it, so the hook refuses the push of the setup
-  branch. The pattern does not run `pnpm josh audit:provision` first, for the same reason.
+  installs it and `josh start` did not provision it, so the hook refused the push of the setup
+  branch. `josh start` now provisions it first; the pattern still does not run
+  `pnpm josh audit:provision` itself, since the guide does not.
 - **The bare-shell probe exits 127**: `pnpm: command not found`. The installer puts pnpm on `PATH`
   through `.bashrc` alone, so a shell that reads no profile does not have it.
 - **The node-only probe exits 1**, every check failing at once. From the packed checkout each failed
@@ -108,6 +119,35 @@ Run on 2026-10-13 against kit 1.1387.0 — the packed checkout for `init`, the p
   `kit-test-html-start-2` with the setup Issue and pull request `josh start` opened, and
   `kit-test-svelte-start-1` with the setup Issue alone. `kit-test-lua-start-1` stopped before a
   repository was created.
+
+On 2026-10-15 `kit-test-lua-start` passed against the published 1.1435.0, which carries both #3754
+and #3712: `josh start` exited 0 with a private repository, `main` pushed and every workflow and
+release-classification label, and the first commit held `main.lua` and kit's files only. The bare-shell
+probe exited 127 and the node-only probe exited 1, naming the missing pnpm for each check
+([joshuafolkken/kit#3716](https://github.com/joshuafolkken/kit/issues/3716)). It left
+`kit-test-lua-start-2`, and an aborted run against 1.1387.0 left `kit-test-lua-start-1` with only its
+initial commit; both are private.
+
+The same day `kit-test-html-start` passed against 1.1435.0 with `--profile basic`: `josh start` exited
+0, pushed the existing `main` unchanged to a private repository, added every label, and opened the
+setup Issue `Set up @joshuafolkken/kit` with `ignore-for-release` and an unmerged pull request that
+closes it. The pull request carries kit's files and `index.html` as `josh format` rewrote it, which
+[Set up the basic profile](../setup/basic.md) documents; `origin/main` holds the initial commit alone.
+The gate passed (1 ran, 5 skipped), and the two PATH probes exited 127 and 1 as for Lua
+([joshuafolkken/kit#3718](https://github.com/joshuafolkken/kit/issues/3718)). It left the private
+`kit-test-html-start-3`.
+
+`kit-test-svelte-start` passed against 1.1435.0 with `--profile full`, from an app `sv` 1.1.1 created
+and pushed to a private repository: `josh start` provisioned `osv-scanner` itself
+([joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755)), exited 0, added every
+label while leaving the ten GitHub defaults as they were, and opened the setup Issue with
+`ignore-for-release` and an unmerged pull request that closes it. The pull request carries kit's files
+and the three app files `josh format` rewrote; `origin/main` holds the initial commit alone. The gate
+passed (3 ran, 3 skipped — the minimal app has no Vitest), `pnpm build && pnpm check` passed on the
+setup branch, every CI check of the pull request passed or was skipped, and the two PATH probes exited
+127 and 1 as for the other patterns
+([joshuafolkken/kit#3720](https://github.com/joshuafolkken/kit/issues/3720)). It left the private
+`kit-test-svelte-start-2`.
 
 ## A scenario from another toolkit
 
@@ -190,6 +230,18 @@ Node.js code — a `pyproject.toml` and a `main.py` — so `josh start` sets it 
 profile. It also checks that `josh start` recorded `josh.workflow` and placed `.claude/settings.json`,
 and a third probe counts how often the agent reached `run:carry --begin`. Its repository is
 `kit-test-backlogrun-python-<n>`.
+
+On 2026-10-15 the commands of `kit-test-backlogrun.json` passed against the published 1.1435.0,
+which carries both [joshuafolkken/kit#3760](https://github.com/joshuafolkken/kit/issues/3760) and
+[joshuafolkken/kit#3796](https://github.com/joshuafolkken/kit/issues/3796), from a copy of the spec
+with `package_source: published` that installs `@joshuafolkken/kit@"$PACKAGE_VERSION"` behind the
+release-age exclusion the `start` patterns write. `josh start` added all six labels the check names,
+`backlogrun: started` was printed, `starting session` was the run's first event, the lane was
+dispatched about two minutes later, and its child opened its pull request about nine minutes in.
+Neither the parent's log nor the lane child's held a `requires approval` line
+([joshuafolkken/kit#3797](https://github.com/joshuafolkken/kit/issues/3797)). It left the private
+`kit-test-backlogrun-3` with the Issue `Add a heading to index.html` and the lane's open pull request;
+`kit-test-backlogrun-1` and `kit-test-backlogrun-2`, also private, are left from earlier runs.
 
 ## The log
 

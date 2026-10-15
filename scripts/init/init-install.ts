@@ -62,6 +62,13 @@ function run_post_init_steps(project_root: string): string | undefined {
 	return undefined
 }
 
-const init_install = { NO_INSTALL_FLAG, split_install_flag, did_step_succeed, run_post_init_steps }
+const init_install = {
+	NO_INSTALL_FLAG,
+	INSTALL_STEP,
+	FORMAT_STEP,
+	split_install_flag,
+	did_step_succeed,
+	run_post_init_steps,
+}
 export { init_install }
 export type { InstallStep }

@@ -57,7 +57,7 @@ Repeat step 1 of Pattern A for each change: agree the plan with the agent, then 
 
 ### 2. Opt them in with the `auto-ok` label
 
-Add the `auto-ok` label to each Issue the agent may implement and merge without you — or to the epic, which opts in every Issue under it. The agent never adds it to an Issue you filed; an Issue it files while working on an opted-in one inherits it unless the new Issue needs your judgement. `josh start` creates the label, and `josh sync` adds it to a repository that lacks it.
+Add the `auto-ok` label to each Issue the agent may implement and merge without you — or to the epic, which opts in every Issue under it. An Issue the agent files, including one you asked for with `kickoff new`, gets it when it meets the [criteria](./how-to/run-backlog.md) and needs no judgement from you. `josh start` creates the label, and `josh sync` adds it to a repository that lacks it.
 
 ### 3. Run them all with `backlogrun`
 
@@ -87,7 +87,7 @@ For a project set up with `josh init` and no GitHub. The workflow keywords above
 3. The agent reads the file before changing it, makes the change, checks it and reports what it saw. In a `full` profile project it also adds a test where one fits, runs `pnpm josh gate`, and reports which checks passed and which did not.
 4. Check it yourself: run `pnpm josh gate` ([what it checks and skips](./setup/basic.md#3-verify)), and open the page in a browser when the change is visible.
 
-Want Issues, pull requests and merges handled too? Run `pnpm exec josh start` ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)), then follow Pattern A.
+Want Issues, pull requests and merges handled too? Run `pnpm exec josh start` — in a repository that already has commits, commit your changes first ([init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start)), then follow Pattern A.
 
 ## Where next
 

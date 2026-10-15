@@ -41,6 +41,8 @@ interface Script {
 	unopened_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
+	// How many open issues owe an `auto-ok` judgement; unset reads as none.
+	judgement_owed?: number
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -86,12 +88,17 @@ function dispatch_ports(
 	script: Script,
 	calls: Array<string>,
 	offers: Array<DriveState>,
-): Pick<LoopPorts, 'offer' | 'launch' | 'free_lanes'> {
+): Pick<LoopPorts, 'offer' | 'launch' | 'free_lanes' | 'judgement_owed'> {
 	const queue = [...(script.offers ?? [])]
 	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
 
 	return {
 		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
+		judgement_owed: async () => {
+			calls.push('judgement')
+
+			return script.judgement_owed ?? 0
+		},
 		offer: async (asked) => {
 			calls.push('offer')
 			offers.push(asked)

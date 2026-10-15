@@ -41,9 +41,6 @@ interface FileArguments {
 	is_over_cap: boolean
 	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
 	is_auto_ok_opted_out: boolean
-	// `--requested`: a person asked for this filing, so `auto-ok` is applied only when a `--label` names
-	// it (`issue-auto-ok.ts`).
-	is_requested: boolean
 	// `--release`: the change reaches a consumer only once published, so the Issue is linked to the
 	// repository's release Issue as a blocker (`issue-release-cli.ts`).
 	is_release: boolean
@@ -58,7 +55,6 @@ const OPTIONS = {
 	distinct: { type: 'string', multiple: true },
 	'over-cap': { type: 'boolean' },
 	'no-auto-ok': { type: 'boolean' },
-	requested: { type: 'boolean' },
 	release: { type: 'boolean' },
 } as const
 
@@ -129,7 +125,6 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		repo: values.repo,
 		is_over_cap: values['over-cap'] === true,
 		is_auto_ok_opted_out: values['no-auto-ok'] === true,
-		is_requested: values.requested === true,
 		is_release: values.release === true,
 	}
 }
@@ -151,7 +146,7 @@ function is_undeclared_classification(label: string, body: string): boolean {
 
 // Every label the filing carries: the depth, the route when there is one, the classification labels
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
-// extra `--label`, then `auto-ok` when the filing opted in (`issue-auto-ok.ts`) and no `--label`
+// extra `--label`, then `auto-ok` when the filing is judged in (`issue-auto-ok.ts`) and no `--label`
 // already named it. One request applies them all, so no label is a separate step to forget.
 function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))

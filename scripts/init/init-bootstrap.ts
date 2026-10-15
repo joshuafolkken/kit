@@ -82,13 +82,17 @@ function ensure_project_manifest(project_root: string): void {
 	if (!existsSync(manifest_path)) writeFileSync(manifest_path, init_basic.initial_manifest())
 }
 
+function is_handed_off(): boolean {
+	return process.env[HANDOFF_ENV] !== undefined
+}
+
 // Returns the failure to report, or undefined once the project-installed kit finished the setup.
 function hand_off(
 	package_directory: string,
 	project_root: string,
 	args: ReadonlyArray<string>,
 ): string | undefined {
-	if (process.env[HANDOFF_ENV] !== undefined) return REPEATED_HANDOFF
+	if (is_handed_off()) return REPEATED_HANDOFF
 	console.info('\n🚀 Installing @joshuafolkken/kit into the project, then running its josh init')
 	const template = readFileSync(path.join(package_directory, KIT_BUILDS_TEMPLATE), 'utf8')
 	const install = kit_install_step(has_kit_dependency(project_root), template)
@@ -100,5 +104,5 @@ function hand_off(
 	return undefined
 }
 
-const init_bootstrap = { is_project_kit, kit_build_flags, hand_off }
+const init_bootstrap = { HANDOFF_ENV, is_project_kit, kit_build_flags, hand_off, is_handed_off }
 export { init_bootstrap }

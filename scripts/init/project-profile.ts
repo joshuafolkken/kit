@@ -5,6 +5,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { kit_written_paths } from './kit-written-paths'
+import { own_formatter } from './own-formatter'
 import { workflow_mark } from './workflow-mark'
 
 type ProjectProfile = 'basic' | 'full'
@@ -15,7 +16,8 @@ interface ProfileResult {
 }
 
 interface ProjectShape extends ProfileResult {
-	has_web: boolean
+	// Web files, and no formatter of the project's own (`own-formatter.ts`).
+	should_use_prettier: boolean
 	has_typescript: boolean
 	has_git: boolean
 	has_github: boolean
@@ -127,8 +129,12 @@ function resolve_profile(root: string, requested?: ProjectProfile): ProfileResul
 	return inferred_profile(manifest)
 }
 
+function is_ignored_directory(name: string): boolean {
+	return IGNORED_DIRECTORIES.has(name)
+}
+
 function should_visit(entry: Dirent): boolean {
-	return entry.isDirectory() && !IGNORED_DIRECTORIES.has(entry.name)
+	return entry.isDirectory() && !is_ignored_directory(entry.name)
 }
 
 function scan_directory(directory: string, pending: Array<string>): Array<string> {
@@ -152,7 +158,9 @@ function is_project_file(root: string, file: string): boolean {
 	return !kit_written_paths.is_kit_written(relative_path)
 }
 
-function file_extensions(root: string): Array<string> {
+// Every file under `root` outside the directories no setup reads — the one walk the project scan and
+// the `josh init --dry-run` snapshot share.
+function list_files(root: string): Array<string> {
 	const pending = [root]
 	const files: Array<string> = []
 
@@ -160,15 +168,24 @@ function file_extensions(root: string): Array<string> {
 		files.push(...scan_directory(directory, pending))
 	}
 
-	return files.filter((file) => is_project_file(root, file)).map((file) => path.extname(file))
+	return files
 }
 
-function scan_files(root: string): { has_web: boolean; has_typescript: boolean } {
+function file_extensions(root: string): Array<string> {
+	return list_files(root)
+		.filter((file) => is_project_file(root, file))
+		.map((file) => path.extname(file))
+}
+
+// A project that formats with its own tool gets no Prettier even with Web files: two formatters
+// would rewrite each other's output (joshuafolkken/kit#3832).
+function scan_files(root: string): { should_use_prettier: boolean; has_typescript: boolean } {
 	const extensions = file_extensions(root)
 	const has_web = extensions.some((extension) => WEB_EXTENSIONS.has(extension))
+	const should_use_prettier = has_web && own_formatter.find_config(root) === undefined
 	const has_typescript = extensions.some((extension) => TYPESCRIPT_EXTENSIONS.has(extension))
 
-	return { has_web, has_typescript }
+	return { should_use_prettier, has_typescript }
 }
 
 function has_github_remote(root: string): boolean {
@@ -205,6 +222,8 @@ const project_profile = {
 	resolve_profile,
 	has_git,
 	inspect_project,
+	is_ignored_directory,
+	list_files,
 	requested_profile,
 	with_legacy_profile_names,
 }

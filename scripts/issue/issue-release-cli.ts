@@ -18,16 +18,21 @@ import { session_cite } from './session-cite'
 // --release` calls the same `link` once its Issue exists, so a new and an existing Issue are linked
 // by one body of code.
 //
+// `--wait` points the edge the other way: `<N>` is blocked by the release Issue, so a run that needs
+// the published version records a dependency rather than a `needs-decision` park, and the backlog
+// offers `<N>` again once a person closes the release Issue (joshuafolkken/kit#3824).
+//
 // The relation is written through `issue_add_blocked_by`, which addresses the repository `gh`
 // resolves — the current one, or the target a cross-repository `issue:file` has pointed `GH_REPO` at.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh issue:release <issue-number>'
+const USAGE = 'Usage: josh issue:release <issue-number> [--wait]'
 const NONE = 'none'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote` — check `gh auth status`.'
+const OPTIONS = { wait: { type: 'boolean' } } as const
 
 interface ReleaseIssue {
 	issue_number: number
@@ -35,7 +40,20 @@ interface ReleaseIssue {
 	is_filed: boolean
 }
 
+interface ReleaseRequest {
+	issue_number: number
+	// `<N>` waits on the release Issue, rather than blocking it.
+	is_wait: boolean
+}
+
+// The two ends of one `blocked_by` edge.
+interface Edge {
+	blocked: number
+	blocker: number
+}
+
 // `undefined` when the listing is unreadable, `NONE` when it reads and names no open release Issue.
+// `pnpm josh release` asks the same question to close the Issue it has just published.
 async function find_open(target: string): Promise<number | typeof NONE | undefined> {
 	const outcome = await git_gh_issue_list.issue_list({
 		json_fields: 'number',
@@ -91,41 +109,59 @@ async function release_of(target: string): Promise<ReleaseIssue | undefined> {
 	return filed === undefined ? undefined : { issue_number: filed, is_filed: true }
 }
 
-function linked_line(release: ReleaseIssue, issue_number: number, target: string): string {
+function release_label_of(release: ReleaseIssue, target: string): string {
 	const how = release.is_filed ? 'filed' : 'open'
-	const release_cite = session_cite.issue(release.issue_number, undefined, target)
 
-	return `release: ${release_cite} (${how}) is blocked by ${session_cite.issue(issue_number, undefined, target)}`
+	return `${session_cite.issue(release.issue_number, undefined, target)} (${how})`
 }
 
-function unlinked_line(issue_number: number, blocked: string, target: string): string {
-	const blocker = session_cite.issue(issue_number, undefined, target)
+function linked_line(release: ReleaseIssue, request: ReleaseRequest, target: string): string {
+	const release_label = release_label_of(release, target)
+	const issue_label = session_cite.issue(request.issue_number, undefined, target)
 
-	return `✖ ${blocker} could not be recorded as a blocker of ${session_cite.issue(blocked, undefined, target)}`
+	return request.is_wait
+		? `release: ${issue_label} waits on ${release_label}`
+		: `release: ${release_label} is blocked by ${issue_label}`
 }
 
-// Whether Issue `issue_number` of `target` now blocks the release Issue. Every outcome is printed.
-async function link(issue_number: number, target: string): Promise<boolean> {
+function unlinked_line(edge: Edge, target: string): string {
+	const blocker = session_cite.issue(edge.blocker, undefined, target)
+
+	return `✖ ${blocker} could not be recorded as a blocker of ${session_cite.issue(edge.blocked, undefined, target)}`
+}
+
+function edge_of(release: ReleaseIssue, request: ReleaseRequest): Edge {
+	return request.is_wait
+		? { blocked: request.issue_number, blocker: release.issue_number }
+		: { blocked: release.issue_number, blocker: request.issue_number }
+}
+
+// Whether the edge between Issue `<N>` of `target` and the release Issue is now recorded. Every
+// outcome is printed.
+async function record(request: ReleaseRequest, target: string): Promise<boolean> {
 	const release = await release_of(target)
 
 	if (release === undefined) return false
-	const blocked = String(release.issue_number)
-	const is_linked = await git_gh_issue_write.issue_add_blocked_by(blocked, String(issue_number))
+	const edge = edge_of(release, request)
+	const is_linked = await git_gh_issue_write.issue_add_blocked_by(
+		String(edge.blocked),
+		String(edge.blocker),
+	)
 
-	if (is_linked) console.info(linked_line(release, issue_number, target))
-	else console.error(unlinked_line(issue_number, blocked, target))
+	if (is_linked) console.info(linked_line(release, request, target))
+	else console.error(unlinked_line(edge, target))
 
 	return is_linked
 }
 
-// An unknown flag parses to no positionals, so it refuses the call like a missing number.
-function positionals_of(argv: ReadonlyArray<string>): ReadonlyArray<string> {
-	return cli_flags.arguments_of(argv, {})?.positionals ?? []
+// Whether Issue `issue_number` of `target` now blocks the release Issue.
+async function link(issue_number: number, target: string): Promise<boolean> {
+	return await record({ issue_number, is_wait: false }, target)
 }
 
 // The number is the one positional: a missing, malformed or second one refuses the whole call.
-function issue_number_of(argv: ReadonlyArray<string>): number | undefined {
-	const [issue_number, ...rest] = positionals_of(argv)
+function issue_number_of(positionals: ReadonlyArray<string>): number | undefined {
+	const [issue_number, ...rest] = positionals
 	const is_single = rest.length === 0 && issue_number !== undefined
 
 	return is_single && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
@@ -133,10 +169,20 @@ function issue_number_of(argv: ReadonlyArray<string>): number | undefined {
 		: undefined
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_number = issue_number_of(argv)
+// An unknown flag parses to no request at all, so it refuses the call like a missing number.
+function request_of(argv: ReadonlyArray<string>): ReleaseRequest | undefined {
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+	const issue_number = issue_number_of(parsed?.positionals ?? [])
 
-	if (issue_number === undefined) {
+	if (parsed === undefined || issue_number === undefined) return undefined
+
+	return { issue_number, is_wait: parsed.values.wait === true }
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const request = request_of(argv)
+
+	if (request === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
@@ -150,7 +196,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return (await link(issue_number, current)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return (await record(request, current)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
 // `process.exitCode` rather than `process.exit()`, so the report on standard output drains first.
@@ -158,8 +204,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_release_cli = { link, run }
+const issue_release_cli = { find_open, link, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export { issue_release_cli }
+export { issue_release_cli, NONE }

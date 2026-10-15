@@ -1,13 +1,11 @@
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 
-// joshuafolkken/kit#3614: an Issue a person asked for is filed with `--requested`, so a live
-// `backlogrun` carry record or an `auto-ok` branch Issue does not opt it in before the person chooses
-// how to run it. Every `new` step that files the Issue declares it, and the words a person may type
-// after `new` are defined in one table rather than left to each run's reading.
+// joshuafolkken/kit#3853: `auto-ok` is judged by `issue:file` from the criteria whoever asked for
+// the Issue, so no `new` step declares `--requested` any more. The words a person may type after
+// `new` are still defined in one table rather than left to each run's reading.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
-const REQUESTED_FILING =
-	'pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --requested'
+const NEW_FILING = 'pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`'
 const NEW_STEP_DOCUMENTS = [
 	`${WORKFLOW_SKILL}/kickoff.md`,
 	`${WORKFLOW_SKILL}/halfrun.md`,
@@ -15,8 +13,11 @@ const NEW_STEP_DOCUMENTS = [
 ]
 
 describe.each(NEW_STEP_DOCUMENTS)('%s — the `new` filing a person asked for', (document) => {
-	it('declares --requested on the filing', () => {
-		expect(read_unwrapped(document)).toContain(REQUESTED_FILING)
+	it('files without the retired --requested', () => {
+		const text = read_unwrapped(document)
+
+		expect(text).toContain(NEW_FILING)
+		expect(text).not.toContain('--requested')
 	})
 
 	it('points at the table of words typed after `new`', () => {
@@ -25,18 +26,18 @@ describe.each(NEW_STEP_DOCUMENTS)('%s — the `new` filing a person asked for', 
 })
 
 describe('kickoff.md — the multi-issue split of a `new` entry', () => {
-	it('declares --requested on each split child', () => {
+	it('files each split child without --requested', () => {
 		expect(read_unwrapped(`${WORKFLOW_SKILL}/kickoff.md`)).toContain(
-			'--depth <n> --route split --requested',
+			'--depth <n> --route split` plus the labels',
 		)
 	})
 })
 
 describe('kickoff.md — the words typed after `new`', () => {
 	it.each([
-		['auto ok', '`--label auto-ok --label run:lane`'],
-		['high', '`--label priority:high`'],
-	])('maps `%s` to %s', (word, flags) => {
-		expect(read_unwrapped(`${WORKFLOW_SKILL}/kickoff.md`)).toContain(`| \`${word}\` | ${flags} |`)
+		['auto ok', /\| `auto ok` \| nothing — `issue:file` judges it\s*\|/u],
+		['high', /\| `high` \s*\| `--label priority:high`\s*\|/u],
+	])('maps `%s` in the table', (_word, row) => {
+		expect(read_unwrapped(`${WORKFLOW_SKILL}/kickoff.md`)).toMatch(row)
 	})
 })

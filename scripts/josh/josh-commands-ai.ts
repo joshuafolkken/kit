@@ -61,6 +61,17 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--exclude <n>[,<n>...]] [--label <name>]', 'automation', ['network']],
 	},
+	'auto-ok:judge': {
+		script: 'scripts/auto-ok/auto-ok-judge-cli.ts',
+		description:
+			'List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)',
+		category: 'AI tools',
+		reference: [
+			'[--apply <n> (--lane | --solo) | --decline <n> --reason <text>]',
+			'automation',
+			['network'],
+		],
+	},
 	...BACKLOG_COMMANDS,
 	cost: {
 		script: 'scripts/cost-runtime/cost-cli.ts',

@@ -6,7 +6,7 @@ import type { ProjectShape } from './project-profile'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: false,
+	should_use_prettier: false,
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
@@ -40,7 +40,7 @@ describe('basic project manifest', () => {
 	})
 
 	it('adds Prettier only when a Web file exists and remains idempotent', () => {
-		const shape = { ...SHAPE, has_web: true }
+		const shape = { ...SHAPE, should_use_prettier: true }
 		const once = init_basic.merge_basic_manifest('{"name":"example"}', shape, VERSIONS)
 		const twice = init_basic.merge_basic_manifest(once, shape, VERSIONS)
 

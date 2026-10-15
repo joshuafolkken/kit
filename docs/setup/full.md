@@ -37,7 +37,7 @@ pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @joshuafolkken/kit
 pnpm exec josh start
 ```
 
-`josh start` needs the [gh CLI](https://cli.github.com/), signed in. It asks first, runs the same setup as §2, then carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start). Once the setup is on `main`, `kickoff new` works — see [tutorial.md](../tutorial.md).
+`josh start` needs the [gh CLI](https://cli.github.com/), signed in. It asks first, runs the same setup as §2, then carries it to GitHub: it creates what is missing — Git, the first commit, the repository — and, when `main` already has commits, opens a pull request with only kit's files for you to merge. There it needs a clean working tree: commit or stash your own changes first. Which steps run for each starting state: [init.md → `josh init` or `josh start`](../init.md#josh-init-or-josh-start). Once the setup is on `main`, `kickoff new` works — see [tutorial.md](../tutorial.md).
 
 Then make `main` require the checks the distributed workflows report — without a required check, a pull request with a failing one can still merge. Create a branch ruleset for `main` under Settings → Rules → Rulesets with **Require status checks to pass** turned on, then let kit fill in the list:
 

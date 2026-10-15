@@ -1,0 +1,4 @@
+- rf:bug-risks | low | docs/init.md:81 | 2026-10-15 | #3835
+- rf:project-conventions | low | scripts/init/kit-setup-state.ts:11 | 2026-10-15 | #3835
+- rf:tests | low | scripts/init/kit-setup-state.test.ts:24 | 2026-10-15 | #3835
+- rf:assumptions | low | scripts/init/start-steps.ts:93 | 2026-10-15 | #3835

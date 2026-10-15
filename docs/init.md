@@ -1,6 +1,6 @@
 # josh init — Detailed Behavior
 
-`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md); the issues each section came from are in `docs/maintainers/init-rationale.md` → "Where each section came from".
+`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. In a repository with at least one commit, the working tree must be clean: with uncommitted changes — modified, staged or untracked files that are not ignored — `josh init` lists them and stops before writing anything, so commit or stash them (`git stash push -u -- .`, which keeps the stash to the project's own paths) first. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md); the issues each section came from are in `docs/maintainers/init-rationale.md` → "Where each section came from".
 
 ```bash
 pnpm josh init
@@ -10,11 +10,24 @@ pnpm josh init --profile basic
 
 # Write the files only — skip the install and format it ends with
 pnpm josh init --no-install
+
+# Print what the setup would change, and change nothing
+pnpm josh init --dry-run
 ```
+
+## Preview with `--dry-run`
+
+`josh init --dry-run` prints the plan and writes nothing to the project. It runs the real setup on a temporary copy of the project — without `.git`, `node_modules` and build output, but with a repository and the same `origin` when the project has one — and reports what that run changed there, so the plan comes from the same decisions as a real run. The copy is removed afterwards. The plan lists:
+
+- **Files** — each path with what the setup would do to it: `create` (new), `merge` (every line, or for a JSON file every value, the project had is kept), `overwrite` (something the project had is replaced or removed) or `delete`.
+- **`package.json`** — under its `merge` / `overwrite` line, each field and each script or dependency entry it would add (`+`), change (`~`) or remove (`-`).
+- **Dependencies** — whether it would run `pnpm install` and `josh format`, and whether it would first install kit into the project and hand the setup to that copy's `josh init`. `--no-install --dry-run` reports that both are skipped.
+
+`--dry-run` combines with `--profile` and `--no-install`. It is refused on the same uncommitted changes as a real run, since that is what the run would do. `josh start --dry-run` prints the same plan for its setup step, after the GitHub steps (see [josh-commands.md → `josh start`](./josh-commands.md#josh-start)).
 
 ## Project profiles
 
-`josh profile` prints the selected profile and its reason, for example `profile: basic (no package.json)`; a `basic` project also gets a `compat: profile: static (…)` line for workflows synced before the rename below. The profiles are `basic` (AI rules, formatting and editor / Git settings for a project of any language) and `full` (kit also runs the JavaScript / TypeScript toolchain: ESLint, type check, tests, Git hooks and CI). An `index.html` file does not decide the profile: Vite projects normally have one.
+`josh profile` prints the selected profile and its reason, for example `profile: basic (no package.json)`; a `basic` project also gets a `compat: profile: static (…)` line for workflows synced before the rename below. The profiles are `basic` (AI rules, Prettier formatting where the project has no formatter of its own, and editor / Git settings for a project of any language) and `full` (kit also runs the JavaScript / TypeScript toolchain: ESLint, type check, tests, Git hooks and CI). An `index.html` file does not decide the profile: Vite projects normally have one.
 
 | Priority | Condition                                                 | Profile             |
 | -------- | --------------------------------------------------------- | ------------------- |
@@ -28,21 +41,21 @@ kit itself does not count as a dependency, so `pnpm add -D @joshuafolkken/kit` b
 
 **`basic` and `full` were formerly called `static` and `node`** (`docs/maintainers/init-rationale.md` → "Renamed profiles"). The old names still work everywhere a profile is read: a recorded `josh.profile: static` or `node`, and `--profile static` or `--profile node`, mean `basic` and `full`. A project keeps its recorded old name until `josh init` runs again, which records the new one. The paths a `basic` project initialized earlier imports — `@joshuafolkken/kit/prettier/static` and `dist/CLAUDE.static.md` — keep resolving to the same preset and rules, and re-running `josh init` moves those two kit-written imports in `prettier.config.mjs` and `CLAUDE.md` onto `prettier/basic` and `dist/CLAUDE.basic.md`, leaving the rest of each file alone.
 
-Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting; TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
+Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting unless the project already has a formatter of its own (a `biome.json`, `biome.jsonc` or `dprint.json` — `.dprint.json` and the `.jsonc` forms too); TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
 
-| Setting or tool                                                                     | `basic`                                                                                                    | `full`                                    |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `package.json`, `josh` script, kit dependency                                       | Always                                                                                                     | Existing package scripts and dependencies |
-| Prettier config, Prettier dependency, `.prettierignore`                             | When HTML, CSS, or JavaScript exists                                                                       | Always                                    |
-| `tsconfig.json`                                                                     | When TypeScript exists, without SvelteKit exclusions                                                       | Always                                    |
-| VS Code extensions                                                                  | Code Spell Checker, Material Icon Theme, Error Lens, Claude Code, GitHub Theme; add Prettier for Web files | Existing recommendations                  |
-| VS Code save formatting                                                             | HTML, CSS, and JavaScript only when Web files exist                                                        | Existing settings                         |
-| Short AI instructions and pointers                                                  | Always                                                                                                     | Existing full instructions                |
-| `.gitignore`, `.gitattributes`                                                      | When Git exists                                                                                            | When Git exists                           |
-| GitHub files                                                                        | When a GitHub origin exists                                                                                | When a GitHub origin exists               |
-| `.claude/settings.json` (permissions, hooks, the `kit@kit` plugin)                  | When `josh start` set the project up, in a Git repository                                                  | When Git exists                           |
-| `JOSH_SESSION_LANG` in `.env`                                                       | When `josh start` set the project up, on first adoption — otherwise no hook reads it                       | On first adoption, when `.env` lacks it   |
-| ESLint, cspell CLI config, Playwright, Lefthook, secretlint, external MCP and hooks | Not installed by default                                                                                   | Existing behavior                         |
+| Setting or tool                                                                     | `basic`                                                                                                                 | `full`                                    |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `package.json`, `josh` script, kit dependency                                       | Always                                                                                                                  | Existing package scripts and dependencies |
+| Prettier config, Prettier dependency, `.prettierignore`                             | When HTML, CSS, or JavaScript exists and the project has no formatter of its own                                        | Always                                    |
+| `tsconfig.json`                                                                     | When TypeScript exists, without SvelteKit exclusions                                                                    | Always                                    |
+| VS Code extensions                                                                  | Code Spell Checker, Material Icon Theme, Error Lens, Claude Code, GitHub Theme; add Prettier's with the Prettier config | Existing recommendations                  |
+| VS Code save formatting                                                             | HTML, CSS, and JavaScript only with the Prettier config                                                                 | Existing settings                         |
+| Short AI instructions and pointers                                                  | Always                                                                                                                  | Existing full instructions                |
+| `.gitignore`, `.gitattributes`                                                      | When Git exists                                                                                                         | When Git exists                           |
+| GitHub files                                                                        | When a GitHub origin exists                                                                                             | When a GitHub origin exists               |
+| `.claude/settings.json` (permissions, hooks, the `kit@kit` plugin)                  | When `josh start` set the project up, in a Git repository                                                               | When Git exists                           |
+| `JOSH_SESSION_LANG` in `.env`                                                       | When `josh start` set the project up, on first adoption — otherwise no hook reads it                                    | On first adoption, when `.env` lacks it   |
+| ESLint, cspell CLI config, Playwright, Lefthook, secretlint, external MCP and hooks | Not installed by default                                                                                                | Existing behavior                         |
 
 **A `basic` project `josh start` set up gets `.claude/settings.json`.** The GitHub Issue workflow runs its agents unattended — `backlogrun` starts each one as a headless `claude -p` — and an agent without the distributed permissions stops at the first command it runs. `josh start` tells the setup it runs through the `JOSH_WORKFLOW=github` variable, and the setup records `josh.workflow: "github"` in `package.json`, so a later `josh init` or `josh sync` keeps writing the file. A `basic` project `josh init` alone set up gets neither ([#3796](https://github.com/joshuafolkken/kit/issues/3796)).
 
@@ -60,14 +73,14 @@ To add Git later, run `git init`, then run `josh init` again to add Git files wi
 
 This section is the single source for choosing between `josh init` and `josh start`; the setup guides, the tutorial and the command reference link here. One question decides which to run: **will this project use the GitHub Issue workflow** (`kickoff`, `fullrun`, `backlogrun`)? If it will, run `josh start` — whether or not the project already has Git or a GitHub repository. If it will not, run `josh init`. The [profile](#project-profiles) is a separate question: both commands choose it the same way.
 
-| Situation                                                                                       | Run                                                                  |
-| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| New or existing project that will use the GitHub Issue workflow                                 | `josh start`                                                         |
-| Project that will not use it — no Git, another Git host, or only kit's rules, format and checks | `josh init`                                                          |
-| Any re-run, or an unattended setup from CI or a script                                          | `josh init`                                                          |
-| Set up with `josh init`, now moving to the GitHub Issue workflow                                | `josh start` — its setup step leaves what `josh init` wrote as it is |
+| Situation                                                                                       | Run                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New or existing project that will use the GitHub Issue workflow                                 | `josh start`                                                                                                                                                            |
+| Project that will not use it — no Git, another Git host, or only kit's rules, format and checks | `josh init`                                                                                                                                                             |
+| Any re-run, or an unattended setup from CI or a script                                          | `josh init`                                                                                                                                                             |
+| Set up with `josh init`, now moving to the GitHub Issue workflow                                | Commit what `josh init` wrote, then `josh start` — its setup pull request adds what the workflow needs on top: `josh.workflow` and, on `basic`, `.claude/settings.json` |
 
-- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository, commits or pushes, so it is safe to re-run and to automate. Run in a Git repository whose checked-out commit does not record kit yet, it ends by pointing at `josh start`.
+- **`josh init`** never asks anything. It selects the profile (or takes `--profile`), creates and merges the settings files, and adds Git and GitHub files only when Git or a GitHub origin already exists. It never runs `git init`, creates a GitHub repository, commits or pushes, so it is safe to re-run and to automate. It does not point onward to `josh start`: choosing `josh init` is choosing against the Issue workflow, and its uncommitted output is what `josh start` refuses to run over.
 - **`josh start`** asks, then runs the same setup as `josh init` and carries it to GitHub. What it does depends on what is already there:
 
 | Before `josh start`                       | Steps                                                                               |
@@ -78,9 +91,9 @@ This section is the single source for choosing between `josh init` and `josh sta
 | GitHub origin, `main` does not record kit | setup → labels → setup pull request                                                 |
 | GitHub origin, `main` already records kit | setup → labels                                                                      |
 
-"Records kit" means the `package.json` committed on the checked-out `main` lists `@joshuafolkken/kit`. "Labels" adds the workflow and release-classification labels the repository is missing. `gh repo create` makes a private repository unless `--public` is given.
+"Records kit" means the `package.json` committed on the checked-out `main` lists `@joshuafolkken/kit` and records `josh.workflow: "github"` — a committed `josh init` setup lacks the mark, so it still gets a setup pull request. "Labels" adds the workflow and release-classification labels the repository is missing. `gh repo create` makes a private repository unless `--public` is given.
 
-**The setup pull request** brings the setup to a `main` that already has history the way every later change arrives, so nothing is committed to `main` directly. It files an Issue titled `Set up @joshuafolkken/kit` with the `ignore-for-release` label, creates the Issue's `<N>-<slug>` branch, stages **only the files kit's setup wrote** — the managed files `josh sync` keeps current, plus `CLAUDE.md`, `prettier.config.mjs`, `.aikido`, `package.json` and `pnpm-lock.yaml` — then commits only those files, pushes and opens the pull request that closes the Issue. Anything else in the working tree, such as a personal note or an editor's own directory — or a file you had already staged — stays out of the commit. The project's own Git hooks run on the commit and the push as on any other. Merging is left to you; once it is merged, `kickoff new` works. On a branch other than `main` there is no pull request to base on `main`, so the step is skipped. If a hook stops the commit, fix the cause and run `josh start` again on the setup branch it left checked out: it reuses that branch's Issue, so no second Issue is filed. If the push or the pull request fails after the commit, finish on the setup branch with `git push` and `pnpm josh pr`.
+**The setup pull request** brings the setup to a `main` that already has history the way every later change arrives, so nothing is committed to `main` directly. It files an Issue titled `Set up @joshuafolkken/kit` with the `ignore-for-release` label, creates the Issue's `<N>-<slug>` branch, stages **only the files kit's setup wrote** — the managed files `josh sync` keeps current, plus `CLAUDE.md`, `prettier.config.mjs`, `.aikido`, `package.json` and `pnpm-lock.yaml` — then commits only those files, pushes and opens the pull request that closes the Issue. In a repository with at least one commit, `josh start` needs a clean working tree: with uncommitted changes — modified, staged or untracked files that are not ignored — it lists them and stops before changing anything or calling GitHub, so commit or stash them (`git stash push -u -- .`) first. Your own edit to `package.json` or `CLAUDE.md` would otherwise land in the setup commit with kit's. The project's own Git hooks run on the commit and the push as on any other. Merging is left to you; once it is merged, `kickoff new` works. On a branch other than `main` there is no pull request to base on `main`, so the step is skipped. If a hook stops the commit, fix the cause and run `josh start` again on the setup branch it left checked out: it reuses that branch's Issue, so no second Issue is filed. If the push or the pull request fails after the commit, finish on the setup branch with `git push` and `pnpm josh pr`.
 
 The steps, options and safety rules are in [josh-commands.md → `josh start`](./josh-commands.md#josh-start).
 
@@ -216,7 +229,7 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 
 ## Dependencies
 
-The `full` profile adds the packages below to `devDependencies`. The `basic` profile adds kit and, when Web files exist, Prettier. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
+The `full` profile adds the packages below to `devDependencies`. The `basic` profile adds kit and, when Web files exist and the project has no formatter of its own, Prettier. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
 
 | Package                                                                                     | Version                                                                                                         |
 | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |

@@ -67,9 +67,12 @@ const ALREADY_DONE_LABEL = 'already-done'
 // Marks the Issue that tracks a repository's next release. An Issue whose
 // change reaches a consumer only once published is linked to it as a `blocked_by` blocker
 // (`josh issue:release`), so "merged but not yet released" is visible in the backlog. A run applies
-// it; **`auto-ok` never rides on it** — `issue-auto-ok.ts` refuses the default for it on every path,
-// since a release is Tier C — and only a person opts it into unattended execution.
+// it; **`auto-ok` never rides on it** — `issue-auto-ok.ts` excludes it, since a release is Tier C —
+// and only a person opts it into unattended execution.
 const RELEASE_LABEL = 'release'
+// A person's mark for work set aside for now; `issue-auto-ok.ts` reads it as an exclusion. Applied by
+// hand and never provisioned, so it is not in `REPOSITORY_LABELS`.
+const DEFERRED_LABEL = 'deferred'
 // Applied to an Issue whose second review round was skipped, so the condition stays auditable
 // (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not").
 const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
@@ -402,6 +405,7 @@ export {
 	BUG_LABEL,
 	BUGFIX_LABEL,
 	BREAKING_CHANGE_LABEL,
+	DEFERRED_LABEL,
 	depth_label_of,
 	DEPTH_0_LABEL,
 	DEPTH_1_LABEL,

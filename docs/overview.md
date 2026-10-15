@@ -35,6 +35,7 @@ To walk the Issue-driven loop once — file an Issue, have an agent plan and imp
 
 **Set up**
 
+- [setup/choose.md](./setup/choose.md) — with or without GitHub: what each setup does and adds
 - [setup/prerequisites.md](./setup/prerequisites.md) — Node.js, pnpm and the gh CLI
 - [setup/basic.md](./setup/basic.md) — a `basic` project, from an empty machine
 - [setup/full.md](./setup/full.md) — a Node project, with `josh init` or `josh start`

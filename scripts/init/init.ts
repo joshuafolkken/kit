@@ -19,20 +19,27 @@ import { init_actions, PRETTIER_CONFIG_JS } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_basic } from './init-basic'
 import { init_bootstrap } from './init-bootstrap'
+import { init_dry_run } from './init-dry-run'
 import { init_file_action } from './init-file-action'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
-import { kit_setup_state } from './kit-setup-state'
 import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
+import { working_tree } from './working-tree'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const LEFTHOOK_BIN = 'lefthook'
 const ARGUMENT_START_INDEX = 2
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
-const INIT_USAGE = 'josh init [--profile basic|full] [--no-install]'
+const INIT_USAGE = 'josh init [--profile basic|full] [--no-install] [--dry-run]'
+
+interface InitRequest {
+	is_dry_run: boolean
+	is_install: boolean
+	requested: ProjectProfile | undefined
+}
 
 const engine_pin_schema = z.looseObject({ name: z.string(), version: z.string() })
 
@@ -265,14 +272,21 @@ function set_up_project(requested: ProjectProfile | undefined, is_install: boole
 	console.info('\n✅ Done.\n')
 }
 
-// True when this process set the project up — false when it refused, or handed the run to the
-// project's own kit, which then speaks for itself.
-function main(args: ReadonlyArray<string> = []): boolean {
-	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return false
-	const { is_install, rest } = init_install.split_install_flag(args)
-	// Validated before the hand-off, so a malformed invocation is refused before kit is installed.
-	const requested = project_profile.requested_profile(rest, INIT_USAGE)
+// A dry run sets nothing up, so it answers false and points nowhere onward.
+function print_dry_run({ requested, is_install }: InitRequest): false {
+	const has_git = project_profile.has_git(PROJECT_ROOT)
 
+	console.info(
+		init_dry_run.plan_report({ root: PROJECT_ROOT, profile: requested, has_git, is_install }),
+	)
+
+	return false
+}
+
+function did_set_up_here(
+	{ requested, is_install }: InitRequest,
+	args: ReadonlyArray<string>,
+): boolean {
 	const is_set_up_here = !is_install || !did_hand_off(args)
 
 	if (is_set_up_here) set_up_project(requested, is_install)
@@ -280,19 +294,43 @@ function main(args: ReadonlyArray<string> = []): boolean {
 	return is_set_up_here
 }
 
-// Only the command a person typed points onward to `josh start`: `josh start` calls `main` itself and
-// is already the next step.
-// A setup that failed after writing, such as a failed install, sets the exit code and points nowhere.
-function print_start_hint(): void {
-	if (process.exitCode !== undefined && process.exitCode !== 0) return
-	const hint = kit_setup_state.start_hint(PROJECT_ROOT)
+// The flags are peeled off first, so what remains is exactly the `--profile` pair.
+// Validated before the hand-off, so a malformed invocation is refused before kit is installed.
+function parse_init_args(args: ReadonlyArray<string>): InitRequest {
+	const { is_dry_run, rest: run_args } = init_dry_run.split_dry_run_flag(args)
+	const { is_install, rest } = init_install.split_install_flag(run_args)
 
-	if (hint !== undefined) console.info(`${hint}\n`)
+	return { is_dry_run, is_install, requested: project_profile.requested_profile(rest, INIT_USAGE) }
+}
+
+// True when this process set the project up — false when it refused, or handed the run to the
+// project's own kit, which then speaks for itself.
+function main(args: ReadonlyArray<string> = []): boolean {
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return false
+	const request = parse_init_args(args)
+
+	return request.is_dry_run ? print_dry_run(request) : did_set_up_here(request, args)
+}
+
+// Only the command a person typed is refused, before anything is written or installed. `josh start`
+// calls `main` itself and decides about its own tree (#3835); a handed-off run follows the check
+// its caller already passed, on a tree the kit install it just made has changed.
+function did_refuse_dirty_tree(): boolean {
+	const refusal = init_bootstrap.is_handed_off()
+		? undefined
+		: working_tree.dirty_tree_refusal(PROJECT_ROOT, 'josh init')
+
+	if (refusal === undefined) return false
+	console.error(`\n${refusal}\n`)
+	process.exitCode = 1
+
+	return true
 }
 
 function run_cli(args: ReadonlyArray<string>): void {
 	try {
-		if (main(args)) print_start_hint()
+		if (did_refuse_dirty_tree()) return
+		main(args)
 	} catch (error) {
 		console.error(`\n✖ ${error_text.message_of(error)}\n`)
 		process.exitCode = 1
@@ -312,5 +350,5 @@ const init = {
 }
 
 // `init` is the entry point; `main` is exported for its own unit test, the way `sync.ts` exports the
-// `main()` its self-run guard lives in.
-export { init, main }
+// `main()` its self-run guard lives in, and `run_cli` for the refusal only the typed command makes.
+export { init, main, run_cli }

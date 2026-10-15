@@ -36,7 +36,7 @@ const COMMAND_FAILURE = 'Command failed with exit code 1'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: true,
+	should_use_prettier: true,
 	has_typescript: false,
 	has_git: true,
 	has_github: false,
@@ -161,7 +161,10 @@ describe('reading the Git state', () => {
 	})
 
 	it('reads whether the checked-out commit records kit (#2816)', () => {
-		mocked_execa.mockReturnValue(result(0, '{"devDependencies":{"@joshuafolkken/kit":"1.0.0"}}'))
+		const manifest =
+			'{"josh":{"workflow":"github"},"devDependencies":{"@joshuafolkken/kit":"1.0.0"}}'
+
+		mocked_execa.mockReturnValue(result(0, manifest))
 
 		expect(start_steps.read_git_state(ROOT, SHAPE).has_kit_committed).toBe(true)
 	})

@@ -17,6 +17,7 @@ import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
+import { review_code_tree } from './review-code-tree'
 import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
 import { review_level, type ReviewLevel } from './review-level'
@@ -112,13 +113,15 @@ function kept_note(taken_at: string): string {
 // `change_base`, and `change_base` is recomputed on every invocation — so without the commit it was
 // measured against, round 2 cannot tell a fix from a base that moved under it, and reports the
 // difference between two incomparable sets as round 1's fixes.
+// **Answers whether it wrote**, because the comment-free code record is taken only at that moment: a
+// code record retaken over a kept snapshot would describe the fixed tree, the exact retake above.
 function record_round_one(
 	round: number,
 	tree: Record<string, string>,
 	base: string | undefined,
 	target?: string,
-): void {
-	if (round !== FIRST_ROUND) return
+): boolean {
+	if (round !== FIRST_ROUND) return false
 
 	try {
 		const recorded = review_stamps.round_one_stamp.read(target)
@@ -126,12 +129,15 @@ function record_round_one(
 		if (recorded !== undefined) {
 			console.error(kept_note(recorded.taken_at))
 
-			return
+			return false
 		}
 
 		review_stamps.round_one_stamp.write(tree, target, base)
+
+		return true
 	} catch {
 		/* no record widens the next round rather than narrowing it */
+		return false
 	}
 }
 
@@ -308,6 +314,17 @@ async function read_change(): Promise<ChangeReading> {
 	return { base, commit, paths, tree }
 }
 
+async function record_review(
+	round: number,
+	tree: Record<string, string>,
+	commit: string | undefined,
+): Promise<void> {
+	const is_snapshot_written = record_round_one(round, tree, commit)
+
+	if (is_snapshot_written) await review_code_tree.record(Object.keys(tree), commit)
+	record_briefed(round, tree, commit)
+}
+
 async function run_review(round: number, reading: ChangeReading): Promise<number> {
 	const { base, commit, paths, tree } = reading
 	const refusal = scoped_green.refusal_for(tree, commit)
@@ -318,8 +335,7 @@ async function run_review(round: number, reading: ChangeReading): Promise<number
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
 	agent_role_profile.warn_of_default()
 	console.info(await compose_brief({ round, paths, tree, base, profile: resolved.profile }))
-	record_round_one(round, tree, commit)
-	record_briefed(round, tree, commit)
+	await record_review(round, tree, commit)
 
 	return 0
 }
@@ -343,6 +359,7 @@ const review_brief_cli = {
 	format_reason,
 	KEPT_NOTE_PREFIX,
 	parse_round,
+	record_review,
 	record_round_one,
 	report_error,
 	run,

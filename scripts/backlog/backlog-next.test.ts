@@ -1,6 +1,7 @@
 import {
 	auto_ok_fixture,
 	BLOCKER_NUMBER,
+	CLOSED_SPELLING,
 	CREATED_EARLIER,
 	CREATED_LATER,
 	EPIC_NUMBER,
@@ -189,6 +190,23 @@ describe('dependencies', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(`${String(CHILD)}\n${String(SECOND_CHILD)}`)
+	})
+})
+
+// joshuafolkken/kit#3824: an issue that waits on the release Issue (`issue:release <N> --wait`) is
+// offered again once a person closes the release Issue, with no label to remove by hand.
+describe('a wait on the release Issue', () => {
+	it('offers the waiting issue once the release Issue has closed', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [
+				blocked_issue(OLD_ISSUE_NUMBER, CREATED_EARLIER, [
+					{ number: BLOCKER_NUMBER, state: CLOSED_SPELLING },
+				]),
+			],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 })
 

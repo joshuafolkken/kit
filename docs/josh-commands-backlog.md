@@ -55,6 +55,14 @@ pnpm josh issue:release 3360
 2. When none is open, file `Release <owner/repo> (next version)` with the `release` label. It never gets `auto-ok` on its own — `issue:file` refuses `auto-ok` for the `release` label on every path — so the release stays a person's call; a person may still add `auto-ok`.
 3. Record the issue as a `blocked_by` blocker of the release issue and print `release: #<R> (open|filed) is blocked by #<N>`. A failed link exits 1.
 
+**Options:**
+
+- `--wait` — point the edge the other way: the issue is blocked by the release issue, for an issue that needs the published version. Prints `release: #<N> waits on #<R> (open|filed)`. `backlog:next` offers the issue again once the release issue closes, with no label for a person to remove — a run records a wait for publication this way rather than with `needs-decision` (`.claude/skills/workflow-commands/prerequisite.md`).
+
+```bash
+pnpm josh issue:release 3716 --wait
+```
+
 ---
 
 ### `josh issue:scout`
@@ -94,15 +102,14 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--over-cap` — the run is blocked by this filing; the cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
-- `--requested` — a person asked for this filing (a `new` entry, or a request in conversation). The carry record and the branch's issue are not read, so `auto-ok` comes only from `--label auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 
 **Steps (run in this order):**
 
 1. Refuse when the target is third-party (Tier C).
-2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint). Refuse on any problem.
+2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem.
 3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not.
-4. Print the `auto-ok` decision (applied in a `backlogrun` or when the branch's issue has it, unless `--no-auto-ok`, `--requested` or a `release` label withholds it). When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
+4. Print the `auto-ok` decision, judged the same way for every filing, including one a person asked for. It is not applied with `--no-auto-ok`, for another repository, or when the labels carry `release`, `breaking-change` (including a body that declares `- 互換性: 破壊的変更`), `deferred`, `needs-human-review` or `epic`. Otherwise the body's `## 背景` decides it: `- 人の判断: 不要` applies it, `- 人の判断: 要` does not. A body that declares neither, or both, is refused at step 2 with how to write the line. When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
 5. Unless the filing is a split child (`--route split` — the split assessment already decided it is separate), when the same finder already filed an issue into the same repository that is still open (a `filed` event not named in `--distinct`, by the same finder — the lane child, else the issue the branch names, read across every invocation on the stream; with no finder, a `filed` event with none in the current invocation), ask the [`josh issue:fold`](#josh-issuefold) question and print `fold: <reason> · filed earlier by this finder: <refs>`. Only `fold` refuses, naming the earlier issue to add the finding to and the `--distinct <N>` that declares it a separate deliverable; `undetermined` (no diff that measures the size) files. A first filing asks nothing.
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
@@ -392,6 +399,24 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 stdout is one token — the issue number, or `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
 
+### `josh auto-ok:judge`
+
+List the open issues a `backlogrun` still owes an `auto-ok` judgement, or record one. `backlog:drive` hands back `judge` when its watch finds the opted-in pool exhausted, a lane free and at least one such issue.
+
+```bash
+pnpm josh auto-ok:judge                                    # the issues that still owe a judgement
+pnpm josh auto-ok:judge --apply 912 --lane                 # opt it in, with its run label
+pnpm josh auto-ok:judge --decline 913 --reason "<why>"     # record why it stays out
+```
+
+A candidate is an open issue without `auto-ok` that carries none of the labels [`josh issue:file`](#josh-issuefile) refuses `auto-ok` on. Whether it needs a policy decision, an external account or a person's visual check is read from its body and comments by the agent, never by this command.
+
+- Bare — one number per line on stdout, or `none`, with each title on stderr; exit 1 if the listing could not be read.
+- `--apply <N> --lane|--solo` — checks the exclusions again against the labels as they stand, applies the run label and then `auto-ok`, and notes it on the progress board.
+- `--decline <N> --reason <text>` — applies nothing.
+
+Both answers post a judgement comment carrying a digest of the body. An issue is listed again only once its body changes or a person comments after that comment.
+
 ### `josh backlog:next`
 
 Order the whole opted-in backlog in one command — standalone `auto-ok` issues plus the descendants of every epic whose root carries `auto-ok`, followed transitively through nested epics. Read-only. Tokens are bare numbers scoped to the repository.
@@ -482,7 +507,7 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). Only `run:merge`'s control `stop` (the failure guard, or a failed child left unparked) stops the run: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. The offer `run:merge` passes through is never read, so its `stop` after a merge is decided by `backlog:offer` on the next pass, as after any other. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
+An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). Only `run:merge`'s control `stop` (the failure guard, or a failed child left unparked) stops the run: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. The offer `run:merge` passes through is never read, so its `stop` after a merge is decided by `backlog:offer` on the next pass, as after any other. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are described, with their creation commands, in [Labels and run states](./labels-and-run-states.md).
 
@@ -533,7 +558,7 @@ pnpm josh review:round2 --json              # the verdict and the reason, machin
 - `--round-1-closed` — the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.
 - `--json` — machine-readable verdict and reason.
 
-`skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one non-inert path. Full reasoning: `prompts/review.md`.
+`skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification, `docs/**/*.md`, the root `README.md`, under `prompts/`, or a `.ts` / `.js` / `.svelte` file outside `.claude/` whose only change is in comments); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one path outside Arm B. Full reasoning: `prompts/review.md`.
 
 ### `josh disposition`
 

@@ -17,7 +17,7 @@ function widest_shape(profile: ProjectProfile): ProjectShape {
 	return {
 		profile,
 		reason: 'josh uninstall',
-		has_web: true,
+		should_use_prettier: true,
 		has_typescript: true,
 		has_git: true,
 		has_github: true,

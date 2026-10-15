@@ -288,7 +288,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/review/review-finding-ledger.test.ts',
 	'scripts/review/review-level.test.ts',
 	'scripts/review/review-profile.test.ts',
-	'scripts/review/review-round2-cli.test.ts',
 	'scripts/review/review-round2.test.ts',
 	'scripts/review/review-rubric.test.ts',
 	'scripts/rules/backlogrun-entry-prose-document-rule.test.ts',

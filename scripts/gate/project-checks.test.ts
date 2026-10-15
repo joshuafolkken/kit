@@ -134,6 +134,17 @@ describe('project_checks prettier readiness', () => {
 		expect(project_checks.prettier_skip_reason(root)).toBeUndefined()
 	})
 
+	it('skips Prettier on a basic project that formats with its own tool', () => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, PACKAGE_JSON), BASIC_MANIFEST)
+		writeFileSync(path.join(root, INDEX_HTML), '')
+		writeFileSync(path.join(root, 'biome.jsonc'), '{}')
+		expect(project_checks.prettier_skip_reason(root)).toBe(
+			"biome.jsonc configures the project's own formatter",
+		)
+	})
+
 	it('never skips Prettier on a full project', () => {
 		expect(project_checks.prettier_skip_reason(fixture())).toBeUndefined()
 	})

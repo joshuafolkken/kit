@@ -319,7 +319,7 @@ Run an install scenario in a Docker container of a machine with nothing installe
 
 > **Audience:** developer · **Side effects:** files, network, processes
 
-`[--profile basic|full] [--no-install]`
+`[--profile basic|full] [--no-install] [--dry-run]`
 
 Initialize config in a new project
 
@@ -379,7 +379,7 @@ Fail when a pull request adds any new SonarCloud issue or duplicated block
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]`
+`[--profile basic|full] [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]`
 
 Set a project up for the GitHub Issue workflow, from git init to the setup PR
 
@@ -765,6 +765,16 @@ Git hook: scan staged files for secrets
 
 ## AI tools
 
+### `josh auto-ok:judge`
+
+> **Audience:** automation · **Side effects:** network
+
+`[--apply <n> (--lane | --solo) | --decline <n> --reason <text>]`
+
+List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)
+
+---
+
 ### `josh auto-ok:next`
 
 > **Audience:** automation · **Side effects:** network
@@ -1069,7 +1079,7 @@ Post one comment to an issue from a file, so no shell expands the body
 
 > **Audience:** automation · **Side effects:** network
 
-`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]`
+`<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]`
 
 File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle
 
@@ -1119,9 +1129,9 @@ Print each issue's title, body and every comment on it, in one call
 
 > **Audience:** automation · **Side effects:** network
 
-`<issue>`
+`<issue> [--wait]`
 
-Link an Issue to the repository's open release Issue as its blocker, filing one when none is open
+Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open
 
 ---
 

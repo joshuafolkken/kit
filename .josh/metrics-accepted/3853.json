@@ -1,0 +1,8 @@
+{
+	"reason": "#3853: issue-template gains the required '- 人の判断:' declaration, its classification row and the run-label pointer every filing path reads, replacing the retired --requested flag as the auto-ok signal",
+	"date": "2026-10-15",
+	"growth": {
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 820
+	}
+}

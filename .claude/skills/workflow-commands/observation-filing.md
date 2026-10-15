@@ -70,7 +70,7 @@ defines, before the create call.
 
 - **It is read off the subject, exactly as the table is** — so applying it is not a judgement and not
   a person's to make, which is what separates it from `auto-ok` and `needs-human-review`. Those two
-  decide what a run may do (`auto-ok` by `issue:file`'s default for a filing found by opted-in work —
+  decide what a run may do (`auto-ok` by `issue:file`'s judgement against the criteria —
   `backlogrun-steps.md` → "What one invocation approves"); this one records what an Issue is about
   and withholds nothing.
 - **Applied at filing, not at completion.**

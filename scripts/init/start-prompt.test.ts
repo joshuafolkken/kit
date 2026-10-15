@@ -15,7 +15,7 @@ const NOTHING_CHANGED = 'Nothing was changed'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: true,
+	should_use_prettier: true,
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
@@ -25,6 +25,7 @@ const OPTIONS: StartOptions = {
 	profile: undefined,
 	is_yes: false,
 	is_github: false,
+	is_dry_run: false,
 	visibility: 'private',
 	init_command: undefined,
 	push_preflight_command: undefined,

@@ -12,12 +12,12 @@ runs is stated by the keyword and its arguments, never inferred from a request's
 that would bound this the other way are prohibited** — dropping a run's own filings, and requiring a
 person's `auto-ok` on a child; the brake below bounds it. A Tier C action inside a child still stops that child.
 
-**`pnpm josh issue:file` decides the `auto-ok` default and prints it** — `auto-ok: applied` or
-`auto-ok: not applied` with the reason; `scripts/issue/issue-auto-ok.ts` is the single source. **Pass
-`--no-auto-ok` only when the new issue needs a person's judgement** — a Tier B toss-up or a Tier C
-action inside it. The retrospective's filings take the same default and count against the same brake.
-**A filing a person asked for declares `--requested` and takes no default** — `auto-ok` only when they
-named it (`kickoff.md` → "Words typed after `new`").
+**`pnpm josh issue:file` judges `auto-ok` and prints it** — `auto-ok: applied` or
+`auto-ok: not applied` with the reason; `scripts/issue/issue-auto-ok.ts` is the single source. Every
+filing is judged the same way, whoever asked for it: the excluded labels, then the body's
+`- 人の判断:` declaration (`issue-template.md`). **Declare `- 人の判断: 要` when the new issue needs a
+person's judgement** — a Tier B toss-up or a Tier C action inside it; `--no-auto-ok` withholds it too.
+The retrospective's filings are judged the same way and count against the same brake.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way";
 provenance of each rule: `docs/maintainers/backlogrun-steps-rationale.md` → "Where each rule came from"
@@ -115,7 +115,8 @@ person, Out of scope) to the person in the session language, with any truncated-
   the loop, leaving whatever is still labelled parked.
 
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the only workflow labels a run
-applies by hand** — never `auto-ok` or `needs-human-review` (`needs-human-review.md`).
+applies by hand** — never `needs-human-review` (`needs-human-review.md`), and `auto-ok` only through
+`pnpm josh issue:file` or `pnpm josh auto-ok:judge`, which check the exclusions first.
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
 
@@ -130,6 +131,7 @@ section the row names:
 | Handed back | What the session does | Read |
 | --- | --- | --- |
 | `triage` | Label each issue stderr names `run:solo` or `run:lane` (`blocked-by` where one must land first) | "Resolve what the plan can resolve, before starting" above |
+| `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` | `docs/josh-commands-backlog.md` → "`josh auto-ok:judge`" |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** | — |
 | `launch #N` | Read the lane's log and park `#N` | `backlogrun-park.md` → "park and continue" |
 | `merge [<token>] #N` | `environment` ends the run; the others re-read the child | `backlogrun-progress.md` → "Running a named epic's children" |

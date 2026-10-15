@@ -60,18 +60,25 @@ and a resolution review reads a different subject.
 
 `prompts/review.md` → "When round 2 is skipped entirely, and when it is not". Both `skip` arms are
 states in which round 1's fix code needs no review: **A** — the fix delta is empty, round 1's findings
-closed without an edit; **B** — every path in the fix delta is inert, neither executing, instructing,
-nor shipping. **Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a
-closed finding, so `--round-1-closed` is not passable; the cap is still two rounds; and a confirmed High
-still blocks the merge. A documentation-only fix delta is not inert, so a prompt fix answers
-`required`.
+closed without an edit; **B** — the fix leaves what executes unchanged. **Neither arm weakens the
+standard.** A round-1 High/Medium that did not close is not a closed finding, so `--round-1-closed` is
+not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
 
-## The rejected wider skip
+Arm B first covered only the review level's inert set. joshuafolkken/kit#3787 widened it, on the
+requester's decision of 2026-10-15, to `docs/**/*.md`, the root `README.md`, `prompts/**` and comment-only
+edits to `.ts` / `.js` / `.svelte` (joshuafolkken/kit#3826). Round 2 ran in 41 of 55 reviews and added
+a median 4.8 minutes to a lane's critical path. **What goes unread is only the fix**: round 1 still
+reviews the documentation or prompt change in full, and its findings are still fixed. A comment-only
+edit is measured, not judged — the round-1 brief also records a comment-free digest of each source file,
+and equal digests mean equal code.
+
+## The rejected wider skips
 
 `prompts/review.md` → "When round 2 is skipped entirely, and when it is not". joshuafolkken/kit#1433
-also proposed exempting every fix delta that is not a runtime code path. **It was not adopted**: a
-documentation-only diff is exactly where the review is the only detector (the #963 / #965
-measurement above), so a prompt fix answers `required`.
+proposed exempting every fix delta that is not a runtime code path; joshuafolkken/kit#3787 weighed
+exempting test-only deltas and deltas of a few lines. **None was adopted.** A test fix can weaken the
+verification it belongs to, and the review is the only thing that reads that. A line count says
+nothing about risk. `.claude/**` and `CLAUDE.md` stay outside arm B by the same decision.
 
 ## Why branch 3 is the default disposition
 

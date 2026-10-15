@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { project_profile, type ProjectShape } from './project-profile'
 import { start } from './start'
+import { start_dry_run } from './start-dry-run'
 import { start_prompt } from './start-prompt'
 import { start_steps } from './start-steps'
 
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: true,
+	should_use_prettier: true,
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
@@ -20,6 +21,7 @@ const INIT_COMMAND = 'josh-app init'
 const PREFLIGHT_FLAG = '--push-preflight-command'
 const PREFLIGHT_COMMAND = 'josh-app start:preflight'
 const START_USAGE = 'Usage: josh start'
+const DRY_RUN_REPORT = 'dry-run report'
 const NO_GIT = {
 	has_git: false,
 	has_github: false,
@@ -29,13 +31,20 @@ const NO_GIT = {
 	has_kit_committed: false,
 }
 
+// Every prerequisite the real machine or checkout would answer passes, so each test sets only the one
+// it is about.
+function pass_prerequisites(): void {
+	vi.spyOn(start_steps, 'self_run_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'github_cli_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'git_identity_refusal').mockReturnValue(undefined)
+	vi.spyOn(start_steps, 'uncommitted_refusal').mockReturnValue(undefined)
+}
+
 beforeEach(() => {
 	vi.restoreAllMocks()
 	vi.spyOn(project_profile, 'inspect_project').mockReturnValue(SHAPE)
 	vi.spyOn(start_steps, 'read_git_state').mockReturnValue(NO_GIT)
-	vi.spyOn(start_steps, 'self_run_refusal').mockReturnValue(undefined)
-	vi.spyOn(start_steps, 'github_cli_refusal').mockReturnValue(undefined)
-	vi.spyOn(start_steps, 'git_identity_refusal').mockReturnValue(undefined)
+	pass_prerequisites()
 	vi.spyOn(start_steps, 'run_steps').mockResolvedValue(undefined)
 	vi.spyOn(start_prompt, 'confirm_choices').mockResolvedValue('basic')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -63,6 +72,17 @@ describe('josh start', () => {
 		expect(start_prompt.confirm_choices).toHaveBeenCalledWith(
 			expect.objectContaining({ shape: SHAPE, consent: 'ask' }),
 		)
+	})
+})
+
+describe('josh start --dry-run (#3830)', () => {
+	it('prints the plan and the dry-run report without running a step', async () => {
+		vi.spyOn(start_dry_run, 'report').mockReturnValue(DRY_RUN_REPORT)
+
+		expect(await start.run(['--dry-run'], false)).toBe(0)
+		expect(start_steps.run_steps).not.toHaveBeenCalled()
+		expect(start_prompt.confirm_choices).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(DRY_RUN_REPORT)
 	})
 })
 
@@ -142,6 +162,7 @@ describe('josh start options', () => {
 			profile: undefined,
 			is_yes: false,
 			is_github: false,
+			is_dry_run: false,
 			visibility: 'private',
 			init_command: undefined,
 			push_preflight_command: undefined,
@@ -149,12 +170,13 @@ describe('josh start options', () => {
 	})
 
 	it('reads the profile alongside every switch', () => {
-		const args = ['--yes', '--profile', 'full', '--github', '--public']
+		const args = ['--yes', '--profile', 'full', '--github', '--public', '--dry-run']
 
 		expect(start.parse_start_options(args)).toStrictEqual({
 			profile: 'full',
 			is_yes: true,
 			is_github: true,
+			is_dry_run: true,
 			visibility: 'public',
 			init_command: undefined,
 			push_preflight_command: undefined,

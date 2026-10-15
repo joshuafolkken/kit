@@ -13,6 +13,7 @@ const OPTIONS: StartOptions = {
 	profile: undefined,
 	is_yes: false,
 	is_github: false,
+	is_dry_run: false,
 	visibility: 'private',
 	init_command: undefined,
 	push_preflight_command: undefined,
@@ -188,6 +189,21 @@ describe('consent to create the GitHub repository', () => {
 
 	it('asks at a terminal before opening the setup pull request', () => {
 		expect(start_plan.github_consent(['setup_pr'], OPTIONS, 'interactive').value).toBe('ask')
+	})
+})
+
+describe('josh start --dry-run and its permissions (#3830)', () => {
+	const DRY_RUN = { ...OPTIONS, is_dry_run: true }
+
+	it('runs unattended without a terminal or --yes', () => {
+		expect(start_plan.interaction_of(DRY_RUN, false)).toStrictEqual({
+			value: 'unattended',
+			refusal: undefined,
+		})
+	})
+
+	it('lists the GitHub steps without --github, since it creates nothing', () => {
+		expect(start_plan.github_consent(WITH_REPOSITORY, DRY_RUN, 'unattended').value).toBe('granted')
 	})
 })
 

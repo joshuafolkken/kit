@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
+import { review_code_tree } from './review-code-tree'
 import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 
@@ -22,6 +23,10 @@ import { review_stamps } from './review-stamps'
 // taken by a test. joshuafolkken/kit#1437 fixed exactly that trap one directory over, where the gate
 // suites were writing the real green-gate record.
 const RECORD_PATH = path.join(tmpdir(), `josh-review-round1-suite-${String(process.pid)}.json`)
+const CODE_RECORD_PATH = path.join(
+	tmpdir(),
+	`josh-review-round1-code-suite-${String(process.pid)}.json`,
+)
 
 const SOURCE = 'scripts/review/review-brief-cli.ts'
 const ADDED_TEST = 'scripts/review/review-round1-snapshot.test.ts'
@@ -63,6 +68,7 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(RECORD_PATH, { force: true })
+	rmSync(CODE_RECORD_PATH, { force: true })
 })
 
 describe('review_brief_cli.record_round_one — written once per run, never retaken', () => {
@@ -104,6 +110,55 @@ describe('review_brief_cli.record_round_one — written once per run, never reta
 	})
 })
 
+// joshuafolkken/kit#3826: the comment-free code record is taken only when this answers true, so it
+// describes the same moment as the snapshot and is never retaken over the fixes.
+function record(round: number, tree: Record<string, string>): boolean {
+	return review_brief_cli.record_round_one(round, tree, BASE, RECORD_PATH)
+}
+
+describe('review_brief_cli.record_round_one — says whether it wrote the snapshot', () => {
+	it('answers true when it wrote the snapshot', () => {
+		expect(record(review_brief_cli.FIRST_ROUND, IMPLEMENTATION)).toBe(true)
+	})
+
+	it('answers false when it kept the record the run already has', () => {
+		plant(IMPLEMENTATION)
+
+		expect(record(review_brief_cli.FIRST_ROUND, AFTER_FIXES)).toBe(false)
+	})
+
+	it('answers false on round 2', () => {
+		expect(record(review_brief.SECOND_ROUND, AFTER_FIXES)).toBe(false)
+	})
+})
+
+function stub_records(recorded: ReturnType<typeof review_stamps.round_one_stamp.read>): void {
+	vi.spyOn(review_stamps.round_one_stamp, 'read').mockReturnValue(recorded)
+	vi.spyOn(review_stamps.round_one_stamp, 'write').mockReturnValue('')
+	vi.spyOn(review_stamps.briefed_stamp, 'write').mockReturnValue('')
+}
+
+// The real records are stubbed: this asserts only which writes the brief issues, never their files.
+describe('review_brief_cli.record_review — the code record rides on a written snapshot', () => {
+	it('records the code tree when the round-1 snapshot is written', async () => {
+		stub_records(undefined)
+		const code_record = vi.spyOn(review_code_tree, 'record').mockResolvedValue()
+
+		await review_brief_cli.record_review(review_brief_cli.FIRST_ROUND, IMPLEMENTATION, BASE)
+
+		expect(code_record).toHaveBeenCalledWith([SOURCE], BASE)
+	})
+
+	it('records no code tree over a kept snapshot', async () => {
+		stub_records({ taken_at: '', files: IMPLEMENTATION, base: BASE })
+		const code_record = vi.spyOn(review_code_tree, 'record').mockResolvedValue()
+
+		await review_brief_cli.record_review(review_brief_cli.FIRST_ROUND, AFTER_FIXES, BASE)
+
+		expect(code_record).not.toHaveBeenCalled()
+	})
+})
+
 // The acceptance criterion of joshuafolkken/kit#1441, asserted end to end across the two commands:
 // the retake attempt no longer produces the state that answered `skip`.
 describe('the round-2 decision after a round-1 brief is re-run over the fixed tree', () => {
@@ -133,10 +188,12 @@ describe('the round-2 decision after a round-1 brief is re-run over the fixed tr
 describe('review_stamps.clear_round_one — the record lives for one run', () => {
 	it('clears the record so the next run records its own round 1', () => {
 		plant(IMPLEMENTATION)
+		review_stamps.round_one_code_stamp.write(IMPLEMENTATION, CODE_RECORD_PATH, BASE)
 
-		review_stamps.clear_round_one(RECORD_PATH)
+		review_stamps.clear_round_one(RECORD_PATH, CODE_RECORD_PATH)
 
 		expect(recorded_files()).toBeUndefined()
+		expect(review_stamps.round_one_code_stamp.read(CODE_RECORD_PATH)).toBeUndefined()
 
 		review_brief_cli.record_round_one(review_brief_cli.FIRST_ROUND, AFTER_FIXES, BASE, RECORD_PATH)
 
@@ -152,7 +209,7 @@ describe('review_stamps.clear_round_one — the record lives for one run', () =>
 		})
 
 		expect(() => {
-			review_stamps.clear_round_one(RECORD_PATH)
+			review_stamps.clear_round_one(RECORD_PATH, CODE_RECORD_PATH)
 		}).not.toThrow()
 	})
 })

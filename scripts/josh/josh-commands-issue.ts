@@ -75,7 +75,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			'File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]',
+			'<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]',
 			'automation',
 			['network'],
 		],
@@ -83,9 +83,9 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:release': {
 		script: 'scripts/issue/issue-release-cli.ts',
 		description:
-			"Link an Issue to the repository's open release Issue as its blocker, filing one when none is open",
+			"Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open",
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
+		reference: ['<issue> [--wait]', 'automation', ['network']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

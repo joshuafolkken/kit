@@ -15,6 +15,7 @@ import { start_exec } from './start-exec'
 import { start_plan, type GitState, type StartStep, type Visibility } from './start-plan'
 import { start_setup_pr } from './start-setup-pr'
 import { workflow_mark } from './workflow-mark'
+import { working_tree } from './working-tree'
 
 interface StepContext {
 	root: string
@@ -83,6 +84,17 @@ function git_identity_refusal(steps: ReadonlyArray<StartStep>, root: string): st
 		: undefined
 }
 
+// A repository with a history receives the setup as a commit, and the user's own uncommitted change to
+// a file kit also writes would land in it, so the tree must be clean before the first write (#3835).
+// The setup branch a failed commit or push left checked out is the exception: what is uncommitted
+// there is that run's own output, which the re-run resumes with. Without a commit there is nothing to
+// keep apart — the initial commit takes every file.
+function uncommitted_refusal(root: string, state: GitState): string | undefined {
+	if (!state.has_commits || start_setup_pr.is_setup_branch(state.branch)) return undefined
+
+	return working_tree.dirty_tree_refusal(root, 'josh start')
+}
+
 // `josh init` refuses to run inside the kit source repository by printing and setting the exit code
 // rather than throwing, so its step would pass and the later steps would commit and publish the
 // source repository. The same check is raised before the first write instead.
@@ -141,7 +153,9 @@ async function open_setup_pull_request(context: RunContext): Promise<void> {
 // What was already changed before the setup ran, read whenever a setup pull request will follow, so
 // it can tell the setup's files from the user's own (#2872). Kit's own `josh init` needs it as much as
 // a caller's command: its `josh format` rewrites the project's own sources, which kit cannot name, and
-// leaving them out failed the pull request's Prettier check.
+// leaving them out failed the pull request's Prettier check. On `main` it is empty, since a dirty tree
+// is refused there (#3835); it is kept for the setup branch a failed commit left, where the earlier
+// run's output is already uncommitted when the re-run starts.
 function baseline_of(
 	steps: ReadonlyArray<StartStep>,
 	context: StepContext,
@@ -239,6 +253,7 @@ const start_steps = {
 	github_cli_refusal,
 	git_identity_refusal,
 	self_run_refusal,
+	uncommitted_refusal,
 	run_steps,
 }
 export { start_steps }

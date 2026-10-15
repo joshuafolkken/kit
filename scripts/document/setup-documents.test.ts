@@ -10,8 +10,11 @@ import { document_scan } from './document-scan'
 // guide through the tutorial it names as the one next step. Their link on to the tutorial is pinned
 // by the tutorial's own suite.
 const PREREQUISITES = 'docs/setup/prerequisites.md'
+// joshuafolkken/kit#3851: the Quick start offers A (with GitHub) or B (without) and leaves what
+// differs between them to one comparison page.
+const SETUP_CHOICE = 'docs/setup/choose.md'
 const PROFILE_GUIDES: ReadonlyArray<string> = ['docs/setup/basic.md', 'docs/setup/full.md']
-const SETUP_PAGES: ReadonlyArray<string> = [...PROFILE_GUIDES, PREREQUISITES]
+const SETUP_PAGES: ReadonlyArray<string> = [...PROFILE_GUIDES, PREREQUISITES, SETUP_CHOICE]
 const TUTORIAL = 'docs/tutorial.md'
 const README = 'README.md'
 const QUICK_START_HEADING = '## Quick start'
@@ -21,6 +24,15 @@ const AUTHENTICATION = 'docs/authentication.md'
 const INIT_GUIDE = 'docs/init.md'
 const COMMAND_CATALOG = 'docs/josh-command-catalog.md'
 const README_POSITIONING = "kit gives Claude Code or Codex your project's rules and checks."
+// joshuafolkken/kit#3829: the README sums up what adopting kit into an existing project touches,
+// one line each, and leaves the detail to the guide each line links to.
+const ADOPTION_HEADING = '### Adding kit to an existing project'
+const ADOPTION_DETAILS: ReadonlyArray<string> = [
+	'docs/init.md#project-profiles',
+	'docs/sync.md#ai-files-overwritten',
+	'docs/init.md#claude-code-permission-mode',
+	'docs/init.md#josh-init-or-josh-start',
+]
 // joshuafolkken/kit#3343: each repeated setup note has one home the other user pages link to. The
 // marker is a phrase only the full statement carries, never the link that replaces it.
 const SINGLE_SOURCE_NOTES: ReadonlyArray<readonly [string, string]> = [
@@ -34,16 +46,20 @@ function user_documents(): Array<string> {
 		.map((entry) => `docs/${entry}`)
 }
 
-function quick_start_links(): Array<string> {
+function readme_section(heading: string, next_heading: string): string {
 	const text = read_document(README)
-	const start = text.indexOf(QUICK_START_HEADING)
-	const end = text.indexOf(NEXT_README_HEADING, start)
+	const start = text.indexOf(heading)
+	const end = text.indexOf(next_heading, start + heading.length)
 
 	expect(start).not.toBe(-1)
 	expect(end).not.toBe(-1)
 
+	return text.slice(start, end)
+}
+
+function quick_start_links(): Array<string> {
 	return document_scan
-		.link_targets(text.slice(start, end))
+		.link_targets(readme_section(QUICK_START_HEADING, NEXT_README_HEADING))
 		.map((target) => target.replace(/^\.\//u, ''))
 }
 
@@ -54,7 +70,7 @@ describe('the setup guides', () => {
 		expect(SETUP_PAGES.filter((path) => !scanned.has(path))).toStrictEqual([])
 	})
 
-	it.each([PREREQUISITES, TUTORIAL])('the README Quick start links to %s', (path) => {
+	it.each([PREREQUISITES, TUTORIAL, SETUP_CHOICE])('the README Quick start links to %s', (path) => {
 		expect(quick_start_links()).toContain(path)
 	})
 
@@ -70,6 +86,10 @@ describe('the setup guides', () => {
 
 	it.each(SETUP_PAGES)('%s links back to the README Quick start', (path) => {
 		expect(linked_paths(path)).toContain(README)
+	})
+
+	it.each(ADOPTION_DETAILS)('the README adoption section links to %s', (target) => {
+		expect(readme_section(ADOPTION_HEADING, '\n#')).toContain(`](./${target})`)
 	})
 })
 

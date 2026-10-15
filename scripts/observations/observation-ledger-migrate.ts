@@ -8,6 +8,7 @@ import {
 	rmSync,
 } from 'node:fs'
 import path from 'node:path'
+import { process_identity } from '#scripts/josh/process-identity'
 import { file_reader } from '#scripts/lib/read-file'
 import {
 	LEDGER_FILE_EXTENSION,
@@ -38,8 +39,6 @@ import { observation_ledger_line } from './observation-ledger-line'
 // migration with no await point cannot be interleaved with another write in the same process.
 
 const NEWLINE = '\n'
-const NO_SIGNAL = 0
-const NO_SUCH_PROCESS = 'ESRCH'
 
 function claim_path(legacy: string): string {
 	return `${legacy}.${String(process.pid)}${MIGRATION_CLAIM_SUFFIX}`
@@ -55,18 +54,6 @@ function claim(from: string, to: string): boolean {
 	}
 }
 
-// Only `ESRCH` means the process is gone; `EPERM` means it runs under another user, and its claim is
-// still its own.
-function is_alive(pid: number): boolean {
-	try {
-		process.kill(pid, NO_SIGNAL)
-
-		return true
-	} catch (error) {
-		return (error as NodeJS.ErrnoException).code !== NO_SUCH_PROCESS
-	}
-}
-
 // A claim is named `<old ledger>.<pid>.migrating`, so the pid is what sits between the two.
 function is_stale_claim(name: string, legacy_name: string): boolean {
 	const prefix = `${legacy_name}.`
@@ -75,7 +62,8 @@ function is_stale_claim(name: string, legacy_name: string): boolean {
 
 	const pid = Number(name.slice(prefix.length, -MIGRATION_CLAIM_SUFFIX.length))
 
-	return Number.isSafeInteger(pid) && !is_alive(pid)
+	// A process under another user still holds its claim (`process_identity.is_present_pid`).
+	return Number.isSafeInteger(pid) && !process_identity.is_present_pid(pid)
 }
 
 function stale_claims(legacy: string): ReadonlyArray<string> {

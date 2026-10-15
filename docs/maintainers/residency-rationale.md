@@ -178,9 +178,10 @@ Examples that answer "no" and keep their body on the skill side:
 - The verification gate and the merge chain (`.claude/skills/workflow-commands/chain-rule.md` / `followup.md`)
 - The post-dependency-update verification (`.claude/skills/dependency-update/`) — where the two
   protections above point
-- Picking up `auto-ok` and "only a person applies the label" (`.claude/skills/workflow-commands/backlogrun.md`).
-  A write prohibition would normally be resident, but `auto-ok` exists nowhere except the documents
-  that forbid writing it, so a turn that never opens them never reaches it.
+- Picking up `auto-ok` and "a run applies it only through `issue:file` or `auto-ok:judge`"
+  (`.claude/skills/workflow-commands/backlogrun-steps.md`). A write restriction would normally be
+  resident, but `auto-ok` exists nowhere except the documents that restrict writing it, so a turn that
+  never opens them never reaches it.
 
 ## A pointer-only topic file is never cited
 
