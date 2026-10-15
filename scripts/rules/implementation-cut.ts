@@ -173,37 +173,14 @@ function is_over_threshold_edit(
 // building it from `CONTEXT_CUT_THRESHOLD` keeps the two from drifting. `cost_format.format_tokens` renders it the way every cost report does.
 const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
 
-// The instruction in the shape a refusal can carry: what the cut is for, what each verdict means, and
-// the reissue sentence every delivery needs. The verdicts are spelled out rather than pointed at,
-// because `cut` is the only one that ends the turn and a run told merely to "take the cut" would have to
-// read which of the others leave it implementing — the same reason `pre-gate-cut.ts` spells them out.
+// The instruction in the shape a refusal can carry: the handoff in the format the parser reads, the
+// cut, and the one verdict that ends the turn — `cut` is the only one, so a run told merely to "take
+// the cut" is not left to look it up.
 const IMPLEMENTATION_CUT_REASON =
-	'⛔ implementation-phase cut: this checkout is a lane dispatched for this issue, or a run holds it for ' +
-	'this issue (joshuafolkken/kit#2760), and its recent-context ' +
-	`cost has crossed the shared ${THRESHOLD_TEXT} threshold mid-implementation, so the thinking accumulated ` +
-	'so far is now re-read on every later request. Take the cut before this edit. ' +
-	`First write a handoff file at \`${run_cut_handoff.HANDOFF_PATH}\` (ignored, so it is never committed) with the Write tool — the user’s instruction verbatim, what you have ` +
-	'completed, what remains, and what you deliberately did not touch, as ' +
-	`${run_cut_handoff.HANDOFF_FORMAT} (Markdown is refused) — and pass it as \`--handoff <path>\`, ` +
-	'so the fresh process resumes on the original instruction rather than the working tree alone ' +
-	'(joshuafolkken/kit#2354); a resume that finds no instruction is refused `incomplete` rather than ' +
-	'continuing blind. ' +
-	'`pnpm josh run:cut --impl <N> --handoff <path>` ends this process and relaunches a fresh one that resumes back into ' +
-	'implementation (`resume-impl`), dropping the accumulated context rather than carrying it — ' +
-	'joshuafolkken/kit#1933 built the boundary and joshuafolkken/kit#2310 measured it firing 0 times ' +
-	'because the verdict was only ever read at session entry, where the context has not yet grown. The ' +
-	"verdict is `pnpm josh cost --cut`'s exactly — the same per-request billed-input statistic against the " +
-	'same threshold, never a second measurement. Issue `pnpm josh run:cut --impl <N> --handoff <path>` now and read the ' +
-	'verdict: on `cut`, read what the command printed. Where it relaunched a fresh process, **end the turn ' +
-	'immediately** — that process owns the run and continues implementing, so it must not be waited for, ' +
-	'and **no Telegram is owed**: a cut that resumes itself leaves a person nothing to act on. Where it printed that nothing was relaunched, do what it prints, then end the turn; on `not-a-lane`, `unready`, `busy`, `failed` or ' +
-	'`unknown`, this process carries the run on and the edit is simply the next call. Never relaunch a ' +
-	'second process after `busy`. This fired because the dispatch mark names this lane or the run hold ' +
-	'names this issue; a person working here carries no mark and holds no run, so sees no refusal, so there is no human-or-child judgement left to make. The ' +
-	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue this edit once the cut has ' +
-	'answered — an edit reissued right after this refusal passes, so `busy` / `failed` cannot wedge the ' +
-	'run edit after edit. Past that window it asks again while the cut can still be taken; a ' +
-	'`not-a-lane` or `unready` answer silences it for the rest of this hold.'
+	`⛔ implementation-phase cut: refused on every edit past the ${THRESHOLD_TEXT} line. ` +
+	`Write \`${run_cut_handoff.HANDOFF_PATH}\` as ${run_cut_handoff.HANDOFF_FORMAT}, run ` +
+	'`pnpm josh run:cut --impl <N> --handoff <path>`; `cut`: end the turn immediately, no Telegram ' +
+	'is owed; else reissue the edit (`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
 // **A refusal younger than this window is this edit's own refusal being answered**.
 // A `decide` row that refused every over-threshold edit would wedge a run whose cut came back `busy` /
@@ -242,6 +219,11 @@ const ROW = {
 	reason: IMPLEMENTATION_CUT_REASON,
 	decide,
 	keeps: bash_triggers.on_bash_command(takes_the_impl_cut),
+	// The opening the reason carried before it was cut to the action and the next command.
+	former_reasons: [
+		'⛔ implementation-phase cut: this checkout is a lane dispatched',
+		"⛔ implementation-phase cut: this run's context crossed the",
+	],
 }
 
 const implementation_cut = {

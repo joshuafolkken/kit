@@ -368,28 +368,15 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 		['pnpm josh run:cut --impl <N> --handoff <path>'],
 		// What `cut` obliges, which the run cannot infer from the verdict alone.
 		['end the turn immediately'],
-		// That the fresh process continues implementing rather than going to the gate.
-		['resume-impl'],
-		// The handoff the cut must write and pass, so the resume carries the instruction
-		// (joshuafolkken/kit#2354).
-		['--handoff <path>'],
-		['deliberately did not touch'],
-		// The one measurement, so a reader knows this is not a second one (joshuafolkken/kit#1933).
-		['never a second measurement'],
-		// One of the verdicts that leave this process implementing.
-		['not-a-lane'],
-		// The pointer every delivery names.
+		// What every other verdict obliges: the edit is simply reissued.
+		['reissue the edit'],
+		// The pointer every delivery names — where `resume-impl`, the handoff's contents, the one
+		// measurement and the per-crossing reissue are stated (`implementation-cut-rule.test.ts`).
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		// **The threshold is the shared value, assembled from the constant** (joshuafolkken/kit#2385):
 		// joshuafolkken/kit#2406 derives it from the break-even model, so the old literal would tell
 		// agents the wrong number — this reads the constant's current formatting.
 		['135,000-token'],
-		// **The reissue sentence, now the per-crossing form** (joshuafolkken/kit#2385): a reissue right
-		// after a refusal passes so `busy` / `failed` cannot wedge the run, and the row asks again past
-		// the window until a `not-a-lane` / `unready` answer silences it (joshuafolkken/kit#3881).
-		['reissued right after this refusal passes'],
-		['asks again while the cut can still be taken'],
-		['silences it for the rest of this hold'],
 	])('carries %j', (marker) => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(marker)
 	})

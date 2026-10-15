@@ -137,30 +137,14 @@ function decide(): boolean {
 	return true
 }
 
-// The instruction in the shape a refusal can carry: what the call is about to cost, the reissue that
-// avoids it, and the half a run forgets once the push has landed. The measurement is named because it
-// is what makes the rule believable — the work was 17 minutes and the run was 45.
+// The instruction in the shape a refusal can carry: the reissue, and the half a run forgets once the
+// push has landed. The measurement behind it is in `docs/maintainers/rule-delivery-rationale.md`.
 const RUN_TAIL_REASON =
 	'⛔ run tail: this issues the commit-push-PR step in the foreground, where the harness decides ' +
-	'when to stop waiting. Reissue it with `run_in_background` set. In `fullrun #1501` this call was ' +
-	'given a 900-second timeout, the harness detached it at its own 600-second cap, and nothing read ' +
-	'the output for a further 6m28s — 45m03s of wall clock on about 17 minutes of work ' +
-	'(joshuafolkken/kit#1510). **Never give a foreground call a timeout above the harness cap**: the ' +
-	'cap decides, not the number. A backgrounded call re-invokes you when it exits, so the completion ' +
-	'notification is what resumes the run. **When it arrives, the turn that reads it goes straight ' +
-	'through any branch-2 filing and `pnpm josh epic:bundle` to `pnpm josh followup` — the turn never ' +
-	'ends at the push.** CI went green 6m06s before the merge started in that run, and it started ' +
-	'only because the person asked; joshuafolkken/kit#1333 had already settled that the merge is ' +
-	'issued in the turn the review closes. While the push runs, do the work that writes nothing — ' +
-	'drafting the completion body to a file, deciding the branch-2 disposition. `pnpm josh followup` ' +
-	'itself stays in the **foreground** — nearly every step after it reads its result. But a tail ' +
-	'does follow the merge, measured at 3.0 min and 5.9% of a run (joshuafolkken/kit#1462), so ' +
-	'empty it beforehand: the steps that read the merge result stay after `followup`, and the rest ' +
-	'are composed in the turn that issues it, bar the one exception background-commands.md names. The ' +
-	'procedure is `.claude/skills/workflow-commands/background-commands.md`, "A command that can take ' +
-	'minutes is issued in the background". **This rule fires on every foreground push, not once per ' +
-	'run**, so ' +
-	'reissuing the same call in the foreground will be refused again.'
+	'when to stop waiting. Reissue it with `run_in_background` set; when it exits, go straight on to ' +
+	'`pnpm josh followup` in the foreground — the turn never ends at the push ' +
+	'(`.claude/skills/workflow-commands/background-commands.md`). It fires on every foreground push, ' +
+	'not once per run.'
 
 const run_tail_rule = {
 	RUN_TAIL_REASON,

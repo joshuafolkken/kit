@@ -22,7 +22,8 @@ Where each rule came from: `docs/maintainers/background-commands-rationale.md` �
 ## How the wait ends — the task's exit, never a regex over its output
 
 **Background it from the first, then end the turn.** A `run_in_background` command re-invokes the run
-when it *exits* — not on a regex match, not at the block limit — so there is nothing to wait on.
+when it *exits* — that completion notification is what ends the wait, not a regex match or the block
+limit.
 
 **Never hand-write a `while`/`until` … `sleep` loop over the output file** — a regex that never matches
 waits to the block limit, one that matches a mid-run line exits early. `pnpm josh rule:guard` refuses it

@@ -1,5 +1,6 @@
 import { mkdirSync, realpathSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -151,15 +152,20 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 	// to judgement at the moment nothing else is open to read — joshuafolkken/kit#1518's failure.
 	it.each([
 		'pnpm josh issue:read <N>',
-		'gh issue view <N> --comments',
 		'gh api repos/{owner}/{repo}/issues/<N>/comments',
-		'the later text is the agreement in force',
-		'a comment supersedes the body it contradicts',
-		'reassigns to another Issue is out of scope',
-		'`confirmation` Telegram',
+		'a later comment supersedes the body it contradicts',
 		'`.claude/skills/workflow-commands/issue-comments.md`',
 	])(CARRIES_MARKER, (marker) => {
 		expect(delivered_rules.ISSUE_COMMENTS_REASON).toContain(marker)
+	})
+
+	// The two answers that are not the run's to make live in the topic file the refusal points at.
+	it.each([
+		'**The later text is the agreement in force**',
+		'**A comment that reassigns part of the scope to another Issue** takes that part out of scope',
+		'sends a `confirmation` Telegram',
+	])('leaves %j to the topic file', (marker) => {
+		expect(read_unwrapped('.claude/skills/workflow-commands/issue-comments.md')).toContain(marker)
 	})
 
 	// The reissue without the comments is refused again — once per run let it through unread

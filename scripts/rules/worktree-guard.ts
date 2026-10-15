@@ -124,18 +124,11 @@ function is_unauthorized_worktree_change(command: string): boolean {
 // and — for a stash — the message form that is allowed. `pnpm josh git` and `pnpm josh stash:pop` are
 // invisible to this trigger, so a run that uses them is never refused.
 const WORKTREE_MUTATION_REASON =
-	'⛔ unauthorized working-tree change: `git checkout -- <path>`, `git restore <path>`, a forced ' +
-	'`git clean` and an unauthorized `git stash` discard work or mutate the repository-wide stash every work tree ' +
-	'shares, and none is on the `.claude/settings.json` deny list (`operating-rules.md`). Do not run ' +
-	'them on your own judgement. A commit goes through `pnpm josh git`; a stash pop goes through `pnpm ' +
-	'josh stash:pop "<message>"`, never a positional `git stash pop` a shared stack lets another lane ' +
-	'divert. A stash push is authorized only inside a documented flow and only with a findable message ' +
-	'— `git stash push -u -m "<message>"` — which this row allows; a bare `git stash`, a message-less ' +
-	'push, or `pop` / `apply` / `drop` is refused. A plan that restores a handed-over stash with `git ' +
-	'stash apply` / `git stash pop` is read as `pnpm josh stash:pop "<message>"`: apply it that way, ' +
-	'continue, and record the substitution on the Issue — Tier A, never a `needs-decision` park ' +
-	'unless the plan says why the owner keeps the stash: then stop and confirm (`operating-rules.md` ' +
-	'→ "no-self-staging"). **This rule fires on every occurrence, not once per run.**'
+	'⛔ unauthorized working-tree change: `git checkout --`, `git restore`, `git clean -f`, ' +
+	'`git stash`. A documented flow stashes with `git stash push -u -m "<message>"`; a handed-over ' +
+	'stash is `pnpm josh stash:pop "<message>"`; record the substitution on the Issue (Tier A) unless ' +
+	'the plan says why the owner keeps the stash: then stop and confirm. It fires on every occurrence ' +
+	'(`operating-rules.md`).'
 
 const ROW = {
 	id: 'worktree-mutation',

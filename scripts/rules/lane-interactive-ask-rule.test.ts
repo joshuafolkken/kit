@@ -29,11 +29,6 @@ describe('the delivered text — what the refusal states', () => {
 		expect(delivered).toContain("labels[]=needs-decision'")
 		expect(delivered).toContain('backlogrun-park.md')
 	})
-
-	// It refuses every occurrence, never once per run — an interactive ask must never succeed.
-	it('says it fires on every occurrence', () => {
-		expect(delivered).toContain('every occurrence')
-	})
 })
 
 describe(`${TOPIC_FILE} — the single source for the interactive-ask rule`, () => {
@@ -45,6 +40,9 @@ describe(`${TOPIC_FILE} — the single source for the interactive-ask rule`, () 
 		'the notify guard never fires',
 		'park the question instead',
 		'AskUserQuestion',
+		// It refuses every occurrence, never once per run — an interactive ask must never succeed. The
+		// refusal names this file rather than restating it.
+		'refuses `AskUserQuestion` for a marked lane child on every occurrence',
 		// The backstop and the shared extractor.
 		'pnpm josh run:ending',
 		SHARED_EXTRACTOR,

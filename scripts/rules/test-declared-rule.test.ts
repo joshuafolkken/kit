@@ -131,7 +131,7 @@ describe('TEST_DECLARED_REASON', () => {
 		['non-runtime exception'],
 		['Step 0 work summary'],
 		// The pointer, and the reissue sentence every delivery needs.
-		['prompts/collaboration-workflow/rule-delivery.md'],
+		['`CLAUDE.md` → Code Change Rules'],
 		['once per run'],
 	])('carries %j', (marker) => {
 		expect(test_declared_commit.REASON).toContain(marker)

@@ -243,6 +243,7 @@ describe('LANE_PARK_REASON', () => {
 		["-f 'labels[]=needs-decision'"],
 		// The other stops that already carry their label, so the child is not sent to add a second one.
 		['needs-human-review'],
+		['already-done'],
 		// The pointer, and the reissue sentence every delivery needs.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		['once per run'],

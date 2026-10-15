@@ -89,25 +89,15 @@ function is_carry_conflict(
 }
 
 // The instruction in the shape a refusal can carry: what the child cannot do, why the record is not a
-// conflict, and the mechanical branch to take instead — continue, never park or ask. **The procedure
-// is named, not restated** — its single sources are `pre-gate-cut.md` and `backlogrun-progress.md` →
-// "The hand-off", and a second copy here would be the clone `CLAUDE.md` prohibits. Apostrophes are
-// avoided so the single-quoted literal needs no escaping, as the sibling reasons do.
+// conflict, and the mechanical branch to take instead — continue, never park or ask. Its history is
+// `docs/maintainers/rule-delivery-rationale.md` → "Why a refusal is the action and the next command".
+// Apostrophes are avoided so the single-quoted literal needs no escaping, as the sibling reasons do.
 const LANE_CARRY_CONFLICT_REASON =
 	'⛔ lane child carry conflict: this session is a dispatched lane child, and ' +
-	'`pnpm josh run:merge` / `pnpm josh run:carry` are the parent backlogrun budget commands — a child ' +
-	'must never run them. The live carry record here belongs to the parent that launched this child, ' +
-	'not to a competing run: the parent holds the one run budget for the repository, and every lane ' +
-	'shares the common git directory it is keyed on, so a live owner a lane child reads is always its ' +
-	'parent (joshuafolkken/kit#2267, measured 2026-09-21 in backlogrun #2252 — a child read run:merge ' +
-	'`busy` as a competitor and parked #2258 unimplemented). Do not run this command, and do not treat ' +
-	'it as a conflict: no `needs-decision`, no `confirmation` Telegram, no question to a person — a ' +
-	'dispatched child cannot ask, and there is nothing to decide. Continue implementing this Issue; the ' +
-	'parent owns the budget and counts the outcome at the return. The procedure is ' +
-	'`.claude/skills/workflow-commands/pre-gate-cut.md` and `backlogrun-progress.md` → "The hand-off". ' +
-	'Live evidence of `run:carry` is taken with a fresh `JOSH_TEMP_ROOT` prefixed to the call, which this ' +
-	'rule lets through (joshuafolkken/kit#3458); `run:merge` is refused under any root, because it also ' +
-	'syncs main, closes lanes and writes to GitHub. This rule fires on every occurrence, not once per run.'
+	'`run:merge` / `run:carry` are the parent budget commands; the live record belongs to the parent, ' +
+	'not to a competing run. Continue implementing this Issue: no `needs-decision`, no Telegram. ' +
+	'Live `run:carry` evidence takes a fresh `JOSH_TEMP_ROOT`; `run:merge` is refused under any root, ' +
+	'on every occurrence.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `is_trigger` reads the input through
 // `on_bash_command` — the `Bash` tool-name gate every command row shares — and `decide` returns true

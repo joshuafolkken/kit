@@ -40,17 +40,16 @@ const REASONING: ReadonlyArray<string> = [
 
 // Every sentence here changes what the reader does next. Drop the mechanism and the refusal reads as
 // a style note; drop the sanctioned way to bound the output and the caller is left with the very
-// problem that put the pipe there; drop the boundary and the rule reads as covering every pipe.
+// problem that put the pipe there. The boundary (read-only listings stay untouched) is the topic
+// file's, pinned in the suite below.
 describe('the delivered text — what the refusal states', () => {
 	const delivered = delivered_rules.PIPED_VERIFICATION_REASON
 
 	it.each([
 		"a pipeline exits with its last command's status",
-		'Run the check without the pipe',
 		'redirect it to a file and read ranges from that file',
 		PIPEFAIL,
 		'never the exit code alone',
-		'Read-only listings are untouched',
 	])('carries %j', (marker) => {
 		expect(delivered).toContain(marker)
 	})

@@ -131,17 +131,10 @@ function writes_rule_prose(
 // skips, the commands that answer them, and the reissue once they have run.
 const RULE_BODY_REASON =
 	'⛔ rule written into prose: this edit adds rule text to CLAUDE.md, a `prompts/**` doc or a skill ' +
-	'body. Before it lands, run the residency questions the addition skips. A rule whose answer is ' +
-	'computable from mechanically readable inputs should be a decision oracle, not prose — question 0; ' +
-	'`pnpm josh oracle:list` lists the existing oracles a new one joins (single source ' +
-	'`scripts/rules/decision-oracle.ts`). A rule that decides *when* or *in what order* to act belongs ' +
-	'in the run driver, not prose — the ordering question; `pnpm josh run:step` is the state machine a ' +
-	'sequencing rule moves into. Only a rule that is neither — not computable, not ordering — stays ' +
-	'prose, and then as a trigger-plus-pointer line rather than a second copy of its procedure. The ' +
-	'criterion is `prompts/collaboration-workflow/residency.md` (question 0 and the ordering question); ' +
-	'the delivery enumeration is `prompts/collaboration-workflow/rule-delivery.md`. Every such edit is ' +
-	'refused until both commands are on the transcript — run them, confirm the rule can be neither an ' +
-	'oracle nor an ordering step, then reissue this edit.'
+	'body. Answer question 0 (`pnpm josh oracle:list`) and the ordering question (`pnpm josh ' +
+	'run:step`) of `prompts/collaboration-workflow/residency.md`; refused until both commands are on ' +
+	'the transcript, then reissue this as a trigger-plus-pointer line ' +
+	'(`prompts/collaboration-workflow/rule-delivery.md`).'
 
 // The two placement oracles the residency questions name: question 0 is `pnpm josh oracle:list`, the
 // ordering question is `pnpm josh run:step` (its degenerate pre-implementation form `run:next` counts

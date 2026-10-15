@@ -73,20 +73,16 @@ function is_masked_verification(command: string): boolean {
 	return time_shell.discarded_commands(command).some((segment) => is_verification_command(segment))
 }
 
-// The masking, the two ways out of it and the boundary, in the shape a refusal can carry. **The way
+// The masking and the ways out of it, in the shape a refusal can carry; the boundary is the topic file's. **The way
 // out travels with the refusal rather than being named**, because a delivery saying only "do not pipe
 // it" leaves the caller with the same long output and no sanctioned way to read it, which is what put
 // the pipe there in the first place.
 const PIPED_VERIFICATION_REASON =
 	"⛔ piped verification: a pipeline exits with its last command's status, so `pnpm josh gate | " +
-	'tail` reports success on a gate that failed, and the verdict is discarded before anything reads ' +
-	'it. Run the check without the pipe — josh prints its verdict line last, so the harness output cap ' +
-	'keeps it even when the middle is elided. Where the output genuinely has to be narrowed, redirect ' +
-	'it to a file and read ranges from that file, or prefix `set -o pipefail` so the pipeline carries ' +
-	"the check's status. Read the printed verdict either way, never the exit code alone. Read-only " +
-	'listings are untouched — this fires only on a command whose result means pass or fail. The rule ' +
-	'is in `prompts/collaboration-workflow/output-bounds.md`. Reissue this call with no pipe — it ' +
-	'fires once per run and cannot repeat on the call in hand.'
+	'tail` reports success on a gate that failed. Reissue this call with no pipe (josh prints its ' +
+	'verdict last), or redirect it to a file and read ranges from that file, or prefix ' +
+	'`set -o pipefail`; read the verdict line, never the exit code alone ' +
+	'(`prompts/collaboration-workflow/output-bounds.md`).'
 
 // Every command position on the line: the chain cut `shell_segments` makes, each piece of a pipeline
 // inside it taken on its own.
@@ -156,8 +152,7 @@ const GROUP_SYNTAX = /[()]/u
 const PIPEFAIL_NOTE =
 	'↻ piped verification: the josh check was piped, so its pipeline was wrapped in ' +
 	"`(set -o pipefail; …)` to carry the check's status, and the rest of the line ran as typed. Read " +
-	'the printed verdict, never the exit code alone — `prompts/collaboration-workflow/output-bounds.md` ' +
-	'(joshuafolkken/kit#3875).'
+	'the printed verdict, never the exit code alone — `prompts/collaboration-workflow/output-bounds.md`.'
 
 function reads_to_the_end(piece: string): boolean {
 	return FULL_READING_FILTER.test(piece) && !EARLY_EXIT_GREP.test(piece)

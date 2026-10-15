@@ -9,13 +9,9 @@ import { bash_triggers } from './bash-triggers'
 
 const DIRECT_FILING_REASON =
 	'⛔ direct filing: an Issue is filed with `pnpm josh issue:file "<title>" --body-file <path> ' +
-	'--depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>]`, never with `gh api …/issues` ' +
-	'or `gh issue create`. The command runs every filing step in order — the duplicate scout, the body ' +
-	'lint and its classification labels, the depth and `route:` labels, the `## Origin` check when filing ' +
-	'into another repository, and `epic:bundle` after the create — so none of them is a step to remember. ' +
-	'When the scout prints candidates it holds the filing: read each, then reissue with `--distinct <N,…>` ' +
-	'for the ones that are separate deliverables. Reference: `docs/josh-commands-backlog.md` → "`josh issue:file`". ' +
-	'**This rule fires on every occurrence, not once per run.**'
+	'--depth <0|1|2>`, never with `gh api …/issues` or `gh issue create` — it runs the scout, the lint, ' +
+	'the labels and `epic:bundle` itself. It fires on every occurrence (`docs/josh-commands-backlog.md` ' +
+	'→ "`josh issue:file`").'
 
 function is_any_filing(command: string): boolean {
 	return bash_triggers.is_direct_filing(command) || bash_triggers.is_issue_filing(command)

@@ -228,6 +228,77 @@ the wrong turn is worse than no hook". `!` (history expansion) is not a trigger 
 measured not to fire in non-interactive zsh. The rule body and the trigger's blind spots are in
 [`shell-body.md`](../../prompts/collaboration-workflow/shell-body.md).
 
+## Why a refusal is the action and the next command
+
+A refusal or notice is read by the model and stays in its context for the rest of the session, so
+each one says what is wrong and the next command, in at most 400 characters, and never carries its
+history: no Issue number, no "Before this". `scripts/hooks/hook-refusal-brevity.test.ts` pins that
+bound over every `PreToolUse` and `Stop` text, extending `hook-notice-brevity.test.ts`. A reworded
+reason keeps its first 48 characters (`rule-value.ts` matches a delivered refusal by its opening) or
+lists the old opening in its row's `former_reasons`. The history the texts used to carry lives here:
+
+- `early-heartbeat` — two timers armed at once produced reports 3–5 minutes apart on a 15-minute
+  setting: a new one was armed on the turn a timer fired and again on the turn a child's completion
+  woke the run (joshuafolkken/kit#1570).
+- `implementation-cut` — fires in a dispatched lane or a held checkout (joshuafolkken/kit#2760); the
+  handoff carries the instruction so the fresh process resumes on it (joshuafolkken/kit#2354);
+  joshuafolkken/kit#1933 built the boundary and joshuafolkken/kit#2310 measured it firing 0 times while
+  the verdict was read only at session entry.
+- `issue-comments` — comments changed a diagnosis (joshuafolkken/kit#1537), a default and an
+  acceptance criterion (joshuafolkken/kit#1520), and handed a scope to another Issue
+  (joshuafolkken/kit#1304).
+- `josh-git-bare` — a bare `josh git` took its cancel branch in a lane, threw away about 31 seconds
+  and was reissued with `-y` anyway (joshuafolkken/kit#2297).
+- `lane-background` — a backgrounded `josh gate` / `git` / `followup` / `ship` dies with a headless
+  child's turn at exit 143 (joshuafolkken/kit#2704: the #2606 child parked instead of merging); a
+  backgrounded `ship` dies with the turn
+  (joshuafolkken/kit#3027), and a backgrounded `ship` issued alone is moved to the foreground
+  (joshuafolkken/kit#3154).
+- `lane-carry-conflict` — a child read `run:merge` `busy` as a competitor and parked #2258
+  unimplemented in backlogrun #2252 (joshuafolkken/kit#2267, 2026-09-21); `run:carry` under a fresh
+  `JOSH_TEMP_ROOT` is let through (joshuafolkken/kit#3458), while `run:merge` is refused under any root
+  because it also syncs main, closes lanes and writes to GitHub.
+- `lane-interactive-ask` / `lane-park` — a child that asked or stopped without parking left the
+  parent an OPEN Issue with `in-progress` and no question (joshuafolkken/kit#2201);
+  joshuafolkken/kit#2034 measured it twice in one run and placed the rule one tool call too late.
+- `lane-split-park` — the child for #3255 parked its promoted epic, with nobody to answer
+  (joshuafolkken/kit#3296, 2026-10-06).
+- `piped-verification` — the output bound behind the pipefail rewrite (joshuafolkken/kit#3570).
+- `poll-loop` — about 45 minutes, 13% of six lanes, lost to polling (joshuafolkken/kit#2371).
+- `pre-gate-cut` — 176K of 204K output rode across the implementation boundary
+  (joshuafolkken/kit#1839), and the step carried as prose was taken 0 times (joshuafolkken/kit#1864).
+- `raw-field-body` — two park comments were lost to a raw-field body (joshuafolkken/kit#2304).
+- `run-tail-rule` — in `fullrun #1501` a 900-second foreground timeout was detached at the harness's
+  600-second cap and the output went unread for 6m28s: 45m03s of wall clock on about 17 minutes of
+  work (joshuafolkken/kit#1510). joshuafolkken/kit#1333 settled that the merge is issued in the turn
+  the review closes, and the tail after the merge measured 3.0 min, 5.9% of a run
+  (joshuafolkken/kit#1462).
+- `shell-body` — a body with a backtick or `$` was executed by the shell rather than merely mangled
+  (joshuafolkken/kit#1198).
+- The `backlogrun` parent hand-off — between merges every later request re-reads the accumulated
+  context (joshuafolkken/kit#2947).
+
+### The lane-child guard modes
+
+`lane-guard-policy.ts` gives each mode a one-sentence `because`; the measurements behind it:
+
+- `investigation` → `notice`. A refusal ends a child turn (joshuafolkken/kit#2138), so it was `off`
+  until joshuafolkken/kit#2382 re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372
+  #2374 #2375):
+  every one read 4–17 files it never edited, over the threshold of 3. The notice names the concrete
+  files (the #2276 precedent), since a generic "delegate" did not move the number (#2164 → #2178).
+- `batching` → `off`. A notice (joshuafolkken/kit#2164), taken off (joshuafolkken/kit#2178), restored
+  (joshuafolkken/kit#2276) and re-measured (joshuafolkken/kit#2405) at 1.13 calls per round trip
+  against a 1.40 target, as every advisory attempt before it (joshuafolkken/kit#1304, #1329, #1337,
+  #1390). A `PreToolUse` hook cannot see the turn it is in; the lever that moved the density is a
+  composite command (`read:files` / `edit:files`, joshuafolkken/kit#2202, #2311).
+- `duplicate-read` → `notice`. Unchanged re-reads are measured in lane children above all
+  (joshuafolkken/kit#2298 baseline: 8.0 per lane run), so `off` would neuter it where the count lives.
+- `rule` → `refuse`. A cut carried as prose fired 0 times (joshuafolkken/kit#1864,
+  joshuafolkken/kit#2310). A `PreToolUse` deny cancels a batched sibling (joshuafolkken/kit#2177,
+  measured on #2160); the chain orders the cut before the gate, so the collateral is gone from the
+  default path rather than from the guard.
+
 ## Marker tests
 
 The suites pinning the delivery list's items are `scripts/rules/turn-batching-rule.test.ts`,

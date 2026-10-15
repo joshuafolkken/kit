@@ -31,24 +31,11 @@ describe('the delivered text — what the refusal states', () => {
 	})
 
 	// **A refusal that named the command but not what its answer obliges would be half a rule.** `cut`
-	// is the only verdict that ends the turn, and the resume continues implementing (`resume-impl`)
-	// rather than gating, which the run cannot infer from the verdict alone.
+	// is the only verdict that ends the turn; every other one reissues the edit.
 	it('hands over the command and what its verdicts oblige', () => {
 		expect(delivered).toContain(CUT_COMMAND)
 		expect(delivered).toContain('end the turn immediately')
-		expect(delivered).toContain('resume-impl')
-	})
-
-	// **The one measurement, so a reader knows this is not a second one** (joshuafolkken/kit#1933): the
-	// guard reads `pnpm josh cost --cut`'s verdict, the same statistic against the same threshold.
-	it('states that it reads the one measurement, never a second', () => {
-		expect(delivered).toContain('never a second measurement')
-	})
-
-	// **The dispatch mark is what fires the refusal, so a person sees none** (joshuafolkken/kit#1904).
-	it('states that the dispatch mark fired it, and a person carries none', () => {
-		expect(delivered).toContain('the dispatch mark names this lane')
-		expect(delivered).toContain('carries no mark and holds no run, so sees no refusal')
+		expect(delivered).toContain('reissue the edit')
 	})
 })
 
@@ -87,6 +74,17 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 		// joshuafolkken/kit#3734: a lane child sent the ⏸️ confirmation for a cut that resumes itself.
 		'**A cut that relaunches its successor owes no Telegram**',
 	])('states the boundary %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	// **What the refusal points at rather than carries**: the resume continues implementing rather than
+	// gating, every verdict but `cut` leaves the process implementing, and the guard reads
+	// `pnpm josh cost --cut`'s verdict rather than a second measurement.
+	it.each([
+		'`resume-impl`',
+		'**`cut` is the only verdict that ends the turn.**',
+		'never a second one',
+	])('states what the refusal leaves to it: %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

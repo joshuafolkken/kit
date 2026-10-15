@@ -83,25 +83,15 @@ function is_poll_loop(command: string): boolean {
 	return LOOP_KEYWORD.test(plain) && SLEEP_COMMAND.test(plain)
 }
 
-// The instruction in the shape a refusal can carry: what the loop is about to cost, why the command's
-// exit is the thing to wait on, and the one route that delivers that exit. The measurement is named
-// because it is what makes the rule believable — six lanes, about 45 minutes, 13% of their wall clock.
+// The instruction in the shape a refusal can carry: why the command's exit is the thing to wait on,
+// and the one route that delivers that exit. The measurement behind it is in
+// `docs/maintainers/rule-delivery-rationale.md`.
 const POLL_LOOP_REASON =
 	"⛔ output poll loop: this hand-writes a `while`/`until` wait loop over a command's output, a " +
-	'marker file or a process — with a `sleep` or, worse, without one — and the loop does not know ' +
-	'when the command finished. A regex that never matches waits to ' +
-	'the harness block limit; one that matches a mid-run line exits too early — either way the ' +
-	'command exit is not what ends the wait, and each pass spends a full-context round trip ' +
-	'(joshuafolkken/kit#2371 measured about 45 minutes, 13% of six lanes, lost to exactly this). Do ' +
-	'not poll the output file. A command known to take minutes — `pnpm josh gate`, `pnpm josh ' +
-	'followup`, `pnpm josh format` — is started detached from the first with `run_in_background` set, ' +
-	'and the harness re-invokes you when it exits: its completion notification is what ends the wait, ' +
-	'on the task exit rather than a regex or the block limit. So issue the long command in the ' +
-	'background and end the turn — do not arm a loop; the wake-up brings you back. To glance at ' +
-	'interim output, `Read` the output file once, never in a sleep loop. If you are waiting on CI, ' +
-	'`pnpm josh followup` waits on it for you. The procedure is ' +
-	'`.claude/skills/workflow-commands/background-commands.md`, "A command that can take minutes is ' +
-	'issued in the background". **This rule fires on every occurrence, not once per run.**'
+	'marker file or a process, and the loop does not know when the command finished. Issue the long ' +
+	'command with `run_in_background` set and end the turn — its exit re-invokes you; for CI, ' +
+	'`pnpm josh followup` (`.claude/skills/workflow-commands/background-commands.md`). It fires on ' +
+	'every occurrence.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
 // occurrence; it declares no `keeps` — waiting on the task exit is the *absence* of a loop, not a

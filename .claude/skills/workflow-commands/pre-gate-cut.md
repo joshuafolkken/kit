@@ -27,7 +27,7 @@ A person's interactive `fullrun` never relaunches itself. A dispatched child is 
 - **Meaning**: "this session was launched for issue `<N>`, not typed by a person."
 - **Lifetime**: the child process — set at launch, never written by the run itself.
 - **Trust**: only where its value equals the lane's own issue; a leaked mark naming another issue, or
-  none, is read as a person.
+  none, is read as a person. An interactive `fullrun` carries no mark.
 
 The name, meaning and lifetime are documented here and nowhere else. `run:cut` itself looks for an
 **open lane** for the issue instead (`not-a-lane` otherwise), so it is safe to issue unconditionally.

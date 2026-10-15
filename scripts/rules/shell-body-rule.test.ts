@@ -51,7 +51,7 @@ describe('the delivered text — what the refusal states', () => {
 
 	it.each([
 		'contains a backtick or a `$`',
-		'executed rather than merely mangled',
+		'so the shell executes it',
 		'--body-file <path>',
 		ISSUE_COMMENT_SPELLING,
 		'--notify-message-file',

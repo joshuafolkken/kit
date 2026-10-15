@@ -52,12 +52,9 @@ function is_bare_josh_git(command: string): boolean {
 // sibling reasons do.
 const JOSH_GIT_BARE_REASON =
 	'⛔ bare `pnpm josh git`: this prompts to confirm the staging, and with no TTY the prompt falls to ' +
-	'its cancel branch — `Checking unstaged files... Found` then `Operation cancelled.` — so the call ' +
-	'throws away the time it takes to fail (about 31 seconds in one measured lane) and you reissue it ' +
-	'with `-y` anyway (joshuafolkken/kit#2297). Run it unattended from the start: ' +
-	'`pnpm josh git -y "<title> #<N>"`. The recovery form that opens the PR for a push that already ' +
-	'landed is `pnpm josh git -y --skip-commit --skip-push`. This rule fires on every occurrence, not ' +
-	'once per run.'
+	'its cancel branch. Run `pnpm josh git -y "<title> #<N>"`, or ' +
+	'`pnpm josh git -y --skip-commit --skip-push` to open the PR for a push that already landed. It ' +
+	'fires on every occurrence.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `is_trigger` reads the input through
 // `on_bash_command` — the `Bash` tool-name gate every command row shares — and `decide` returns true so

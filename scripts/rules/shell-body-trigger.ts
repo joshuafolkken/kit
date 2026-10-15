@@ -187,12 +187,10 @@ function carries_a_body(command: string): boolean {
 // (`git-force.ts`, `lane-carry-conflict.ts`).
 const SHELL_BODY_REASON =
 	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
-	'contains a backtick or a `$`, so the shell runs it — the text is executed rather than merely ' +
-	'mangled (joshuafolkken/kit#1198). Write the body to a file and pass it by path: `pnpm josh ' +
-	'issue:comment <N> --body-file <path>`, `pnpm josh followup --notify-message-file <path>`, or ' +
-	"`--body-file <path>` wherever offered. `$'…'` quoting is the other safe form; the rule and the " +
-	"trigger's blind spots are in `prompts/collaboration-workflow/shell-body.md`. Reissue this call " +
-	'once the body is in a file — it fires once per run and cannot repeat on the call in hand.'
+	'contains a backtick or a `$`, so the shell executes it. Reissue this call once the body is in a ' +
+	'file, passed by path (`pnpm josh issue:comment <N> --body-file <path>`, ' +
+	"`--notify-message-file <path>`), or use `$'…'` quoting " +
+	'(`prompts/collaboration-workflow/shell-body.md`).'
 
 const shell_body_trigger = {
 	SHELL_BODY_REASON,
