@@ -6,7 +6,7 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 
 Check which registry the install uses before changing `.npmrc`.
 
-- For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit` for the package, then check `https://registry.npmjs.org/@joshuafolkken%2fkit/<version>` for the exact version requested (replace `<version>`). The package URL can return `200` while an unpublished version returns `404`. Adding a GitHub Packages mapping does not fix public npm publication.
+- For a new kit-only install, public npm is the expected registry. Check `https://registry.npmjs.org/@joshuafolkken%2fkit/<version>` for the exact version requested — the package URL can return `200` while that version returns `404`. A GitHub Packages mapping does not fix it.
 - For an existing project intentionally using GitHub Packages, confirm its `.npmrc` still contains the mapping. See §3 of [authentication.md](./authentication.md) if it is missing:
   ```ini
   @joshuafolkken:registry=https://npm.pkg.github.com
@@ -39,9 +39,9 @@ Then follow [Install pnpm and Node.js](./setup/prerequisites.md#2-install-pnpm-a
 
 ## Every `josh gate` check fails at once, in 0.0s
 
-`josh gate` marks every check ✗ after `0.0s`, and each one says `spawn pnpm ENOENT` and that pnpm was not found on the PATH. `josh` runs each check as a `pnpm josh <check>` child process, so none of them could start. Before this message existed, the same failure printed bare ✗ lines and left the log file empty.
+`josh gate` marks every check ✗ after `0.0s`, and each one says `spawn pnpm ENOENT` and that pnpm was not found on the PATH. Each check runs as a `pnpm josh <check>` child process, so none of them could start.
 
-`pnpm` works in your terminal and is still missing here when the gate was started from somewhere with a different `PATH` — an editor task, an AI agent's shell, a CI step, or a service. Those shells often skip the profile file (`~/.zshrc`, `~/.bashrc`) that `pnpm setup` or the install script wrote the `PATH` line into, and Node.js can stay reachable while pnpm is not when the two were installed by different routes.
+This happens when the gate was started from somewhere with a different `PATH` than your terminal — an editor task, an AI agent's shell, a CI step, or a service — that skips the profile file (`~/.zshrc`, `~/.bashrc`) holding pnpm's `PATH` line.
 
 Ask from the same place the gate ran:
 
@@ -62,9 +62,13 @@ pnpm -v
 
 If pnpm is older than 12, install the current standalone pnpm release using the [official installer](https://pnpm.io/installation/), then check `pnpm -v` again. A Corepack-managed pnpm cannot run `pnpm self-update`; switch to the standalone installation before updating the project pin.
 
-If pnpm only differs from the project's pin, you do not need to install that version. A project with `devEngines.packageManager.onFail: "download"` — what `josh init` writes — makes pnpm fetch and run the pinned version by itself. A project that still has `"error"` refuses to run instead; `josh sync` moves it to `"download"` ([sync.md](./sync.md#what-does-not-get-synced)), which fixes it for CI and every machine at once.
+If pnpm only differs from the project's pin, you do not need to install that version: with `devEngines.packageManager.onFail: "download"` (what `josh init` writes) pnpm fetches the pinned version itself. A project that still has `"error"` refuses to run; run `josh sync`, which moves it to `"download"` ([sync.md](./sync.md#what-does-not-get-synced)).
 
-For a project you cannot change, pnpm's own `pmOnFail` setting does the same on your machine. It overrides `onFail` in **every** project there, including a `"warn"` or `"ignore"` set on purpose ([pnpm `pmOnFail`](https://pnpm.io/settings/cli#pmonfail)). Set it in pnpm's global `config.yaml` — `~/Library/Preferences/pnpm/config.yaml` on macOS, `~/.config/pnpm/config.yaml` on Linux (`$XDG_CONFIG_HOME/pnpm/config.yaml` when that is set), `~\AppData\Local\pnpm\config\config.yaml` on Windows — changing an existing `pmOnFail` line rather than adding a second one:
+For a project you cannot change, set pnpm's own [`pmOnFail`](https://pnpm.io/settings/cli#pmonfail) on your machine. It overrides `onFail` in **every** project there. Edit (or add) the line in pnpm's global `config.yaml`:
+
+- macOS: `~/Library/Preferences/pnpm/config.yaml`
+- Linux: `~/.config/pnpm/config.yaml` (`$XDG_CONFIG_HOME/pnpm/config.yaml` when that is set)
+- Windows: `~\AppData\Local\pnpm\config\config.yaml`
 
 ```yaml
 pmOnFail: download
@@ -101,13 +105,13 @@ JOSH_PLAYWRIGHT_BROWSERS = chromium firefox webkit
 
 Set it under _Settings → Secrets and variables → Actions → Variables_. Use the variable rather than editing the workflow: the CI workflow is managed by `josh sync` and a local edit is overwritten on the next sync.
 
-Names are Playwright's own and are lowercase — `chromium`, `firefox`, `webkit`, `chromium-headless-shell`. Only letters, dashes and the spaces between them are passed through; anything else is stripped before the command runs, and a value left with no usable name falls back to `chromium`. A misspelled name is _not_ silently dropped: it reaches Playwright and the install step fails naming the value, so the mistake surfaces where it was made rather than later as a missing browser executable. The `Resolve Playwright image` job logs the list it settled on, so the run always says which browsers it installed. The container path ignores the variable entirely — the image already ships every browser it needs.
+Names are Playwright's own, lowercase — `chromium`, `firefox`, `webkit`, `chromium-headless-shell`. Characters other than letters, dashes and spaces are stripped, and a value with no usable name falls back to `chromium`. A misspelled name fails the install step, naming the value. The `Resolve Playwright image` job logs the list it settled on. The container path ignores the variable — the image already ships every browser.
 
 ## Local E2E aborts with "http://localhost:5173 is already used"
 
-Something else is listening on the port `playwright.config.ts` runs the dev server on, and Playwright refuses to start rather than adopt it. This is deliberate: `5173` is vite's default, so it is the port _every_ vite project takes first, and later ones drift to `5174`, `5178`, and so on. Because the config sets no `use.baseURL`, Playwright derives the base URL from `webServer.port` — so a reused foreign server would send every relative navigation in every spec to a different application, and the suite would report green against it. The abort replaces a silent wrong-app pass.
+Something else is listening on the port `playwright.config.ts` runs the dev server on — usually another vite project, since `5173` is vite's default. Playwright refuses to reuse it, so the suite never runs against a different application.
 
-Free the port — usually by stopping the other project's dev server — and re-run. If you hit this regularly because several kit projects share one machine, give each project its own pair of ports instead by setting `PORT_SEED` in its `.env` (see [`josh port`](./josh-commands.md#josh-port)) — a seed reduces how often a foreign server is on the port at all, while this abort is what stops a foreign server from being adopted when one is.
+Free the port — usually by stopping the other project's dev server — and re-run. If several kit projects share one machine, give each its own ports by setting `PORT_SEED` in its `.env` (see [`josh port`](./josh-commands.md#josh-port)).
 
 If the server on that port **is** this project's own and you want Playwright to skip booting a second one, opt in explicitly:
 
@@ -115,15 +119,13 @@ If the server on that port **is** this project's own and you want Playwright to 
 PLAYWRIGHT_REUSE_SERVER=1 pnpm josh test
 ```
 
-The flag accepts `1`, `true`, `yes` or `on` (case- and whitespace-insensitive); every other value, including unset, boots a fresh server. It means the same thing in CI, where it exists for an orchestrator that pre-builds and boots the preview so several checks share one server. Do **not** edit `reuseExistingServer` in `playwright.config.ts` instead — that file is managed by `josh sync` and the change is overwritten on the next sync.
+The flag accepts `1`, `true`, `yes` or `on` (case- and whitespace-insensitive); every other value, including unset, boots a fresh server. It works the same in CI. Do **not** edit `reuseExistingServer` in `playwright.config.ts` instead — `josh sync` overwrites that file.
 
 ## `CI=0` runs locally but the HTML report never opens
 
-`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and the explicit negatives `0`, `false`, `no` and `off` (case- and whitespace-insensitive). The test is inverted rather than an allow-list because `CI` has no fixed vocabulary — Woodpecker exports `CI=woodpecker`, and an allow-list would drop such a run into dev mode. Exporting `CI=0` therefore selects the local branch: the `dev` script (`node --run dev`) on the dev port the seed resolves to (`5173` with no `PORT_SEED` set), no retries, the `list` reporter.
+`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and `0`, `false`, `no` and `off` (case- and whitespace-insensitive). `CI=0` therefore runs locally: the `dev` script on the seeded dev port (`5173` with no `PORT_SEED`), no retries, the `list` reporter.
 
-Playwright's own modules read `CI` with plain truthiness, though, and `'0'` is a non-empty string. Left alone they would still classify the run as CI — most visibly in the HTML reporter, which then stays silent when the run ends: no auto-open after a failing run, and no `To open last HTML report run:` hint either, so the report is unreachable unless you already know `pnpm exec playwright show-report`. To keep every reader on one verdict, the config **removes `CI` from the environment** once it has judged the run local. Nothing is removed on the CI branch, and a provider value such as `CI=woodpecker` is never touched.
-
-One consequence is worth knowing: the `webServer` child process (`node --run dev`) inherits that environment, so it does not see `CI` either. That is deliberate — a dev server still reading `CI=0` as CI would reproduce the same bug one process down — but it means `CI=0` and `unset CI` are equivalent for anything in your dev pipeline that keys off the variable.
+To stop Playwright's own modules, which treat any non-empty `CI` as CI, from silencing the HTML report, the config **removes `CI` from the environment** once it has judged the run local. The dev server it starts does not see `CI` either, so `CI=0` and `unset CI` behave the same. If the report still does not open, run `pnpm exec playwright show-report`.
 
 ## `pnpm install` fails with `401 Unauthorized` / `403 Forbidden`
 

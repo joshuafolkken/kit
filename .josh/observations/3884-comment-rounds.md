@@ -1,0 +1,6 @@
+- rf:bug-risks | medium | scripts/run/merge/run-merge-ship.ts:114 | 2026-10-15 | #3884
+- rf:confidence | low | scripts/run/merge/run-merge-ship.ts | 2026-10-15 | #3884
+- rf:bug-risks | low | scripts/run/merge/run-merge-cli.ts | 2026-10-15 | #3884
+- rf:bug-risks | low | scripts/run/merge/run-merge-cli.ts:200 | 2026-10-15 | #3884
+- rf:performance | low | scripts/run/merge/run-merge-cli.ts:236 | 2026-10-15 | #3884
+- rf:tests | low | scripts/run/merge/run-merge-ship.test.ts | 2026-10-15 | #3884
