@@ -103,6 +103,8 @@ It never carries:
 
 - a choice with a clearly better default — that is Tier A: decide it and record it as an Issue comment;
 - whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
+- a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`
+  (`prerequisite.md`);
 - a defect in the running repository's own run tooling — the run fixes it and resumes
   (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合").
 

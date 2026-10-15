@@ -63,13 +63,19 @@ const PATH_PROBES = [
 ]
 
 // What a `josh start` run is checked against before the PATH states: the profile it recorded, the
-// repository's visibility and branch, its labels, and the files the first commit on `main` holds.
+// repository's visibility and branch, its labels, and the files the first commit on `main` holds. Where
+// `main` already had a commit, `josh start` opens a setup Issue and pull request instead of pushing to
+// it; the last four record those, the files the pull request carries and the `main` GitHub holds.
 const PROFILE = 'pnpm josh profile'
 const START_PROBES = [
 	PROFILE,
 	'gh repo view --json visibility,defaultBranchRef',
 	'gh label list --limit 100',
 	'git show --name-only --format= "$(git rev-list --max-parents=0 main)"',
+	'gh issue list --state all --json number,title,state,labels',
+	'gh pr list --state all --json number,title,state,headRefName,labels,closingIssuesReferences',
+	'gh pr diff --name-only',
+	'git log --oneline origin/main',
 ]
 
 // What a `josh init` run is checked against after the gate: the profile it chose, the files it left
@@ -124,7 +130,7 @@ const PATTERNS: ReadonlyArray<Scenario> = [
 	start_pattern('lua', LUA_FILES, [MACHINE_IDENTITY, BARE_MANIFEST], 'basic'),
 	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
 	// Git with a first commit on `main`, no GitHub repository.
-	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST]),
+	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST], 'basic'),
 	init_pattern('svelte', {}, [CREATE_SVELTEKIT, SV_VERSION, SVELTEKIT_CHECKS], [SVELTEKIT_CHECKS]),
 	// A GitHub repository with `main` already pushed.
 	start_pattern('svelte', {}, [CREATE_SVELTEKIT, ...FIRST_COMMIT, CREATE_REPOSITORY]),

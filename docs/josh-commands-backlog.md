@@ -55,6 +55,14 @@ pnpm josh issue:release 3360
 2. When none is open, file `Release <owner/repo> (next version)` with the `release` label. It never gets `auto-ok` on its own — `issue:file` refuses `auto-ok` for the `release` label on every path — so the release stays a person's call; a person may still add `auto-ok`.
 3. Record the issue as a `blocked_by` blocker of the release issue and print `release: #<R> (open|filed) is blocked by #<N>`. A failed link exits 1.
 
+**Options:**
+
+- `--wait` — point the edge the other way: the issue is blocked by the release issue, for an issue that needs the published version. Prints `release: #<N> waits on #<R> (open|filed)`. `backlog:next` offers the issue again once the release issue closes, with no label for a person to remove — a run records a wait for publication this way rather than with `needs-decision` (`.claude/skills/workflow-commands/prerequisite.md`).
+
+```bash
+pnpm josh issue:release 3716 --wait
+```
+
 ---
 
 ### `josh issue:scout`

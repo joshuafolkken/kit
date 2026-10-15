@@ -488,7 +488,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:release": [
-      "<issue>",
+      "<issue> [--wait]",
       "automation",
       [
         "network",

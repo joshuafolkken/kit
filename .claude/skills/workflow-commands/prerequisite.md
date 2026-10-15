@@ -28,6 +28,12 @@ action. `pnpm josh run:merge` enforces the computable half: an unfinished child 
 blocked-by is released to **wait** — no `needs-decision` label, no failure counted — and the backlog
 offer hands it back once its blockers merge.
 
+**A wait for the next published release is a dependency too** — never `needs-decision`. Record it
+with `pnpm josh issue:release <M> --wait` (`<M>` blocked by the release Issue, filed when none is
+open), then stash, comment and `pnpm josh run:release <M>` as for a prerequisite below; `fullrun` /
+`halfrun` stop, `backlogrun` continues. Closing the release Issue once a person has published it hands
+`<M>` back to `backlog:next` (`docs/josh-commands-backlog.md` → `josh issue:release`).
+
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during implementation
 stays countable by filing route afterwards. **This paragraph belongs to the prerequisite row, not to
 the table** — the label means a filing the run is *blocked by*, so the observation row carries no
