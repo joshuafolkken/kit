@@ -66,7 +66,11 @@ Three projects by two commands, each from the state its row names:
   other dependency keeps the wait.
 - **`start` runs the scoped checks before the gate.** `josh start` leaves the project on its setup
   branch, where `pnpm josh gate` refuses until `pnpm josh lint:related && pnpm josh test:related` has
-  passed; the pattern runs the line that refusal hands back.
+  passed; the pattern runs the line that refusal hands back. `kit-test-lua-start` passes
+  `--profile basic`, the way an agent names the profile; the other two leave it to detection.
+- **`start` records what it left on GitHub** before the PATH probes: `pnpm josh profile`,
+  `gh repo view --json visibility,defaultBranchRef`, `gh label list --limit 100`, and the files of the
+  first commit on `main`.
 - **Every pattern ends with two probes**, recorded whatever they exit with: `pnpm josh gate` from
   `bash --noprofile --norc` with an environment of `HOME` and the system `PATH` only, and `josh gate`
   from a `PATH` that has `node` on it and no `pnpm`.
@@ -108,6 +112,14 @@ Run on 2026-10-13 against kit 1.1387.0 — the packed checkout for `init`, the p
   `kit-test-html-start-2` with the setup Issue and pull request `josh start` opened, and
   `kit-test-svelte-start-1` with the setup Issue alone. `kit-test-lua-start-1` stopped before a
   repository was created.
+
+On 2026-10-15 `kit-test-lua-start` passed against the published 1.1435.0, which carries both #3754
+and #3712: `josh start` exited 0 with a private repository, `main` pushed and every workflow and
+release-classification label, and the first commit held `main.lua` and kit's files only. The bare-shell
+probe exited 127 and the node-only probe exited 1, naming the missing pnpm for each check
+([joshuafolkken/kit#3716](https://github.com/joshuafolkken/kit/issues/3716)). It left
+`kit-test-lua-start-2`, and an aborted run against 1.1387.0 left `kit-test-lua-start-1` with only its
+initial commit; both are private.
 
 ## A scenario from another toolkit
 

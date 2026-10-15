@@ -1,0 +1,7 @@
+{
+	"reason": "The fresh-machine start patterns gain the probes and the profile flag #3716's acceptance criteria are checked against",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}
