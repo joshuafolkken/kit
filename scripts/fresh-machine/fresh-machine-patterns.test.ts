@@ -11,7 +11,7 @@ const START_NAMES = [LUA_START, HTML_START, SVELTE_START]
 const GIT_INIT = 'git init --initial-branch main'
 const CREATE_REPOSITORY = 'gh repo create "$RUN_NAME" --private --source . --push'
 const START = 'pnpm exec josh start --yes --github'
-const LUA_START_COMMAND = `${START} --profile basic`
+const BASIC_START_COMMAND = `${START} --profile basic`
 const MACHINE_IDENTITY = 'git config --global user.name'
 const TARBALL = '"$PACKAGE_TARBALL"'
 const SVELTEKIT_CHECKS = 'pnpm build && pnpm check'
@@ -82,15 +82,6 @@ describe('fresh_machine_patterns gate', () => {
 		expect(path_probes[1]).toContain('./node_modules/.bin/josh gate')
 	})
 
-	it.each(START_NAMES)('%s records the profile, repository, labels and first commit', (name) => {
-		expect(pattern(name).probes.slice(0, -2)).toStrictEqual([
-			PROFILE,
-			'gh repo view --json visibility,defaultBranchRef',
-			'gh label list --limit 100',
-			'git show --name-only --format= "$(git rev-list --max-parents=0 main)"',
-		])
-	})
-
 	it.each(INIT_NAMES)('%s records the profile, the files and a second init', (name) => {
 		const { probes } = pattern(name)
 
@@ -99,6 +90,26 @@ describe('fresh_machine_patterns gate', () => {
 		expect(probes[2]).toMatch(
 			/sha256sum > (?<file>\S+) && pnpm exec josh init && .+\| diff \k<file> -$/u,
 		)
+	})
+})
+
+describe('fresh_machine_patterns start probes', () => {
+	it.each(START_NAMES)('%s records the profile, repository, labels and first commit', (name) => {
+		expect(pattern(name).probes.slice(0, 4)).toStrictEqual([
+			PROFILE,
+			'gh repo view --json visibility,defaultBranchRef',
+			'gh label list --limit 100',
+			'git show --name-only --format= "$(git rev-list --max-parents=0 main)"',
+		])
+	})
+
+	it.each(START_NAMES)('%s records the setup Issue, pull request and pushed main', (name) => {
+		expect(pattern(name).probes.slice(4, -2)).toStrictEqual([
+			'gh issue list --state all --json number,title,state,labels',
+			'gh pr list --state all --json number,title,state,headRefName,labels,closingIssuesReferences',
+			'gh pr diff --name-only',
+			'git log --oneline origin/main',
+		])
 	})
 })
 
@@ -124,12 +135,12 @@ describe('fresh_machine_patterns SvelteKit init', () => {
 
 // The starting states of joshuafolkken/kit#2848: what exists before `josh start` runs.
 describe('fresh_machine_patterns starting states', () => {
-	it('names the basic profile for the Lua project', () => {
-		expect(pattern(LUA_START).commands).toContain(LUA_START_COMMAND)
+	it.each([LUA_START, HTML_START])('%s names the basic profile', (name) => {
+		expect(pattern(name).commands).toContain(BASIC_START_COMMAND)
 	})
 
-	it.each([HTML_START, SVELTE_START])('%s leaves the profile to detection', (name) => {
-		expect(pattern(name).commands).toContain(START)
+	it('leaves the profile of the SvelteKit project to detection', () => {
+		expect(pattern(SVELTE_START).commands).toContain(START)
 	})
 
 	it('starts the Lua project without Git', () => {
@@ -149,7 +160,7 @@ describe('fresh_machine_patterns starting states', () => {
 		const { commands } = pattern(HTML_START)
 
 		expect(commands.indexOf(GIT_INIT)).toBeGreaterThan(-1)
-		expect(commands.indexOf(GIT_INIT)).toBeLessThan(commands.indexOf(START))
+		expect(commands.indexOf(GIT_INIT)).toBeLessThan(start_index(commands))
 		expect(commands).not.toContain(CREATE_REPOSITORY)
 	})
 
