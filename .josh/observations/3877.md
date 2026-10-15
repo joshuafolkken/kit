@@ -1,0 +1,5 @@
+- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:51 | 2026-10-15 | #3877
+- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:110 | 2026-10-15 | #3877
+- rf:project-conventions | low | scripts/hooks/pretool-guard.ts:33 | 2026-10-15 | #3877
+- rf:tests | low | scripts/hooks/pretool-guard-investigation.test.ts:92 | 2026-10-15 | #3877
+- rf:comments | low | scripts/hooks/pretool-guard.ts:29 | 2026-10-15 | #3877
