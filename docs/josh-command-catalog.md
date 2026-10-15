@@ -1119,9 +1119,9 @@ Print each issue's title, body and every comment on it, in one call
 
 > **Audience:** automation · **Side effects:** network
 
-`<issue>`
+`<issue> [--wait]`
 
-Link an Issue to the repository's open release Issue as its blocker, filing one when none is open
+Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open
 
 ---
 

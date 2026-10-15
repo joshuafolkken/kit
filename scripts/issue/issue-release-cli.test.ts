@@ -97,6 +97,38 @@ describe('issue_release_cli.run — a release Issue is open', () => {
 	})
 })
 
+// joshuafolkken/kit#3824: `--wait` records the edge the other way — Issue N is blocked by the release
+// Issue — so a run that needs the published version waits on a dependency rather than a person.
+describe('issue_release_cli.run --wait', () => {
+	it('records the Issue as blocked by the open release Issue, filing nothing', async () => {
+		issue_list.mockResolvedValue(listing_of([OPEN_RELEASE]))
+
+		expect(await issue_release_cli.run([String(ISSUE_NUMBER), '--wait'])).toBe(SUCCESS_EXIT_CODE)
+		expect(exec_gh_api).not.toHaveBeenCalled()
+		expect(add_blocked_by).toHaveBeenCalledWith(String(ISSUE_NUMBER), String(OPEN_RELEASE))
+		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('waits on')
+	})
+
+	it('files a release Issue when none is open and waits on it', async () => {
+		expect(await issue_release_cli.run(['--wait', String(ISSUE_NUMBER)])).toBe(SUCCESS_EXIT_CODE)
+		expect(create_body()).toMatchObject({ labels: ['release', 'depth:0'] })
+		expect(add_blocked_by).toHaveBeenCalledWith(String(ISSUE_NUMBER), String(FILED_RELEASE))
+	})
+
+	it('fails, naming the release Issue as the blocker, when the relation cannot be recorded', async () => {
+		issue_list.mockResolvedValue(listing_of([OPEN_RELEASE]))
+		add_blocked_by.mockResolvedValue(false)
+
+		expect(await issue_release_cli.run([String(ISSUE_NUMBER), '--wait'])).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toMatch(
+			new RegExp(
+				`${String(OPEN_RELEASE)}.*could not be recorded as a blocker of.*${String(ISSUE_NUMBER)}`,
+				'u',
+			),
+		)
+	})
+})
+
 describe('issue_release_cli.run — refusals', () => {
 	// A listing that failed may hide an open release Issue, and a second one would split the blockers.
 	it('files nothing when the open release Issues cannot be listed', async () => {
