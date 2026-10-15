@@ -5,7 +5,7 @@ import type { ProjectShape } from './project-profile'
 const BASIC_SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: false,
+	should_use_prettier: false,
 	has_typescript: false,
 	has_git: false,
 	has_github: false,
@@ -27,7 +27,7 @@ describe('profile-specific AI files', () => {
 	it('adds Web and Git files only when those axes are present', () => {
 		const files = init_ai_copy.ai_files({
 			...BASIC_SHAPE,
-			has_web: true,
+			should_use_prettier: true,
 			has_git: true,
 			has_github: true,
 		})

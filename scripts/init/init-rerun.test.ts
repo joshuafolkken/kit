@@ -100,3 +100,16 @@ describe('a second josh init in a project without Web files (#3713)', () => {
 		expect(first[PACKAGE_JSON]).toContain(PRETTIER_DEPENDENCY)
 	})
 })
+
+describe('josh init in a project with a formatter of its own (#3832)', () => {
+	it('adds no Prettier or its files beside a biome.json, on the first run and the second', async () => {
+		write_project_file('index.html', '<h1>Hello</h1>\n')
+		write_project_file('biome.json', '{}\n')
+		const { first, second } = await snapshot_two_runs()
+
+		for (const snapshot of [first, second]) {
+			for (const file of PRETTIER_FILES) expect(snapshot).not.toHaveProperty([file])
+			expect(snapshot[PACKAGE_JSON]).not.toContain(PRETTIER_DEPENDENCY)
+		}
+	})
+})

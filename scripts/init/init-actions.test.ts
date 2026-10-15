@@ -126,7 +126,7 @@ function shape(overrides: Partial<ProjectShape> = {}): ProjectShape {
 	return {
 		profile: 'basic',
 		reason: 'test',
-		has_web: false,
+		should_use_prettier: false,
 		has_typescript: false,
 		has_git: false,
 		has_github: false,
@@ -153,7 +153,7 @@ describe('basic profile file actions', () => {
 	})
 
 	it('adds Web formatting without Svelte or Playwright tooling', () => {
-		const actions = init_actions.build_file_actions(shape({ has_web: true }))
+		const actions = init_actions.build_file_actions(shape({ should_use_prettier: true }))
 		const destinations = actions.map((action) => action.dest)
 
 		expect(destinations).toEqual([BASIC_PRETTIER, VSCODE_EXTENSIONS, VSCODE_SETTINGS])
@@ -165,7 +165,7 @@ describe('basic profile file actions', () => {
 
 describe('basic profile merge and optional settings', () => {
 	it('merges recommendations and preserves existing formatters', () => {
-		const actions = init_actions.build_file_actions(shape({ has_web: true }))
+		const actions = init_actions.build_file_actions(shape({ should_use_prettier: true }))
 		const extensions = merge_action(
 			actions,
 			VSCODE_EXTENSIONS,

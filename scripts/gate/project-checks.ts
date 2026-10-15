@@ -2,6 +2,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { own_formatter } from '#scripts/init/own-formatter'
 import { project_profile } from '#scripts/init/project-profile'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
@@ -150,10 +151,12 @@ function type_check_skip_reason(directory: string): string | undefined {
 }
 
 // Shared by `josh lint`, `josh lint:related` and `josh format`, so a basic project without Web
-// files — a Python or Rust project, which `josh init` gives no Prettier — is skipped for the same
-// reason by all three.
+// files — a Python or Rust project, which `josh init` gives no Prettier — or with a formatter of its
+// own is skipped for the same reason by all three.
 function prettier_skip_reason(directory: string): string | undefined {
 	if (!is_basic(directory)) return undefined
+	const formatter = own_formatter.find_config(project_root(directory))
+	if (formatter !== undefined) return `${formatter} configures the project's own formatter`
 	if (!has_files(directory, WEB_FILES)) return 'no HTML, CSS or JavaScript files were found'
 
 	return missing_tool_reason(directory, 'prettier', 'prettier')

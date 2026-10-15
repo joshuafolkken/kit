@@ -15,7 +15,7 @@ const NOTHING_CHANGED = 'Nothing was changed'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: true,
+	should_use_prettier: true,
 	has_typescript: false,
 	has_git: false,
 	has_github: false,

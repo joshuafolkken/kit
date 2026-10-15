@@ -45,7 +45,7 @@ function merge_basic_manifest(
 	const with_kit = init_logic.merge_development_dependencies(with_script, {
 		[KIT_PACKAGE_NAME]: versions.kit,
 	})
-	const with_prettier = shape.has_web
+	const with_prettier = shape.should_use_prettier
 		? init_logic.merge_development_dependencies(with_kit, { prettier: versions.prettier })
 		: with_kit
 

@@ -106,7 +106,7 @@ function build_basic_settings_action(): FileAction {
 }
 
 function build_basic_vscode_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
-	const recommendations = shape.has_web
+	const recommendations = shape.should_use_prettier
 		? [...BASIC_EXTENSIONS, PRETTIER_EXTENSION]
 		: BASIC_EXTENSIONS
 	const actions: Array<FileAction> = [
@@ -117,7 +117,7 @@ function build_basic_vscode_actions(shape: ProjectShape): ReadonlyArray<FileActi
 		),
 	]
 
-	if (shape.has_web) actions.push(build_basic_settings_action())
+	if (shape.should_use_prettier) actions.push(build_basic_settings_action())
 
 	return actions
 }
@@ -210,7 +210,7 @@ function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 	if (shape.has_git) actions.push(build_gitignore_action())
 	if (shape.has_typescript) actions.push(build_basic_tsconfig_action())
 
-	if (shape.has_web) {
+	if (shape.should_use_prettier) {
 		actions.push({
 			dest: BASIC_PRETTIER_CONFIG,
 			create: () =>
