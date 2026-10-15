@@ -126,7 +126,7 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
 
 	return run_board_layout.local_layout_of(
-		run_board_status.statuses_of(local.events, local.lanes, new Set()),
+		run_board_status.statuses_of(local.events, local.lanes, new Set(), local.idle_lanes),
 	)
 }
 

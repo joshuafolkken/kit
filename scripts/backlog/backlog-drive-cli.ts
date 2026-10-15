@@ -11,6 +11,7 @@ import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge_cli, type MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { z } from 'zod'
@@ -202,6 +203,15 @@ function ports_of(
 	}
 }
 
+// The run `run:carry --end` last ended, whose unsettled launches this run inherits.
+async function previous_run(): Promise<EndedRun | undefined> {
+	const repository = await run_carry.repository_directory()
+
+	if (repository === undefined) return undefined
+
+	return run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
+}
+
 async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string> | undefined> {
 	const carry = await read_record()
 
@@ -212,8 +222,12 @@ async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string
 	await backlog_drive_named.reconcile(carry, events, context.owner)
 
 	const lanes = [...new Set([...(await open_lanes()), ...context.awaited])]
+	// Launches are read across invocations: a lane the previous `backlogrun` dispatched and nothing settled
+	// is still this driver's to collect, or its dead unit holds a seat that `epic:next` reads as `time`.
+	const all = await run_event_stream_emit.all_events()
+	const launches = backlog_drive_restore.run_events(all, carry.started_at, await previous_run())
 
-	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [])
+	return backlog_drive_restore.restore(lanes, launches, carry.merged_issues ?? [])
 }
 
 // The interval between two asks is `backlog:budget`'s own, so the driver keeps the one its reason prints.
@@ -283,6 +297,7 @@ const backlog_drive_cli = {
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
 	run,
+	seeded_lanes,
 	to_offer,
 }
 

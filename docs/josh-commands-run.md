@@ -271,7 +271,11 @@ child (CLOSED) is counted into the carry record (which resets the failure streak
 `lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
 or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API) has its stale `in-progress` dropped but is **not** parked and
-**not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
+**not** counted, staying re-dispatchable; an **interrupted** child (OPEN, unparked, its transcript's
+last session stopped mid-turn with no exit record — the unit was killed with the session that ran it)
+has any process it left ended and its stale `in-progress` dropped, is **not** parked and counts nothing,
+and an `interrupt` event records it — once per invocation, so a second interruption of the same child
+is a failure; a **failed** child (OPEN, unparked, not an outage) has its
 stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
 A failed child whose detached `josh ship` has ended is parked for the ship's stop: the park comment's
 `Why` names the newest `ship-stop` line since the ship's launch, or the ship's result and
@@ -280,7 +284,7 @@ A **cut** child (OPEN, unparked, its lane holding a declared cut with its handof
 adopted) is neither parked nor counted: its successor is relaunched in the same
 lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
 unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
-`--output <path>` names the transcript the outage split reads; absent, it is off.
+`--output <path>` names the transcript the outage and interruption splits read; absent, both are off.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
@@ -393,7 +397,7 @@ and after a cut, the stream the run's, the position the caller's.
 
 `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
-`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `interrupt`, `cut`,
 `resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`, `pr-checks`); a kind outside it is refused.
 `lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
 `pr-checks` is `josh followup`'s poll of a PR's checks, written only on change.

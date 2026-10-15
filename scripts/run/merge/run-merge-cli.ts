@@ -15,6 +15,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
+import { run_merge_interrupt } from './run-merge-interrupt'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
 
@@ -211,12 +212,13 @@ async function read_merged_pr(child: string, read: IssueRead): Promise<string | 
 }
 
 async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
-	const [is_cut, merged_pr] = await Promise.all([
+	const [is_cut, merged_pr, is_interrupted] = await Promise.all([
 		run_merge_steps.has_resumable_cut(ctx.child),
 		read_merged_pr(ctx.child, read),
+		run_merge_interrupt.is_interrupted(ctx.child, ctx.output),
 	])
 
-	return { is_outage: read_is_outage(ctx.output), is_cut, merged_pr }
+	return { is_outage: read_is_outage(ctx.output), is_cut, is_interrupted, merged_pr }
 }
 
 function outcome_of(read: IssueRead, signals: EndingSignals): ChildOutcome {
@@ -326,6 +328,16 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
+// A child whose unit was killed with the session that ran it: released to be dispatched again with
+// nothing counted and nothing parked, and the next child — which may be this same one — is offered.
+async function on_interrupted(ctx: MergeContext): Promise<MergeVerdict> {
+	const refused = await run_merge_interrupt.release(ctx)
+
+	if (refused !== undefined) return report_count_refused(refused)
+
+	return await offered(ctx)
+}
+
 // A child that ended its session with a cut no successor adopted: its successor is relaunched,
 // nothing is counted and nothing is parked, and `resumed` tells the parent to await the same lane
 // again rather than dispatch into it. A successor that could not be started — or a cut the
@@ -393,6 +405,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	cut: on_cut,
 	failed: on_failed,
 	'human-review': on_human_review,
+	interrupted: on_interrupted,
 	merged: on_merged,
 	outage: on_outage,
 	parked: on_parked,

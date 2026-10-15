@@ -103,6 +103,18 @@ describe('run_board_status.statuses_of lanes', () => {
 			lane: 'lane 3409',
 		})
 	})
+
+	// joshuafolkken/kit#3884: a lane whose unit was killed is not drawn running.
+	it('draws a launched child stopped when no process runs in its lane', () => {
+		const events = [event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409)]
+		const statuses = run_board_status.statuses_of(events, ['3409'], NONE, new Set([3409]))
+
+		expect(statuses.get(3409)).toStrictEqual({
+			state: 'stopped',
+			started_ms: Date.parse(T0),
+			track: ['investigate'],
+		})
+	})
 })
 
 // joshuafolkken/kit#3444: a running child's phase, read from the records its steps already write.

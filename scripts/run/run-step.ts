@@ -160,6 +160,8 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.MERGE]: merge_command,
 	[KIND.OUTAGE]: merge_command,
 	[KIND.PARK]: () => command(OFFER_BACKLOG),
+	// An interrupted child was released to be dispatched again, so the backlog offers it next.
+	[KIND.INTERRUPT]: () => command(OFFER_BACKLOG),
 	[KIND.CUT]: (issue_number) => command(`pnpm josh run:cut --resume ${issue_number}`),
 	// A stall is undispatched ready work with a free lane, so its next step is exactly a park's: offer
 	// the backlog. The detector only reports the stall; reading it here as a dispatch is what turns the

@@ -73,7 +73,12 @@ function fold_plan(state: BoardState): BoardState {
 }
 
 function statuses_for(plan: BoardPlan, local: LocalRead): ReadonlyMap<number, ItemStatus> {
-	return run_board_status.statuses_of(local.events, local.lanes, run_board_layout.numbers_of(plan))
+	return run_board_status.statuses_of(
+		local.events,
+		local.lanes,
+		run_board_layout.numbers_of(plan),
+		local.idle_lanes,
+	)
 }
 
 // The children the run touched that the open listing no longer holds and the board has not read yet.

@@ -55,6 +55,9 @@ const EVENT_KIND = {
 	PARK: 'park',
 	SPLIT: 'split',
 	OUTAGE: 'outage',
+	// A child's unit ended without an exit record — killed with the session that ran it — and
+	// `run:merge` released it to be dispatched again, counting nothing.
+	INTERRUPT: 'interrupt',
 	CUT: 'cut',
 	// A fresh session adopted an implementation cut — `run:cut --resume` answered `resume-impl`. The
 	// resume clears the cut record, so without this the `cut` would stay the newest position and
