@@ -35,7 +35,8 @@ the gate. The direct commands follow for shipping without an agent:
 `pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'halfrun ready for manual
 verification\nNext: prrun #<N> | fullrun #<N>\nWithout an agent: pnpm josh git -y "<title> #<N>" && pnpm josh
 followup "<title> #<N>" --notify-message "Implemented <title>\\nCause: ...\\nFix: ...\\nResult:
-...\\n\\nDetails:\\n- <change1>"'`. The stop report names the same two, in the same order.
+...\\n\\nDetails:\\n- <change1>"' --recommended "Verify by hand, then prrun #<N>" --alternative "fullrun
+#<N>"`. The stop report names the same two, in the same order.
 **Invoking `halfrun` is _not_ authorization to commit, push, or merge** — do not run `pnpm josh git -y` or `pnpm josh followup` yourself. If the user comes
 back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, send another
 `confirmation` Telegram, stop again.

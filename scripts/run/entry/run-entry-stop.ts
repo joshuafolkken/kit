@@ -1,6 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command } from '#scripts/josh/josh-run'
-import { telegram_notify } from '#scripts/notify/telegram-notify'
+import { telegram_notify, type ConfirmInput } from '#scripts/notify/telegram-notify'
 import { lane_park } from '#scripts/rules/lane-park'
 
 // What `run:entry` does on the way out of a stop it decided itself.
@@ -26,14 +26,15 @@ interface StopNotice {
 }
 
 interface StopPorts {
-	notify: (input: { issue_title: string; body: string; recovery: string }) => Promise<boolean>
+	notify: (input: ConfirmInput) => Promise<boolean>
 	release: (issue_number: string) => Promise<boolean>
 	is_parking_child: () => boolean
 }
 
 const RECOVERY = 'If this did not arrive, the run:entry output in the session names the stop.'
+const LATER_ALTERNATIVE = 'Leave the Issue for a later session — nothing was changed'
 const NOTIFY_FAILED_NOTE =
-	'(the confirmation Telegram could not be sent — send it with `pnpm josh notify --task-type confirmation` before stopping)'
+	'(the confirmation Telegram could not be sent — send it with `pnpm josh notify --task-type confirmation --recommended "<choice>"` before stopping)'
 const RELEASED_NOTE = '(hold released by run:entry — the tree is free for the resume)'
 const RELEASE_FAILED_NOTE =
 	'(the hold could not be released — run `pnpm josh run:release` before stopping)'
@@ -78,6 +79,8 @@ async function notify_stop(notice: StopNotice, ports: StopPorts): Promise<void> 
 		issue_title: `${notice.command} ${issue_cite.plain(notice.issue_number)} stopped`,
 		body: body_of(notice),
 		recovery: RECOVERY,
+		recommended: `Run \`${notice.command} ${issue_cite.plain(notice.issue_number)}\` again in a fresh session`,
+		alternatives: [LATER_ALTERNATIVE],
 	})
 
 	console.info(is_sent ? lane_park.COMMAND_NOTIFY_MARKER : NOTIFY_FAILED_NOTE)

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { telegram_test_logic, type ResolvedContext } from './telegram-test-logic'
 
 const EMPTY_CONTEXT: ResolvedContext = {
@@ -52,6 +52,7 @@ describe('telegram_test_logic.build_input — explicit flags win', () => {
 			repo_name: OVERRIDE_REPO,
 			issue_title: OVERRIDE_TITLE,
 			body: OVERRIDE_BODY,
+			choices: undefined,
 			issue_url: OVERRIDE_ISSUE_URL,
 			pr_url: OVERRIDE_PR_URL,
 		})
@@ -75,6 +76,48 @@ describe('telegram_test_logic.build_input — body normalization', () => {
 		})
 
 		expect(result.body).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3861: a confirmation names the recommended choice and the others.
+describe('telegram_test_logic.build_input — confirmation choices', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('refuses a confirmation without --recommended', () => {
+		expect(() =>
+			telegram_test_logic.build_input({
+				values: { 'task-type': 'confirmation', body: OVERRIDE_BODY, recommended: ' ' },
+				context: EMPTY_CONTEXT,
+			}),
+		).toThrow(/--recommended/u)
+	})
+
+	it('carries the recommended choice and every --alternative beside the body', () => {
+		vi.stubEnv('JOSH_SESSION_LANG', 'en')
+		const result = telegram_test_logic.build_input({
+			values: {
+				'task-type': 'confirmation',
+				body: OVERRIDE_BODY,
+				recommended: 'Resume',
+				alternative: ['Wait', 'Close'],
+			},
+			context: EMPTY_CONTEXT,
+		})
+
+		expect(result.body).toBe(OVERRIDE_BODY)
+		expect(result.choices).toBe('Recommended: Resume\nAlternatives:\n- Wait\n- Close')
+	})
+
+	it('leaves the body of any other type untouched and carries no choices', () => {
+		const result = telegram_test_logic.build_input({
+			values: { 'task-type': 'failure', body: OVERRIDE_BODY },
+			context: EMPTY_CONTEXT,
+		})
+
+		expect(result.body).toBe(OVERRIDE_BODY)
+		expect(result.choices).toBeUndefined()
 	})
 })
 

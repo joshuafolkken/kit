@@ -1,3 +1,7 @@
+import {
+	confirmation_options,
+	type ConfirmationOptions,
+} from '#scripts/notify/confirmation-options'
 import { telegram_notify, type TelegramSendInput } from '#scripts/notify/telegram-notify'
 
 // What to type when the confirmation notification itself could not be delivered.
@@ -5,7 +9,7 @@ import { telegram_notify, type TelegramSendInput } from '#scripts/notify/telegra
 // commands and a backtick inside shell double quotes is evaluated before the command runs.
 const CONFIRMATION_RECOVERY =
 	'send it by hand — `pnpm josh notify --task-type confirmation --issue-url <url> ' +
-	'--body-file <path>`'
+	'--body-file <path> --recommended "<choice>"`'
 
 interface TelegramContext {
 	repo_name: string | undefined
@@ -14,15 +18,18 @@ interface TelegramContext {
 	pr_url: string | undefined
 }
 
-function build_confirmation_input(input: {
+interface ConfirmationInput extends ConfirmationOptions {
 	context: TelegramContext
 	body: string
-}): TelegramSendInput {
+}
+
+function build_confirmation_input(input: ConfirmationInput): TelegramSendInput {
 	return {
 		task_type: 'confirmation',
 		repo_name: input.context.repo_name,
 		issue_title: input.context.issue_title,
 		body: input.body,
+		choices: confirmation_options.block(input),
 		issue_url: input.context.issue_url,
 		pr_url: input.context.pr_url,
 	}
@@ -34,10 +41,7 @@ function build_confirmation_input(input: {
 //
 // Unlike the completion notification, this one *has* a recovery: a `confirmation` is exactly what
 // `josh notify` is for, and the run stops here anyway, so re-sending it by hand loses nothing.
-async function notify_confirmation(input: {
-	context: TelegramContext
-	body: string
-}): Promise<void> {
+async function notify_confirmation(input: ConfirmationInput): Promise<void> {
 	await telegram_notify.send_or_report(build_confirmation_input(input), CONFIRMATION_RECOVERY)
 }
 

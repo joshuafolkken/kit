@@ -41,6 +41,9 @@ describe('is_shell_evaluated_body — the spellings the shell evaluates', () => 
 		// A substitution embedded in prose really is evaluated, so the `$(…)` exemption is anchored to
 		// a value that is nothing else.
 		'gh api repos/o/r/issues/1/comments -f body="Result: run $(git log -1) to confirm"',
+		// A confirmation's choices are free text naming commands, as exposed to the shell as its body.
+		'pnpm josh notify --task-type confirmation --recommended "Re-run `pnpm josh followup`"',
+		'pnpm josh notify --task-type confirmation --recommended x --alternative="Run `git log`"',
 	])(READS_AS_EVALUATED, (command) => {
 		expect(is_shell_evaluated_body(command)).toBe(true)
 	})
@@ -49,6 +52,7 @@ describe('is_shell_evaluated_body — the spellings the shell evaluates', () => 
 		// The shape every prompt in this repository actually writes — inert, and left alone.
 		INERT_PLACEHOLDER_BODY,
 		'gh issue comment 1198 --body "Implemented the gate. Done!"',
+		'pnpm josh notify --task-type confirmation --recommended "Resume it" --alternative "Close it"',
 		// Already safe: the body never reaches the shell as text. The `*-file` spellings end in `-`
 		// where the pattern needs whitespace or `=`, so they cannot match it.
 		FIELD_FILE_BODY,

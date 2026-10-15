@@ -47,7 +47,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Send Telegram notification',
 		category: 'Workflow',
 		reference: [
-			'[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>]',
+			'[--task-type <type>] [--body <text> | --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...',
 			'automation',
 			['notifications'],
 		],

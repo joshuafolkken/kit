@@ -34,6 +34,17 @@ describe('build_text — Telegram length limit', () => {
 		expect(() => encodeURIComponent(result)).not.toThrow()
 	})
 
+	// joshuafolkken/kit#3861: a confirmation's choices are what the reader acts on, so the body is cut
+	// rather than them.
+	it('keeps the choices whole when the body is cut', () => {
+		const choices = 'Recommended: Resume\nAlternatives: none'
+		const long_body = `${CAUSE}\n${'stderr line\n'.repeat(LONG_BODY_REPEAT)}`
+		const result = build_text({ ...make_input(long_body), choices })
+
+		expect(result).toHaveLength(TELEGRAM_TEXT_LIMIT)
+		expect(result.endsWith(`\n...\n\n${choices}\n\nIssue: ${ISSUE_URL}`)).toBe(true)
+	})
+
 	it('leaves a body within the limit untouched', () => {
 		const result = build_text(make_input(CAUSE))
 

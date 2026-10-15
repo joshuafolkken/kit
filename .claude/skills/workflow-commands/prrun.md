@@ -27,7 +27,8 @@ Where `fullrun` runs `pnpm josh followup` and merges, `prrun` does three things 
    follows for finishing without an agent:
    `pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'prrun ready to
    merge: <pr-url>\nNext: fullrun #<N>\nAfter a manual merge, without an agent: pnpm josh followup
-   "<title> #<N>"'`. The stop report names the same two, in the same order.
+   "<title> #<N>"' --recommended "fullrun #<N>" --alternative "Merge by hand, then pnpm josh
+   followup"`. The stop report names the same two, in the same order.
 
 **Invoking `prrun` is _not_ authorization to merge** — never run `pnpm josh followup` without
 `--no-merge` in a `prrun`. After a person merges by hand, the same `pnpm josh followup "<title> #<N>"`

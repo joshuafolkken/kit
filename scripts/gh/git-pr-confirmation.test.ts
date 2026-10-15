@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_pr_confirmation, has_ignore_reason, type TelegramContext } from './git-pr-confirmation'
 
 vi.mock('#scripts/notify/telegram-notify', () => ({
@@ -15,37 +15,54 @@ const CONTEXT: TelegramContext = {
 	pr_url: 'https://github.com/joshuafolkken/kit/pull/2',
 }
 const BODY = 'The review found a blocker.'
+const RECOMMENDED = 'Fix the findings'
+const ALTERNATIVE = 'Pass an ignore reason'
+const INPUT = {
+	context: CONTEXT,
+	body: BODY,
+	recommended: RECOMMENDED,
+	alternatives: [ALTERNATIVE],
+}
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv('JOSH_SESSION_LANG', 'en')
 	mocked_send_or_report.mockResolvedValue(true)
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 describe('notify_confirmation', () => {
-	it('sends a confirmation carrying every context field and the body', async () => {
-		await git_pr_confirmation.notify_confirmation({ context: CONTEXT, body: BODY })
+	it('sends a confirmation carrying every context field, the body and the choices', async () => {
+		await git_pr_confirmation.notify_confirmation(INPUT)
 
 		expect(mocked_send_or_report).toHaveBeenCalledWith(
-			{ task_type: 'confirmation', ...CONTEXT, body: BODY },
+			{
+				task_type: 'confirmation',
+				...CONTEXT,
+				body: BODY,
+				choices: `Recommended: ${RECOMMENDED}\nAlternatives:\n- ${ALTERNATIVE}`,
+			},
 			expect.any(String),
 		)
 	})
 
 	it('names the by-hand --body-file recovery for a send that fails', async () => {
-		await git_pr_confirmation.notify_confirmation({ context: CONTEXT, body: BODY })
+		await git_pr_confirmation.notify_confirmation(INPUT)
 
 		const recovery = mocked_send_or_report.mock.calls[0]?.[1]
 
 		expect(recovery).toContain('pnpm josh notify --task-type confirmation')
 		expect(recovery).toContain('--body-file')
+		expect(recovery).toContain('--recommended')
 	})
 
 	it('resolves even when the send reports a failure', async () => {
 		mocked_send_or_report.mockResolvedValue(false)
 
-		await expect(
-			git_pr_confirmation.notify_confirmation({ context: CONTEXT, body: BODY }),
-		).resolves.toBeUndefined()
+		await expect(git_pr_confirmation.notify_confirmation(INPUT)).resolves.toBeUndefined()
 	})
 })
 
