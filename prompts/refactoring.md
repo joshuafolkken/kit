@@ -1,103 +1,93 @@
 # リファクタリング支援プロンプト
 
-このプロンプトは AI へのリファクタリング指示書です。
-
-- **「リファクタリングを提案して」** → 分析・提案のみ行い、実装はユーザーに委ねる
-- **「リファクタリングして」** → 優先度高・中を自動実施し、同一セッション内で収束するまで繰り返す
+- 「リファクタリングを提案して」→ 分析・提案のみ。実装はユーザーに委ねる
+- 「リファクタリングして」→ 優先度高・中を自動実施し、同一セッション内で収束するまで繰り返す
 
 ---
 
 ## 対象と候補の算出（`pnpm josh refactor:scan`）
 
-対象ファイルの特定・スコープ拡張・lint で決まる候補の集計・収束判定は、すべて `pnpm josh refactor:scan` が計算する。手作業で grep せず、まずこのコマンドを実行する（joshuafolkken/kit#2180）。詳細は `docs/josh-commands.md` の `josh refactor:scan`。
+対象ファイル・スコープ拡張・lint 候補の集計・収束判定は `pnpm josh refactor:scan` が計算する。手作業で grep せず、まずこれを実行する（joshuafolkken/kit#2180、詳細は `docs/josh-commands.md` の `josh refactor:scan`）。
 
 ```bash
 pnpm josh refactor:scan
 ```
 
-コマンドが行うこと：
+- 対象ファイル: 作業ツリーの変更＋main との差分＋未追跡ファイル。いずれも無ければ `scripts/` 配下。`demo`・`src/routes/stories`・先頭に `/* @refactor-ignore */` を持つファイルは除外。
+- スコープ拡張: import グラフを双方向に最大3段階たどり、新規0件で止める。拡張後の集合を印字する。
+- **候補の集計**: eslint の件数と file:line — 行数・複雑度（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、型の安全性（`@typescript-eslint/no-explicit-any`）、名前空間エクスポート（`local/namespace-object-export`）、重複コード（`sonarjs/no-identical-functions`）、変数名の書式（`@typescript-eslint/naming-convention`）、重複文字列（`sonarjs/no-duplicate-string`）、マジックナンバー（`@typescript-eslint/no-magic-numbers`）、未使用コード（低優先度: `@typescript-eslint/no-unused-vars`）。件数は `pnpm josh gate` の eslint と同一。
+- 収束判定: 高・中優先度の候補が0件なら `verdict: clear`、残れば `verdict: candidates`。低優先度は報告のみで数えない。
 
-- **対象ファイルの特定**: 作業ツリーの変更＋main との差分＋未追跡ファイルを起点とし、いずれも無ければ `scripts/` 配下。`demo`・`src/routes/stories`・先頭に `/* @refactor-ignore */` を持つファイルは除外する。
-- **スコープ拡張**: 起点ファイルから import グラフを双方向（import 元・import 先）に最大3段階たどり、新規0件で止める。拡張後のファイル集合を印字する。
-- **候補の集計**: プロジェクト自身の eslint に JSON で問い合わせ、次を件数と file:line で印字する — 行数・複雑度（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、型の安全性（`@typescript-eslint/no-explicit-any`）、名前空間エクスポート（`local/namespace-object-export`）、重複コード（`sonarjs/no-identical-functions`）、変数名の書式（`@typescript-eslint/naming-convention`）、重複文字列（`sonarjs/no-duplicate-string`）、マジックナンバー（`@typescript-eslint/no-magic-numbers`）、未使用コード（低優先度: `@typescript-eslint/no-unused-vars`）。件数は gate の eslint と同一なので `pnpm josh gate` と食い違わない。
-- **収束判定**: 高・中優先度の候補が0件なら `verdict: clear`、残っていれば `verdict: candidates`。これが「優先度高・中が0件」の判定である。低優先度（未使用コード）は報告のみで収束判定には数えない。
-
-行数はコード行数であり物理行数ではない — `max-lines` / `max-lines-per-function` は `skipBlankLines` と `skipComments` を有効にして数えるので、`wc -l` ではなくこのコマンド（gate と同じ eslint）の報告で判断する。
+行数はコード行数（`max-lines` / `max-lines-per-function` は `skipBlankLines` と `skipComments` 有効）。`wc -l` ではなくこのコマンドの報告で判断する。
 
 ---
 
 ## コマンドが見ない、目視で残すもの
 
-`refactor:scan` は決定的に読める入力（lint と import グラフ）だけを扱う。次の2つは機械的に判定できないため、コマンドの結果に加えて必ず目視で確認する：
+次の2つは機械判定できないため、コマンドの結果に加えて必ず目視で確認する：
 
-- **副作用の冪等性**: intersection observer・イベントハンドラ・コールバックなど、一度だけ実行すべき副作用に、状態チェックによる早期 return のガード節があるか確認する。
-- **似た UI 構造**: 同じ UI パターン・振る舞いが複数箇所にあり、props で差を吸収する共通コンポーネントにまとめられないか確認する。
+- **副作用の冪等性**: 一度だけ実行すべき副作用（intersection observer・イベントハンドラ・コールバック）に、状態チェックで早期 return するガード節があるか。
+- **似た UI 構造**: 複数箇所の同じ UI パターンを、props で差を吸収する共通コンポーネントにまとめられないか。
 
 ---
 
 ## 「リファクタリングを提案して」の動作
 
-1. `pnpm josh refactor:scan` を実行して候補を網羅的に洗い出し、コマンドが見ない2項目（副作用の冪等性・似た UI 構造）を目視で補う
-2. 高・中優先度の候補 → すべて提案（件数制限なし）／すべて低優先度の場合のみ → 最大3つまで提案
-3. 提案のみ行い、実装はユーザーに委ねる
-4. コメント提案は不要。実装可能なサンプルコードを提供する
-5. このプロンプトの内容説明は不要。直接提案に移る
+1. `refactor:scan` で候補を洗い出し、目視2項目で補う
+2. 高・中優先度 → すべて提案（件数制限なし）／すべて低優先度なら最大3つ
+3. 実装はせず、コメントでなく実装可能なサンプルコードを示す
+4. このプロンプトの説明はせず、直接提案に移る
 
 ---
 
 ## 「リファクタリングして」の動作
 
-**対象範囲**は「対象ファイルの特定」と同一（変更しない）。
+対象範囲は「対象ファイル」と同一。
 
 ```text
-[対象の特定] `pnpm josh refactor:scan` が対象範囲を決める
-[テスト準備] 対象のふるまいを検証する unit/E2E テストを先に実装し、すべてグリーンを確認してから構造変更を始める
-[1回目]    refactor:scan の候補 + 目視2項目で網羅的分析 → 優先度高・中をすべて実施
+[テスト準備] 対象のふるまいを検証する unit/E2E テストを先に実装し、グリーンを確認してから構造変更を始める
+[1回目]    refactor:scan の候補 + 目視2項目 → 優先度高・中をすべて実施
 [2回目以降] refactor:scan を再実行 → 漏れがあれば実施
-[収束判定]  refactor:scan が `verdict: clear` を返す（優先度高・中が0件）
-[完了]     verdict: clear かつ目視2項目も0件 → 低優先度のみ報告して完了
+[完了]     `verdict: clear` かつ目視2項目も0件 → 低優先度のみ報告して完了
 ```
 
-- 優先度高・中が **0件になるまで**、同一セッション内で繰り返す（ユーザー再依頼不要）
-- 低優先度は自動実施せず、ユーザーへの報告のみ
-- 繰り返しのたびに「N回目の分析」「残り候補: X件」など進捗を簡潔に示す
-
----
+- 高・中が0件になるまで、ユーザーの再依頼なしに繰り返す
+- 低優先度は自動実施せず報告のみ
+- 毎回「N回目の分析」「残り候補: X件」と進捗を示す
 
 ## 部分的に lint が当たる項目（目視で補う）
 
-lint が完全に検出できる項目は `pnpm josh refactor:scan` が件数と file:line で報告する（上記「候補の集計」）。ここに挙げるのは、**規則が一部の面しか当たらず、残る面を人が判断する項目**だけである。コーディング規約・命名規則は `CLAUDE.md` を参照（規則の単一ソース。`AGENTS.md` / `GEMINI.md` はそこへの導線でしかない）。
+lint が一部の面しか見ない項目だけを挙げる。コーディング規約・命名規則は `CLAUDE.md` を参照。
 
 ### 高優先度
 
-- **責務の分離**: 再利用可能・独立した責任を持つ機能を別ファイルに分離する。`max-lines` は大きさだけを見るので、行数が収まっていても複数責任が混在していないかは目視で判断する。
-- **リテラル型の保持**: データ配列はリテラル型を保つために `as const satisfies T` を使っているか確認する（型注釈のみでは `string` に widen される）。`prefer-as-const` は別の場面の規則で、この判断は肩代わりしない。
+- **責務の分離**: 行数が収まっていても複数責任が混在していれば、再利用可能・独立した機能を別ファイルに分ける（`max-lines` は大きさだけを見る）。
+- **リテラル型の保持**: データ配列は `as const satisfies T` でリテラル型を保つ（型注釈のみでは `string` に widen される。`prefer-as-const` は肩代わりしない）。
 
 ### 中優先度
 
-- **変数名の意味**: `@typescript-eslint/naming-convention` は書式（snake_case など）だけを見る。意味が不明確な名前・実態と合わない名前は目視で見直す。
-- **類似コードの共通化**: `sonarjs/no-identical-functions` は完全一致だけを検出する。似ているが同一でないコードの共通化は目視で判断する。
+- **変数名の意味**: `@typescript-eslint/naming-convention` は書式だけを見る。意味が不明確・実態と合わない名前は見直す。
+- **類似コードの共通化**: `sonarjs/no-identical-functions` は完全一致だけを検出する。似ているが同一でないコードは目視で共通化を判断する。
 
 ### 低優先度
 
-- **不要コメントの整理**: 冗長・陳腐化したコメントを削除する。未使用の変数・関数は `@typescript-eslint/no-unused-vars` が検出し、`refactor:scan` が低優先度として報告する。
+- **不要コメントの整理**: 冗長・陳腐化したコメントを削除する。
 
 ---
 
 ## 基本方針
 
-- **構造変更の前にテストを書く**: リファクタリング実施前に、対象のふるまいを検証する unit/E2E テストを先に実装し、グリーンを確認する。デグレを防ぐための安全網として機能する
-- **可読性・保守性・パフォーマンス・AI コストは同列で、どれも悪化させない**（`prompts/collaboration-workflow/principles.md` → "quality-priority"）
+- 可読性・保守性・パフォーマンス・AI コストは同列で、どれも悪化させない（`prompts/collaboration-workflow/principles.md` → "quality-priority"）
 - コードクローンの排除・メソッド抽出・共通コンポーネント化は必ず分析・提案に含める
-- **提案しないパターン**: `async () => await fn()` → `() => fn()` への簡素化は行わない
-- 提案が特にない場合は、無理に提案しない
+- `async () => await fn()` → `() => fn()` の簡素化は提案しない
+- 提案が無ければ無理に提案しない
 
 ---
 
 ## 提案の形式
 
-各提案: **優先度** / **問題点** / **改善案と効果** / **サンプルコード**（プロジェクト規約準拠、lint エラーなし）/ **影響ファイル**
+各提案: 優先度 / 問題点 / 改善案と効果 / サンプルコード（プロジェクト規約準拠、lint エラーなし）/ 影響ファイル
 
 ## 実装後の品質保証（絶対遵守）
 
-実装後は `read_lints` → `pnpm run lint` の順で全関与ファイルを確認し、エラーが0件になるまで修正する。エラーが残った状態での完了報告は禁止。
+実装後は `read_lints` → `pnpm run lint` の順で全関与ファイルを確認し、エラー0件になるまで修正する。エラーが残ったまま完了報告しない。

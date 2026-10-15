@@ -1,59 +1,51 @@
 ## 別パッケージ起因の問題は割り込み Issue で対応する
 
-作業中（実装・検証・レビュー対応のいずれの段階でも）に新たな課題を発見した場合、**即席対応を優先せず根本的な解決を先に行う**。発見した問題が、実は別パッケージ（依存パッケージや、このプロジェクトが消費している配布元 = kit / `josh` ツールなど）に起因する場合でも同様で、現在のリポジトリ内のローカル回避策（ハック・パッチ・回避コード）で押し切ってはならない。根本原因を **対象パッケージ側** で解決する。
+作業中（実装・検証・レビュー対応のどの段階でも）に見つけた問題が別パッケージ（依存パッケージ、配布元の kit / `josh` ツールなど）に起因するとき、現在のリポジトリ内のローカル回避策（ハック・パッチ・回避コード）で押し切らず、**根本原因を対象パッケージ側で解決する**。`CLAUDE.md` → "Cross-package problems → file the upstream Issue, then stop" の本体。
 
 ### 無条件ルール: 起票は確認なし、停止は必ず
 
-**この手順に「これは今の作業をブロックするか？」という判定は一切存在しない。** 上流の欠陥は、ブロックするものもしないものも、**発見した時点で**同じ手順を通る。例外はない。判定を置かない理由は `docs/maintainers/upstream-interrupt-rationale.md` → "Why there is no blocking test" にある。
+**「今の作業をブロックするか」は判定しない。** 上流の欠陥は、発見した時点で例外なく同じ手順を通る（`docs/maintainers/upstream-interrupt-rationale.md` → "Why there is no blocking test"）。
 
-- **トリガーは「発見」であって「ブロックし始めたとき」ではない**
-- **起票は Tier A（確認なし）**。起票してよいか、どのリポジトリへ起票するか、いずれもユーザー確認を取らない。対象は first-party に限る（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
-- **停止は無条件**。Issue が存在する状態にしてから停止する。上流の修正を待つか先送りするかは、Issue を目の前にしたユーザーが決める
-- **`backlogrun` の中では、停止の範囲がセッション全体ではなくその子 Issue に限定される**。起票と回避策の禁止は変わらない。上流の修正を待つか先送りするかは人の判断なので、該当の子に `needs-decision` を付けて park し、依存していない他の子へ進む（→ `.claude/skills/workflow-commands/backlogrun-park.md` → "Only a person's judgement carries `needs-decision`"）
+- 起票は Tier A — 起票するか・どこへ起票するかをユーザーに確認しない。対象は first-party に限る（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
+- **停止は無条件**。Issue を作ってから停止し、待つか先送りするかはユーザーが決める
+- `backlogrun` の中では、停止はその子 Issue に限る。起票と回避策の禁止は変わらない。該当の子に `needs-decision` を付けて park し、依存していない他の子へ進む（→ `.claude/skills/workflow-commands/backlogrun-park.md` → "Only a person's judgement carries `needs-decision`"）
 
 ### 実行中のリポジトリ自身のラン機構の不具合
 
-**この手順の対象は別パッケージであり、実行中のリポジトリ自身は含まない。** kit の中で kit のラン機構（`backlog:drive`、`run:wake`、`run:carry`、レーン、分類、カウンタ、ガードなど）の不具合を見つけた場合、それは上流の欠陥ではなく**このリポジトリの割り込み**である。上流 Issue を立てて停止する代わりに、次の手順を取る。この節がその単一ソースである。
+**実行中のリポジトリ自身はこの手順の対象外である。** kit の中で kit のラン機構（`backlog:drive`、`run:wake`、`run:carry`、レーン、分類、カウンタ、ガードなど）の不具合を見つけたら、上流 Issue で停止する代わりに、このリポジトリの割り込みとして次を行う。
 
 1. **起票する** — `pnpm josh issue:file "<title>" --body-file <path> --depth <n> --route interrupt --label priority:high`。上限は効かない（`wip-cap.md` →「割り込み起票 — 上限が効かない側」の条件 2）
-2. **止まらずに直す** — 壊れた機構を迂回しない（回避策の禁止と、検証ゲートを緩めない規則はここでも変わらない）。`backlogrun` の中では、その割り込みを次の子にし、修正が着地してから塞がれていた子へ戻る。プールから選ぶランでは `priority:high` が先頭に並べ、epic の下では `wip-cap.md` の手順 3 で挿入する。名前を指定したランのドライバーは指定された Issue しか出さないので、`pnpm josh lane:launch <N>` で自分で dispatch する。バッチの外では `wip-cap.md` の手順 4 が変わらず効く — 起票まで済ませ、打つべき `fullrun #<N>` を報告して止まる
-3. **再開できるなら自分で再開し、動くことを確かめる** — 修正のマージ後、再開の手段がある答えには人の打ち直しを求めない。手渡し済みの記録、所有者が死んだ記録、監督プロセスの停止（`warning` Telegram）には `pnpm josh run:wake --start`、`run:carry` の `standing` には `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` を自分で打つ。そのあと `pnpm josh run:wake --list` が監督プロセスを示し、そのログに次の子の dispatch が現れることを確かめて報告する
-4. **人に打ち直しを求めるのは再開の手段が無いときだけ** — `mismatch`（別の起動の記録）、別の生きた所有者の `busy`。新しい承認を宣言するのは人だけ、という規則も変わらない
-5. **`needs-decision` を付けない** — ランが自分で直せる不具合は人の判断を要さない（`.claude/skills/workflow-commands/backlogrun-park.md` → "Only a person's judgement carries `needs-decision`"）
+2. **止まらずに直す** — 壊れた機構を迂回せず、検証ゲートも緩めない。`backlogrun` の中では割り込みを次の子にし、着地後に塞がれていた子へ戻る（プールでは `priority:high` が先頭、epic の下では `wip-cap.md` の手順 3 で挿入、名前指定のランでは `pnpm josh lane:launch <N>` で自分で dispatch）。バッチの外では `wip-cap.md` の手順 4 どおり、打つべき `fullrun #<N>` を報告して止まる
+3. **再開できるなら自分で再開し、動くことを確かめる** — 修正のマージ後、手渡し済み・所有者が死んだ記録・監督プロセスの停止（`warning` Telegram）には `pnpm josh run:wake --start`、`run:carry` の `standing` には `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` を打つ。`pnpm josh run:wake --list` が監督プロセスを示し、ログに次の子の dispatch が現れることを確かめて報告する
+4. **人に打ち直しを求めるのは再開の手段が無いときだけ** — `mismatch`（別の起動の記録）、別の生きた所有者の `busy`。新しい承認を宣言するのは人だけ
+5. **`needs-decision` を付けない**（`.claude/skills/workflow-commands/backlogrun-park.md` → "Only a person's judgement carries `needs-decision`"）
 
 手順:
 
-1. **現在の作業を退避する**: `git stash push -u -m "upstream-interrupt: paused #<N>"`（WIP コミットでも可）。退避したことを忘れないよう、この時点で stash を作る。メッセージ付きで積むのは、復元をメッセージで特定するため（下記ステップ 5）
-2. **進行中の Issue に状況を明記する**: `pnpm josh issue:comment <N> --body-file <path>` で、(a) 作業を stash したこと、(b) 中断理由（どの別パッケージの・どんな問題で中断したか）、(c) 対象パッケージに作成した新 Issue へのリンクを `## Upstream issues` 見出しの下に `owner/repo#N` 形式で、を記載する。これにより「なぜこの Issue が一時停止しているか」と「何を待っているのか」が後から監査できる（→「起票元へのバックリンク」）
-3. **対象パッケージのリポジトリに新しい Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --depth <n> --route tier-a --repo <owner>/<repo>`（`route:tier-a` は実装中の Tier A 起票を経路として集計するためのラベル — joshuafolkken/kit#1083）。本文の検査、本文が宣言する分類ラベルの付与、`## Origin` 節の確認、起票先での重複探し、`epic:bundle` はこのコマンドが実行する（`docs/josh-commands-backlog.md` → `josh issue:file`）。分類の単一ソースは `prompts/collaboration-workflow/issue-template.md`。根本原因・再現・期待結果を Step 1 のテンプレに沿って記載し、**本文に `## Origin` 節を置いて起票元 Issue を `owner/repo#N` 形式で書く**（→「起票元へのバックリンク」）。ここで「起票してよいか」を尋ねて停止してはならない
-4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と、何が止まっているかを本文に書く（→ `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"）。無人実行でも画面外でユーザーが気付ける。停止は Issue が既に存在する状態で行うので、ユーザーは「待つ / 先送りする」を Issue を見ながら 1 語で答えられる
-5. **元の作業を再開する**: 上流の修正がマージされた、または**ユーザーが先送りを明示判断した**後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"`（位置指定や引数なしの `git stash pop` は使わない — stash は全 work tree が共有する 1 本のスタックで、別のレーンの stash を取り込む恐れがある）して、退避していた元タスクを続行する。上流 Issue を割り込みで実装するかどうかもユーザーの判断（上流パッケージの実装・PR・マージはそれぞれのワークフロー規則に従う）
+1. **現在の作業を退避する**: `git stash push -u -m "upstream-interrupt: paused #<N>"`（WIP コミットでも可）
+2. **進行中の Issue に状況を書く**: `pnpm josh issue:comment <N> --body-file <path>` で、stash したこと、中断理由（どの別パッケージのどんな問題か）、新 Issue へのリンク（`## Upstream issues` 見出しの下に `owner/repo#N` 形式、→「起票元へのバックリンク」）
+3. **対象パッケージのリポジトリに Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --depth <n> --route tier-a --repo <owner>/<repo>`（joshuafolkken/kit#1083）。検査・分類ラベル・重複探し・`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。根本原因・再現・期待結果を `prompts/collaboration-workflow/issue-template.md` の Step 1 のテンプレで書き、`## Origin` 節に起票元 Issue を `owner/repo#N` 形式で書く
+4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と何が止まっているかを書く（→ `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"）
+5. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
 
 ### 第三者リポジトリへの書き込みは Tier C（明示指示が必要）
 
-上の「起票は確認なし」は **first-party**（`pnpm josh repo:party` が `first-party` と答えるリポジトリ）だけに成り立つ。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
+「起票は確認なし」は first-party だけに成り立つ。
 
-- **判定は機械的に行い、判断に委ねない**: `pnpm josh repo:party [<owner/repo>]` が `first-party` / `third-party` / `unknown` の 1 語で答える（対象リポジトリの owner がセッションのリポジトリの owner と一致すれば **first-party**、owner を読めなければ **unknown** で third-party 扱いはしない）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る
-- **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する
-- **third-party は書き込みの種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビューのいずれも、**その turn におけるユーザーの明示指示**なしに行ってはならない。公開は外向きかつ実質不可逆である（`docs/maintainers/upstream-interrupt-rationale.md` → "Why third-party writes are Tier C"）
-- **third-party だと判明したときの手順**: (1) **自分たちの側の Issue** に証拠込みで所見を記録する。見出しは `## Upstream candidate` を使い、`## Upstream issues` は使わない（後者は「起票済み」を主張する見出しであるため）。(2) 報告本文の下書きをその Issue 内に用意し、ユーザーが 1 メッセージで承認できる状態にする。(3) 対象プロジェクト名と報告しようとしている内容を書いた `confirmation` Telegram を送って**停止する**
-- **third-party 報告の証拠バー**（下書きを提示する前に満たす）:
-  - **自プロジェクトの外で成立する最小再現**（対象の依存だけを入れた素の scaffold）。用意できない場合は「プロジェクト組み込みの再現しかない」ことを下書きに明記する
-  - **本文の全主張が検証済み**であること。推測を事実として書かない
-  - 同じ欠陥を扱う**既存 Issue の検索**
-- **取り下げも外向きの行為**: 既に起票した third-party Issue のクローズ・編集・コメントも、同じく明示指示を要する
-- **正しい診断は公開の許可ではない**。所見の正しさは、この節のどの要求も免除しない（事例: `docs/maintainers/upstream-interrupt-rationale.md` → "Why a correct diagnosis is not authorization"）
+- **判定は `pnpm josh repo:party [<owner/repo>]` が答える**: `first-party` / `third-party` / `unknown`（unknown は third-party 扱いしない）。fork や contribute しているだけの org リポジトリも third-party
+- **third-party への書き込みは種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビュー、既存 Issue のクローズ・編集も、その turn のユーザーの明示指示なしに行わない。正しい診断も許可ではない（`docs/maintainers/upstream-interrupt-rationale.md` → "Why third-party writes are Tier C"、`docs/maintainers/upstream-interrupt-rationale.md` → "Why a correct diagnosis is not authorization"）
+- third-party と判明したら: (1) 自分たちの側の Issue に証拠込みで所見を `## Upstream candidate` 見出しで記録する（`## Upstream issues` は使わない）。(2) 報告本文の下書きをその Issue 内に用意する。(3) 対象プロジェクト名と報告内容を書いた `confirmation` Telegram を送って停止する
+- 下書きの前に揃える証拠: 自プロジェクトの外で成立する最小再現（無ければ「プロジェクト組み込みの再現しかない」と明記）、全主張の検証、既存 Issue の検索
 
 ### 検証ゲートを緩めることも「回避策」である
 
-ローカルに回避コードを書くことだけが違反ではない。**上流の欠陥に合わせて `lint` / `tsc` / `cspell` / unit / E2E の出力を絞り込む・狭める・読み替える行為も、ローカルパッチを書くのと同じ違反**であり、同じ停止を引き起こす。
+**上流の欠陥に合わせて `lint` / `tsc` / `cspell` / unit / E2E の出力を絞り込む・狭める・読み替えることは、ローカルパッチと同じ違反**で、同じ停止を引き起こす。
 
-- 典型例: 上流が配布する設定によって生成されるディレクトリ由来の型エラーを除外し、「プロジェクトソースはエラー 0」として完了ゲートを通過したことにする
-- **絞り込んだことを正直に開示しても、ルールを満たしたことにはならない**。完了報告の読者は「緑ではない型チェック」を緑として受け取る
-- 検証ゲートは上流の欠陥に合わせて調整しない。**調整したくなった時点が、このルールの発火点**である
+- 例: 上流が配布する設定で生成されるディレクトリ由来の型エラーを除外し、「プロジェクトソースはエラー 0」としてゲートを通す
+- 絞り込みを開示しても、ルールを満たしたことにはならない
+- ゲートを調整したくなった時点が、このルールの発火点である
 
 注意:
 
-- **即席回避と根本対応は「迷って選ぶもの」ではない**。上流起因と分かった時点で選択肢は根本対応だけであり、「今回は軽いから即席で」という判断はこの手順に存在しない
-- 上流パッケージの **マージ等の共有状態操作** は、起票と違って Tier A ではない。通常どおりそれぞれのワークフローの明示起動を要する
-- このルールは横断ドキュメント（CLAUDE.md「Cross-package problems → file the upstream Issue, then stop」）のカノニカル参照
+- 上流起因と分かったら選択肢は根本対応だけ。「今回は軽いから即席で」はない
+- 上流パッケージのマージ等の共有状態操作は Tier A ではない。それぞれのワークフローの明示起動を要する

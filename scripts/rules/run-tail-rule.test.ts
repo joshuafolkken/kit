@@ -268,7 +268,7 @@ describe('RUN_TAIL_REASON', () => {
 	// what to do with the tail after the merge — not only that `followup` stays in the foreground.
 	it.each([
 		['**Never give a foreground call a timeout above the harness cap**'],
-		['**It does — the step stays after `followup`.**'],
+		['**It does — it stays after `followup`**'],
 	])('leaves %j to the topic file it points at', (marker) => {
 		expect(read_unwrapped('.claude/skills/workflow-commands/background-commands.md')).toContain(
 			marker,

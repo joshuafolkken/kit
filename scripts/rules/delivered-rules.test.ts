@@ -161,7 +161,7 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 
 	// The two answers that are not the run's to make live in the topic file the refusal points at.
 	it.each([
-		'**The later text is the agreement in force.**',
+		'**The later text is the agreement in force**',
 		'**A comment that reassigns part of the scope to another Issue** takes that part out of scope',
 		'sends a `confirmation` Telegram',
 	])('leaves %j to the topic file', (marker) => {

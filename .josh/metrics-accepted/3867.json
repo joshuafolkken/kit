@@ -1,8 +1,9 @@
 {
-	"reason": "#3867 moves the history the guard refusal texts carried into docs/maintainers/rule-delivery-rationale.md, so the per-rule history bullets add on-demand bytes and long paragraphs while the resident hook texts shrink",
+	"reason": "Merging main restored two topic-file statements (completion notification ends the wait; an interactive fullrun carries no mark) that main's condensation dropped and this branch's shortened refusals delegate to",
 	"date": "2026-10-15",
 	"growth": {
-		"ai_cost.on_demand_bytes": 133,
+		"scripts.comment_ratio": 0.01,
+		"ai_cost.on_demand_bytes": 207,
 		"prose.long_paragraphs": 5
 	}
 }
