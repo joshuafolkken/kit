@@ -23,8 +23,9 @@ const CLOSED_STATE = 'CLOSED'
 // resets the streak (`run-carry.ts` → `next_failures`), so the guard trips only on an environment
 // failing every child it is handed rather than on failures scattered across a long run.
 const CONSECUTIVE_FAILURE_LIMIT = 3
-// Three API outages in a row stop the run too — the same shape as the failure
-// guard, over its own streak. An outage is a child that could not reach the API, so a run of them is
+// Three outages in a row stop the run too — the same shape as the failure
+// guard, over its own streak. An outage is a child its environment ended — it could not reach the API,
+// its session was killed inside a turn, or its ship stopped with no relaunch — so a run of them is
 // the environment being down; stopping is what keeps the run from re-dispatching into a dead API
 // forever. A merge or a genuine child failure resets it (`run-carry.ts` → `next_outages`).
 const CONSECUTIVE_OUTAGE_LIMIT = 3

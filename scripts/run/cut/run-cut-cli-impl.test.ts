@@ -1,12 +1,16 @@
+import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
 import { run_cut_cli_fixture } from './run-cut-cli-fixture'
+import { run_cut_decline } from './run-cut-decline'
 
 const {
 	BRANCH,
 	CONTEXT_UNDER,
+	DEFAULT_BRANCH,
+	REPOSITORY,
 	ISSUE,
 	WITH_HANDOFF,
 	emit,
@@ -22,6 +26,11 @@ const {
 } = run_cut_cli_fixture
 
 run_cut_cli_fixture.install()
+
+// The decline record is keyed to the fixture's scratch repository, so each case starts without one.
+beforeEach(() => {
+	stamp_file.remove_stamp(run_cut_decline.decline_path(REPOSITORY))
+})
 
 const FAILURE_EXIT_CODE = 1
 
@@ -129,6 +138,61 @@ describe('a cut outside a lane that is not taken', () => {
 
 		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
 		expect(run_cut.read_cut(target()).kind).toBe('none')
+		expect(run_cut_decline.read(REPOSITORY)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3881: the guard kept asking for a cut this hold could never take. A refused
+// implementation cut is recorded under the hold it answered, so the guard stops asking.
+const HOLD = { hold_taken_at: '2026-10-16T00:00:00.000Z' }
+
+function held_on_the_default_branch(): void {
+	held_by(ISSUE)
+	state.mockResolvedValue({
+		branch: DEFAULT_BRANCH,
+		is_dirty: true,
+		is_held: true,
+		held_issue: ISSUE,
+		...HOLD,
+	})
+}
+
+describe('a refused implementation cut is recorded for the guard', () => {
+	it('records not-a-lane under the hold it answered', async () => {
+		held_by('2294')
+		state.mockResolvedValue({ branch: BRANCH, is_dirty: true, is_held: true, ...HOLD })
+
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
+		expect(run_cut_decline.read(REPOSITORY)).toStrictEqual({ issue: ISSUE, ...HOLD })
+	})
+
+	it('records unready for a run held on the default branch', async () => {
+		held_on_the_default_branch()
+
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect(verdict()).toBe(run_cut_cli.UNREADY_VERDICT)
+		expect(run_cut_decline.read(REPOSITORY)).toStrictEqual({ issue: ISSUE, ...HOLD })
+	})
+
+	it('records nothing for a refused pre-gate cut in a lane', async () => {
+		state.mockResolvedValue({ branch: DEFAULT_BRANCH, is_dirty: true, is_held: false, ...HOLD })
+
+		await run_cut_cli.run([ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.UNREADY_VERDICT)
+		expect(run_cut_decline.read(REPOSITORY)).toBeUndefined()
+	})
+
+	it('records nothing for a cut it takes', async () => {
+		held_by(ISSUE)
+
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+		expect(run_cut_decline.read(REPOSITORY)).toBeUndefined()
 	})
 })
 

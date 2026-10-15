@@ -9,19 +9,24 @@ const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
 const NAME_ONLY_FLAG = '--name-only'
 const DEFAULT_BRANCH_FALLBACK = 'main'
 
+const DEFAULT_BRANCH_ARGUMENTS = ['symbolic-ref', 'refs/remotes/origin/HEAD'] as const
+
+// The default branch `DEFAULT_BRANCH_ARGUMENTS` names, or the fallback for a missing or unexpected
+// answer — shared with the synchronous read the implementation-cut guard takes it with.
+function default_branch_of(output: string | undefined): string {
+	const trimmed = output?.trim() ?? ''
+
+	if (!trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) return DEFAULT_BRANCH_FALLBACK
+
+	return trimmed.slice(REFS_REMOTES_ORIGIN_PREFIX.length)
+}
+
 async function get_default_branch(): Promise<string> {
 	try {
-		const output = await git_spawn.read(['symbolic-ref', 'refs/remotes/origin/HEAD'])
-		const trimmed = output.trim()
-
-		if (trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) {
-			return trimmed.slice(REFS_REMOTES_ORIGIN_PREFIX.length)
-		}
+		return default_branch_of(await git_spawn.read([...DEFAULT_BRANCH_ARGUMENTS]))
 	} catch {
-		// fall through to default
+		return DEFAULT_BRANCH_FALLBACK
 	}
-
-	return DEFAULT_BRANCH_FALLBACK
 }
 
 const MERGE_BASE_COMMAND = 'merge-base'
@@ -210,8 +215,10 @@ async function untracked_names(): Promise<string> {
 }
 
 const git_diff_reads = {
+	DEFAULT_BRANCH_ARGUMENTS,
 	change_base,
 	change_base_commit,
+	default_branch_of,
 	default_branch_reference,
 	diff_cached_names,
 	diff_main,

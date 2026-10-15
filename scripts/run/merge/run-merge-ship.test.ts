@@ -1,5 +1,7 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ending } from '#scripts/run/run-ending'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { describe, expect, it, vi } from 'vitest'
 import { run_merge_ship } from './run-merge-ship'
@@ -75,6 +77,30 @@ describe('run_merge_ship.cause_of', () => {
 	})
 })
 
+describe('run_merge_ship.interrupted_of', () => {
+	const STOPPED_AT = Date.parse(STOP.at)
+
+	it('reads a stop no relaunched session answered as an interruption', () => {
+		const events = [LAUNCH, STOP]
+
+		expect(run_merge_ship.interrupted_of(ending(FAILED), events, CHILD, STOPPED_AT - 1)).toBe(true)
+	})
+
+	it('leaves a stop the relaunched session wrote after to the failed child', () => {
+		const events = [LAUNCH, STOP]
+
+		expect(run_merge_ship.interrupted_of(ending(FAILED), events, CHILD, STOPPED_AT + 1)).toBe(false)
+	})
+
+	it('reads a supervisor that died before any stage as an interruption', () => {
+		expect(run_merge_ship.interrupted_of(ending(ABNORMAL), [LAUNCH], CHILD, undefined)).toBe(true)
+	})
+
+	it.each(['running', 'success'] as const)('never reads a %s ship as interrupted', (result) => {
+		expect(run_merge_ship.interrupted_of(ending(result), [LAUNCH, STOP], CHILD, 0)).toBe(false)
+	})
+})
+
 describe('run_merge_ship.cause', () => {
 	it('reads the record and the stream of the repository the directory belongs to', () => {
 		const repository = vi.spyOn(git_common_directory, 'repository').mockReturnValue(REPOSITORY)
@@ -91,5 +117,48 @@ describe('run_merge_ship.cause', () => {
 		vi.spyOn(git_common_directory, 'repository').mockReturnValue(undefined)
 
 		expect(run_merge_ship.cause(CHILD, '/nowhere')).toBeUndefined()
+	})
+})
+
+function lane_of(provider: 'anthropic' | 'openai'): LaneInfo {
+	return {
+		issue: CHILD,
+		branch: `${CHILD}-lane`,
+		directory: WORKTREE,
+		seat: undefined,
+		development_port: undefined,
+		preview_port: undefined,
+		output: '/t/12.log',
+		profile: { provider, role: 'worker', model: 'model', effort: 'medium' },
+		is_stranded: false,
+	}
+}
+
+function stopped_unanswered(provider: 'anthropic' | 'openai'): void {
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(REPOSITORY)
+	vi.spyOn(run_ship_detach, 'read_result').mockReturnValue(ending(FAILED))
+	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([LAUNCH, STOP])
+	vi.spyOn(run_ending, 'written_at').mockReturnValue(Date.parse(STOP.at) - 1)
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(lane_of(provider))
+}
+
+describe('run_merge_ship.is_unanswered', () => {
+	it('reads an unanswered stop on a relaunched lane as unanswered', async () => {
+		stopped_unanswered('anthropic')
+
+		expect(await run_merge_ship.is_unanswered(CHILD, '/t/12.log')).toBe(true)
+	})
+
+	it('leaves a child whose lane is gone, which nothing relaunches, to the failed child', async () => {
+		stopped_unanswered('anthropic')
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+
+		expect(await run_merge_ship.is_unanswered(CHILD, '/t/12.log')).toBe(false)
+	})
+
+	it('leaves an OpenAI lane, whose parent books every stop, to the failed child', async () => {
+		stopped_unanswered('openai')
+
+		expect(await run_merge_ship.is_unanswered(CHILD, '/t/12.log')).toBe(false)
 	})
 })

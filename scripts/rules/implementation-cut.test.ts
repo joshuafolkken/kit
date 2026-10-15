@@ -51,6 +51,7 @@ interface StateOptions {
 	verdict?: () => CostVerdict
 	// The role fragment the launch wrote, absent for a session kit did not launch.
 	role?: MarkerSource
+	can_cut?: (issue: string) => boolean
 }
 
 const REVIEWER = agent_session_role.env_for(agent_role_profile.REVIEWER)
@@ -78,6 +79,7 @@ function state_of(options: StateOptions = {}): LaneCostState {
 		carried: () => cut,
 		held_issue: () => held,
 		verdict,
+		can_cut: options.can_cut ?? ((): boolean => true),
 	}
 }
 
@@ -255,6 +257,35 @@ describe('is_over_threshold_edit — a run held outside a lane', () => {
 
 	it('says nothing about a tree no run holds, without reading the verdict', () => {
 		const state = held_run({ held: undefined, verdict: unread_verdict })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#3881: a run held on the default branch was refused edit after edit for a cut
+// `run:cut --impl` could only answer `unready`. The guard now asks whether the cut can be taken.
+function never_asked(): boolean {
+	throw new Error('whether the cut can be taken was asked of an under-threshold edit')
+}
+
+describe('is_over_threshold_edit — a cut that cannot be taken', () => {
+	it.each([
+		['a held run', held_run],
+		['a lane child', state_of],
+	])('says nothing in %s over threshold when the cut cannot be taken', (_label, make) => {
+		const state = make({ can_cut: () => false })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
+	})
+
+	it('asks about the run issue the cut would be taken for', () => {
+		const state = held_run({ can_cut: (issue) => issue === ISSUE })
+
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(true)
+	})
+
+	it('does not ask whether the cut can be taken under threshold', () => {
+		const state = held_run({ verdict: (): CostVerdict => UNDER, can_cut: never_asked })
 
 		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})
