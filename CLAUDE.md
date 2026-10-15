@@ -7,13 +7,14 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 ## Communication
 
 - **Answer opinion-seeking questions from a neutral standpoint.** A leading question is not a cue to agree — recommend the option you genuinely judge best.
-- **Fix root causes, not symptoms.** Where the proper fix is out of scope, surface the root cause instead of papering over it.
+- **Fix root causes, not symptoms.** Where the proper fix is out of scope, surface it instead of papering over it.
 - **Cross-package problems → file the upstream Issue, then stop.** A defect in another package (a dependency, or `josh` / kit tooling) is never worked around locally — **weakening a verification gate is a workaround too**. File it (first-party Tier A, third-party Tier C) and stop. `prompts/collaboration-workflow/upstream-interrupt.md`. Your own repository's run tooling is not another package: `upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合".
 - **Third-party repositories are Tier C.** Decide the party with `pnpm josh repo:party`; every write to a tracker we do not own needs explicit current-turn instruction. `prompts/collaboration-workflow/upstream-interrupt.md`.
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals → "quality-priority".
+- **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
 - **Distinguish consultation from execution.** A question or goal statement asks for analysis only — act on an explicit imperative or a workflow keyword. `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
-- **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config (`josh sync` overwrites them); in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
+- **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`) for session output and artifact prose; English for Issue/PR titles, code comments, test titles, commit messages and script strings. `prompts/collaboration-workflow/overview.md`.
 - **Durable rules belong in prompts/docs, not local MEMORY.** `prompts/collaboration-workflow/principles.md` → "durable-rules".
@@ -31,16 +32,16 @@ Log auto-decisions: an Issue comment in an Issue workflow, else a one-line "Auto
 
 ## Critical Conventions (non-standard — always apply)
 
-Naming, exports, file names and content rules are enforced by `eslint/rules/`; their single source is `prompts/coding-standards.md` → "Conventions". `function` syntax, not arrows (named SvelteKit route handlers may use the typed-const arrow idiom) — lint does not check it.
+Naming, exports, file names and content rules are enforced by `eslint/rules/`; their single source is `prompts/coding-standards.md` → "Conventions". `function` syntax, not arrows (named SvelteKit route handlers may use typed-const arrows); lint does not check it.
 
 ### Quality limits
 
-- Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4 — line counts are code lines, not physical lines (`pnpm josh lint`); test files allow 35 code lines per function.
+- Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4 — line counts are code lines, not physical lines; test functions allow 35 code lines.
 - No magic numbers beyond `0`, `1`, `-1` · no `any` · restricted `as` · explicit param and return types · single short early return → one-liner `if (x) return y`.
 
 ## Package-First Development
 
-Before building a feature, check for a well-maintained package — measure with `pnpm josh pkg:scout <keywords>`: `clear` → select it (Tier A), `close` → ask (Tier B).
+Before building a feature, run `pnpm josh pkg:scout <keywords>`: `clear` → use it (Tier A), `close` → ask (Tier B).
 
 ## Code Change Rules
 

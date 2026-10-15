@@ -255,3 +255,34 @@ describe('quality-priority keeps the three tiers and the conflict order', () => 
 		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).toContain(marker)
 	})
 })
+
+// joshuafolkken/kit#3865 added the prose rule; the section has to obey its own bold limit.
+describe('concise-prose states the rule and follows it', () => {
+	const section =
+		read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)
+			.split('\n## ')
+			.find((part) => part.startsWith('concise-prose')) ?? ''
+
+	it.each([
+		'concise-prose — 文章は条件と動作だけを書く',
+		'本文には、いつ何をするか（条件と動作）だけを書く',
+		'理由と経緯は rationale 文書に置き',
+		'太字は 1 節に 1 つまで',
+		'箇条書き先頭の見出し語は数えない',
+		'で引かれている太字は消さない',
+		'同じ内容を言い換えて繰り返さない',
+		'自分自身を説明する文',
+	])('states %j', (marker) => {
+		expect(section).toContain(marker)
+	})
+
+	it('uses bold at most once', () => {
+		expect(section.split('**').length - 1).toBeLessThanOrEqual(2)
+	})
+
+	it('is pointed at from CLAUDE.md', () => {
+		expect(read_repo_file('CLAUDE.md')).toMatch(
+			/`prompts\/collaboration-workflow\/principles\.md` → "concise-prose"/u,
+		)
+	})
+})

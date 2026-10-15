@@ -49,3 +49,11 @@ joshuafolkken/kit#2329: a bare `#N` leaked into session-facing output, and the `
 whole reply be reissued, which duplicated it. The naive answer was to strengthen the hook that
 scolds; the elegant answer was to fix the printer that supplied the bare `#N`. With the material
 gone, the scolding fires less often by itself.
+
+## Why concise-prose exists
+
+Prose the agent wrote kept coming out long, and the owner trimmed it afterwards: 20 commits titled
+`Shorten` / `Trim` / `Condense`, and 373 lines over 400 characters across the docs, prompts and skills
+(joshuafolkken/kit#3865). The "冗長さ" goal in quality-priority covers duplication only, so no rule said
+how to write. The recurring patterns — a packed paragraph, history in the body, heavy bold,
+restatement and meta sentences — each became one bullet of the rule.
