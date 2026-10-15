@@ -43,3 +43,108 @@ Performance is a goal no change may worsen (`prompts/collaboration-workflow/prin
 - **A tolerance of +10%**, where the static totals have none: a count read off a tree is the same on every run, a duration is not.
 - **The baseline never moves down on its own.** One quiet run would set a bar the next ordinary run misses; a speedup is recorded with `--accept`, as a raise is.
 - **The baseline is per machine and never committed.** It is `josh-metrics-durations.json` in the repository's common git directory — one file per clone, shared by every lane of it. The same durations on two machines do not compare, CI starts each job on a fresh runner, and a committed table keyed by host would publish host names and conflict on every merge. A machine's first measurement of a duration becomes its baseline; deleting the file starts that machine over.
+
+## `josh gate` in detail
+
+- **The last line is the verdict, and it counts what ran apart from what was skipped.** `✔ verification gate passed (6 checks) in 41.2s.` when every check ran, `✔ verification gate passed (2 ran, 4 skipped) in 3.1s.` when some printed only a skip notice, and `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` when none ran — a `basic` project with nothing to check. That last gate still exits `0`, but it is not a passed gate and writes no green record. A check that ran with nothing of the project's to look at — `exports` in a consumer, `behavior` with no transcript — is counted as skipped only beside a real skip, so a gate that skipped nothing keeps the first line.
+- **Each check claims a place in a machine-wide weighted core budget before it starts, and waits while the budget is full** (`scripts/gate/core-budget.ts`). The budget is the cores and memory the machine has free, not the bare core count, and a check the wait cap admitted past it is named in the summary. A lone gate is admitted at once with its concurrency unchanged; overlapping gates share the machine instead of each reserving all of it. How the budget is weighted and swept: "`josh gate`'s core budget" above.
+
+## `josh bytes` in detail
+
+- The recorded ceiling is block-quantized — the next 4 KB multiple at or above the document's size (`document-byte-budget.ts`), so a document growing within its block needs no ceiling edit and parallel command-adding lanes stop conflicting on this record. An over-budget row names the value to record: the next block multiple, not the raw current size. Never fails — the ceiling is the gate's and `josh lint:related`'s to enforce; a non-zero exit means the argument list was unusable.
+
+## `josh metrics` in detail
+
+- **A ratchet, and a step of [`josh gate`](../josh-commands.md#josh-gate).** Exit `1` when the code lines, the comment ratio, the rule lines, the guards or either AI cost grew past the merge-base's, naming each with both values. A total that shrank needs no record: once merged it is what the next branch is measured from. The only way up is `--accept --reason "<why>"`, which writes the growth, the reason and the date to `.josh/metrics-accepted/<issue>.json` — one file per issue, so parallel branches never conflict on it. `JOSH_METRICS_BASE=<commit>` names the commit to measure from where no merge-base can be asked for (CI) — "`josh metrics`' totals" above.
+
+## `josh behavior` in detail
+
+- **The scope is the current run, not the whole corpus.** The store holds thousands of transcripts and over a gigabyte; walking all of it every gate would cost minutes. Each gate checks its own run — the newest session transcript, resolved exactly as `josh cost` resolves "the run that just finished" — so across runs the whole corpus is covered a run at a time. The engine stays general, so a broad scan of past runs (how a new assertion is verified green before it is added) is the same walk over a different set of files.
+
+## `josh test:unit` in detail
+
+- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pure-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
+
+## `josh test:declared` in detail
+
+Report whether the working-tree change needs a test — `required`, `exempt`, or `satisfied` — from changed paths alone; the same verdict refuses `pnpm josh git -y` on `required` (`prompts/collaboration-workflow/rule-delivery.md`). On `required` the detail names each untested file's type — `E2E` under `src/routes/`, `Unit` elsewhere (`prompts/testing-guide.md` §1) — and then the one command to run next: declare a test for each and verify with `pnpm josh test:declared --match < summary.md`.
+
+`--match` checks each `Test: <type> — <path>` declaration on stdin against the change set, printing `match` / `type-mismatch` / `path-missing` / `test-not-created` per line and exiting non-zero on any mismatch. A path wrapped in a code span, as the template writes it, is read as the path inside it. A `path-missing` line is followed by the changed paths with the same file name, when there are any, and the `report-format.md` section that defines the declaration line's shape.
+
+## `josh test:red` in detail
+
+Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green`, `no-test` or `test-only`. A change whose every path is a test file prints `test-only` without running anything — the merge-base runs the same code as HEAD, so its result would say nothing about the fix. A change to a doc or `prompts/` file is not test-only, because a document-rule test reads those files. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
+
+## `josh start` in detail
+
+**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything. A run that creates a commit (the first commit, or the setup pull request) also needs a Git author identity — [Tell Git who you are](../setup/prerequisites.md#4-tell-git-who-you-are); without one it stops before changing anything and prints the two `git config` commands that set it.
+
+**Options:** `--profile basic|full` sets the profile instead of asking (the detected one is the default). `--yes` accepts the defaults, but is **not** consent to write to GitHub: when step 4 or 6 is planned, an unattended run without `--github` stops before changing anything. `--public` creates a public repository. Without a terminal, `--yes` is required. `--init-command "<command>"` runs that command as step 2 instead of kit's setup — for a toolkit layered over kit, e.g. `"josh-app init"`. It runs without a shell, with `--profile <confirmed profile>` appended; its non-zero exit stops before the commit, and step 6 also commits every file changed since it ran. `--push-preflight-command "<command>"` runs that command before step 1, after every refusal, and only when step 4 or 6 is planned — for a check the toolkit's own pre-push hook depends on, e.g. `"josh-app start:preflight"`. It runs without a shell; its non-zero exit stops the run with nothing changed. A run that pushes nothing never runs it. `--dry-run` prints what each planned step would create or write ([init.md → Preview with `--dry-run`](../init.md#preview-with---dry-run)) and stops before step 1; it needs no terminal, `--yes` or `--github`, and an `--init-command` is named, not simulated.
+
+**Existing state:** with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change. In a repository with at least one commit, the working tree must be clean: uncommitted changes — modified, staged or untracked files that are not ignored — are listed and refused before any change, so the setup commit holds only what kit wrote; commit or stash them (`git stash push -u -- .`) first. The setup branch a failed commit left is exempt, since its uncommitted files are that run's own output.
+
+## `josh registry:migrate` in detail
+
+Migrate an existing project from GitHub Packages to public npm. Prints the current registry and proposed change, checks that every locked `@joshuafolkken` package (kit, `app-kit` and the rest) has its exact version on public npm, then updates the project `.npmrc` and rewrites the lockfile entries of all of them. It leaves user-level configuration and any `//npm.pkg.github.com/:_authToken=` line untouched and restores both project files if dependency resolution fails.
+
+## `josh adopt` in detail
+
+Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each toolkit's managed files, update the other dependencies with [`josh latest`](../josh-commands.md#josh-latest), verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](../josh-commands-automation.md#josh-propagate), sharing its step order with `josh latest` added — propagation carries one exact release and leaves the other dependencies alone.
+
+Steps, in this repository's directory: working-tree check, `pnpm add -D <toolkit>@latest` (once per installed toolkit, base tier first), `pnpm josh sync` per toolkit's own CLI, `pnpm install` then `pnpm josh latest` (the other dependencies, the audit and the pnpm pin — after the sync and behind an install, so the lockfile covers what the sync added to `package.json` even when `josh latest` rolls its update back), verification gate ([`josh gate`](../josh-commands.md#josh-gate)), open issue, `pnpm josh git`, return to default branch.
+
+**Output / exit codes:** exits `0` on a skip (no toolkit declared, or all current with no file changed). A failing step exits non-zero; one that fails before `pnpm josh git` — `josh latest` included — opens no pull request, and a failed return to the default branch leaves the pull request open. Refused inside kit's own repository, when a runnable toolkit is missing or declared under `dependencies`, or when `@joshuafolkken/kit` is not a direct dependency. Stops at the open pull request — merging is [`josh followup`](../josh-commands-automation.md#josh-followup)'s job.
+
+## `josh main:sync` in detail
+
+**Behavior:** refuses inside a linked work tree (a lane) and exits non-zero — run it in the primary checkout instead; a lane's terminal step is `pnpm josh lane:close <issue-number>`. A default branch that has diverged fails loudly under `--ff-only` rather than growing a merge commit — the deliberate opposite of [`josh main:merge`](../josh-commands.md#josh-mainmerge). The same `--ff-only` pull is used by [`josh git`](../josh-commands.md#josh-git) and `josh pr` when they start from the default branch. After the pull it runs `git fetch --prune` and deletes, with `git branch -d`, every local branch whose remote-tracking upstream is `[gone]`, that is merged into the default branch, and that no work tree has checked out — a lane's branch, an unmerged branch, a branch with no upstream and a branch with a deleted local upstream are kept. It prints how many it pruned and names any `git branch -d` refused.
+
+## `josh main:merge` in detail
+
+**Behavior:** the merge strategy is named by the command rather than read from git config, so a diverged branch — the state the command exists for — merges cleanly instead of aborting with `fatal: Need to specify how to reconcile divergent branches`. Merging (not rebasing) avoids the force push the distributed `.claude/settings.json` denies. A conflict or uncommitted work on an incoming path fails; commit via `pnpm josh git -y`.
+
+## `josh version` in detail
+
+Show the global-install version, the current project version, and the latest published version — plus the **running binary** (the install that actually executed, resolved from `import.meta.url`), the single source of truth for which `josh` produced the report. A not-installed target reports `not installed`; a stale one gets a `Run:` hint with the upgrade command. A release inside the `pnpm-workspace.yaml` `minimumReleaseAge` window prints a `Held:` line. When the `josh` first on `PATH` is not the pnpm-global install, a PATH-shadowing warning names both paths and points to [`josh doctor --fix`](../josh-commands.md#josh-doctor).
+
+## `josh ranges` in detail
+
+Check that every dependency range this package **publishes** still resolves for a consumer. For each `dependencies` entry it runs `pnpm view <name>@<range> version` under safe-chain's shims, so the age-filtered view a consumer installs under is observed rather than modelled. `devDependencies`, peer ranges, and non-registry protocols (`workspace:*`, `catalog:`, `file:`, `link:`, git URLs) are set aside and printed, not probed.
+
+In a package built on a `@joshuafolkken/*` toolkit it also compares each published `peerDependencies` range with that of every installed toolkit `package.json` declares, and fails when a floor sits below the toolkit's — `josh latest` never rewrites a peer range, so the declaration would otherwise keep promising versions nobody verified. Matching or narrower ranges, peers no toolkit shares, and kit's own repository report nothing.
+
+**Output / exit codes:** fails closed — a range resolves only when the output contains a `semver`-parsable version; a probe that cannot answer (network, auth) is reported unresolvable. Probing `@joshuafolkken/*` dependencies needs `NODE_AUTH_TOKEN` — run `export NODE_AUTH_TOKEN=$(gh auth token)` first for a bare invocation. To fix a violation, lower the floor to a release already outside the age window (e.g. `^4.23.4` instead of `^4.23.5`). A peer-floor violation names the dependency, its range, and the toolkit (name and installed version) with the range it requires; raise the `peerDependencies` floor to that range.
+
+## `josh doctor` in detail
+
+`doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`), warning when the two differ and printing the recovery command. In a kit consumer it also prints a **Consumer setup** section — one-line `✓` / `⚠` verdicts for the kit plugin, git `core.hooksPath`, `CLAUDE.md`, and secretlint — plus the repository's **Dependabot security updates** and **Allow auto-merge** settings (`enabled` / `disabled` / `could not be read`; auto-merge also `paused`) and, where a distributed workflow is present, the **Required status checks** report of [`josh ruleset:check`](../josh-commands-automation.md#josh-rulesetcheck). None of these ever fail the command, and `doctor` never changes a repository setting.
+
+## The discovered repository map in detail
+
+Discovery is automatic: `doctor` scans the parent directory one level deep, reads each work tree's `origin` remote, and keys the map by that remote's normalized `owner/repo` (SSH, host-alias SSH, credentialed HTTPS, and plain HTTPS all normalize the same). **The directory name is never used as the repository name** — a checkout in `kit-experiment` whose `origin` points at `game-kit` maps as `game-kit`.
+
+## `josh latest` in detail
+
+`josh latest` never lowers a version: a supply-chain age gate can make the registry report an older release as newest, so `latest:update` rolls the whole tree back rather than writing a silent downgrade. It reports the overrides verdict itself and separately fails the run if `pnpm-lock.yaml` no longer honours an unconditional override. Whether a run has to update at all is [`josh latest:scope`](../josh-commands-automation.md#josh-latestscope).
+
+## `josh latest:corepack` in detail
+
+Updates pnpm and pins `packageManager` to the newest release on the project's **current major** (from `packageManager`, or from `devEngines.packageManager.version` when that is the only pin). The command name is retained for compatibility. With an existing `packageManager` pin, it obtains the release integrity value, runs `pnpm self-update`, then restores the integrity suffix and aligns `devEngines.packageManager.version` byte-for-byte with `packageManager`. Without that pin, it adds a verified pin and checks that the selected pnpm version starts. A registry answer that is not newer than the pin, or no release on the major aged past the quarantine window yet, is a skip and exits `0`. Any failure — a registry that does not answer, no integrity value, `pnpm self-update` exiting non-zero, an unexpected pin after it, or a selected version that cannot start — restores `package.json`, prints the cause and exits `1`. When pnpm runs through the Corepack shim, which pnpm 11 and later refuse to self-update under (`ERR_PNPM_CANT_SELF_UPDATE_IN_COREPACK`), the message also names the remedy: `corepack disable pnpm`, a standalone pnpm, and `josh sync` so `devEngines.packageManager.onFail` is `"download"` — the standalone pnpm then fetches the pinned version rather than refusing to run. Either way, existing `devEngines` drift is still aligned to `packageManager`.
+
+## `josh latest:update` in detail
+
+Runs `pnpm update --latest`, skipping **held-back** and **overridden** packages (effective overrides read from `pnpm-workspace.yaml`) — `typescript` is currently held at `6.x`. Skipped packages print as `⏭ Skipping held-back / overridden packages: …`. If any direct dependency would move down, it restores `package.json` and `pnpm-lock.yaml` to what it found and exits `0`. Otherwise it also moves the `SAFE_CHAIN_INSTALLER_VERSION` / `SAFE_CHAIN_INSTALLER_SHA256` env to the newest `@aikidosec/safe-chain` release — a registry answer that is not an exact semver version is refused and nothing moves — in every workflow under `.github/workflows` and `templates/workflows` and every local composite action under `.github/actions` that carries the pin — in kit itself, the `.github/actions/setup-pnpm` action every workflow installs through, the distributed `ci.yml` included — the hash is computed from that release's `install-safe-chain.sh`, and a failed download leaves the workflows' pins untouched (the next `josh latest` retries).
+
+When the update moved the installed `@playwright/test`, it runs `pnpm exec playwright install chromium`: a Playwright release cannot launch the browsers an earlier one downloaded. Set `JOSH_PLAYWRIGHT_BROWSERS` in `.env` to a space-separated list (`chromium firefox webkit`) for more — CI reads the same name from a repository variable ([troubleshooting.md](../troubleshooting.md#widening-the-fallback-browser-list)). An unmoved version installs only missing browsers. A failed or rolled-back update that moved it still installs. A failed install prints `✖ Playwright browser install failed` and exits non-zero, stopping `josh latest`.
+
+## `josh backlogrun` in detail
+
+- `--stop` stops the run in this repository in one command, so the next `pnpm josh backlogrun` starts a new one. It stops the [`run:wake`](../josh-commands-run.md#josh-runwake) supervisor, then the parent session `josh backlogrun` started, then a headless session the run launched (the one the supervisor woke) where that session holds the run's record — the record itself marks it, so this holds after the supervisor's record is gone, then ends the run's record as a stopped run (the board keeps it as one). It takes no other argument: beside an Issue or another flag it prints the usage and stops nothing.
+
+**Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board. `--stop` prints one line per thing it stopped, or `backlogrun: nothing is running`, and exits 0; it exits 1 only when the record is left with an owner it did not start.
+
+## `josh rule:value` in detail
+
+Print each delivered rule's **unaided compliance** — how far the carried text alone kept the rule in the window before its trigger fired (`scripts/rules/rule-value.ts`). One row per rule: the runs that reached the situation it governs, the rate kept before the trigger (or `unmeasured` where the rule declares no `keeps` predicate, `unreached` where no run reached it), and the refusals the hook actually delivered — followed by `rewritten N` on a rule whose hook rewrote the call instead of refusing it.
+
+- Read once per iteration at the `backlogrun` loop head (`josh backlog:offer`), so a rule that never fires appears as a printed row rather than as something a person has to think to measure. The loop head never measures: it prints the last reading from `node_modules/.cache/josh/rule-value.txt` to stderr and, at most once every 15 minutes, starts a detached `josh rule:value --refresh` that rewrites it, so the offer never waits on the measurement and a failed one never changes its answer. Single sources: `scripts/rules/rule-value-cli.ts` and `scripts/rules/rule-value-cache.ts`.

@@ -1,6 +1,6 @@
 # josh CLI — Issue, Epic, Backlog and Review Command Reference
 
-The commands the issue-driven workflow calls to read and file issues, track epics, pick and plan a backlog, brief and attest a review, and decide what a run delegates. Moved out of [josh-commands-automation.md](josh-commands-automation.md), which keeps the other automation commands; the run, lane and session commands are in [josh-commands-run.md](josh-commands-run.md), the commands you type by hand are in [josh-commands.md](josh-commands.md), and every command is indexed in the [Command Catalog](josh-command-catalog.md). The issues each command came from: `docs/maintainers/josh-commands-backlog-rationale.md` → "Where each command came from".
+The commands the issue-driven workflow calls to read and file issues, track epics, pick and plan a backlog, brief and attest a review, and decide what a run delegates. Where each command came from: `docs/maintainers/josh-commands-backlog-rationale.md` → "Where each command came from".
 
 ## Issues
 
@@ -25,7 +25,9 @@ Record that the run has read a person's update to its issue, printing the update
 pnpm josh issue:ack 3773
 ```
 
-`josh run:entry` records the issue as the run's baseline per checkout, so a lane child and a `fullrun` in your own checkout behave alike. The PreToolUse hook polls at most every three minutes with a conditional request and shows a person's body edit or new comment once; josh's own `<!-- josh:run -->`-marked comments and bot comments do not count. `issue:ack` prints what it takes in and makes that read the new baseline. Not detected: comment edits, and the seconds between `josh followup`'s last check and the merge.
+`josh run:entry` records the issue as the run's baseline; the PreToolUse hook then shows a person's body edit or new comment once, and `issue:ack` makes that read the new baseline.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:ack` in detail".
 
 ### `josh issue:state`
 
@@ -57,13 +59,15 @@ pnpm josh issue:release 3360
 
 **Options:**
 
-- `--wait` — point the edge the other way: the issue is blocked by the release issue, for an issue that needs the published version. Prints `release: #<N> waits on #<R> (open|filed)`. `backlog:next` offers the issue again once the release issue closes, with no label for a person to remove — a run records a wait for publication this way rather than with `needs-decision` (`.claude/skills/workflow-commands/prerequisite.md`).
+- `--wait` — the issue is blocked by the release issue instead, so `backlog:next` offers it again once the release ships (`.claude/skills/workflow-commands/prerequisite.md`).
 
 ```bash
 pnpm josh issue:release 3716 --wait
 ```
 
 ---
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:release` in detail".
 
 ### `josh issue:scout`
 
@@ -109,8 +113,8 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 1. Refuse when the target is third-party (Tier C).
 2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem.
 3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not.
-4. Print the `auto-ok` decision, judged the same way for every filing, including one a person asked for. It is not applied with `--no-auto-ok`, for another repository, or when the labels carry `release`, `breaking-change` (including a body that declares `- 互換性: 破壊的変更`), `deferred`, `needs-human-review` or `epic`. Otherwise the body's `## 背景` decides it: `- 人の判断: 不要` applies it, `- 人の判断: 要` does not. A body that declares neither, or both, is refused at step 2 with how to write the line. When the labels carry `auto-ok` but neither `run:lane` nor `run:solo`, refuse: an untriaged opted-in issue stops `backlog:next` from offering anything. Pass `--label run:lane`, or `--label run:solo` for a defect in kit's own verification (`backlogrun-lanes.md`), or `--no-auto-ok`.
-5. Unless the filing is a split child (`--route split` — the split assessment already decided it is separate), when the same finder already filed an issue into the same repository that is still open (a `filed` event not named in `--distinct`, by the same finder — the lane child, else the issue the branch names, read across every invocation on the stream; with no finder, a `filed` event with none in the current invocation), ask the [`josh issue:fold`](#josh-issuefold) question and print `fold: <reason> · filed earlier by this finder: <refs>`. Only `fold` refuses, naming the earlier issue to add the finding to and the `--distinct <N>` that declares it a separate deliverable; `undetermined` (no diff that measures the size) files. A first filing asks nothing.
+4. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
+5. On a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
 8. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
@@ -120,6 +124,8 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 
 A refusal in steps 1–7 files nothing and exits 1. The per-run filing cap (`filing-cap`) applies to calls of this command; a refused call is not counted. The WIP cap and the fold question are this command's own steps, so no delivered rule refuses the call ahead of them.
 
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:file` in detail".
+
 ### `josh issue:fold-existing`
 
 After the existing issue and the draft have been read — bodies, comments, state, pull requests and dependencies — return `duplicate` / `fold` / `separate` / `inspect` from that assessment record. It only decides; it never updates the issue.
@@ -128,7 +134,9 @@ After the existing issue and the draft have been read — bodies, comments, stat
 pnpm josh issue:fold-existing assessment.json --json
 ```
 
-The JSON carries `content` (`duplicate` / `compatible` / `separate` / `unknown`), `is_open`, `is_unstarted`, `has_pull_request`, `has_complete_read`, `has_dependency_conflict`, `is_separable`, `size_verdict` (`single` / `split`), `existing_body`, `draft_body` and `verification`. Omit any fact you do not know; the answer is then `inspect`. Only on `fold` does the output JSON's `body` carry the proposed addition, with the original body kept. Confirm the original body and comments have not changed since the assessment, update through REST, and re-read with `pnpm josh issue:read <N>`. `separate` returns to the ordinary filing path.
+The JSON carries the assessment facts (`content`, `is_open`, `size_verdict`, `existing_body`, `draft_body`, …); an unknown fact answers `inspect`. `separate` returns to the ordinary filing path.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:fold-existing` in detail".
 
 ### `josh issue:fold`
 
@@ -145,7 +153,9 @@ pnpm josh issue:fold "a" "b" --json                                   # the verd
 - `--not-separable` — declare the judgement half: the findings are one deliverable, so they fold whatever their size.
 - `--json` — print the verdict and reason as JSON.
 
-The size half is [`josh split:assess`](#josh-splitassess)'s own verdict, called not recomputed — the counting and the guide are single-sourced there. `separate` needs both halves (separable **and** over the size guide); every other measured case folds, and a lone candidate answers `no-fold-needed` without measuring. **A diff that cannot be read, or that has no non-test file, answers `undetermined`**: an empty diff is the state of a run that has not yet written its findings, and reading it as under the guide would fold every one of them. The size is then the whole request's estimate (`split-assessment.md` → "The question"). [`josh issue:file`](#josh-issuefile) asks this question itself on a run's second filing (its step 5), so a filing needs no separate call.
+The size half is [`josh split:assess`](#josh-splitassess)'s verdict; `separate` needs separable **and** over the guide, and an unreadable diff answers `undetermined`. [`josh issue:file`](#josh-issuefile) asks this itself on a run's second filing.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:fold` in detail".
 
 ### `josh issue:cite`
 
@@ -166,7 +176,7 @@ Citation lines go to stdout so the block stays paste-ready; a number that resolv
 
 ### `josh issue:comment`
 
-Post one comment to an issue (a PR comment is an issue comment over REST) with the body passed by path, and print the comment URL. It is the write side the read commands lacked — before it, every park, decision record and plan comment fell to a raw `gh api … body=@<path>`, where `-f` / `--raw-field` sends the literal `@<path>` and `-F` / `--field` reads the file, one character apart and silent when wrong. One command removes the choice.
+Post one comment to an issue (or a PR) with the body passed by path, and print the comment URL — no raw `gh api … body=@<path>` to get wrong.
 
 ```bash
 pnpm josh issue:comment 2304 --body-file /tmp/park.md   # the body from a file — no shell evaluates it
@@ -179,6 +189,8 @@ pnpm josh issue:comment 2304 --body "a short note"      # inline, for a body wit
 - `--body-file <path>` — read the body from a file, or from stdin with `-`. The safe form the rule steers every caller toward.
 
 The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared with `notify` / `followup`, so no shell evaluates it; `--body` and `--body-file` at once is refused rather than ranked. `pnpm josh rule:guard` refuses the `-f body=@…` misfire before it runs (the `raw-field-body` row), so the literal `@<path>` cannot reach GitHub.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:comment` in detail".
 
 ### `josh pkg:scout`
 
@@ -198,9 +210,11 @@ Check an issue body file against the template's four required headings — `## �
 pnpm josh issue:lint /tmp/issue-body.md
 ```
 
-Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. [`josh issue:file`](#josh-issuefile) runs this check as a filing step and applies the labels it prints; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples.
+Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1. [`josh issue:file`](#josh-issuefile) runs it as a filing step.
 
-A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現`. The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline.
+A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".
 
 ### `josh defect:rate`
 
@@ -215,7 +229,9 @@ pnpm josh defect:rate --days 30
 
 - `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
 
-**Behavior:** the numerator is issues filed in the window labelled `bug`, `bugfix` or `route:interrupt`, or declaring `- 種別: 不具合`; the denominator is issues closed as completed in the window labelled `enhancement`. The labels read older issues, whose bodies rarely declared a kind, by the same standard as newer ones. With no completed enhancement, prints `n/a`. The search API returns at most 1000 results; beyond that the counts are lower bounds. An unreadable search exits 1. `backlog:next` uses this rate to prioritize defects.
+**Behavior:** defects filed in the window over enhancements completed in it; `n/a` with no completed enhancement. An unreadable search exits 1. `backlog:next` uses the rate to prioritize defects.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh defect:rate` in detail".
 
 ### `josh issue:backlinks`
 
@@ -225,7 +241,9 @@ Classify an origin issue's upstream backlinks into one fixed word. The backlink 
 pnpm josh issue:backlinks 2123
 ```
 
-**Verdicts:** `ok` (exit 0) when `## Upstream issues` lists repository-qualified references and each listed upstream cites `## Origin` back — a body with only `## Upstream candidate` (nothing filed yet) also reads `ok`; `missing-upstream` when no backlink heading is present; `missing-origin` when a listed upstream does not point back; `wrong-heading` for a near-miss heading (`## Upstream`), a bare `#N` reference, or a checkbox reference. Anything but `ok` exits 1.
+**Verdicts:** `ok` (exit 0) when `## Upstream issues` and each upstream's `## Origin` cite each other; otherwise `missing-upstream`, `missing-origin` or `wrong-heading`, exit 1.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:backlinks` in detail".
 
 ### `josh report:lint`
 
@@ -239,7 +257,7 @@ Prints `ok` (exit 0), or the violations one per line followed by one line naming
 
 ### `josh stash:pop`
 
-Pop the stash whose message matches, and no other. The stash is a repository-wide stack every work tree shares, so a bare `git stash pop` — or a positional `stash@{n}` read before another lane pushed — takes whichever entry now sits on top; that is how one lane's parked work reached another's tree. This resolves the selector from the message immediately before the pop, targeting the entry itself rather than a position that moves.
+Pop the stash whose message matches, and no other — never whatever entry another lane left on top of the shared stack.
 
 ```bash
 pnpm josh stash:pop "backlogrun: parked #2028"
@@ -249,6 +267,8 @@ pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # into
 **Options:** `--dir <path>` applies the pop in that work tree (`git -C <path>`); without it the pop lands in the current checkout. The stack is shared, so it reads the same either way.
 
 **Verdicts:** `popped` and `conflicted` (exit 0), `no-match` and `ambiguous` (exit 1). A pop that applies but leaves conflicts is `conflicted` — the stash is on the tree, resolve the conflicts and continue. A message matching no stash, or more than one, is refused rather than guessed at — pass a message that identifies exactly one entry.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh stash:pop` in detail".
 
 ## Epics and backlog
 
@@ -307,12 +327,14 @@ Nothing is written unless all three places will agree. `#M` must be a child of t
 pnpm josh epic --reconcile 2184   # rewrite the body to match the recorded blocked-by, and record any order the body declared
 ```
 
-When the `## Dependencies` declaration and the native `blocked-by` relations disagree, `--add` and `--remove` both refuse and `backlog:next` reports the graph unusable — and the only other exit was to edit the epic body by hand. `--reconcile` is that repair. There is no judgement in it: a relation recorded but never declared is written into the declaration (the relation is the GitHub-side fact, the body its copy), and an order declared but never recorded is aligned by recording the relation. The result declares exactly what it records.
+When the `## Dependencies` declaration and the `blocked-by` relations disagree, `--reconcile` makes the declaration state exactly what is recorded, with no judgement.
 
 - It **writes no `## Decisions`** — synchronizing a copy is not a decision, so nothing is recorded on the epic or its children.
 - When the two already agree it writes nothing and prints `nothing to reconcile`.
 - A circular union of declared and recorded orders is refused without writing; there is nothing to reconcile a cycle to.
 - On success it states that `epic:audit` and `backlog:next` now agree on the epic's order.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh epic --reconcile` — bring the declaration and the recorded relations back into agreement in detail".
 
 ### `josh epic:next`
 
@@ -428,15 +450,17 @@ pnpm josh backlog:next --exclude 1630  # skip the issue just merged
 
 - `--exclude <N>` — drop issues from every bucket; comma-separated, repeatable.
 
-stdout is one token per line (all exit 0 unless noted): `<number>…` (each an issue a run may start, possibly in parallel), `wait` (resolves on its own), `stop` (needs a person), `triage` (a candidate is untriaged — see below), `retry` (429/5xx or a request that never arrived), `error` (an unusable graph; anything GitHub answered with, 403 included), `none` (nothing opted in), or empty with exit 1 if a listing could not be read. Explanations to stderr.
+stdout is one token per line: issue numbers a run may start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
 
-**Triage gate**: a candidate is triaged when it carries `run:solo` (runs alone) or `run:lane` (may run beside others), matched case-insensitively. When any candidate of this repository carries neither, the command prints `triage` and no numbers — an untriaged issue may be one that must run alone, so none of the others may start either — and names the untriaged issues on stderr. `backlog:offer` maps it to the budget answer `untriaged`, `backlog:budget` answers `triage`, and `backlog:drive` hands it back to the parent. The gate runs before the `run:solo` gate below. `epic:next --lanes` applies it to a named epic's lanes too.
+**Triage gate**: while any candidate carries neither `run:solo` nor `run:lane`, it prints `triage` and no numbers, naming the untriaged issues on stderr.
 
-**Defect priority**: on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline (0.73, `BASELINE_RATE` in `scripts/issue/defect-rate.ts`), the runnable numbers are re-ordered — defects (counted as `defect:rate`'s numerator counts them) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
+**Defect priority**: while `defect:rate` is above its baseline, defects move to the front of the runnable numbers and new mechanisms to the back.
 
-**Ranking**: after the defect priority, this repository's runnable numbers are sorted by three keys, the earlier order breaking ties — `priority:high` first, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then the number of open backlog issues blocked by it. The `run:solo` gate below sees the whole ranking; only then are the standalone (non-epic) numbers cut to five, and a number past the cut is listed as waiting.
+**Ranking**: `priority:high` first, then a verification-path defect, then the number of issues it blocks; standalone numbers are cut to five.
 
-**`run:solo` gate**: on a `run` answer the command reads the repository's open `in-progress` issues (parked ones excluded) and applies three rules. While a `run:solo` issue is running, it prints `wait`. When nothing is running, a `run:solo` candidate at the head is printed alone. A `run:solo` candidate further down cuts the list, so only the candidates ahead of it are printed. While other lanes run, a `run:solo` candidate at the head prints `wait`. The label does not move a candidate up the ranking. When the listing cannot be read, or was cut short, it prints `wait`. The reason goes to stderr. `epic:next --lanes` applies the same gate to a named epic's lanes. `backlog:plan` is not gated, but it marks such rows `[run:solo]` and rows with neither label `[untriaged]`.
+**`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:next` in detail".
 
 ### `josh backlog:plan`
 
@@ -449,7 +473,7 @@ pnpm josh backlog:plan --waves         # the run order, wave by wave
 ```
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
-- `--waves` — print the order the run takes instead of the sections. It assumes each wave merges before the next one starts, leaves out issues a run already has, and plans only this repository. Wave 1 is what `backlog:next` prints for an idle repository; each later wave marks the earlier ones closed and applies the same classification and `run:solo` gate again. A wave of several issues is marked `(parallel)`. Issues no wave reaches are listed last with their reason. Read-only, and refused with named issues or `--only`.
+- `--waves` — print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.
 
 ```text
 Wave 1  #2770 [run:solo]
@@ -459,6 +483,8 @@ Wave 3  #2774 #2766 #2769   (parallel)
 
 Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`, a row with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
 
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".
+
 ### `josh backlog:stalled`
 
 Report whether ready backlog work is sitting undispatched while a lane is free and nothing has dispatched for a while — the state where a run is alive but not advancing and nobody notices until a person asks. Reads three facts, weighs none: a runnable count from `backlog:next`, the free-lane count, and the age of the last `child-launch` event on the run's stream.
@@ -467,7 +493,9 @@ Report whether ready backlog work is sitting undispatched while a lane is free a
 pnpm josh backlog:stalled
 ```
 
-stdout is one verdict word, always exit 0 — it reports, it never stops: `stalled` (all three hold), `unreadable` (no run stream to key on), or `ok`. On `stalled` it leaves a `stall` marker on the run's event stream — once per episode, which is what a terminal reader following the stream sees and what `run:step` reads as `backlog:next` — and sends one `⏳` Telegram notification. The cheap conditions gate the costly one: the backlog is only read when the run is already idle past the threshold with a free lane. Wired into the Stop hook (`stop-guard`) so it fires at each loop boundary; failures are swallowed so a report never holds a stop.
+stdout is one verdict word, always exit 0: `stalled`, `unreadable` or `ok`. A stall leaves one marker on the event stream and sends one `⏳` Telegram; the Stop hook runs it.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:stalled` in detail".
 
 ### `josh backlog:budget`
 
@@ -485,19 +513,28 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 - `--max <count>` — issues one invocation may take (default unlimited); `--merged` and `--running` count against it.
 - `--json` — collapse verdict and reason into `{"budget": "<verdict>", "reason": "…"}`.
 
-stdout is the verdict word (reason to stderr): `run` (start what was offered), `watch` (sleep the interval and ask both again), `stop` (report and finish), `triage` (judge the untriaged issues, then ask again — only after the maximum), or empty with exit 1 if the invocation is unreadable. An `exhausted`, `parked` or `unreadable` answer all enter the same watch: 8 hours from `--active`, restarted when a child runs, and ended early only by `--idle 0`. No bound is counted from `--started`. A watch polls every 60 s, the same interval as a running batch.
+stdout is the verdict word: `run`, `watch`, `stop` or `triage`; empty with exit 1 if the invocation is unreadable. An idle watch lasts 8 hours from `--active`, polling every 60 s.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:budget` in detail".
 
 ### `josh backlog:offer`
 
-A `backlogrun` loop-head event in one call: `backlog:next`, mapped to a budget word, then `backlog:budget`. This section is the single source of the mapping: issue numbers → `candidates`; `wait` → `blocked` with children in flight, `exhausted` without; `none` → `exhausted`; `stop` → `parked`; `triage` → `untriaged`; `retry` → `blocked` below three consecutive asks, `unreadable` at the third (any other answer resets the count); `error`, or exit 1 with empty stdout, → `unreadable` — never `none`, and never re-asked.
+A `backlogrun` loop-head event in one call: `backlog:next`, mapped to a budget word, then `backlog:budget`. This section is the single source of the mapping:
+
+- issue numbers → `candidates`; `none` → `exhausted`; `stop` → `parked`; `triage` → `untriaged`
+- `wait` → `blocked` with children in flight, `exhausted` without
+- `retry` → `blocked` below three consecutive asks, `unreadable` at the third
+- `error`, or exit 1 with empty stdout → `unreadable`, never `none`
 
 ```bash
 pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --retries 1
 ```
 
-`--exclude` / `--repo` forward to `backlog:next`; `--started` / `--active` / `--merged` / `--running` / `--max` / `--idle` forward to `backlog:budget` (`--answer` is computed here). `--running` also decides `wait` (→ `blocked` with children in flight, else `exhausted`) and `--retries` decides `retry` (→ `blocked` below three, `unreadable` at the third). stdout is the verdict, then — on `run` — the issue numbers one per line; the new retry count is the last stderr line (`retries: <n>`) and in `--json`. Exit 1 from `backlog:next` maps to `unreadable`, never `none`.
+`--exclude` / `--repo` forward to `backlog:next`; the budget flags forward to `backlog:budget`. stdout is the verdict, then on `run` the issue numbers; the retry count is the last stderr line.
 
 At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the event stream (once per drain, best-effort), so the next `run:step` fires the retrospective before the idle watch. A watch opened while children still merge is left unmarked.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:offer` in detail".
 
 ### `josh backlog:drive`
 
@@ -507,9 +544,11 @@ Run the `backlogrun` parent loop as one wait: offer, launch, await, merge, then 
 pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 ```
 
-An open carry record supplies the start time, merged count and remaining named issues. A record that does not read is read again at the 60-second offer interval, up to 6 times, before the driver exits 1 naming what each read answered; a record `run:carry --end` ended, or one another owner holds, ends the driver at once. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective`, or `window`), or `stop <reason>` after `run:report` and `run:carry --end`; the second line contains resume flags. The driver merges without the context hand-off check — the supervisor that runs it has no session to cut, so a merge is never handed back as `over` — and it excludes every child still in flight from the offer, so a child that merged its own PR before the loop collected it is never offered for a second launch. A judgment hand-off carries a `Next:` line naming the section to act by and the command that hands the loop back (`run:carry --cut`). Only `run:merge`'s control `stop` (the failure guard, or a failed child left unparked) stops the run: that child is collected, nothing new starts, and every child still in flight is collected before the run ends as `stop`. The offer `run:merge` passes through is never read, so its `stop` after a merge is decided by `backlog:offer` on the next pass, as after any other. A drained backlog yields for the retrospective only when `JOSH_RETROSPECTIVE` is on (the same switch `run:step` reads, loaded from `.env`); with the switch off, or once the retrospective has run, the idle watch continues and a drained `stop` ends the run itself. Named issues are dispatched in their recorded order; `--only` reports and ends after the list. On restart, only lanes with a launch event from this invocation are adopted. A merge is counted once per Issue in the carry record, including when the process stops between counting and the merge event. Launches pass `--stash` while the `josh latest` stash exists.
+An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are described, with their creation commands, in [Labels and run states](./labels-and-run-states.md).
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:drive` in detail".
 
 ## Review, delegation and oracles
 
@@ -558,7 +597,9 @@ pnpm josh review:round2 --json              # the verdict and the reason, machin
 - `--round-1-closed` — the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.
 - `--json` — machine-readable verdict and reason.
 
-`skip` on **Arm A** (the fix delta is empty) or **Arm B** (every path in the fix delta is inert by [`josh review:brief --level-only`](#josh-reviewbrief)'s classification, `docs/**/*.md`, the root `README.md`, under `prompts/`, or a `.ts` / `.js` / `.svelte` file outside `.claude/` whose only change is in comments); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one path outside Arm B. Full reasoning: `prompts/review.md`.
+`skip` when the fix delta is empty or touches only inert paths (docs, prompts, comment-only code); `required` otherwise. Full reasoning: `prompts/review.md`.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:round2` in detail".
 
 ### `josh disposition`
 
@@ -580,7 +621,9 @@ pnpm josh review:attest --check   # run by the run, before it acts on the review
 - `<nonce>` — attest the checkout the review read.
 - `--check` — verify before acting; `josh followup` asks again before merging.
 
-Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded and nothing attested it — a refusal, not a pass), `mismatch` (a different root, branch or HEAD), `not-required` (no brief recorded in this checkout inside a run's lifetime). All three fields are checked; scoped to a checkout that briefed a review, expiring after eight hours. An `ok` is still refused on a person's issue update unread or taken in after the brief ([`josh issue:ack`](#josh-issueack)).
+Answers `ok`, `missing` (a refusal), `mismatch` or `not-required`; an attestation expires after eight hours, and an `ok` is still refused on an unread issue update ([`josh issue:ack`](#josh-issueack)).
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:attest` in detail".
 
 ### `josh delegate`
 
@@ -630,14 +673,16 @@ pnpm josh fanout scripts/a.ts,shared.ts scripts/b.ts,shared.ts # → serial (uni
 pnpm josh fanout scripts/a.ts                                   # → serial (fewer than two units)
 ```
 
-**File-disjointness is the necessary condition, and it is mechanical.** Two subagents editing one file in parallel race on it — the later write lands on the earlier, or the gate has to reconcile a collision the parallelism was meant to save. So the split is refused the moment any file appears in more than one unit, and the naming of what collides is on stderr. **The default is serial**: fewer than two units is nothing to run in parallel, and an Issue whose units share files stays serial exactly as one that will not split does.
+**File-disjointness is the necessary condition**: a split is refused when any file is in two units. **The default is serial**.
 
 **This is the precondition the `implementation-unit` delegation row reads, and the procedure around it is one fan-out turn:**
 
 1. From the Step 0 change list, group the `<what changes> — Test: … — <file path>` rows into candidate units, each a set of files no other unit touches.
 2. Ask `pnpm josh fanout` with each unit's file list. On `serial`, write the change in the main line as usual. On `parallel`, continue.
 3. **Launch every unit's subagent in a single turn** — the turn-batching principle (`prompts/collaboration-workflow/turn-batching.md`) reaching the `Agent` launches, not one subagent after another — each briefed with its own files and its slice of the Step 0 table.
-4. The main line keeps the design that decided _what_ to write, integrates the returned edits, and runs the one `pnpm josh gate` and `/code-review` over the whole. That gate and review — which the parent runs anyway — is the row's verifier: a unit's mistake fails the same backstop a serial edit passes through, and the disjointness `josh fanout` confirmed keeps two units from colliding on a file. The design stays in the main line, which is why `design` is rejected while the writing is delegated.
+4. The main line keeps the design, integrates the returned edits, and runs one `pnpm josh gate` and `/code-review` over the whole — the row's verifier.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh fanout` in detail".
 
 ### `josh split:assess`
 
@@ -648,18 +693,22 @@ pnpm josh split:assess          # → single
 pnpm josh split:assess --json   # the verdict and the reason, machine-readable
 ```
 
-`split` needs **both** the file guide (10) and the line guide (400) exceeded; either alone, or an empty diff, is `single` — the conservative default of `.claude/skills/workflow-commands/split-assessment.md` → "The question". It answers the **size** question only: separability stays a judgement, so `split` is the size condition met, not a decision to divide the Issue. Untracked files have no diff base — commit before measuring for an exact count.
+`split` needs **both** the file guide (10) and the line guide (400) exceeded — the size question only (`.claude/skills/workflow-commands/split-assessment.md` → "The question").
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh split:assess` in detail".
 
 ### `josh oracle:list`
 
-Print the decision oracles — commands that answer a rule question from mechanically readable inputs alone (question 0 of the rule-placement criterion, `prompts/collaboration-workflow/residency.md` → "第 0 問"). Each row carries the command, its answer vocabulary, its **firing point** (or the reason none can be named) and its single-source document. Adding a new oracle means adding a row here and a firing-point declaration in `scripts/rules/oracle-firing.ts`, and nowhere else.
+Print the decision oracles — commands that answer a rule question from mechanically readable inputs (`prompts/collaboration-workflow/residency.md` → "第 0 問") — with each one's answers, firing point and single source.
 
 ```bash
 pnpm josh oracle:list
 ```
 
-- **The firing point is what makes an oracle enforced**. A declared firing point — the action the oracle must precede — wires a generic `oracle-consulted` delivered rule that refuses that action until the oracle's command has run (`scripts/rules/oracle-consulted.ts`). One is wired: `pkg:scout` (a package add). `issue:lint` no longer has one — [`josh issue:file`](#josh-issuefile) runs the lint as a filing step. `release:scope` is on the reason side, not a firing point: it reads the release owed _after_ `pnpm josh followup` merges, so it trails the merge rather than gating it. The rest declare why no firing point can be named and stay **visibly unenforced** rather than silently so, so a new oracle must always answer whether it has a firing point.
+- **The firing point is what makes an oracle enforced**: a declared one refuses that action until the oracle has run (`scripts/rules/oracle-consulted.ts`); the rest stay visibly unenforced.
 - Single source: `scripts/rules/decision-oracle.ts` (the enumeration) and `scripts/rules/oracle-firing.ts` (the firing points).
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh oracle:list` in detail".
 
 ### `josh clone:scan`
 
@@ -667,4 +716,6 @@ Count code duplication across files and first-party repos (`JOSH_REPO_PATHS` inc
 
 ### `josh cases`
 
-Read changed paths and print the I/O boundaries the diff crosses (`network` / `process` / `fs` / `none`) and, for each, the mandatory abnormal cases a test declaration must account for (non-200, timeout, empty response, malformed JSON, rate limit). A decision oracle: the unit suite blocks network by design, so these cases are confronted at declaration time. Single source: `scripts/cases/cases-cli.ts`.
+Print the I/O boundaries a diff crosses (`network` / `process` / `fs` / `none`) and the abnormal cases a test declaration must cover. Single source: `scripts/cases/cases-cli.ts`.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh cases` in detail".

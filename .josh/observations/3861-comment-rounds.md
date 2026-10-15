@@ -1,0 +1,5 @@
+- rf:comments | low | scripts/rules/shell-body-trigger.ts:10 | 2026-10-15 | #3861
+- rf:bug-risks | low | scripts/notify/telegram-test-logic.ts:80 | 2026-10-15 | #3861
+- rf:tests | low | scripts/run/run-stop-notify.ts:41 | 2026-10-15 | #3861
+- rf:comments | low | scripts/gh/git-pr-ai-review.ts:125 | 2026-10-15 | #3861
+- rf:project-conventions | low | docs/how-to/set-up-notifications.md:5 | 2026-10-15 | #3861
