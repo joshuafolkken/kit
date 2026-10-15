@@ -1,34 +1,30 @@
-import { git_branch } from '#scripts/git/git-branch'
-import { git_command } from '#scripts/git/git-command'
-import { run_carry } from '#scripts/run/carry/run-carry'
-import { issue_file } from './issue-file'
-import { AUTO_OK_LABEL, has_label_name, RELEASE_LABEL } from './issue-labels'
-import { issue_state_cli } from './issue-state-cli'
+import {
+	BREAKING_CHANGE_LABEL,
+	DEFERRED_LABEL,
+	EPIC_LABEL,
+	has_label_name,
+	NEEDS_HUMAN_REVIEW_LABEL,
+	RELEASE_LABEL,
+} from './issue-labels'
+import { markdown_section } from './markdown-section'
 
-// Whether `josh issue:file` applies `auto-ok` to the Issue it files. So that work found during an
-// unattended run does not wait in the backlog until a person labels it, the filing computes the
-// answer instead of leaving it to the agent's memory: an Issue filed while a
-// `backlogrun` carry record is live, or from a branch whose Issue carries `auto-ok`, is opted in by
-// default. `--no-auto-ok` is the one exception, declared for an Issue that needs a person's judgement
-// (a Tier B toss-up or a Tier C action). A filing to another repository is never opted in: that
-// repository's own `backlogrun` would implement and merge it though nobody opted that repository in.
-// A `release` Issue is never opted in either: a release is Tier C, so only a
-// person applies `auto-ok` to it, whatever the carry record or the branch's Issue says.
-// `--requested` withholds the default the same way: a person asked for this filing (a `new` entry, or
-// a request in conversation), so the run's own opt-in does not speak for them — `auto-ok` comes only
-// from their own `--label auto-ok`. A filing without the declaration — an observation, a
-// retrospective, a routed filing — keeps the default above.
+// Whether `josh issue:file` applies `auto-ok` to the Issue it files, judged against the criteria
+// `docs/how-to/run-backlog.md` records rather than the context the filing happens in, so a filing a
+// person asked for (`kickoff new`) is judged the same as one an agent makes on its own. The answer is
+// a pure reading of the filing — its labels, its body and its target — so `backlogrun`'s judgement
+// of an Issue already open reuses `exclusion_of` rather than a second list (joshuafolkken/kit#3854).
+// The order: `--no-auto-ok`, a filing to another repository (whose own `backlogrun` would implement
+// and merge it though nobody opted that repository in), a label that keeps a person in the loop, and
+// last the body's judgement declaration (`JUDGEMENT_NEEDED` / `JUDGEMENT_NOT_NEEDED`): whether a
+// policy decision, an external account or a human visual check is needed.
 
-interface AutoOkSignals {
+interface AutoOkFiling {
+	// `--no-auto-ok`: the filer declared the Issue needs a person's judgement.
 	is_opted_out: boolean
-	// `--requested`: a person asked for the filing, so neither the carry record nor the branch speaks.
-	is_requested: boolean
-	// The filing carries the `release` label.
-	is_release: boolean
-	is_carried: boolean
-	// The labels of the Issue the current branch names; `undefined` when the branch names none or the
-	// Issue could not be read.
-	branch_labels: ReadonlyArray<string> | undefined
+	is_cross_repository: boolean
+	// Every label the filing carries, including the ones the body's declarations add.
+	labels: ReadonlyArray<string>
+	body: string
 }
 
 interface AutoOkDecision {
@@ -36,98 +32,71 @@ interface AutoOkDecision {
 	reason: string
 }
 
+const BACKGROUND_HEADING = '## 背景'
+const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
+const JUDGEMENT_NEEDED = '- 人の判断: 要'
+const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account, a human visual check) is needed: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
+
 const OPTED_OUT: AutoOkDecision = { is_applied: false, reason: '--no-auto-ok declared' }
 const CROSS_REPOSITORY: AutoOkDecision = {
 	is_applied: false,
 	reason: 'the Issue is filed to another repository',
 }
-const RELEASE: AutoOkDecision = {
+const JUDGEMENT: AutoOkDecision = {
 	is_applied: false,
-	reason: `a ${RELEASE_LABEL} Issue is opted in by a person only`,
+	reason: `the body declares \`${JUDGEMENT_NEEDED}\``,
 }
-const REQUESTED: AutoOkDecision = {
-	is_applied: false,
-	reason: 'a person asked for this filing; auto-ok only when they declare it',
-}
-const CARRIED: AutoOkDecision = { is_applied: true, reason: 'a backlogrun carry record is live' }
-const BRANCH_OPTED_IN: AutoOkDecision = {
+const APPLIED: AutoOkDecision = {
 	is_applied: true,
-	reason: 'the Issue this branch works on carries auto-ok',
-}
-const NOT_OPTED_IN: AutoOkDecision = {
-	is_applied: false,
-	reason: 'no backlogrun carry record is live and the branch names no auto-ok Issue',
+	reason: 'no exclusion holds and the body declares no judgement is needed',
 }
 
-// What the filing itself declares: `--no-auto-ok` and `--requested`.
-type AutoOkDeclared = Pick<AutoOkSignals, 'is_opted_out' | 'is_requested'>
-type Withholding = AutoOkDeclared & Pick<AutoOkSignals, 'is_release'>
+// The labels that keep a person in the loop, each with the reason it withholds `auto-ok`. A
+// `breaking-change` declared in the body arrives here as its label, added before the decision.
+const EXCLUDED_LABELS: ReadonlyArray<readonly [string, string]> = [
+	[RELEASE_LABEL, 'a release is Tier C'],
+	[BREAKING_CHANGE_LABEL, 'a breaking change needs a person to accept the migration'],
+	[DEFERRED_LABEL, 'the Issue is deferred'],
+	[NEEDS_HUMAN_REVIEW_LABEL, 'a person reviews the change before it lands'],
+	[EPIC_LABEL, 'an epic is opted in by a person, and that opts in every descendant'],
+]
 
-// The three signals that withhold `auto-ok` before any other is read, or `undefined` when none holds.
-function withheld(signals: Withholding): AutoOkDecision | undefined {
-	if (signals.is_opted_out) return OPTED_OUT
-	if (signals.is_release) return RELEASE
-	if (signals.is_requested) return REQUESTED
+// The first label that withholds `auto-ok`, or `undefined` when none of them is present.
+function exclusion_of(labels: ReadonlyArray<string>): AutoOkDecision | undefined {
+	const found = EXCLUDED_LABELS.find(([label]) => has_label_name(labels, label))
 
-	return undefined
+	if (found === undefined) return undefined
+
+	return { is_applied: false, reason: `a \`${found[0]}\` Issue — ${found[1]}` }
 }
 
-// The opt-out, the `release` label and `--requested` win over every signal, then the carry record,
-// then the branch's Issue.
-function decide(signals: AutoOkSignals): AutoOkDecision {
-	const decision = withheld(signals)
+// `true` / `false` for a declared need, `undefined` when the background declares neither or both.
+function judgement_of(body: string): boolean | undefined {
+	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
+	const lines = markdown_section.unfenced_lines(background).map((line) => line.trim())
+	const is_not_needed = lines.some((line) => line.startsWith(JUDGEMENT_NOT_NEEDED))
+	const is_needed = lines.some((line) => line.startsWith(JUDGEMENT_NEEDED))
 
-	if (decision !== undefined) return decision
-	if (signals.is_carried) return CARRIED
-	if (has_label_name(signals.branch_labels ?? [], AUTO_OK_LABEL)) return BRANCH_OPTED_IN
+	return is_not_needed === is_needed ? undefined : is_needed
+}
 
-	return NOT_OPTED_IN
+// Why the filing is refused for its declaration, or `undefined` when it declares exactly one answer.
+function declaration_problem(body: string): string | undefined {
+	return judgement_of(body) === undefined ? DECLARATION_PROBLEM : undefined
+}
+
+function decide(filing: AutoOkFiling): AutoOkDecision {
+	if (filing.is_opted_out) return OPTED_OUT
+	if (filing.is_cross_repository) return CROSS_REPOSITORY
+
+	return exclusion_of(filing.labels) ?? (judgement_of(filing.body) === false ? APPLIED : JUDGEMENT)
 }
 
 function line_of(decision: AutoOkDecision): string {
 	return `auto-ok: ${decision.is_applied ? 'applied' : 'not applied'} — ${decision.reason}`
 }
 
-// Read from the common git directory, so a lane sees the record its batch wrote in the main tree.
-async function is_carried(): Promise<boolean> {
-	const directory = await run_carry.repository_directory()
+const issue_auto_ok = { declaration_problem, decide, exclusion_of, line_of }
 
-	if (directory === undefined) return false
-
-	return run_carry.read_carry(run_carry.carry_path(directory)).kind === 'carried'
-}
-
-// An unreadable Issue is read as no labels: the filing goes on without `auto-ok` rather than failing.
-// The branch names an Issue of `current`, read there by name: a filing to another repository has
-// already pointed `GH_REPO` at its target, which would otherwise answer with the target's Issue.
-async function branch_labels(current: string): Promise<ReadonlyArray<string> | undefined> {
-	const issue_number = git_branch.issue_from_branch(await git_command.branch())
-
-	if (issue_number === undefined) return undefined
-	const read = await issue_state_cli.read_issue(String(issue_number), current)
-
-	return read.kind === 'state' ? read.state.labels : undefined
-}
-
-// Each read is skipped once an earlier signal has already decided the answer; a cross-repository
-// filing is refused before any signal is read. `labels` are the ones the filing declares.
-async function resolve(
-	declared: AutoOkDeclared,
-	target: string,
-	current: string,
-	labels: ReadonlyArray<string> = [],
-): Promise<AutoOkDecision> {
-	const withholding = { ...declared, is_release: has_label_name(labels, RELEASE_LABEL) }
-	const decision = withheld(withholding)
-
-	if (decision !== undefined) return decision
-	if (!issue_file.is_same_repository(target, current)) return CROSS_REPOSITORY
-	if (await is_carried()) return CARRIED
-
-	return decide({ ...withholding, is_carried: false, branch_labels: await branch_labels(current) })
-}
-
-const issue_auto_ok = { decide, line_of, resolve }
-
-export type { AutoOkDeclared, AutoOkDecision, AutoOkSignals }
+export type { AutoOkDecision, AutoOkFiling }
 export { issue_auto_ok }

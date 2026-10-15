@@ -24,7 +24,7 @@ import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
 // `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]` — file an Issue
+// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
 // with every filing step run in order: the third-party refusal, the body
 // lint, the `## Origin` check for another repository, the `auto-ok` decision
 // with the run label it owes, the fold question against the run's earlier
@@ -37,7 +37,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--requested] [--release]'
+	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -74,10 +74,13 @@ function is_third_party(target: string): boolean {
 // the filing may go on to the scout.
 function refusals_of(filing: Filing): ReadonlyArray<string> {
 	if (is_third_party(filing.target)) return [THIRD_PARTY_MESSAGE]
-	const problems = issue_lint_cli.problems(filing.body).map((problem) => `✖ ${problem}`)
-	const origin = issue_file.origin_problem(filing.body, filing.target, filing.current)
+	const problems = [
+		...issue_lint_cli.problems(filing.body),
+		issue_auto_ok.declaration_problem(filing.body),
+		issue_file.origin_problem(filing.body, filing.target, filing.current),
+	]
 
-	return origin === undefined ? problems : [...problems, `✖ ${origin}`]
+	return problems.filter((problem) => problem !== undefined).map((problem) => `✖ ${problem}`)
 }
 
 function unacknowledged_message(numbers: ReadonlyArray<number>): string {
@@ -143,18 +146,15 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 }
 
 // Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label.
-// Decided before the WIP count and the scout, so a refusal costs no listing.
-async function labels_of(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
-	const declared = {
+// Decided before the WIP count and the scout, so a refusal costs no listing. The decision reads the
+// labels the body's declarations add, so a declared breaking change is excluded like its label.
+function labels_of(filing: Filing): ReadonlyArray<string> | undefined {
+	const auto_ok = issue_auto_ok.decide({
 		is_opted_out: filing.args.is_auto_ok_opted_out,
-		is_requested: filing.args.is_requested,
-	}
-	const auto_ok = await issue_auto_ok.resolve(
-		declared,
-		filing.target,
-		filing.current,
-		filing.args.labels,
-	)
+		is_cross_repository: !issue_file.is_same_repository(filing.target, filing.current),
+		labels: issue_file.labels_of(filing.args, filing.body),
+		body: filing.body,
+	})
 
 	console.info(issue_auto_ok.line_of(auto_ok))
 	const labels = issue_file.labels_of(filing.args, filing.body, auto_ok.is_applied)
@@ -271,7 +271,7 @@ async function is_clear(filing: Filing): Promise<boolean> {
 
 async function file(filing: Filing): Promise<number> {
 	if (!is_admitted(filing)) return FAILURE_EXIT_CODE
-	const labels = await labels_of(filing)
+	const labels = labels_of(filing)
 
 	if (labels === undefined || !(await is_clear(filing))) return FAILURE_EXIT_CODE
 

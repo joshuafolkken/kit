@@ -13,8 +13,11 @@ epic declares "the children of that epic". That declaration is the statement of 
 unattended, and it is the one thing a run must not leave ambiguous — which is why what runs is stated
 by the keyword and its arguments, never inferred from the shape of a request.
 
-**A run labelling its own inputs would be widening its own authorization**, which is why `auto-ok`
-stays a person's to apply. A named issue is approved by the keyword and its number for the same reason
+**A run labelling an existing issue would be widening its own authorization**, which is why `auto-ok`
+on an issue already open stays a person's to apply. A filing is different: `issue:file` judges it
+against written criteria (joshuafolkken/kit#3853) — the excluded labels, then the body's `- 人の判断:`
+declaration — so what admits it is a rule a person wrote, applied the same way to every filing, rather
+than the run's own discretion. A named issue is approved by the keyword and its number for the same reason
 `queue` was explicit authorization to merge each of its issues (joshuafolkken/kit#1984): typing them is
 the declaration.
 
@@ -28,9 +31,9 @@ that could run; the budget bounds the _amount_, which is the only thing left to 
 filings are admitted deliberately. The ten-filings ceiling and `--max` together are why the loop
 terminates: after them the run ends and the next one waits for a person to type the keyword.
 
-**Why the end-of-run retrospective may apply `auto-ok`** (joshuafolkken/kit#2328). It is the single path
-on which a run labels its own input, and it is not the self-widening the rule guards against because
-every brake bounds it with no exception: its filings count against the ten-per-invocation ceiling, the
+**Why the end-of-run retrospective's filings may carry `auto-ok`** (joshuafolkken/kit#2328). They are
+judged by the same criteria as every other filing (joshuafolkken/kit#3853), and they are not the
+self-widening the rule guards against because every brake bounds them with no exception: its filings count against the ten-per-invocation ceiling, the
 WIP cap, `--max` and the session budget exactly as any other filing does.
 A retrospective that judges nothing worth carrying files nothing, so "file → drain → file again"
 converges the moment improvements run out.
@@ -109,9 +112,11 @@ alone rather than re-reading the body.
 
 **Why `needs-decision` is the one label a run may apply by hand.** `auto-ok` and `needs-human-review`
 widen or withhold what may be _executed_. `needs-decision` records only that a person's answer is
-needed, which is a finding rather than an authorization. `auto-ok` reaching a run's own filing through
-`issue:file`'s default (joshuafolkken/kit#3213) is computed from a person's earlier opt-in — the live
-carry record or the branch issue's label — so the run inherits an authorization rather than granting one.
+needed, which is a finding rather than an authorization. `auto-ok` reaching a filing through
+`issue:file` (joshuafolkken/kit#3853) is judged by written criteria — a `release`, breaking, `deferred`,
+`needs-human-review` or `epic` label withholds it, and otherwise the filer's `- 人の判断:` declaration
+decides — so the run applies a rule a person wrote rather than granting an authorization of its own;
+the count and the budget still bound how many such filings one invocation can make.
 
 ## Why the loop's contract is shaped this way
 

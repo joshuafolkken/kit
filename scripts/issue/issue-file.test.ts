@@ -33,7 +33,6 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		distinct: [],
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
-		is_requested: false,
 		is_release: false,
 		...overrides,
 	}
@@ -80,12 +79,10 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 	})
 })
 
-// joshuafolkken/kit#3614: a filing a person asked for declares it, so the run's opt-in does not apply.
+// joshuafolkken/kit#3853: auto-ok is judged by the criteria whoever asked, so `--requested` is gone.
 describe('issue_file.parse — a filing a person requested', () => {
-	it('reads --requested', () => {
-		const parsed = issue_file.parse([...FILED, '--requested'])
-
-		expect(parsed).toStrictEqual(args_of({ is_requested: true }))
+	it('refuses the retired --requested', () => {
+		expect(issue_file.parse([...FILED, '--requested'])).toBeUndefined()
 	})
 })
 
