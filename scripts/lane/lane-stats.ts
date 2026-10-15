@@ -258,6 +258,7 @@ const lane_stats = {
 	MISSING,
 	header,
 	in_window,
+	mean,
 	median,
 	peak,
 	row,

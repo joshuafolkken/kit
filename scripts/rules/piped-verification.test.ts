@@ -141,6 +141,8 @@ const REWRITES: Array<[string, string]> = [
 	['pnpm josh lint | tail -5  # lint', `${WRAP}pnpm josh lint | tail -5)  # lint`],
 	['pnpm josh lint | tail -3 # a\ngit status', `${WRAP}pnpm josh lint | tail -3) # a\ngit status`],
 	['pnpm josh gate | grep "#x"', `${WRAP}pnpm josh gate | grep "#x")`],
+	// A quoted parenthesis is text, not a group.
+	['pnpm josh gate | grep "a(b"', `${WRAP}pnpm josh gate | grep "a(b")`],
 ]
 
 describe('pipefail_input', () => {
@@ -159,6 +161,11 @@ describe('pipefail_input', () => {
 		'git status; pnpm josh lint:related | head -5',
 		// A heredoc's body lines would be cut as commands of their own.
 		"pnpm josh gate | tail -5; cat <<'EOF'\na; b\nEOF",
+		// The cut splits inside a group, which would leave the group's own pipe without `pipefail`.
+		'(cd x && pnpm josh lint) | tail -5',
+		'(pnpm josh lint | tail -5)',
+		// Masked as a whole line but in no part: wrapping nothing must not claim a wrap.
+		'pnpm josh lint\ngit log | head',
 	])('leaves %j to the refusal', (command) => {
 		expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
 	})

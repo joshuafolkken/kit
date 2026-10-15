@@ -2,50 +2,26 @@
 
 <!-- cspell:words hotspot Hotspot hotspots Hotspots NOSONAR -->
 
-This guide extends the collaboration workflow with a project-local procedure for handling SonarCloud Security Hotspots. It is kept out of the upstream-synced `prompts/collaboration-workflow/` topics so those stay identical across the projects that consume them.
-
-AI tools cannot perform OAuth browser login to SonarCloud, so this guide assumes public-API and config-based actions as the primary path.
+Project-local procedure for SonarCloud Security Hotspots, kept out of the upstream-synced `prompts/collaboration-workflow/`. AI tools cannot do SonarCloud's OAuth browser login, so the primary path is the public API and config.
 
 ## Quality Gate enforcement (CI blocks PRs)
 
-The distributed `.github/workflows/sonar-qube.yml` runs the SonarCloud scan with
-`-Dsonar.qualitygate.wait=true`, so the `SonarQube` job — a required PR check — fails when the
-Quality Gate is red. **The gate alone is not enough**: `Sonar way` judges ratings and ratios, so a
-few MINOR code smells keep the maintainability rating at A and a small copied block stays under the
-duplication threshold. On a pull request the job therefore ends with `pnpm josh sonar:new-code <PR>`,
-which **fails on a single new issue of any type or severity, or a single new duplicated block**
-(joshuafolkken/kit#3045). An issue resolved in SonarCloud as accepted or a false positive is not
-counted — that resolution is the route for a deliberate exception. This job is the single enforcement point:
-`josh followup` does **not** scan SonarCloud findings (it only scans CodeRabbit / Claude Review
-comments), but it **does** wait on the required `SonarQube` CI check, so a red gate also blocks the
-`followup` merge. Consumers pick the workflow up verbatim via `josh sync`; do not re-implement the
-gate per consumer.
+The distributed `.github/workflows/sonar-qube.yml` scans with `-Dsonar.qualitygate.wait=true`, so the required `SonarQube` PR check fails on a red Quality Gate. On a pull request the job then runs `pnpm josh sonar:new-code <PR>`, which **fails on a single new issue of any type or severity, or a single new duplicated block** (joshuafolkken/kit#3045) — `Sonar way` judges ratings and ratios, so a few MINOR smells or a small copied block would otherwise pass. An issue resolved in SonarCloud as accepted or a false positive is not counted; that resolution is the route for a deliberate exception.
 
-**A run that cannot see `SONAR_TOKEN` skips the scan and passes**, printing one line that names the
-missing token (joshuafolkken/kit#2815) — a consumer that does not use SonarCloud is never blocked by
-it. The same holds for any run GitHub withholds secrets from (a fork pull request, or a Dependabot
-run without the secret in the Dependabot store), so a repository that relies on this gate keeps
-`SONAR_TOKEN` in both secret stores.
+This job is the single enforcement point: `josh followup` does not scan SonarCloud findings but waits on the required `SonarQube` check, so a red gate blocks its merge too. Consumers get the workflow verbatim via `josh sync`; do not re-implement the gate per consumer.
+
+A run that cannot see `SONAR_TOKEN` skips the scan and passes, printing one line naming the missing token (joshuafolkken/kit#2815). GitHub withholds secrets from fork pull requests and from Dependabot runs without the secret in the Dependabot store, so a repository relying on this gate keeps `SONAR_TOKEN` in both secret stores.
 
 ### New Code vs Overall Code semantics
 
-The scan passes `package.json`'s `version` as `sonar.projectVersion`, so New Code — "since the
-previous version" — restarts at every `josh bump` that reaches main instead of growing from the
-first analysis on.
+The scan passes `package.json`'s `version` as `sonar.projectVersion`, so New Code ("since the previous version") restarts at every `josh bump` that reaches main.
 
-SonarCloud's default **Sonar way** Quality Gate evaluates **New Code only** — conditions
-(new bugs, new code smells above the Maintainability rating, new coverage/duplication) apply to
-lines changed in the PR's New Code period, not the whole codebase. Consequences:
+The default Sonar way gate evaluates New Code only — lines changed in the PR's New Code period:
 
-- A PR is blocked when it **introduces or modifies** code that trips a condition — this is what
-  catches the recurring Maintainability `0 -> 1` regression that motivated this gate.
-- Pre-existing Overall-Code findings on untouched files do **not** fail an unrelated PR. To make
-  the gate enforce Overall Code as well, add Overall conditions to the gate in the SonarCloud
-  project settings (Quality Gates UI) — that is a SonarCloud-side configuration, not a repo file.
+- A PR that introduces or modifies code tripping a condition is blocked (e.g. a Maintainability `0 -> 1` regression).
+- Pre-existing Overall-Code findings on untouched files do not fail an unrelated PR. Enforcing Overall Code needs Overall conditions added in the SonarCloud Quality Gates UI, not a repo file.
 
-When triaging a red gate, confirm via the PR analysis whether the failing condition is a **New
-Code** condition (caused by this PR — fix it) or an **Overall** condition (pre-existing — handle
-per the table below, and do not let it silently block an unrelated change).
+Red gate → check in the PR analysis: a New Code condition is this PR's (fix it); an Overall one is pre-existing (handle per the table below, never silently blocking an unrelated change).
 
 ## Step A / Step B: fetch the hotspots and read each one's disposition
 
@@ -53,11 +29,7 @@ per the table below, and do not let it silently block an unrelated change).
 pnpm josh sonar:hotspots <PR>
 ```
 
-The command fetches the hotspots on the pull request from SonarCloud's public API (no auth), reading
-the project key from `sonar-project.properties`, and prints per hotspot its `status`, `component`,
-`line`, `ruleKey` and the Step B branch it falls into. The one branch key that used to be walked by
-eye — "is this path upstream-synced?" — is answered by calling `josh sync:scope`'s own detection, so
-no distribution path list is duplicated. The four branches:
+Reads the PR's hotspots from SonarCloud's public API (no auth; project key from `sonar-project.properties`) and prints each one's `status`, `component`, `line`, `ruleKey` and Step B branch; upstream-synced paths come from `josh sync:scope`'s detection.
 
 | Branch     | Meaning                                                                                                    |
 | ---------- | ---------------------------------------------------------------------------------------------------------- |
@@ -66,15 +38,15 @@ no distribution path list is duplicated. The four branches:
 | `fix`      | A reviewed-and-fixed hotspot — the real issue was fixed                                                    |
 | `defer`    | A reviewed hotspot set aside — out of scope for this PR                                                    |
 
-A read that failed (rate-limit, network) prints `unreadable: <reason>`, told apart from a success
-that found no hotspots. `pnpm josh oracle:list` carries the same vocabulary. **The only judgement
-left to you is whether a `TO_REVIEW` hotspot is really a false positive** — if it is, apply its
-`excluded` / `local` branch; if it is instead a real issue fix the code and add a regression test,
-and if it is out of scope mention it in the completion comment and open a follow-up Issue.
+A failed read (rate-limit, network) prints `unreadable: <reason>`, distinct from finding none. `pnpm josh oracle:list` uses the same vocabulary. **Your only judgement: is a `TO_REVIEW` hotspot really a false positive?**
+
+- False positive → apply its `excluded` / `local` branch.
+- Real issue → fix the code and add a regression test.
+- Out of scope → mention it in the completion comment and open a follow-up Issue.
 
 ## Step C: optional — mark SAFE via API if a token is available
 
-If `SONAR_TOKEN` is exported (SonarCloud user token with write scope):
+With `SONAR_TOKEN` exported (SonarCloud user token with write scope):
 
 ```bash
 curl -sS -u "$SONAR_TOKEN:" -X POST \
@@ -82,10 +54,10 @@ curl -sS -u "$SONAR_TOKEN:" -X POST \
   -d "hotspot=<hotspot-key>&status=REVIEWED&resolution=SAFE&comment=<reason>"
 ```
 
-Without a token, prefer Step B's config-based approach — that change is reviewable in the PR diff, whereas API-side state changes are not.
+Without a token, prefer Step B's config-based approach — it is reviewable in the PR diff; API-side state changes are not.
 
 ## Reporting rules
 
-- List every outstanding hotspot in the completion comment (never hide a failing SonarCloud analysis).
-- State which action you took (excluded / marked SAFE / fixed / deferred) and why.
-- If you deferred, include a link to the follow-up Issue.
+- List every outstanding hotspot in the completion comment; never hide a failing SonarCloud analysis.
+- State the action taken (excluded / marked SAFE / fixed / deferred) and why.
+- Link the follow-up Issue for a deferral.

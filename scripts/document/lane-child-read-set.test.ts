@@ -16,11 +16,13 @@ import { lane_child_read_set } from './lane-child-read-set'
 // the trim into the shared read, so the child reads less in absolute terms while the margin narrows.
 // Lowered from 18KB in joshuafolkken/kit#3566, which moved history out of `latest-gate.md` and
 // `progress-watcher.md`: the documents the child skips got smaller, so skipping them saves less.
+// Lowered from 17KB in joshuafolkken/kit#3871, which condensed the skill files — `progress-watcher.md`
+// among the skipped documents — for the same reason.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
-const REQUIRED_SAVING_BYTES = 17 * BYTES_PER_KB
+const REQUIRED_SAVING_BYTES = 16 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
 // Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
 // per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in

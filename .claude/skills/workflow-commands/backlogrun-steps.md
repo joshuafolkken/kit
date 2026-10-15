@@ -1,26 +1,30 @@
 # `backlogrun` — the detailed procedure behind the manifest
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table"; how the driver runs the loop on its own is `docs/maintainers/backlogrun-driver.md`.
+Point-of-use, read one section at a time from `backlogrun.md` → "The route table"; how the driver runs the loop on its own is `docs/maintainers/backlogrun-driver.md`. Reasons:
+
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way"
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Why a session cut does not end the run"
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the loop's contract is shaped this way"
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free"
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the cost check skips a watch"
+- `docs/maintainers/backlogrun-steps-rationale.md` → "Where each rule came from"
 
 ## What one invocation approves
 
 **One `backlogrun` approves every merge of every issue `pnpm josh backlog:next` offers** — `auto-ok`
 issues, every child of an epic whose root carries it, and a run's own filing once `pnpm josh
 epic:bundle` (Tier A, `observation-filing.md`) has placed it under such a root. **A named issue is
-approved by the keyword and its number, not by `auto-ok`** ("Named issues run first, in order"). What
-runs is stated by the keyword and its arguments, never inferred from a request's shape. **Two repairs
-that would bound this the other way are prohibited** — dropping a run's own filings, and requiring a
-person's `auto-ok` on a child; the brake below bounds it. A Tier C action inside a child still stops that child.
+approved by the keyword and its number, not by `auto-ok`**. What runs is stated by the keyword and its
+arguments, never inferred. **Two repairs that would bound this the other way are prohibited** —
+dropping a run's own filings, and requiring a person's `auto-ok` on a child; the brake below bounds it.
+A Tier C action inside a child still stops that child.
 
 **`pnpm josh issue:file` judges `auto-ok` and prints it** — `auto-ok: applied` or
-`auto-ok: not applied` with the reason; `scripts/issue/issue-auto-ok.ts` is the single source. Every
-filing is judged the same way, whoever asked for it: the excluded labels, then the body's
-`- 人の判断:` declaration (`issue-template.md`). **Declare `- 人の判断: 要` when the new issue needs a
-person's judgement** — a Tier B toss-up or a Tier C action inside it; `--no-auto-ok` withholds it too.
-The retrospective's filings are judged the same way and count against the same brake.
-
-Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way";
-provenance of each rule: `docs/maintainers/backlogrun-steps-rationale.md` → "Where each rule came from"
+`auto-ok: not applied` with the reason (`scripts/issue/issue-auto-ok.ts`). Every filing, the
+retrospective's included, is judged the same way: the excluded labels, then the body's `- 人の判断:`
+declaration (`issue-template.md`). **Declare `- 人の判断: 要` when the new issue needs a person's
+judgement** — a Tier B toss-up or a Tier C action inside it; `--no-auto-ok` withholds it too.
 
 ### The brake that replaces the promise
 
@@ -33,30 +37,26 @@ provenance of each rule: `docs/maintainers/backlogrun-steps-rationale.md` → "W
 | **Ten filings per invocation** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `run:carry --filed` |
 | The WIP cap on open issues | the pool across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
-**This section is the single source of how the `epic:bundle` obligation and this authorization
-boundary meet.** `observation-filing.md` points here rather than restating it.
+**This section is the single source of how the `epic:bundle` obligation and this boundary meet.**
 
 ## Named issues run first, in order
 
-**`backlogrun #N1 #N2 …` runs the named issues before it touches the pool**,
-in the order typed, **one at a time — no lanes**, each as a full `fullrun` in a delegated unit
-(`backlogrun-child.md` → "Each child runs in a delegated unit"); the parent reads each one's state back
-with `pnpm josh issue:state <N>`, never the unit's summary. `pnpm josh backlog:plan #N1 #N2 …` renders
-the order, and `scripts/backlog/backlog-named.ts` is its single source.
+**`backlogrun #N1 #N2 …` runs the named issues before it touches the pool**, in the order typed, **one
+at a time — no lanes**, each as a `fullrun` in a delegated unit (`backlogrun-child.md` → "Each child
+runs in a delegated unit"), read back with `pnpm josh issue:state <N>`. `pnpm josh backlog:plan #N1
+#N2 …` renders the order (`scripts/backlog/backlog-named.ts`).
 
-**A named issue that cannot finish parks, and the rest of the named list is skipped**; the run then
-drains the pool, and the report lists what was not started (`backlog_named.after_failure`). A
-`needs-human-review` named issue stops the whole run (`needs-human-review.md`). **`--only` runs the
-named list and stops there, draining no pool** — a failure under `--only` ends the run, and `--only`
-with no named issues is refused before anything starts (`backlog_named.startup`).
+**A named issue that cannot finish parks, and the rest of the named list is skipped**; the run drains
+the pool and reports what was not started (`backlog_named.after_failure`). A `needs-human-review` named
+issue stops the whole run. **`--only` runs the named list and stops there, draining no pool** — a
+failure ends the run, and `--only` with no named issues is refused (`backlog_named.startup`).
 
 ## The session cut is inside the invocation
 
 **Typing `backlogrun` once authorizes the declared budget, and a session cut does not end the run** —
-the next session picks the same invocation up from the carry record (`backlogrun-progress.md` → "The
-hand-off"). The record keeps the opening invocation string, `--only` and the named list included; a
-resumed session runs `remaining` from `--json`. The contract is `docs/josh-commands-run.md` →
-"`josh run:carry`".
+the next session resumes the invocation from the carry record (`backlogrun-progress.md` → "The
+hand-off"), which keeps the invocation string, `--only` and the named list; it runs `remaining` from
+`--json` (`docs/josh-commands-run.md` → "`josh run:carry`").
 
 ```bash
 pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"
@@ -64,9 +64,9 @@ pnpm josh run:carry --json                                                   # r
 pnpm josh run:wake --start                                                   # same turn as --begin; `running` under `josh backlogrun`
 ```
 
-**Always pass `--owner "$PPID"`**, and ask it before the plan, in the same turn as the first `pnpm josh
-ms`. **The record is the parent loop's, and a lane never touches it**; count into it with `--merged <N>`
-and `--filed 1`, and **`--cut` is the session's last write**.
+**Always pass `--owner "$PPID"`**, before the plan, in the same turn as the first `pnpm josh ms`. **The
+record is the parent loop's; a lane never touches it**. Count with `--merged <N>` and `--filed 1`;
+**`--cut` is the session's last write**.
 
 | It answers | What the run does |
 | --- | --- |
@@ -85,30 +85,27 @@ named epic's children", never the root as a standalone `fullrun`, then ask `pnpm
 a child number or `complete` continues; only `stop` or a failure records `pnpm josh run:carry --done <E>
 --owner "$PPID"`.
 
-**A person keeps control of the run** — `pnpm josh run:wake --list` reads it, `pnpm josh backlogrun
---stop` stops it (`docs/josh-commands.md` → "`josh backlogrun`").
-
-Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why a session cut does not end the run"
+**A person keeps control** — `pnpm josh run:wake --list` reads it, `pnpm josh backlogrun --stop` stops
+it (`docs/josh-commands.md` → "`josh backlogrun`").
 
 ## The plan, before the first child starts
 
 **Report the plan before anything is dispatched. The plan is one command's output** — `pnpm josh
-backlog:plan`, rendered from the same
-pool `backlog:next` answers from. Report all four of its sections (Ready now, Waiting, Waiting on a
-person, Out of scope) to the person in the session language, with any truncated-listing `⚠`.
+backlog:plan`, from the pool `backlog:next` answers from. Report all four sections (Ready now, Waiting,
+Waiting on a person, Out of scope) in the session language, with any truncated-listing `⚠`.
 
 ### Resolve what the plan can resolve, before starting
 
 **Settle every `needs-decision` issue the plan listed in one pass**, from one `pnpm josh issue:read <N>
-<N> …` call (body and comments, `issue-comments.md`):
+<N> …` call (`issue-comments.md`):
 
 - **An answer already in the issue** — record it as a comment and **remove the label** (Tier A).
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
-  carries `needs-decision`"); the next plan classifies it by the label alone.
-- **Order and isolate** — a native `blocked-by` where one must land first;
-  `run:solo` on all three `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**,
-  commenting the reason.
+  carries `needs-decision`").
+- **Order and isolate** — a native `blocked-by` where one must land first; `run:solo` on all three
+  `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**, commenting the
+  reason.
 - **`priority:high`** only on a cited ground (a stated deadline, a person's written policy), commented;
   **never remove it**.
 - **Report `pnpm josh backlog:plan --waves`** with the plan, never an order derived by hand; then start
@@ -116,9 +113,7 @@ person, Out of scope) to the person in the session language, with any truncated-
 
 **`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the only workflow labels a run
 applies by hand** — never `needs-human-review` (`needs-human-review.md`), and `auto-ok` only through
-`pnpm josh issue:file` or `pnpm josh auto-ok:judge`, which check the exclusions first.
-
-Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
+`pnpm josh issue:file` or `pnpm josh auto-ok:judge`.
 
 ## The loop
 
@@ -140,11 +135,7 @@ section the row names:
 | `window` | Hand the loop back as is | — |
 
 **A candidate only in another repository is never a token** — report it with its checkout. The budgets,
-verdicts and stops are the driver's own: `docs/maintainers/backlogrun-driver.md` (rationale:
-`docs/maintainers/backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free";
-`docs/maintainers/backlogrun-steps-rationale.md` → "Why the cost check skips a watch").
-
-Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why the loop's contract is shaped this way"
+verdicts and stops are the driver's own: `docs/maintainers/backlogrun-driver.md`.
 
 ## What runs once per session, not once per issue
 

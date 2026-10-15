@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity } from './lane-capacity'
 import { lane_ledger } from './lane-ledger'
+import { lane_process_stats } from './lane-process-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats } from './lane-stats'
@@ -119,6 +120,7 @@ async function stats_command(
 			`${lane_stats.header()}\n${row}`,
 			lane_stage_stats.table(entries, window),
 			lane_stop_stats.table(entries, window),
+			lane_process_stats.table(entries, window),
 		].join('\n\n'),
 	)
 

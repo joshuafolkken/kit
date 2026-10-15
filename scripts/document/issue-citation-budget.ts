@@ -38,7 +38,7 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'prompts/collaboration-workflow/residency.md', citations: 3 },
 	{ path: 'prompts/collaboration-workflow/rule-delivery.md', citations: 5 },
 	{ path: 'prompts/collaboration-workflow/shell-body.md', citations: 2 },
-	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 4 },
+	{ path: 'prompts/collaboration-workflow/turn-batching.md', citations: 3 },
 	{ path: 'prompts/collaboration-workflow/upstream-interrupt.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', citations: 2 },
 	{ path: 'prompts/refactoring.md', citations: 1 },

@@ -56,6 +56,12 @@ const gate_schema = z.object({
 // worth its load. `swapped_mb` is `machine_capacity`'s counter, every page swapped since boot.
 // Both memory fields were renamed with their meaning (joshuafolkken/kit#3593): an older row's
 // `free_mb` / `swap_mb` are stripped on read, so the two measurements never share a column.
+const process_kind_schema = z.object({
+	kind: z.string(),
+	cpu_percent: z.number(),
+	rss_mb: z.number(),
+	count: z.number(),
+})
 const load_schema = z.object({
 	kind: z.literal(KIND.LOAD),
 	at: z.string(),
@@ -63,6 +69,9 @@ const load_schema = z.object({
 	available_mb: z.number().optional(),
 	swapped_mb: z.number().optional(),
 	lanes: z.number().optional(),
+	// The heaviest process kinds at the instant of the sample (`lane-process-load.ts`), so the load the
+	// core budget's ledger does not explain can be read back by what made it (joshuafolkken/kit#3874).
+	processes: z.array(process_kind_schema).optional(),
 })
 // A lane child started on `issue` — the instant its implementation is timed from.
 const dispatch_schema = z.object({

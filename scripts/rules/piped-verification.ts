@@ -139,7 +139,9 @@ function keeps_verdict_intact(command: string): boolean {
 // **The check's own pipeline is read for what the cut cannot see.** `parts_of` does not split on a lone
 // `&`, so `| tail & curl …`, `| tail > ~/.zshrc` and `| tail -n $(cmd)` look like a filter after a check.
 // Any `&`, redirection, backtick or `$(` there beyond the check's own `2>&1` leaves the line to the
-// refusal, as does a heredoc anywhere on it, whose body lines the cut would read as commands.
+// refusal, as does a heredoc anywhere on it, whose body lines the cut would read as commands. An
+// unquoted `(` or `)` does too: the cut splits inside a group, so `(cd x && pnpm josh lint) | tail` would
+// wrap the inner check and leave the group's own pipe without `pipefail`.
 const PIPEFAIL_OPEN = '(set -o pipefail; '
 const PIPEFAIL_CLOSE = ')'
 const COMMENT_START = /(?:^|\s)#/u
@@ -149,6 +151,7 @@ const EARLY_EXIT_GREP =
 
 const ALLOWED_OPERATORS = /2>&1|&&/gu
 const SIDE_EFFECT_SYNTAX = /[&<>`]|\$\(/u
+const GROUP_SYNTAX = /[()]/u
 
 const PIPEFAIL_NOTE =
 	'↻ piped verification: the josh check was piped, so its pipeline was wrapped in ' +
@@ -171,11 +174,11 @@ function has_side_effect_syntax(command: string): boolean {
 }
 
 // The side-effect syntax is read on the typed part, since a double-quoted `$(cmd)` still runs; the pipe
-// cut is read on the blanked one, since a quoted `|` is text.
+// cut and the grouping are read on the blanked one, since a quoted `|` or `(` is text.
 function is_rewritable_part(raw: string, judged: string): boolean {
 	const pipeline = judged.split('|').map((piece) => piece.trim())
 
-	return !has_side_effect_syntax(raw) && is_filtered_check(pipeline)
+	return !has_side_effect_syntax(raw) && !GROUP_SYNTAX.test(judged) && is_filtered_check(pipeline)
 }
 
 // Where the part's code ends: an unquoted `#` opens a comment, which would swallow the closing `)`.
@@ -219,7 +222,10 @@ function pipefail_command(command: string): string | undefined {
 		return rewritten_part(raw, part)
 	})
 
-	return parts.includes(undefined) ? undefined : parts.join('')
+	const rewritten = parts.includes(undefined) ? undefined : parts.join('')
+
+	// A line masked as a whole but in no part wraps nothing, so no note may claim a wrap.
+	return rewritten === command ? undefined : rewritten
 }
 
 // The call's input with each masked check wrapped, or `undefined` where the call is not a rewritable

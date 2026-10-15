@@ -12,14 +12,14 @@ throughput, gate duration and machine load side by side.
 One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in the josh temp root, keyed
 on the common git directory so every lane, the parent and the sampler write to the same file.
 
-| Entry      | Written by                                                    | Fields                                                 |
-| ---------- | ------------------------------------------------------------- | ------------------------------------------------------ |
-| `merge`    | `josh run:merge`, when a child merged                         | `at`, `issue`                                          |
-| `gate`     | `josh gate`, when it finishes (passed or failed)              | `at`, `elapsed_ms`, `is_passed`, `unit_ms?`            |
-| `load`     | `josh backlog:drive` while it runs, and `josh lane:sample`    | `at`, `load`, `available_mb?`, `swapped_mb?`, `lanes?` |
-| `dispatch` | `josh lane:dispatch`, when a child started                    | `at`, `issue`                                          |
-| `stage`    | `josh ship`, as each stage ends; `josh followup` for the wait | `at`, `stage`, `elapsed_ms`, `issue?`                  |
-| `stop`     | `josh ship`, when it stops at a stage or on a conflict        | `at`, `issue`, `reason`                                |
+| Entry      | Written by                                                    | Fields                                                               |
+| ---------- | ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `merge`    | `josh run:merge`, when a child merged                         | `at`, `issue`                                                        |
+| `gate`     | `josh gate`, when it finishes (passed or failed)              | `at`, `elapsed_ms`, `is_passed`, `unit_ms?`                          |
+| `load`     | `josh backlog:drive` while it runs, and `josh lane:sample`    | `at`, `load`, `available_mb?`, `swapped_mb?`, `lanes?`, `processes?` |
+| `dispatch` | `josh lane:dispatch`, when a child started                    | `at`, `issue`                                                        |
+| `stage`    | `josh ship`, as each stage ends; `josh followup` for the wait | `at`, `stage`, `elapsed_ms`, `issue?`                                |
+| `stop`     | `josh ship`, when it stops at a stage or on a conflict        | `at`, `issue`, `reason`                                              |
 
 A `stage` entry's `at` is when the stage ended, so it began `elapsed_ms` earlier. `josh followup`
 writes one of its own, `ci-wait` — the time it spent waiting for the checks — and that one carries no
@@ -136,3 +136,19 @@ the resumption of the old stop. A stop late in the period whose resumption falls
 
 **The decision the table is for**: which stop reason to remove next — the reason whose runs times
 median is largest costs the lanes the most time.
+
+## What the load is made of
+
+A `load` sample's `processes` is the machine's process list at that minute, grouped by the kind of
+tool each command line runs — `vitest`, `eslint`, `tsc`, `cspell`, `prettier`, `playwright`, the
+browsers, `claude`, `josh`, `vscode`, `node`, else `other` — with each kind's summed CPU (`ps`'s
+`%cpu`, so 300 is three cores) and resident size, the five heaviest kept. A `ps` that fails or
+overruns the probe budget leaves the field out rather than recording an empty list.
+
+Under the stop table, `lane:stats` prints a fourth: one row per kind over the period, with its mean and
+peak CPU in cores, its peak resident size in GB and how many samples named it, heaviest mean first. A
+period whose samples carried no breakdown prints the header alone.
+
+**The decision the table is for**: what is loading the machine beyond the core budget's ledger
+([#3874](https://github.com/joshuafolkken/kit/issues/3874)) — a kind with a high mean that nothing
+reserves is the next thing to put on the budget.
