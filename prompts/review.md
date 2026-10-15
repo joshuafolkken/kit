@@ -100,10 +100,14 @@ round-1 High/Medium finding actually closed — by a fix in this working tree, o
 positive — and none was filed or deferred. **Without the flag the answer is `required`**, which is also
 what the command answers to every uncertainty it meets, a missing round-1 snapshot included.
 
-**`skip` has exactly two arms** — **A** (no fix code: the fix delta is empty) and **B** (inert fix
-code: every path in the fix delta is inert by the review-level classification above); the reason line
-names which fired. Why neither weakens the standard: `docs/maintainers/review-history.md` → "The two
-skip arms".
+**`skip` has exactly two arms** — **A** (no fix code: the fix delta is empty) and **B** (a fix that
+leaves what executes unchanged: every path in the fix delta is inert by the review-level classification
+above, `docs/**/*.md`, the root `README.md`, under `prompts/`, or a `.ts` / `.js` / `.svelte` file
+outside `.claude/` whose only change is in comments, a directive comment — lint, type-check, coverage
+or bundler — counting as code); the reason line names which fired. **One path
+outside that set makes the round `required`** — `.claude/**`, `CLAUDE.md`, a test, configuration, a
+code line, or a source file whose comment-free text cannot be read. Why neither arm weakens the
+standard: `docs/maintainers/review-history.md` → "The two skip arms".
 
 **A skipped round is recorded on the Issue**, so the condition stays auditable and can be withdrawn if
 a defect is later traced to a skipped delta:

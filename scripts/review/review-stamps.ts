@@ -13,11 +13,17 @@ const TEST_RELATED_PREFIX = 'josh-test-related-stamp-'
 const GATE_PREFIX = 'josh-gate-stamp-'
 const IN_FLIGHT_PREFIX = 'josh-gate-running-'
 const ROUND_ONE_PREFIX = 'josh-review-round1-'
+const ROUND_ONE_CODE_PREFIX = 'josh-review-round1-code-'
 const BRIEFED_PREFIX = 'josh-review-briefed-'
 
 const gate_stamp: FileMapStampAccess = file_map_stamp.create(GATE_PREFIX, PROJECT_ROOT)
 const in_flight_stamp: FileMapStampAccess = file_map_stamp.create(IN_FLIGHT_PREFIX, PROJECT_ROOT)
 const round_one_stamp: FileMapStampAccess = file_map_stamp.create(ROUND_ONE_PREFIX, PROJECT_ROOT)
+// Written beside the round-1 snapshot: the comment-free digest of each source file (`review-code-tree.ts`).
+const round_one_code_stamp: FileMapStampAccess = file_map_stamp.create(
+	ROUND_ONE_CODE_PREFIX,
+	PROJECT_ROOT,
+)
 // Retaken on every brief: the round-1 snapshot is not the tree a later review read.
 const briefed_stamp: FileMapStampAccess = file_map_stamp.create(BRIEFED_PREFIX, PROJECT_ROOT)
 const lint_related_stamp: FileMapStampAccess = file_map_stamp.create(
@@ -29,24 +35,39 @@ const test_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	PROJECT_ROOT,
 )
 
+// Swallowed: a code record left behind only ever sits beside an older snapshot, which the next
+// round-1 brief replaces together with it.
+function clear_round_one_code(target?: string): void {
+	try {
+		round_one_code_stamp.remove(target)
+	} catch {
+		/* the next round-1 brief overwrites it */
+	}
+}
+
 // Called only from the end of a merged run: a leftover widens the next delta (safe), while an early
 // removal lets round 1 re-snapshot an already-fixed tree (unsafe). Swallowed — the PR already merged.
-function clear_round_one(target?: string): void {
+function clear_round_one(target?: string, code_target?: string): void {
 	try {
 		round_one_stamp.remove(target)
 	} catch {
 		/* a record left behind widens the next round rather than narrowing it */
 	}
+
+	clear_round_one_code(code_target)
 }
 
 const review_stamps = {
 	briefed_stamp,
 	clear_round_one,
+	clear_round_one_code,
 	GATE_PREFIX,
 	gate_stamp,
 	IN_FLIGHT_PREFIX,
 	in_flight_stamp,
 	lint_related_stamp,
+	ROUND_ONE_CODE_PREFIX,
+	round_one_code_stamp,
 	ROUND_ONE_PREFIX,
 	round_one_stamp,
 	test_related_stamp,
