@@ -24,7 +24,7 @@
 
 ## 配送は 1 ラン 1 回
 
-配送文は**ラン 1 回につき 1 度**しか出ないので、**「同じ呼び出しをもう一度出せ」と明記する**。例外は 2 つで、繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）。その配送文にはそれぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する。バッチングと調査の 2 ガードは違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）。前提の証拠を読めないときは拒否を基本とする。経緯: `docs/maintainers/rule-delivery-rationale.md` → "One delivery per run"。
+配送文は**ラン 1 回につき 1 度**しか出ないので、**「同じ呼び出しをもう一度出せ」と明記する**。例外は 2 つで、繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）。その配送文にはそれぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する。バッチングと調査の 2 ガードは違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）。前提の証拠を読めないときは拒否を基本とする。経緯: `docs/maintainers/rule-delivery-rationale.md` → "One delivery per run"。配送文の長さの上限と経緯の置き場所: `docs/maintainers/rule-delivery-rationale.md` → "Why a refusal is the action and the next command"。
 
 ## マーカーテスト
 

@@ -119,7 +119,7 @@ function foreground_input(
 const FOREGROUND_NOTE =
 	'lane background: this lane child backgrounded `josh ship`, which would die with the headless turn ' +
 	'before its supervisor exists — so it was run in the foreground instead, where it detaches itself ' +
-	'after the preflight. End the turn on `launched` / `busy` (joshuafolkken/kit#3154).'
+	'after the preflight. End the turn on `launched` / `busy`.'
 
 // The launches `launched_ids` reads off the transcript tail that never saw their finish. A launch is
 // read off its own tool result and a finish off the harness notice, both by `time_transcript_line`.
@@ -149,26 +149,15 @@ function pending_agent_ids(tail: string): ReadonlyArray<string> {
 
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
-	'`claude -p` process whose background Bash tasks are killed when the turn ends — so a backgrounded ' +
-	'`josh gate` / `josh git` / `josh followup` / `josh ship` never re-invokes you; it dies at `exit code ' +
-	'143` (joshuafolkken/kit#2704, measured on the #2606 child: implementation, review and live ' +
-	'verification done, the run parked instead of merged). Hand the gate-to-merge region to the detached ' +
-	'supervisor instead: `pnpm josh ship --detach --review "<title> #<N>"` (add `--cite <N>`) issued in ' +
-	'the foreground — its preflight runs in this process before the supervisor exists, so a backgrounded ' +
-	'`ship` dies with the turn (joshuafolkken/kit#3027; a backgrounded `ship` issued alone is moved to ' +
-	'the foreground for you, joshuafolkken/kit#3154) — then end the turn on `launched` / `busy`. ' +
-	'`.claude/skills/workflow-commands/chain-rule.md` step 0 is the single source. A ' +
-	'single check you must read before continuing runs in the foreground within the tool timeout; the ' +
-	'commit-push step does not — in a child it too belongs to the detached ship, in either spelling. This ' +
-	'rule fires on every occurrence, not once per run.'
+	'process whose background tasks die when the turn ends. Hand over to ' +
+	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then end the turn on ' +
+	'`launched` / `busy`. It fires on every occurrence ' +
+	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =
 	'⛔ lane background stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a background task ' +
-	'it launched has not finished — ending this headless turn kills it, and nothing re-invokes you ' +
-	'afterwards (joshuafolkken/kit#2704). Do not send a notification and do not stop: wait for the task ' +
-	'in the foreground and act on its result, or re-issue the work through `pnpm josh ship --detach`, ' +
-	'whose supervisor outlives the turn (`.claude/skills/workflow-commands/chain-rule.md` step 0). Do ' +
-	'not repeat your previous reply.'
+	'it launched has not finished, and ending this turn kills it. Wait for it in the foreground, or ' +
+	're-issue the work through `pnpm josh ship --detach` — do not notify, stop or repeat your reply.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. It fires on every occurrence (`decide`
 // returns true): a child must never background these, so the route is always the detached ship, never

@@ -108,19 +108,11 @@ function records_the_park(command: string): boolean {
 // single source is `backlogrun-park.md` → "park and continue", and a second copy here would be the
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
-	'⛔ lane child park: this session is a dispatched lane child, and a stop that waits on a person must ' +
-	'leave the question on the Issue before it sends this Telegram — otherwise the parent finds an OPEN ' +
-	'Issue with `in-progress` and no question, and a person cannot tell what to answer ' +
-	'(joshuafolkken/kit#2034 measured this twice in one run). The child is the only process that knows ' +
-	'the question, the options and whether it stashed, so it records the park itself rather than leaving ' +
-	'the parent to guess from a log. Before you notify and stop: apply `needs-decision` and post a ' +
-	'comment carrying the question, the options, and whether work was stashed — ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'` then " +
-	'`pnpm josh issue:comment <N> --body-file <path>`. If this stop is a ' +
-	'`needs-human-review` or `already-done` one, that label is already on the Issue and there is nothing ' +
-	'to add. Then reissue this notify — it fires once per run and cannot repeat on the call in hand. The ' +
-	'procedure is `.claude/skills/workflow-commands/pre-gate-cut.md` → "A lane child records its park ' +
-	'before it stops", and the park itself is `backlogrun-park.md` → "park and continue".'
+	'⛔ lane child park: this session is a dispatched lane child, so a stop for a person parks first: ' +
+	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'`; " +
+	'`pnpm josh issue:comment <N> --body-file <path>` (question, options, stash); a ' +
+	'`needs-human-review` / `already-done` stop already is. Reissue this notify, once per run ' +
+	'(`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`, and
 // no `already_satisfied`.** The stop ends the turn, so it is not the recurring act `decide` is for. It carries no `already_satisfied` because the park it asks for is a GitHub label a

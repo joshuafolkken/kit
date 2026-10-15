@@ -48,11 +48,10 @@ function command_line(oracle: Oracle): string {
 // the single source of the procedure.
 function reason_for(oracle: Oracle, firing_point: FiringPoint): string {
 	return (
-		`⛔ decision oracle not consulted: this is ${firing_point.describes}, but the run has not run ` +
-		`\`${command_line(oracle)}\` first — the oracle that decides ${oracle.decision.toLowerCase()}. ` +
-		`It answers ${oracle.vocabulary.join(' | ')}; single source ${oracle.single_source}. Reissue ` +
-		`after running it and reading its verdict. Every such call is refused until that command is on ` +
-		`the transcript.`
+		`⛔ decision oracle not consulted: this is ${firing_point.describes}. Run ` +
+		`\`${command_line(oracle)}\` first — it decides ${oracle.decision.toLowerCase()} and answers ` +
+		`${oracle.vocabulary.join(' | ')} (${oracle.single_source}). Every such call is refused until ` +
+		`that command is on the transcript.`
 	)
 }
 

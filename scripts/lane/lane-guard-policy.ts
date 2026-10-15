@@ -47,25 +47,25 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 		id: 'investigation',
 		mode_in_lane_child: 'notice',
 		because:
-			'a refusal ends a child turn so it cannot fire as one (kit#2138), which is why it was `off` from #2138 to #2382. The exemption reason — "the child is itself the delegated unit, so it cannot dispatch a sub-unit to read its own edit targets" — did not hold in measurement: kit#2382 re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372 #2374 #2375) and every one dispatched sub-agents (10 launches, 2 of them investigation fan-outs) and read 4–17 files it never edited, all six over the threshold of 3. So the reading the guard exists to send out was there to send. It takes `notice`, not `off`: the child is nudged to delegate rather than killed, on the `additionalContext` path batching and duplicate-read already use, and the notice names the concrete unedited files this run read (the #2276 precedent) rather than the generic "delegate" #2164 → #2178 measured not to move the number. The density is a genuine experiment — re-measured on the next backlogrun, and a notice that still does not move it is redesigned rather than kept',
+			'a refusal ends a child turn, yet lane children were measured reading files they never edited, so the child is nudged to delegate by a notice rather than killed',
 	},
 	{
 		id: 'batching',
 		mode_in_lane_child: 'off',
 		because:
-			'a refusal ends a child turn so it cannot fire as one (kit#2138); kit#2164 replaced it with a notice, kit#2178 took that notice off after it did not move the density, and kit#2276 restored it — naming the concrete recent calls and recurring every single-call turn — as a genuine experiment to be redesigned rather than kept if the next backlogrun still missed 1.40. kit#2405 is that re-measurement, and it cuts the notice off (`off`). `josh time:density` read 1.13 calls per round trip over the ten most recent lanes (1.04 in the Issue’s per-message frame), short of the 1.40 target as every advisory attempt before it was (kit#1304/#1329/#1337/#1390/#2164/#2276). The cause is structural rather than wording: a `PreToolUse` hook cannot see the turn it is in — a turn’s later `tool_use` lines arrive 1.4–15s after its first — so it judges only closed turns, and a notice at turn close still asks for the parallel `tool_use` blocks the model resists. The one lever measured to move the density is a composite command the model emits in a single call (`read:files`/`edit:files`, kit#2202/#2311), which needs no notice. So per the issue’s instruction to discontinue advisory means when the target is missed, the notice is cut off rather than rewritten a seventh time; the density stays readable through `josh time:density`',
+			'a refusal ends a child turn and every advisory notice was measured not to move the call density, so the guard is off and the density stays readable through `josh time:density`',
 	},
 	{
 		id: 'duplicate-read',
 		mode_in_lane_child: 'notice',
 		because:
-			'a refusal ends a child turn so it cannot fire as one (kit#2138), and the unchanged re-reads the guard catches are measured in lane children above all (kit#2298 baseline: 8.0 per lane run) — so silencing it there (`off`) would neuter it exactly where the count lives. It takes `notice` instead: the child is nudged to scroll up to the earlier read rather than killed. The mode is a genuine experiment, as the batching notice is — a notice that does not reduce the duplicate reads on the next backlogrun is redesigned rather than kept',
+			'a refusal ends a child turn, yet unchanged re-reads are measured in lane children above all, so the child is nudged to scroll up to the earlier read by a notice rather than killed',
 	},
 	{
 		id: 'rule',
 		mode_in_lane_child: 'refuse',
 		because:
-			"it carries the lane-only rules a child depends on (`pre-gate-cut`, `implementation-cut`, `lane-park`) and the safety rules a child must still obey (`shell-body`, `piped-verification`); a blanket suppression would disarm exactly the guards written for the child. `implementation-cut` (joshuafolkken/kit#2310) needs `refuse` for the same reason the pre-gate cut does — kit#1864 and kit#2310 both measured a cut carried as prose firing 0 times, so a notice, being prose in front of the run, would drop enforcement without a procedural replacement. The pre-gate-cut refusal does collateral a sibling call batched in the same turn — a `PreToolUse` deny cancels the turn's other parallel calls, which is the harness behavior kit#2177 measured on #2160 (gate refused, its batched `review:brief` cancelled) — and that collateral is not avoidable at the guard level. `notice` was considered for the pre-gate-cut point and rejected: kit#1864 measured the cut taken 0 times while it was carried as prose, and a notice is prose in front of the run (kit#2178 measured a lane-child notice not moving the number), so a notice would drop enforcement without a procedural replacement. kit#2177 supplies that replacement in the procedure instead — the chain orders the cut before the gate, so the cut is issued on its own (its `cut` verdict ends the turn, batching with nothing) and the gate runs in the fresh process where the carried cut keeps this guard silent; the refusal therefore stays `refuse` as insurance and the collateral is gone from the default path rather than from the guard",
+			'it carries the lane-only rules a child depends on (`pre-gate-cut`, `implementation-cut`, `lane-park`) and the safety rules it must still obey, and a notice was rejected despite the collateral a refusal costs a batched sibling, because a cut carried as prose was measured never to fire',
 	},
 ]
 

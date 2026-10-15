@@ -171,20 +171,13 @@ function carries_a_file_body(
 	)
 }
 
-// The instruction in the shape a refusal can carry: what the command is doing, the safe tool, and the
-// file forms that stay allowed. The measured cost is named because it is the half that reads as
-// surprising — the command body is billed on every later request of the run.
+// The instruction in the shape a refusal can carry: what the command is doing and the safe tool. The
+// measured cost behind it is in `file-edits.md`.
 const FILE_BODY_REASON =
-	"⛔ file body in a shell command: this carries a file's new text inline — a heredoc rewriting an " +
-	'existing file, an interpreter (`python3 - <<`, `node -e`) whose body writes, a script file (`cat > ' +
-	'edit.py <<EOF`) whose body writes, or an in-place `perl -0pi -e`. `CLAUDE.md` forbids it because ' +
-	'the command body is re-read on every later request of the run, so an editing script written early ' +
-	'is billed for the rest of it (`file-edits.md` measured one run at ~2m45s spent retyping existing ' +
-	'lines). Edit a region with the Edit tool (old / new); a change scattered so widely that the ' +
-	'partial edits would carry more than the file is rewritten whole with the Write tool, never a ' +
-	'heredoc. Pass a body by path (`--field body=@<path>`, `--body-file <path>`). A new-file creation (`cat > ' +
-	'<new-file> <<EOF`), a read-only heredoc (`cat <<EOF`), and a short `sed -i` stay allowed. **This ' +
-	'rule fires on every occurrence, not once per run.**'
+	"⛔ file body in a shell command: this carries a file's new text inline, which is re-read on every " +
+	'later request. Edit a region with the Edit tool, rewrite a whole file with the Write tool, and ' +
+	'pass a body by path (`--body-file <path>`); a new-file `cat > <new-file> <<EOF` stays allowed. ' +
+	'This rule fires on every occurrence (`prompts/collaboration-workflow/file-edits.md`).'
 
 const ROW = {
 	id: 'file-body',

@@ -37,12 +37,11 @@ describe('the delivered text — what the refusal states', () => {
 		expect(delivered).toContain('end the turn immediately')
 	})
 
-	// **The dispatch mark is what fires the refusal now, so a person sees none** (joshuafolkken/kit#1904).
-	// The old text warned a person on the firing side not to cut; the mark takes them off it, so the
-	// refusal states why it fired rather than telling someone to ignore it.
-	it('states that the dispatch mark fired it, and a person carries none', () => {
-		expect(delivered).toContain('the dispatch mark names this lane')
-		expect(delivered).toContain('carries no mark and sees no refusal')
+	// **The dispatch mark is what fires the refusal, so a person sees none** (joshuafolkken/kit#1904).
+	// The refusal names the lane it fired in; the topic file states that a person carries no mark.
+	it('states that it fired in a dispatched lane, and the topic file says a person sees none', () => {
+		expect(delivered).toContain('a lane dispatched for this issue')
+		expect(read_unwrapped(TOPIC_FILE)).toContain('An interactive `fullrun` carries no mark')
 	})
 })
 

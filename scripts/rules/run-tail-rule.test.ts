@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { test_declared_changed } from '#scripts/test/test-declared-changed'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -253,22 +254,25 @@ describe('RUN_TAIL_REASON', () => {
 		// The second half a run forgets once the push has landed.
 		['pnpm josh followup'],
 		['never ends at the push'],
-		// The cap is what actually produced symptom 1, so it is stated rather than implied.
-		['above the harness cap'],
 		// The boundary, so the rule does not read as contradicting the foreground rule for followup.
 		['foreground'],
-		// The pointer to the procedure, and the two Issues the rule rests on.
+		// The pointer to the procedure.
 		['background-commands.md'],
-		['joshuafolkken/kit#1510'],
-		['joshuafolkken/kit#1333'],
 		// A recurring rule has to say so, or a reader treats one refusal as the whole of it.
 		['fires on every foreground push, not once per run'],
-		// joshuafolkken/kit#1462 measured the tail this rule used to say did not exist, so the rule
-		// carries what to do with it — not only that `followup` stays in the foreground.
-		['joshuafolkken/kit#1462'],
-		['read the merge result stay after'],
 	])('carries %j', (marker) => {
 		expect(run_tail_rule.RUN_TAIL_REASON).toContain(marker)
+	})
+
+	// What the refusal points at rather than carries: the harness cap that produced symptom 1, and
+	// what to do with the tail after the merge — not only that `followup` stays in the foreground.
+	it.each([
+		['**Never give a foreground call a timeout above the harness cap**'],
+		['**It does — the step stays after `followup`.**'],
+	])('leaves %j to the topic file it points at', (marker) => {
+		expect(read_unwrapped('.claude/skills/workflow-commands/background-commands.md')).toContain(
+			marker,
+		)
 	})
 
 	// The retracted premise, kept as a negative assertion rather than deleted quietly: an agent told

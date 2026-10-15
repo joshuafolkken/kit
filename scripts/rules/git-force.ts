@@ -69,19 +69,15 @@ function is_force_or_delete(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => is_destructive_segment(segment))
 }
 
-// The instruction in the shape a refusal can carry: what the command does, why the deny list did not
-// stop it, and the one route left. There is no "safe reissue" the way a backgrounded push is for
+// The instruction in the shape a refusal can carry: what the command does and the one route left. The
+// spellings the deny glob misses are pinned on `is_force_or_delete`, not repeated in the text. There is no "safe reissue" the way a backgrounded push is for
 // `run-tail` — a force push and a branch delete are Tier C, so the honest next move is a person's, in
 // their own terminal.
 const GIT_FORCE_REASON =
 	'⛔ force push or branch delete: this rewrites or removes shared history, which is Tier C and needs ' +
-	'explicit current-turn user instruction — never an AI decision, even to fix a problem you caused ' +
-	'(`prompts/collaboration-workflow/operating-rules.md`). The `.claude/settings.json` deny list ' +
-	'matches globs, so it misses this spelling: a combined short cluster (`git push -uf`), a `git -C ' +
-	'<path>` prefix, and the colon-form delete (`git push origin :branch`) all pass it. This row reads ' +
-	'the argv instead, so the spelling does not matter. For an ordinary push use `pnpm josh git`; a ' +
-	"force push, a `git push --delete` / `:branch`, or a `git branch -d` / `-D` is the user's to run in " +
-	'their own terminal. **This rule fires on every occurrence, not once per run.**'
+	'explicit current-turn user instruction. Push with `pnpm josh git`; leave a force push or branch ' +
+	"delete to the user's own terminal. This rule fires on every occurrence " +
+	'(`prompts/collaboration-workflow/operating-rules.md`).'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
 // occurrence; it declares no `keeps` — not force-pushing is the absence of a call, not a call, so the

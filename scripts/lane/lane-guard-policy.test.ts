@@ -77,15 +77,15 @@ describe('lane_guard_policy — the enumeration is the whole of it', () => {
 		}
 	})
 
-	// **kit#2177 records the pre-gate-cut collateral trade-off here.** The refusal collaterals a batched
-	// sibling and that is not avoidable at the guard level, so the enumeration is where the `notice`
-	// option and the reason it was rejected are kept — the record the acceptance condition asks for.
+	// **The rule row records the pre-gate-cut collateral trade-off (kit#2177).** The refusal collaterals a batched
+	// sibling and that is not avoidable at the guard level, so the enumeration names the `notice` option
+	// and the reason it was rejected; the measurements behind it live in
+	// `docs/maintainers/rule-delivery-rationale.md`, not in the row.
 	it('records the pre-gate-cut collateral and the rejected notice option on the rule row', () => {
 		const rule_entry = lane_guard_policy.entry_for('rule')
 
 		expect(rule_entry?.because).toContain('collateral')
 		expect(rule_entry?.because).toContain('notice')
-		expect(rule_entry?.because).toContain('kit#2177')
 	})
 })
 

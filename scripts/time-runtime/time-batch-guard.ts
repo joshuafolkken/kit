@@ -51,12 +51,12 @@ type NamedCall = Pick<Span, 'is_bundleable' | 'is_writing' | 'label' | 'targets'
 const RULE_POINTER = '`prompts/collaboration-workflow/turn-batching.md`'
 const STREAK = `${String(CONSECUTIVE_LIMIT)} single-call turns in a row`
 
-// Includes what to do when the turn was already batching — the guard cannot see the turn it interrupted.
+// Includes what to do when there is nothing to pair — the guard cannot see the turn it interrupted.
 const REASON =
 	`⛔ batching: ${STREAK}. Reissue this with the calls that do not need its result — the test is ` +
 	`whether a call's input needs another call's result, not what kind of call it is (edits are covered ` +
-	`exactly as reads), and it never authorizes weakening a verification gate or a review. Already ` +
-	`batching, or nothing to pair? Reissue it unchanged; this fires once per streak. ${RULE_POINTER}`
+	`exactly as reads); it never authorizes weakening a verification gate or a review. Nothing to ` +
+	`pair? Reissue it unchanged. ${RULE_POINTER}`
 
 // A whole-file write earns a notice, not a refusal: a `Write` cannot be refused safely.
 const NOTICE =

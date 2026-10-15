@@ -103,16 +103,11 @@ function writes_third_party(
 // to do instead. The command that computes the party is handed over, because the whole point of this
 // Issue is that the test is computed rather than judged.
 const THIRD_PARTY_WRITE_REASON =
-	'⛔ third-party write: this `gh api` call writes to a repository whose owner is not this session — ' +
-	'a tracker we do not own is Tier C, and every write there (Issue, comment, PR, Discussion, review) ' +
-	'needs explicit current-turn user instruction; typing the target, or holding a correct diagnosis, ' +
-	'is not that instruction (`CLAUDE.md` → "Third-party repositories are Tier C", ' +
-	'`prompts/collaboration-workflow/upstream-interrupt.md`). Confirm the party with ' +
-	'`pnpm josh repo:party <owner/repo>` — owner equality, computed not judged. A read (`-X GET`, or no ' +
-	'field flag) passes untouched; only a write (`-f`/`-F`/`--field`/`--raw-field`/`--input`, or ' +
-	'`-X POST|PATCH|PUT|DELETE`) is refused. Record the finding on our own Issue and draft the artifact ' +
-	'for a person to post — do not publish it yourself. **This rule fires on every occurrence, not once ' +
-	'per run.**'
+	'⛔ third-party write: this `gh api` call writes to a repository whose owner is not this session, ' +
+	'which is Tier C and needs explicit current-turn user instruction. Check with ' +
+	'`pnpm josh repo:party <owner/repo>`, then record the finding on our own Issue and draft the ' +
+	'artifact for a person to post. This rule fires on every occurrence ' +
+	'(`prompts/collaboration-workflow/upstream-interrupt.md`).'
 
 // `decide` returns true so it refuses every occurrence; it declares no `keeps` — not writing to
 // another owner's tracker is the absence of a call, not a call, so the row is reported unmeasured

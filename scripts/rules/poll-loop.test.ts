@@ -1,3 +1,4 @@
+import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { early_heartbeat } from './early-heartbeat'
 import { poll_loop } from './poll-loop'
@@ -80,10 +81,18 @@ describe('poll_loop.POLL_LOOP_REASON', () => {
 	it.each([
 		'output poll loop',
 		'run_in_background',
-		'completion notification',
+		'its exit re-invokes you',
 		'background-commands.md',
 		'fires on every occurrence',
 	])('carries %j', (marker) => {
 		expect(poll_loop.POLL_LOOP_REASON).toContain(marker)
+	})
+
+	// The topic file the refusal points at states that the task's completion notification, not a
+	// regex over the output, is what ends the wait.
+	it('points at a topic file that names the completion notification as the end of the wait', () => {
+		const topic = read_unwrapped('.claude/skills/workflow-commands/background-commands.md')
+
+		expect(topic).toContain('that completion notification is what ends the wait')
 	})
 })

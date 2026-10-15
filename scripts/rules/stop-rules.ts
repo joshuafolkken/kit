@@ -101,25 +101,19 @@ const NO_OUTCOME: StopOutcome = { reason: undefined }
 // mid-workflow, and the transcript is what says the notify was sent.
 const STOP_NOTIFY_REASON =
 	'⛔ mid-workflow stop notification: this working tree is still held by a run and no `confirmation` ' +
-	'Telegram was sent this turn, so a person is being left to wait off-screen without knowing the run ' +
-	'paused. `CLAUDE.md` → "Mid-workflow stop notification" requires ' +
+	'Telegram was sent this turn. Send ' +
 	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\' ' +
-	'--recommended "<choice>" --alternative "<choice>"` before any ' +
-	'mid-workflow pause. Send it, then end with a one-line confirmation that it was sent — do not repeat ' +
-	'your previous reply. This fires only while the hold is held and no notify is on the transcript, and ' +
-	'`stop_hook_active` lets a second stop through so a run is never wedged.'
+	'--recommended "<choice>" --alternative "<choice>"` (`CLAUDE.md` → "Mid-workflow stop ' +
+	'notification"), then confirm in one line that it was sent — do not repeat your previous reply.'
 
 // **A clean tree that still holds is a tree the next run will trample.** `working-tree-hold.md`: a stop that
 // leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop
 // keep it because their tree is dirty, which is why this row is silent whenever the tree is not clean.
 const HOLD_RELEASE_REASON =
 	'⛔ working-tree hold not released: this working tree is clean but its `run:hold` record is still in ' +
-	'place, so the next run here runs `pnpm josh ms` believing the tree is free while ' +
-	'you hold it. The workflow-commands skill → `working-tree-hold.md`: a stop that leaves the tree clean ' +
-	'releases the hold with `pnpm josh run:release <N>` (bare for a `new` entry). A `halfrun` ' +
-	'pre-commit stop and a `needs-human-review` stop keep the hold because their tree is dirty, and a ' +
-	'`prrun` stop keeps it by its stop mark — this row is silent there. Release it, then end with a one-line confirmation that it was released — do ' +
-	'not repeat your previous reply.'
+	'place. Release it with `pnpm josh run:release <N>` (bare for a `new` entry; ' +
+	'`working-tree-hold.md`), then confirm in one line that it was released — do not repeat your ' +
+	'previous reply.'
 
 // **A refusal that corrects rather than advises**. The bare `#N` is already
 // on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
@@ -149,13 +143,10 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 // first**: there the offer is the correct reply, so `needs_filing` is silent.
 const FILING_OFFER_REASON =
 	'⛔ filing offer: your reply offers to file an Issue instead of filing it, and this run is ' +
-	'unattended — nobody is there to answer. Filing into a first-party repository there is Tier A — ' +
-	"the trigger is the judgement that it is worth filing, not the run's progress (the " +
-	'workflow-commands skill → `observation-filing.md`). Run ' +
-	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` — it scouts, lints, labels and ' +
-	'runs `epic:bundle` itself — then end with the one-line citation of what was filed; do not repeat ' +
-	'your previous reply. If it is not worth filing ' +
-	'after all, say so in one line instead.'
+	'unattended — nobody is there to answer. Run ' +
+	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` (Tier A, ' +
+	'`observation-filing.md`), then end with the one-line citation of what was filed; do not repeat ' +
+	'your previous reply. If it is not worth filing after all, say so in one line instead.'
 
 // **A headless parent's turn-end is its process's end**. Under `claude -p` the
 // background waits die with the turn, so the lanes lose their parent and nothing re-invokes it. The
@@ -176,12 +167,10 @@ const HEADLESS_REFUSAL_CAP = 3
 const HEADLESS_WAIT_CALLS = ['"command":"pnpm josh lane:await']
 
 const HEADLESS_WAIT_BODY =
-	' this is a `claude -p` `backlogrun` parent (`JOSH_RUN_HEADLESS`) with lanes still ' +
-	'in flight, and ending this turn ends the process — its background waits are killed with it and the ' +
-	"lanes are left without a parent. Do not watch them yourself: the `run:wake` supervisor's driver " +
-	'watches the lanes and wakes a session only for a branch that needs judging. Hand the loop back with ' +
+	' this is a `claude -p` `backlogrun` parent with lanes in flight, and ending this turn kills the ' +
+	'process and its background waits. Hand the loop back with ' +
 	'`pnpm josh run:carry --cut --owner "$PPID"` (or `--end` when the run is over), then end the turn ' +
-	'(`backlogrun-progress.md` → "Picking the lanes up in the fresh session").'
+	'(`backlogrun-progress.md`).'
 
 const HEADLESS_WAIT_REASON = `${HEADLESS_WAIT_MARKER}${HEADLESS_WAIT_BODY}`
 
@@ -195,11 +184,9 @@ const PERMISSION_PATTERN = /許可|承認|permission|approve|approval|authorizat
 
 const LANE_INDEX_REASON =
 	'⛔ lane index permission: this is a dispatched lane child (`JOSH_LANE_CHILD`) and your reply asks ' +
-	"a person for permission to change the git index. A lane is a per-run work tree with no person's " +
-	'staging to protect, and the sanctioned commit flow is already authorized: remove any conflict ' +
-	'markers, then run `pnpm josh git -y`, which stages and commits them — a conflicted merge included. ' +
-	'This is Tier A (`.claude/skills/workflow-commands/chain-rule.md` → "origin/main is merged in before ' +
-	'the gate"). Do it and continue the run — do not repeat your previous reply.'
+	'a person for permission to change the git index. That is Tier A here (`chain-rule.md`): remove any ' +
+	'conflict markers, run `pnpm josh git -y` (it stages and commits, a conflicted merge included) and ' +
+	'continue the run — do not repeat your previous reply.'
 
 function asks_index_permission(message: string): boolean {
 	return INDEX_COMMAND_PATTERN.test(message) && PERMISSION_PATTERN.test(message)

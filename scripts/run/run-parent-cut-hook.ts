@@ -53,16 +53,11 @@ function current_state(): ParentCutState {
 const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
 
 const PARENT_CUT_REASON =
-	'⛔ backlogrun parent hand-off: this session drives a `backlogrun` (it owns the live carry record) and ' +
-	`its recent-context cost has crossed the shared ${THRESHOLD_TEXT} threshold between merges, so every ` +
-	'later request re-reads the accumulated context (joshuafolkken/kit#2947). Take the hand-off now rather ' +
-	'than at the next merge: follow `.claude/skills/workflow-commands/backlogrun-progress.md` → "The ' +
-	'hand-off" from its `over` branch — open no new lane and take no new child, read `pnpm josh lane:list`, ' +
-	'make sure every lane in flight records an output path, then run `pnpm josh run:carry --cut --owner ' +
-	'"$PPID"` and, unless it answers `capped`, `pnpm josh run:wake`, post the progress comment and end the ' +
-	'turn. A lane nobody can poll means the cut does not happen; carry on and this asks again later. ' +
-	'Reissue this call when the hand-off is done or cannot be taken — the guard stays quiet for a while ' +
-	'after it refuses, so the hand-off calls themselves are not refused.'
+	'⛔ backlogrun parent hand-off: this session drives a `backlogrun` and its recent-context cost ' +
+	`crossed the ${THRESHOLD_TEXT} threshold between merges. Take the hand-off now: open no new lane, ` +
+	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:carry --cut --owner "$PPID"`, then ' +
+	'`pnpm josh run:wake` unless `capped`) and end the turn. Reissue this call once done or if it ' +
+	'cannot be taken.'
 
 // Neither an uncapped parent's own record nor a measured `over` is optional: a capped record has no cut
 // left to take (`run:carry --cut` answers `capped`), and an unmeasurable session is left alone here —

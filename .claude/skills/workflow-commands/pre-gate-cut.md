@@ -173,9 +173,10 @@ implementation — **the implementation resume clears the record**, so the cut m
 that relaunches its successor owes no Telegram**, the pre-gate cut as much as this one: nobody has
 anything to act on, and a resume answering `stale` / `busy` sends its own. Outside a lane nothing is
 relaunched, so `run:cut --impl` prints the held run's instruction — on a measured `over` that run
-keeps the hold, sends a `confirmation` Telegram naming `fullrun #<N>` and ends the turn. The refusal states the rest — **It fires on every threshold crossing,
-not once per run**; **An edit reissued right after a refusal passes**; **An unmeasurable session
-warrants the cut**; **It is silent between a cut and its resume**. Rationale:
+keeps the hold, sends a `confirmation` Telegram naming `fullrun #<N>` and ends the turn. Also —
+**It fires on every threshold crossing, not once per run**; **An edit reissued right after a refusal
+passes**; **An unmeasurable session warrants the cut**; **It is silent between a cut and its resume**.
+Rationale:
 `docs/maintainers/pre-gate-cut-rationale.md` → "Why the rules are guards, not prose";
 `scripts/rules/implementation-cut.ts` implements it. A child that ended without cutting is detected
 after the fact by `pnpm josh run:ending <N> --output <path>`.
