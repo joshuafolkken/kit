@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto'
-import { constants, cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import {
+	constants,
+	cpSync,
+	existsSync,
+	lstatSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
@@ -44,14 +53,24 @@ function split_dry_run_flag(args: ReadonlyArray<string>): DryRunSplit {
 	}
 }
 
-// A link is copied as the file it points to, so no write in the scratch copy can follow a link back
-// into the project; a dangling one is left out, as the project scan leaves out what it cannot read.
-// The root itself is always copied: `cpSync` filters it too, so a project in a directory named
-// `build` or `dist` would otherwise be planned as an empty one.
+// A directory is copied unless the project scan skips it: an ignored one, or a link — followed, a
+// link to the project or an ancestor would copy it into itself until the path is too long.
+function is_copied_directory(source: string): boolean {
+	return (
+		!lstatSync(source).isSymbolicLink() &&
+		!project_profile.is_ignored_directory(path.basename(source))
+	)
+}
+
+// A link to a file is copied as the file it points to, so no write in the scratch copy can follow a
+// link back into the project; a dangling one is left out, as the project scan leaves out what it
+// cannot read. The root itself is always copied: `cpSync` filters it too, so a project in a
+// directory named `build` or `dist` would otherwise be planned as an empty one.
 function is_copied(root: string, source: string): boolean {
 	if (source === root) return true
+	if (!existsSync(source)) return false
 
-	return existsSync(source) && !project_profile.is_ignored_directory(path.basename(source))
+	return !statSync(source).isDirectory() || is_copied_directory(source)
 }
 
 // The scratch repository answers the setup's git questions as the project's does: one exists, and

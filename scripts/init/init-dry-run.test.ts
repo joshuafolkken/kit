@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execaSync } from 'execa'
@@ -20,7 +29,13 @@ const OPTIONS_SCHEMA = z.object({ cwd: z.string() })
 const ARGS_SCHEMA = z.array(z.string())
 
 // What the stand-in setup saw of the scratch copy while it ran.
-const state = { root: '', scratch: '', has_git: false, has_node_modules: false }
+const state = {
+	root: '',
+	scratch: '',
+	has_git: false,
+	has_node_modules: false,
+	entries: new Array<string>(),
+}
 
 function result_of(exit_code: number): ReturnType<typeof execaSync> {
 	const result = { exitCode: exit_code, all: INIT_OUTPUT, stdout: '', stderr: '' }
@@ -32,6 +47,7 @@ function record_scratch(scratch: string): void {
 	state.scratch = scratch
 	state.has_git = existsSync(path.join(scratch, '.git'))
 	state.has_node_modules = existsSync(path.join(scratch, NODE_MODULES))
+	state.entries = readdirSync(scratch)
 }
 
 // Stands in for the real `josh init`: it adds a file and a script, and records where it ran.
@@ -134,6 +150,31 @@ describe('init_dry_run.plan_report, the project directory (#3830)', () => {
 		fake_init()
 
 		expect(init_dry_run.plan_report(request({ root }))).toContain(`merge     ${PACKAGE_JSON}`)
+	})
+})
+
+describe('init_dry_run.plan_report, links (#3830)', () => {
+	it('copies a link to a file as the file, so the setup cannot write through it', () => {
+		const target = path.join(state.root, NODE_MODULES, 'agents-target.md')
+
+		writeFileSync(target, '# shared\n')
+		symlinkSync(target, path.join(state.root, GENERATED_FILE))
+		fake_init()
+		init_dry_run.plan_report(request())
+
+		expect(readFileSync(target, 'utf8')).toBe('# shared\n')
+	})
+
+	it('leaves out a dangling link and a link to a directory, and keeps a file named like one', () => {
+		symlinkSync(path.join(state.root, 'missing.md'), path.join(state.root, 'gone.md'))
+		symlinkSync(state.root, path.join(state.root, 'self'))
+		writeFileSync(path.join(state.root, 'build'), '#!/bin/sh\n')
+		fake_init()
+		init_dry_run.plan_report(request())
+
+		expect(state.entries).not.toContain('gone.md')
+		expect(state.entries).not.toContain('self')
+		expect(state.entries).toContain('build')
 	})
 })
 
