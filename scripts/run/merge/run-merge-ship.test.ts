@@ -149,6 +149,13 @@ describe('run_merge_ship.is_unanswered', () => {
 		expect(await run_merge_ship.is_unanswered(CHILD, '/t/12.log')).toBe(true)
 	})
 
+	it('leaves a child whose lane is gone, which nothing relaunches, to the failed child', async () => {
+		stopped_unanswered('anthropic')
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+
+		expect(await run_merge_ship.is_unanswered(CHILD, '/t/12.log')).toBe(false)
+	})
+
 	it('leaves an OpenAI lane, whose parent books every stop, to the failed child', async () => {
 		stopped_unanswered('openai')
 

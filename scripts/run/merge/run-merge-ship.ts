@@ -105,13 +105,13 @@ function is_interrupted(
 
 // Whether the child's ship stopped and the relaunch meant to fix it never ran, read against its
 // transcript at `output`. An OpenAI lane is never relaunched — its parent books every stop as an ended
-// child — so only another lane's reads as one.
+// child — and nothing relaunches a child whose lane is gone, so only an open non-OpenAI lane reads as one.
 async function is_unanswered(child: string, output: string | undefined): Promise<boolean> {
 	if (output === undefined || !is_interrupted(child, run_ending.written_at(output))) return false
 
 	const lane = await lane_registry.find_open_lane(child)
 
-	return lane === undefined || !lane_relaunch.is_openai_lane(lane)
+	return lane !== undefined && !lane_relaunch.is_openai_lane(lane)
 }
 
 const run_merge_ship = { cause, cause_of, interrupted_of, is_unanswered }
