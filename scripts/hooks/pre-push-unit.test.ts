@@ -1,6 +1,7 @@
 import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
@@ -309,6 +310,36 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 
 // The hook's line names this command, so a command that is not registered is a push that fails on
 // every repository the config reaches.
+// joshuafolkken/kit#3874: a push's whole suite ran beside other lanes' gates without a place in the core
+// budget, so their admission read its workers as load from outside the ledger.
+describe('the whole suite holds a place in the core budget', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reserves the direct unit weight before it runs the suite', async () => {
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockImplementation(async (_weight, run) => await run())
+
+		await run_hook()
+
+		expect(reservation).toHaveBeenCalledTimes(1)
+		expect(reservation.mock.calls[0]?.[0]).toBeGreaterThanOrEqual(1)
+		expect(suite_run_count()).toBe(SUITE_RAN)
+	})
+
+	// A claim on the reuse path could make a push wait out a full ledger for a suite it then skips.
+	it('reserves nothing when the green record is reused', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		record_green(CHANGED_TREE, BASE)
+		await run_hook()
+
+		expect(reservation).not.toHaveBeenCalled()
+	})
+})
+
 describe(`josh ${COMMAND_NAME} is registered`, () => {
 	it('routes through the pre-push unit script', () => {
 		expect(COMMAND_MAP[COMMAND_NAME]?.script).toBe(SCRIPT_PATH)
