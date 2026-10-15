@@ -20,3 +20,7 @@ session that carried both credentials as real environment variables. They now us
 configured therefore sees `josh notify` fail rather than pass quietly; `josh followup` still
 completes. `JOSH_NOTIFY=off` was added afterwards as the explicit way to say nobody is meant to be
 notified ([#2821](https://github.com/joshuafolkken/kit/issues/2821)).
+
+`josh followup` carries on past a failed send because it sends its completion message on the way to
+the merge, and a gateway timeout at Telegram is not a reason to leave a reviewed, green pull request
+unmerged.
