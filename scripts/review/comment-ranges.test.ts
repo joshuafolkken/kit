@@ -120,6 +120,11 @@ describe('comment_ranges.strip — a directive comment is code', () => {
 		'/// <reference types="node" />',
 		'/* v8 ignore next */',
 		'/** @type {number} */',
+		'/** @arg {any} x */',
+		'/** @extends {B<any>} */',
+		'/** @implements {I} */',
+		'/** @property {string} name */',
+		'/** @custom {T} */',
 	])('keeps an added `%s`', (directive) => {
 		expect(is_same_code(CODE, `${directive}\n${CODE}`)).toBe(false)
 	})

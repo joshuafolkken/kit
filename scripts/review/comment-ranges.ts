@@ -30,8 +30,8 @@ const MARKUP_COMMENT = /<!--[\s\S]*?-->/gu
 const VIRTUAL_FILE_NAME = 'fix-delta.ts'
 // A comment a tool reads is code: a fix that silences lint, the type check or coverage, or changes
 // what a bundler or the type checker reads, does it by adding one — the edit only the review sees.
-// JSDoc type tags count too, since a checked `.js` file takes its types from them. Matching too much
-// only costs a round.
+// JSDoc type tags count too, since a checked `.js` file takes its types from them — any tag carrying a
+// `{…}` type expression, plus the type tags that carry none. Matching too much only costs a round.
 const DIRECTIVE_MARKERS: ReadonlyArray<string> = [
 	'///',
 	'@ts-',
@@ -54,11 +54,12 @@ const DIRECTIVE_MARKERS: ReadonlyArray<string> = [
 ]
 const JSDOC_TYPE_TAG =
 	/@(?:type|typedef|param|returns?|template|satisfies|import|callback|overload|enum|this)\b/u
+const JSDOC_TYPE_EXPRESSION = /@\w+\s*\{/u
 
 function is_directive(text: string, range: Range): boolean {
 	const comment = text.slice(range[0], range[1])
 
-	if (JSDOC_TYPE_TAG.test(comment)) return true
+	if (JSDOC_TYPE_TAG.test(comment) || JSDOC_TYPE_EXPRESSION.test(comment)) return true
 
 	return DIRECTIVE_MARKERS.some((marker) => comment.includes(marker))
 }
