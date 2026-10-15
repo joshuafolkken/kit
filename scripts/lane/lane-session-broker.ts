@@ -12,6 +12,7 @@ import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { z } from 'zod'
+import { lane_broker_server, type BrokerServer } from './lane-broker-server'
 import { lane_child_invocation, type ShipStop } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import type { LaneInfo } from './lane-registry'
@@ -32,8 +33,10 @@ const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 const LOG_PREFIX = 'josh-ship-review-log-'
 const CACHE_DIRECTORY = ['node_modules', '.cache']
 const POLL_MS = 100
-const HEARTBEAT_MS = 500
-const HEARTBEAT_LIMIT_MS = 3000
+// The heartbeat is kept for a ship branched before the server record, and read only where a
+// supervisor started before it left no such record (`lane-broker-server.ts`).
+const LEGACY_HEARTBEAT_MS = 500
+const LEGACY_HEARTBEAT_LIMIT_MS = 3000
 const MINUTE_MS = 60_000
 const REQUEST_LIMIT_MINUTES = 30
 const REQUEST_LIMIT_MS = REQUEST_LIMIT_MINUTES * MINUTE_MS
@@ -203,6 +206,7 @@ async function serve(
 	}
 }
 
+// The server record is written before the response, so a ship that finds the response finds it too.
 function prepare(lane: LaneInfo): { response: string; current: BrokerResponse } {
 	const response = response_path(lane.directory, lane.issue)
 	if (response === undefined) throw new Error('review broker has no trusted response location')
@@ -211,6 +215,7 @@ function prepare(lane: LaneInfo): { response: string; current: BrokerResponse } 
 
 	mkdirSync(path.dirname(response), { recursive: true })
 	mkdirSync(path.dirname(request_path(lane.directory, lane.issue)), { recursive: true })
+	lane_broker_server.write(response, session)
 	const current: BrokerResponse = {
 		session,
 		nonce: '',
@@ -227,7 +232,7 @@ function start_heartbeat(state: { current: BrokerResponse }, response: string): 
 	const heartbeat = setInterval(() => {
 		state.current = { ...state.current, heartbeat_at: Date.now() }
 		write_response(response, state.current)
-	}, HEARTBEAT_MS)
+	}, LEGACY_HEARTBEAT_MS)
 
 	heartbeat.unref()
 
@@ -246,6 +251,7 @@ async function stop_server(
 	await serving
 	clearInterval(heartbeat)
 	unlinkSync(response)
+	lane_broker_server.remove(response)
 }
 
 async function with_server<T>(lane: LaneInfo, run: () => Promise<T>): Promise<T> {
@@ -261,25 +267,40 @@ async function with_server<T>(lane: LaneInfo, run: () => Promise<T>): Promise<T>
 	}
 }
 
-function is_live_response(
-	response: BrokerResponse | undefined,
-	session: string,
-): response is BrokerResponse {
+function is_fresh_heartbeat(heartbeat_at: number): boolean {
 	const now = Date.now()
 
-	return (
-		response?.session === session &&
-		response.heartbeat_at <= now &&
-		response.heartbeat_at >= now - HEARTBEAT_LIMIT_MS
-	)
+	return heartbeat_at <= now && heartbeat_at >= now - LEGACY_HEARTBEAT_LIMIT_MS
+}
+
+// Live by the server record (`lane-broker-server.ts`); a response with none was written by a
+// supervisor started before it, read by the heartbeat that supervisor still writes.
+function is_live_response(
+	target: string,
+	response: BrokerResponse | undefined,
+	is_live: (server: BrokerServer) => boolean,
+): response is BrokerResponse {
+	if (response === undefined) return false
+
+	const server = lane_broker_server.read(target, response.session)
+
+	return server === undefined ? is_fresh_heartbeat(response.heartbeat_at) : is_live(server)
+}
+
+function session_response(target: string, session: string): BrokerResponse | undefined {
+	const response = read_record(target, response_schema)
+
+	return response?.session === session ? response : undefined
 }
 
 function response_verdict(
-	response: BrokerResponse | undefined,
+	target: string,
 	session: string,
 	nonce: string,
 ): 'wait' | 'success' | 'failure' {
-	if (!is_live_response(response, session)) return 'failure'
+	const response = session_response(target, session)
+
+	if (!is_live_response(target, response, lane_broker_server.is_running)) return 'failure'
 	if (response.nonce !== nonce) return 'wait'
 
 	return response.is_success ? 'success' : 'failure'
@@ -289,7 +310,7 @@ async function wait_response(target: string, session: string, nonce: string): Pr
 	const deadline = Date.now() + REQUEST_LIMIT_MS
 
 	while (Date.now() < deadline) {
-		const verdict = response_verdict(read_record(target, response_schema), session, nonce)
+		const verdict = response_verdict(target, session, nonce)
 		if (verdict !== 'wait') return verdict === 'success'
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
@@ -302,7 +323,9 @@ async function wait_response(target: string, session: string, nonce: string): Pr
 function live_response(target: string): BrokerResponse | undefined {
 	const response = read_record(target, response_schema)
 
-	return is_live_response(response, response?.session ?? '') ? response : undefined
+	return is_live_response(target, response, lane_broker_server.is_serving_process)
+		? response
+		: undefined
 }
 
 // Whether a server answers for this lane now — what a Claude lane's ship asks before it hands a session

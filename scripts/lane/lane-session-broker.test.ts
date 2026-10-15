@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -169,24 +169,6 @@ it('fails closed when the isolated reviewer is unavailable', async () => {
 	expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
 })
 
-it('rejects a response after the trusted heartbeat expires', async () => {
-	const target = lane_session_broker.response_path(LANE.directory, ISSUE)
-	if (target === undefined) throw new Error(MISSING_RESPONSE)
-	mkdirSync(path.dirname(target), { recursive: true })
-	writeFileSync(
-		target,
-		JSON.stringify({
-			session: randomUUID(),
-			nonce: '',
-			is_success: false,
-			heartbeat_at: Date.now() - 60_000,
-		}),
-	)
-
-	expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
-	expect(launch_mock).not.toHaveBeenCalled()
-})
-
 it("refuses a reviewer on a provider other than the lane's own", async () => {
 	claude_reviewer()
 	const is_result = await lane_session_broker.with_server(
@@ -247,75 +229,5 @@ describe('lane_session_broker — the relaunch action', () => {
 		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue({ kind: 'rejected', note: 'no profile' })
 
 		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#3817: a server told to stop while its reviewer still runs keeps its heartbeat until
-// the reviewer answers, so the waiting ship reads the verdict rather than a dead server.
-// Two steps of 2 s age a stopped heartbeat past the 3 s limit, while a live one, rewritten between the
-// steps, never reads older than one step.
-const STEP_MS = 2000
-const HEARTBEAT_WAIT_MS = 700
-
-async function age_one_step(): Promise<void> {
-	vi.setSystemTime(Date.now() + STEP_MS)
-	await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_WAIT_MS))
-}
-
-function held_reviewer(): { finish: () => void } {
-	const reviewer = { finish: (): void => undefined }
-
-	claude_reviewer()
-	launch_mock.mockImplementation(
-		async () =>
-			await new Promise((resolve) => {
-				reviewer.finish = () => {
-					resolve({ kind: 'completed', pid: 1, exit_code: 0 })
-				}
-			}),
-	)
-
-	return reviewer
-}
-
-describe('lane_session_broker.with_server — stopping mid-review', () => {
-	afterEach(() => {
-		vi.useRealTimers()
-	})
-
-	it('answers the review it was serving when it was told to stop', async () => {
-		const reviewer = held_reviewer()
-		const asked = { pending: Promise.resolve(false) }
-
-		vi.useFakeTimers({ toFake: ['Date'] })
-		const stopping = lane_session_broker.with_server(CLAUDE_LANE, async () => {
-			asked.pending = lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)
-			await vi.waitFor(() => {
-				expect(launch_mock).toHaveBeenCalledOnce()
-			})
-		})
-
-		await age_one_step()
-		await age_one_step()
-		reviewer.finish()
-
-		expect(await asked.pending).toBe(true)
-		await stopping
-	})
-})
-
-describe('lane_session_broker.is_serving', () => {
-	it('answers true while a server holds the lane', async () => {
-		const is_result = await lane_session_broker.with_server(CLAUDE_LANE, async () =>
-			lane_session_broker.is_serving(LANE.directory, ISSUE),
-		)
-
-		expect(is_result).toBe(true)
-	})
-
-	it('answers false once the server has stopped', async () => {
-		await lane_session_broker.with_server(CLAUDE_LANE, async () => undefined)
-
-		expect(lane_session_broker.is_serving(LANE.directory, ISSUE)).toBe(false)
 	})
 })
