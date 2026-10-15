@@ -2,6 +2,7 @@ import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
+import { run_board_idle } from './run-board-idle'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
@@ -72,8 +73,15 @@ function fold_plan(state: BoardState): BoardState {
 	}
 }
 
-function statuses_for(plan: BoardPlan, local: LocalRead): ReadonlyMap<number, ItemStatus> {
-	return run_board_status.statuses_of(local.events, local.lanes, run_board_layout.numbers_of(plan))
+function statuses_for(
+	state: BoardState,
+	plan: BoardPlan,
+	local: LocalRead,
+): ReadonlyMap<number, ItemStatus> {
+	const in_run = run_board_layout.numbers_of(plan)
+	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
+
+	return run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
 }
 
 // The children the run touched that the open listing no longer holds and the board has not read yet.
@@ -83,7 +91,7 @@ function unread_closed(state: BoardState, local: LocalRead): Array<number> {
 
 	if (open === undefined || state.plan === undefined) return []
 
-	const touched = [...statuses_for(state.plan, local).keys()]
+	const touched = [...statuses_for(state, state.plan, local).keys()]
 
 	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
 }

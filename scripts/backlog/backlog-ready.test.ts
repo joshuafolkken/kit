@@ -1,5 +1,7 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_limit_cli } from '#scripts/lane/lane-limit-cli'
 import { lane_limit_override } from '#scripts/lane/lane-limit-override'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -80,6 +82,47 @@ describe('backlog_ready.drive_free_lane_count', () => {
 		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
 
 		await expect(backlog_ready.drive_free_lane_count()).rejects.toThrow('JOSH_LANE_LIMIT')
+	})
+})
+
+function lane_of(issue: string): LaneInfo {
+	return {
+		issue,
+		branch: `${issue}-lane`,
+		directory: `/lanes/${issue}`,
+		seat: undefined,
+		development_port: undefined,
+		preview_port: undefined,
+		output: undefined,
+		is_stranded: false,
+	}
+}
+
+const LIMIT = 6
+// Five lanes open under a limit of six: one is free.
+const OPEN = ['3865', '3867', '3868', '3871', '3881'].map((issue) => lane_of(issue))
+
+// joshuafolkken/kit#3893: the board said "no free lane" beside a `lane:limit` that printed free 1.
+describe('backlog_ready.free_lanes_beside', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
+		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+	})
+
+	it('answers the free count `lane:limit` prints', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', String(LIMIT))
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		await lane_limit_cli.run([])
+
+		await expect(backlog_ready.free_lanes_beside(OPEN)).resolves.toBe(1)
+		expect(info).toHaveBeenCalledWith(expect.stringMatching(/· free 1$/u))
+	})
+
+	it('answers nothing where the limit could not be read', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
+
+		await expect(backlog_ready.free_lanes_beside(OPEN)).resolves.toBeUndefined()
 	})
 })
 

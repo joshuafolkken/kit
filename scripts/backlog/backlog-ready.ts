@@ -2,7 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
-import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
@@ -28,6 +28,16 @@ async function live_lane_count(): Promise<number> {
 	return lane_registry.live_count(await lane_registry.list_lanes())
 }
 
+// Free lanes beside `lanes`, `undefined` where the limit could not be read: the count `lane:limit`
+// prints, and the one `run:board` draws, so the two never answer apart.
+async function free_lanes_beside(lanes: ReadonlyArray<LaneInfo>): Promise<number | undefined> {
+	const limit = await lane_capacity.lane_limit()
+
+	if (limit.kind !== 'limit') return undefined
+
+	return lane_capacity.free_lanes(limit.limit, lane_registry.live_count(lanes))
+}
+
 async function free_under(limit: number): Promise<number> {
 	return lane_capacity.free_lanes(limit, await live_lane_count())
 }
@@ -42,11 +52,7 @@ async function free_under(limit: number): Promise<number> {
 // (`backlog:next`) is gated behind a free lane, so a network read here would defeat that design. The
 // two can diverge, but only toward over-counting live lanes → fewer free lanes, the safe direction.
 async function free_lane_count(): Promise<number> {
-	const limit = await lane_capacity.lane_limit()
-
-	if (limit.kind !== 'limit') return NO_FREE
-
-	return await free_under(limit.limit)
+	return (await free_lanes_beside(await lane_registry.list_lanes())) ?? NO_FREE
 }
 
 // **The drive's count throws on an unreadable limit**. The drive launches no
@@ -165,6 +171,7 @@ const backlog_ready = {
 	read_backlog_next,
 	print_offer_hint,
 	free_lane_count,
+	free_lanes_beside,
 	live_lane_count,
 	drive_free_lane_count,
 	drains_pool,

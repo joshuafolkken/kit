@@ -1,6 +1,7 @@
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_spent } from '#scripts/lane/lane-spent'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -77,6 +78,8 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
 	// Every log is read off the machine: never a real one from a test.
 	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
+	// Each lane's child is probed with `pgrep`: never a real process from a test.
+	vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
 }
 
 afterEach(() => {
@@ -96,6 +99,7 @@ describe('run_board_read.read_local', () => {
 			resume: undefined,
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
+			idle_lanes: [],
 			free_lanes: FREE_LANES,
 			usual: new Map(),
 		})
@@ -214,5 +218,16 @@ describe('run_board_read.read_local free lanes', () => {
 		vi.mocked(lane_capacity.lane_limit).mockResolvedValue({ kind: 'problem', problem: 'bad' })
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: undefined })
+	})
+})
+
+// joshuafolkken/kit#3893: a lane whose child had died was drawn running.
+describe('run_board_read.read_local idle lanes', () => {
+	it('reads which of its open lanes no child is working in', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const idle_lanes = vi.mocked(lane_spent.idle_lanes).mockReturnValue(['3432'])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ idle_lanes: ['3432'] })
+		expect(idle_lanes).toHaveBeenCalledWith([lane('3432')])
 	})
 })

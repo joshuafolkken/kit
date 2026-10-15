@@ -1,7 +1,8 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
-import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_spent } from '#scripts/lane/lane-spent'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -33,19 +34,14 @@ interface LocalRead {
 	is_stranded: boolean
 	// The newest operation of each session of the run, read off the end of its log.
 	operations?: SessionOperations | undefined
-	// How many more lanes the limit allows beside the live ones; `undefined` where the limit could not
-	// be read, so nothing is said about it.
+	// The open lanes no child is working in at this read (`lane-spent.ts`); one is drawn stopped once it
+	// has stayed so (`run-board-idle.ts`).
+	idle_lanes?: ReadonlyArray<string> | undefined
+	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
+	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
-}
-
-async function free_lanes_of(lanes: ReadonlyArray<LaneInfo>): Promise<number | undefined> {
-	const choice = await lane_capacity.lane_limit()
-
-	if (choice.kind !== 'limit') return undefined
-
-	return lane_capacity.free_lanes(choice.limit, lane_registry.live_count(lanes))
 }
 
 const NO_SPAN: SpanHere = { span: undefined, resume: undefined, transcript: undefined }
@@ -104,7 +100,8 @@ async function read_local(): Promise<LocalRead | undefined> {
 		resume,
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-		free_lanes: await free_lanes_of(lanes),
+		idle_lanes: lane_spent.idle_lanes(lanes),
+		free_lanes: await backlog_ready.free_lanes_beside(lanes),
 		usual: run_board_usual.read(repository),
 	}
 }

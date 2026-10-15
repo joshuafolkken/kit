@@ -236,3 +236,27 @@ describe('lane_spent.lanes_in_use', () => {
 		expect(process_trace).toHaveBeenCalledExactlyOnceWith(LANE.issue)
 	})
 })
+
+// joshuafolkken/kit#3893: `run:board` drew a lane whose child had died as running.
+describe('lane_spent.idle_lanes', () => {
+	it('names the lanes read with no child, a stranded one among them', () => {
+		const stranded = { ...OTHER, is_stranded: true }
+
+		expect(
+			lane_spent.idle_lanes([LANE, stranded], probes_of({ process_trace: () => 'alive' })),
+		).toStrictEqual([OTHER.issue])
+	})
+
+	it('never names a lane whose probe did not answer', () => {
+		const probes = probes_of({
+			process_trace: (issue) => (issue === LANE.issue ? 'unknown' : 'none'),
+		})
+
+		expect(lane_spent.idle_lanes([LANE, OTHER], probes)).toStrictEqual([OTHER.issue])
+	})
+
+	it('probes through the live process trace by default', () => {
+		expect(lane_spent.idle_lanes([LANE])).toStrictEqual([LANE.issue])
+		expect(live.process_trace_default).toHaveBeenCalledWith(LANE.issue)
+	})
+})

@@ -1,7 +1,9 @@
+import { lane_await } from '#scripts/lane/lane-await'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_idle } from './run-board-idle'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
@@ -34,10 +36,30 @@ const { FRESH_STATE, is_due } = run_board_state
 const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
 const { gather_thanks } = run_board_thanks
 
-async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
+async function read_at(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
+	const local = await ports.read_local()
+	const idle_since = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], now_ms)
+
+	return { ...state, local, read_ms: now_ms, idle_since }
+}
+
+// A single frame has no earlier read to confirm an idle lane against (`run-board-idle.ts`).
+function is_unconfirmed(before: BoardState, read: BoardState, pace: Pace): boolean {
+	return pace === 'settled' && before.read_ms === undefined && read.idle_since.size > 0
+}
+
+async function reread(state: BoardState, ports: BoardPorts, pace: Pace): Promise<BoardState> {
+	const now_ms = ports.now()
+
 	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
 
-	return { ...state, local: await ports.read_local(), read_ms: now_ms }
+	const read = await read_at(state, ports, now_ms)
+
+	if (!is_unconfirmed(state, read, pace)) return read
+
+	await ports.sleep(lane_await.RECONFIRM_MS)
+
+	return await read_at(read, ports, ports.now())
 }
 
 // Each lane's usage, read on the machine's second; a reading that failed draws no column.
@@ -69,9 +91,9 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 function state_for(state: BoardState, local: LocalRead): BoardState {
 	if (state.run_started_ms === local.started_ms) return state
 
-	const { local: kept, read_ms } = state
+	const { local: kept, read_ms, idle_since } = state
 
-	return { ...FRESH_STATE, local: kept, read_ms, run_started_ms: local.started_ms }
+	return { ...FRESH_STATE, local: kept, read_ms, idle_since, run_started_ms: local.started_ms }
 }
 
 // The plan with a closed child's title and labels under the listing's own.
@@ -108,7 +130,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		closed,
 		labels: plan.labels,
 	}
-	const statuses = run_board_status.settle_closed(statuses_for(plan, local), read)
+	const statuses = run_board_status.settle_closed(statuses_for(state, plan, local), read)
 	const reason_of = run_board_reason.reader({
 		plan,
 		statuses,
@@ -125,8 +147,10 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
 
+	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
+
 	return run_board_layout.local_layout_of(
-		run_board_status.statuses_of(local.events, local.lanes, new Set()),
+		run_board_status.statuses_of(local.events, local.lanes, new Set(), stopped),
 	)
 }
 
@@ -220,8 +244,9 @@ async function tick(
 	ports: BoardPorts,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
+	const read = await reread(state, ports, pace)
+	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
-	const read = await reread(state, ports, now_ms)
 	const { local } = read
 
 	if (local === undefined) {

@@ -178,10 +178,13 @@ function issues_traced(traced: ReadonlyArray<TracedLane>, trace: ProcessTrace): 
 	return traced.filter(([, answer]) => answer === trace).map(([issue]) => issue)
 }
 
+function traced_of(lanes: ReadonlyArray<LaneInfo>, probes: SpentProbes): Array<TracedLane> {
+	return lanes.map((lane): TracedLane => [lane.issue, trace_of(lane, probes)])
+}
+
 /** The lanes in use — what a run being replaced must not be stopped over. */
 async function lanes_in_use(probes: SpentProbes = LIVE_PROBES): Promise<LaneUse> {
-	const lanes = await lane_registry.list_lanes()
-	const traced = lanes.map((lane): TracedLane => [lane.issue, trace_of(lane, probes)])
+	const traced = traced_of(await lane_registry.list_lanes(), probes)
 
 	return {
 		working: issues_traced(traced, PROCESS_ALIVE),
@@ -189,7 +192,15 @@ async function lanes_in_use(probes: SpentProbes = LIVE_PROBES): Promise<LaneUse>
 	}
 }
 
-const lane_spent = { kept_reason, lanes_in_use, sort_lanes }
+/** The lanes no child is working in, read as such — never one whose probe did not answer. */
+function idle_lanes(
+	lanes: ReadonlyArray<LaneInfo>,
+	probes: SpentProbes = LIVE_PROBES,
+): Array<string> {
+	return issues_traced(traced_of(lanes, probes), PROCESS_NONE)
+}
+
+const lane_spent = { idle_lanes, kept_reason, lanes_in_use, sort_lanes }
 
 export type { KeptLane, LaneUse, SpentProbes, SpentSort }
 export { lane_spent }

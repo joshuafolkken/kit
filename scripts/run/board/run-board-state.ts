@@ -4,6 +4,7 @@ import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { TerminalSize } from './run-board-fit'
 import type { BoardForm } from './run-board-header'
+import { run_board_idle, type IdleSince } from './run-board-idle'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
@@ -56,6 +57,8 @@ interface BoardState {
 	// The last local read, drawn until the next is due; `undefined` when no run had started.
 	local: LocalRead | undefined
 	read_ms: number | undefined
+	// When each lane the reads found idle was first read so (`run-board-idle.ts`).
+	idle_since: IdleSince
 	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
 	run_started_ms: number | undefined
 	plan: BoardPlan | undefined
@@ -91,6 +94,7 @@ interface BoardState {
 const FRESH_STATE: BoardState = {
 	local: undefined,
 	read_ms: undefined,
+	idle_since: run_board_idle.NO_IDLE,
 	run_started_ms: undefined,
 	plan: undefined,
 	plan_fetch: undefined,
