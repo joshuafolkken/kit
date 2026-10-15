@@ -5,6 +5,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { kit_written_paths } from './kit-written-paths'
+import { own_formatter } from './own-formatter'
 import { workflow_mark } from './workflow-mark'
 
 type ProjectProfile = 'basic' | 'full'
@@ -15,7 +16,8 @@ interface ProfileResult {
 }
 
 interface ProjectShape extends ProfileResult {
-	has_web: boolean
+	// Web files, and no formatter of the project's own (`own-formatter.ts`).
+	should_use_prettier: boolean
 	has_typescript: boolean
 	has_git: boolean
 	has_github: boolean
@@ -163,12 +165,15 @@ function file_extensions(root: string): Array<string> {
 	return files.filter((file) => is_project_file(root, file)).map((file) => path.extname(file))
 }
 
-function scan_files(root: string): { has_web: boolean; has_typescript: boolean } {
+// A project that formats with its own tool gets no Prettier even with Web files: two formatters
+// would rewrite each other's output (joshuafolkken/kit#3832).
+function scan_files(root: string): { should_use_prettier: boolean; has_typescript: boolean } {
 	const extensions = file_extensions(root)
 	const has_web = extensions.some((extension) => WEB_EXTENSIONS.has(extension))
+	const should_use_prettier = has_web && own_formatter.find_config(root) === undefined
 	const has_typescript = extensions.some((extension) => TYPESCRIPT_EXTENSIONS.has(extension))
 
-	return { has_web, has_typescript }
+	return { should_use_prettier, has_typescript }
 }
 
 function has_github_remote(root: string): boolean {

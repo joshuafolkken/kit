@@ -36,7 +36,7 @@ const COMMAND_FAILURE = 'Command failed with exit code 1'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
 	reason: 'test',
-	has_web: true,
+	should_use_prettier: true,
 	has_typescript: false,
 	has_git: true,
 	has_github: false,

@@ -47,6 +47,8 @@ Details: [Run the backlog unattended](./docs/how-to/run-backlog.md)
 
 ### AI assistant only — no GitHub account needed
 
+Adds the AI assistant rules, editor settings and a `josh` script, plus Git, GitHub and TypeScript settings where the project has them. It also adds Prettier for HTML, CSS or JavaScript, unless the project already formats with Biome or dprint ([what it adds](./docs/setup/basic.md)).
+
 Requires [Node.js and pnpm](./docs/setup/prerequisites.md).
 
 ```bash

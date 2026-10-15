@@ -120,7 +120,7 @@ describe('project file detection', () => {
 		writeFileSync(path.join(root, 'src', 'app.ts'), 'export {}')
 		expect(project_profile.inspect_project(root)).toMatchObject({
 			profile: 'basic',
-			has_web: true,
+			should_use_prettier: true,
 			has_typescript: true,
 			has_git: false,
 			has_github: false,
@@ -131,8 +131,18 @@ describe('project file detection', () => {
 			const root = fixture()
 
 			writeFileSync(path.join(root, `app.${extension}`), 'module.exports = {}')
-			expect(project_profile.inspect_project(root).has_web).toBe(true)
+			expect(project_profile.inspect_project(root).should_use_prettier).toBe(true)
 		}
+	})
+})
+
+describe('project formatter detection', () => {
+	it('gives no Prettier to Web files beside a formatter of the project own (#3832)', () => {
+		const root = fixture()
+
+		writeFileSync(path.join(root, 'app.js'), 'export {}')
+		writeFileSync(path.join(root, 'dprint.json'), '{}')
+		expect(project_profile.inspect_project(root).should_use_prettier).toBe(false)
 	})
 })
 
@@ -142,8 +152,8 @@ describe('project file detection beside the files kit wrote', () => {
 
 		writeFileSync(path.join(root, '.pnpmfile.mjs'), 'export {}')
 		writeFileSync(path.join(root, 'prettier.config.mjs'), 'export default {}')
-		expect(project_profile.inspect_project(root).has_web).toBe(false)
+		expect(project_profile.inspect_project(root).should_use_prettier).toBe(false)
 		writeFileSync(path.join(root, 'app.mjs'), 'export {}')
-		expect(project_profile.inspect_project(root).has_web).toBe(true)
+		expect(project_profile.inspect_project(root).should_use_prettier).toBe(true)
 	})
 })

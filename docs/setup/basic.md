@@ -18,16 +18,16 @@ pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 
 `josh init` selects the `basic` profile and records it in `package.json`. It creates only:
 
-| File                                                                                           | When                                                          |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`                                          | Always — short AI assistant instructions                      |
-| `.vscode/extensions.json`                                                                      | Always — recommendations, not installs                        |
-| `pnpm-workspace.yaml`                                                                          | Always — approves the esbuild and unrs-resolver build scripts |
-| `package.json` scripts `preinstall` and `josh`                                                 | Always                                                        |
-| `prettier.config.mjs`, `.prettierignore`, `.vscode/settings.json`, Prettier                    | Only when HTML, CSS or JavaScript files exist                 |
-| `tsconfig.json`                                                                                | Only when TypeScript files exist                              |
-| `.gitignore`, `.gitattributes`                                                                 | Only when the directory is a Git repository                   |
-| `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/pull_request_template.md`, `.github/release.yml` | Only when the Git repository has a GitHub `origin`            |
+| File                                                                                           | When                                                                                                                    |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`                                          | Always — short AI assistant instructions                                                                                |
+| `.vscode/extensions.json`                                                                      | Always — recommendations, not installs                                                                                  |
+| `pnpm-workspace.yaml`                                                                          | Always — approves the esbuild and unrs-resolver build scripts                                                           |
+| `package.json` scripts `preinstall` and `josh`                                                 | Always                                                                                                                  |
+| `prettier.config.mjs`, `.prettierignore`, `.vscode/settings.json`, Prettier                    | Only when HTML, CSS or JavaScript files exist and the project has no formatter of its own (`biome.json`, `dprint.json`) |
+| `tsconfig.json`                                                                                | Only when TypeScript files exist                                                                                        |
+| `.gitignore`, `.gitattributes`                                                                 | Only when the directory is a Git repository                                                                             |
+| `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/pull_request_template.md`, `.github/release.yml` | Only when the Git repository has a GitHub `origin`                                                                      |
 
 It then runs `pnpm install` and `josh format` for you, so the tools it listed are installed and every file is formatted. If the install fails, `josh init` stops before formatting, exits non-zero and prints the commands to re-run by hand. `--no-install` skips both steps, for CI or an offline machine; run `pnpm install` and `pnpm josh format` yourself afterwards.
 
@@ -41,7 +41,7 @@ It adds no ESLint, cspell, Playwright, Git hooks, GitHub workflows or external-s
 pnpm josh gate
 ```
 
-`josh gate` is not part of `josh init`, so a lint error in your own code is never mistaken for a failed setup. The `josh format` that `josh init` ran uses Prettier over every file type it supports — HTML, CSS and JavaScript, and also Markdown, JSON and YAML such as `CLAUDE.md` and `package.json`; running it again changes nothing. `josh gate` runs Prettier's check and skips each check the project does not have, printing why — for example `josh eslint: no ESLint configuration was found — skipping eslint, which this project does not use.` A project with no Web files has no Prettier, so both commands skip it with `josh prettier: no HTML, CSS or JavaScript files were found`. The last line counts both: `✔ verification gate passed (1 ran, 5 skipped)` when a check ran, and `⚠ verification gate not verified (0 ran, 6 skipped)` when none did — nothing failed, and nothing was checked. The skipped count includes the two checks that have nothing of yours to look at (`exports`, and `behavior` with no transcript).
+`josh gate` is not part of `josh init`, so a lint error in your own code is never mistaken for a failed setup. The `josh format` that `josh init` ran uses Prettier over every file type it supports — HTML, CSS and JavaScript, and also Markdown, JSON and YAML such as `CLAUDE.md` and `package.json`; running it again changes nothing. `josh gate` runs Prettier's check and skips each check the project does not have, printing why — for example `josh eslint: no ESLint configuration was found — skipping eslint, which this project does not use.` A project with no Web files has no Prettier, so both commands skip it with `josh prettier: no HTML, CSS or JavaScript files were found`. Nor does a project that formats with Biome or dprint, which both skip with `josh prettier: biome.json configures the project's own formatter`. The last line counts both: `✔ verification gate passed (1 ran, 5 skipped)` when a check ran, and `⚠ verification gate not verified (0 ran, 6 skipped)` when none did — nothing failed, and nothing was checked. The skipped count includes the two checks that have nothing of yours to look at (`exports`, and `behavior` with no transcript).
 
 **The unit check runs the tests your project declares.** A `basic` project has no Vitest, so `josh gate` and `josh test:unit` run the `test` script in `package.json` instead — `pnpm run test` — whatever runner it starts (`node --test`, jest, mocha), and a failing test fails the gate:
 

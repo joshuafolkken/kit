@@ -348,7 +348,7 @@ function should_copy_github_file(filename: string, shape?: ProjectShape): boolea
 function should_copy_basic_file(filename: string, shape?: ProjectShape): boolean {
 	if (filename !== PRETTIER_IGNORE || shape?.profile !== 'basic') return true
 
-	return shape.has_web
+	return shape.should_use_prettier
 }
 
 function should_copy_ai_file(filename: string, shape?: ProjectShape): boolean {
