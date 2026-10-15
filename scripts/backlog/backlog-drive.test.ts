@@ -60,6 +60,16 @@ describe('backlog_drive.run_pass — the lane limit', () => {
 		expect(result.kind).toBe('continue')
 	})
 
+	it('launches an issue that holds a kept lane even when no lane is free', async () => {
+		const offered = offer('run', [OFFERED, OFFERED_TOO])
+		const script = { offers: [offered], free_lanes: [NO_FREE_LANES], kept_lanes: [OFFERED_TOO] }
+		const { ports, calls } = harness(script)
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(calls).toStrictEqual(['offer', `launch ${OFFERED_TOO}`])
+		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([OFFERED_TOO])
+	})
+
 	it('keeps the active stamp when no lane is free, so the idle budget still runs out', async () => {
 		const offered = offer('run', [OFFERED])
 		const { ports } = harness({ offers: [offered], free_lanes: [NO_FREE_LANES] })

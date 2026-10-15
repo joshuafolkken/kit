@@ -6,7 +6,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
-import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
@@ -24,6 +24,7 @@ import {
 	type OfferRead,
 } from './backlog-drive'
 import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
+import { backlog_drive_carried } from './backlog-drive-carried'
 import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -32,6 +33,7 @@ import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
+import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
 
@@ -153,10 +155,10 @@ function finished_checker(seeded: ReadonlyArray<string>): (issue: string) => boo
 	}
 }
 
-async function open_lanes(): Promise<ReadonlyArray<string>> {
+async function open_lanes(): Promise<ReadonlyArray<LaneInfo>> {
 	const lanes = await lane_registry.list_lanes()
 
-	return lanes.filter((lane) => !lane.is_stranded).map((lane) => lane.issue)
+	return lanes.filter((lane) => !lane.is_stranded)
 }
 
 function end_line(end: DriveEnd): string {
@@ -190,6 +192,7 @@ function ports_of(
 		offer: async (state) => await read_offer(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		free_lanes: backlog_ready.drive_free_lane_count,
+		has_lane: backlog_drive_seats.has_kept_lane,
 		judgement_owed: judgement_reader(),
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
@@ -211,9 +214,11 @@ async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string
 
 	await backlog_drive_named.reconcile(carry, events, context.owner)
 
-	const lanes = [...new Set([...(await open_lanes()), ...context.awaited])]
+	const open = await open_lanes()
+	const lanes = [...new Set([...open.map((lane) => lane.issue), ...context.awaited])]
+	const dispatched = await backlog_drive_carried.carried(open)
 
-	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [])
+	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [], dispatched)
 }
 
 // The interval between two asks is `backlog:budget`'s own, so the driver keeps the one its reason prints.
