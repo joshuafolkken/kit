@@ -311,6 +311,22 @@ describe('gate_plan.format_gate_plan', () => {
 // that fans out to the other three. What matters is that the narrower plan is still a *plan* —
 // every check it names runs, and the printed line describes the set that ran rather than the set
 // the gate has when nobody passes the flag.
+// joshuafolkken/kit#3874: speeding the gate up must never mean checking less, so the set it runs —
+// each check and the command behind it — is written out here rather than read from the constant.
+describe('gate_plan the checks a gate runs', () => {
+	it('is exactly the lint, type, spell, behavior, exports, metrics and unit checks', () => {
+		expect(gate_plan.GATE_CHECKS.map((check) => [check.label, check.target])).toStrictEqual([
+			['lint', 'lint'],
+			['check', 'check'],
+			['cspell', 'cspell:dot'],
+			['behavior', 'behavior'],
+			['exports', 'exports:unused'],
+			['metrics', 'metrics'],
+			['test:unit', 'test:unit'],
+		])
+	})
+})
+
 describe('gate_plan without the unit suite', () => {
 	it('keeps the three static checks and drops only the unit one', () => {
 		expect(gate_plan.select_gate_checks(false)).toEqual(gate_plan.STATIC_CHECKS)
