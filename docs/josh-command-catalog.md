@@ -319,7 +319,7 @@ Run an install scenario in a Docker container of a machine with nothing installe
 
 > **Audience:** developer · **Side effects:** files, network, processes
 
-`[--profile basic|full] [--no-install]`
+`[--profile basic|full] [--no-install] [--dry-run]`
 
 Initialize config in a new project
 
@@ -379,7 +379,7 @@ Fail when a pull request adds any new SonarCloud issue or duplicated block
 
 > **Audience:** developer · **Side effects:** files, git, network, processes
 
-`[--profile basic|full] [--yes] [--github] [--public] [--init-command <command>] [--push-preflight-command <command>]`
+`[--profile basic|full] [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]`
 
 Set a project up for the GitHub Issue workflow, from git init to the setup PR
 

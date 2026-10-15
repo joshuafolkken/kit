@@ -7,6 +7,7 @@ interface StartOptions {
 	profile: ProjectProfile | undefined
 	is_yes: boolean
 	is_github: boolean
+	is_dry_run: boolean
 	visibility: Visibility
 	init_command: string | undefined
 	push_preflight_command: string | undefined
@@ -120,8 +121,9 @@ function has_commit(steps: ReadonlyArray<StartStep>): boolean {
 	return steps.some((step) => COMMIT_STEPS.has(step))
 }
 
+// A dry run asks nothing and changes nothing, so it needs neither a terminal nor `--yes`.
 function interaction_of(options: StartOptions, is_tty: boolean): Verdict<Interaction> {
-	if (options.is_yes) return { value: 'unattended', refusal: undefined }
+	if (options.is_yes || options.is_dry_run) return { value: 'unattended', refusal: undefined }
 	if (is_tty) return { value: 'interactive', refusal: undefined }
 
 	return {
@@ -133,13 +135,16 @@ function interaction_of(options: StartOptions, is_tty: boolean): Verdict<Interac
 
 // `--yes` accepts the detected defaults, never the creation of a public-facing resource: an
 // unattended run creates a repository, pushes, or opens the setup Issue and pull request only when
-// `--github` asks for it by name.
+// `--github` asks for it by name. A dry run writes to GitHub no more than it writes anywhere else, so
+// it lists the GitHub steps without that consent.
 function github_consent(
 	steps: ReadonlyArray<StartStep>,
 	options: StartOptions,
 	interaction: Interaction,
 ): Verdict<Consent> {
-	if (!has_push(steps) || options.is_github) return { value: 'granted', refusal: undefined }
+	const is_consented = options.is_github || options.is_dry_run
+
+	if (is_consented || !has_push(steps)) return { value: 'granted', refusal: undefined }
 	if (interaction === 'interactive') return { value: 'ask', refusal: undefined }
 
 	return {

@@ -129,8 +129,12 @@ function resolve_profile(root: string, requested?: ProjectProfile): ProfileResul
 	return inferred_profile(manifest)
 }
 
+function is_ignored_directory(name: string): boolean {
+	return IGNORED_DIRECTORIES.has(name)
+}
+
 function should_visit(entry: Dirent): boolean {
-	return entry.isDirectory() && !IGNORED_DIRECTORIES.has(entry.name)
+	return entry.isDirectory() && !is_ignored_directory(entry.name)
 }
 
 function scan_directory(directory: string, pending: Array<string>): Array<string> {
@@ -154,7 +158,9 @@ function is_project_file(root: string, file: string): boolean {
 	return !kit_written_paths.is_kit_written(relative_path)
 }
 
-function file_extensions(root: string): Array<string> {
+// Every file under `root` outside the directories no setup reads — the one walk the project scan and
+// the `josh init --dry-run` snapshot share.
+function list_files(root: string): Array<string> {
 	const pending = [root]
 	const files: Array<string> = []
 
@@ -162,7 +168,13 @@ function file_extensions(root: string): Array<string> {
 		files.push(...scan_directory(directory, pending))
 	}
 
-	return files.filter((file) => is_project_file(root, file)).map((file) => path.extname(file))
+	return files
+}
+
+function file_extensions(root: string): Array<string> {
+	return list_files(root)
+		.filter((file) => is_project_file(root, file))
+		.map((file) => path.extname(file))
 }
 
 // A project that formats with its own tool gets no Prettier even with Web files: two formatters
@@ -210,6 +222,8 @@ const project_profile = {
 	resolve_profile,
 	has_git,
 	inspect_project,
+	is_ignored_directory,
+	list_files,
 	requested_profile,
 	with_legacy_profile_names,
 }

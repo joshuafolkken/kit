@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { project_profile, type ProjectShape } from './project-profile'
 import { start } from './start'
+import { start_dry_run } from './start-dry-run'
 import { start_prompt } from './start-prompt'
 import { start_steps } from './start-steps'
 
@@ -20,6 +21,7 @@ const INIT_COMMAND = 'josh-app init'
 const PREFLIGHT_FLAG = '--push-preflight-command'
 const PREFLIGHT_COMMAND = 'josh-app start:preflight'
 const START_USAGE = 'Usage: josh start'
+const DRY_RUN_REPORT = 'dry-run report'
 const NO_GIT = {
 	has_git: false,
 	has_github: false,
@@ -63,6 +65,17 @@ describe('josh start', () => {
 		expect(start_prompt.confirm_choices).toHaveBeenCalledWith(
 			expect.objectContaining({ shape: SHAPE, consent: 'ask' }),
 		)
+	})
+})
+
+describe('josh start --dry-run (#3830)', () => {
+	it('prints the plan and the dry-run report without running a step', async () => {
+		vi.spyOn(start_dry_run, 'report').mockReturnValue(DRY_RUN_REPORT)
+
+		expect(await start.run(['--dry-run'], false)).toBe(0)
+		expect(start_steps.run_steps).not.toHaveBeenCalled()
+		expect(start_prompt.confirm_choices).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(DRY_RUN_REPORT)
 	})
 })
 
@@ -142,6 +155,7 @@ describe('josh start options', () => {
 			profile: undefined,
 			is_yes: false,
 			is_github: false,
+			is_dry_run: false,
 			visibility: 'private',
 			init_command: undefined,
 			push_preflight_command: undefined,
@@ -149,12 +163,13 @@ describe('josh start options', () => {
 	})
 
 	it('reads the profile alongside every switch', () => {
-		const args = ['--yes', '--profile', 'full', '--github', '--public']
+		const args = ['--yes', '--profile', 'full', '--github', '--public', '--dry-run']
 
 		expect(start.parse_start_options(args)).toStrictEqual({
 			profile: 'full',
 			is_yes: true,
 			is_github: true,
+			is_dry_run: true,
 			visibility: 'public',
 			init_command: undefined,
 			push_preflight_command: undefined,
