@@ -93,6 +93,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "auto-ok:judge": [
+      "[--apply <n> (--lane | --solo) | --decline <n> --reason <text>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "auto-ok:next": [
       "[--exclude <n>[,<n>...]] [--label <name>]",
       "automation",

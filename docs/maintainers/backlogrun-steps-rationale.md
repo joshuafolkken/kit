@@ -13,11 +13,16 @@ epic declares "the children of that epic". That declaration is the statement of 
 unattended, and it is the one thing a run must not leave ambiguous — which is why what runs is stated
 by the keyword and its arguments, never inferred from the shape of a request.
 
-**A run labelling an existing issue would be widening its own authorization**, which is why `auto-ok`
-on an issue already open stays a person's to apply. A filing is different: `issue:file` judges it
+**A run labelling an issue at its own discretion would be widening its own authorization**, which is
+why `auto-ok` reaches an issue only through a written judgement. A filing is judged by `issue:file`
 against written criteria (joshuafolkken/kit#3853) — the excluded labels, then the body's `- 人の判断:`
 declaration — so what admits it is a rule a person wrote, applied the same way to every filing, rather
-than the run's own discretion. A named issue is approved by the keyword and its number for the same reason
+than the run's own discretion. An issue already open is judged by `auto-ok:judge`
+(joshuafolkken/kit#3854), and only once the opted-in pool is exhausted and a lane is free: the command
+re-checks the same excluded labels, and the agent reads the body for a policy decision, an external
+account or a person's visual check — what a filing's `- 人の判断:` line declares. Every answer leaves a
+judgement comment, so a person sees each opt-in and can revert it, and the brake still bounds how much
+one invocation runs. A named issue is approved by the keyword and its number for the same reason
 `queue` was explicit authorization to merge each of its issues (joshuafolkken/kit#1984): typing them is
 the declaration.
 
@@ -113,7 +118,8 @@ alone rather than re-reading the body.
 **Why `needs-decision` is the one label a run may apply by hand.** `auto-ok` and `needs-human-review`
 widen or withhold what may be _executed_. `needs-decision` records only that a person's answer is
 needed, which is a finding rather than an authorization. `auto-ok` reaching a filing through
-`issue:file` (joshuafolkken/kit#3853) is judged by written criteria — a `release`, breaking, `deferred`,
+`issue:file` (joshuafolkken/kit#3853), or an open issue through `auto-ok:judge`
+(joshuafolkken/kit#3854), is judged by written criteria — a `release`, breaking, `deferred`,
 `needs-human-review` or `epic` label withholds it, and otherwise the filer's `- 人の判断:` declaration
 decides — so the run applies a rule a person wrote rather than granting an authorization of its own;
 the count and the budget still bound how many such filings one invocation can make.

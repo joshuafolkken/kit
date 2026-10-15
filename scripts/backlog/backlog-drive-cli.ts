@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { auto_ok_judge_read, type JudgedCache } from '#scripts/auto-ok/auto-ok-judge-read'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
@@ -166,6 +167,18 @@ function end_line(end: DriveEnd): string {
 	return end.detail === undefined ? base : `${base} ${end.detail}`
 }
 
+// The count of open issues owing an `auto-ok` judgement, over a cache kept for the process so a watch
+// minute reads the comments only of the issues that moved (`auto-ok-judge-read.ts`).
+function judgement_reader(): () => Promise<number> {
+	const cache: JudgedCache = new Map()
+
+	return async () => {
+		const owed = await auto_ok_judge_read.owed(cache)
+
+		return owed?.length ?? 0
+	}
+}
+
 function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
@@ -177,6 +190,7 @@ function ports_of(
 		offer: async (state) => await read_offer(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		free_lanes: backlog_ready.drive_free_lane_count,
+		judgement_owed: judgement_reader(),
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
 			await sleep(milliseconds)

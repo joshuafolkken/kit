@@ -67,6 +67,18 @@ describe('to_gh_issue — the fields whose names or values differ', () => {
 		expect(map('state', open_pull)).toEqual({ state: 'OPEN' })
 	})
 
+	// The one that bites: REST's `url` is the API endpoint, and `epic_issue.is_pull_request` decides
+	// from `/pull/` appearing in the browser URL — which the endpoint never carries.
+	it('reads url from html_url rather than from the API endpoint', () => {
+		expect(map('url')).toEqual({ url: ISSUE_HTML_URL })
+	})
+
+	it('keeps a pull request identifiable by its browser URL', () => {
+		expect(map('url', { html_url: PULL_HTML_URL })).toEqual({ url: PULL_HTML_URL })
+	})
+})
+
+describe('to_gh_issue — the timestamps', () => {
 	it('reads createdAt from created_at', () => {
 		expect(map('createdAt')).toEqual({ createdAt: ISSUE_CREATED_AT })
 	})
@@ -78,14 +90,11 @@ describe('to_gh_issue — the fields whose names or values differ', () => {
 		})
 	})
 
-	// The one that bites: REST's `url` is the API endpoint, and `epic_issue.is_pull_request` decides
-	// from `/pull/` appearing in the browser URL — which the endpoint never carries.
-	it('reads url from html_url rather than from the API endpoint', () => {
-		expect(map('url')).toEqual({ url: ISSUE_HTML_URL })
-	})
-
-	it('keeps a pull request identifiable by its browser URL', () => {
-		expect(map('url', { html_url: PULL_HTML_URL })).toEqual({ url: PULL_HTML_URL })
+	// joshuafolkken/kit#3854: `auto-ok:judge` re-reads an issue's comments only once it moves.
+	it('reads updatedAt from updated_at', () => {
+		expect(map('updatedAt', { updated_at: ISSUE_CREATED_AT })).toEqual({
+			updatedAt: ISSUE_CREATED_AT,
+		})
 	})
 })
 

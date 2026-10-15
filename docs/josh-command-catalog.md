@@ -765,6 +765,16 @@ Git hook: scan staged files for secrets
 
 ## AI tools
 
+### `josh auto-ok:judge`
+
+> **Audience:** automation · **Side effects:** network
+
+`[--apply <n> (--lane | --solo) | --decline <n> --reason <text>]`
+
+List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)
+
+---
+
 ### `josh auto-ok:next`
 
 > **Audience:** automation · **Side effects:** network
