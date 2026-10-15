@@ -24,33 +24,42 @@ beforeEach(() => {
 	execa.mockReset()
 })
 
+const KIND_CASES: Array<[string, string]> = [
+	['node /repo/node_modules/.bin/vitest related a.ts', 'vitest'],
+	['pnpm exec vitest run', 'vitest'],
+	['node /repo/node_modules/typescript/bin/tsc --noEmit', 'tsc'],
+	['node /repo/node_modules/svelte-check/bin/svelte-check', 'tsc'],
+	['node /repo/node_modules/cspell/bin.mjs lint .', 'cspell'],
+	['node /repo/node_modules/prettier/bin/prettier.cjs --check .', 'prettier'],
+	['node /repo/node_modules/@playwright/test/cli.js test', 'playwright'],
+	['/cache/ms-playwright/chromium-1200/chrome-mac/Chromium --headless', 'playwright'],
+	['/cache/chromium_headless_shell-1200/headless_shell --type=renderer', 'chromium'],
+	['/Users/me/.local/bin/claude -p', 'claude'],
+	['node --import tsx scripts/josh/josh.ts ship', 'josh'],
+	['/Applications/Visual Studio Code.app/Contents/MacOS/Code Helper', 'vscode'],
+	[
+		'/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) /extensions/node_modules/typescript/lib/tsserver.js',
+		'vscode',
+	],
+	['Code Helper (Plugin) /extensions/vscode-eslint/server/out/eslintServer.js', 'vscode'],
+	[
+		'node /Users/me/.vscode/extensions/vendor.vscode-eslint-3.0.34/server/out/eslintServer.js',
+		'vscode',
+	],
+	['node /Users/me/.npm-global/lib/node_modules/@anthropic-ai/claude-code/cli.js', 'claude'],
+	['/bin/zsh -c source /Users/me/.claude/shell-snapshots/snapshot.sh && git status', 'other'],
+	['/bin/bash /Users/me/.claude/hooks/notify.sh', 'other'],
+	[
+		'/repo/node_modules/.pnpm/@esbuild+darwin-arm64@0.25.0/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.25.0',
+		'other',
+	],
+	['node /opt/homebrew/bin/pnpm josh gate', 'josh'],
+	['node server.js', 'node'],
+	['/usr/sbin/mDNSResponder', 'other'],
+]
+
 describe('lane_process_load.kind_of', () => {
-	it.each([
-		['node /repo/node_modules/.bin/vitest related a.ts', 'vitest'],
-		['pnpm exec vitest run', 'vitest'],
-		['node /repo/node_modules/typescript/bin/tsc --noEmit', 'tsc'],
-		['node /repo/node_modules/svelte-check/bin/svelte-check', 'tsc'],
-		['node /repo/node_modules/cspell/bin.mjs lint .', 'cspell'],
-		['node /repo/node_modules/prettier/bin/prettier.cjs --check .', 'prettier'],
-		['node /repo/node_modules/@playwright/test/cli.js test', 'playwright'],
-		['/cache/ms-playwright/chromium-1200/chrome-mac/Chromium --headless', 'playwright'],
-		['/cache/chromium_headless_shell-1200/headless_shell --type=renderer', 'chromium'],
-		['/Users/me/.local/bin/claude -p', 'claude'],
-		['node --import tsx scripts/josh/josh.ts ship', 'josh'],
-		['/Applications/Visual Studio Code.app/Contents/MacOS/Code Helper', 'vscode'],
-		[
-			'/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) /extensions/node_modules/typescript/lib/tsserver.js',
-			'vscode',
-		],
-		['Code Helper (Plugin) /extensions/vscode-eslint/server/out/eslintServer.js', 'vscode'],
-		[
-			'/repo/node_modules/.pnpm/@esbuild+darwin-arm64@0.25.0/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.25.0',
-			'other',
-		],
-		['node /opt/homebrew/bin/pnpm josh gate', 'josh'],
-		['node server.js', 'node'],
-		['/usr/sbin/mDNSResponder', 'other'],
-	])('reads %s as %s', (command_line, kind) => {
+	it.each(KIND_CASES)('reads %s as %s', (command_line, kind) => {
 		expect(lane_process_load.kind_of(command_line)).toBe(kind)
 	})
 })
@@ -80,7 +89,11 @@ describe('lane_process_load.read', () => {
 		execa.mockResolvedValue({ stdout: LISTING })
 
 		await expect(lane_process_load.read()).resolves.toHaveLength(lane_process_load.TOP_KINDS)
-		expect(execa).toHaveBeenCalledWith('ps', expect.any(Array), expect.any(Object))
+		expect(execa).toHaveBeenCalledWith(
+			'ps',
+			expect.any(Array),
+			expect.objectContaining({ env: { LC_ALL: 'C' } }),
+		)
 	})
 
 	it('answers nothing when ps does not answer', async () => {

@@ -13,13 +13,17 @@ import { execa } from 'execa'
 // process, so the name says nothing; the first pattern a command line matches names its kind, in the
 // order below, so `pnpm exec vitest` is `vitest` rather than `josh`. The IDE comes first: its language
 // servers run out of a `typescript` or `eslint` directory, and read as `tsc` or `eslint` they would
-// pass the IDE's load off as the gate's own checks. `pnpm` is the command, never the `.pnpm/` store a
-// resolved binary's path runs through.
+// pass the IDE's load off as the gate's own checks — and a server the IDE starts on a plain `node`
+// runtime is known only by its `.vscode/extensions/` path. `claude` is the executable or its package,
+// never a `.claude/` path a session's Bash-tool shell or hook script runs through. `pnpm` is the
+// command, never the `.pnpm/` store a resolved binary's path runs through.
 //
 // **`%cpu` is the share of one core**, so 300 is three cores busy; it is `ps`'s decaying average,
 // which is what a one-minute sample beside the one-minute load average wants.
 
 const PS_ARGUMENTS = ['-A', '-o', 'rss=,%cpu=,args=']
+// `ps` prints `%cpu` with the locale's decimal separator, and a `0,7` would parse as NaN.
+const PS_ENVIRONMENT = { LC_ALL: 'C' }
 const FIELD_SEPARATOR = /\s+/u
 const KB_PER_MB = 1024
 // Enough to name what dominates and the runner-up behind it, short enough for one ledger line a minute.
@@ -27,7 +31,7 @@ const TOP_KINDS = 5
 const OTHER_KIND = 'other'
 
 const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
-	['vscode', /Visual Studio Code|Code Helper/u],
+	['vscode', /Visual Studio Code|Code Helper|\.vscode\/extensions\//u],
 	['vitest', /vitest/u],
 	['eslint', /eslint/u],
 	['tsc', /\btsc\b|svelte-check|typescript/u],
@@ -36,7 +40,7 @@ const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	['playwright', /playwright/u],
 	['chrome', /Google Chrome/u],
 	['chromium', /chromium|headless_shell/iu],
-	['claude', /claude/u],
+	['claude', /(?:^|\/)claude(?:\s|$)|@anthropic-ai\/claude-code\//u],
 	['josh', /josh\.ts|\btsx\b|(?<!\.)\bpnpm\b/u],
 	['node', /\bnode\b/u],
 ]
@@ -99,7 +103,10 @@ function summarize(listing: string): Array<ProcessKind> {
 // `undefined` where `ps` did not answer, so the sample records no breakdown rather than an empty one.
 async function read(): Promise<Array<ProcessKind> | undefined> {
 	try {
-		const { stdout } = await execa('ps', PS_ARGUMENTS, { timeout: PROBE_TIMEOUT_MS })
+		const { stdout } = await execa('ps', PS_ARGUMENTS, {
+			env: PS_ENVIRONMENT,
+			timeout: PROBE_TIMEOUT_MS,
+		})
 
 		return summarize(stdout)
 	} catch {
