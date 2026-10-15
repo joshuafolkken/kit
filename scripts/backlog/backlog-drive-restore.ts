@@ -70,6 +70,13 @@ function is_unowned_launch(event: RunEvent, gap: Gap | undefined): boolean {
 	return at > Date.parse(gap.from) && at < Date.parse(gap.to)
 }
 
+// A hand-corrupted ended record with an unreadable start must not drop this run's own launches.
+function floor_of(started_at: string, ended: EndedRun | undefined): string {
+	const floor = ended?.started_at ?? started_at
+
+	return Number.isNaN(Date.parse(floor)) ? started_at : floor
+}
+
 // The events a driver restores its lanes from: those since the run `--end` last ended began — a run
 // handed to a new invocation still owns what the previous one launched — less any launch between that
 // run's end and this one's start, which no run made (a `lane:dispatch` by hand) and so none collects.
@@ -78,7 +85,7 @@ function run_events(
 	started_at: string,
 	ended: EndedRun | undefined,
 ): ReadonlyArray<RunEvent> {
-	const floor = ended?.started_at ?? started_at
+	const floor = floor_of(started_at, ended)
 	const gap = ended === undefined ? undefined : { from: ended.ended_at, to: started_at }
 	const scoped = run_event_scope.scoped_events(events, { kind: 'since', started_at: floor }) ?? []
 

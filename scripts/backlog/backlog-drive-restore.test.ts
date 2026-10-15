@@ -32,6 +32,7 @@ const PREVIOUS_RUN = {
 
 const IN_PREVIOUS_RUN = '2026-09-23T00:00:00.000Z'
 const BETWEEN_RUNS = '2026-09-23T18:00:00.000Z'
+const IN_THIS_RUN = '2026-09-24T06:00:00.000Z'
 
 function launch_at(pos: number, at: string): RunEvent {
 	return { pos, kind: CHILD_LAUNCH, text: `#${String(pos)} dispatched`, at }
@@ -43,11 +44,21 @@ it('keeps the previous run and this one, less a launch made between them', () =>
 		launch_at(2, IN_PREVIOUS_RUN),
 		launch_at(3, BETWEEN_RUNS),
 		{ pos: 4, kind: 'park', text: '#2507 parked', at: BETWEEN_RUNS },
+		launch_at(5, IN_THIS_RUN),
 	]
 
 	const kept = backlog_drive_restore.run_events(events, STARTED_AT, PREVIOUS_RUN)
 
-	expect(kept.map((kept_event) => kept_event.pos)).toStrictEqual([2, 4])
+	expect(kept.map((kept_event) => kept_event.pos)).toStrictEqual([2, 4, 5])
+})
+
+it('reads from this run when the ended run records no readable start', () => {
+	const events = [launch_at(1, IN_PREVIOUS_RUN), launch_at(2, IN_THIS_RUN)]
+	const unreadable = { ...PREVIOUS_RUN, started_at: 'not a time' }
+
+	const kept = backlog_drive_restore.run_events(events, STARTED_AT, unreadable)
+
+	expect(kept.map((kept_event) => kept_event.pos)).toStrictEqual([2])
 })
 
 it('reads only this run when no run has ended before it', () => {

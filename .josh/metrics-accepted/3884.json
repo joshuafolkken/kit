@@ -1,8 +1,8 @@
 {
-	"reason": "#3884 adds the interrupted run:merge outcome with its release step and the board's idle-lane probe, and bounds the driver's cross-invocation lane restore to the previous ended run's window; the docs describe the new outcome in the same bold form as its sibling outcomes",
+	"reason": "Round-2 review fix: fall back to this run's start when an ended record's started_at does not parse, so a corrupted record cannot drop this run's own launches",
 	"date": "2026-10-15",
 	"growth": {
-		"scripts.code_lines": 113,
+		"scripts.code_lines": 117,
 		"prose.excess_bold": 2
 	}
 }
