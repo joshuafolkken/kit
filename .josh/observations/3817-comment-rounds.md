@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/lane/lane-session-broker.ts:246 | 2026-10-14 | #3817
+- rf:tests | low | scripts/lane/claude-lane-broker.test.ts:49 | 2026-10-14 | #3817

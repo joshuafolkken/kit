@@ -14,6 +14,7 @@ const {
 	find_open_lane,
 	is_reviewer,
 	launch,
+	printed_errors,
 	session_verdict,
 	state,
 	target,
@@ -70,6 +71,17 @@ describe('the implementation cut outside a lane', () => {
 		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.CUT_VERDICT])
 		expect(run_cut.read_cut(target()).kind).toBe('carried')
 		expect(launch).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#3734: the held run's instruction is this command's to print. The edit guard names
+	// none of it, so a lane child whose cut relaunches a successor is never handed it.
+	it('prints the held run its confirmation and its resume command', async () => {
+		held_by(ISSUE)
+
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect(printed_errors()).toContain('`confirmation` Telegram')
+		expect(printed_errors()).toContain(`fullrun #${ISSUE}`)
 	})
 
 	it('resumes that cut back into implementation in the fresh session', async () => {

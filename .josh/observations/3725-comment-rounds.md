@@ -1,0 +1,6 @@
+- rf:bug-risks | low | docs/troubleshooting.md:30 | 2026-10-13 | #3725
+- rf:bug-risks | low | docs/troubleshooting.md:32 | 2026-10-13 | #3725
+- rf:confidence | low | docs/troubleshooting.md:30 | 2026-10-13 | #3725
+- rf:tests | low | scripts/ci/ci-yml-pnpm-setup.test.ts:30 | 2026-10-13 | #3725
+- rf:tests | low | scripts/ci/ci-yml-pnpm-setup.test.ts:263 | 2026-10-13 | #3725
+- rf:project-conventions | low | scripts/ci/ci-yml-pnpm-setup.test.ts:248 | 2026-10-13 | #3725

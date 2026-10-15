@@ -112,8 +112,16 @@ function is_failed_verdict(line: string): boolean {
 	return josh_verdict.read_verdict(line) === josh_verdict.FAILED_VERDICT
 }
 
-function is_passed_verdict(line: string): boolean {
-	return josh_verdict.read_verdict(line) === josh_verdict.PASSED_VERDICT
+// **A gate that ran no check closes its region exactly as a passed one does.** Its `not verified`
+// verdict is still the gate's own statement that no check failed, so a failure mark a skip notice
+// forwarded in front of it is no more the gate's than one in front of `passed`.
+const GREEN_VERDICTS: ReadonlySet<string | undefined> = new Set([
+	josh_verdict.PASSED_VERDICT,
+	josh_verdict.UNVERIFIED_VERDICT,
+])
+
+function is_green_verdict(line: string): boolean {
+	return GREEN_VERDICTS.has(josh_verdict.read_verdict(line))
 }
 
 // What one pass over the body has established. The two failure buckets are kept apart because a
@@ -165,7 +173,7 @@ function note_failure(scan: FailureScan): void {
 // anything about the region: it is the gate's report about one check, and the run it belongs to states
 // a failed verdict of its own.
 function scan_line(scan: FailureScan, line: string): void {
-	if (is_passed_verdict(line)) {
+	if (is_green_verdict(line)) {
 		close_region(scan)
 
 		return

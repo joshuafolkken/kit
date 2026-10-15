@@ -54,6 +54,7 @@ const ALIASES: Record<string, string> = {
 	pf: 'profile',
 	st: 'start',
 	sy: 'sync',
+	un: 'uninstall',
 	rmi: 'registry:migrate',
 	g: 'git',
 	gp: 'pr',
@@ -79,9 +80,12 @@ const ALIASES: Record<string, string> = {
 	rvf: 'review:findings',
 	ruv: 'rule:value',
 	ev: 'eval',
+	fr: 'fresh:run',
+	as: 'auth:setup',
 	lsm: 'lane:sample',
 	lst: 'lane:stats',
 	lli: 'lane:limit',
+	lrs: 'lane:restart',
 	blr: 'backlogrun',
 }
 

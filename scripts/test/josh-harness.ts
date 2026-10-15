@@ -185,6 +185,7 @@ async function wait_for(is_ready: () => boolean, timeout_ms: number): Promise<bo
 
 const josh_harness = {
 	...josh_harness_environment,
+	CHILD_ENVIRONMENT,
 	DEFAULT_TIMEOUT_MS,
 	is_running,
 	run,

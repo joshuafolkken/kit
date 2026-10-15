@@ -58,4 +58,5 @@ After upgrading the package, pull in updated AI files, workflow templates and ot
 - Import the config presets and libraries directly: [package-api.md](../package-api.md), or wire them up without `josh init`: [manual-config.md](../manual-config.md).
 - Full command reference: [josh-commands.md](../josh-commands.md).
 - Want `josh` available everywhere? Install the [global CLI](../cli.md).
+- Not a fit? [Remove kit from a project](../how-to/uninstall.md).
 - Hitting an error? See [troubleshooting.md](../troubleshooting.md).

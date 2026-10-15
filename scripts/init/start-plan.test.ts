@@ -191,6 +191,19 @@ describe('consent to create the GitHub repository', () => {
 	})
 })
 
+describe('the steps that need a git author identity (#3754)', () => {
+	it.each([[['initialize', 'commit'] as const], [['initialize', 'labels', 'setup_pr'] as const]])(
+		'finds the commit in %j',
+		(steps) => {
+			expect(start_plan.has_commit(steps)).toBe(true)
+		},
+	)
+
+	it('finds none when kit is already committed and only the additive steps run', () => {
+		expect(start_plan.has_commit(['initialize', 'repository', 'labels'])).toBe(false)
+	})
+})
+
 describe('the steps a push preflight guards (#3702)', () => {
 	it.each([[WITH_REPOSITORY], [['initialize', 'labels', 'setup_pr'] as const]])(
 		'finds the push in %j',
@@ -208,6 +221,16 @@ describe('the steps a push preflight guards (#3702)', () => {
 
 		expect(report).toContain('the push preflight (josh-app start:preflight) failed')
 		expect(report).toContain('Nothing was changed.\nCause: exit code 1')
+	})
+})
+
+describe('the report of a run stopped for want of the audit scanner (#3755)', () => {
+	it('says nothing was changed, names the cause and how to run again', () => {
+		const report = start_plan.scanner_report('fetch failed')
+
+		expect(report).toContain('osv-scanner, which the pre-push audit needs')
+		expect(report).toContain('Nothing was changed.\nCause: fetch failed')
+		expect(report).toContain('then run josh start again')
 	})
 })
 

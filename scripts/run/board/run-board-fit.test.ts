@@ -153,6 +153,66 @@ describe('run_board_fit.fit order of the rows that stay longest', () => {
 	})
 })
 
+// joshuafolkken/kit#3815: the footer and the legend go first, the notes down to three before the
+// finished rows, the rest of the notes after them, then the thanks — before any row not yet started.
+const THANKS = ['', '  🙏 fish']
+const FIVE_NOTES: NotesPart = {
+	head: ['', 'N'],
+	lines: ['  n1', '  n2', '  n3', '  n4', '  n5'],
+	hidden: 0,
+}
+const CROWDED = parts_of([section([issue(1, 'finished', 10), issue(2)])], {
+	notes: FIVE_NOTES,
+	thanks: THANKS,
+	footer: FOOTER,
+})
+
+describe('run_board_fit.fit thanks', () => {
+	it('drops the footer and the legend before the thanks, and draws them right above the legend', () => {
+		const thanks = ['', '  🙏 fish  KittenLab']
+		const parts = parts_of([issues(2)], { thanks, footer: FOOTER })
+		const shown = [...HEADER, '', '  1', '  2']
+
+		expect(fit_wide(parts, 11)).toStrictEqual([...shown, ...thanks, ...LEGEND, ...FOOTER])
+		expect(fit_wide(parts, 10)).toStrictEqual([...shown, ...thanks, ...LEGEND])
+		expect(fit_wide(parts, 8)).toStrictEqual([...shown, ...thanks])
+		expect(fit_wide(parts, 6)).toStrictEqual(shown)
+	})
+})
+
+describe('run_board_fit.fit order of the notes', () => {
+	it.each([
+		[
+			'the oldest notes down to three, keeping the finished row',
+			13,
+			['', '  1', '  2'],
+			['  n1', '  n2', '  n3', '  more 2'],
+		],
+		[
+			'the finished row, then the next oldest note',
+			12,
+			['', '  2', '  more 1'],
+			['  n1', '  n2', '  more 3'],
+		],
+	])('cuts %s', (_, rows, plan, notes) => {
+		expect(fit_wide(CROWDED, rows)).toStrictEqual([
+			...HEADER,
+			...plan,
+			'',
+			'N',
+			...notes,
+			...THANKS,
+		])
+	})
+
+	it('cuts the rest of the notes before the thanks, and the thanks before a row not yet started', () => {
+		const plan = [...HEADER, '', '  2', '  more 1']
+
+		expect(fit_wide(CROWDED, 7)).toStrictEqual([...plan, ...THANKS])
+		expect(fit_wide(CROWDED, 6)).toStrictEqual(plan)
+	})
+})
+
 describe('run_board_fit.whole', () => {
 	it('draws every part in its order, the notes counting the ones past their limit', () => {
 		const notes = { head: ['', 'notes'], lines: ['  a'], hidden: 2 }

@@ -222,3 +222,40 @@ describe('backlogrun_launch.started_for', () => {
 		expect(backlogrun_launch.started_for(GIT_DIRECTORY, LAUNCHED_PID)).toBeUndefined()
 	})
 })
+
+// A launch record whose removal and whose parent's signal are both held by a spy.
+function stage_stop(is_live: boolean): void {
+	stage_launch(STARTED_RECORD, is_live)
+	vi.spyOn(process, 'kill').mockReturnValue(true)
+	vi.spyOn(stamp_file, 'remove_stamp').mockReturnValue()
+}
+
+// joshuafolkken/kit#3708: `josh backlogrun --stop` stops the parent this launcher started, and only it.
+describe('backlogrun_launch.stop_parent', () => {
+	it('signals the launched parent while it is still that process, and forgets the launch', () => {
+		stage_stop(true)
+
+		expect(backlogrun_launch.stop_parent(GIT_DIRECTORY)).toBe(LAUNCHED_PID)
+		expect(process.kill).toHaveBeenCalledExactlyOnceWith(LAUNCHED_PID, 'SIGTERM')
+		expect(stamp_file.remove_stamp).toHaveBeenCalledOnce()
+	})
+
+	it('signals nobody once the launched pid is another process, and still forgets the launch', () => {
+		stage_stop(false)
+
+		expect(backlogrun_launch.stop_parent(GIT_DIRECTORY)).toBeUndefined()
+		expect(process.kill).not.toHaveBeenCalled()
+		expect(stamp_file.remove_stamp).toHaveBeenCalledOnce()
+	})
+
+	it('forgets the launch of a parent that cannot be signalled', () => {
+		stage_stop(true)
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		vi.mocked(process.kill).mockImplementation(() => {
+			throw new Error('EPERM')
+		})
+
+		expect(backlogrun_launch.stop_parent(GIT_DIRECTORY)).toBe(LAUNCHED_PID)
+		expect(stamp_file.remove_stamp).toHaveBeenCalledOnce()
+	})
+})

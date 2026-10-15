@@ -10,14 +10,16 @@ import { lane_seed_policy } from './lane-seed'
 // is what would have to be undone the first time two epics run together, which is why the scheduler
 // is epic-free.
 //
-// **It is a ceiling, not a prediction.** Six lanes does not say six children will run at once; it
-// says a seventh will not start. What actually runs is bounded by what is runnable, by the port
+// **It is a ceiling, not a prediction.** Four lanes does not say four children will run at once; it
+// says a fifth will not start. What actually runs is bounded by what is runnable, by the port
 // seats `lane-seed.ts` can allocate, and by the machine.
 
-// Six rather than the nine seats `lane_seed_policy` can allocate: the seats are the hard structural
+// Four rather than the nine seats `lane_seed_policy` can allocate: the seats are the hard structural
 // bound, this is the one a person tunes, and leaving headroom between them means raising the limit
-// never lands on "the ports ran out" as its first symptom.
-const DEFAULT_LANE_LIMIT = 6
+// never lands on "the ports ran out" as its first symptom. joshuafolkken/kit#3788 lowered it from
+// six: a week of `lane:stats` showed 1.5 effective lanes, while the hours at five or six lanes held
+// the swap peak, the slowest gates and most of the gate and commit failures.
+const DEFAULT_LANE_LIMIT = 4
 const LANE_LIMIT_KEY = 'JOSH_LANE_LIMIT'
 const POSITIVE_INTEGER = /^[1-9]\d*$/u
 const NO_LANES = 0
@@ -28,7 +30,7 @@ const NO_LANES = 0
 type LimitChoice = { kind: 'limit'; limit: number } | { kind: 'problem'; problem: string }
 
 // **An invalid value is a hard error, never a silent fall back to the default** — the rule
-// `PORT_SEED` already holds to. A typo that quietly becomes 6 is a limit nobody set, and the whole
+// `PORT_SEED` already holds to. A typo that quietly becomes 4 is a limit nobody set, and the whole
 // point of the setting is that the number is the one a person chose.
 //
 // Blank is unset, not invalid: an `.env` line left as `JOSH_LANE_LIMIT=` is a variable nobody

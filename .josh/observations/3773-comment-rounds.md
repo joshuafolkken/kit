@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/issue/issue-watch-diff.ts:96 | 2026-10-14 | #3773
+- rf:comments | low | scripts/issue/issue-watch.ts:117 | 2026-10-14 | #3773
+- rf:performance | low | scripts/issue/issue-watch-hook.ts:24 | 2026-10-14 | #3773

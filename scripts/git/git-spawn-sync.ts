@@ -72,4 +72,4 @@ function toplevel(timeout: number = GIT_TIMEOUT_MS): GitSyncResult {
 const git_spawn_sync = { GIT_TIMEOUT_MS, C_LOCALE, run, read, origin_url, toplevel }
 
 export { git_spawn_sync }
-export type { GitSyncResult }
+export type { GitSyncOptions, GitSyncResult }

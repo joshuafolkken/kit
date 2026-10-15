@@ -61,7 +61,7 @@ resumed session runs `remaining` from `--json`. The contract is `docs/josh-comma
 ```bash
 pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"
 pnpm josh run:carry --json                                                   # read it back in a resumed session
-pnpm josh run:wake --start                                                   # same turn as --begin
+pnpm josh run:wake --start                                                   # same turn as --begin; `running` under `josh backlogrun`
 ```
 
 **Always pass `--owner "$PPID"`**, and ask it before the plan, in the same turn as the first `pnpm josh
@@ -85,7 +85,8 @@ named epic's children", never the root as a standalone `fullrun`, then ask `pnpm
 a child number or `complete` continues; only `stop` or a failure records `pnpm josh run:carry --done <E>
 --owner "$PPID"`.
 
-**A person keeps control of the supervisor** — `pnpm josh run:wake --list` / `--stop`.
+**A person keeps control of the run** — `pnpm josh run:wake --list` reads it, `pnpm josh backlogrun
+--stop` stops it (`docs/josh-commands.md` → "`josh backlogrun`").
 
 Rationale: `docs/maintainers/backlogrun-steps-rationale.md` → "Why a session cut does not end the run"
 
@@ -129,7 +130,7 @@ section the row names:
 | Handed back | What the session does | Read |
 | --- | --- | --- |
 | `triage` | Label each issue stderr names `run:solo` or `run:lane` (`blocked-by` where one must land first) | "Resolve what the plan can resolve, before starting" above |
-| `offer` | Report what stderr printed; **never pick an issue by hand** | — |
+| `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** | — |
 | `launch #N` | Read the lane's log and park `#N` | `backlogrun-park.md` → "park and continue" |
 | `merge [<token>] #N` | `environment` ends the run; the others re-read the child | `backlogrun-progress.md` → "Running a named epic's children" |
 | `epic #N` | A named epic's turn | "The session cut is inside the invocation" above |

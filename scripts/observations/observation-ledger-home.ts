@@ -119,6 +119,7 @@ async function append(target: string, lines: ReadonlyArray<string>): Promise<voi
 
 const observation_ledger_home = {
 	append,
+	file_path,
 	issue_path,
 	ledger_date,
 	ledger_root,

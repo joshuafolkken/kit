@@ -381,3 +381,13 @@ it('records each stage a ship ran, never a skipped one, up to the one that faile
 		record.mock.calls.map(([stage]) => `${stage.stage} #${String(stage.issue)}`),
 	).toStrictEqual(['preflight', 'sync', 'gate'].map((stage) => `${stage} #${NUMBER}`))
 })
+
+// joshuafolkken/kit#3789: the stop goes to the ledger too, so `lane:stats` can time the wait it began.
+it('records the stop of a ship with the stage it stopped at', async () => {
+	const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+
+	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red' })
+	await run_ship_cli.run([TITLE, '--review'])
+
+	expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'gate' }]])
+})

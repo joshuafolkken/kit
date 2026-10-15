@@ -1,7 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { epic_audit_logic } from './epic-audit'
-import type { BacklogIssue } from './epic-bundle'
+import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_issue, type EpicIssue } from './epic-issue'
 
 // Candidates the open backlog cannot show, read from the subject's own prose.
@@ -64,15 +64,12 @@ interface ReferencedContext {
 }
 
 function to_backlog_issue(issue: EpicIssue, context: ReferencedContext): BacklogIssue {
-	const epic = context.epics.get(issue.number)
-
 	return {
 		number: issue.number,
 		repo: context.repo,
 		body: issue.body,
 		blocked_by: epic_issue.blocker_references_of(issue, context.repo),
-		is_epic: context.epic_numbers.has(issue.number),
-		...(epic !== undefined && { epic }),
+		...epic_bundle.membership_of(issue.number, epic_issue.label_names(issue), context),
 	}
 }
 

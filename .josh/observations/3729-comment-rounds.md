@@ -1,0 +1,4 @@
+- rf:assumptions | low | scripts/backlog/backlogrun-replace.ts:36 | 2026-10-13 | #3729
+- rf:comments | low | docs/josh-commands.md:582 | 2026-10-13 | #3729
+- rf:bug-risks | low | scripts/backlog/backlogrun-cli.ts:95 | 2026-10-13 | #3729
+- rf:bug-risks | low | scripts/backlog/backlogrun-replace.ts:55 | 2026-10-13 | #3729

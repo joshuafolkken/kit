@@ -120,3 +120,18 @@ describe('lane_stage_stats.table — the implementation, from dispatch to the fi
 		expect(row_of(entries, IMPLEMENT)?.at(-1)).toBe('1')
 	})
 })
+
+// joshuafolkken/kit#3769: how long each stage usually takes, which `run:board` colors a phase against.
+describe('lane_stage_stats.medians', () => {
+	it('maps each recorded stage to its median, in milliseconds, over every entry given', () => {
+		const reviews = REVIEW_MINUTES.map((minutes) => stage(REVIEW, minutes, 1))
+		const medians = lane_stage_stats.medians([...reviews, dispatch(30), stage('preflight', 1, 19)])
+
+		expect(medians.get(REVIEW)).toBe(4 * MS_PER_MINUTE)
+		expect(medians.get(lane_stage_stats.IMPLEMENT)).toBe(10 * MS_PER_MINUTE)
+	})
+
+	it('leaves out a stage nothing recorded rather than reading it as zero', () => {
+		expect(lane_stage_stats.medians([stage(REVIEW, 2, 1)]).has(CI_WAIT)).toBe(false)
+	})
+})

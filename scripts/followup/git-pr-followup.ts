@@ -10,6 +10,7 @@ import {
 	type TelegramSendInput,
 	type TelegramTaskType,
 } from '#scripts/notify/telegram-notify'
+import { followup_checks_event } from './followup-checks-event'
 import { git_followup_merged } from './git-followup-merged'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
@@ -229,6 +230,7 @@ async function run_review_checks(
 	input: FollowupInput,
 	context: TelegramContext,
 	log: StageLog,
+	issue_number: string | undefined,
 ): Promise<{ notes: Array<string>; managed: Array<string> }> {
 	if (input.is_merged === true) return { notes: [], managed: [] }
 
@@ -238,6 +240,7 @@ async function run_review_checks(
 	const snapshot = await run_checks({
 		branch_name: input.branch_name,
 		is_skip_watch: input.is_skip_watch,
+		observe: followup_checks_event.observer_of(issue_number, context.pr_url),
 	})
 
 	lap(log, STAGE.checks_wait)
@@ -278,7 +281,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 	const { issue_number, closes_number, context } = await read_run_context(input)
 
 	lap(log, STAGE.closes_and_context)
-	const checks = await run_review_checks(input, context, log)
+	const checks = await run_review_checks(input, context, log, issue_number)
 	const is_completion_recorded = await notify_unless_recorded(input, issue_number, context, checks)
 
 	lap(log, STAGE.telegram)

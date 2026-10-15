@@ -181,7 +181,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'test:unit': {
 		script: 'scripts/test/test-unit-guard.ts',
 		description:
-			'Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)',
+			'Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests)',
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
 		core_weight: gate_plan.direct_unit_weight,

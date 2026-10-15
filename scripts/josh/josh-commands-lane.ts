@@ -40,7 +40,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:prune': {
 		...LANE_ARGUMENTS,
 		description:
-			'Close every lane an interruption left without its work tree, then sweep unregistered leftovers under the lanes root',
+			'Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root',
 		category: 'AI tools',
 		reference: ['', 'automation', ['files', 'git']],
 		default_script_arguments: ['prune'],
@@ -74,6 +74,15 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> [--stash <message>]', 'automation', ['files', 'git', 'processes']],
 	},
+	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so the lane is found.
+	'lane:restart': {
+		script: 'scripts/lane/lane-restart-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure',
+		category: 'AI tools',
+		reference: ['<issue>', 'developer', ['files', 'git', 'processes', 'network']],
+	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.
 	'lane:limit': {
@@ -97,7 +106,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it',
+			'Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, and the wait after each ship stop reason under those',
 		category: 'AI tools',
 		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
 		default_script_arguments: ['stats'],

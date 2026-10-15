@@ -1,0 +1,2 @@
+- rf:assumptions | low | scripts/lane/lane-open.ts:179 | 2026-10-13 | #3738
+- rf:confidence | low | scripts/run/board/run-board-setup.ts:55 | 2026-10-13 | #3738

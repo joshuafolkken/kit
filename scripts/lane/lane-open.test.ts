@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
@@ -139,6 +140,8 @@ beforeEach(() => {
 	install_answers(true, '')
 	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(lane_leftover.reclaim).mockReset()
+	// The stage an open writes goes to the checkout's own stream, which is a live run's: never from a test.
+	vi.spyOn(run_event_setup, 'emit').mockReset().mockResolvedValue()
 	git_answers()
 })
 
@@ -265,6 +268,26 @@ describe('opening a lane — its dependencies', () => {
 		expect(vi.mocked(lane_install.install_dependencies)).toHaveBeenCalledWith(
 			path.join(LANE_ROOT, ISSUE),
 		)
+	})
+
+	// joshuafolkken/kit#3738: the install is the long part of an open, so it is a stage of its own.
+	it('says the install on the run’s stream before it starts', async () => {
+		await lane_open.open_lane(ISSUE)
+
+		expect(run_event_setup.emit).toHaveBeenCalledExactlyOnceWith(
+			`installing dependencies #${ISSUE}`,
+		)
+		expect(run_event_setup.emit).toHaveBeenCalledBefore(
+			vi.mocked(lane_install.install_dependencies),
+		)
+	})
+
+	it('says no install for a lane that is already open', async () => {
+		lanes_are([live_lane(ISSUE, 1)])
+
+		await lane_open.open_lane(ISSUE)
+
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
 	})
 
 	// The hooks of a linked work tree belong to the primary repository, so the installer warning is

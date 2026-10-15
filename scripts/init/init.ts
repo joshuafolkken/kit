@@ -23,7 +23,6 @@ import { init_file_action } from './init-file-action'
 import { init_install } from './init-install'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
-import { kit_development_versions } from './kit-development-versions'
 import { kit_setup_state } from './kit-setup-state'
 import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
@@ -71,27 +70,8 @@ function get_kit_self_dependency(): Record<string, string> {
 	return { [KIT_PACKAGE_NAME]: version }
 }
 
-// Each config `init` generates runs a CLI or imports types the consumer has to resolve itself:
-// `cspell.config.yaml` → cspell, `playwright.config.ts` → @types/node, `lefthook.yml` → lefthook.
-// Prettier, its preset plugins and @playwright/test come in as peers. Without them the first
-// `josh gate` after `pnpm install` fails.
-const TOOL_DEVELOPMENT_DEPENDENCIES = ['cspell', '@types/node']
-const LEFTHOOK_DEVELOPMENT_DEPENDENCY = 'lefthook'
-
-function tool_dependency_names(has_git: boolean): ReadonlyArray<string> {
-	return has_git
-		? [...TOOL_DEVELOPMENT_DEPENDENCIES, LEFTHOOK_DEVELOPMENT_DEPENDENCY]
-		: TOOL_DEVELOPMENT_DEPENDENCIES
-}
-
-// Versions mirror kit's own devDependencies, so the consumer runs the toolchain kit is verified with.
-function get_toolchain_development_dependencies(has_git: boolean): Record<string, string> {
-	return kit_development_versions.versions_of([
-		...kit_development_versions.peer_names(),
-		...tool_dependency_names(has_git),
-	])
-}
-
+// Each config `init` generates runs a CLI or imports types the consumer has to resolve itself, so
+// the toolchain is added here: without it the first `josh gate` after `pnpm install` fails.
 function apply_dependency_merges(content: string, has_git = true): string {
 	const migrated = init_logic.strip_managed_postinstall(content)
 	const suggested = init_logic.get_suggested_scripts_for_content(migrated)
@@ -103,7 +83,7 @@ function apply_dependency_merges(content: string, has_git = true): string {
 	)
 	const with_toolchain = init_logic.merge_development_dependencies(
 		merged,
-		get_toolchain_development_dependencies(has_git),
+		init_logic.get_toolchain_development_dependencies(has_git),
 	)
 	const with_secretlint = init_logic.merge_secretlint_development_deps(with_toolchain)
 
@@ -147,6 +127,7 @@ function merged_manifest(existing: string, shape: ProjectShape): string {
 	return init_basic.with_recorded_profile(
 		apply_package_json_merges(existing, shape.has_git),
 		shape.profile,
+		shape.has_workflow,
 	)
 }
 
@@ -325,6 +306,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const init = {
 	copy_ai_file: init_ai_copy.copy_ai_file,
 	apply_package_json_merges,
+	merged_manifest,
 	install_lefthook,
 	resolve_kit_package_manager,
 }

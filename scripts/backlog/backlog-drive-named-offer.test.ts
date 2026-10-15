@@ -1,9 +1,11 @@
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { expect, test, vi } from 'vitest'
-import { backlog_drive } from './backlog-drive'
+import { backlog_drive, type LoopPorts } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
+import { backlog_drive_fixture, type Harness } from './backlog-drive-fixture'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
+import { backlog_offer } from './backlog-offer'
 
 const ACTIVE = new Date().toISOString()
 const CARRY = {
@@ -77,6 +79,59 @@ test('offers the next named issue after the epic root is recorded done', async (
 
 	expect(offer).toMatchObject({ verdict: 'run', issues: ['2'] })
 	read.mockRestore()
+})
+
+// joshuafolkken/kit#3739: a failed state read is the driver's to repeat. Only a read that stays failed
+// reaches a session, as the `offer` row the loop's table already answers.
+const UNREACHABLE = { kind: 'unreadable', reason: 'unreachable', status: 502 } as const
+const OPEN_STATE = {
+	kind: 'state',
+	state: { state: 'OPEN', labels: [], is_human_review: false },
+} as const
+
+function named_ports(harness: Harness): LoopPorts {
+	return {
+		...harness.ports,
+		offer: async (state) => await backlog_drive_named_offer.read(CARRY, state, CONTEXT),
+	}
+}
+
+test('reads a named issue again after a failed state read, then launches it', async () => {
+	vi.spyOn(console, 'error').mockImplementation(vi.fn())
+	vi.spyOn(issue_state_cli, 'read_issue')
+		.mockResolvedValueOnce(UNREACHABLE)
+		.mockResolvedValue(OPEN_STATE)
+	const harness = backlog_drive_fixture.harness({})
+	const ports = named_ports(harness)
+
+	const first = await backlog_drive.run_pass(backlog_drive_fixture.state(), true, ports)
+	const second = await backlog_drive.run_pass(first.state, true, ports)
+
+	expect(first).toMatchObject({ kind: 'continue', state: { retries: 1, in_flight: [] } })
+	expect(second).toMatchObject({ kind: 'continue', state: { retries: 0, in_flight: ['1'] } })
+	expect(harness.calls).toEqual(['launch 1'])
+	vi.restoreAllMocks()
+})
+
+test('hands back `offer` naming the issue once its state stays unreadable', async () => {
+	const error = vi.spyOn(console, 'error').mockImplementation(vi.fn())
+	const read = vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue(UNREACHABLE)
+	const harness = backlog_drive_fixture.harness({})
+	const state = backlog_drive_fixture.state()
+
+	const end = await backlog_drive.run_loop(
+		state,
+		backlog_drive_fixture.CONFIG,
+		named_ports(harness),
+	)
+
+	expect(end).toMatchObject({ reason: 'offer', token: 'offer' })
+	expect(read).toHaveBeenCalledTimes(backlog_offer.RETRY_LIMIT)
+	expect(error).toHaveBeenLastCalledWith(
+		'The state of named issue #1 could not be read (unreachable, status 502); the offer failed 3 times in a row.',
+	)
+	expect(harness.calls).toEqual([])
+	vi.restoreAllMocks()
 })
 
 // joshuafolkken/kit#3419: a park is booked done so the run moves on, but it is not a merge — an `--only`

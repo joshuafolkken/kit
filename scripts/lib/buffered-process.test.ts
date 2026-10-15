@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { pnpm_reach } from './pnpm-reach'
 import { SUITE_TIMEOUT_MS } from './timeouts'
 
 vi.mock('execa', () => ({
@@ -16,6 +17,10 @@ const SIGNAL_EXIT_CODE = undefined
 const FAILING_EXIT_CODE = 1
 const LANE_DIRECTORY = '/lanes/1554'
 const SHORTER_TIMEOUT_MS = 600_000
+const LINT_OUTPUT = 'lint errors'
+const MISSING_DIRECTORY = '/lanes/3712/removed'
+const SPAWN_FAILED = 'Command failed with ENOENT: pnpm josh lint\nspawn pnpm ENOENT'
+const TIMED_OUT = 'Command timed out after 1800000 milliseconds: pnpm josh test:unit'
 
 // Only the options the callers depend on; execa's own Options type carries dozens more.
 interface ObservedExecaOptions {
@@ -44,6 +49,20 @@ async function fake_execa(
 
 function mock_execa(): void {
 	mocked_execa.mockImplementation(fake_execa as unknown as ExecaImplementation)
+}
+
+// What execa resolves with when the child produced no exit code, as observed against the real
+// library: `code` only when the spawn itself failed, `all` holding whatever was written first.
+interface UnfinishedOutcome {
+	all: string
+	code?: string
+	shortMessage: string
+}
+
+function mock_unfinished(outcome: UnfinishedOutcome): void {
+	const result = { ...outcome, exitCode: undefined } as unknown as ExecaResult
+
+	mocked_execa.mockImplementation((async () => result) as unknown as ExecaImplementation)
 }
 
 beforeEach(() => {
@@ -115,6 +134,53 @@ describe('run_buffered_process', () => {
 
 		expect(Number.isFinite(result.elapsed_ms)).toBe(true)
 		expect(result.elapsed_ms).toBeGreaterThanOrEqual(0)
+	})
+})
+
+// joshuafolkken/kit#3712: a child with no exit code never said why, so `josh gate` printed a bare ✗
+// and an empty log for every check when `pnpm` was missing from the PATH the gate ran with.
+describe('run_buffered_process — a child that produced no exit code', () => {
+	it('says pnpm is not on PATH when the child could not be started', async () => {
+		mock_unfinished({ all: '', code: 'ENOENT', shortMessage: SPAWN_FAILED })
+
+		const result = await buffered_process.run_buffered_process(['josh', 'lint'])
+
+		expect(result.exit_code).toBeUndefined()
+		expect(result.output).toBe(`${SPAWN_FAILED}\n${pnpm_reach.NOT_ON_PATH_NOTICE}`)
+	})
+
+	// A removed working directory fails the spawn with the same code; blaming pnpm for it would send
+	// the reader to reinstall a tool that is working.
+	it('does not blame pnpm when the working directory is what is missing', async () => {
+		mock_unfinished({ all: '', code: 'ENOENT', shortMessage: SPAWN_FAILED })
+
+		const result = await buffered_process.run_buffered_process(['install'], {
+			cwd: MISSING_DIRECTORY,
+		})
+
+		expect(result.output).toBe(SPAWN_FAILED)
+	})
+
+	it('keeps what the child wrote and adds why it stopped when it ran past its bound', async () => {
+		mock_unfinished({ all: 'partial', shortMessage: TIMED_OUT })
+
+		const result = await buffered_process.run_buffered_process(['josh', 'test:unit'])
+
+		expect(result.output).toBe(`partial\n${TIMED_OUT}`)
+	})
+
+	it('adds nothing to a child that exited by itself', async () => {
+		const failed = {
+			all: LINT_OUTPUT,
+			exitCode: FAILING_EXIT_CODE,
+			shortMessage: 'Command failed',
+		}
+
+		mocked_execa.mockImplementation((async () => failed) as unknown as ExecaImplementation)
+		const result = await buffered_process.run_buffered_process(['josh', 'lint'])
+
+		expect(result.output).toBe(LINT_OUTPUT)
+		expect(result.exit_code).toBe(FAILING_EXIT_CODE)
 	})
 })
 

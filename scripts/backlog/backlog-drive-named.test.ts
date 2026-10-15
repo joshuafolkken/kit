@@ -5,6 +5,7 @@ import path from 'node:path'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { expect, test, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -67,7 +68,7 @@ test('records a named merge under the separate supervisor PID', async () => {
 
 	await backlog_drive_named.mark_done(
 		'1',
-		{ outcome: 'merged', code: 0, token: 'none' },
+		{ outcome: 'merged', code: 0, token: 'none', is_offer: true },
 		String(supervisor.pid),
 	)
 	expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
@@ -92,18 +93,28 @@ test('recovers a named merge from the event stream after an interrupted handoff'
 	rmSync(directory, { recursive: true, force: true })
 })
 
-test('skips later named issues after a failed first issue', async () => {
+// An offer's `stop` passed through the merge is not the failure guard (joshuafolkken/kit#3781): the
+// failed child is settled like any other, and only the control `stop` leaves it unmarked.
+const FAILED_RESULTS: ReadonlyArray<[string, MergeResult, ReadonlyArray<number>]> = [
+	['an offered child', { outcome: 'failed', code: 0, token: 'none', is_offer: true }, [1, 2]],
+	['an offer stop', { outcome: 'failed', code: 0, token: 'stop', is_offer: true }, [1, 2]],
+	[
+		'no named issue after the control stop',
+		{ outcome: 'failed', code: 0, token: 'stop', is_offer: false },
+		[],
+	],
+]
+
+test.each(FAILED_RESULTS)('marks %s after a failed first issue', async (_label, result, done) => {
 	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-failed-'))
 	const target = run_carry.carry_path(directory)
 	const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
 
 	run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(process.pid))
-	await backlog_drive_named.mark_done(
-		'1',
-		{ outcome: 'failed', code: 0, token: 'none' },
-		String(process.pid),
-	)
-	expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1, 2] } })
+	await backlog_drive_named.mark_done('1', result, String(process.pid))
+	const read = run_carry.read_carry(target)
+
+	expect(read.kind === 'carried' ? (read.carry.done ?? []) : undefined).toStrictEqual(done)
 	read_directory.mockRestore()
 	rmSync(directory, { recursive: true, force: true })
 })
@@ -117,7 +128,7 @@ async function done_after_failure(failed: string, is_priority: boolean): Promise
 	if (carry !== undefined) run_carry_added.add_issues(target, carry, [{ issue: 5, is_priority }])
 	await backlog_drive_named.mark_done(
 		failed,
-		{ outcome: 'failed', code: 0, token: 'none' },
+		{ outcome: 'failed', code: 0, token: 'none', is_offer: true },
 		String(process.pid),
 	)
 	const read = run_carry.read_carry(target)

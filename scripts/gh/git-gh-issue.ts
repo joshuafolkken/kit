@@ -14,7 +14,10 @@ const NUMBER_AND_BODY_FIELDS = 'number,body'
 // tell a row with no blockers from one with some **before** deciding whether that row is worth a
 // per-issue read, which would otherwise be made for every open issue in the repository. Absent on a
 // row whose summary is missing, which must not be read as zero; `git-gh-issue-rest.ts` states why.
-const BACKLOG_SCAN_FIELDS = `number,title,body,${BLOCKED_BY_COUNT_FIELD}`
+//
+// `labels` rides along on the same response too: `epic:bundle` reads the release label off it,
+// because the release issue's blockers are recorded mechanically and signal no shared work.
+const BACKLOG_SCAN_FIELDS = `number,title,body,labels,${BLOCKED_BY_COUNT_FIELD}`
 // The recently-closed scan's fields. It compares titles like the scan above
 // and never reads a body, and it needs the labels to tell an epic from a deliverable — the open half
 // gets that from the epic listing, which by construction holds no closed epic.

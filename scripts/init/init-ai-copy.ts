@@ -25,9 +25,11 @@ const PRETTIER_IGNORE = '.prettierignore'
 const GIT_ATTRIBUTES = '.gitattributes'
 const CODE_OF_CONDUCT = 'CODE_OF_CONDUCT.md'
 const { SECURITY_MD } = security_policy
+const AGENTS_MD = 'AGENTS.md'
+const GEMINI_MD = 'GEMINI.md'
 const BASIC_AI_FILES = [
-	'AGENTS.md',
-	'GEMINI.md',
+	AGENTS_MD,
+	GEMINI_MD,
 	PRETTIER_IGNORE,
 	GIT_ATTRIBUTES,
 	CODE_OF_CONDUCT,
@@ -36,6 +38,8 @@ const BASIC_AI_FILES = [
 ]
 // A basic project gets its own template for these, not kit's development copy.
 const BASIC_SOURCES: Readonly<Record<string, string>> = {
+	[AGENTS_MD]: 'templates/AGENTS.basic.md',
+	[GEMINI_MD]: 'templates/GEMINI.basic.md',
 	[PRETTIER_IGNORE]: 'templates/prettierignore.basic',
 	[WORKSPACE_YAML]: 'templates/pnpm-workspace.basic.yaml',
 }
@@ -43,6 +47,9 @@ const BASIC_SOURCES: Readonly<Record<string, string>> = {
 const CONSUMER_SOURCES: Readonly<Record<string, string>> = {
 	[SECURITY_MD]: security_policy.SECURITY_TEMPLATE,
 }
+// A basic project `josh start` set up for the GitHub Issue workflow runs its agents unattended, on the
+// permissions, hooks and plugin this file declares (#3796).
+const BASIC_WORKFLOW_AI_FILES = [...BASIC_AI_FILES, '.claude/settings.json']
 const GITHUB_FILES = new Set([CODE_OF_CONDUCT, SECURITY_MD])
 const BASIC_POINTER_MAPPING = { src: 'templates/cursorrules.basic', dest: '.cursorrules' }
 const PULL_REQUEST_TEMPLATE = '.github/pull_request_template.md'
@@ -62,11 +69,15 @@ function did_read_unstamped(destination_path: string): boolean {
 	}
 }
 
-function copy_ai_file(source_path: string, destination_path: string): void {
-	const content = readFileSync(source_path, 'utf8')
+// What kit writes at a destination it copies to — the content `josh uninstall` compares a project's
+// file against, so it is read from the one place the copy itself reads it.
+function copied_content(source_path: string, destination_path: string): string {
+	return transform_copied_content(destination_path, readFileSync(source_path, 'utf8'))
+}
 
+function copy_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, transform_copied_content(destination_path, content))
+	writeFileSync(destination_path, copied_content(source_path, destination_path))
 }
 
 // `init` declines to modify a file that already exists, and that includes not stamping it: the
@@ -132,6 +143,14 @@ function merge_existing_workspace_yaml(source_path: string, destination_path: st
 	console.info(`  ✔ updated   ${WORKSPACE_YAML}`)
 }
 
+// The workspace file kit writes where the project has none.
+function workspace_content(source_path: string, destination_path: string): string {
+	return transform_copied_content(
+		destination_path,
+		read_workspace_template(source_path, destination_path),
+	)
+}
+
 function did_skip_workspace_yaml_copy(source_path: string, destination_path: string): boolean {
 	if (existsSync(destination_path)) {
 		merge_existing_workspace_yaml(source_path, destination_path)
@@ -139,9 +158,7 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 		return false
 	}
 
-	const template = read_workspace_template(source_path, destination_path)
-
-	writeFileSync(destination_path, transform_copied_content(destination_path, template))
+	writeFileSync(destination_path, workspace_content(source_path, destination_path))
 	console.info(`  ✔ created   ${WORKSPACE_YAML}`)
 
 	return false
@@ -342,8 +359,12 @@ function should_copy_ai_file(filename: string, shape?: ProjectShape): boolean {
 	)
 }
 
+function basic_ai_files(shape: ProjectShape): ReadonlyArray<string> {
+	return shape.has_workflow ? BASIC_WORKFLOW_AI_FILES : BASIC_AI_FILES
+}
+
 function ai_files(shape?: ProjectShape): ReadonlyArray<string> {
-	const files = shape?.profile === 'basic' ? BASIC_AI_FILES : init_logic.get_ai_copy_files()
+	const files = shape?.profile === 'basic' ? basic_ai_files(shape) : init_logic.get_ai_copy_files()
 
 	return files.filter((filename) => should_copy_ai_file(filename, shape))
 }
@@ -397,6 +418,8 @@ function run_ai_copies(shape?: ProjectShape): string | undefined {
 
 const init_ai_copy = {
 	copy_ai_file,
+	copied_content,
+	workspace_content,
 	run_ai_copies,
 	ai_files,
 	ai_file_source,
@@ -405,4 +428,4 @@ const init_ai_copy = {
 	read_workspace_template,
 }
 
-export { init_ai_copy, CLAUDE_MD_FILENAME }
+export { init_ai_copy, CLAUDE_MD_FILENAME, WORKSPACE_YAML }

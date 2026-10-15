@@ -5,6 +5,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
   "aliases": {
     "a": "audit",
     "ad": "adopt",
+    "as": "auth:setup",
     "bh": "behavior",
     "blr": "backlogrun",
     "bp": "bump",
@@ -14,6 +15,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "eu": "exports:unused",
     "ev": "eval",
     "f": "format",
+    "fr": "fresh:run",
     "g": "git",
     "ga": "gate",
     "gp": "pr",
@@ -23,6 +25,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lli": "lane:limit",
     "ln": "lines",
     "lr": "lint:related",
+    "lrs": "lane:restart",
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
@@ -53,6 +56,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "trd": "test:red",
     "tu": "test:unit",
     "u": "latest",
+    "un": "uninstall",
     "v": "version",
   },
   "references": {
@@ -79,6 +83,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "network",
+      ],
+    ],
+    "auth:setup": [
+      "[--check]",
+      "maintainer",
+      [
+        "network",
+        "processes",
       ],
     ],
     "auto-ok:next": [
@@ -133,7 +145,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "backlogrun": [
-      "[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]",
+      "[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop",
       "developer",
       [
         "files",
@@ -371,6 +383,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "fresh:run": [
+      "<pattern> | --spec <file.json> [--package-version <version>] [--log-dir <dir>] [--rebuild] | --list",
+      "maintainer",
+      [
+        "files",
+        "network",
+        "processes",
+      ],
+    ],
     "gate": [
       "[--verbose|--force|--no-unit]",
       "developer",
@@ -401,6 +422,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "issue:ack": [
+      "<issue>",
+      "automation",
+      [
+        "network",
       ],
     ],
     "issue:backlinks": [
@@ -547,6 +575,16 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "git",
+      ],
+    ],
+    "lane:restart": [
+      "<issue>",
+      "developer",
+      [
+        "files",
+        "git",
+        "processes",
+        "network",
       ],
     ],
     "lane:sample": [
@@ -1239,6 +1277,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "uninstall": [
+      "[--profile basic|full] [--yes]",
+      "developer",
+      [
+        "files",
+        "processes",
       ],
     ],
     "version": [

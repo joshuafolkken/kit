@@ -207,6 +207,40 @@ It refuses, changing nothing and exiting `1`, unless the directory:
 - lies outside the kit checkout it is run from;
 - has no commit yet, and is not inside another git repository — a `.git` without history, as `sv create` leaves, is accepted.
 
+### `josh fresh:run`
+
+Run one install scenario in a Docker container of a machine with nothing installed — no Node.js, pnpm, git or gh — and keep every command and its output as a log. Needs Docker on the machine it is run from.
+
+```bash
+pnpm josh fresh:run --list                                # kit's six patterns
+pnpm josh fresh:run kit-test-html-init                    # one pattern, the packed checkout
+pnpm josh fresh:run kit-test-html-start                   # a GitHub pattern, the latest published version
+pnpm josh fresh:run --spec fresh/html-init.json           # a scenario another toolkit wrote
+```
+
+**Options:**
+
+- `--list` — print the pattern names and run nothing.
+- `--spec <file.json>` — run the scenario in this file instead of a named pattern; the path is relative to the project root.
+- `--package-version <version>` — the published version a `package_source: published` scenario installs. Default: the registry's latest version of the package the command is run from.
+- `--log-dir <dir>` — where the log is written. Default: `.claude/tmp/fresh-machine`.
+- `--rebuild` — build the machine image without the layer cache.
+
+**Output / exit codes:** the image build, the pack and the container's session are printed and written to `<log-dir>/<scenario>-<n>.log`, whose path is the last line. Exit status is the container's — `0` when every command of the scenario passed, whatever the probes after them exited with — the build's when the image could not be built, and `1` for an unknown pattern, a named pattern run outside a kit checkout, an invalid spec, a missing Docker, a GitHub scenario when `gh auth token` prints no token, or a `requires_claude` scenario with no Claude token (see `josh auth:setup`).
+
+A GitHub scenario creates a real private repository named after the run, and no run deletes one. The scenario format, the patterns and the token handling: [maintainers/fresh-machine.md](./maintainers/fresh-machine.md).
+
+### `josh auth:setup`
+
+Run `claude setup-token` (a browser sign-in) and save the token to the macOS keychain — never shown, never in a file — for `fresh:run`'s `requires_claude` scenarios.
+
+```bash
+pnpm josh auth:setup           # sign in and save the token
+pnpm josh auth:setup --check   # ok: … saved on <date>, or missing: … and exit 1
+```
+
+**Exit codes:** `0` once saved; `1` on no token or no keychain (then set `CLAUDE_CODE_OAUTH_TOKEN`). Full handling: [maintainers/fresh-machine.md](./maintainers/fresh-machine.md#claude-code).
+
 ### `josh sonar:hotspots`
 
 Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
@@ -284,7 +318,7 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 
 **Live-execution evidence:** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
 
-**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), confirms the Issue closed — closing it with a comment when GitHub did not apply `closes #N` — removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive.
+**Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), confirms the Issue closed — closing it with a comment when GitHub did not apply `closes #N` — removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive. Every CI poll and the step right before the merge also check the run's issue: a person's update the run has not acknowledged stops it unmerged, printing the update ([`josh issue:ack`](josh-commands-backlog.md#josh-issueack)); the blocking `gh pr checks --watch` phase before the polls is not interrupted.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
@@ -342,7 +376,7 @@ Count a `- k:<key>` sighting across `.josh/observations/`, append it, and print 
 
 ### `josh review:record`
 
-Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane) — the same append-only ledger the observation lines use, under a distinct `- rf:` prefix so the `- k:` grammar never treats a finding as its own. It is the one write path for findings.
+Record a `/code-review` round's findings so they survive the run. It appends one `- rf:<category> | <severity> | <file> | <date> | #<issue>` line per finding to the issue's own file of the observation ledger (`.josh/observations/<N>.md`, in the work tree the command runs in — a lane's inside a lane), under a distinct `- rf:` prefix the observation lines' `- k:` grammar never reads. It is the one write path for findings.
 
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
@@ -351,7 +385,7 @@ pnpm josh review:record --issue 2325 --comment  # a round that passed after the 
 pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
 ```
 
-**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. The category must be one of the nine review-rubric categories and the severity one of `high` / `medium` / `low`, or the call is refused with the usage and the accepted categories and severities, listed from the ledger's own constants. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a round that found nothing is recorded rather than mistaken for a round nobody reviewed. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round that passed after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Both the append and `--check` use the primary checkout's ledger, even when run in a lane — a lane's own copy never reaches the default branch. `pnpm josh observations:flush` commits the appended lines like any other ledger change.
+**Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. A category outside the nine review-rubric ones or a severity other than `high` / `medium` / `low` is refused with the usage and the accepted values. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a clean round differs from an unreviewed one. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Once the issue closes, the next ledger round carries those lines into `.josh/observations/<N>-comment-rounds.md` on its own commit, for `josh review:findings` and the retrospective, from `OWNER` / `MEMBER` / `COLLABORATOR` comments only; a carry that cannot read GitHub only warns. Both the append and `--check` use the running work tree's ledger — a lane's inside a lane. `pnpm josh observations:flush` commits them like any ledger change.
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 

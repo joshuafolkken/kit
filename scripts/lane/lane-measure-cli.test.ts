@@ -102,4 +102,18 @@ describe('lane_measure_cli.run — stats', () => {
 		expect(printed).toContain('| review | 1.0 | 1.0 | 1 |')
 		expect(printed).toContain('| ci-wait | not measured | not measured | 0 |')
 	})
+
+	// joshuafolkken/kit#3789: and, under that, how long a stopped ship waited for each stop reason.
+	it('prints the per-stop-reason table last', async () => {
+		const context = fresh_context()
+
+		lane_ledger.append(context.ledger_path, { kind: 'stop', at: AT, issue: 1, reason: 'gate' })
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| stop | median (min) | max (min) | runs | not resumed |')
+		expect(printed).toContain('| gate | not measured | not measured | 0 | 1 |')
+	})
 })

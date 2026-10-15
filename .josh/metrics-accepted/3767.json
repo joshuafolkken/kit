@@ -1,0 +1,7 @@
+{
+	"reason": "#3767 adds per-child lane-event reading (run-board-lane-event.ts), kind icons and the third line's aligned time cell to run:board — new behavior, not duplication",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 156
+	}
+}

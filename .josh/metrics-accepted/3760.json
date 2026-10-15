@@ -1,0 +1,7 @@
+{
+	"reason": "josh start now provisions the six labels kit applies but did not create (auto-ok, needs-decision, needs-human-review, already-done, review-round2-skipped, bug), with a test that pins every managed label as provisioned or exempt",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

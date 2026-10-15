@@ -129,6 +129,7 @@ const run_headless = {
 	is_backlog_parent,
 	is_cut_capped,
 	is_headless,
+	is_headless_parent,
 	is_owned_here,
 	must_keep_waiting,
 }

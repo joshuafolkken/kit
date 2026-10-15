@@ -1,0 +1,7 @@
+{
+	"reason": "josh start gains a new pre-write refusal for a missing git author identity (#3754): the commit-step predicate, the git identity probe, the refusal and its hint, and the fresh-machine pattern's identity line. The review round added two cases the probe has to tell apart — a git that could not be started is not a missing identity, and a plan that creates the repository asks from where it will be so a per-directory identity counts — new behavior with no existing code to fold it into",
+	"date": "2026-10-13",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}

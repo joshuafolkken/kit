@@ -1,0 +1,8 @@
+{
+	"reason": "Supervisor launched by josh backlogrun, plus round-2 fixes: a claim held for a pending launch re-points to a live run another invocation began first, carrying that run's fresh wake state rather than the pending launch's",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 127,
+		"ai_cost.on_demand_bytes": 35
+	}
+}

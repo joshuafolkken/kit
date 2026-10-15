@@ -8,6 +8,7 @@ import { run_board_phase } from './run-board-phase'
 
 const { WORDS, bar_of, clock_of, elapsed_of, minute_of, span_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_INTERVAL_MS, painted } = run_board_labels
+const { stage_span_of } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -52,6 +53,24 @@ describe('run_board_labels.span_of', () => {
 
 	it('reads a negative span as zero', () => {
 		expect(span_of(-MINUTE)).toBe('0:00:00')
+	})
+})
+
+// joshuafolkken/kit#3738: the time beside a stage is short while the stage is, and a span from an hour on.
+describe('run_board_labels.stage_span_of', () => {
+	it('draws minutes it does not pad and seconds it does, under an hour', () => {
+		expect(stage_span_of(2 * MINUTE + 31 * SECOND + 999)).toBe('2:31')
+		expect(stage_span_of(0)).toBe('0:00')
+		expect(stage_span_of(HOUR - SECOND)).toBe('59:59')
+	})
+
+	it('draws the span’s three fields from an hour on', () => {
+		expect(stage_span_of(HOUR)).toBe('1:00:00')
+		expect(stage_span_of(HOUR + 2 * MINUTE + 3 * SECOND)).toBe('1:02:03')
+	})
+
+	it('reads a stage entered after now as just entered', () => {
+		expect(stage_span_of(-MINUTE)).toBe('0:00')
 	})
 })
 

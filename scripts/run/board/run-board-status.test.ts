@@ -99,6 +99,7 @@ describe('run_board_status.statuses_of lanes', () => {
 			state: 'running',
 			started_ms: Date.parse(T0),
 			track: ['investigate'],
+			phase_ms: Date.parse(T0),
 			lane: 'lane 3409',
 		})
 	})
@@ -118,6 +119,13 @@ describe('run_board_status.statuses_of phases', () => {
 		const cut: Step = [KIND.CUT, '#3409 cut']
 
 		expect(phase_after(IMPLEMENT_3409, cut, [KIND.RESUME, '#3409'])).toBe('implement')
+	})
+
+	// joshuafolkken/kit#3772: a person's restart starts the child over in a fresh session.
+	it('starts the track over when a person restarts the child', () => {
+		const restart: Step = [KIND.RESTART, '#3409 restarted in a fresh session by a person']
+
+		expect(track_after(IMPLEMENT_3409, restart)).toStrictEqual(['investigate'])
 	})
 
 	it('takes no phase from another issue', () => {
@@ -327,9 +335,13 @@ describe('run_board_status.activity_of', () => {
 
 		expect(run_board_status.activity_of(events)).toStrictEqual({
 			setup: undefined,
-			is_preparing: false,
+			setup_ms: undefined,
 			last_event_ms: Date.parse(T2),
+			latest: { text: MERGE_3409, at_ms: Date.parse(T2) },
+			idle_ms: Date.parse(T2),
 			is_stopped: false,
+			lane_events: new Map(),
+			pr_checks: new Map(),
 		})
 	})
 

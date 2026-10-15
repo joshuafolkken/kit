@@ -60,6 +60,10 @@ const EVENT_KIND = {
 	// resume clears the cut record, so without this the `cut` would stay the newest position and
 	// `run:step` would keep answering the resume command it had just run.
 	RESUME: 'resume',
+	// A person stopped a running lane child and re-dispatched its issue in a fresh session
+	// (`lane:restart`). It follows the fresh dispatch's `CHILD_LAUNCH`, so it is a launch to the parent and
+	// the board, and — like that launch — a batch record a lane child never reads as its own position.
+	RESTART: 'restart',
 	// The backlog emptied while nothing of the run's own was in flight — the drain. It marks the position
 	// at which the end-of-run retrospective is owed, *before* the idle watch opens, so `run:step` fires
 	// the retrospective at the drain rather than after the watch runs its course. It is not itself a
@@ -126,10 +130,15 @@ const EVENT_KIND = {
 	// already holds. A trace: it says the run gained room, not where the run is.
 	LANE_LIMIT: 'lane-limit',
 	// One stage of the run's start — the session starting, the plan, the hand-off to the supervisor, a
-	// lane opening (`run-event-setup.ts`). `run:board` draws it until the first child launches, so the
+	// lane opening (`run-event-setup.ts`). `run:board` draws it while the run stands at it, so the
 	// minutes before one read as work rather than as a run that has stopped. A trace: it says the run is
 	// getting ready, not where the run is.
 	SETUP: 'setup',
+	// A child's pull request checks as `josh followup` last polled them — the CI counts and CodeRabbit's
+	// state (`run-event-checks.ts`), written only when they change, so `run:board` draws a child waiting
+	// in followup without asking GitHub (joshuafolkken/kit#3770). A trace: it says how the checks stand,
+	// not where the run is.
+	PR_CHECKS: 'pr-checks',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -148,17 +157,19 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.ADD,
 	EVENT_KIND.LANE_LIMIT,
 	EVENT_KIND.SETUP,
+	EVENT_KIND.PR_CHECKS,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
 // it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
-// `run:board` draws from that line. A `setup` line is read only until the child it prepares launches,
-// so every one but the newest goes.
+// `run:board` draws from that line. Only the newest `setup` line is the stage the run stands at,
+// so every one but the newest goes; likewise only each child's newest `pr-checks` is drawn.
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SHIP_STAGE,
 	EVENT_KIND.HEARTBEAT,
 	EVENT_KIND.SETUP,
+	EVENT_KIND.PR_CHECKS,
 ])
 
 const event_schema = z.object({
@@ -229,17 +240,18 @@ function last_position(events: ReadonlyArray<RunEvent>): number {
 	return events[events.length - POSITION_INCREMENT]?.pos ?? FIRST_POSITION
 }
 
-// The issue a ship-stage names — `#<N> <stage> <phase>` carries it first.
+// The issue a ship-stage or a `pr-checks` line names — `#<N> …` carries it first.
 function issue_of(event: RunEvent): string {
 	return event.text.split(WORD_SEPARATOR)[FIRST_POSITION] ?? ''
 }
 
-// Each issue's newest ship-stage, the one the board reads its furthest phase from.
-function newest_stages(events: ReadonlyArray<RunEvent>): ReadonlySet<RunEvent> {
+// Each issue's newest line of one kind: the ship-stage the board reads its furthest phase from, and the
+// `pr-checks` it draws a followup row's end from.
+function newest_by_issue(events: ReadonlyArray<RunEvent>, kind: string): ReadonlySet<RunEvent> {
 	const newest = new Map<string, RunEvent>()
 
 	for (const event of events) {
-		if (event.kind === EVENT_KIND.SHIP_STAGE) newest.set(issue_of(event), event)
+		if (event.kind === kind) newest.set(issue_of(event), event)
 	}
 
 	return new Set(newest.values())
@@ -253,12 +265,16 @@ function is_stage_start(event: RunEvent): boolean {
 	return event.text.split(WORD_SEPARATOR)[STAGE_PHASE_INDEX] === run_ship_stage.PHASE.START
 }
 
-// The disposable lines the bound never drops: each issue's newest ship-stage and the run's newest
-// `setup` stage, the ones `run:board` draws from now.
+// The disposable lines the bound never drops: each issue's newest ship-stage and `pr-checks` and the
+// run's newest `setup` stage, the ones `run:board` draws from now.
 function drawn_lines(events: ReadonlyArray<RunEvent>): ReadonlySet<RunEvent> {
 	const setup = events.findLast((event) => event.kind === EVENT_KIND.SETUP)
 
-	return new Set([...newest_stages(events), ...(setup === undefined ? [] : [setup])])
+	return new Set([
+		...newest_by_issue(events, EVENT_KIND.SHIP_STAGE),
+		...newest_by_issue(events, EVENT_KIND.PR_CHECKS),
+		...(setup === undefined ? [] : [setup]),
+	])
 }
 
 // The lines the bound may drop, in the order it drops them: the ones that draw nothing first, then the
@@ -282,7 +298,7 @@ function droppable(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEvent> {
 // **Each issue's newest ship-stage is not disposable**: it is the only record `run:board` draws a lane's
 // review-and-later phase from, and on a stream full of positions it would otherwise roll off in its own
 // append. **The newest `setup` stage is kept for the same reason**: it is the stage `run:board` draws
-// until the first child launches, and a run that starts on a full stream would otherwise show none.
+// while the run stands at it, and a run that starts on a full stream would otherwise show none.
 //
 // **A ship-stage `start` outlasts the other disposable lines**: each one is a phase on the lane's track,
 // so it is kept past the `done` lines and the heartbeats.

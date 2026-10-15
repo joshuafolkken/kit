@@ -6,10 +6,8 @@ import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_merge_collect } from '#scripts/run/merge/run-merge-collect'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_headless } from '#scripts/run/run-headless'
-import { run_stop_notify } from '#scripts/run/run-stop-notify'
 import {
 	run_carry,
 	type CarryClaim,
@@ -19,8 +17,7 @@ import {
 } from './run-carry'
 import { run_carry_args, type CountRequest, type Request } from './run-carry-args'
 import { run_carry_conversation } from './run-carry-conversation'
-import { run_carry_ended } from './run-carry-ended'
-import { run_carry_stash } from './run-carry-stash'
+import { run_carry_end } from './run-carry-end'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts.
 // A `backlogrun` begins it, counts a merge and a filing into it, marks each
@@ -316,52 +313,12 @@ async function count(
 	return report_carry(COUNTED_VERDICT, carry, is_json)
 }
 
-// **A stop over a record that is still there pushes one ⏸️ confirmation before the record goes**.
-// `plan` is read from the record `--end` is about to remove, so the second `--end` reads `none` and
-// plans nothing — one stop never notifies twice. A clean `--end` passes no reason and stays silent,
-// because a completed run has its own notification. The closed-issue stash report
-// (`run-carry-stash.ts`) is once per invocation on the same read.
-async function report_end(read: CarryRead): Promise<void> {
-	if (read.kind === 'none') return
-
-	await run_carry_stash.report_orphans()
-}
-
-// Best-effort: the board's record of the ended run never stands between `--end` and the carry record it
-// clears, so a failed write goes to stderr rather than leaving the run carried.
-function keep_ended(directory: string, read: CarryRead, stopped: string | undefined): void {
-	try {
-		run_carry_ended.record_ended(run_carry_ended.ended_path(directory), read, new Date(), stopped)
-	} catch (error) {
-		console.error(`run:carry: the ended run was not recorded for run:board: ${String(error)}`)
-	}
-}
-
-// The record goes, and the run it held stays readable as the last ended run, so `run:board` keeps the
-// finished run on screen until the next one begins — a stopped one with the session to resume it from.
-function close_record(directory: string, stopped: string | undefined): CarryRead {
-	const target = run_carry.carry_path(directory)
-	const read = run_carry.read_carry(target)
-
-	keep_ended(directory, read, stopped)
-	run_carry.end_carry(target)
-
-	return read
-}
-
-// The merges the run ended with are recorded while its record can still count them.
 async function finish(
 	directory: string,
 	stopped: string | undefined,
 	is_json: boolean,
 ): Promise<number> {
-	await run_merge_collect.collect_merged(directory)
-	const read = close_record(directory, stopped)
-	const notice = run_stop_notify.plan(read, stopped)
-
-	if (notice !== undefined) await run_stop_notify.announce(notice)
-
-	await report_end(read)
+	const read = await run_carry_end.end_run(directory, { stopped, is_announced: true })
 
 	if (read.kind === 'none') return report(NONE_VERDICT, undefined, is_json, SUCCESS_EXIT_CODE)
 

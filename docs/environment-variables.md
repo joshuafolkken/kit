@@ -6,7 +6,7 @@ Only these load `.env` themselves, and only when it exists:
 
 - **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
 - **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
-- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:sample`, `josh lane:stats`.
+- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:sample`, `josh lane:stats`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.
 - **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
 - `playwright.config.ts`.
@@ -49,7 +49,7 @@ A missing `.env` file is not itself an error: both commands also read the two va
 | ------------------------- | -------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT_SEED`               | No       | `0` (dev 5173, preview 4173)                      | Several kit projects run on one machine: an integer `0`–`99` that moves this project's dev and preview ports by `seed × 10` ([`josh port`](./josh-commands.md#josh-port)).                                                 |
 | `JOSH_LANE_ROOT`          | No       | `.<repository-name>-lanes`, beside the repository | Where `josh lane:open` puts a lane's work tree.                                                                                                                                                                            |
-| `JOSH_LANE_LIMIT`         | No       | `6`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-backlog.md#josh-epicnext)); set `2` on a small container.                                                                                   |
+| `JOSH_LANE_LIMIT`         | No       | `4`                                               | How many lanes one repository runs at once ([`josh epic:next`](./josh-commands-backlog.md#josh-epicnext)); set `2` on a small container.                                                                                   |
 | `PLAYWRIGHT_REUSE_SERVER` | No       | off                                               | `1` / `true` / `yes` / `on` lets the E2E run reuse this project's own server already on the port instead of booting one ([troubleshooting](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used)). |
 
 ### Unattended agents
@@ -125,22 +125,24 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 
 kit sets these for the processes it starts, or writes them into a lane's own `.env`. They are listed so every variable the code reads is named here; do not set them by hand.
 
-| Variable                   | Set by                         | Meaning                                                                                                                              |
-| -------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `JOSH_LANE_CHILD`          | a `backlogrun` dispatch        | This session is a dispatched lane child.                                                                                             |
-| `JOSH_LANE_SEAT`           | `josh lane:open`               | The lane's seat (`1`–`9`), added to the port offset.                                                                                 |
-| `JOSH_LANE_OUTPUT`         | `josh lane:open`               | Where the lane's child writes its output.                                                                                            |
-| `JOSH_LANE_AGENT_PROVIDER` | a `backlogrun` dispatch        | The provider the lane's child was launched with.                                                                                     |
-| `JOSH_LANE_AGENT_ROLE`     | a `backlogrun` dispatch        | The role the lane's child was launched as.                                                                                           |
-| `JOSH_LANE_AGENT_MODEL`    | a `backlogrun` dispatch        | The model the lane's child was launched with.                                                                                        |
-| `JOSH_LANE_AGENT_EFFORT`   | a `backlogrun` dispatch        | The effort the lane's child was launched with.                                                                                       |
-| `JOSH_AGENT_PROVIDER`      | a detached launcher            | The provider handed to a process that is not itself an agent session; unset outside a session, the provider defaults to `anthropic`. |
-| `JOSH_AGENT_HEADLESS`      | every kit agent launch         | This agent session was launched by kit, so no person reads its reply.                                                                |
-| `JOSH_AGENT_ROLE`          | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                |
-| `JOSH_RUN_HEADLESS`        | the run supervisor             | This session was launched headless by the supervisor.                                                                                |
-| `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                 |
-| `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                   |
-| `JOSH_INIT_HANDED_OFF`     | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                  |
-| `JOSH_UNIT_RUN_MARKED`     | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                     |
-| `JOSH_UNIT_GUARD_LOG`      | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                  |
-| `JOSH_GIT_BINARY`          | the unit suite's network guard | The `git` every spawn runs in place of the platform's own binary.                                                                    |
+| Variable                   | Set by                         | Meaning                                                                                                                                 |
+| -------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_LANE_CHILD`          | a `backlogrun` dispatch        | This session is a dispatched lane child.                                                                                                |
+| `JOSH_LANE_SEAT`           | `josh lane:open`               | The lane's seat (`1`–`9`), added to the port offset.                                                                                    |
+| `JOSH_LANE_OUTPUT`         | `josh lane:open`               | Where the lane's child writes its output.                                                                                               |
+| `JOSH_LANE_AGENT_PROVIDER` | a `backlogrun` dispatch        | The provider the lane's child was launched with.                                                                                        |
+| `JOSH_LANE_AGENT_ROLE`     | a `backlogrun` dispatch        | The role the lane's child was launched as.                                                                                              |
+| `JOSH_LANE_AGENT_MODEL`    | a `backlogrun` dispatch        | The model the lane's child was launched with.                                                                                           |
+| `JOSH_LANE_AGENT_EFFORT`   | a `backlogrun` dispatch        | The effort the lane's child was launched with.                                                                                          |
+| `JOSH_AGENT_PROVIDER`      | a detached launcher            | The provider handed to a process that is not itself an agent session; unset outside a session, the provider defaults to `anthropic`.    |
+| `JOSH_AGENT_HEADLESS`      | every kit agent launch         | This agent session was launched by kit, so no person reads its reply.                                                                   |
+| `JOSH_AGENT_ROLE`          | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                   |
+| `JOSH_RUN_HEADLESS`        | the run supervisor             | This session was launched headless by the supervisor.                                                                                   |
+| `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
+| `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |
+| `JOSH_INIT_HANDED_OFF`     | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                     |
+| `JOSH_WORKFLOW`            | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                   |
+| `JOSH_UNIT_RUN_MARKED`     | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                        |
+| `JOSH_UNIT_GUARD_LOG`      | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                     |
+| `JOSH_PROJECT_TEST_SCRIPT` | `josh test:unit`               | A `basic` project's own `test` script is running, so a call back into the unit check from inside it skips instead of starting it again. |
+| `JOSH_GIT_BINARY`          | the unit suite's network guard | The `git` every spawn runs in place of the platform's own binary.                                                                       |

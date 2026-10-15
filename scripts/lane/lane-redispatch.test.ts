@@ -102,24 +102,24 @@ describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', (
 // starting a fresh `fullrun`, recovering its context. The fresh path is already pinned by the suite
 // above (no exit record is written, so it plans fresh); this writes an outage exit record into the
 // lane's own log so the re-dispatch reads it and resumes.
+const SESSION = '1d34ae8b-6f89-44b7-9f0f-42a67c44e650'
+const OUTAGE_LINE = JSON.stringify({
+	type: 'result',
+	is_error: true,
+	result: 'The socket connection was closed unexpectedly',
+	session_id: SESSION,
+})
+
+function write_outage_log(): void {
+	mkdirSync(path.dirname(DERIVED_LOG), { recursive: true })
+	writeFileSync(DERIVED_LOG, `${OUTAGE_LINE}\n`, 'utf8')
+}
+
+afterEach(() => {
+	rmSync(DERIVED_LOG, { force: true })
+})
+
 describe('re-dispatching an outage child by resuming its session', () => {
-	const SESSION = '1d34ae8b-6f89-44b7-9f0f-42a67c44e650'
-	const OUTAGE_LINE = JSON.stringify({
-		type: 'result',
-		is_error: true,
-		result: 'The socket connection was closed unexpectedly',
-		session_id: SESSION,
-	})
-
-	function write_outage_log(): void {
-		mkdirSync(path.dirname(DERIVED_LOG), { recursive: true })
-		writeFileSync(DERIVED_LOG, `${OUTAGE_LINE}\n`, 'utf8')
-	}
-
-	afterEach(() => {
-		rmSync(DERIVED_LOG, { force: true })
-	})
-
 	it('launches the resume argv carrying the stored session id', async () => {
 		write_outage_log()
 		await lane_dispatch.dispatch_child(RELEASED_CHILD)
@@ -138,5 +138,17 @@ describe('re-dispatching an outage child by resuming its session', () => {
 		const outcome = await lane_dispatch.dispatch_child(RELEASED_CHILD)
 
 		expect(lane_dispatch.describe(outcome, RELEASED_CHILD)).toContain(`Resumed session ${SESSION}`)
+	})
+})
+
+// joshuafolkken/kit#3772: a person's restart wants a new session that reads the Issue afresh, so the
+// outage record the stopped child left is not resumed.
+describe('re-dispatching a restarted child in a fresh session', () => {
+	it('starts fresh despite an outage record when asked for a fresh session', async () => {
+		write_outage_log()
+		const outcome = await lane_dispatch.dispatch_child(RELEASED_CHILD, 'restart')
+
+		expect(lane_dispatch.describe(outcome, RELEASED_CHILD)).toContain('Started fresh')
+		expect(apply_label).not.toHaveBeenCalled()
 	})
 })

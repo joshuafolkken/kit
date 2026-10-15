@@ -28,6 +28,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	outage: { ja: '障害', en: 'outage' },
 	cut: { ja: 'セッション交代', en: 'session cut' },
 	resume: { ja: '実装を再開', en: 'implementation resumed' },
+	restart: { ja: '止めて出し直し', en: 'restarted' },
 	drain: { ja: 'バックログが空', en: 'backlog drained' },
 	stop: { ja: '停止', en: 'stopped' },
 	'pr-opened': { ja: 'PR 作成', en: 'PR opened' },
@@ -45,6 +46,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	add: { ja: '割り込み', en: 'added' },
 	'lane-limit': { ja: 'レーン上限', en: 'lane limit' },
 	setup: { ja: '準備', en: 'setup' },
+	'pr-checks': { ja: 'PR のチェック', en: 'PR checks' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))

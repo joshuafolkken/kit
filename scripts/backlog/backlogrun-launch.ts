@@ -172,6 +172,29 @@ function started_for(git_directory: string, owner_pid: number | undefined): Date
 	return Number.isNaN(started_ms) ? undefined : new Date(started_ms)
 }
 
+function signal_parent(pid: number): void {
+	try {
+		process.kill(pid, 'SIGTERM')
+	} catch {
+		note_to_stderr(`process ${String(pid)} could not be signalled; its launch record is removed.`)
+	}
+}
+
+// Stops the parent this launcher started and forgets its launch — the pid stopped, `undefined` where
+// no launched parent was live. **Only the process the record names, and only while it is still that
+// process**: a session a person typed `backlogrun` into has no launch record and is never signalled.
+function stop_parent(git_directory: string): number | undefined {
+	const record = live_launch(git_directory)
+
+	stamp_file.remove_stamp(launch_path(git_directory))
+
+	if (record === undefined) return undefined
+
+	signal_parent(record.pid)
+
+	return record.pid
+}
+
 // The headless mark holds the parent's turn open while its lanes run, as `run:wake`'s does. The launch
 // strips only Claude's session keys, so a Codex session this was typed in is cleared here too — inherited,
 // it would make the parent's own `josh` commands resolve the wrong provider.
@@ -223,6 +246,7 @@ const backlogrun_launch = {
 	pending_launch,
 	start,
 	started_for,
+	stop_parent,
 }
 
 export type { Launched, LaunchTarget, PendingLaunch, StartResult }

@@ -27,6 +27,10 @@ vi.mock('#scripts/followup/git-followup-issue-close', () => ({
 
 vi.mock('#scripts/lane/lane-reap', () => ({ lane_reap: { reap_child: vi.fn() } }))
 
+const ship_cause_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./run-merge-ship', () => ({ run_merge_ship: { cause: ship_cause_mock } }))
+
 const { run_merge_steps } = await import('./run-merge-steps')
 
 const CHILD = '2761'
@@ -55,6 +59,7 @@ beforeEach(() => {
 	comment_mock.mockReset().mockResolvedValue(undefined)
 	remove_label_mock.mockReset().mockResolvedValue(undefined)
 	ensure_closed_mock.mockReset().mockResolvedValue(undefined)
+	ship_cause_mock.mockReset().mockReturnValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
 	serve_labels(IN_PROGRESS)
@@ -101,6 +106,40 @@ describe('run_merge_steps.do_failed — the park is explained on the issue', () 
 		await run_merge_steps.do_failed(CONTEXT)
 
 		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3808: the ship's stop is the reason a person needs, not the ended session.
+describe('run_merge_steps.do_failed — a child whose detached ship ended', () => {
+	const SHIP_CAUSE = 'its detached ship stopped and was not fixed: #2761 review.'
+
+	it('parks it for the ship’s stop', async () => {
+		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
+
+		await run_merge_steps.do_failed(CONTEXT)
+
+		expect(ship_cause_mock).toHaveBeenCalledWith(CHILD)
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining(`- Why: ${SHIP_CAUSE}`),
+		)
+	})
+
+	it('keeps the caller’s cause over the ship’s', async () => {
+		ship_cause_mock.mockReturnValue('ship cause')
+
+		await run_merge_steps.do_failed(CONTEXT, run_merge_steps.CUT_RELAUNCH_CAUSE)
+
+		expect(ship_cause_mock).not.toHaveBeenCalled()
+	})
+
+	it('falls back to the ended session when no ship ended', async () => {
+		await run_merge_steps.do_failed(CONTEXT)
+
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining('- Why: the child’s session ended with its issue still open'),
+		)
 	})
 })
 

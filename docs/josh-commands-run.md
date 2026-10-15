@@ -83,9 +83,13 @@ Continue a cut `backlogrun` from outside the conversation. The detached supervis
 ```bash
 pnpm josh run:wake --start                 # launch the detached supervisor
 pnpm josh run:wake --list                  # supervisor state, cut/wake counts, latest progress line
-pnpm josh run:wake --stop                  # stop it
+pnpm josh run:wake --stop                  # stop the supervisor alone
 pnpm josh run:wake --loop --interval 30    # run the loop body in the foreground
 ```
+
+**A run started by [`pnpm josh backlogrun`](./josh-commands.md#josh-backlogrun) already has its supervisor**: the command starts it beside the parent, where it inherits the credential the parent's Bash tool does not pass on, and it claims its record before the parent's `run:carry --begin`. The parent's `--start` then answers `running`. Until the record is carried, `--loop` waits while the launched parent is alive and exits without a record once it is gone.
+
+**To stop a `backlogrun`, use [`pnpm josh backlogrun --stop`](./josh-commands.md#josh-backlogrun)**: it stops this supervisor and ends the run's record together. `run:wake --stop` alone leaves the record behind with no owner, and the next `pnpm josh backlogrun` answers `standing` on it rather than starting.
 
 `scheduler` runs provider; listings show profile/result. Anthropic defaults. OpenAI uses worktree-local
 `sqlite_home` and `--ephemeral`, retaining native auth/config. Unclaimed wakes try thrice.
@@ -269,6 +273,9 @@ or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit reco
 reach the API) has its stale `in-progress` dropped but is **not** parked and
 **not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
 stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
+A failed child whose detached `josh ship` has ended is parked for the ship's stop: the park comment's
+`Why` names the newest `ship-stop` line since the ship's launch, or the ship's result and
+`pnpm josh ship --log <N>` when it ended without one.
 A **cut** child (OPEN, unparked, its lane holding a declared cut with its handoff that no successor
 adopted) is neither parked nor counted: its successor is relaunched in the same
 lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
@@ -387,9 +394,10 @@ and after a cut, the stream the run's, the position the caller's.
 `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
-`resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`); a kind outside it is refused.
+`resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`, `pr-checks`); a kind outside it is refused.
 `lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
-`setup` is one stage of a run's start — `starting session`, `planning`, `handing off`, `opening lane #<N>` — written by the step that enters it; it is a trace, so it never moves the run's position.
+`pr-checks` is `josh followup`'s poll of a PR's checks, written only on change.
+`setup` is one stage the run itself works through — `starting session`, `planning`, `handing off`, `waiting on judgment`, `judgment session running`, `no child launched`, `opening lane #<N>`, `installing dependencies #<N>`, `dispatching #<N>` — written by the step that enters it, and its `at` is the moment `run:board` counts the stage's elapsed time from; it is a trace, so it never moves the run's position.
 `filed` is an Issue `issue:file` created, and `note` a one-line
 observation below the filing bar (`run:board` shows both). `run:merge` appends `merge`, `park`
 and `outage`; other steps call `--append`. The stream is bounded, so an unattended run cannot grow it
@@ -430,18 +438,45 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 `--every <minutes>` answers a request for periodic progress off-screen, with no model in between: started in the background, it sends the `--chat` frame as a `📊 Progress` Telegram at once and every `<minutes>` after, sends the ended run's frame once after `run:carry --end` and exits; with no run here it sends nothing and exits. It runs only when a person asks for it — the `run:progress` heartbeat still sends no Telegram — and `JOSH_PROGRESS=0` sends nothing. A failed send is reported on stderr and the next interval sends again.
 
-The header is two lines in three columns:
+The header is three lines — the first two in three columns, the third a spinner and time under the second column, then the kind's icon and words under the third:
 
 ```
-⠦ backlogrun  ⏰ 7:18:07  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0
-  kit         💓 1:00:32  ⚡  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
+▶ backlogrun  ⏰ 7:18:07  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0
+  kit         💓 0:00:20  ⚡  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
+              ⠦  0:00:04  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first line is the run's state (`▶` running, `⏸` idle, `✋` waiting on a person, `■` ended) and name, `⏰` elapsed as `H:MM:SS`, a progress bar with arrivals as `(+N)` and per-state counts, and `⚠` only when a plan read failed. Until the run's first child launches, the mark turns as a running run's does and the run's stage stands in the progress's place — `starting session`, `planning`, `handing off`, `opening lane #<N>`, followed by `· <n> planned` once the plan is read — with `⏰` counting from the moment `josh backlogrun` started the session; a lane opening for a later child only turns the mark, and a lane with no child launched yet is drawn `⏳`. The second is the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned, and both lines' first bars start in one. Both lines are written the same while the run works and while it waits: a wait is read off the `⏸` or `✋` mark and the `💓` that counts on from the run's last event — and it ends the idle window (8 hours, or `--idle`) after the run last launched or collected a lane. A run whose owner and supervisor are both gone (`run:stranded`) is drawn `■`, not `⏸`. An ended run draws `🔚 HH:MM` in the `💓`'s place — two colons are a length, one is a time of day. Below: touched children — each with its elapsed `MM:SS` and a track of every phase it has passed (`investigate` → `plan` → `implement` → `review` → `gate` → `commit` → `followup`, read from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events), a settled child's ending on its state icon — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
+The first line is how far the run is: its state (`▶` working, `⏸` idle, `✋` waiting on a person, `■` ended) and name, `⏰` elapsed as `H:MM:SS` — counting from the moment `josh backlogrun` started the session — a progress bar with arrivals as `(+N)` and per-state counts, and `⚠` only when a plan read failed. It is the progress in every state; what only the plan knows is `-` until the plan is read. The mark stands still in every state: the spinner turns on the third line. `⏳` is a waiting child — its count on the first line, and its row, a lane's whose child has not launched yet among them — and, followed by a spinner at the end of the first line, a plan read in flight.
+
+The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned, and both lines' first bars start in one.
+
+The third line is what the run is doing now, and is there for the whole run — blank only while the stream holds no event. Its three cells stand under the ones above: a spinner under `⏰` and `💓` — turning on a terminal while a child runs and while the run itself is at a stage, a judgment session after the first launch included, and blank while the run watches, after it ended and in a chat — then how long ago what it says happened, as `H:MM:SS` with its digits under theirs, then the kind's icon under `⚡` and the words, in English with no label. The kinds are `🔧` an operation; a child's event under its row's phase icon (`🔍 📝 🔨 👀 🚦 🔀 📦 🔂 ⚓ 📣`, `💥` failed); a stage's own icon (`🚀` starting session, `📝` planning, `🤝` handing off, `🤔` waiting on judgment, `💭` judgment session running, `🚫` no child launched, `🚪` opening lane, `📥` installing dependencies, `📤` dispatching); `🔄` children running; `🔭` watching; and `🔚` ended — the header's own end mark, as `🏁` is a done row's. The legend names `🔧` and `🔚`, the two whose words do not say what they are:
+
+- **At a stage** — the stage's own words then why, timed from when the run reached the stage: `⠸  0:02:31  🤔 waiting on judgment — 4 waiting`. The stages are `starting session`, `planning`, `handing off`, `waiting on judgment` (the driver handed its answer to a session — an untriaged child, an epic left to a person), `judgment session running` (the supervisor started that session; the next `handing off` is its end), `no child launched` (a lane's launch returned without a child — no lane was free, or a step after the open failed), `opening lane #<N>`, `installing dependencies #<N>` and `dispatching #<N>`. Before the first launch the run is at whichever is newest; after it, at a lane's stage until that lane's child launches and at a judgment stage until the next `handing off`. The time is counted from the stage's own event and starts again at each new stage, so a stage that is taking long is told from one just entered — the spinner turns on every redraw whether or not the run moved.
+- **At a stage a session works on** — `planning` (the parent session) and `judgment session running` (the judgment session) keep the stage's icon and are followed by that session's newest operation, timed from it, in place of the reason: `⠼  0:00:03  📝 planning · Bash pnpm josh backlog:plan`, `⠼  0:00:01  💭 judgment session running · Read docs/setup/prerequisites.md`. An operation older than the stage is not that session's and is not drawn. Every other stage is written as above.
+- **Children running, no stage** — the newest of the running children's operations and events (`lane-phase`, `ship-stage`), named by its issue: `⠙  0:00:04  🔧 #<N> · Bash pnpm josh test:related`. A child inside a long `josh ship` makes no call while the ship writes on, so where a child's event is the newer, its words are drawn under its phase icon: `⠹  0:00:01  🚦 #<N> · ship gate`. An operation wins a tie.
+- **No operation readable** — a log that is missing, unreadable or holds no call falls back to what the line said before: the stage with its time and reason, or how many children run (`🔄 2 running`), with no time.
+- **Watching** — nothing running and no stage: `0:24:10  🔭 watching — pool empty`, the time counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at — so a judgment session's minutes are not counted as watching).
+- **Ended** — the newest thing the run did, in that event's words, timed up to the end: `0:00:42  🔚 backlog drained`.
+
+An operation is the tool's name and what it was pointed at, never the session's own description of the call, so the line stays English: a `Bash` call draws the first line of its command without the variables set ahead of it, cut at 40 characters with `…`; `Edit`, `Write` and `Read` draw the file's path from the checkout down (its name alone outside the checkout); any other tool draws its name alone. Each is read from the last 64 KiB of the session's log — a lane's dispatch log, the parent's transcript, the watcher's log — so a call whose line is longer than that is not found and the line falls back.
+
+The reason after `—` is the children running (`2 running`), else what the plan has left: `pool empty`, `<n> waiting` (blocked or not yet triaged), or `<n> waiting on a person` when `needs-decision` holds all of it; it is left out until the plan is read. `run:board --chat` writes the same three lines. All three are written the same while the run works and while it waits: a wait is read off the `⏸` or `✋` mark, the `💓` that counts on from the run's last event and the third line's `watching` — and it ends the idle window (8 hours, or `--idle`) after the run last launched or collected a lane. A run whose owner and supervisor are both gone (`run:stranded`) is drawn `■`, not `⏸`. An ended run draws `🔚 HH:MM` in the `💓`'s place — two colons are a length, one is a time of day. Below: touched children — led by its phase's icon (from the `child-launch`, `plan`, `lane-phase` and `ship-stage` events), then elapsed `MM:SS` and CPU/memory; a running child ends on its time in that phase, as `MM:SS` whose minutes never carry into hours and right-aligned to the widest so the next cell starts in one column (yellow past 2×, red past 3× its ledger median, floor 2 min) and the icon and `MM:SS` age of its newest activity (yellow past 15, red past 30 min) — in `followup`, its newest `pr-checks` instead: `PR <n>  ✓ <n>  ⏳ <n>  ✗ <n>  🐰 <state>`, zero counts dropped, `✗` red, `🐰 ⛔` (rate-limited) yellow — a settled one on `🔚` and its end — the `backlog:plan --waves` order under `── 1 ──` rules (epic children as a tree under the epic's title, other blockers as `🔗`), `needs-decision` and unreached children, and the newest filings, parks and notes. A dim legend at the foot names the symbols.
+
+A waiting row (`⏳`) ends with why it waits, in English whatever the session language, after its `🔗` blockers — which are drawn as before, so a row with both shows both:
+
+- `untriaged` — the issue carries neither `run:lane` nor `run:solo`, so nobody has judged it. It is the one reason drawn beside a `🔗`, since judging it is what a person can do meanwhile.
+- `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
+- `overlaps <N> (<file>)` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
+- `no free lane` — nothing else keeps it waiting and the open lanes have reached the lane limit.
+
+A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`, and the reasons are read in the order above, so a row says the first that holds. A row whose lane is being opened says that lane's own stage instead, with how long the lane has stood there as `M:SS` — `opening lane 0:05`, `installing 0:42`, `dispatching 0:03` — read from the newest `setup` event naming the issue, so lanes opened side by side each show their own stage; it is gone once the child launches, once the driver writes `no child launched` for a launch that left none — a refusal it waits out is followed by no hand-off — or once the run hands off or back, and a stopped run draws none. Where the pane is too narrow for a row with a reason, the title is cut further (never under 8 columns) so the reason stays on the row's one line. `run:board --chat` draws the same rows.
+
+Right above the legend, the terminal board (the live redraw and `--once`) names the people who helped review kit, on one line in the rows' own color, wrapped between names where the pane is too narrow, led by one 🙏 on its first line. When the pane is too short, the parts below the header give way in this order — the footer, the legend, the oldest notes until three are left, the finished rows, the rest of the notes, these names (wrapped lines and all), the rows not yet started, the parked rows and, last, the running rows — each stage stopping once the frame fits. A name with a `url` is an OSC 8 link to it. The roster is a Google spreadsheet published as CSV, whose URL is a constant in `scripts/run/board/run-board-thanks-read.ts`, so it changes apart from any kit release. It is read beside the board, never holding up a redraw, and its answer is kept in the project's record and reused for five minutes. A CSV whose header is not exactly `name,url` is not used; a row with an empty `name` or a `url` that is not `https://` is skipped, and a name loses its control characters and is cut to 40 columns. A read that fails or times out keeps the last answer and, with none, draws no line — nothing about the failure is shown. `--chat` and `--every` never read or draw it, and a frame with no run draws none.
 
 On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** the stream and lanes re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed and whether a merged pull request closed it — and drawn `✅` (merged) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏰` and when it ended in the header, only that run's events — until the next run begins. An ended run asks GitHub about its unread closed children once after it ended, then reads nothing until the next run. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument, or an `--every` that is not a positive number of minutes, exits 1; Ctrl+C exits 130 and SIGTERM 143.
+**Output / exit codes:** the stream, the lanes and the end of each session's log re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed and whether a merged pull request closed it — and drawn `✅` (merged) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏰` and when it ended in the header, only that run's events — until the next run begins. An ended run asks GitHub about its unread closed children once after it ended, then reads nothing until the next run. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument, or an `--every` that is not a positive number of minutes, exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
 ### `josh run:watcher:guard`
 
@@ -479,12 +514,12 @@ pnpm josh lane:prune
 
 **Options:**
 
-- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree, then remove unregistered lanes-root leftovers git can fully restore (the rest are kept with a reason).
+- `lane:close --all` — close every lane; `lane:prune` — close lanes left registered without a work tree and lanes that are spent (no child working in it, its Issue closed, not a lane the running `backlogrun` launched and has not collected with `run:merge`, a clean tree, no commit that is on no remote), then remove unregistered lanes-root leftovers git can fully restore (the rest are kept with a reason). Every other lane is kept and named on standard error with why — a condition that could not be read keeps the lane too — beside the `pnpm josh lane:close <N>` that discards it.
 
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
-- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 6); applied by `josh epic:next`.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`.
 
 **Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
 
@@ -574,7 +609,7 @@ The child's pid is the one thing on stdout; a refusal is an empty capture beside
 
 #### `josh lane:sample` / `josh lane:stats`
 
-Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch and ship stages, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, and under it the median and maximum of each stage of a lane. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
+Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch, ship stages and ship stops, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, under it the median and maximum of each stage of a lane, and under those how long a stopped `josh ship` waited to resume, per stop reason. Procedure and columns: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 ## Session and documents
 

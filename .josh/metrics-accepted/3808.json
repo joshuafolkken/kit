@@ -1,0 +1,7 @@
+{
+	"reason": "run:merge parks a child whose detached ship ended for the ship's stop, so the park names the stage a person has to fix (#3808)",
+	"date": "2026-10-14",
+	"growth": {
+		"scripts.code_lines": 37
+	}
+}

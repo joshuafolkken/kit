@@ -52,6 +52,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],
+	// The detached driver's stderr, which the supervisor tails into the hand-off; the read that would
+	// resolve the link is the one that just failed.
+	['backlog/backlog-drive-unread.ts', 1],
 	['backlog/backlog-drive.ts', 1],
 	['backlog/backlog-plan.ts', 1],
 	['epic/epic-parse.ts', 1],
@@ -59,13 +62,18 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['lane/lane-child-invocation.ts', 5],
 	['lane/lane-dispatch.ts', 2],
 	['lane/lane-phase.ts', 1],
+	['lane/lane-restart.ts', 1],
 	['run/board/run-board-layout.ts', 1],
+	// The run board's frame, which a person watches in a terminal or on Telegram; `run:board --chat`
+	// answers with it inside one code block, where nothing is linked.
+	['run/board/run-board-now.ts', 1],
 	['run/cut/run-cut-cli.ts', 3],
 	['run/entry/run-entry-stop.ts', 3],
+	['run/event/run-event-checks.ts', 1],
 	['run/event/run-event-filed.ts', 1],
 	['run/event/run-event-plan.ts', 1],
 	['run/event/run-event-scope.ts', 1],
-	['run/event/run-event-setup.ts', 1],
+	['run/event/run-event-setup.ts', 3],
 	['run/merge/run-merge-cli.ts', 7],
 	['run/merge/run-merge.ts', 1],
 	['run/ship/run-ship-detach.ts', 1],

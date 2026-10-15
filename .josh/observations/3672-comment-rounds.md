@@ -1,0 +1,1 @@
+- rf:assumptions | low | scripts/init/security-policy.ts:44 | 2026-10-11 | #3672

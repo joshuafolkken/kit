@@ -130,6 +130,7 @@ function shape(overrides: Partial<ProjectShape> = {}): ProjectShape {
 		has_typescript: false,
 		has_git: false,
 		has_github: false,
+		has_workflow: false,
 		...overrides,
 	}
 }
@@ -191,5 +192,14 @@ describe('basic profile merge and optional settings', () => {
 			.map((action) => action.dest)
 
 		expect(destinations).toEqual([GITIGNORE, TSCONFIG, VSCODE_EXTENSIONS])
+	})
+
+	// The distributed settings wire the session:lang hook, whose unset default is ja (#3796).
+	it('seeds the session language only for a project josh start set up', () => {
+		const marked = init_actions.build_file_actions(shape({ has_git: true, has_workflow: true }))
+		const unmarked = init_actions.build_file_actions(shape({ has_git: true }))
+
+		expect(marked.map((action) => action.dest)).toContain(ENV_FILE)
+		expect(unmarked.map((action) => action.dest)).not.toContain(ENV_FILE)
 	})
 })

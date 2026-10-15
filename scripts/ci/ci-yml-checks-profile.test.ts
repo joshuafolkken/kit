@@ -43,6 +43,7 @@ const BASIC_SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: true,
 	has_github: true,
+	has_workflow: false,
 }
 const VERSIONS = { kit: '1.0.0', prettier: '^3.0.0' }
 const { TEMPLATE_CI_YML, find_job, find_step_by_id, step_run } = ci_yml_fixture

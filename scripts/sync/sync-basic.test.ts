@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,6 +16,7 @@ vi.mock('#scripts/init/init-paths', () => ({
 }))
 
 const BASIC = 'basic'
+const PACKAGE_JSON = 'package.json'
 const CLAUDE_MD = 'CLAUDE.md'
 const BASIC_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md'
 const STATIC_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.static.md'
@@ -26,10 +27,13 @@ const PRETTIER_IGNORE = '.prettierignore'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CI_WORKFLOW = '.github/workflows/ci.yml'
 const CODERABBIT = '.coderabbit.yaml'
-// What `josh init` deliberately leaves out of a basic project.
+const AGENT_POINTERS = ['AGENTS', 'GEMINI']
+const CLAUDE_SETTINGS = '.claude/settings.json'
+const OWN_PERMISSION = 'Bash(python -m unittest)'
+// What `josh init` deliberately leaves out of a basic project `josh start` did not set up.
 const FULL_ONLY_FILES = [
 	CI_WORKFLOW,
-	'.claude/settings.json',
+	CLAUDE_SETTINGS,
 	'.codex/hooks.json',
 	'.codex/config.toml',
 	CODERABBIT,
@@ -51,12 +55,27 @@ function read_template(name: string): string {
 	return readFileSync(path.join(REPOSITORY_ROOT, 'templates', name), 'utf8')
 }
 
+function read_repository_file(name: string): string {
+	return readFileSync(path.join(REPOSITORY_ROOT, name), 'utf8')
+}
+
 function prettier_config(preset: string): string {
 	return `import { config } from '@joshuafolkken/kit/prettier/${preset}'\n\nexport default config\n`
 }
 
 function write_manifest(profile: string): void {
-	writeFileSync(project_file('package.json'), JSON.stringify({ private: true, josh: { profile } }))
+	writeFileSync(project_file(PACKAGE_JSON), JSON.stringify({ private: true, josh: { profile } }))
+}
+
+// A basic project `josh start` set up, whose `.claude/settings.json` holds a permission of its own.
+function write_workflow_project(): void {
+	const manifest = { private: true, josh: { profile: BASIC, workflow: 'github' } }
+	const settings_path = project_file(CLAUDE_SETTINGS)
+
+	writeFileSync(project_file(PACKAGE_JSON), JSON.stringify(manifest))
+	mkdirSync(project_file('.git'))
+	mkdirSync(path.dirname(settings_path))
+	writeFileSync(settings_path, JSON.stringify({ permissions: { allow: [OWN_PERMISSION] } }))
 }
 
 async function run_sync(profile: string): Promise<void> {
@@ -82,6 +101,21 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('josh sync in a basic project josh start set up (#3796)', () => {
+	it('merges .claude/settings.json, keeping what the project added', async () => {
+		write_workflow_project()
+		const { main } = await import('./sync')
+
+		main()
+		const settings = read_project_file(CLAUDE_SETTINGS)
+
+		expect(settings).toContain(OWN_PERMISSION)
+		expect(settings).toContain('Bash(*)')
+		expect(settings).toContain('enabledPlugins')
+		expect(existsSync(project_file(CI_WORKFLOW))).toBe(false)
+	})
+})
+
 describe('josh sync file set in a basic project', () => {
 	it.each([BASIC, 'static'])(
 		'writes no file init leaves out when profile is %s',
@@ -92,6 +126,14 @@ describe('josh sync file set in a basic project', () => {
 		},
 	)
 
+	// `josh init` adds the full toolchain to no basic project, so `josh sync` adds none later either.
+	it('adds no toolchain devDependencies, Git repository or not', async () => {
+		mkdirSync(project_file('.git'))
+		await run_sync(BASIC)
+
+		expect(read_project_file(PACKAGE_JSON)).not.toContain('devDependencies')
+	})
+
 	it('writes the basic templates rather than the full copies', async () => {
 		await run_sync(BASIC)
 
@@ -100,6 +142,19 @@ describe('josh sync file set in a basic project', () => {
 		expect(read_project_file(WORKSPACE_YAML)).toContain('esbuild: true')
 		expect(read_project_file(WORKSPACE_YAML)).not.toContain('overrides:')
 	})
+
+	it.each(AGENT_POINTERS)(
+		'replaces the full %s.md an earlier init wrote with the basic one',
+		async (name) => {
+			const filename = `${name}.md`
+
+			writeFileSync(project_file(filename), read_repository_file(filename))
+			await run_sync(BASIC)
+
+			expect(read_project_file(filename)).toBe(read_template(`${name}.basic.md`))
+			expect(read_project_file(filename)).not.toContain('prompts/')
+		},
+	)
 })
 
 describe('josh sync path migration in a basic project', () => {
@@ -157,8 +212,16 @@ describe('josh sync AI files in a full project', () => {
 		expect(existsSync(project_file(CI_WORKFLOW))).toBe(true)
 		expect(existsSync(project_file(CODERABBIT))).toBe(true)
 		expect(read_project_file(CLAUDE_MD)).toContain(FULL_IMPORT)
-		expect(read_project_file(PRETTIER_IGNORE)).toBe(
-			readFileSync(path.join(REPOSITORY_ROOT, PRETTIER_IGNORE), 'utf8'),
-		)
+		expect(read_project_file(PRETTIER_IGNORE)).toBe(read_repository_file(PRETTIER_IGNORE))
+	})
+
+	it.each(AGENT_POINTERS)('still writes the %s.md that names the hook rules', async (name) => {
+		write_manifest('full')
+		const { sync_ai_files } = await import('./sync-ai-files')
+
+		sync_ai_files.sync_ai_copy_all(false)
+
+		expect(read_project_file(`${name}.md`)).not.toBe(read_template(`${name}.basic.md`))
+		expect(read_project_file(`${name}.md`)).toContain('collaboration-workflow/principles.md')
 	})
 })

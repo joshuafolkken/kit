@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
 import { project_checks } from '#scripts/gate/project-checks'
 import { execa } from 'execa'
+import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -35,29 +36,71 @@ const NODE_MODULES = 'node_modules'
 // oversight.** The argument above rests on the package's presence being a declaration, and
 // `@playwright/test` is not one: it is an optional peer dependency that vitest's browser mode also
 // needs, so a project can legitimately have it installed with no `*.e2e.{ts,js}` file at all.
+//
+// **A basic project without vitest is not thereby a project without tests.** It may be of any
+// language and any runner, and the `scripts.test` it declares is run in vitest's place
+// (`project-test-script.ts`); only a basic project that declares none skips. A full project keeps the
+// plain skip: its unit suite is vitest's, and `scripts.test` there is not this check's to run.
 const SKIP_ACTION = 'skip-missing-package'
 const SKIP_NO_TESTS_ACTION = 'skip-no-tests'
+const SKIP_NO_SCRIPT_ACTION = 'skip-no-test-script'
+const SKIP_REENTRANT_ACTION = 'skip-reentrant'
+const RUN_SCRIPT_ACTION = 'run-project-script'
 const FAIL_ACTION = 'fail-no-tests'
 
-type GuardAction = 'run' | typeof SKIP_ACTION | typeof SKIP_NO_TESTS_ACTION | typeof FAIL_ACTION
+type SkipAction =
+	| typeof SKIP_ACTION
+	| typeof SKIP_NO_TESTS_ACTION
+	| typeof SKIP_NO_SCRIPT_ACTION
+	| typeof SKIP_REENTRANT_ACTION
+type GuardAction = 'run' | typeof RUN_SCRIPT_ACTION | SkipAction | typeof FAIL_ACTION
 
-// The word the gate looks for to know a passing step did not actually run. Exported and reused on
-// both sides rather than matched by eye: the gate does not print a passing check's body, so without
-// this a gate that skipped the whole unit suite would print the same lines as one that ran it.
-const SKIP_REASON = 'vitest is not installed'
-const SKIP_NO_TESTS_REASON = 'no unit test files were found in this basic project'
+// What each skip did not run, said in full: a basic project that declares no test script was not
+// skipped for lacking vitest alone, and the unit tests it skipped were never vitest's. The
+// `SKIP_MARKER` between the two halves is the word the gate looks for to know a passing step did not
+// actually run; the gate does not print a passing check's body, so without it a gate that skipped the
+// whole unit suite would print the same lines as one that ran it.
+const VITEST_SUBJECT = 'vitest unit tests'
+const UNIT_SUBJECT = 'unit tests'
+const SKIP_NOTICES: Record<SkipAction, { reason: string; subject: string }> = {
+	[SKIP_ACTION]: { reason: 'vitest is not installed', subject: VITEST_SUBJECT },
+	[SKIP_NO_TESTS_ACTION]: {
+		reason: 'no unit test files were found in this basic project',
+		subject: VITEST_SUBJECT,
+	},
+	[SKIP_NO_SCRIPT_ACTION]: {
+		reason: 'vitest is not installed and package.json declares no test script',
+		subject: UNIT_SUBJECT,
+	},
+	[SKIP_REENTRANT_ACTION]: {
+		reason: "the project's test script called back into this check",
+		subject: UNIT_SUBJECT,
+	},
+}
 const FAIL_REASON =
 	'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing'
+
+const BASIC_MISSING_PACKAGE_ACTIONS: Record<ProjectScriptState, GuardAction> = {
+	declared: RUN_SCRIPT_ACTION,
+	absent: SKIP_NO_SCRIPT_ACTION,
+	reentrant: SKIP_REENTRANT_ACTION,
+}
+
+function resolve_installed_action(has_tests: boolean, is_basic: boolean): GuardAction {
+	if (has_tests) return 'run'
+
+	return is_basic ? SKIP_NO_TESTS_ACTION : FAIL_ACTION
+}
 
 function resolve_guard_action(
 	is_installed: boolean,
 	has_tests: boolean,
 	is_basic = false,
+	script_state: ProjectScriptState = 'absent',
 ): GuardAction {
-	if (!is_installed) return SKIP_ACTION
-	if (has_tests) return 'run'
+	if (is_installed) return resolve_installed_action(has_tests, is_basic)
 
-	return is_basic ? SKIP_NO_TESTS_ACTION : FAIL_ACTION
+	return is_basic ? BASIC_MISSING_PACKAGE_ACTIONS[script_state] : SKIP_ACTION
 }
 
 function is_vitest_installed(project_directory: string): boolean {
@@ -84,15 +127,27 @@ function guard_action(project_directory: string): GuardAction {
 		is_vitest_installed(project_directory),
 		has_unit_tests(project_directory),
 		project_checks.is_basic(project_directory),
+		project_test_script.state(project_directory),
 	)
+}
+
+function is_skip_action(action: GuardAction): action is SkipAction {
+	return Object.hasOwn(SKIP_NOTICES, action)
 }
 
 // **A skip is the project having no unit suite, so no unit check can ever vouch for its tree.** The
 // failing branch is not one: it is a broken suite, and it is left to fail where it is reported.
 function is_skipping(project_directory: string): boolean {
+	return is_skip_action(guard_action(project_directory))
+}
+
+// **Whether a green exit vouches for the tree** — vitest ran, or the project's own script did. The
+// scoped record is written on this answer, so a project `is_skipping` requires a record from is
+// always one that can write it.
+function is_running(project_directory: string): boolean {
 	const action = guard_action(project_directory)
 
-	return action === SKIP_ACTION || action === SKIP_NO_TESTS_ACTION
+	return action === 'run' || action === RUN_SCRIPT_ACTION
 }
 
 // A lane's port allocation belongs to its development and preview servers, not to unit fixtures.
@@ -146,16 +201,16 @@ const UNIT_COMMAND_LABEL = 'test:unit'
 // they mean different things: one says the project has no unit suite yet, the other says it has one
 // that could not be found. Only the first keeps `SKIP_MARKER`, so the
 // gate's "passed without running" handling still means exactly what it did.
-function report_no_run(action: Exclude<GuardAction, 'run'>, command_label: string): number {
+function report_no_run(action: SkipAction | typeof FAIL_ACTION, command_label: string): number {
 	if (action === FAIL_ACTION) {
 		console.error(`josh ${command_label}: ${FAIL_REASON}.`)
 
 		return FAIL_EXIT_CODE
 	}
 
-	const reason = action === SKIP_NO_TESTS_ACTION ? SKIP_NO_TESTS_REASON : SKIP_REASON
+	const { reason, subject } = SKIP_NOTICES[action]
 
-	console.info(`josh ${command_label}: ${reason} ${SKIP_MARKER} vitest unit tests.`)
+	console.info(`josh ${command_label}: ${reason} ${SKIP_MARKER} ${subject}.`)
 
 	return 0
 }
@@ -163,6 +218,10 @@ function report_no_run(action: Exclude<GuardAction, 'run'>, command_label: strin
 // `announcement` is printed only on the branch that actually spawns vitest. A caller that wrote it
 // itself would claim a run before this guard had decided there would be one — the same "a passing
 // step did not actually run" ambiguity `SKIP_MARKER` exists for, reintroduced one layer up.
+//
+// **The project's own script takes neither the vitest arguments nor the announcement.** Both describe
+// a vitest run — a filter, a narrowing to related files — and the script runs as the project declared
+// it, whole; it prints its own notice saying so.
 async function run_guarded_vitest(
 	project_directory: string,
 	vitest_arguments: ReadonlyArray<string>,
@@ -170,6 +229,10 @@ async function run_guarded_vitest(
 	announcement?: string,
 ): Promise<number> {
 	const action = guard_action(project_directory)
+
+	if (action === RUN_SCRIPT_ACTION) {
+		return await project_test_script.run(project_directory, command_label)
+	}
 
 	if (action !== 'run') return report_no_run(action, command_label)
 	if (announcement !== undefined) process.stdout.write(`${announcement}\n`)
@@ -195,6 +258,7 @@ const test_unit_guard = {
 	SKIP_MARKER,
 	guard_action,
 	is_skipping,
+	is_running,
 	resolve_guard_action,
 	is_vitest_installed,
 	has_unit_tests,

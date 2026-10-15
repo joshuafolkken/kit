@@ -6,6 +6,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { execa } from 'execa'
 
 // `josh lane:launch <issue> [--stash <message>]` — one composite command for a `backlogrun` lane-start
@@ -73,8 +74,11 @@ async function install(directory: string): Promise<boolean> {
 
 // The first lane pops the shared stash and re-installs against the lock it brought in; a pop that
 // refused (`no-match` / `ambiguous`) stops the lane rather than dispatching onto an unprepared tree.
-// A caller without `--stash` skips both, which is every lane after the first.
-async function prepare(stash: string | undefined, directory: string): Promise<boolean> {
+// A caller without `--stash` skips both, which is every lane after the first. The re-install is a
+// stage of its own on the run's stream, as the install `lane:open` ran was.
+async function prepare(context: LaunchContext, directory: string): Promise<boolean> {
+	const { issue, stash } = context
+
 	if (stash === undefined) return true
 
 	const popped = await josh_command.josh_run(
@@ -83,6 +87,8 @@ async function prepare(stash: string | undefined, directory: string): Promise<bo
 	)
 
 	if (popped.code !== SUCCESS_EXIT_CODE) return false
+
+	await run_event_setup.emit(run_event_setup.installing(issue))
 
 	return await install(directory)
 }
@@ -124,13 +130,16 @@ async function lane_directory(issue: string): Promise<string | undefined> {
 }
 
 // The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
-// chain.
+// chain. The dispatch is said on the run's stream before it starts, so the board draws a lane that is
+// ready apart from one still being filled.
 async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
 	const directory = await lane_directory(context.issue)
 
 	if (directory === undefined) return UNOPENED
 
-	if (!(await prepare(context.stash, directory))) return FAILED
+	if (!(await prepare(context, directory))) return FAILED
+
+	await run_event_setup.emit(run_event_setup.dispatching(context.issue))
 
 	const dispatched = await josh_command.josh_run(
 		['lane:dispatch', context.issue],

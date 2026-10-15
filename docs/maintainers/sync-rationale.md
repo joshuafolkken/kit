@@ -7,13 +7,54 @@ this file changes no behavior (joshuafolkken/kit#2896).
 ## The skills ship as a plugin
 
 **The distributed skills ship as the `kit` Claude Code plugin, not as copies
-(joshuafolkken/kit#1879).** `.claude/settings.json` still overwrites the consumer's file because it
+(joshuafolkken/kit#1879).** `.claude/settings.json` is still distributed because it
 carries the `permissions.deny` rules a plugin cannot provide; it also declares the `kit` marketplace
 and enables the plugin, so in a trusted workspace nothing needs installing. `josh sync` removes a
 stale copied skill directory only when its content still matches the shipment, and keeps — with a
 warning — one the consumer edited or authored. A retired skill has no package source left to compare
 against, so its leftover copy is matched against the recorded hash of its last distributed content
 instead: an untouched copy is removed, an edited one is kept with a warning.
+
+## The merge of .claude/settings.json
+
+**`josh sync` replaces kit's entries in `.claude/settings.json` and keeps the project's own
+(joshuafolkken/kit#3728).** It used to write the distributed file over the project's, on the
+assumption that a project's own settings belong in `.claude/settings.local.json`. That file is
+personal and normally uncommitted, so a team had nowhere to keep a shared hook or permission, and a
+sync deleted one without saying so.
+
+- **A kit hook is told by the shape of its command, not by a list of names.** Every distributed hook
+  runs through `scripts/hooks/run-hook.sh`, so the launcher — in kit's form and in the form rebased
+  onto the installed package — identifies it, and a hook kit retires later is removed by the same
+  test with nothing to maintain. The shapes are held beside the rewrite that produces them
+  (`scripts/init/hook-command-rewrite.ts`), so the two cannot drift.
+- **The installed `dist/josh.js` dispatcher counts as kit's too.** The releases from 2026-09-13
+  (joshuafolkken/kit#1930) until the launcher (2026-10-05) rebased `pnpm josh <command>` onto it;
+  left alone, a project upgrading from one would run each guard twice.
+- **So do six exact `pnpm josh <command>` hooks.** Before joshuafolkken/kit#1930 nothing was rebased,
+  and a consumer received `audit:provision`, `batch:guard`, `format:edited`, `investigation:guard`,
+  `rule:guard` and `session:lang` in that form. `pnpm josh <command>` is also how a project writes
+  its own hook, so the form alone proves nothing and only those whole commands are matched. Removing
+  one costs a project nothing even where it wrote the line itself: kit still delivers all six through
+  the launcher, and the leftover would run a counting guard or the formatter a second time. The list
+  is closed history, not something to maintain.
+- **A withdrawn permission has to be named.** A merge cannot tell an entry kit stopped shipping from
+  one the project added, so without a list a `deny` kit relaxes or an `allow` kit revokes would stay
+  in every existing project and the sync would report `unchanged`. `WITHDRAWN_KIT_PERMISSIONS`
+  (`scripts/sync/claude-settings-merge.ts`) holds them: withdrawing an entry means removing it from
+  `.claude/settings.json` and adding it there. An entry inside an object (`env`, `enabledPlugins`)
+  has no such list and stays; `docs/sync.md` says so.
+- **The older `echo` reminder hooks are not matched.** Nothing in an `echo` distinguishes kit's from
+  a project's, and deleting a project's hook is the worse error, so a leftover one stays and
+  `docs/sync.md` says so.
+- **kit's `deny` entries cannot be removed in the project file.** They guard the verification gate;
+  a project that needs one gone raises it with kit instead of editing it out locally.
+- **No warning or backup before the write.** Nothing of the project's is lost from a file that
+  parses as JSON, so there is nothing to warn about; one that does not parse is replaced as it
+  always was (`docs/sync.md`). `--force` remains the plain replacement, as it is for
+  `pnpm-workspace.yaml`.
+- **`.codex/hooks.json` stays overwritten.** It is generated from kit's own settings file, so a
+  project's hooks never reach it; carrying them across is a separate change.
 
 ## Dependabot: the github-actions backstop and npm version updates
 

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { main as init_main } from './init'
 import { PACKAGE_DIR } from './init-paths'
 import type { ProjectShape } from './project-profile'
+import { start_exec } from './start-exec'
 import { start_setup_pr } from './start-setup-pr'
 import { start_steps, type StepContext } from './start-steps'
 
@@ -30,6 +31,7 @@ const CONTEXT: StepContext = {
 }
 const INIT_COMMAND = 'josh-app init --verbose'
 const PREFLIGHT_COMMAND = 'josh-app start:preflight'
+const GIT_FATAL_EXIT_CODE = 128
 const COMMAND_FAILURE = 'Command failed with exit code 1'
 const SHAPE: ProjectShape = {
 	profile: 'basic',
@@ -38,6 +40,7 @@ const SHAPE: ProjectShape = {
 	has_typescript: false,
 	has_git: true,
 	has_github: false,
+	has_workflow: false,
 }
 
 function result(exit_code: number, stdout = ''): ReturnType<typeof execaSync> {
@@ -60,6 +63,48 @@ beforeEach(() => {
 	mocked_execa.mockReturnValue(result(0))
 	vi.mocked(init_main).mockReset()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+})
+
+describe('the git author identity prerequisite (#3754)', () => {
+	it('names the commands that set the identity when a commit is planned without one', () => {
+		mocked_execa.mockReturnValueOnce(result(GIT_FATAL_EXIT_CODE))
+
+		const refusal = start_steps.git_identity_refusal(['initialize', 'commit'], ROOT)
+
+		expect(refusal).toContain('git config --global user.name')
+		expect(refusal).toContain('git config --global user.email')
+		expect(refusal).toContain('Nothing was changed.')
+	})
+
+	it('stops a planned setup pull request when only the committer is unknown', () => {
+		mocked_execa.mockReturnValueOnce(result(0)).mockReturnValueOnce(result(GIT_FATAL_EXIT_CODE))
+
+		expect(start_steps.git_identity_refusal(['initialize', 'setup_pr'], ROOT)).toBeDefined()
+	})
+
+	it('passes a planned commit when git knows the author and the committer', () => {
+		expect(start_steps.git_identity_refusal(['commit'], ROOT)).toBeUndefined()
+		expect(commands()).toStrictEqual(['git var GIT_AUTHOR_IDENT', 'git var GIT_COMMITTER_IDENT'])
+	})
+
+	it('asks from the repository to be created only when the plan creates one', () => {
+		const probe = vi.spyOn(start_exec, 'lacks_git_identity')
+
+		start_steps.git_identity_refusal(['git_init', 'initialize', 'commit'], ROOT)
+		start_steps.git_identity_refusal(['initialize', 'commit'], ROOT)
+
+		expect(probe.mock.calls).toStrictEqual([
+			[ROOT, true],
+			[ROOT, false],
+		])
+	})
+
+	it('does not ask git when the plan creates no commit', () => {
+		mocked_execa.mockReturnValue(result(GIT_FATAL_EXIT_CODE))
+
+		expect(start_steps.git_identity_refusal(['initialize', 'labels'], ROOT)).toBeUndefined()
+		expect(mocked_execa).not.toHaveBeenCalled()
+	})
 })
 
 describe('the GitHub CLI prerequisite', () => {
@@ -146,6 +191,21 @@ describe('the steps josh start runs', () => {
 
 		expect(init_main).toHaveBeenCalledWith(['--profile', 'full'])
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+
+	// The mark reaches the setup as a variable, which a handed-off kit or `--init-command` inherits.
+	it('tells the setup it runs for the GitHub Issue workflow (#3796)', async () => {
+		vi.stubEnv('JOSH_WORKFLOW', undefined)
+		vi.mocked(init_main).mockImplementation(() => {
+			expect(process.env['JOSH_WORKFLOW']).toBe('github')
+
+			return true
+		})
+
+		await start_steps.run_steps(['initialize'], CONTEXT)
+
+		expect(init_main).toHaveBeenCalledOnce()
+		vi.unstubAllEnvs()
 	})
 
 	// The initialize step installs, so the commit after it carries the lockfile (#2766).

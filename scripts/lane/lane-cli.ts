@@ -18,6 +18,7 @@ import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
 import { lane_seed_policy } from './lane-seed'
+import type { KeptLane } from './lane-spent'
 import { lane_stray } from './lane-stray'
 
 // `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle.
@@ -263,10 +264,23 @@ async function list_command(rest: ReadonlyArray<string>): Promise<number> {
 	return code
 }
 
+// A lane left open is named with its reason, so a person can tell a lane somebody is in from one that
+// only waits on a push, a commit or an issue — and knows the command that discards it anyway.
+function report_kept(kept: ReadonlyArray<KeptLane>): void {
+	for (const lane of kept) {
+		console.error(
+			`Kept the lane for ${session_cite.issue(lane.issue)}: ${lane.reason}. \`pnpm josh lane:close ${lane.issue}\` discards it.`,
+		)
+	}
+}
+
 async function prune_command(rest: ReadonlyArray<string>): Promise<number> {
 	if (rest.length > 0) return report_usage()
 
-	const code = report_sweep(await lane_close.prune_lanes())
+	const outcome = await lane_close.prune_lanes()
+	const code = report_sweep(outcome)
+
+	report_kept(outcome.kept)
 
 	// After the closes, so a lane whose close left its directory behind is swept in the same run. A
 	// kept stray is reported, never a failure: it waits on a person, and a non-zero exit would stop

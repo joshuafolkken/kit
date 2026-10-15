@@ -2,6 +2,8 @@ import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { repository_labels } from '#scripts/repo/repository-labels'
+import { security_audit } from '#scripts/security/security-audit'
+import { security_audit_provision } from '#scripts/security/security-audit-provision'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { parseCommandString } from 'execa'
 import { main as init_main } from './init'
@@ -12,6 +14,7 @@ import type { ProjectProfile, ProjectShape } from './project-profile'
 import { start_exec } from './start-exec'
 import { start_plan, type GitState, type StartStep, type Visibility } from './start-plan'
 import { start_setup_pr } from './start-setup-pr'
+import { workflow_mark } from './workflow-mark'
 
 interface StepContext {
 	root: string
@@ -29,6 +32,12 @@ const GH_INSTALL_HINT =
 	'GitHub CLI (gh) is not installed. Install it from https://cli.github.com/, run gh auth login, then run josh start again. Nothing was changed.'
 const GH_AUTH_HINT =
 	'GitHub CLI is not signed in. Run gh auth login, then run josh start again. Nothing was changed.'
+const GIT_IDENTITY_HINT =
+	'Git has no author identity, which the commit josh start creates needs. Run git config --global user.name "Your Name" and git config --global user.email "you@example.com", then run josh start again. Nothing was changed.'
+// Printed before the scanner is looked for: a first run downloads tens of megabytes, and a terminal
+// that says nothing for minutes reads as a hang the user interrupts (#3755).
+const SCANNER_NOTICE =
+	'Checking for osv-scanner, which the pre-push audit needs. A first run downloads it, which can take a few minutes on a slow connection.'
 
 const { git_succeeds, git_read, run_local } = start_exec
 
@@ -63,6 +72,17 @@ function github_cli_refusal(root: string): string | undefined {
 	return undefined
 }
 
+// A machine Git was just installed on has no author identity, and the commit that needs one comes
+// after the repository and kit's files are written. It is asked for before the first write, and only
+// when the plan commits — a re-run with nothing left to commit is not stopped by it (#3754).
+function git_identity_refusal(steps: ReadonlyArray<StartStep>, root: string): string | undefined {
+	if (!start_plan.has_commit(steps)) return undefined
+
+	return start_exec.lacks_git_identity(root, steps.includes('git_init'))
+		? GIT_IDENTITY_HINT
+		: undefined
+}
+
 // `josh init` refuses to run inside the kit source repository by printing and setting the exit code
 // rather than throwing, so its step would pass and the later steps would commit and publish the
 // source repository. The same check is raised before the first write instead.
@@ -85,7 +105,10 @@ function create_git_repository(context: StepContext): void {
 // A toolkit that layers its files over kit's (`josh-app init`) names its own setup instead, so every
 // other step and guard stays here rather than in a copy of this command (#2872). That command runs
 // without a shell, is given the same profile, and a non-zero exit stops the run before the commit.
+// Either one is told the project is set up for the GitHub Issue workflow (`workflow-mark.ts`).
 function initialize(context: StepContext): void {
+	workflow_mark.request()
+
 	if (context.init_command === undefined) {
 		init_main(['--profile', context.profile])
 
@@ -148,6 +171,27 @@ function run_push_preflight(steps: ReadonlyArray<StartStep>, context: StepContex
 	}
 }
 
+// The `full` profile installs kit's pre-push hook, whose audit refuses a push without osv-scanner. The
+// scanner is otherwise fetched at an agent's session start, which a first `josh start` from a terminal
+// has not had, so it is fetched here — forced, because a person asked for this run. A scanner that
+// still cannot be found stops the run before the first step rather than at the push (#3755).
+async function ensure_audit_scanner(
+	steps: ReadonlyArray<StartStep>,
+	context: StepContext,
+): Promise<void> {
+	if (context.profile !== 'full' || !start_plan.has_push(steps)) return
+
+	const { platform, arch } = process
+
+	console.info(`\n${SCANNER_NOTICE}`)
+	const outcome = await security_audit_provision.report(context.root, platform, arch, true)
+
+	console.info(outcome)
+	if (security_audit.resolve_scanner(context.root, platform) !== undefined) return
+
+	throw new Error(start_plan.scanner_report(outcome))
+}
+
 type StepAction = (context: RunContext) => void | Promise<void>
 
 const STEP_ACTIONS: Readonly<Record<StartStep, StepAction>> = {
@@ -178,6 +222,7 @@ async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext):
 	const labels = start_plan.step_labels(context.init_command)
 
 	run_push_preflight(steps, context)
+	await ensure_audit_scanner(steps, context)
 	const run_context: RunContext = { ...context, baseline: baseline_of(steps, context) }
 
 	for (const [index, step] of steps.entries()) {
@@ -192,6 +237,7 @@ async function run_steps(steps: ReadonlyArray<StartStep>, context: StepContext):
 const start_steps = {
 	read_git_state,
 	github_cli_refusal,
+	git_identity_refusal,
 	self_run_refusal,
 	run_steps,
 }

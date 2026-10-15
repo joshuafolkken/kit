@@ -33,6 +33,9 @@ async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind
 
 	const outcome = await lane_launch_cli.launch_lane({ issue, stash: await latest_stash() })
 
+	// A refusal the driver waits out writes nothing else, so the lane's stage is ended here.
+	if (outcome.kind !== 'launched') await run_event_setup.emit(run_event_setup.STAGE.NO_CHILD)
+
 	return outcome.kind
 }
 

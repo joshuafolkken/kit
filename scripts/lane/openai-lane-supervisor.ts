@@ -9,10 +9,10 @@ import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
+import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
 import { openai_lane_supervisor_owner, type SupervisorOwner } from './openai-lane-supervisor-owner'
-import { openai_review_broker } from './openai-review-broker'
 
 const { claim, read_state, release, update } = openai_lane_supervisor_owner
 const CHILD_POLL_MS = 250
@@ -178,7 +178,7 @@ async function supervise(lane: LaneInfo, profile: AgentProfile, nonce: string): 
 	try {
 		if (!(await openai_lane_supervisor_decision.is_approved(lane.directory, nonce))) return 0
 
-		return await openai_review_broker.with_server(
+		return await lane_session_broker.with_server(
 			lane,
 			async () => await run_claimed(lane, profile, owner),
 		)

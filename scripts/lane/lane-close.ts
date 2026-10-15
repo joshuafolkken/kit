@@ -5,6 +5,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { lane_paths } from './lane-paths'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_spent, type KeptLane } from './lane-spent'
 
 // Closing a lane: no work tree, no branch, no directory.
 //
@@ -40,6 +41,11 @@ interface CloseOutcome {
 interface SweepOutcome {
 	closed: Array<string>
 	failed: Array<string>
+}
+
+interface PruneOutcome extends SweepOutcome {
+	// The live lanes left open, each with the reason it was not discarded.
+	kept: Array<KeptLane>
 }
 
 async function ignore_failure(action: () => Promise<string>): Promise<void> {
@@ -171,14 +177,17 @@ async function close_each(issues: ReadonlyArray<string>): Promise<SweepOutcome> 
 }
 
 /**
- * Close every lane whose work tree is no longer on disk — the route out of an interruption that took
- * the directory with it and left git's registration behind.
+ * Close every lane nothing needs any more: one whose work tree is no longer on disk — the route out of
+ * an interruption that took the directory with it and left git's registration behind — and one a past
+ * run left spent (`lane-spent.ts`). A live lane that is not spent is kept, and `kept` says why.
  */
-async function prune_lanes(): Promise<SweepOutcome> {
+async function prune_lanes(): Promise<PruneOutcome> {
 	const lanes = await lane_registry.list_lanes()
-	const stranded = lanes.filter((lane) => lane.is_stranded)
+	const { spent, kept } = await lane_spent.sort_lanes(lanes)
+	const doomed = lanes.filter((lane) => lane.is_stranded || spent.includes(lane))
+	const sweep = await close_each(doomed.map((lane) => lane.issue))
 
-	return await close_each(stranded.map((lane) => lane.issue))
+	return { ...sweep, kept }
 }
 
 async function close_all_lanes(): Promise<SweepOutcome> {
@@ -194,5 +203,5 @@ const lane_close = {
 	resolve_lane,
 }
 
-export type { CloseKind, CloseOutcome, ResolvedLane, SweepOutcome }
+export type { CloseKind, CloseOutcome, PruneOutcome, ResolvedLane, SweepOutcome }
 export { lane_close }

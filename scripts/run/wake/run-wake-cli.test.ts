@@ -197,7 +197,7 @@ describe('josh run:wake --list — a person can see what is running', () => {
 		expect(await run_wake_cli.run(['--list'])).toBe(SUCCESS)
 		expect(out).toStrictEqual([run_wake_cli.SUPERVISING_VERDICT])
 		expect(errors.join('\n')).toContain(INVOCATION)
-		expect(errors.join('\n')).toContain('pnpm josh run:wake --stop')
+		expect(errors.join('\n')).toContain('pnpm josh backlogrun --stop')
 	})
 
 	// A caller branching on the one stdout token — the documented use — must not read `supervising`

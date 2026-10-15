@@ -1,0 +1,4 @@
+- rf:comments | low | scripts/backlog/backlog-drive-merge-stop.test.ts:5 | 2026-10-14 | #3781
+- rf:bug-risks | low | scripts/backlog/backlog-drive.ts:220 | 2026-10-14 | #3781
+- rf:project-conventions | low | scripts/run/merge/run-merge-cli.ts:11 | 2026-10-14 | #3781
+- rf:assumptions | low | scripts/backlog/backlog-drive-named.ts:130 | 2026-10-14 | #3781

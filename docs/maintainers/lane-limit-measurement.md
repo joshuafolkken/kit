@@ -19,6 +19,7 @@ on the common git directory so every lane, the parent and the sampler write to t
 | `load`     | `josh backlog:drive` while it runs, and `josh lane:sample`    | `at`, `load`, `available_mb?`, `swapped_mb?`, `lanes?` |
 | `dispatch` | `josh lane:dispatch`, when a child started                    | `at`, `issue`                                          |
 | `stage`    | `josh ship`, as each stage ends; `josh followup` for the wait | `at`, `stage`, `elapsed_ms`, `issue?`                  |
+| `stop`     | `josh ship`, when it stops at a stage or on a conflict        | `at`, `issue`, `reason`                                |
 
 A `stage` entry's `at` is when the stage ended, so it began `elapsed_ms` earlier. `josh followup`
 writes one of its own, `ci-wait` — the time it spent waiting for the checks — and that one carries no
@@ -114,3 +115,24 @@ interrupted leaves no entry.
 `review`'s median is at least `ci-wait`'s, and almost nothing when `review` is under a minute. Lowering
 `JOSH_LANE_LIMIT` is worth it when `gate` grows with the effective lanes while the load peak is above
 the core count.
+
+## How long a stopped ship waits
+
+Under the per-stage table, `lane:stats` prints a third: one row per reason a `josh ship` stopped —
+each stage, plus `conflict` for a merge git could not finish, the reasons the retrospective counts —
+with the median and the maximum of the wait from the stop to the resumed ship, how many stops were
+resumed (`runs`) and how many never were (`not resumed`). The stage rows above time the work; this
+table times the time between the work, which none of them holds.
+
+**The wait is derived, not recorded.** Every stopped ship writes a `stop` entry naming its issue and its
+reason; the wait runs from it to the start of the same issue's next `stage` entry, the way `implement`
+is read.
+
+**A stop nothing resumed is `not resumed`, never a wait.** A lane parked or left stopped has no end to
+its wait, so it is counted beside the row and kept out of the median and the maximum. A dispatch of
+the same issue after the stop ends the search too: the new child's ship is a fresh lane's work, not
+the resumption of the old stop. A stop late in the period whose resumption falls after it reads as
+`not resumed` as well.
+
+**The decision the table is for**: which stop reason to remove next — the reason whose runs times
+median is largest costs the lanes the most time.

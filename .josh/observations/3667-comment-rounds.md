@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/lint/cross-file-recheck.ts:137 | 2026-10-11 | #3667
+- rf:assumptions | low | scripts/lint/cross-file-recheck.ts:57 | 2026-10-11 | #3667

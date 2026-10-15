@@ -8,6 +8,7 @@ import type { ProjectShape } from '#scripts/init/project-profile'
 import { security_policy } from '#scripts/init/security-policy'
 import { file_reader } from '#scripts/lib/read-file'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
+import { claude_settings_merge } from './claude-settings-merge'
 import { copy_directory_failure, directory_copy_blocker } from './directory-copy-guard'
 import { file_content } from './file-content'
 import { REMOVED_SKILL_MANIFEST } from './removed-skill-manifest'
@@ -45,9 +46,32 @@ function should_skip_hook_file(filename: string): boolean {
 	return true
 }
 
-function sync_file(source: string, filename: string): void {
+// The project's own hooks, permissions and keys survive: only kit's entries are replaced
+// (`claude-settings-merge.ts`). `--force` is the replacement sync used to make, as it is for
+// `pnpm-workspace.yaml`.
+function sync_claude_settings(
+	source_path: string,
+	destination_path: string,
+	is_force: boolean,
+): boolean {
+	const distributed = transform_copied_content(destination_path, readFileSync(source_path, 'utf8'))
+	const existing = is_force ? undefined : file_reader.read_optional(destination_path)
+	const content =
+		existing === undefined
+			? distributed
+			: claude_settings_merge.merge_claude_settings(existing, distributed)
+
+	return file_content.write_text_if_changed(destination_path, content)
+}
+
+function sync_file(source: string, filename: string, is_force: boolean): void {
 	if (should_skip_hook_file(filename)) return
-	const did_change = sync_ai_file(path.join(PACKAGE_DIR, source), path.join(PROJECT_ROOT, filename))
+	const source_path = path.join(PACKAGE_DIR, source)
+	const destination_path = path.join(PROJECT_ROOT, filename)
+	const did_change =
+		filename === CLAUDE_SETTINGS_FILE
+			? sync_claude_settings(source_path, destination_path, is_force)
+			: sync_ai_file(source_path, destination_path)
 
 	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${filename}`)
 }
@@ -96,7 +120,7 @@ function sync_ai_copy_file(filename: string, is_force: boolean, shape?: ProjectS
 		return
 	}
 
-	sync_file(source, filename)
+	sync_file(source, filename, is_force)
 }
 
 // The reason this directory was not synced, or nothing when it was. Both halves answer the same
@@ -203,6 +227,7 @@ const sync_ai_files = {
 	sync_ai_file,
 	sync_workspace_yaml,
 	sync_claude_md,
+	ensured_claude_md,
 	sync_directory,
 	sync_ai_copy_all,
 }

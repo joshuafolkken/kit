@@ -60,13 +60,14 @@ async function loading(events: ReadonlyArray<typeof LAUNCH>): Promise<Array<stri
 }
 
 describe('run_board_tick.tick before the plan is read', () => {
-	it('draws two header lines and a blank, the run’s own child, and - for what it does not know', async () => {
+	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
 		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
-		expect(lines[2]).toBe('')
-		expect(lines[3]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}    …`, 'u'))
+		expect(lines[2]?.trimStart()).toMatch(/^\S {11}🔄 1 running$/u)
+		expect(lines[3]).toBe('')
+		expect(lines[4]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}    …`, 'u'))
 	})
 
 	// The regression: the running count was the plan's, so a board still loading drew a run as waiting.
@@ -83,6 +84,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 
 		expect(lines[0]).toMatch(/^⏸ backlogrun {2}⏰ \d+:\d{2}:\d{2} {2}✅/u)
 		expect(lines[1]).toMatch(/^ +💓 \d+:\d{2}:\d{2} {2}🧠/u)
+		expect(lines[2]).toMatch(/^ +\d+:\d{2}:\d{2} {2}🔭 watching/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 
@@ -94,6 +96,25 @@ describe('run_board_tick.tick before the plan is read', () => {
 		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
 
 		expect(lines_of(frames[0])[0]).toMatch(/^■ backlogrun/u)
+	})
+})
+
+// joshuafolkken/kit#3757: the operations the local read carries reach the header's third line.
+describe('run_board_tick.tick with a session’s operation', () => {
+	it('draws the running child’s newest operation on the third line', async () => {
+		const operation = { kind: 'Bash', target: 'pnpm josh gate', at_ms: run_board_fixture.START }
+		const operations = {
+			lanes: [{ issue: CHILD, operation }],
+			owner: undefined,
+			judgment: undefined,
+		}
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH], operations }, [])
+
+		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
+
+		expect(lines_of(frames[0])[2]?.trimStart().slice(1)).toBe(
+			`  0:00:00  🔧 #${String(CHILD)} · Bash pnpm josh gate`,
+		)
 	})
 })
 

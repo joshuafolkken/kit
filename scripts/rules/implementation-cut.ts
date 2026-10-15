@@ -176,9 +176,9 @@ const IMPLEMENTATION_CUT_REASON =
 	'because the verdict was only ever read at session entry, where the context has not yet grown. The ' +
 	"verdict is `pnpm josh cost --cut`'s exactly — the same per-request billed-input statistic against the " +
 	'same threshold, never a second measurement. Issue `pnpm josh run:cut --impl <N> --handoff <path>` now and read the ' +
-	'verdict: on `cut`, **end the turn immediately** — in a lane the fresh process owns the run and ' +
-	'continues implementing, so it must not be waited for; outside a lane nothing is relaunched, so first ' +
-	'send the `confirmation` Telegram naming the resume command `fullrun #<N>` and keep the hold; on `not-a-lane`, `unready`, `busy`, `failed` or ' +
+	'verdict: on `cut`, read what the command printed. Where it relaunched a fresh process, **end the turn ' +
+	'immediately** — that process owns the run and continues implementing, so it must not be waited for, ' +
+	'and **no Telegram is owed**: a cut that resumes itself leaves a person nothing to act on. Where it printed that nothing was relaunched, do what it prints, then end the turn; on `not-a-lane`, `unready`, `busy`, `failed` or ' +
 	'`unknown`, this process carries the run on and the edit is simply the next call. Never relaunch a ' +
 	'second process after `busy`. This fired because the dispatch mark names this lane or the run hold ' +
 	'names this issue; a person working here carries no mark and holds no run, so sees no refusal, so there is no human-or-child judgement left to make. The ' +

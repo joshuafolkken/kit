@@ -1,0 +1,7 @@
+{
+	"reason": "round-2 fix: an assignment's value is read as one shell word (escaped quotes, line breaks, command substitution), with the tests that pin each case",
+	"date": "2026-10-13",
+	"growth": {
+		"scripts.code_lines": 221
+	}
+}

@@ -1,10 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { IssueReadReason } from '#scripts/gh/git-gh-issue-read'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
+import { issue_report_failures } from './issue-report-failures'
 import { issue_state, type IssueState } from './issue-state'
 
 // `josh issue:state <N> [<N> ...]` — print each issue's state and labels, in the spelling the
@@ -50,7 +51,14 @@ interface StateRequest {
 // One issue's state, or the failure kind. Named for export because `run:prep` reads the state beside
 // the body and the dependency-update scope, reusing this read rather than a
 // second one that would drift from the `human_review` decision `parse_issue_state` owns.
-type StateRead = { kind: 'state'; state: IssueState } | { kind: ReadFailureKind }
+//
+// **Why a read failed rides along where the request said it**: `backlog:drive` names the reason when it
+// hands an unreadable named issue back. Both are optional, so a caller that only separates the kinds
+// needs no edit.
+type StateRead =
+	| { kind: 'state'; state: IssueState }
+	| { kind: 'missing' }
+	| { kind: 'unreadable'; reason?: IssueReadReason | undefined; status?: number | undefined }
 
 interface IssueReport {
 	issue_number: string
@@ -102,11 +110,13 @@ function parse_request(argv: ReadonlyArray<string>): StateRequest | undefined {
 async function read_issue(issue_number: string, repo?: string): Promise<StateRead> {
 	const read = await git_gh_command.issue_view_json_classified(issue_number, STATE_FIELDS, repo)
 
-	if (read.kind !== 'read') return { kind: read.kind }
+	if (read.kind !== 'read') return read
 
 	const parsed = issue_state.parse_issue_state(read.json)
 
-	return parsed === undefined ? { kind: 'unreadable' } : { kind: 'state', state: parsed }
+	return parsed === undefined
+		? { kind: 'unreadable', reason: 'malformed' }
+		: { kind: 'state', state: parsed }
 }
 
 // Through the shared pool rather than a raw `Promise.all`: each read spawns a `gh` process, and a

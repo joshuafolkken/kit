@@ -271,7 +271,7 @@ Run only the unit tests related to the changed files (full suite on fallback)
 
 `[filters...]`
 
-Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)
+Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests)
 
 ## Project
 
@@ -285,6 +285,16 @@ Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR
 
 ---
 
+### `josh auth:setup` · `josh as`
+
+> **Audience:** maintainer · **Side effects:** network, processes
+
+`[--check]`
+
+Save the long-lived Claude Code token `claude setup-token` prints in the macOS keychain, for josh fresh:run
+
+---
+
 ### `josh dogfood:commit`
 
 > **Audience:** automation · **Side effects:** files, git · **kit only**
@@ -292,6 +302,16 @@ Upgrade the @joshuafolkken toolkits and other dependencies here, open the PR
 `<dir>`
 
 Make the first commit of a dogfood run's own kit-test-* project
+
+---
+
+### `josh fresh:run` · `josh fr`
+
+> **Audience:** maintainer · **Side effects:** files, network, processes
+
+`<pattern> | --spec <file.json> [--package-version <version>] [--log-dir <dir>] [--rebuild] | --list`
+
+Run an install scenario in a Docker container of a machine with nothing installed, and keep the log
 
 ---
 
@@ -392,6 +412,16 @@ Say whether this change touches a file josh sync distributes
 `[--staged]`
 
 List the screenshot-target routes the current change touches
+
+---
+
+### `josh uninstall` · `josh un`
+
+> **Audience:** developer · **Side effects:** files, processes
+
+`[--profile basic|full] [--yes]`
+
+Remove what kit added to a project and list what is left to review by hand
 
 ## Workflow
 
@@ -809,9 +839,9 @@ Report whether ready backlog work is sitting undispatched with a free lane and n
 
 > **Audience:** developer · **Side effects:** files, network, processes
 
-`[#<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex]`
+`[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop`
 
-Start a backlogrun in the background and show its board; with one already running, only show the board
+Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it
 
 ---
 
@@ -992,6 +1022,16 @@ Say whether proposed implementation units are file-disjoint, so they may run in 
 _No arguments._
 
 Claude Code hook: refuse a read once the unedited-read threshold is reached again (reads the tool call on stdin)
+
+---
+
+### `josh issue:ack`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue>`
+
+Record that the run read a person's update to its issue, printing the update it acknowledges
 
 ---
 
@@ -1191,7 +1231,17 @@ Record, or read back, where the unit running a lane’s child writes
 
 _No arguments._
 
-Close every lane an interruption left without its work tree, then sweep unregistered leftovers under the lanes root
+Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root
+
+---
+
+### `josh lane:restart` · `josh lrs`
+
+> **Audience:** developer · **Side effects:** files, git, processes, network
+
+`<issue>`
+
+Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure
 
 ---
 
@@ -1211,7 +1261,7 @@ Record the machine load (load average, swap, free memory, working lanes) to the 
 
 `--period <days> [--limit <lane-limit>]`
 
-Print one table row of lane throughput, gate duration and machine load over a period, and the per-stage durations of a lane under it
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, and the wait after each ship stop reason under those
 
 ---
 

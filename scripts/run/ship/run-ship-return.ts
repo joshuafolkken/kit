@@ -1,8 +1,9 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
+import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { ShipResume } from './run-ship-next'
@@ -49,6 +50,31 @@ function note(text: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
+function relaunched(lane: LaneInfo, stop: ShipStop): ReturnOutcome {
+	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
+	const phase = agent_role_profile.IMPLEMENTATION_PHASE
+	const result = lane_relaunch.relaunch(lane, invocation, phase, note)
+
+	if (result.kind === 'launched') return 'relaunched'
+
+	note(`the lane child could not be relaunched: ${result.note}`)
+
+	return 'recorded'
+}
+
+// **A served lane's child is relaunched by its broker, not from here**: this supervisor descends from the
+// child's Bash tool, which Claude Code starts without the token, so a child started here could not sign
+// in where the token is the only credential (joshuafolkken/kit#3817).
+async function brokered(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
+	if (await lane_session_broker.request(lane.directory, lane.issue, { kind: 'relaunch', stop })) {
+		return 'relaunched'
+	}
+
+	note('the lane child could not be relaunched: the lane broker did not start it')
+
+	return 'recorded'
+}
+
 async function return_control(
 	issue: string,
 	stage: Stage,
@@ -63,19 +89,11 @@ async function return_control(
 
 	if (lane === undefined) return 'recorded'
 
-	const invocation = lane_child_invocation.ship_stop_invocation(issue, { stage, ...resume })
-	const result = lane_relaunch.relaunch(
-		lane,
-		invocation,
-		agent_role_profile.IMPLEMENTATION_PHASE,
-		note,
-	)
+	const stop = { stage, ...resume }
 
-	if (result.kind === 'launched') return 'relaunched'
-
-	note(`the lane child could not be relaunched: ${result.note}`)
-
-	return 'recorded'
+	return lane_session_broker.is_serving(lane.directory, issue)
+		? await brokered(lane, stop)
+		: relaunched(lane, stop)
 }
 
 const run_ship_return = { return_control }

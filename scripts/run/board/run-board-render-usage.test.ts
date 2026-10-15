@@ -15,7 +15,7 @@ const GB = 1024 * 1024 * 1024
 const USAGE = '⚡ 20% 🧠1.6G'
 const WIDE = 200
 const NARROW = 80
-// Wide enough for a running row up to its usage, not for its three-round track after it too.
+// Wide enough for a running row up to its usage, not for its tail and what it waits on after it too.
 const FITTING = 100
 
 const usages: LaneUsages = new Map([
@@ -28,7 +28,12 @@ const running: BoardRow = {
 	title: 'Issue 1',
 	kind: undefined,
 	state: 'running',
-	status: { state: 'running', started_ms: NOW, track: ['investigate', 'plan', 'implement'] },
+	status: {
+		state: 'running',
+		started_ms: NOW,
+		track: ['investigate', 'plan', 'implement'],
+		phase_ms: NOW,
+	},
 	waits: ['3'],
 }
 const waiting: BoardRow = {
@@ -57,11 +62,11 @@ function sized(columns: number): Array<string> {
 }
 
 describe('run_board_render.render usage column', () => {
-	// joshuafolkken/kit#3526: the usage before the track, which grows with every round.
-	it('draws a running row’s usage before its track, and both before what it waits on', () => {
+	// joshuafolkken/kit#3769: the usage before the tail, both before what the row waits on.
+	it('draws a running row’s usage before its tail, and both before what it waits on', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}🔍📝🔨 {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}00:00 {2}🔗 3$/u)
 		expect(row_line(lines, 'Issue 2')).not.toContain('⚡')
 	})
 
@@ -77,12 +82,9 @@ describe('run_board_render.render usage column', () => {
 		expect(row_line(sized(NARROW), 'Issue 1')).toContain('Issue 1')
 	})
 
-	// joshuafolkken/kit#3526: the track grows without bound, so its length never takes the column away.
-	it('keeps the column on every row however long a running row’s track has grown', () => {
-		const round: Array<Phase> = ['implement', 'ship', 'failed']
-		const track: Array<Phase> = ['investigate', 'plan', ...round, ...round, ...round]
-		const long: BoardRow = { ...running, status: { state: 'running', started_ms: NOW, track } }
-		const layout = { ...EMPTY_LAYOUT, active: [long, waiting] }
+	// joshuafolkken/kit#3769: only the tail and what a row waits on may wrap, never the columns before them.
+	it('keeps the column on every row where only the tail and what a row waits on would wrap', () => {
+		const layout = { ...EMPTY_LAYOUT, active: [running, waiting] }
 		const lines = run_board_render.render({
 			header: header({ layout, usages }),
 			notes: [],
@@ -94,12 +96,19 @@ describe('run_board_render.render usage column', () => {
 })
 
 // joshuafolkken/kit#3554: the usage column on every row, a finished row's filled with its finish time,
-// so every track starts in one column.
+// so every running row's tail starts in one column.
 const TRACK: Array<Phase> = ['investigate', 'plan', 'ship']
 const FINISH = /🔚 (?:\d+\/\d+ )?\d{2}:\d{2}/u
+const PHASE_TIME = '00:30'
 
 function tracked(number: number, state: BoardRow['state'], ended_ms?: number): BoardRow {
-	const status = { state, started_ms: NOW - MINUTE, ended_ms, track: TRACK }
+	const status = {
+		state,
+		started_ms: NOW - MINUTE,
+		ended_ms,
+		track: TRACK,
+		phase_ms: NOW - MINUTE / 2,
+	}
 
 	return { number, title: `Issue ${String(number)}`, kind: undefined, state, status, waits: [] }
 }
@@ -128,16 +137,27 @@ function mixed_lines(extra: Partial<BoardHeader> = {}, columns = WIDE): Array<st
 		.filter((line) => line.includes('Issue'))
 }
 
-// The columns before a row's track, as the terminal counts them.
-function track_column(line: string): number {
-	return run_board_fit.width_of(line.slice(0, line.indexOf('🔍')))
+// The columns before `marker` on a line, as the terminal counts them.
+function column_of(line: string, marker: string): number {
+	return run_board_fit.width_of(line.slice(0, line.indexOf(marker)))
 }
 
 describe('run_board_render.render usage column on every row', () => {
-	it('starts every row’s track in one column whatever each row draws in the column', () => {
-		const columns = mixed_lines().map((line) => track_column(line))
+	it('starts every running row’s tail in one column whatever each row draws in the column', () => {
+		const lines = mixed_lines()
+		const columns = ['Issue 1', 'Issue 4', 'Issue 6'].map((title) =>
+			column_of(row_line(lines, title), PHASE_TIME),
+		)
 
+		expect(columns[0]).toBeGreaterThan(0)
 		expect(new Set(columns).size).toBe(1)
+	})
+
+	it('ends a settled row on its usage column, with no tail after it', () => {
+		const lines = mixed_lines()
+
+		expect(row_line(lines, 'Issue 3')).toMatch(/🔚 [\d/ :]+$/u)
+		expect(row_line(lines, 'Issue 7')).not.toContain(PHASE_TIME)
 	})
 
 	it('draws a finished row’s finish time, and none on a row with no end or not finished', () => {
@@ -153,7 +173,7 @@ describe('run_board_render.render usage column on every row', () => {
 		const lines = mixed_lines({}, NARROW)
 
 		expect(lines.join('\n')).not.toMatch(/[🔚⚡]/u)
-		expect(row_line(lines, 'Issue 3')).toMatch(/\d{2}:\d{2} {2}🔍/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/\d{2}:\d{2}$/u)
 	})
 
 	it('draws both in a chat as on a screen', () => {
@@ -164,8 +184,9 @@ describe('run_board_render.render usage column on every row', () => {
 	})
 })
 
-// A plan row the run has not touched draws no column, so what it waits on stays beside its title.
-function planned_line(): string {
+// joshuafolkken/kit#3769: a plan row the run has not touched draws blanks in the column, so what it
+// waits on starts where a running row's tail does.
+function planned_lines(): Array<string> {
 	const planned: BoardRow = { ...waiting, number: 9, title: 'Planned', waits: ['3554'] }
 	const waves = [[{ kind: 'row' as const, row: planned }]]
 	const layout = { ...EMPTY_LAYOUT, active: mixed, waves }
@@ -176,14 +197,16 @@ function planned_line(): string {
 		size,
 	})
 
-	return row_line(
-		lines.map((line) => stripVTControlCharacters(line)),
-		'Planned',
-	)
+	return lines.map((line) => stripVTControlCharacters(line))
 }
 
 describe('run_board_render.render usage column on a plan row', () => {
-	it('keeps what an untouched row waits on right after its title', () => {
-		expect(planned_line()).toMatch(/Planned {2}\S+ \S*3554$/u)
+	it('starts what an untouched row waits on in the tail’s column', () => {
+		const lines = planned_lines()
+
+		expect(row_line(lines, 'Planned')).toMatch(/Planned +🔗 3554$/u)
+		expect(column_of(row_line(lines, 'Planned'), '🔗')).toBe(
+			column_of(row_line(lines, 'Issue 1'), PHASE_TIME),
+		)
 	})
 })

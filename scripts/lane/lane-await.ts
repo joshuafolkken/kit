@@ -12,6 +12,7 @@ import {
 } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
+import { process_tools } from './process-tools'
 
 // Detached lane children are not harness-tracked processes, so their completion fires no
 // re-invocation event in the parent's session. Without a blocking wait the parent notices only
@@ -30,6 +31,7 @@ const NEVER_APPEARED_TIMEOUT_MS = 600_000
 const MS_PER_SECOND = 1000
 const PROCESS_FOUND = 0
 const PROCESS_NOT_FOUND = 1
+const PGREP_COMMAND = 'pgrep'
 
 // `is_settled` is read once, when the wait starts: a child that ended between two `lane:await` calls
 // never appears in the second one, and only its settled issue tells it apart from one not yet
@@ -77,13 +79,15 @@ interface RunConfig extends CheckConfig {
 
 // Three answers, not two: only pgrep's own "no match" exit is `none`. A pgrep that failed or hit its
 // timeout never looked, and `run:liveness` answers `undetermined` for it rather than booking a live
-// child as stopped.
+// child as stopped. A pgrep that is not installed could never look, so it is refused by name.
 function process_trace_default(issue: string): ProcessTrace {
 	const pattern = lane_child_invocation.process_pattern(issue)
-	const result = spawnSync('pgrep', ['-f', pattern], {
+	const result = spawnSync(PGREP_COMMAND, ['-f', pattern], {
 		encoding: 'utf8',
 		timeout: PROBE_TIMEOUT_MS,
 	})
+
+	process_tools.throw_if_missing(PGREP_COMMAND, result.error)
 
 	if (result.status === PROCESS_FOUND) return PROCESS_ALIVE
 	if (lane_handoff.is_ship_running(issue, process.cwd())) return PROCESS_ALIVE

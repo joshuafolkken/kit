@@ -221,6 +221,9 @@ function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 	}
 
 	actions.push(...build_basic_vscode_actions(shape))
+	// The `.claude/settings.json` a `josh start` project receives wires the `session:lang` hook, whose
+	// unset default is `ja`, so the language is seeded from the locale as on `full`.
+	if (shape.has_workflow) actions.push(...session_language_environment.build_session_lang_actions())
 
 	return actions
 }
@@ -248,4 +251,4 @@ function build_file_actions(shape?: ProjectShape): ReadonlyArray<FileAction> {
 const init_actions = { build_file_actions, read_package_json }
 
 export type { FileAction }
-export { init_actions, PRETTIER_CONFIG_JS, BASIC_PRETTIER_CONFIG }
+export { init_actions, PRETTIER_CONFIG_JS, BASIC_PRETTIER_CONFIG, LEFTHOOK_PATH }

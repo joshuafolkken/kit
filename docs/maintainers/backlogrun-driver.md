@@ -97,7 +97,11 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **`--only` ends the run once the named list is done** — it never enters the pool loop.
 - **`pnpm josh backlog:budget` answering `stop`** — an idle watch running out, the maximum reached,
   and, only with the watch turned off by `--idle 0`, an empty backlog, a parked backlog or an
-  unreadable listing. With the watch on, all three wait instead.
+  unreadable listing. With the watch on, all three wait instead — **right after a merge too**: the
+  offer `run:merge` passes through is never read by the driver, so its `stop` (only person-waiting
+  issues left) is not a stop; the next pass asks `backlog:offer`, and `backlog:budget` decides
+  (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — the failure guard, or a failed
+  child left unparked — ends the run there (`run_merge_token.is_control_stop`).
 - **The guards in `backlogrun.md` → "Guards"**, counted over the whole `backlogrun`; whichever binds
   first ends the run.
 - **A `needs-human-review` child stops the whole run** before its commit (`needs-human-review.md`).
@@ -110,6 +114,11 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   interval of the idle watch, never the rest of it. Two records are not re-read: one `run:carry --end`
   ended stops at once with `The carry record is no longer active.`, and one another owner holds
   stops with `The driver no longer owns the carry record.`
+- **A named issue whose state does not read is read again before a session hears of it**
+  (joshuafolkken/kit#3739). The failure is a `wait`, so the next offer — 60 seconds on — reads it again
+  while the children in flight are still collected. The third consecutive failure (`backlog:offer`'s
+  retry limit) hands back `offer`, with the issue and why the read failed on stderr; a number that
+  resolves to nothing is handed back at once (`scripts/backlog/backlog-drive-unread.ts`).
 - **A driver failure the supervisor cannot recover from ends the watch, and says so.** The driver
   exits non-zero once its re-reads run out, and the supervisor — whose own read of the record then
   fails too — stops as `failed`: it removes its wake record, sends the warning, and — when the run is
@@ -143,6 +152,16 @@ so a child filed into the epic mid-run is dispatched without `run:add` and witho
 hands `epic #N` back with the original invocation only on `epic:next`'s `stop`, when every child left
 waits on a person, or after `backlog:offer`'s retry limit of consecutive `epic:next` failures (a broken
 graph).
+
+**`triage` is handed back rather than waited on** (joshuafolkken/kit#3731), when a child carries neither
+`run:solo` nor `run:lane`. `epic:next --lanes` answers it with exit 0 on every pass, so it never reaches
+the failure limit, and the named path gives `backlog:budget` a fixed `candidates` answer
+(`scripts/backlog/backlog-drive-named-offer.ts`), so the idle bound never ends it either — a wait there
+starts nothing and tells nobody. **It is handed back as `triage`, the pool path's word, never as
+`epic #N`**: the `epic #N` procedure runs the epic's children and asks the single-child `epic:next`,
+which is not triage-gated, so a session woken on it would launch the untriaged child. On `triage` the
+session labels each child standard error names and cuts (`backlogrun-steps.md` → "The loop"), and the
+next pass offers them; a child already running is left running.
 
 ## Waiting while something is in flight
 

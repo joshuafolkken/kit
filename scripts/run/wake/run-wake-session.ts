@@ -1,6 +1,12 @@
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import {
+	agent_role_profile,
+	type AgentProfile,
+	type AgentProvider,
+	type ProfileResult,
+} from '#scripts/agent/agent-role-profile'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_invocation } from '#scripts/run/run-invocation'
 
@@ -46,10 +52,20 @@ function scheduler_profile(): AgentProfile | undefined {
 	return undefined
 }
 
-function supervisor_environment(profile: AgentProfile): Record<string, string> {
+// The scheduler profile of the provider a run was started on, whatever session the command was typed in
+// (joshuafolkken/kit#3804).
+function chosen_profile(provider: AgentProvider): ProfileResult {
+	const environment = backlogrun_launch.chosen_environment(provider)
+
+	return agent_role_profile.resolve(agent_role_profile.SCHEDULER, environment)
+}
+
+// **A Claude supervisor clears an inherited Codex session key**, so one started from a command typed in
+// a Codex session does not read itself as both.
+function supervisor_environment(profile: AgentProfile): Record<string, string | undefined> {
 	return profile.provider === 'openai'
 		? { CODEX_THREAD_ID: SUPERVISOR_SESSION }
-		: { CLAUDE_CODE_CHILD_SESSION: SUPERVISOR_SESSION }
+		: { CLAUDE_CODE_CHILD_SESSION: SUPERVISOR_SESSION, CODEX_THREAD_ID: undefined }
 }
 
 // **What comes back is always the rebuilt text, and it is refused unless it matches the record.** The
@@ -149,6 +165,7 @@ const run_wake_session = {
 	ensure_log: detached_launch.ensure_log,
 	is_safe_argv: detached_launch.is_safe_argv,
 	launch: detached_launch.launch,
+	chosen_profile,
 	scheduler_profile,
 	supervisor_argv,
 	supervisor_environment,

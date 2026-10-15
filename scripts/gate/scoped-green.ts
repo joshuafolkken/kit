@@ -64,7 +64,8 @@ interface ScopedSources {
 }
 
 // **`test:related` is required only where it can ever answer**. In a project
-// whose unit guard skips — vitest absent, or a basic project with no test file — `test:related` runs
+// whose unit guard skips — vitest absent with no project test script to run in its place, or a basic
+// project with no test file — `test:related` runs
 // nothing and so writes no record, and requiring one refused the gate forever with no way through.
 // The guard's own decision is asked rather than re-derived, so the writer and this reader agree; a
 // project with a unit suite still needs the record, and a run that executed nothing still writes none.

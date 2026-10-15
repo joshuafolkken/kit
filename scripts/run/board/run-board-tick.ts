@@ -8,10 +8,12 @@ import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
+import { run_board_reason } from './run-board-reason'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type RunActivity } from './run-board-status'
+import { run_board_thanks } from './run-board-thanks'
 import { run_board_usage } from './run-board-usage'
 
 // One `run:board` redraw. **Three speeds**: the frame is redrawn once a second, on the second, so
@@ -30,6 +32,7 @@ const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
 const { FRESH_STATE, is_due } = run_board_state
 const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
+const { gather_thanks } = run_board_thanks
 
 async function reread(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
 	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
@@ -88,17 +91,17 @@ function titles_of(state: BoardState): Titles {
 	return with_closed(state.plan, state.closed).context.titles
 }
 
-// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-// Before the plan is read, the run's own children alone.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout {
-	const { plan, closed } = state
+// A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
+function activity_here(local: LocalRead): RunActivity {
+	return run_board_status.activity_of(
+		local.events,
+		local.ended_ms !== undefined || local.is_stranded,
+	)
+}
 
-	if (plan === undefined) {
-		return run_board_layout.local_layout_of(
-			run_board_status.statuses_of(local.events, local.lanes, new Set()),
-		)
-	}
-
+// The plan laid under its statuses, each waiting row saying why it waits.
+function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
+	const { closed } = state
 	const read = {
 		open_numbers: plan.context.open_numbers,
 		read_ms: state.fetched_ms,
@@ -106,8 +109,25 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 		labels: plan.labels,
 	}
 	const statuses = run_board_status.settle_closed(statuses_for(plan, local), read)
+	const reason_of = run_board_reason.reader({
+		plan,
+		statuses,
+		events: local.events,
+		free_lanes: local.free_lanes,
+		is_stopped: activity_here(local).is_stopped,
+	})
 
-	return run_board_layout.layout_of(with_closed(plan, closed), statuses)
+	return run_board_layout.layout_of(with_closed(plan, closed), statuses, reason_of)
+}
+
+// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
+// Before the plan is read, the run's own children alone.
+function layout_for(state: BoardState, local: LocalRead): BoardLayout {
+	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
+
+	return run_board_layout.local_layout_of(
+		run_board_status.statuses_of(local.events, local.lanes, new Set()),
+	)
 }
 
 // What one redraw draws with.
@@ -116,12 +136,20 @@ interface Redraw {
 	now_ms: number
 }
 
-// A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
-function activity_here(local: LocalRead): RunActivity {
-	return run_board_status.activity_of(
-		local.events,
-		local.ended_ms !== undefined || local.is_stranded,
-	)
+// What the header reads off the local read.
+type LocalHeader = Pick<
+	BoardHeader,
+	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual'
+>
+
+function local_header(local: LocalRead): LocalHeader {
+	return {
+		started_ms: local.started_ms,
+		ended_ms: local.ended_ms,
+		activity: activity_here(local),
+		operations: local.operations,
+		usual: local.usual,
+	}
 }
 
 function header_of(
@@ -132,9 +160,7 @@ function header_of(
 ): BoardHeader {
 	return {
 		now_ms: redraw.now_ms,
-		started_ms: local.started_ms,
-		ended_ms: local.ended_ms,
-		activity: activity_here(local),
+		...local_header(local),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
@@ -161,6 +187,8 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 		header: header_of(state, local, layout, redraw),
 		notes: run_board_notes.notes_of(local.events, titles_of(state)),
 		resume: local.resume,
+		thanks: state.thanks,
+		link: redraw.ports.link,
 		...bounds,
 	})
 
@@ -203,8 +231,9 @@ async function tick(
 	}
 
 	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
+	const thanked = await gather_thanks(gathered, ports, now_ms, pace)
 
-	return draw_run(await resample(gathered, ports, now_ms), local, { ports, now_ms })
+	return draw_run(await resample(thanked, ports, now_ms), local, { ports, now_ms })
 }
 
 const run_board_tick = {

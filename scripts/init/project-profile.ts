@@ -4,6 +4,8 @@ import { repo_origin } from '#scripts/discovery/repo-origin'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { kit_written_paths } from './kit-written-paths'
+import { workflow_mark } from './workflow-mark'
 
 type ProjectProfile = 'basic' | 'full'
 
@@ -17,6 +19,8 @@ interface ProjectShape extends ProfileResult {
 	has_typescript: boolean
 	has_git: boolean
 	has_github: boolean
+	// Set up by `josh start` for the GitHub Issue workflow (`workflow-mark.ts`).
+	has_workflow: boolean
 }
 
 const IGNORED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'build', '.svelte-kit'])
@@ -136,18 +140,27 @@ function scan_directory(directory: string, pending: Array<string>): Array<string
 			.map((entry) => path.join(directory, entry.name)),
 	)
 
-	return entries.filter((entry) => entry.isFile()).map((entry) => path.extname(entry.name))
+	return entries.filter((entry) => entry.isFile()).map((entry) => path.join(directory, entry.name))
+}
+
+// A file kit wrote says nothing about the project: counted, the `.pnpmfile.mjs` of the first
+// `josh init` would read as the user's Web file on the second and bring Prettier in
+// (joshuafolkken/kit#3713).
+function is_project_file(root: string, file: string): boolean {
+	const relative_path = path.relative(root, file).split(path.sep).join(path.posix.sep)
+
+	return !kit_written_paths.is_kit_written(relative_path)
 }
 
 function file_extensions(root: string): Array<string> {
 	const pending = [root]
-	const extensions: Array<string> = []
+	const files: Array<string> = []
 
 	for (const directory of pending) {
-		extensions.push(...scan_directory(directory, pending))
+		files.push(...scan_directory(directory, pending))
 	}
 
-	return extensions
+	return files.filter((file) => is_project_file(root, file)).map((file) => path.extname(file))
 }
 
 function scan_files(root: string): { has_web: boolean; has_typescript: boolean } {
@@ -164,17 +177,33 @@ function has_github_remote(root: string): boolean {
 	return url !== undefined && repo_origin.parse_origin_url(url) !== undefined
 }
 
+function has_git(root: string): boolean {
+	return existsSync(path.join(root, '.git'))
+}
+
+// The run is asked first, so a `josh start` whose setup has not written `package.json` yet reads it.
+function has_workflow(root: string): boolean {
+	return workflow_mark.is_requested() || workflow_mark.is_recorded(read_manifest(root))
+}
+
 function inspect_project(root: string, requested?: ProjectProfile): ProjectShape {
 	const profile = resolve_profile(root, requested)
 	const files = scan_files(root)
-	const has_git = existsSync(path.join(root, '.git'))
+	const is_git = has_git(root)
 
-	return { ...profile, ...files, has_git, has_github: has_git && has_github_remote(root) }
+	return {
+		...profile,
+		...files,
+		has_git: is_git,
+		has_github: is_git && has_github_remote(root),
+		has_workflow: has_workflow(root),
+	}
 }
 
 const project_profile = {
 	parse_profile,
 	resolve_profile,
+	has_git,
 	inspect_project,
 	requested_profile,
 	with_legacy_profile_names,

@@ -1,11 +1,18 @@
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
+import { run_wake } from '#scripts/run/wake/run-wake'
+import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_read } from './run-board-read'
+import { run_board_usual } from './run-board-usual'
+
+const MINUTE_MS = 60_000
 
 // joshuafolkken/kit#3439: the board reads the running run, else the one that last ended, and keeps the
 // next run's events off an ended run's board.
@@ -30,6 +37,21 @@ const STOPPED: EndedRun = {
 	session: 'abc',
 }
 
+const CARRY: RunCarry = {
+	invocation: 'backlogrun',
+	started_at: ENDED_AT,
+	merged: 0,
+	filed: 0,
+	cuts: 0,
+	failures: 0,
+	outages: 0,
+}
+const TRANSCRIPT = '/home/.claude/projects/kit/session.jsonl'
+const LANE_LOG = '/logs/josh-lane-dispatch-3432.log'
+// Three lanes allowed and one open: two more may open.
+const LANE_LIMIT = 3
+const FREE_LANES = 2
+
 function lane(issue: string): LaneInfo {
 	return {
 		issue,
@@ -51,6 +73,10 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
 	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, AFTER])
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane('3432')])
+	// The limit is read off the environment and a live run's override: never a real one from a test.
+	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
+	// Every log is read off the machine: never a real one from a test.
+	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
 }
 
 afterEach(() => {
@@ -69,6 +95,9 @@ describe('run_board_read.read_local', () => {
 			lanes: ['3432'],
 			resume: undefined,
 			is_stranded: false,
+			operations: { lanes: [], owner: undefined, judgment: undefined },
+			free_lanes: FREE_LANES,
+			usual: new Map(),
 		})
 	})
 
@@ -95,21 +124,22 @@ describe('run_board_read.read_local', () => {
 	})
 })
 
+// joshuafolkken/kit#3769: how long each phase usually takes is read off the repository's ledger.
+describe('run_board_read.read_local usual times', () => {
+	it('reads each phase’s usual time from the repository', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const usual = new Map([['review' as const, MINUTE_MS]])
+		const read = vi.spyOn(run_board_usual, 'read').mockReturnValue(usual)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ usual })
+		expect(read).toHaveBeenCalledWith(REPOSITORY)
+	})
+})
+
 // joshuafolkken/kit#3437: a stopped run offers its session; a run that begins hides it.
 describe('run_board_read.read_local resume', () => {
 	it('reads the session a stopped run resumes from, only while that run is the one drawn', async () => {
-		const running: CarryRead = {
-			kind: 'carried',
-			carry: {
-				invocation: 'backlogrun',
-				started_at: ENDED_AT,
-				merged: 0,
-				filed: 0,
-				cuts: 0,
-				failures: 0,
-				outages: 0,
-			},
-		}
+		const running: CarryRead = { kind: 'carried', carry: CARRY }
 
 		arrange(NONE, STOPPED)
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ resume: 'abc' })
@@ -147,5 +177,42 @@ describe('run_board_read.read_local with a launch its parent has not claimed', (
 			ended_ms: undefined,
 			resume: undefined,
 		})
+	})
+})
+
+// joshuafolkken/kit#3757: each session's newest operation is read from the log the run names for it.
+describe('run_board_read.read_local operations', () => {
+	it('reads the lane’s, the parent’s and the watcher’s logs, each in its own checkout', async () => {
+		const root = process.cwd()
+		const read = vi.spyOn(run_board_operation_read, 'read')
+
+		arrange({ kind: 'carried', carry: { ...CARRY, owner_transcript: TRANSCRIPT } }, undefined)
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([{ ...lane('3432'), output: LANE_LOG }])
+		await run_board_read.read_local()
+
+		expect(read).toHaveBeenCalledExactlyOnceWith({
+			lanes: [{ issue: '3432', log: LANE_LOG, root: '/lanes/3432' }],
+			owner: { log: TRANSCRIPT, root },
+			judgment: { log: run_wake.wake_log_path(REPOSITORY), root },
+		})
+	})
+})
+
+// joshuafolkken/kit#3750: a waiting row says no lane is free, so the count is read beside the lanes.
+describe('run_board_read.read_local free lanes', () => {
+	it('counts the lanes the limit still allows, a stranded lane holding none', async () => {
+		const stranded = { ...lane('3433'), is_stranded: true }
+
+		arrange(NONE, STOPPED)
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3432'), stranded])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: FREE_LANES })
+	})
+
+	it('reads no count where the limit is not a number anyone set', async () => {
+		arrange(NONE, STOPPED)
+		vi.mocked(lane_capacity.lane_limit).mockResolvedValue({ kind: 'problem', problem: 'bad' })
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: undefined })
 	})
 })

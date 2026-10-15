@@ -9,6 +9,7 @@ import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
 import type { LocalRead } from './run-board-read'
 import type { Spot } from './run-board-spin'
+import type { Thanks } from './run-board-thanks-csv'
 import type { LaneUsages, UsageMark } from './run-board-usage'
 
 // What a `run:board` redraw reads through and folds forward, shared by the
@@ -38,6 +39,8 @@ interface BoardPorts {
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here.
 	mark: () => Promise<void>
+	// The reviewers' roster (`run-board-thanks-read.ts`); none where the frame thanks nobody — the chat.
+	read_thanks?: (() => Promise<Thanks>) | undefined
 	// Sends one chat frame off-screen, for `--every` alone.
 	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
@@ -79,6 +82,10 @@ interface BoardState {
 	// them.
 	usage: UsageMark | undefined
 	usages: LaneUsages | undefined
+	// The reviewers drawn above the legend, the read of them in flight, and when it was last launched.
+	thanks: Thanks
+	thanks_fetch: Fetch<Thanks> | undefined
+	thanks_attempted_ms: number | undefined
 }
 
 const FRESH_STATE: BoardState = {
@@ -101,6 +108,9 @@ const FRESH_STATE: BoardState = {
 	spots: [],
 	usage: undefined,
 	usages: undefined,
+	thanks: [],
+	thanks_fetch: undefined,
+	thanks_attempted_ms: undefined,
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {

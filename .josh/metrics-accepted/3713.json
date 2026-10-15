@@ -1,0 +1,7 @@
+{
+	"reason": "#3713: the Web-file scan now filters out the paths kit wrote (one import and one predicate in project-profile.ts); the fix cannot be made by removing lines",
+	"date": "2026-10-13",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

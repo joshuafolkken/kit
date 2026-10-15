@@ -1,14 +1,12 @@
-import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
-import { run_board_track } from './run-board-track'
 
 // joshuafolkken/kit#3430: the board as a person reads it. joshuafolkken/kit#3444: a row carries its
-// number, title, elapsed `MM:SS` and its phase track; sections are rules, symbols a legend.
+// number, title, elapsed `MM:SS`; sections are rules, symbols a legend.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of, note, rule } =
 	run_board_render_fixture
@@ -30,8 +28,8 @@ function passed_of(phase: Phase): Array<Phase> {
 	return run_board_phase.PHASES.slice(0, run_board_phase.PHASES.indexOf(phase) + 1)
 }
 
-// A running row whose phases are `track` — the phases up to `phase` in the track's order where one
-// phase is named, as a child that never went back would have passed them.
+// A running row whose phases are `track` — the phases up to `phase` in the order a run passes them
+// where one phase is named, as a child that never went back would have passed them.
 function running(number: number, started_ms: number, phase: Phase | ItemStatus['track']): BoardRow {
 	const track = typeof phase === 'string' ? passed_of(phase) : phase
 
@@ -42,16 +40,11 @@ function padded(title: string): string {
 	return title.padEnd(run_board_render.TITLE_LIMIT)
 }
 
-// The phase track as the stripped lines draw it, whether or not this run's output is colored.
-function plain_track(phase: Phase): string {
-	return stripVTControlCharacters(run_board_track.track_of(passed_of(phase)))
-}
-
 describe('run_board_render.render rows', () => {
-	it('draws a running row with its number, title, elapsed time and phase track, and no lane', () => {
+	it('draws a running row with its number, title and elapsed time, and no lane', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
-		const row_line = `  🔨 1    ${padded('Issue 1')}  90:00  ${plain_track('implement')}`
+		const row_line = `  🔨 1    ${padded('Issue 1')}  90:00`
 
 		expect(lines).toContain(row_line)
 		expect(row_line).not.toContain('■')
@@ -72,7 +65,7 @@ describe('run_board_render.render rows', () => {
 		expect(ends[0]).toBe(ends[1])
 	})
 
-	it('draws a settled row with no track with its whole span and nothing after it', () => {
+	it('draws a settled row with its whole span and nothing after it', () => {
 		const status = {
 			state: 'merged' as const,
 			started_ms: STARTED,
@@ -110,11 +103,17 @@ describe('run_board_render.render release kinds', () => {
 		expect(lines).toContain(`  ✅ 4    ${padded('Issue 4')}  01:00`)
 	})
 
-	it('keeps the usual gap before the waits of a row with no title', () => {
+	// joshuafolkken/kit#3769: every row's title is padded, so what a row waits on starts in one column.
+	it('starts the waits of a row with no title in the column a titled row’s start in', () => {
 		const untitled = row(12, { kind: 'enhancement', title: undefined, waits: ['3'] })
-		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [untitled] } }))
+		const titled = row(13, { kind: 'enhancement', waits: ['3'] })
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [untitled, titled] } }))
+		const columns = ['⏳ 12', '⏳ 13'].map(
+			(mark) => lines.find((line) => line.includes(mark)) ?? '',
+		)
 
-		expect(lines).toContain('  ⏳ 12 ✨  🔗 3')
+		expect(columns[0]).toMatch(/^ {2}⏳ 12 ✨ +🔗 3$/u)
+		expect(columns[0]?.indexOf('🔗')).toBe(columns[1]?.indexOf('🔗'))
 	})
 
 	it('names the drawn kinds in the legend', () => {
@@ -230,7 +229,7 @@ describe('run_board_render.render running row lead', () => {
 		expect(lines).toContain('     └ ⏳ 5    Issue 5')
 	})
 
-	it('leads a running row with its newest phase’s icon, and 🔄 before its track draws one', () => {
+	it('leads a running row with its newest phase’s icon, and 🔄 before it reaches one', () => {
 		const active = [running(1, NOW, 'commit'), running(2, NOW, undefined)]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active } }))
 

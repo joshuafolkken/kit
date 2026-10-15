@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/init/hook-command-rewrite.ts:110 | 2026-10-13 | #3728
+- rf:bug-risks | low | scripts/sync/claude-settings-merge.ts:72 | 2026-10-13 | #3728
+- rf:tests | low | scripts/sync/claude-settings-merge.test.ts:120 | 2026-10-13 | #3728
+- rf:assumptions | low | docs/sync.md:56 | 2026-10-13 | #3728

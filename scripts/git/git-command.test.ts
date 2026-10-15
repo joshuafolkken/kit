@@ -70,6 +70,34 @@ describe('the status reading targets another work tree when given its directory'
 	})
 })
 
+// joshuafolkken/kit#3733: a lane is discarded only when deleting its branch loses nothing, so the
+// count is of commits no remote-tracking ref reaches, and an unreadable count is never read as zero.
+describe('git_command.commit_count_unpushed', () => {
+	it('counts the commits on the branch that no remote reaches', async () => {
+		const { git_command } = await import('./git-command')
+
+		execa_mock.state.stdout = '2'
+
+		await expect(git_command.commit_count_unpushed('3347-lane')).resolves.toBe(2)
+		// In this order: `--not` negates every revision after it, so a branch named after it counts zero.
+		expect(execa_mock.state.last_arguments).toEqual([
+			'rev-list',
+			'--count',
+			'3347-lane',
+			'--not',
+			'--remotes',
+		])
+	})
+
+	it('throws on output that is not a count rather than answering zero', async () => {
+		const { git_command } = await import('./git-command')
+
+		await expect(git_command.commit_count_unpushed('3347-lane')).rejects.toThrow(
+			'rather than a count',
+		)
+	})
+})
+
 // joshuafolkken/kit#907: with git's default quoting, a path containing a non-ASCII byte comes back
 // C-quoted, and a classifier matching a path prefix answers no for a file it should have matched.
 // `josh review:level` reads these same paths, so a dropped match would misjudge the review depth.

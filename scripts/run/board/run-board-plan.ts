@@ -5,7 +5,7 @@ import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import type { BoardPlan } from './run-board-layout'
+import { run_board_layout, type BoardPlan } from './run-board-layout'
 
 // The plan `run:board` lays the run over, scoped to what the run was asked to do.
 // **`--only`** draws the named issues alone — a named epic expanded into its children; **a named prefix
@@ -56,6 +56,7 @@ async function board_of(
 		tracked: plan.tracked,
 		context: backlog_plan_read.context_of(plan, read.listing),
 		labels: labels_of(read.listing.rows),
+		declared: plan.scope.declared,
 	}
 }
 
@@ -75,10 +76,6 @@ async function named_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan 
 	return await board_of({ kind: 'read', issues, cutoff: 'none' }, [], read)
 }
 
-function children_of(plan: BoardPlan): Array<EpicChild> {
-	return [...plan.waves.waves.flat(), ...plan.waves.unreached]
-}
-
 function not_held(children: ReadonlyArray<EpicChild>, held: ReadonlySet<number>): Array<EpicChild> {
 	return children.filter((child) => !held.has(child.number))
 }
@@ -86,7 +83,7 @@ function not_held(children: ReadonlyArray<EpicChild>, held: ReadonlySet<number>)
 // The named waves lead and the pool's follow, a child the named plan already holds left out of the pool
 // so a named epic's children are not drawn twice.
 function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
-	const held = new Set(children_of(lead).map((child) => child.number))
+	const held = run_board_layout.numbers_of(lead)
 
 	return {
 		waves: {
@@ -96,6 +93,7 @@ function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
 		tracked: new Map([...pool.tracked, ...lead.tracked]),
 		context: pool.context,
 		labels: pool.labels,
+		declared: new Map([...(pool.declared ?? []), ...(lead.declared ?? [])]),
 	}
 }
 

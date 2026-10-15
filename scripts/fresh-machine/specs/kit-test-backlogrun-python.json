@@ -1,0 +1,34 @@
+{
+	"name": "kit-test-backlogrun-python",
+	"requires_github": true,
+	"package_source": "tarball",
+	"requires_claude": true,
+	"files": {
+		"pyproject.toml": "[project]\nname = \"greeting\"\nversion = \"0.1.0\"\nrequires-python = \">=3.9\"\n",
+		"main.py": "def main() -> None:\n    print(\"Hello\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
+	},
+	"commands": [
+		"gh auth setup-git",
+		"git config --global user.name kit-test && git config --global user.email kit-test@example.com",
+		"printf '{ \"private\": true }\\n' > package.json",
+		"cp \"$PACKAGE_TARBALL\" . && pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver \"./$(basename \"$PACKAGE_TARBALL\")\"",
+		"pnpm exec josh start --yes --github",
+		"pnpm josh profile | grep -x 'profile: basic (package.json josh.profile)'",
+		"grep -q '\"workflow\": \"github\"' package.json && test -f .claude/settings.json",
+		"curl -fsSL https://claude.ai/install.sh | bash && export PATH=\"$HOME/.local/bin:$PATH\" && claude --version",
+		"gh issue create --title 'Print a greeting with a name in main.py' --body 'Make main.py print \"Hello, Josh\" instead of \"Hello\".' --label auto-ok --label run:lane",
+		"timeout 60 pnpm josh backlogrun > \"$HOME/backlogrun.out\" 2>&1; cat \"$HOME/backlogrun.out\"; grep -q '^backlogrun: started' \"$HOME/backlogrun.out\"",
+		"pnpm josh run:event --from 0 | grep 'starting session'",
+		"for i in $(seq 1 90); do pnpm josh run:event --from 0 | grep -q 'dispatching' && break; sleep 10; done; pnpm josh run:event --from 0 | grep 'dispatching'",
+		"for i in $(seq 1 120); do test \"$(gh pr list --state all --json number --jq length)\" -gt 0 && break; sleep 10; done; pnpm josh run:board --chat",
+		"pnpm josh backlogrun --stop"
+	],
+	"probes": [
+		"tail -n 40 \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\" | cut -c1-400",
+		"grep -c 'requires approval' \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\"",
+		"grep -c 'run:carry --begin' \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\"",
+		"tail -n 40 /tmp/josh-lane-dispatch-*.log | cut -c1-400",
+		"cat /tmp/josh-lane-dispatch-*.log | grep -c 'requires approval'",
+		"gh pr list --state all"
+	]
+}

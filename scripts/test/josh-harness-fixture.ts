@@ -1,6 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -19,6 +20,10 @@ const GATE_TIMEOUT_MS = 180_000
 const RECORD = 'review:record'
 const DECOY_DIRECTORY = 'decoy-bin'
 const DECOY_EXIT_CODE = 97
+const KEPT_TOOLS_DIRECTORY = 'kept-tools-bin'
+const NODE = 'node'
+const GIT = 'git'
+const { PNPM } = pnpm_reach
 const EXECUTABLE_MODE = 0o755
 const ROUND_ISSUE = 101
 
@@ -73,6 +78,32 @@ function decoy_bin(workspace: string): string {
 	})
 
 	return directory
+}
+
+function is_on(directory: string, tool: string): boolean {
+	return existsSync(path.join(directory, tool))
+}
+
+// Carries `node` and `git` over by link, since either may share a directory with `pnpm` — Homebrew
+// and pnpm's own home both do that — and dropping the directory would take them along.
+function link_kept_tools(directory: string, search: ReadonlyArray<string>): void {
+	const git_home = search.find((entry) => is_on(entry, GIT))
+
+	symlinkSync(process.execPath, path.join(directory, NODE))
+	if (git_home !== undefined) symlinkSync(path.join(git_home, GIT), path.join(directory, GIT))
+}
+
+// A PATH on which `node` and `git` still resolve and `pnpm` does not: the machine a gate meets when
+// Node.js arrived by a route of its own and only `pnpm` is out of sight (joshuafolkken/kit#3712).
+// Inside the workspace, so closing the environment removes it.
+function path_without_pnpm(workspace: string): string {
+	const directory = path.join(workspace, KEPT_TOOLS_DIRECTORY)
+	const search = (process.env['PATH'] ?? '').split(path.delimiter)
+
+	mkdirSync(directory, { recursive: true })
+	link_kept_tools(directory, search)
+
+	return [directory, ...search.filter((entry) => !is_on(entry, PNPM))].join(path.delimiter)
 }
 
 function ledger_at(directory: string, issue: number): string {
@@ -171,6 +202,7 @@ const josh_harness_fixture = {
 	ledger_at,
 	ledger_text,
 	open_environments,
+	path_without_pnpm,
 	stop_leftovers_after_each,
 }
 

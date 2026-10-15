@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -24,8 +25,6 @@ import { session_cite } from './session-cite'
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const ISSUE_FIELDS = 'body,author_association'
-const TRUSTED_ASSOCIATIONS: ReadonlySet<string> = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
-const TRUSTED_LIST = [...TRUSTED_ASSOCIATIONS].join(' / ')
 const UNKNOWN_ASSOCIATION = 'unknown'
 const USAGE = 'Usage: josh measure:rerun <issue-number>'
 const NO_BASELINE = 'no `command → value` baseline found in ## ベースライン — nothing to re-run'
@@ -100,10 +99,10 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 
 	const association = issue.author_association ?? UNKNOWN_ASSOCIATION
 
-	if (!TRUSTED_ASSOCIATIONS.has(association)) {
+	if (!gh_author_association.is_trusted(association)) {
 		return {
 			kind: 'refused',
-			reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author is ${association}, not ${TRUSTED_LIST}`,
+			reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author is ${association}, not ${gh_author_association.TRUSTED_LIST}`,
 		}
 	}
 

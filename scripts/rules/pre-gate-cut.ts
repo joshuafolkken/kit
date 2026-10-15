@@ -172,7 +172,7 @@ const PRE_GATE_CUT_REASON =
 	'176K of 204K output riding across that boundary, and joshuafolkken/kit#1864 measured the step ' +
 	'itself firing 0 times in 6 lane children while it was carried as prose. Issue ' +
 	'`pnpm josh run:cut <N>` now, and read the verdict: on `cut`, **end the turn immediately** — the ' +
-	'fresh process owns the run from there and must not be waited for; on `not-a-lane`, `unready`, ' +
+	'fresh process owns the run from there and must not be waited for, and **no Telegram is owed** for a cut that resumes itself; on `not-a-lane`, `unready`, ' +
 	'`busy`, `failed` or `unknown`, this process carries the run on and the gate is simply the next ' +
 	'call. Never relaunch a second process after `busy`. This fired because the dispatch mark names ' +
 	'this lane; a person working here carries no mark and sees no refusal, so there is no ' +

@@ -71,7 +71,10 @@ test('the detached supervisor retains a Claude Code invocation marker', () => {
 		agent_role_profile.DEFAULT_PROFILES.scheduler,
 	)
 
-	expect(environment).toStrictEqual({ CLAUDE_CODE_CHILD_SESSION: SUPERVISOR_SESSION })
+	expect(environment).toStrictEqual({
+		CLAUDE_CODE_CHILD_SESSION: SUPERVISOR_SESSION,
+		CODEX_THREAD_ID: undefined,
+	})
 	expect(agent_role_profile.resolve_provider(environment)).toStrictEqual({
 		kind: 'provider',
 		provider: 'anthropic',

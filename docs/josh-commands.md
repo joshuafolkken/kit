@@ -29,6 +29,7 @@ pnpm josh gate --no-unit   # the static checks only (CI only)
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - **Refuses to start when the scoped pair has not been green on this tree.** A unit-included local gate reads the same record `josh review:brief` does and refuses — naming `pnpm josh lint:related && pnpm josh test:related` — so the first gate is the only gate. It never fires for `--no-unit` (CI has no scoped check in front of it) or `--force`, and `JOSH_SCOPED_GREEN=0` turns it off.
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
+- **The last line is the verdict, and it counts what ran apart from what was skipped.** `✔ verification gate passed (6 checks) in 41.2s.` when every check ran, `✔ verification gate passed (2 ran, 4 skipped) in 3.1s.` when some printed only a skip notice, and `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` when none ran — a `basic` project with nothing to check. That last gate still exits `0`, but it is not a passed gate and writes no green record. A check that ran with nothing of the project's to look at — `exports` in a consumer, `behavior` with no transcript — is counted as skipped only beside a real skip, so a gate that skipped nothing keeps the first line.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
 - The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
 - **Each check claims a place in a machine-wide weighted core budget before it starts, and waits while the budget is full** (`scripts/gate/core-budget.ts`). The budget is the cores and memory the machine has free, not the bare core count, and a check the wait cap admitted past it is named in the summary. A lone gate is admitted at once with its concurrency unchanged; overlapping gates share the machine instead of each reserving all of it. How the budget is weighted and swept: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
@@ -150,13 +151,13 @@ pnpm josh exports:unused
 
 ### `josh test:unit`
 
-Run unit tests with vitest. **Skips gracefully (exit 0)** when `vitest` is not installed. Once `vitest` and at least one test file are present, runs `vitest run`.
+Run vitest unit tests. Without `vitest`: **skips (exit 0)**; a `basic` project runs its [`test` script](./setup/basic.md#3-verify). With `vitest` and a test file: `vitest run`.
 
 ```bash
 pnpm josh test:unit
 ```
 
-- `vitest` installed with **no** `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip.
+- `vitest` with **no** `*.{test,spec}.{ts,js}` file fails; `basic` projects skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
 - **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pure-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set — and the rest run `isolated` with the default. They partition the suite exactly, so **the same files run and the green condition is unchanged**; only the pure ones run faster. The state guard is scoped to `pure`.
 - **A setup file silences the real streams for each test body** (`scripts/test/test-stdout-guard.ts`), so a fixture that drives a CLI `main` cannot leak its `process.stdout` lines into the suite's output; `console.*` is untouched and the streams are restored after each test.
@@ -290,7 +291,9 @@ pnpm exec josh start                                    # asks for the profile a
 pnpm exec josh start --yes --github --profile basic    # unattended, including the GitHub repository
 ```
 
-**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything.
+**Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything. A run that creates a commit (the first commit, or the setup pull request) also needs a Git author identity — [Tell Git who you are](./setup/prerequisites.md#4-tell-git-who-you-are); without one it stops before changing anything and prints the two `git config` commands that set it.
+
+The `full` profile's pre-push hook runs `josh audit`, which needs `osv-scanner`. A run that pushes fetches the pinned scanner itself before its first step (the same fetch as `pnpm josh audit:provision --force`), so nothing has to be installed by hand; where the fetch fails and no scanner is on `PATH`, `josh start` stops before changing anything and prints the cause.
 
 **Steps**, printed as `[n/N]` while they run:
 
@@ -340,6 +343,23 @@ pnpm josh sync   # overwrite managed files
 **Output / exit codes:** exits non-zero inside the distribution package's own repository, where syncing would overwrite the source with its own derived templates.
 
 See [sync.md](./sync.md) for the full file list.
+
+### `josh uninstall`
+
+Remove what kit added to a project. It prints three lists before it changes anything — what it removes, what it keeps, and what is left for you to review — and removes only the first.
+
+```bash
+pnpm josh uninstall         # show the plan, then ask
+pnpm josh uninstall --yes   # remove without asking
+```
+
+- **Remove:** each distributed file that is still byte for byte what kit writes, the `@joshuafolkken/kit` dependency and the `josh.profile` record in `package.json`, and the git hooks lefthook installed (`lefthook uninstall`, where `lefthook.yml` is one kit wrote or merged into). A directory the last removed file leaves empty goes with it.
+- **Keep:** a distributed file that differs from what kit writes — one you edited, or one of your own that kit merged entries into.
+- **Review by hand:** the `package.json` entries kit merges in (`scripts.josh`, `devDependencies.prettier`, …) that the project still holds, `sonar-project.properties` / `.aikido` when present, and `.gitignore` — deleting it would un-ignore `.env` and `node_modules`. They are never changed: `josh init` kept no record of the values it found.
+
+**Options:** `--yes` skips the question. `--profile basic|full` names the profile whose files are compared, instead of the recorded one. Without a terminal and without `--yes`, the run is a preview that removes nothing.
+
+**Output / exit codes:** exits non-zero inside the distribution package's own repository, where it removes nothing. Files are compared with the installed kit version, and nothing in `node_modules`, `pnpm-lock.yaml` or on GitHub is touched — see [Remove kit from a project](./how-to/uninstall.md).
 
 ### `josh adopt`
 
@@ -569,14 +589,26 @@ Start a `backlogrun` from the terminal and watch it on [`josh run:board`](./josh
 pnpm josh backlogrun                    # start in Claude, then show the board
 pnpm josh backlogrun 3437 --only        # the arguments go to backlogrun as typed
 pnpm josh backlogrun --agent codex      # start in Codex
+pnpm josh backlogrun --stop             # stop the run in this repository
 ```
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number in the named list is read as `#<n>`, since an unquoted `#` starts a shell comment.
 - `--agent claude|codex` picks the agent; the default is `claude`. The start command is built by `scripts/agent/agent-argv.ts`, the same builder that starts lane children, and the choice is handed to the run as `JOSH_AGENT_PROVIDER`.
 - A run already going in this repository is never joined by a second one: nothing is started, the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
+- An idle run is replaced by a different invocation, so `--stop` need not be typed first. The run going is stopped as `--stop` stops it and the typed one is started when all of these hold:
+  - the typed invocation differs from the one the run was started with — the same invocation, a bare `pnpm josh backlogrun` over a bare one included, only shows the board, so reopening the board never rebuilds a run;
+  - the run is watching: its backlog drained, it has launched no child since, and it owes no end-of-run retrospective (`JOSH_RETROSPECTIVE`);
+  - no child is working in a lane — a lane left open with no child in it (a parked child's, a merged one's not yet closed) does not keep the run, and stays where it is.
+  - A run that is kept says why in one line above the board, naming `pnpm josh lane:close <N>` when a lane is the reason (an unanswered process probe is said as that); the same invocation prints no such line.
+  - Before the run's record is written, the launch's own invocation is compared: any other is kept as still starting.
+  - What was stopped and what was started are printed, one line each, before the board. A run owned by a session of your own is not replaced: the owner's pid is printed and the exit code is 1.
 - Closing the board (Ctrl+C) closes only the board; the run goes on, and the board's last line says so. When the run stops for a person, the board prints the `claude --resume <session-id>` that reopens it.
+- `--stop` stops the run in this repository in one command, so the next `pnpm josh backlogrun` starts a new one. It stops the [`run:wake`](./josh-commands-run.md#josh-runwake) supervisor, then the parent session `josh backlogrun` started, then a headless session the run launched (the one the supervisor woke) where that session holds the run's record — the record itself marks it, so this holds after the supervisor's record is gone, then ends the run's record as a stopped run (the board keeps it as one). It takes no other argument: beside an Issue or another flag it prints the usage and stops nothing.
+  - Lanes still running are **not** stopped; their count and Issue numbers are printed, and each child finishes or is closed with `pnpm josh lane:close <N>`.
+  - A run typed into a session of your own is owned by that session, which `--stop` does not signal: the owner's pid is printed, the record is kept and the exit code is 1. End that run from its session.
+  - No Telegram is sent: the person who typed the stop is at the terminal.
 
-**Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board.
+**Output / exit codes:** prints one line naming the started pid, session and log path, then the board's exit code. Bad arguments print the usage and exit 1; an agent that cannot start (a missing or outdated CLI) exits 1 without a board. `--stop` prints one line per thing it stopped, or `backlogrun: nothing is running`, and exits 0; it exits 1 only when the record is left with an owner it did not start.
 
 ### `josh lane:limit`
 
@@ -594,6 +626,19 @@ pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies agai
 - The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
 
 **Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
+
+### `josh lane:restart`
+
+Stop a running lane child and start its issue over in a fresh session — after correcting the Issue mid-run.
+
+```bash
+pid=$(pnpm josh lane:restart 3769) || exit 1
+```
+
+- In order: it claims the `in-progress` marker, stops the child's process tree, ends any cut it carried, stashes the lane's uncommitted work as `<N>: uncommitted work at lane restart`, dispatches a fresh `fullrun #<N>` that never resumes the stopped session, then comments the `stash:pop` line on the Issue. A `restart` event follows its `child-launch`.
+- It is not a recovery: with no GitHub call between them, the stop and the dispatch fall inside `lane:await`'s 15 s re-confirm window, so `run:merge` never classifies the child — nothing is parked, and neither the failure count nor `CONSECUTIVE_OUTAGE_LIMIT` moves.
+
+**Output / exit codes:** the fresh child's pid on stdout, exit 0. No lane, no running child or a refused marker: child untouched, exit 1. Work that cannot be stashed, or a failed dispatch, leaves the stopped child for `run:merge` and exits 1.
 
 ### `josh rule:value`
 

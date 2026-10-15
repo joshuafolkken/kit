@@ -71,6 +71,16 @@ vi.mock('#scripts/review/review-attest', () => ({
 	},
 }))
 
+// The issue watch polls GitHub, so it is mocked for the same reason (joshuafolkken/kit#3773).
+const WATCH_REFUSAL = vi.hoisted(() => 'issue-watch-refusal-sentinel')
+const watch_refusal_mock = vi.hoisted(() =>
+	vi.fn(async (): Promise<string | undefined> => undefined),
+)
+
+vi.mock('#scripts/issue/issue-watch-gate', () => ({
+	issue_watch_gate: { review_refusal_here: watch_refusal_mock },
+}))
+
 // **Mocked for the same reason `review_attest` above is** (joshuafolkken/kit#2343): `main` runs at
 // import time, so the real check would read the observation ledger of whatever run is executing this
 // suite. Its default is `not-required`, so importing the module does not throw before a case runs.
@@ -243,6 +253,14 @@ describe('a merge is refused unless the review attested its checkout', () => {
 		attest_check_mock.mockResolvedValueOnce({ status })
 
 		await expect(git_followup_workflow.assert_review_attested(true)).resolves.toBeUndefined()
+	})
+
+	// joshuafolkken/kit#3773: an attested review of the earlier specification is still refused.
+	it('throws on an issue update the review did not read', async () => {
+		attest_check_mock.mockResolvedValueOnce({ status: OK })
+		watch_refusal_mock.mockResolvedValueOnce(WATCH_REFUSAL)
+
+		await expect(git_followup_workflow.assert_review_attested(true)).rejects.toThrow(WATCH_REFUSAL)
 	})
 
 	// A `--no-merge` run has not reached the gate this record guards, and nothing merges there. The

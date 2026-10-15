@@ -8,6 +8,7 @@ import {
 	FAIL_EXIT_CODE,
 	type BufferedProcessResult,
 } from '#scripts/lib/buffered-process'
+import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
 
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
@@ -67,6 +68,22 @@ async function run_checked_eslint(
 	return await run_eslint(eslint)
 }
 
+function is_silent_pass(result: BufferedProcessResult): boolean {
+	return result.output === '' && !buffered_process.is_process_failed(result)
+}
+
+// Only beside a skipped sibling (`project_checks.ran_notice`): a `lint` that skipped nothing keeps the
+// output it always had.
+function with_ran_notice(
+	check: string,
+	result: BufferedProcessResult,
+	sibling: BufferedProcessResult,
+): BufferedProcessResult {
+	if (!sibling.output.includes(SKIP_MARKER) || !is_silent_pass(result)) return result
+
+	return { ...result, output: `${project_checks.ran_notice(check)}\n` }
+}
+
 function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcessResult): number {
 	return buffered_process.is_process_failed(prettier) || buffered_process.is_process_failed(eslint)
 		? FAIL_EXIT_CODE
@@ -94,8 +111,8 @@ async function run_lint_checks(
 		run_checked_eslint(directory, { args: eslint_args, recheck }),
 	])
 
-	write_output(prettier)
-	write_output(eslint)
+	write_output(with_ran_notice('prettier', prettier, eslint))
+	write_output(with_ran_notice('eslint', eslint, prettier))
 
 	return lint_exit_code(prettier, eslint)
 }

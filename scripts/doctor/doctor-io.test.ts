@@ -41,6 +41,8 @@ const COMMENT_ONLY_WORKFLOW =
 const NESTED_REPOSITORY = `${TOP_LEVEL}/vendor/nested`
 const PERMISSION_DENIED = 'EACCES: permission denied'
 const GIT_OK_EXIT = 0
+const PNPM_PATH_OUTPUT = '/usr/local/bin/pnpm\n'
+const PNPM_STARTED_AND_FAILED = 'bin/pnpm.cjs not found'
 const GIT_NOT_A_REPOSITORY_EXIT = 128
 
 // Every field is explicit: a default would fire on an explicitly-passed `undefined`, so the
@@ -69,8 +71,71 @@ function git_failed(stderr: string): ExecaSyncResult {
 	return fake_result({ stdout: '', exitCode: GIT_NOT_A_REPOSITORY_EXIT, stderr })
 }
 
+// A child that started and exited 1, as opposed to one that could not be spawned.
+function command_failed(stdout: string, stderr: string): ExecaSyncResult {
+	return fake_result({ stdout, exitCode: 1, stderr })
+}
+
+function spawn_not_found(): ExecaSyncResult {
+	const not_found = { stdout: undefined, exitCode: undefined, stderr: '', code: 'ENOENT' }
+
+	return not_found as unknown as ExecaSyncResult
+}
+
 beforeEach(() => {
 	vi.resetAllMocks()
+})
+
+// joshuafolkken/kit#3712: every check `josh` runs is a `pnpm` child, so `doctor` asks whether this
+// process can start one — before a gate finds out by failing every check.
+describe('probe_pnpm', () => {
+	it('reports the version of the pnpm that answered', () => {
+		mocked_execa_sync.mockReturnValue(git_ran('12.11.2\n'))
+
+		expect(doctor_io.probe_pnpm()).toStrictEqual({ state: 'found', version: '12.11.2' })
+	})
+
+	it('reports pnpm as missing when the spawn found no executable', () => {
+		mocked_execa_sync.mockReturnValue(spawn_not_found())
+
+		expect(doctor_io.probe_pnpm()).toStrictEqual({ state: 'missing' })
+	})
+
+	// Windows hands an unresolved `pnpm` to `cmd.exe`, which starts and exits 1 — there is no
+	// `ENOENT` to read, so only the PATH lookup can say pnpm is not there.
+	it('reports pnpm as missing when it failed and the PATH lookup finds none', () => {
+		mocked_execa_sync
+			.mockReturnValueOnce(command_failed('', "'pnpm' is not recognized"))
+			.mockReturnValueOnce(command_failed('', 'INFO: Could not find files'))
+
+		expect(doctor_io.probe_pnpm()).toStrictEqual({ state: 'missing' })
+	})
+
+	// A pnpm that started and failed is on PATH; calling it missing would point at the wrong fix.
+	it('reports a pnpm that started and failed as unknown, not as missing', () => {
+		mocked_execa_sync
+			.mockReturnValueOnce(command_failed('', PNPM_STARTED_AND_FAILED))
+			.mockReturnValueOnce(git_ran(PNPM_PATH_OUTPUT))
+
+		expect(doctor_io.probe_pnpm()).toStrictEqual({ state: 'unknown' })
+	})
+
+	it('does not read the stdout of a pnpm that exited non-zero as a version', () => {
+		mocked_execa_sync
+			.mockReturnValueOnce(command_failed('ERR_PNPM_BAD_ENV\n', ''))
+			.mockReturnValueOnce(git_ran(PNPM_PATH_OUTPUT))
+
+		expect(doctor_io.probe_pnpm()).toStrictEqual({ state: 'unknown' })
+	})
+
+	// A lookup command that is itself absent says nothing about pnpm.
+	it('reports unknown when the PATH lookup could not run', () => {
+		mocked_execa_sync
+			.mockReturnValueOnce(command_failed('', PNPM_STARTED_AND_FAILED))
+			.mockReturnValueOnce(spawn_not_found())
+
+		expect(doctor_io.probe_pnpm()).toStrictEqual({ state: 'unknown' })
+	})
 })
 
 describe('resolve_git_top_level', () => {

@@ -1,3 +1,4 @@
+import { issue_watch_diff } from '#scripts/issue/issue-watch-diff'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { git_gh_issue_write } from './git-gh-issue-write'
@@ -97,7 +98,10 @@ describe('issue_comment', () => {
 
 		expect(url).toBe(ISSUE_URL)
 		expect(first_request().path).toBe(COMMENTS_PATH)
-		expect(parsed_body(first_request())).toStrictEqual({ body: MULTILINE_BODY })
+		// joshuafolkken/kit#3773: the marker tells the issue watch a run's comment from a person's.
+		expect(parsed_body(first_request())).toStrictEqual({
+			body: `${MULTILINE_BODY}\n\n${issue_watch_diff.RUN_MARKER}`,
+		})
 	})
 
 	// `gh api` promotes a request carrying `--input` to POST, so a creation names no method — and

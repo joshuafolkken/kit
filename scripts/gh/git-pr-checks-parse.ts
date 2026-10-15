@@ -31,10 +31,14 @@ const KEY_STATUS = 'status'
 const KEY_CONCLUSION = 'conclusion'
 const KEY_NAME = 'name'
 const KEY_CONTEXT = 'context'
+const KEY_DESCRIPTION = 'description'
 
 interface RollupCheck {
 	name: string
 	status: string
+	// A status context's own words — CodeRabbit says `Review rate limited` under a `success` state
+	// (joshuafolkken/kit#3770). Absent where the check carries none.
+	description?: string
 }
 
 interface PrStateSnapshot {
@@ -95,7 +99,10 @@ function parse_rollup_item(item: RollupItemData): RollupCheck | undefined {
 	const name = read_string(item[KEY_NAME]) ?? read_string(item[KEY_CONTEXT])
 	if (name === undefined) return undefined
 
-	return { name, status: parse_rollup_status(item) }
+	const check = { name, status: parse_rollup_status(item) }
+	const description = read_string(item[KEY_DESCRIPTION])
+
+	return description === undefined ? check : { ...check, description }
 }
 
 function parse_rollup_checks(raw_json: string): Array<RollupCheck> {

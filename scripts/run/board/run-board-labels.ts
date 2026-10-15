@@ -1,6 +1,7 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import cli_spinners from 'cli-spinners'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
@@ -67,6 +68,12 @@ const WORDS = {
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
+	// What the run is doing now, where no stage of its own says it.
+	watching: 'watching',
+	pool_empty: 'pool empty',
+	on_person: 'waiting on a person',
+	operation: 'operation',
+	ended: 'ended',
 	// The session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
 	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
@@ -175,6 +182,24 @@ const HEADER_ICONS = {
 	heartbeat: '💓',
 } as const
 
+// The kind of what the header's third line says, under the `⚡` (joshuafolkken/kit#3767): a call a
+// session made, the run watching its pool, the run ended, or each of the run's own stages, keyed by the
+// stage's words before any issue. A child's event draws its row's phase icon instead. The run ended
+// draws the header's own end mark — 🏁 is already a done row's state icon.
+const NOW_ICONS = { operation: '🔧', watching: '🔭', ended: HEADER_ICONS.ended } as const
+const { STAGE, LANE_STAGE } = run_event_setup
+const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
+	[STAGE.STARTING]: '🚀',
+	[STAGE.PLANNING]: '📝',
+	[STAGE.HANDING_OFF]: '🤝',
+	[STAGE.JUDGING]: '🤔',
+	[STAGE.SESSION]: '💭',
+	[STAGE.NO_CHILD]: '🚫',
+	[LANE_STAGE.OPENING]: '🚪',
+	[LANE_STAGE.INSTALLING]: '📥',
+	[LANE_STAGE.DISPATCHING]: '📤',
+}
+
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red
 // in the system's dark-mode values. A palette's `green` draws blue and its `red` orange in a VSCode
 // terminal, so the normal gauge would read as the cyan plan bar and the busy one as yellow.
@@ -214,15 +239,30 @@ function elapsed_of(ms: number): string {
 	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
 }
 
-// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
-// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
-function span_of(ms: number): string {
+// A length as its hours, and its minutes and seconds within the hour; a negative span reads as zero.
+function span_fields(ms: number): [hours: number, minutes: number, seconds: number] {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
 	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
 	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-	const tail = [minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
+
+	return [hours, minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
+}
+
+// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
+// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
+function span_of(ms: number): string {
+	const [hours, ...tail] = span_fields(ms)
 
 	return [String(hours), ...tail.map((value) => two_digits(value))].join(':')
+}
+
+// How long the run has stood at its stage, as `M:SS` with the minutes not padded, and as `span_of`'s
+// `H:MM:SS` from an hour on. It stands beside the stage's words, never in the header's time column, so
+// its one separator is not read there as a time of day.
+function stage_span_of(ms: number): string {
+	const [hours, minutes, seconds] = span_fields(ms)
+
+	return hours === 0 ? `${String(minutes)}:${two_digits(seconds)}` : span_of(ms)
 }
 
 function is_shade(color: Paint): color is Shade {
@@ -281,9 +321,11 @@ const run_board_labels = {
 	KIND_WORDS,
 	NOTES_ICON,
 	NOTE_ICONS,
+	NOW_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	SPINNER_INTERVAL_MS,
+	STAGE_ICONS,
 	STATE_ICONS,
 	WAITS_ICON,
 	WORDS,
@@ -294,6 +336,7 @@ const run_board_labels = {
 	painted,
 	span_of,
 	spinner_of,
+	stage_span_of,
 }
 
 export { run_board_labels }

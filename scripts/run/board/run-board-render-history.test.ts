@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
+import type { LaneEvent } from './run-board-lane-event'
 import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemState } from './run-board-status'
 import type { LaneUsages } from './run-board-usage'
 
-// joshuafolkken/kit#3526: a running row's track as a stage history — led by its newest icon, drawn after
-// the lane's CPU and memory so those stay in one column whatever the track's length.
+// joshuafolkken/kit#3526: a running row led by the phase it reached last, the lane's CPU and memory in
+// one column. joshuafolkken/kit#3769: no phase track after them — a running row ends on how long it has
+// stood at its phase and its newest activity, a settled row on its finish time.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const { minute_of } = run_board_labels
 const GB = 1024 * 1024 * 1024
 const CPU = '⚡'
+const TITLE_WIDTH = 48
 
 const PLANNED: ReadonlyArray<Phase> = ['investigate', 'plan']
 const RETRIED: ReadonlyArray<Phase> = [
@@ -27,22 +30,15 @@ const RETRIED: ReadonlyArray<Phase> = [
 	'gate',
 ]
 const FAILED: ReadonlyArray<Phase> = ['investigate', 'plan', 'implement', 'ship', 'failed']
-const SHIPPED: ReadonlyArray<Phase> = [
-	'investigate',
-	'plan',
-	'implement',
-	'ship',
-	'review',
-	'gate',
-	'sync',
-	'commit',
-	'round_two',
-	'followup',
-	'report',
-]
+const SHIPPED: ReadonlyArray<Phase> = [...RETRIED.slice(0, 4), 'review', 'gate', 'sync', 'report']
 
 function running(number: number, track: ReadonlyArray<Phase>): BoardRow {
-	const status = { state: 'running' as const, started_ms: NOW - 5 * MINUTE, track }
+	const status = {
+		state: 'running' as const,
+		started_ms: NOW - 5 * MINUTE,
+		track,
+		phase_ms: NOW - 2 * MINUTE,
+	}
 
 	return {
 		number,
@@ -60,31 +56,39 @@ const usages: LaneUsages = new Map(
 	ROWS.map((row) => [row.number, { cpu_percent: 8, memory_bytes: GB / 2, memory_percent: 3 }]),
 )
 
+const GATE_EVENT: LaneEvent = { phase: 'gate', words: 'ship gate', at_ms: NOW - MINUTE }
+
 function board_lines(): Array<string> {
-	return lines_of(header({ layout: { ...EMPTY_LAYOUT, active: ROWS }, usages }))
+	const activity = {
+		last_event_ms: NOW - MINUTE,
+		is_stopped: false,
+		lane_events: new Map([[2, GATE_EVENT]]),
+	}
+
+	return lines_of(header({ layout: { ...EMPTY_LAYOUT, active: ROWS }, usages, activity }))
 }
 
 function row_line(lines: ReadonlyArray<string>, number: number): string {
 	return lines.find((line) => line.includes(`Sample ${String(number)}`)) ?? ''
 }
 
-describe('run_board_render.render stage history', () => {
-	it('leads every running row with the last icon of its track', () => {
+describe('run_board_render.render running rows', () => {
+	it('leads every running row with the last phase it reached, and draws no track after it', () => {
 		const lines = board_lines()
 
-		expect(row_line(lines, 1)).toMatch(/^ {2}📝 1 .*🔍📝$/u)
-		expect(row_line(lines, 2)).toMatch(/^ {2}🚦 2 .*🔍📝🔨🚢💥🔨🚢👀🚦$/u)
-		expect(row_line(lines, 3)).toMatch(/^ {2}💥 3 .*🔍📝🔨🚢💥$/u)
-		expect(row_line(lines, 4)).toMatch(/^ {2}📣 4 .*🔍📝🔨🚢👀🚦🔀📦🔂⚓📣$/u)
+		expect(row_line(lines, 1)).toMatch(/^ {2}📝 1 .* 02:00$/u)
+		expect(row_line(lines, 3)).toMatch(/^ {2}💥 3 .* 02:00$/u)
+		expect(row_line(lines, 4)).toMatch(/^ {2}📣 4 .* 02:00$/u)
+		expect(lines.join('\n')).not.toContain('🔍📝')
 	})
 
-	it('draws no dim line ahead of any track', () => {
+	it('draws no dim line on any running row', () => {
 		const rows = ROWS.map((row) => row_line(board_lines(), row.number))
 
 		expect(rows.every((line) => !line.includes('─'))).toBe(true)
 	})
 
-	it('keeps the CPU and memory in one column whatever each track’s length', () => {
+	it('keeps the CPU and memory in one column on every running row', () => {
 		const lines = board_lines()
 		const columns = ROWS.map((row) => row_line(lines, row.number).indexOf(CPU))
 
@@ -92,11 +96,11 @@ describe('run_board_render.render stage history', () => {
 		expect(new Set(columns).size).toBe(1)
 	})
 
-	it('draws a row as the reference does: lead, number, title, time, usage, track', () => {
-		const title = 'Sample 2'.padEnd(48)
+	it('draws a row as the reference does: lead, number, title, time, usage, phase time, activity', () => {
+		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2    ${title}  05:00  ⚡  8% 🧠0.5G  🔍📝🔨🚢💥🔨🚢👀🚦`,
+			`  🚦 2    ${title}  05:00  ⚡  8% 🧠0.5G  02:00  🚦 01:00`,
 		)
 	})
 })
@@ -109,27 +113,25 @@ function settled_line(state: ItemState, track: ReadonlyArray<Phase>): string {
 	return row_line(lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [row] }, usages })), 1)
 }
 
-// joshuafolkken/kit#3535: a settled row keeps its track, ended on its own state icon rather than a fixed
-// ✅ — it runs no process, so it draws no CPU or memory; a finished one draws its finish time in their
-// place (joshuafolkken/kit#3554).
-describe('run_board_render.render settled history', () => {
-	const title = 'Sample 1'.padEnd(48)
+// joshuafolkken/kit#3535: a settled row leads with its own state icon — it runs no process, so it draws
+// no CPU or memory; a finished one draws its finish time in their place (joshuafolkken/kit#3554), and
+// nothing after it (joshuafolkken/kit#3769).
+describe('run_board_render.render settled rows', () => {
+	const title = 'Sample 1'.padEnd(TITLE_WIDTH)
 
 	it.each<[ItemState, string]>([
 		['merged', '✅'],
 		['done', '🏁'],
-	])('draws a %s row’s finish time, then its track ended on its state icon', (state, icon) => {
+	])('ends a %s row on its finish time', (state, icon) => {
 		const finish = `🔚 ${minute_of(NOW)}`
 
-		expect(settled_line(state, FAILED)).toBe(
-			`  ${icon} 1    ${title}  05:00  ${finish}  🔍📝🔨🚢💥${icon}`,
-		)
+		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  05:00  ${finish}`)
 	})
 
 	it.each<[ItemState, string]>([
 		['stopped', '🛑'],
 		['parked', '💤'],
-	])('draws a %s row’s track ended on its state icon right after its time', (state, icon) => {
-		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  05:00  🔍📝🔨🚢💥${icon}`)
+	])('ends a %s row on its time', (state, icon) => {
+		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  05:00`)
 	})
 })

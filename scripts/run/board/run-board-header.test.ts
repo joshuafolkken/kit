@@ -18,6 +18,10 @@ const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
 const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
 const TIME_BLANK = ' '.repeat('⏰ 0:30:00'.length + 1)
 const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
+// joshuafolkken/kit#3749: the third line — blank where the stream holds no event, else what the run is
+// doing now: its time under the second column, its icon and words under the third.
+const NOW_BLANK = ''
+const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const STALE_BEAT = '💓 0:40:00'
 const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = backlog_budget.MS_PER_MINUTE
@@ -99,6 +103,7 @@ describe('run_board_header.header_lines state', () => {
 		expect(lines_of(board)).toStrictEqual([
 			`■ backlogrun  ⏰ 1:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
 			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}    ${MACHINE_UNKNOWN}`,
+			NOW_BLANK,
 		])
 	})
 
@@ -115,6 +120,7 @@ describe('run_board_header.header_lines shape', () => {
 		expect(lines_of(header({ activity }))).toStrictEqual([
 			`⏸ backlogrun  ⏰ 0:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
 			`${NAME_BLANK}  💓 0:01:00  ${MACHINE_UNKNOWN}`,
+			NOW_BLANK,
 		])
 	})
 
@@ -125,6 +131,7 @@ describe('run_board_header.header_lines shape', () => {
 		expect(lines_of(header({ layout }))).toStrictEqual([
 			`▶ backlogrun  ⏰ 0:30:00  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
 			RUNNING_CLOCK,
+			ONE_RUNNING,
 		])
 	})
 
@@ -141,31 +148,36 @@ describe('run_board_header.header_lines shape', () => {
 			`${NAME_BLANK}  ${TIME_BLANK}  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
 		)
 	})
+})
 
-	// joshuafolkken/kit#3452
-	it('turns the spinner in place of ▶ for a running run only, every other mark standing still', () => {
-		const stopped = { last_event_ms: undefined, is_stopped: true }
+describe('run_board_header.header_lines spinner', () => {
+	// joshuafolkken/kit#3452, joshuafolkken/kit#3767: the mark stands still in every state; the spinner
+	// turns on the third line, under the `⏰`.
+	it('turns the spinner on the third line of a running run, never in place of its mark', () => {
+		const board = header({ layout: RUNNING_LAYOUT, spinner: '⠙' })
 
-		expect(title_of(header({ layout: RUNNING_LAYOUT, spinner: '⠙' }))).toMatch(/^⠙ backlogrun/u)
-		expect(title_of(header({ spinner: '⠙' }))).toMatch(/^⏸ backlogrun/u)
-		expect(title_of(header({ activity: stopped, spinner: '⠙' }))).toMatch(/^■ backlogrun/u)
+		expect(title_of(board)).toMatch(/^▶ backlogrun/u)
+		expect(lines_of(board)[2]).toBe(
+			`${NAME_BLANK}  ⠙${' '.repeat(TIME_BLANK.length - 1)}  🔄 1 running`,
+		)
 	})
 })
 
 describe('run_board_header.header_lines before the plan is read', () => {
 	// joshuafolkken/kit#3486: before the plan is read the run's own children are counted, and what only
 	// the plan knows — the total and what waits — is `-`, not a `0` that reads as nothing.
-	it('draws two lines, with - for what only the plan knows', () => {
+	it('draws its lines, with - for what only the plan knows', () => {
 		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
 
 		expect(lines_of(board)).toStrictEqual([
 			`▶ backlogrun  ⏰ 0:30:00  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
 			RUNNING_CLOCK,
+			ONE_RUNNING,
 		])
 	})
 
-	it('draws two lines with no layout at all', () => {
-		expect(lines_of(header({ layout: undefined }))).toHaveLength(2)
+	it('draws three lines with no layout at all', () => {
+		expect(lines_of(header({ layout: undefined }))).toHaveLength(3)
 	})
 })
 

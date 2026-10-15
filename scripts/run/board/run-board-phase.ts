@@ -37,6 +37,7 @@ const { STAGE } = run_ship_stage
 const LAUNCHED_PHASE: Phase = 'investigate'
 const WORD_SEPARATOR = ' '
 const STAGE_INDEX = 1
+const PHASE_INDEX = 2
 
 // `josh ship`'s stages, each its own phase; the preflight is the ship's own start.
 const SHIP_PHASES: Readonly<Partial<Record<string, Phase>>> = {
@@ -64,6 +65,11 @@ function stage_word_of(event: RunEvent): string {
 	return event.text.split(WORD_SEPARATOR)[STAGE_INDEX] ?? ''
 }
 
+// The word after the stage — whether it started, succeeded, failed or was passed over.
+function phase_word_of(event: RunEvent): string {
+	return event.text.split(WORD_SEPARATOR)[PHASE_INDEX] ?? ''
+}
+
 // A stage marks its phase when it starts; its `done`, and one a resumed ship passed over, mark none.
 function ship_phase_of(event: RunEvent): Phase | undefined {
 	if (!run_event_stream.is_stage_start(event)) return undefined
@@ -77,6 +83,16 @@ function phase_of(event: RunEvent): Phase | undefined {
 	if (event.kind === KIND.SHIP_STAGE) return ship_phase_of(event)
 
 	return KIND_PHASES[event.kind]
+}
+
+// The phase a `lane-phase` or `ship-stage` event's stage belongs to, started or not, so a line written
+// from it draws the icon its row's track does — a stage that failed is the ship's failure.
+function stage_phase_of(event: RunEvent): Phase | undefined {
+	if (event.kind === KIND.LANE_PHASE) return LANE_PHASES[stage_word_of(event)]
+
+	if (phase_word_of(event) === run_ship_stage.PHASE.FAILED) return 'failed'
+
+	return SHIP_PHASES[stage_word_of(event)]
 }
 
 // A failed ship keeps only its own start: everything after the newest `ship` folds into `failed`.
@@ -130,7 +146,16 @@ function replayed(track: ReadonlyArray<Phase>, attempt: ReadonlyArray<Phase>): A
 	return [...track.slice(0, start), ...(is_covered ? attempt : new Set([...current, ...attempt]))]
 }
 
-const run_board_phase = { LAUNCHED_PHASE, PHASES, attempt_of, history_after, phase_of, replayed }
+const run_board_phase = {
+	LAUNCHED_PHASE,
+	PHASES,
+	SHIP_PHASES,
+	attempt_of,
+	history_after,
+	phase_of,
+	replayed,
+	stage_phase_of,
+}
 
 export { run_board_phase }
 export type { Phase }
