@@ -13,6 +13,12 @@ const ADDED = 'src/added.ts'
 const CHANGELOG = 'CHANGELOG.md'
 const PROMPT = 'prompts/review.md'
 const TEST_FILE = 'scripts/thing.test.ts'
+const DOCUMENT = 'docs/maintainers/review-history.md'
+const README = 'README.md'
+const NESTED_README = 'scripts/README.md'
+const CLAUDE_SKILL = '.claude/skills/workflow-commands/SKILL.md'
+const CLAUDE_MD = 'CLAUDE.md'
+const CONFIG = 'cspell.config.yaml'
 const BEFORE = 'aaa'
 const AFTER = 'bbb'
 // What `review-tree.ts` records for a path the change lists but the working tree no longer holds.
@@ -166,33 +172,70 @@ describe('review_round2.inert_reason', () => {
 	})
 })
 
-// The line joshuafolkken/kit#1433 arrived with and this change rejects: a prompt is an instruction
-// file and a test is the verification that guards a runtime path, so a fix that touched either one
-// still gets the round. `review-level.ts` records the measurement behind it — two documentation-only
-// diffs, ten real defects each, none of them covered by a test.
-describe('review_round2.decide — a fix outside runtime code still gets the round', () => {
-	it('requires the round when a fix touched a distributed prompt', () => {
-		const decision = review_round2.decide({
-			base: BASE,
-			is_round_one_closed: true,
-			snapshot: snapshot_of(tree_of([PROMPT, BEFORE])),
-			tree: tree_of([PROMPT, AFTER]),
-		})
+function every_path_at(paths: ReadonlyArray<string>, digest: string): Record<string, string> {
+	return Object.fromEntries(paths.map((relative) => [relative, digest]))
+}
 
-		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
-		expect(decision.reason).toContain(PROMPT)
+function decide_fix(
+	paths: ReadonlyArray<string>,
+	comment_only: ReadonlyArray<string> = [],
+): ReturnType<typeof review_round2.decide> {
+	return review_round2.decide({
+		base: BASE,
+		comment_only,
+		is_round_one_closed: true,
+		snapshot: snapshot_of(every_path_at(paths, BEFORE)),
+		tree: every_path_at(paths, AFTER),
+	})
+}
+
+// joshuafolkken/kit#3826, on the decision recorded on joshuafolkken/kit#3787: a fix that leaves what
+// executes unchanged skips the round. Round 1 still reviewed the change and the fix is still made;
+// only the re-read of the fix goes.
+describe('review_round2.decide — a fix that leaves what executes unchanged', () => {
+	it.each([
+		['a distributed prompt', [PROMPT]],
+		['documentation under docs/', [DOCUMENT]],
+		['the root README', [README]],
+		['documentation and a prompt together', [DOCUMENT, README, PROMPT]],
+	])('skips the round when a fix touched only %s', (_label, paths) => {
+		const decision = decide_fix(paths)
+
+		expect(decision.verdict).toBe(review_round2.SKIPPED_VERDICT)
+		expect(decision.reason).toContain(review_round2.INERT_DELTA_REASON_PREFIX)
 	})
 
-	it('requires the round when a fix touched a test file', () => {
-		const decision = review_round2.decide({
-			base: BASE,
-			is_round_one_closed: true,
-			snapshot: snapshot_of(tree_of([TEST_FILE, BEFORE])),
-			tree: tree_of([TEST_FILE, AFTER]),
-		})
+	it('skips the round when a fix changed only the comments of a source file', () => {
+		const decision = decide_fix([SOURCE, DOCUMENT], [SOURCE])
+
+		expect(decision.verdict).toBe(review_round2.SKIPPED_VERDICT)
+		expect(decision.delta).toStrictEqual([DOCUMENT, SOURCE])
+	})
+})
+
+// What the decision on joshuafolkken/kit#3787 left outside: an agent's instructions, the verification
+// itself, configuration and code. One such path among skippable ones decides the whole answer.
+describe('review_round2.decide — a fix outside that range still gets the round', () => {
+	it.each([
+		['`.claude/**`', CLAUDE_SKILL],
+		['`CLAUDE.md`', CLAUDE_MD],
+		['a test file', TEST_FILE],
+		['configuration', CONFIG],
+		['a code line', SOURCE],
+		['a Markdown file outside docs/', NESTED_README],
+	])('requires the round when a fix touched %s beside documentation', (_label, live) => {
+		const decision = decide_fix([DOCUMENT, PROMPT, live])
 
 		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
-		expect(decision.reason).toContain(TEST_FILE)
+		expect(decision.reason).toContain(live)
+	})
+
+	// Only the paths the code record vouches for are comment-only; a sibling's code change still counts.
+	it('requires the round when one source file changed code beside a comment-only one', () => {
+		const decision = decide_fix([SOURCE, ADDED], [SOURCE])
+
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toContain(ADDED)
 	})
 
 	// One live path among inert ones decides the whole answer, the way one non-inert path decides the

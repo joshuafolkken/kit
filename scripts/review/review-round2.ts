@@ -9,14 +9,14 @@ import { review_level } from './review-level'
 //
 // **The two arms are the two states in which round 2's reason does not arise.** Round 2 exists
 // because round 1's *fix code* is unreviewed, and that is structural. Arm A applies where there is no fix code — the findings closed without an edit — so
-// the premise is absent rather than overridden. Arm B applies where the fix code neither executes,
-// nor instructs, nor ships, which is `review-level.ts`'s inert set: the same three ways a defect in
-// this repository escapes, read here for the fix delta instead of the whole change.
+// the premise is absent rather than overridden. Arm B applies where the fix leaves what executes
+// unchanged: `review-level.ts`'s inert set, documentation under `docs/` and the root `README.md`,
+// `prompts/`, and source files whose only change is in comments (`review-code-tree.ts`).
 //
-// **The wider line — "the fix delta touches no runtime code path" — is not adopted**: as
-// `review-level.ts` records, documentation-only diffs carry real defects no test covers. A prompt
-// fix and a test fix are exactly where the review is the only detector, so exempting them would
-// remove the round in the case it earns its keep.
+// **Arm B is wider than the review level's inert set, on purpose** (joshuafolkken/kit#3787). Round 1
+// still reviews a documentation or prompt change in full, and the fix to its findings is still made;
+// what goes unread is only that fix. `.claude/**`, `CLAUDE.md`, tests and configuration stay outside:
+// a test fix can weaken the verification it belongs to, and nothing reads that but the review.
 
 type RoundTwoVerdict = 'required' | 'skip'
 
@@ -33,7 +33,11 @@ const NO_SNAPSHOT_REASON =
 const EMPTY_DELTA_REASON_PREFIX =
 	'the fix delta is empty: round 1 wrote no fix code, so there is no unreviewed fix for a verification pass to read'
 const INERT_DELTA_REASON_PREFIX =
-	'every path round 1 fixed is inert — it neither executes, nor instructs, nor ships'
+	'every path round 1 fixed leaves what executes unchanged — inert, documentation, a prompt, or a comment-only edit'
+const README_PATH = 'README.md'
+const DOCUMENTATION_PREFIX = 'docs/'
+const MARKDOWN_EXTENSION = '.md'
+const PROMPTS_PREFIX = 'prompts/'
 const BASE_MOVED_REASON =
 	'the change base moved since round 1 was recorded, so the two file maps do not cover the same set of paths and their difference is not the fix delta — the round runs rather than reading that difference as one'
 
@@ -51,6 +55,9 @@ interface RoundTwoInput {
 	is_round_one_closed: boolean
 	snapshot: FileMapStamp | undefined
 	tree: Record<string, string>
+	// The paths whose code round 1's fixes left as it was (`review_code_tree.comment_only`). Absent is
+	// none, which is what a run without a code record pays.
+	comment_only?: ReadonlyArray<string>
 }
 
 interface RoundTwoDecision {
@@ -86,13 +93,26 @@ function live_reason(deciding: ReadonlyArray<string>): string {
 	return `round 1's fixes touched paths that execute, instruct or ship: ${path_decision.format_path_list(deciding)}`
 }
 
+function is_documentation(relative: string): boolean {
+	if (relative === README_PATH || relative.startsWith(PROMPTS_PREFIX)) return true
+
+	return relative.startsWith(DOCUMENTATION_PREFIX) && relative.endsWith(MARKDOWN_EXTENSION)
+}
+
+function is_unexecuted(relative: string, comment_only: ReadonlyArray<string>): boolean {
+	if (review_level.is_inert(relative) || is_documentation(relative)) return true
+
+	return comment_only.includes(relative)
+}
+
 function verdict_for_delta(
 	delta: ReadonlyArray<string>,
 	taken_at: string,
+	comment_only: ReadonlyArray<string> = [],
 ): { verdict: RoundTwoVerdict; reason: string } {
 	if (delta.length === 0) return { verdict: SKIPPED_VERDICT, reason: empty_reason(taken_at) }
 
-	const deciding = delta.filter((relative) => !review_level.is_inert(relative))
+	const deciding = delta.filter((relative) => !is_unexecuted(relative, comment_only))
 
 	if (deciding.length === 0) return { verdict: SKIPPED_VERDICT, reason: inert_reason(delta) }
 
@@ -110,7 +130,7 @@ function decide(input: RoundTwoInput): RoundTwoDecision {
 
 	const delta = file_map_stamp.changed_since(input.snapshot, input.tree)
 
-	return { ...verdict_for_delta(delta, input.snapshot.taken_at), delta }
+	return { ...verdict_for_delta(delta, input.snapshot.taken_at, input.comment_only), delta }
 }
 
 const review_round2 = {

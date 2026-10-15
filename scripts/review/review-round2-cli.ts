@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
 import { path_decision } from '#scripts/josh/path-decision'
+import { review_code_tree } from './review-code-tree'
 import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -44,6 +45,14 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	}
 }
 
+// Only the paths the code record covers are re-read, so a run without one parses nothing.
+async function read_comment_only(base: string | undefined): Promise<ReadonlyArray<string>> {
+	const snapshot = review_stamps.round_one_code_stamp.read()
+	const tree = await review_code_tree.read(Object.keys(snapshot?.files ?? {}))
+
+	return review_code_tree.comment_only(snapshot, tree, base)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const options = parse_options(argv)
 
@@ -53,11 +62,13 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
+	// The commit the tree below is a diff against, so the snapshot can be refused when it was taken
+	// against a different one — and the resolved commit rather than `git_command.change_base`, whose
+	// fallback is a ref name that moves and would compare equal to itself.
+	const base = await change_base.resolved()
 	const { verdict, reason } = review_round2.decide({
-		// The commit the tree below is a diff against, so the snapshot can be refused when it was taken
-		// against a different one — and the resolved commit rather than `git_command.change_base`, whose
-		// fallback is a ref name that moves and would compare equal to itself.
-		base: await change_base.resolved(),
+		base,
+		comment_only: await read_comment_only(base),
 		is_round_one_closed: options.is_round_one_closed,
 		snapshot: review_stamps.round_one_stamp.read(),
 		// No paths argument: `read_changed_tree` reads them itself, from the one definition of
@@ -76,7 +87,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const review_round2_cli = { CLOSED_FLAG, parse_options, run }
+const review_round2_cli = { CLOSED_FLAG, parse_options, read_comment_only, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

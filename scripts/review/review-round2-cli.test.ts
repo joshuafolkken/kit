@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { review_code_tree } from './review-code-tree'
 import { review_round2_cli } from './review-round2-cli'
+import { review_stamps } from './review-stamps'
 
 // joshuafolkken/kit#1433. The parser is where a `skip` could be bought by accident, so it is the
 // half with a suite of its own: the assertion flag has to be typed exactly, and anything else is a
@@ -38,6 +40,39 @@ describe('review_round2_cli.parse_options', () => {
 
 	it('refuses a bare argument', () => {
 		expect(review_round2_cli.parse_options(['2'])).toBeUndefined()
+	})
+})
+
+const SOURCE = 'scripts/review/review-round2.ts'
+const BASE = '0123456789abcdef0123456789abcdef01234567'
+
+function plant_record(digest: string): void {
+	vi.spyOn(review_stamps.round_one_code_stamp, 'read').mockReturnValue({
+		taken_at: '',
+		files: { [SOURCE]: digest },
+		base: BASE,
+	})
+}
+
+// joshuafolkken/kit#3826: the code record is re-read against this checkout's own files, so a file
+// whose comment-free digest still matches is named comment-only and one whose digest moved is not.
+describe('review_round2_cli.read_comment_only', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('names a file whose code is as the record took it', async () => {
+		const current = await review_code_tree.read([SOURCE])
+
+		plant_record(current[SOURCE] ?? '')
+
+		expect(await review_round2_cli.read_comment_only(BASE)).toStrictEqual([SOURCE])
+	})
+
+	it('names nothing when the code moved since the record', async () => {
+		plant_record('an-older-digest')
+
+		expect(await review_round2_cli.read_comment_only(BASE)).toStrictEqual([])
 	})
 })
 
