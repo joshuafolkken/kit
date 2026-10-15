@@ -10,8 +10,11 @@ import { document_scan } from './document-scan'
 // guide through the tutorial it names as the one next step. Their link on to the tutorial is pinned
 // by the tutorial's own suite.
 const PREREQUISITES = 'docs/setup/prerequisites.md'
+// joshuafolkken/kit#3851: the Quick start offers A (with GitHub) or B (without) and leaves what
+// differs between them to one comparison page.
+const SETUP_CHOICE = 'docs/setup/choose.md'
 const PROFILE_GUIDES: ReadonlyArray<string> = ['docs/setup/basic.md', 'docs/setup/full.md']
-const SETUP_PAGES: ReadonlyArray<string> = [...PROFILE_GUIDES, PREREQUISITES]
+const SETUP_PAGES: ReadonlyArray<string> = [...PROFILE_GUIDES, PREREQUISITES, SETUP_CHOICE]
 const TUTORIAL = 'docs/tutorial.md'
 const README = 'README.md'
 const QUICK_START_HEADING = '## Quick start'
@@ -67,7 +70,7 @@ describe('the setup guides', () => {
 		expect(SETUP_PAGES.filter((path) => !scanned.has(path))).toStrictEqual([])
 	})
 
-	it.each([PREREQUISITES, TUTORIAL])('the README Quick start links to %s', (path) => {
+	it.each([PREREQUISITES, TUTORIAL, SETUP_CHOICE])('the README Quick start links to %s', (path) => {
 		expect(quick_start_links()).toContain(path)
 	})
 
