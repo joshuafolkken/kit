@@ -1,6 +1,9 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ending } from '#scripts/run/run-ending'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 
 // Why `run:merge` parks a child whose detached ship has already ended (joshuafolkken/kit#3808).
@@ -56,6 +59,61 @@ function cause(child: string, directory: string = process.cwd()): string | undef
 	return cause_of(run_ship_detach.read_result(repository, child), events, child)
 }
 
-const run_merge_ship = { cause, cause_of }
+// Whether the ended ship was never answered: a session relaunched to fix a stop writes to the
+// transcript after it, so a transcript last written before the newest stop means no fix-up ran — its
+// broker or relaunch could not start. A ship with no stop at all ended abnormally only when its supervisor
+// died before reaching a stage.
+function is_stop_unanswered(
+	ending: ShipEnding,
+	attempt: Events,
+	written_at: number | undefined,
+): boolean {
+	const stop = attempt.findLast((event) => event.kind === run_event_stream.EVENT_KIND.SHIP_STOP)
+
+	if (stop === undefined) return ending?.result === 'abnormal'
+
+	return written_at !== undefined && written_at < Date.parse(stop.at)
+}
+
+// Whether the child's ship ended through an interruption rather than its work, so the child is
+// re-dispatched instead of parked.
+function interrupted_of(
+	ending: ShipEnding,
+	events: Events,
+	child: string,
+	written_at: number | undefined,
+): boolean {
+	if (ending === undefined || !ENDED_RESULTS.has(ending.result)) return false
+
+	const attempt = since_ship_launch(events, child)
+
+	return attempt !== undefined && is_stop_unanswered(ending, attempt, written_at)
+}
+
+function is_interrupted(
+	child: string,
+	written_at: number | undefined,
+	directory: string = process.cwd(),
+): boolean {
+	const repository = git_common_directory.repository(directory)
+	if (repository === undefined) return false
+
+	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
+
+	return interrupted_of(run_ship_detach.read_result(repository, child), events, child, written_at)
+}
+
+// Whether the child's ship stopped and the relaunch meant to fix it never ran, read against its
+// transcript at `output`. An OpenAI lane is never relaunched — its parent books every stop as an ended
+// child — so only another lane's reads as one.
+async function is_unanswered(child: string, output: string | undefined): Promise<boolean> {
+	if (output === undefined || !is_interrupted(child, run_ending.written_at(output))) return false
+
+	const lane = await lane_registry.find_open_lane(child)
+
+	return lane === undefined || !lane_relaunch.is_openai_lane(lane)
+}
+
+const run_merge_ship = { cause, cause_of, interrupted_of, is_unanswered }
 
 export { run_merge_ship }

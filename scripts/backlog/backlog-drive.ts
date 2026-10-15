@@ -20,6 +20,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
+import { backlog_drive_seats } from './backlog-drive-seats'
 
 const { MERGE_TOKEN } = run_merge_token
 const RUN_VERDICT = 'run'
@@ -124,6 +125,9 @@ interface DrivePorts {
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
 	free_lanes: () => Promise<number>
+	// Whether the issue already holds a kept lane (one a child was dispatched into) — it is reused, so it
+	// takes no free seat.
+	has_lane: (issue: string) => Promise<boolean>
 	// How many open issues lacking `auto-ok` still owe a judgement — `auto_ok_judge_read.owed` in
 	// production, `0` when the read failed.
 	judgement_owed: () => Promise<number>
@@ -265,10 +269,10 @@ async function refused(
 	return ended('launch', state, undefined, issue)
 }
 
-// **No more launches than free lanes**. `backlog:offer` lists every ready issue
-// without reading the lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran
-// out of seats. The free count is read once, before the first launch, because every launch here opens
-// a lane the count would otherwise have to be told about.
+// **No more new lanes than free lanes**. `backlog:offer` lists every ready issue without reading the
+// lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran out of seats. An issue
+// that already holds a kept lane reuses it and takes no seat (`backlog-drive-seats.ts`); the rest launch
+// up to the free count, read once before the first launch.
 //
 // **Only a launch is activity**: a pass that started nothing — every lane taken
 // — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.
@@ -284,9 +288,10 @@ async function launch_all(
 	ports: DrivePorts,
 ): Promise<PassResult> {
 	const in_flight = [...state.in_flight]
-	const free = await ports.free_lanes()
 
-	for (const issue of issues.slice(0, free)) {
+	const launching = await backlog_drive_seats.seated(issues, ports)
+
+	for (const issue of launching) {
 		// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
 		const outcome = await ports.launch(issue)
 

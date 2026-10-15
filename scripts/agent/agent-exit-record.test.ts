@@ -57,3 +57,39 @@ describe('a transcript the exit record cannot be read from', () => {
 		expect(agent_exit_record.read_exit_record(transcript)).toMatchObject({ is_error: false })
 	})
 })
+
+describe('whether the session was killed inside a turn', () => {
+	it('reads a session that a background task woke after its result, then lost, as mid-turn', () => {
+		const transcript = lines(
+			{ type: 'result', is_error: false, subtype: 'success' },
+			{ type: 'system', subtype: 'task_notification' },
+			{ type: 'user', message: {} },
+		)
+
+		expect(agent_exit_record.is_mid_turn(transcript)).toBe(true)
+	})
+
+	it('reads a session that never finished its first turn as mid-turn', () => {
+		expect(agent_exit_record.is_mid_turn(lines({ type: 'system', subtype: 'init' }))).toBe(true)
+	})
+
+	it('does not read a session whose last event is its result as mid-turn', () => {
+		const transcript = [
+			JSON.stringify({ type: 'assistant', message: {} }),
+			JSON.stringify({ type: 'result', is_error: false }),
+			'trailing stderr text',
+		].join('\n')
+
+		expect(agent_exit_record.is_mid_turn(transcript)).toBe(false)
+	})
+
+	it('does not read a Codex transcript, which never writes a result, as mid-turn', () => {
+		const transcript = lines({ type: 'thread.started' }, { type: 'turn.failed', error: {} })
+
+		expect(agent_exit_record.is_mid_turn(transcript)).toBe(false)
+	})
+
+	it('does not read an empty transcript as mid-turn', () => {
+		expect(agent_exit_record.is_mid_turn('')).toBe(false)
+	})
+})
