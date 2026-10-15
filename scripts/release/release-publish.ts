@@ -5,6 +5,7 @@ import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
+import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
 import { release_progress } from './release-progress'
 import { release_tag } from './release-tag'
@@ -121,6 +122,14 @@ async function commit_release(plan: ReleasePlan): Promise<string> {
 	return pr_url
 }
 
+// The release Issue is closed only once the distribution answered success — a failed watch leaves it
+// open, still naming the work as unreleased (joshuafolkken/kit#3825).
+async function close_when_published(version: string, exit_code: number): Promise<number> {
+	if (exit_code === SUCCESS_EXIT_CODE) await release_issue_close.close_published(version)
+
+	return exit_code
+}
+
 // No tag means nothing downstream ran, so the npm and GitHub Release watches are not started.
 async function merge_and_tag(
 	plan: ReleasePlan,
@@ -136,7 +145,9 @@ async function merge_and_tag(
 	console.info(release_tag.format_result(plan.next_version, is_tagged))
 	if (!is_tagged) return FAILURE_EXIT_CODE
 
-	return await release_progress.wait_for_distribution(plan.next_version)
+	const exit_code = await release_progress.wait_for_distribution(plan.next_version)
+
+	return await close_when_published(plan.next_version, exit_code)
 }
 
 // The whole release happens inside a work tree cut for it, so the root checkout is never touched: the

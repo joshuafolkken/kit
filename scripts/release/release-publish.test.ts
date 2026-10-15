@@ -4,6 +4,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
 import { release_progress } from './release-progress'
 import { release_publish } from './release-publish'
@@ -15,6 +16,8 @@ vi.mock('./release-worktree', () => ({
 }))
 
 vi.mock('#scripts/version/bump-version', () => ({ write_version: vi.fn() }))
+
+vi.mock('./release-issue-close', () => ({ release_issue_close: { close_published: vi.fn() } }))
 
 const BRANCH = 'release/v1.2.0'
 const PR_NUMBER = 123
@@ -234,6 +237,35 @@ describe('release_publish.publish progress', () => {
 
 		expect(await release_publish.publish(PUBLISH_PLAN)).not.toBe(release_publish.SUCCESS_EXIT_CODE)
 		expect(release_progress.wait_for_distribution).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#3825: only a published release closes its release Issue.
+describe('release_publish.publish and the release Issue', () => {
+	beforeEach(() => {
+		arrange_publish()
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	})
+
+	it('closes the release Issue once the distribution succeeds', async () => {
+		expect(await release_publish.publish(PUBLISH_PLAN)).toBe(release_publish.SUCCESS_EXIT_CODE)
+		expect(release_issue_close.close_published).toHaveBeenCalledWith(PUBLISH_PLAN.next_version)
+	})
+
+	it('leaves it open when the distribution fails', async () => {
+		vi.mocked(release_progress.wait_for_distribution).mockResolvedValue(1)
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(release_issue_close.close_published).not.toHaveBeenCalled()
+	})
+
+	it('leaves it open when the tag never appears', async () => {
+		vi.mocked(release_tag.wait_for_tag).mockResolvedValue(false)
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(release_issue_close.close_published).not.toHaveBeenCalled()
 	})
 })
 

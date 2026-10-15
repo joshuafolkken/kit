@@ -1,0 +1,7 @@
+{
+	"reason": "Closing the release Issue on publish needs a module that reads its blockers and carries the unmerged ones to the next release Issue, so none is stranded on a closed one (#3825 review)",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 72
+	}
+}
