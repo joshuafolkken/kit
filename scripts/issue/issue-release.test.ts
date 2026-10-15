@@ -39,6 +39,10 @@ describe('issue_release — the filed release Issue', () => {
 
 	// Nothing closes it automatically, so a release Issue left open would gather already-published
 	// blockers beside the unreleased ones.
+	it('says closing it hands back the Issues that wait on the release', () => {
+		expect(issue_release.body_of(REPO)).toContain('issue:release <N> --wait')
+	})
+
 	it('tells the person to close it once the release is published', () => {
 		expect(issue_release.body_of(REPO)).toContain('Close this Issue once that release is published')
 	})

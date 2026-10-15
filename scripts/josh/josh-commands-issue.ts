@@ -83,9 +83,9 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:release': {
 		script: 'scripts/issue/issue-release-cli.ts',
 		description:
-			"Link an Issue to the repository's open release Issue as its blocker, filing one when none is open",
+			"Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open",
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
+		reference: ['<issue> [--wait]', 'automation', ['network']],
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
