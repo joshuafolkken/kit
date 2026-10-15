@@ -1,3 +1,5 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { session_cite } from '#scripts/issue/session-cite'
 import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_handoff } from './run-cut-handoff'
 
@@ -136,6 +138,16 @@ function report_reviewer(): number {
 	return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
 }
 
+// The cut outside a lane is taken, and nothing is relaunched: the session that took it is the one a
+// person is watching, so the run is handed on the way `fullrun`'s entry `over` stop hands it on.
+function report_held_cut(issue: string): number {
+	console.error(
+		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain(issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
+	)
+
+	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+}
+
 // **An implementation cut is never resumed by a session over the threshold**.
 // The cut outside a lane leaves the session that took it open, so a person retyping `fullrun #N` there
 // would be answered `resume-impl`, keep implementing over the threshold, and be cut again on the next
@@ -176,6 +188,7 @@ const run_cut_report = {
 	report_busy,
 	report_fault,
 	report_handed_off,
+	report_held_cut,
 	report_incomplete,
 	report_over,
 	report_reviewer,
