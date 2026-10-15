@@ -189,6 +189,15 @@ function unquoted(command: string): string {
 	return without_heredoc_bodies(command).replaceAll(QUOTED_SPAN_PATTERN, ' ')
 }
 
+// Quoted text replaced by spaces of its own length, so an offset found here is the same offset in the
+// command — what a caller cutting the command where the unquoted reading says to needs. `undefined`
+// for a line carrying a heredoc, whose body lines a cut would read as commands of their own.
+function blanked(command: string): string | undefined {
+	if (HEREDOC_MARKER.test(command)) return undefined
+
+	return command.replaceAll(QUOTED_SPAN_PATTERN, (span) => ' '.repeat(span.length))
+}
+
 function discarded_commands(command: string): Array<string> {
 	const plain = unquoted(command)
 
@@ -308,6 +317,7 @@ const time_shell = {
 	JOSH_PREFIX,
 	bash_command,
 	bash_label,
+	blanked,
 	command_segment,
 	discarded_commands,
 	josh_arguments,

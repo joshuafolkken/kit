@@ -79,6 +79,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/merge/run-merge-cli.ts', 7],
 	['run/merge/run-merge.ts', 1],
 	['run/ship/run-ship-detach.ts', 1],
+	// The reviewer child's prompt, which an agent reads.
+	['run/ship/run-ship-review.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],
 	['run/ship/run-ship-stop-text.ts', 1],
 	// Printed through `session_cite.text` or `issue_citation.linkify` by the caller that prints it.

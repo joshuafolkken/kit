@@ -292,6 +292,7 @@ describe('pretool_guard.foreground_rewrite', () => {
 const PIPED_LINT = 'pnpm josh lint:related 2>&1 | tail -5'
 const PIPED_HEAD = 'pnpm josh lint:related 2>&1 | head -5'
 const DENY_DECISION = '"permissionDecision":"deny"'
+const PERMISSION_DECISION = '"permissionDecision"'
 const { PIPED_VERIFICATION_REASON, PIPEFAIL_NOTE } = piped_verification
 
 function payload_on(transcript_path: string, command: string): string {
@@ -310,11 +311,11 @@ async function written(raw_payload: string): Promise<string> {
 }
 
 describe('pretool_guard.respond — the pipefail rewrite', () => {
-	it('allows a `| tail` check with `set -o pipefail;` prefixed and the note attached', async () => {
+	it('rewrites a `| tail` check into `(set -o pipefail; …)`, deciding nothing, with the note attached', async () => {
 		const envelope = await written(payload_with_transcript(PIPED_LINT))
 
-		expect(envelope).toContain(ALLOW_DECISION)
-		expect(envelope).toContain(JSON.stringify(`set -o pipefail; ${PIPED_LINT}`))
+		expect(envelope).not.toContain(PERMISSION_DECISION)
+		expect(envelope).toContain(JSON.stringify(`(set -o pipefail; ${PIPED_LINT})`))
 		expect(envelope).toContain(JSON.stringify(PIPEFAIL_NOTE).slice(1, -1))
 	})
 
@@ -364,10 +365,12 @@ describe('pretool_guard.emit — the pipefail rewrite beside other guards', () =
 		expect(envelope).not.toContain('pipefail;')
 	})
 
-	it('refuses a check chained beside another command instead of allowing it', async () => {
+	// joshuafolkken/kit#3875: only the check is wrapped, and with no decision the rest of the line still
+	// meets its own permission prompt.
+	it('wraps a check chained beside another command and leaves the permission to the harness', async () => {
 		const envelope = await written(payload_with_transcript(`${PIPED_LINT} && rm -r dist`))
 
-		expect(envelope).toContain(DENY_DECISION)
-		expect(envelope).not.toContain(ALLOW_DECISION)
+		expect(envelope).not.toContain(PERMISSION_DECISION)
+		expect(envelope).toContain(JSON.stringify(`(set -o pipefail; ${PIPED_LINT}) && rm -r dist`))
 	})
 })
