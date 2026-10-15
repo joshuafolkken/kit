@@ -39,7 +39,7 @@ Next: [tutorial](./docs/tutorial.md)
 
 #### Your first backlogrun
 
-Tell the agent the change you want, then type `kickoff new auto ok` to it (or add the `auto-ok` label to an existing Issue).
+Tell the agent the change you want, then type `kickoff new` to it. The Issue gets the `auto-ok` label when it needs no judgement from you (or add the label to an existing Issue).
 
 ```bash
 pnpm josh backlogrun

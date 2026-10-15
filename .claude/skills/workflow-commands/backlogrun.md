@@ -35,7 +35,7 @@ is still that one invocation (`backlogrun-steps.md` → "The session cut is insi
 2. **Begin the carry record before the plan** — `pnpm josh run:carry --begin "<invocation>" --owner
    "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`.
 3. **What this invocation approves** — the opted-in pool, a run's own filings once bundled, and the
-   brake that bounds the amount; the route table's row points at the single source of the `auto-ok` default.
+   brake that bounds the amount; the route table's row points at the single source of the `auto-ok` rule.
 4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass, recording `blocked-by`, `run:solo` and
    `run:lane` in the same pass.
@@ -56,7 +56,7 @@ never a whole document (`SKILL.md` → "A section reference is read as a section
 | The moment | Read |
 | --- | --- |
 | The entry: the carry record and its answers | `backlogrun-steps.md` → "The session cut is inside the invocation" |
-| What the invocation may merge, and the `auto-ok` default | `backlogrun-steps.md` → "What one invocation approves" |
+| What the invocation may merge, and the `auto-ok` rule | `backlogrun-steps.md` → "What one invocation approves" |
 | Before the first child: the plan and the decision pass | `backlogrun-steps.md` → "The plan, before the first child starts" |
 | The driver hands a branch back | `backlogrun-steps.md` → "The loop" |
 | Once per session | `backlogrun-steps.md` → "What runs once per session, not once per issue" |

@@ -9,7 +9,6 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_release_cli } from './issue-release-cli'
@@ -32,49 +31,43 @@ const HELD_SCOUT = { report: 'Duplicates: 1', candidates: [DUPLICATE] }
 const DISTINCT_HINT = `--distinct ${String(DUPLICATE)}`
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const VALID_BODY = [
-	'## 背景',
-	'',
-	'- 種別: 不具合',
-	'',
-	'## 現象',
-	'',
-	'x',
-	'',
-	'## 期待結果',
-	'',
-	'y',
-	'',
-	'## 受け入れ条件',
-	'',
-	'- [ ] z',
-	'',
-].join('\n')
+const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
+
+const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
+
+// A body the lint accepts, with `declarations` under its background.
+function body_of(...declarations: ReadonlyArray<string>): string {
+	return ['## 背景', '', '- 種別: 不具合', ...declarations, '', SECTIONS].join('\n')
+}
+
+const VALID_BODY = body_of('- 人の判断: 要（目視確認）')
 
 const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-'))
 const valid_path = path.join(work, 'valid.md')
 const invalid_path = path.join(work, 'invalid.md')
 const origin_path = path.join(work, 'origin.md')
+const judged_in_path = path.join(work, 'judged-in.md')
+const breaking_path = path.join(work, 'breaking.md')
+const undeclared_path = path.join(work, 'undeclared.md')
 
 writeFileSync(valid_path, VALID_BODY)
+writeFileSync(judged_in_path, body_of(JUDGEMENT_NOT_NEEDED))
+writeFileSync(breaking_path, body_of(JUDGEMENT_NOT_NEEDED, '- 互換性: 破壊的変更'))
+writeFileSync(undeclared_path, body_of())
 writeFileSync(invalid_path, '## 背景\n')
-writeFileSync(origin_path, `${VALID_BODY}\n## Origin\n\n${HERE}#2808\n`)
+writeFileSync(origin_path, `${body_of(JUDGEMENT_NOT_NEEDED)}\n## Origin\n\n${HERE}#2808\n`)
 
 const scout = vi.spyOn(issue_scout_cli, 'scout')
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const report_for = vi.spyOn(epic_bundle_cli, 'report_for')
 const ensure_labels = vi.spyOn(repository_labels, 'ensure_labels')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
-const resolve_auto_ok = vi.spyOn(issue_auto_ok, 'resolve')
 const link_release = vi.spyOn(issue_release_cli, 'link')
 
 // The filing's `filed` event is asserted in `issue-file-cli-record.test.ts`; here it is only kept off
 // the real stream. The fold question's answers are `issue-file-fold.test.ts`'s; here it only clears.
 vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
-const NOT_APPLIED = { is_applied: false, reason: 'stubbed' }
-const UNDECLARED = { is_opted_out: false, is_requested: false }
-const REQUESTED_FLAG = '--requested'
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
 function listing_of(count: number): { json: string; is_capped: boolean } {
@@ -106,7 +99,6 @@ beforeEach(() => {
 	report_for.mockResolvedValue(SUCCESS_EXIT_CODE)
 	ensure_labels.mockReturnValue([])
 	issue_list.mockResolvedValue(listing_of(1))
-	resolve_auto_ok.mockResolvedValue(NOT_APPLIED)
 })
 
 afterEach(() => {
@@ -177,34 +169,42 @@ describe('issue_file_cli.run — the labels it applies exist first', () => {
 	})
 })
 
-// joshuafolkken/kit#3213: the create call carries `auto-ok` when the filing opted in, unless
-// `--no-auto-ok` is declared, and the decision is printed with its reason.
-const CARRIED = { is_release: false, is_carried: true, branch_labels: undefined }
-
-function stub_carried(): void {
-	resolve_auto_ok.mockImplementation(async (declared) => {
-		return issue_auto_ok.decide({ ...declared, ...CARRIED })
-	})
-}
-
+// joshuafolkken/kit#3853: the create call carries `auto-ok` when the filing is judged in by the
+// criteria — whoever asked for it — and the decision is printed with its reason.
 describe('issue_file_cli.run — the auto-ok decision', () => {
-	it('adds auto-ok to the create call when the filing opted in', async () => {
-		stub_carried()
-
-		expect(await issue_file_cli.run(argv_of(valid_path, '--label', 'run:lane'))).toBe(
+	it('adds auto-ok to the create call when the body declares no judgement is needed', async () => {
+		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:lane'))).toBe(
 			SUCCESS_EXIT_CODE,
 		)
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:lane', 'bug', 'auto-ok'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: applied — ')
+	})
+
+	it.each([
+		[[breaking_path, '--label', 'run:lane'], 'a `breaking-change` Issue'],
+		[[judged_in_path, '--no-auto-ok'], '--no-auto-ok declared'],
+		[[origin_path, '--repo', THERE], 'the Issue is filed to another repository'],
+	])('leaves auto-ok off %j, printing why', async ([body_path = '', ...extra], reason) => {
+		expect(await issue_file_cli.run(argv_of(body_path, ...extra))).toBe(SUCCESS_EXIT_CODE)
+		expect(JSON.stringify(create_body())).not.toContain('auto-ok')
+		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain(
+			`auto-ok: not applied — ${reason}`,
+		)
+	})
+
+	it('refuses a body with no judgement declaration, before the count, the scout or the create', async () => {
+		expect(await issue_file_cli.run(argv_of(undeclared_path))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('`- 人の判断: 不要`')
+		expect(issue_list).not.toHaveBeenCalled()
+		expect(scout).not.toHaveBeenCalled()
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
 
 // joshuafolkken/kit#3313: an untriaged opted-in Issue withholds every lane's candidate.
 describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 	it('refuses an auto-ok filing with no run label, before the count, the scout or the create', async () => {
-		stub_carried()
-
-		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
+		expect(await issue_file_cli.run(argv_of(judged_in_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('--label run:solo')
 		expect(issue_list).not.toHaveBeenCalled()
 		expect(scout).not.toHaveBeenCalled()
@@ -212,9 +212,7 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 	})
 
 	it('files an auto-ok filing judged run:solo', async () => {
-		stub_carried()
-
-		expect(await issue_file_cli.run(argv_of(valid_path, '--label', 'run:solo'))).toBe(
+		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo'))).toBe(
 			SUCCESS_EXIT_CODE,
 		)
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:solo', 'bug', 'auto-ok'] })
@@ -226,31 +224,17 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 	})
 })
 
-// joshuafolkken/kit#3614: `--requested` (a person asked for the filing) withholds it like the opt-out.
-describe('issue_file_cli.run — the auto-ok opt-out and the repositories it reads', () => {
-	it.each([
-		['--no-auto-ok', { ...UNDECLARED, is_opted_out: true }],
-		[REQUESTED_FLAG, { ...UNDECLARED, is_requested: true }],
-	])('leaves auto-ok off with %s, printing why', async (flag, declared) => {
-		stub_carried()
-
-		expect(await issue_file_cli.run(argv_of(valid_path, flag))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(declared, HERE, HERE, [])
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
-		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: not applied — ')
-	})
-
-	it('decides auto-ok with both the target and the current repository', async () => {
-		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(SUCCESS_EXIT_CODE)
-		expect(resolve_auto_ok).toHaveBeenCalledWith(UNDECLARED, THERE, HERE, [])
-	})
-
-	it.each([[[]], [[REQUESTED_FLAG]]])('keeps a named auto-ok once (%j)', async (extra) => {
-		stub_carried()
-		const argv = argv_of(valid_path, ...extra, '--label', 'auto-ok', '--label', 'run:lane')
+describe('issue_file_cli.run — a named auto-ok', () => {
+	it('keeps a named auto-ok once', async () => {
+		const argv = argv_of(judged_in_path, '--label', 'auto-ok', '--label', 'run:lane')
 
 		expect(await issue_file_cli.run(argv)).toBe(SUCCESS_EXIT_CODE)
 		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
+	})
+
+	it('no longer accepts --requested', async () => {
+		expect(await issue_file_cli.run(argv_of(judged_in_path, '--requested'))).toBe(FAILURE_EXIT_CODE)
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
 
