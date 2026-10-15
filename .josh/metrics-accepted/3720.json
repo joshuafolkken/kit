@@ -1,0 +1,7 @@
+{
+	"reason": "The SvelteKit fresh-machine start pattern names the full profile, records the labels before josh start, builds and checks after the gate and waits for the setup pull request's CI, which the acceptance criteria of #3720 check; the tests pin each step",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 21
+	}
+}
