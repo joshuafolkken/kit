@@ -9,6 +9,7 @@ import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { kit_written_paths } from './kit-written-paths'
 import { start_exec } from './start-exec'
+import { working_tree } from './working-tree'
 
 const SETUP_TITLE = `Set up ${KIT_PACKAGE_NAME}`
 const SETUP_BODY = [
@@ -20,16 +21,6 @@ const NAME_ONLY = '--name-only'
 const NOTHING_TO_COMMIT = 'The kit setup has no changes to commit, so no pull request was opened.'
 const OPEN_SETUP_ISSUES_QUERY = `?state=open&labels=${IGNORE_FOR_RELEASE_LABEL}&per_page=100`
 const FIRST_SETUP_ISSUE_FILTER = `[.[] | select(.title == "${SETUP_TITLE}") | .number][0] // empty`
-
-// Listings are read NUL-separated (`-z`), so a path is never quoted — a name a caller's initialize
-// command wrote need not be ASCII the way kit's own are (#2872).
-function paths_of(output: string | undefined = ''): Array<string> {
-	return output.split('\0').filter((listed) => listed.length > 0)
-}
-
-function listing(args: ReadonlyArray<string>, root: string): Array<string> {
-	return paths_of(start_exec.git_read([...args, '-z'], root))
-}
 
 function setup_issue(issue_number: string): IssueInfo {
 	return git_issue.parse(`${SETUP_TITLE} ${issue_cite.plain(issue_number)}`)
@@ -49,19 +40,10 @@ function is_setup_branch(branch: string | undefined): boolean {
 	return setup_branch_number(branch) !== undefined
 }
 
-// Untracked files the ignore rules let through, plus tracked files the setup changed — two plain
-// listings, so nothing has to be parsed out of `git status`.
-function changed_paths(root: string): Array<string> {
-	const untracked = listing(['ls-files', '--others', '--exclude-standard'], root)
-	const modified = listing(['diff', NAME_ONLY, 'HEAD'], root)
-
-	return [...untracked, ...modified]
-}
-
 // On the setup branch a failed commit left, that run's `git add` already staged its files, so they
 // read as changed before this run's command ran — the staged ones count as setup output (#2872).
 function carried_paths(root: string, current: string | undefined): Array<string> {
-	return is_setup_branch(current) ? listing(['diff', NAME_ONLY, '--cached'], root) : []
+	return is_setup_branch(current) ? working_tree.listing(['diff', NAME_ONLY, '--cached'], root) : []
 }
 
 // The Issue carries the release classification the pull request is opened with, so the PR step finds
@@ -130,7 +112,7 @@ function setup_paths(
 	baseline: ReadonlyArray<string> | undefined,
 	current: string | undefined,
 ): Array<string> {
-	const changed = changed_paths(root)
+	const changed = working_tree.changed_paths(root)
 	const kit_paths = kit_written_paths.select(changed)
 
 	if (baseline === undefined) return kit_paths
@@ -161,6 +143,6 @@ async function open(root: string, baseline?: ReadonlyArray<string>): Promise<voi
 	await git_pr.create_with_issue_info(issue)
 }
 
-const start_setup_pr = { open, changed_paths, is_setup_branch }
+const start_setup_pr = { open, changed_paths: working_tree.changed_paths, is_setup_branch }
 
 export { start_setup_pr }

@@ -26,6 +26,7 @@ import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { kit_setup_state } from './kit-setup-state'
 import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
+import { working_tree } from './working-tree'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -290,8 +291,24 @@ function print_start_hint(): void {
 	if (hint !== undefined) console.info(`${hint}\n`)
 }
 
+// Only the command a person typed is refused, before anything is written or installed. `josh start`
+// calls `main` itself and decides about its own tree (#3835); a handed-off run follows the check
+// its caller already passed, on a tree the kit install it just made has changed.
+function did_refuse_dirty_tree(): boolean {
+	const refusal = init_bootstrap.is_handed_off()
+		? undefined
+		: working_tree.dirty_tree_refusal(PROJECT_ROOT, 'josh init')
+
+	if (refusal === undefined) return false
+	console.error(`\n${refusal}\n`)
+	process.exitCode = 1
+
+	return true
+}
+
 function run_cli(args: ReadonlyArray<string>): void {
 	try {
+		if (did_refuse_dirty_tree()) return
 		if (main(args)) print_start_hint()
 	} catch (error) {
 		console.error(`\n✖ ${error_text.message_of(error)}\n`)
@@ -312,5 +329,5 @@ const init = {
 }
 
 // `init` is the entry point; `main` is exported for its own unit test, the way `sync.ts` exports the
-// `main()` its self-run guard lives in.
-export { init, main }
+// `main()` its self-run guard lives in, and `run_cli` for the refusal only the typed command makes.
+export { init, main, run_cli }

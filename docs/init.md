@@ -1,6 +1,6 @@
 # josh init — Detailed Behavior
 
-`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md); the issues each section came from are in `docs/maintainers/init-rationale.md` → "Where each section came from".
+`josh init` selects a project profile, then creates or merges the settings that apply to that project. It can initialize a directory without Git or an existing `package.json`. In a repository with at least one commit, the working tree must be clean: with uncommitted changes — modified, staged or untracked files that are not ignored — `josh init` lists them and stops before writing anything, so commit or stash them (`git stash push -u`) first. The reasons behind its choices are in [init-rationale.md](./maintainers/init-rationale.md); the issues each section came from are in `docs/maintainers/init-rationale.md` → "Where each section came from".
 
 ```bash
 pnpm josh init
