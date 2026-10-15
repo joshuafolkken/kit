@@ -87,14 +87,28 @@ function deny_envelope(reason: string): string {
 }
 
 // **A rewrite, not a refusal**: the call proceeds with `updated_input` merged
-// over its own. `allow` is the decision the harness applies an `updatedInput` under; a settings `deny`
-// rule still wins over it, so this never widens what the call may do.
+// over its own and is allowed past the permission prompt; a settings `deny` rule still wins over it.
+// Where the line may carry commands the hook did not write, `flow_rewrite_envelope` is the one to use.
 function rewrite_envelope(updated_input: Record<string, unknown>, context: string): string {
 	return JSON.stringify({
 		systemMessage: context,
 		hookSpecificOutput: {
 			hookEventName: HOOK_EVENT_NAME,
 			permissionDecision: ALLOW_DECISION,
+			updatedInput: updated_input,
+			additionalContext: context,
+		},
+	})
+}
+
+// **A rewrite that leaves the permission to the harness.** No `permissionDecision`, so the rewritten
+// call meets the same permission flow the typed one would have — whatever else rides the line beside
+// the rewritten part is prompted for, or not, exactly as before (joshuafolkken/kit#3875).
+function flow_rewrite_envelope(updated_input: Record<string, unknown>, context: string): string {
+	return JSON.stringify({
+		systemMessage: context,
+		hookSpecificOutput: {
+			hookEventName: HOOK_EVENT_NAME,
 			updatedInput: updated_input,
 			additionalContext: context,
 		},
@@ -476,6 +490,7 @@ const hook_decision = {
 	deny_envelope,
 	emit_outcome,
 	fault_notice,
+	flow_rewrite_envelope,
 	is_switch_enabled,
 	is_switch_opt_in,
 	load_environment_file,

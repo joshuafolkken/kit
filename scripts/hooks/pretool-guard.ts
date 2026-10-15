@@ -191,7 +191,7 @@ function pipefail_envelope(
 ): string | undefined {
 	if (input === undefined || outcome.reason !== undefined) return undefined
 
-	return hook_decision.rewrite_envelope(
+	return hook_decision.flow_rewrite_envelope(
 		input,
 		rewrite_context(piped_verification.PIPEFAIL_NOTE, outcome),
 	)

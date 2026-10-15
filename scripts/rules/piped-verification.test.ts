@@ -107,19 +107,46 @@ describe('runs_verification and keeps_verdict_intact', () => {
 	})
 })
 
-// joshuafolkken/kit#3570: the commonest masking runs under `pipefail` instead of being refused.
+// joshuafolkken/kit#3570, #3875: each masked check runs under its own `pipefail`; the rest runs as typed.
 function bash(command: string): { name: string; input: Record<string, unknown> } {
 	return { name: 'Bash', input: { command, description: 'd' } }
 }
 
-describe('pipefail_input', () => {
-	it.each([
-		'pnpm josh lint:related 2>&1 | tail -5',
-		PIPED_GREP,
+const WRAP = '(set -o pipefail; '
+
+const REWRITES: Array<[string, string]> = [
+	['pnpm josh lint:related 2>&1 | tail -5', `${WRAP}pnpm josh lint:related 2>&1 | tail -5)`],
+	[PIPED_GREP, `${WRAP}${PIPED_GREP})`],
+	[
 		'pnpm josh lint:related | tail -3 && pnpm josh test:related | tail -3',
-	])('rewrites %j with the prefix, keeping the other fields', (command) => {
+		`${WRAP}pnpm josh lint:related | tail -3) && ${WRAP}pnpm josh test:related | tail -3)`,
+	],
+	// A listing beside the check is never put under a `pipefail` it was not written for.
+	[
+		'pnpm josh lint | tail -3 && git log | head',
+		`${WRAP}pnpm josh lint | tail -3) && git log | head`,
+	],
+	// Whatever else rides the line meets its own permission prompt: the envelope carries no decision.
+	[
+		'pnpm josh lint:related | tail -3 && rm -r dist',
+		`${WRAP}pnpm josh lint:related | tail -3) && rm -r dist`,
+	],
+	['cd /tmp && pnpm josh gate | tail -40', `cd /tmp && ${WRAP}pnpm josh gate | tail -40)`],
+	// A quoted `|` is text, and the typed line keeps its quotes.
+	[
+		'pnpm josh gate | grep -E "a|b"; git status',
+		`${WRAP}pnpm josh gate | grep -E "a|b"); git status`,
+	],
+	// A trailing comment stays outside the subshell, or it would swallow the closing `)`.
+	['pnpm josh lint | tail -5  # lint', `${WRAP}pnpm josh lint | tail -5)  # lint`],
+	['pnpm josh lint | tail -3 # a\ngit status', `${WRAP}pnpm josh lint | tail -3) # a\ngit status`],
+	['pnpm josh gate | grep "#x"', `${WRAP}pnpm josh gate | grep "#x")`],
+]
+
+describe('pipefail_input', () => {
+	it.each(REWRITES)('rewrites %j, keeping the other fields', (command, expected) => {
 		expect(piped_verification.pipefail_input(bash(command))).toStrictEqual({
-			command: `set -o pipefail; ${command}`,
+			command: expected,
 			description: 'd',
 		})
 	})
@@ -129,11 +156,9 @@ describe('pipefail_input', () => {
 		'pnpm josh lint:related | head -5',
 		'pnpm josh gate | grep -q failed',
 		'pnpm josh gate | grep -m 1 error',
-		// A listing beside the check is never put under a `pipefail` it was not written for.
-		'pnpm josh lint | tail -3 && git log | head',
-		// Anything beside the checks would ride the `allow` past its own permission prompt.
-		'pnpm josh lint:related | tail -3 && rm -r dist',
-		'cd /tmp && pnpm josh gate | tail -40',
+		'git status; pnpm josh lint:related | head -5',
+		// A heredoc's body lines would be cut as commands of their own.
+		"pnpm josh gate | tail -5; cat <<'EOF'\na; b\nEOF",
 	])('leaves %j to the refusal', (command) => {
 		expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
 	})

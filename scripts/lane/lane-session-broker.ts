@@ -115,7 +115,7 @@ function review_prompt(lane: LaneInfo, round: ReviewRound): string {
 		round === '1' ? run_ship_review.reviewer_prompt : run_ship_review.verification_prompt
 	const tail = lane_child_invocation.review_invocation(lane.issue)
 
-	return `${prompt_of(target.brief, target.findings)} This is ${tail}`
+	return `${prompt_of(target.brief, target.findings, lane.issue)} This is ${tail}`
 }
 
 async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<boolean> {
