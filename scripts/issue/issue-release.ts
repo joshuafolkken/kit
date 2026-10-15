@@ -42,7 +42,7 @@ function body_of(repo: string): string {
 		'',
 		'Every Issue this one is blocked by changes something a consumer can use only once it is published. Once they have merged, a person runs `pnpm josh release` in the primary checkout.',
 		'',
-		'Close this Issue once that release is published: the next blocker files a new one, so an open release Issue names only unreleased work.',
+		'`pnpm josh release` closes this Issue once that release is published: the next blocker files a new one, so an open release Issue names only unreleased work.',
 		'',
 		'Every Issue this one blocks needs the published version (`pnpm josh issue:release <N> --wait`); closing this Issue hands each of them back to the backlog.',
 		'',

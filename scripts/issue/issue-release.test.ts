@@ -37,13 +37,14 @@ describe('issue_release — the filed release Issue', () => {
 		expect(issue_release.body_of(REPO)).toContain('pnpm josh release')
 	})
 
-	// Nothing closes it automatically, so a release Issue left open would gather already-published
-	// blockers beside the unreleased ones.
 	it('says closing it hands back the Issues that wait on the release', () => {
 		expect(issue_release.body_of(REPO)).toContain('issue:release <N> --wait')
 	})
 
-	it('tells the person to close it once the release is published', () => {
-		expect(issue_release.body_of(REPO)).toContain('Close this Issue once that release is published')
+	// joshuafolkken/kit#3825: the release closes it, so the body no longer asks a person to.
+	it('says the release closes it once published', () => {
+		expect(issue_release.body_of(REPO)).toContain(
+			'`pnpm josh release` closes this Issue once that release is published',
+		)
 	})
 })

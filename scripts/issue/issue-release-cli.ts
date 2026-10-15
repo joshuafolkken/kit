@@ -53,6 +53,7 @@ interface Edge {
 }
 
 // `undefined` when the listing is unreadable, `NONE` when it reads and names no open release Issue.
+// `pnpm josh release` asks the same question to close the Issue it has just published.
 async function find_open(target: string): Promise<number | typeof NONE | undefined> {
 	const outcome = await git_gh_issue_list.issue_list({
 		json_fields: 'number',
@@ -203,8 +204,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_release_cli = { link, run }
+const issue_release_cli = { find_open, link, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export { issue_release_cli }
+export { issue_release_cli, NONE }
