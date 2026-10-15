@@ -15,6 +15,7 @@ const BASE: Metrics = {
 	rules: { files: 3, lines: 200 },
 	guards: 5,
 	ai_cost: { resident_bytes: 9000, on_demand_bytes: 300_000 },
+	prose: { long_paragraphs: 800, excess_bold: 2100 },
 }
 
 function metrics_with(overrides: Partial<Metrics>): Metrics {
@@ -67,6 +68,26 @@ describe('metrics_ratchet.compare', () => {
 
 		expect(metrics_ratchet.compare(BASE, resident, []).kind).toBe('regressed')
 		expect(metrics_ratchet.compare(BASE, on_demand, []).kind).toBe('regressed')
+	})
+})
+
+describe('metrics_ratchet.compare on the prose totals', () => {
+	it('fails on one more long paragraph or one more excess bold span', () => {
+		const longer = metrics_with({ prose: { ...BASE.prose, long_paragraphs: 801 } })
+		const bolder = metrics_with({ prose: { ...BASE.prose, excess_bold: 2101 } })
+
+		expect(metrics_ratchet.compare(BASE, longer, [])).toMatchObject({
+			regressions: [{ name: 'prose.long_paragraphs', growth: 1 }],
+		})
+		expect(metrics_ratchet.compare(BASE, bolder, [])).toMatchObject({
+			regressions: [{ name: 'prose.excess_bold', growth: 1 }],
+		})
+	})
+
+	it('answers shrank when a document lost density, recording nothing', () => {
+		const thinner = metrics_with({ prose: { long_paragraphs: 790, excess_bold: 2000 } })
+
+		expect(metrics_ratchet.compare(BASE, thinner, [])).toStrictEqual({ kind: 'shrank' })
 	})
 })
 

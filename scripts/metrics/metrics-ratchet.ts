@@ -23,7 +23,8 @@ import type { Metrics } from './metrics-logic'
 // produces the same values — any increase is a real one.
 //
 // **Only the totals the ratchet is about are compared** — code lines, the comment ratio, the
-// rule-document lines, the guard count and the two AI-cost byte totals. A
+// rule-document lines, the guard count, the two AI-cost byte totals and the two prose-density
+// totals (`prose-density.ts`). A
 // file count or a comment-line count moves with them and would only state the same growth twice.
 
 const NEWLINE = '\n'
@@ -41,6 +42,7 @@ const metrics_schema = z.object({
 	rules: z.object({ files: z.number(), lines: z.number() }),
 	guards: z.number(),
 	ai_cost: z.object({ resident_bytes: z.number(), on_demand_bytes: z.number() }),
+	prose: z.object({ long_paragraphs: z.number(), excess_bold: z.number() }),
 })
 
 const approval_schema = z.object({
@@ -98,6 +100,8 @@ function ratcheted(metrics: Metrics): ReadonlyArray<[string, number]> {
 		['guards', metrics.guards],
 		['ai_cost.resident_bytes', metrics.ai_cost.resident_bytes],
 		['ai_cost.on_demand_bytes', metrics.ai_cost.on_demand_bytes],
+		['prose.long_paragraphs', metrics.prose.long_paragraphs],
+		['prose.excess_bold', metrics.prose.excess_bold],
 	]
 }
 
