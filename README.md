@@ -8,7 +8,7 @@ kit gives Claude Code or Codex your project's rules and checks.
 
 Type `backlogrun` and the agent takes the Issues you name from plan to merged PR — in parallel, unattended. A live board shows where each one stands:
 
-![The backlogrun board: ten Issues running side by side, seven already merged, each with its stage and elapsed time](./docs/images/backlogrun-board.png)
+![The backlogrun board: ten Issues in one run, three already merged and the rest moving through their stages or waiting for a free lane, with recent findings and decisions below](./docs/images/backlogrun-board.png)
 
 [Every keyword, including the ones that stop for you earlier](./docs/how-to/run-issues.md)
 
