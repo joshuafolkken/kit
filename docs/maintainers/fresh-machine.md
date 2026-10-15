@@ -66,15 +66,17 @@ Three projects by two commands, each from the state its row names:
   other dependency keeps the wait.
 - **`start` runs the scoped checks before the gate.** `josh start` leaves the project on its setup
   branch, where `pnpm josh gate` refuses until `pnpm josh lint:related && pnpm josh test:related` has
-  passed; the pattern runs the line that refusal hands back. `kit-test-lua-start` and
-  `kit-test-html-start` pass `--profile basic`, the way an agent names the profile;
-  `kit-test-svelte-start` leaves it to detection.
+  passed; the pattern runs the line that refusal hands back. Every pattern names its profile, the way
+  an agent does: `kit-test-lua-start` and `kit-test-html-start` pass `--profile basic`,
+  `kit-test-svelte-start` passes `--profile full`, records the repository's labels before the install,
+  and runs `pnpm build && pnpm check` on the setup branch after the gate.
 - **`start` records what it left on GitHub** before the PATH probes: `pnpm josh profile`,
   `gh repo view --json visibility,defaultBranchRef`, `gh label list --limit 100`, the files of the
   first commit on `main`, then every Issue and pull request, the files the setup pull request
   carries (`gh pr diff --name-only`) and the commits on `origin/main`. A project whose `main` already
   had a commit gets kit's files through a setup Issue and pull request in place of a commit to `main`,
   and these show the pull request was opened, left unmerged, and touched nothing else.
+  `kit-test-svelte-start` then waits for the setup pull request's CI (`gh pr checks --watch`).
 - **Every pattern ends with two probes**, recorded whatever they exit with: `pnpm josh gate` from
   `bash --noprofile --norc` with an environment of `HOME` and the system `PATH` only, and `josh gate`
   from a `PATH` that has `node` on it and no `pnpm`.
@@ -101,11 +103,12 @@ Run on 2026-10-13 against kit 1.1387.0 — the packed checkout for `init`, the p
   [the prerequisites' step 4](../setup/prerequisites.md#4-tell-git-who-you-are) has a person do. The
   other two `start` patterns make a first commit before the install, as their starting state asks,
   and set a repository identity for it.
-- **`kit-test-svelte-start` stops until
-  [joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755) is fixed.** A web
+- **`kit-test-svelte-start` stopped until
+  [joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755) was fixed.** A web
   project's pre-push hook runs `pnpm josh audit`, which needs `osv-scanner`; nothing in the guide
-  installs it and `josh start` does not provision it, so the hook refuses the push of the setup
-  branch. The pattern does not run `pnpm josh audit:provision` first, for the same reason.
+  installs it and `josh start` did not provision it, so the hook refused the push of the setup
+  branch. `josh start` now provisions it first; the pattern still does not run
+  `pnpm josh audit:provision` itself, since the guide does not.
 - **The bare-shell probe exits 127**: `pnpm: command not found`. The installer puts pnpm on `PATH`
   through `.bashrc` alone, so a shell that reads no profile does not have it.
 - **The node-only probe exits 1**, every check failing at once. From the packed checkout each failed
@@ -133,6 +136,18 @@ closes it. The pull request carries kit's files and `index.html` as `josh format
 The gate passed (1 ran, 5 skipped), and the two PATH probes exited 127 and 1 as for Lua
 ([joshuafolkken/kit#3718](https://github.com/joshuafolkken/kit/issues/3718)). It left the private
 `kit-test-html-start-3`.
+
+`kit-test-svelte-start` passed against 1.1435.0 with `--profile full`, from an app `sv` 1.1.1 created
+and pushed to a private repository: `josh start` provisioned `osv-scanner` itself
+([joshuafolkken/kit#3755](https://github.com/joshuafolkken/kit/issues/3755)), exited 0, added every
+label while leaving the ten GitHub defaults as they were, and opened the setup Issue with
+`ignore-for-release` and an unmerged pull request that closes it. The pull request carries kit's files
+and the three app files `josh format` rewrote; `origin/main` holds the initial commit alone. The gate
+passed (3 ran, 3 skipped — the minimal app has no Vitest), `pnpm build && pnpm check` passed on the
+setup branch, every CI check of the pull request passed or was skipped, and the two PATH probes exited
+127 and 1 as for the other patterns
+([joshuafolkken/kit#3720](https://github.com/joshuafolkken/kit/issues/3720)). It left the private
+`kit-test-svelte-start-2`.
 
 ## A scenario from another toolkit
 

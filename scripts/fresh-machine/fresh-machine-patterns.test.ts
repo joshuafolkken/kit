@@ -16,6 +16,12 @@ const MACHINE_IDENTITY = 'git config --global user.name'
 const TARBALL = '"$PACKAGE_TARBALL"'
 const SVELTEKIT_CHECKS = 'pnpm build && pnpm check'
 const PROFILE = 'pnpm josh profile'
+const SCOPED_CHECKS = 'pnpm josh lint:related && pnpm josh test:related'
+const GATE = 'pnpm josh gate'
+const SV_VERSION = 'pnpm dlx sv --version'
+const LABELS = 'gh label list --limit 100'
+// The probes every start pattern records before its own and the two PATH states.
+const START_PROBE_COUNT = 8
 
 // The index of the `josh start` command, whichever flags the pattern passes after the shared ones.
 function start_index(commands: ReadonlyArray<string>): number {
@@ -66,12 +72,22 @@ describe('fresh_machine_patterns', () => {
 })
 
 describe('fresh_machine_patterns gate', () => {
-	it.each(START_NAMES)('%s runs the scoped checks the gate asks for on a branch', (name) => {
-		const { commands } = pattern(name)
+	it.each([LUA_START, HTML_START])(
+		'%s runs the scoped checks the gate asks for on a branch',
+		(name) => {
+			const { commands } = pattern(name)
+
+			expect(commands.slice(start_index(commands) + 1)).toStrictEqual([SCOPED_CHECKS, GATE])
+		},
+	)
+
+	it('builds and checks the SvelteKit app on the setup branch after the gate', () => {
+		const { commands } = pattern(SVELTE_START)
 
 		expect(commands.slice(start_index(commands) + 1)).toStrictEqual([
-			'pnpm josh lint:related && pnpm josh test:related',
-			'pnpm josh gate',
+			SCOPED_CHECKS,
+			GATE,
+			SVELTEKIT_CHECKS,
 		])
 	})
 
@@ -98,17 +114,27 @@ describe('fresh_machine_patterns start probes', () => {
 		expect(pattern(name).probes.slice(0, 4)).toStrictEqual([
 			PROFILE,
 			'gh repo view --json visibility,defaultBranchRef',
-			'gh label list --limit 100',
+			LABELS,
 			'git show --name-only --format= "$(git rev-list --max-parents=0 main)"',
 		])
 	})
 
 	it.each(START_NAMES)('%s records the setup Issue, pull request and pushed main', (name) => {
-		expect(pattern(name).probes.slice(4, -2)).toStrictEqual([
+		expect(pattern(name).probes.slice(4, START_PROBE_COUNT)).toStrictEqual([
 			'gh issue list --state all --json number,title,state,labels',
 			'gh pr list --state all --json number,title,state,headRefName,labels,closingIssuesReferences',
 			'gh pr diff --name-only',
 			'git log --oneline origin/main',
+		])
+	})
+
+	it.each([LUA_START, HTML_START])('%s records nothing more before the PATH states', (name) => {
+		expect(pattern(name).probes).toHaveLength(START_PROBE_COUNT + 2)
+	})
+
+	it('waits for the CI of the SvelteKit setup pull request before the PATH states', () => {
+		expect(pattern(SVELTE_START).probes.slice(START_PROBE_COUNT, -2)).toStrictEqual([
+			'gh pr checks --watch --interval 60',
 		])
 	})
 })
@@ -118,7 +144,7 @@ describe('fresh_machine_patterns SvelteKit init', () => {
 		const { commands } = pattern(SVELTE_INIT)
 		const install = commands.findIndex((command) => command.includes(TARBALL))
 
-		expect(commands.slice(1, install)).toStrictEqual(['pnpm dlx sv --version', SVELTEKIT_CHECKS])
+		expect(commands.slice(1, install)).toStrictEqual([SV_VERSION, SVELTEKIT_CHECKS])
 	})
 
 	it('builds and checks the app again after josh init', () => {
@@ -137,10 +163,6 @@ describe('fresh_machine_patterns SvelteKit init', () => {
 describe('fresh_machine_patterns starting states', () => {
 	it.each([LUA_START, HTML_START])('%s names the basic profile', (name) => {
 		expect(pattern(name).commands).toContain(BASIC_START_COMMAND)
-	})
-
-	it('leaves the profile of the SvelteKit project to detection', () => {
-		expect(pattern(SVELTE_START).commands).toContain(START)
 	})
 
 	it('starts the Lua project without Git', () => {
@@ -164,13 +186,6 @@ describe('fresh_machine_patterns starting states', () => {
 		expect(commands).not.toContain(CREATE_REPOSITORY)
 	})
 
-	it('starts the SvelteKit project with its repository created and pushed', () => {
-		const { commands } = pattern(SVELTE_START)
-
-		expect(commands.indexOf(CREATE_REPOSITORY)).toBeGreaterThan(commands.indexOf(GIT_INIT))
-		expect(commands.indexOf(CREATE_REPOSITORY)).toBeLessThan(commands.indexOf(START))
-	})
-
 	it('never deletes a repository an earlier run created', () => {
 		const every_command = fresh_machine_patterns
 			.names()
@@ -178,5 +193,28 @@ describe('fresh_machine_patterns starting states', () => {
 			.join('\n')
 
 		expect(every_command).not.toMatch(/repo delete/u)
+	})
+})
+
+// joshuafolkken/kit#3720: what an agent runs on the SvelteKit project that is already on GitHub.
+describe('fresh_machine_patterns SvelteKit start', () => {
+	it('names the full profile', () => {
+		expect(pattern(SVELTE_START).commands).toContain(`${START} --profile full`)
+	})
+
+	it('starts with its repository created and pushed', () => {
+		const { commands } = pattern(SVELTE_START)
+
+		expect(commands.indexOf(CREATE_REPOSITORY)).toBeGreaterThan(commands.indexOf(GIT_INIT))
+		expect(commands.indexOf(CREATE_REPOSITORY)).toBeLessThan(start_index(commands))
+	})
+
+	it('records the sv version and the labels the repository had before josh start', () => {
+		const { commands } = pattern(SVELTE_START)
+
+		expect(commands.indexOf(SV_VERSION)).toBeGreaterThan(-1)
+		expect(commands.indexOf(SV_VERSION)).toBeLessThan(commands.indexOf(GIT_INIT))
+		expect(commands.indexOf(LABELS)).toBeGreaterThan(commands.indexOf(CREATE_REPOSITORY))
+		expect(commands.indexOf(LABELS)).toBeLessThan(start_index(commands))
 	})
 })

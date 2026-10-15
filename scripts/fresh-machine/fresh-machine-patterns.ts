@@ -29,12 +29,15 @@ const INIT_COMMANDS = [INSTALL_TARBALL, 'pnpm exec josh init', GATE]
 const SCOPED_CHECKS = 'pnpm josh lint:related && pnpm josh test:related'
 const START = 'pnpm exec josh start --yes --github'
 
-// An agent names the profile rather than leaving it to detection, so a pattern that knows its
-// profile passes it.
-function start_commands(profile: string | undefined): Array<string> {
-	const start = profile === undefined ? START : `${START} --profile ${profile}`
-
-	return [EXCLUDE_RELEASE_AGE, INSTALL_PUBLISHED, start, SCOPED_CHECKS, GATE]
+// An agent names the profile rather than leaving it to detection, so every pattern passes its own.
+function start_commands(profile: string): Array<string> {
+	return [
+		EXCLUDE_RELEASE_AGE,
+		INSTALL_PUBLISHED,
+		`${START} --profile ${profile}`,
+		SCOPED_CHECKS,
+		GATE,
+	]
 }
 
 // `gh auth login` cannot run without a person, and it is what points git at gh for credentials; with
@@ -51,6 +54,11 @@ const FIRST_COMMIT = [
 	'git add --all && git commit --message "Initial commit"',
 ]
 const CREATE_REPOSITORY = 'gh repo create "$RUN_NAME" --private --source . --push'
+// The labels a repository already had, recorded before `josh start` so the probe after it shows none
+// was removed or changed.
+const LABELS = 'gh label list --limit 100'
+// The setup pull request's CI, waited for and recorded; the pull request itself is never merged.
+const SETUP_CI = 'gh pr checks --watch --interval 60'
 
 // The two states #3712 was found in: a shell that reads no rc file, and a PATH with `node` on it and
 // no `pnpm`.
@@ -70,7 +78,7 @@ const PROFILE = 'pnpm josh profile'
 const START_PROBES = [
 	PROFILE,
 	'gh repo view --json visibility,defaultBranchRef',
-	'gh label list --limit 100',
+	LABELS,
 	'git show --name-only --format= "$(git rev-list --max-parents=0 main)"',
 	'gh issue list --state all --json number,title,state,labels',
 	'gh pr list --state all --json number,title,state,headRefName,labels,closingIssuesReferences',
@@ -108,32 +116,50 @@ function init_pattern(
 	})
 }
 
+// What a `josh start` pattern adds to the shared steps: the state before the install, the profile it
+// names, the commands that must pass after the gate, and the probes recorded before the PATH states.
+interface StartProject {
+	setup: ReadonlyArray<string>
+	profile: string
+	checks?: ReadonlyArray<string>
+	probes?: ReadonlyArray<string>
+}
+
 function start_pattern(
 	project: string,
 	files: Record<string, string>,
-	setup: ReadonlyArray<string>,
-	profile?: string,
+	{ setup, profile, checks = [], probes = [] }: StartProject,
 ): Scenario {
 	return fresh_machine_spec.define({
 		name: `kit-test-${project}-start`,
 		requires_github: true,
 		package_source: 'published',
 		files,
-		commands: [SIGN_IN, ...setup, ...start_commands(profile)],
-		probes: [...START_PROBES, ...PATH_PROBES],
+		commands: [SIGN_IN, ...setup, ...start_commands(profile), ...checks],
+		probes: [...START_PROBES, ...probes, ...PATH_PROBES],
 	})
 }
 
 const PATTERNS: ReadonlyArray<Scenario> = [
 	init_pattern('lua', LUA_FILES, [BARE_MANIFEST]),
 	// No Git: `josh start` creates the repository, the first commit and the GitHub repository.
-	start_pattern('lua', LUA_FILES, [MACHINE_IDENTITY, BARE_MANIFEST], 'basic'),
+	start_pattern('lua', LUA_FILES, { setup: [MACHINE_IDENTITY, BARE_MANIFEST], profile: 'basic' }),
 	init_pattern('html', HTML_FILES, [BARE_MANIFEST]),
 	// Git with a first commit on `main`, no GitHub repository.
-	start_pattern('html', HTML_FILES, [...FIRST_COMMIT, BARE_MANIFEST], 'basic'),
+	start_pattern('html', HTML_FILES, { setup: [...FIRST_COMMIT, BARE_MANIFEST], profile: 'basic' }),
 	init_pattern('svelte', {}, [CREATE_SVELTEKIT, SV_VERSION, SVELTEKIT_CHECKS], [SVELTEKIT_CHECKS]),
-	// A GitHub repository with `main` already pushed.
-	start_pattern('svelte', {}, [CREATE_SVELTEKIT, ...FIRST_COMMIT, CREATE_REPOSITORY]),
+	// A GitHub repository with `main` already pushed, its labels recorded before the install; the app
+	// still builds and type-checks on the setup branch, and the setup pull request's CI is waited for.
+	start_pattern(
+		'svelte',
+		{},
+		{
+			setup: [CREATE_SVELTEKIT, SV_VERSION, ...FIRST_COMMIT, CREATE_REPOSITORY, LABELS],
+			profile: 'full',
+			checks: [SVELTEKIT_CHECKS],
+			probes: [SETUP_CI],
+		},
+	),
 ]
 
 function names(): Array<string> {
