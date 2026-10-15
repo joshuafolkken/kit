@@ -14,10 +14,16 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 // because `sleep 1200 &` is an armed timer sent to the background and has to be seen as one. That is
 // a different question about a different character, not a second copy of this answer.
 const SEGMENT_SEPARATOR = /&&|\|\||;|\n/u
+const SEGMENT_PARTS = new RegExp(`(${SEGMENT_SEPARATOR.source})`, 'u')
 
 /** The line's commands, trimmed. Empty segments are kept: a caller anchoring at `^` rejects them. */
 function segments_of(command: string): Array<string> {
 	return command.split(SEGMENT_SEPARATOR).map((segment) => segment.trim())
+}
+
+/** The same cut, untrimmed and with each separator kept between its commands, so the parts join back to the line. */
+function parts_of(command: string): Array<string> {
+	return command.split(SEGMENT_PARTS)
 }
 
 // **Both spellings match, and the expansion is not this file's.** `josh_command_of` expands the alias
@@ -36,6 +42,7 @@ function is_josh_command(segment: string, names: ReadonlySet<string>): boolean {
 
 const shell_segments = {
 	is_josh_command,
+	parts_of,
 	segments_of,
 }
 

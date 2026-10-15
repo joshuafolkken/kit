@@ -15,20 +15,22 @@ import { tail_commands } from './tail-commands'
 // **It reads comments in the josh spelling too.** `pnpm josh issue:read <N>` prints the body and every
 // comment in one call, so a run that opened an Issue with it has read the comments as surely as one
 // that passed `--comments` — and that spelling is the one the workflow itself reaches for, so leaving
-// it out would refuse the reader that obeyed the rule most directly.
+// it out would refuse the reader that obeyed the rule most directly. **`run:entry <N>` and `run:prep <N>`
+// count the same way**: both print the bundled report that carries the body and every comment, and a
+// run that opened with one was refused for a read it had made (joshuafolkken/kit#3875).
 
 // The path segment `…/issues/<N>` and `…/issues/<N>/comments` both name the Issue in the same capture.
 const ISSUE_PATH_NUMBER = /issues\/(\d+)/gu
 // The positional after `gh issue view`, past any flags that precede it.
 const ISSUE_VIEW_NUMBER = /\bissue\s+view\s+(?:-{1,2}\S+\s+)*(\d+)/u
-// The run of numbers `pnpm josh issue:read` takes as its positional arguments.
-const ISSUE_READ_ARGUMENTS = /\bissue:read\b([\s\d]*)/u
+// The run of numbers a josh comment-reading command takes as its positional arguments.
+const ISSUE_READ_ARGUMENTS = /\b(?:issue:read|run:entry|run:prep)\b([\s\d]*)/u
 
 // A command that prints an Issue's comments: the comments endpoint, `gh issue view … --comments`, or
-// the josh command that reads body and comments together.
+// a josh command that reads body and comments together.
 const COMMENTS_ENDPOINT = /issues\/\d+\/comments\b/u
 const VIEW_WITH_COMMENTS = /\bissue\s+view\b[^\n]*--comments\b/u
-const ISSUE_READ_COMMAND = /\bissue:read\b/u
+const ISSUE_READ_COMMAND = /\b(?:issue:read|run:entry|run:prep)\b/u
 
 function add_issue_read_numbers(command: string, numbers: Set<number>): void {
 	const match = ISSUE_READ_ARGUMENTS.exec(command)

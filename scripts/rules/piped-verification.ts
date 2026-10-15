@@ -125,26 +125,34 @@ function keeps_verdict_intact(command: string): boolean {
 // `grep` stopping at its first match — closes the pipe on a check still writing, and under `pipefail` the
 // check's SIGPIPE turns a passing run into exit 141; `head` also cuts the verdict line josh prints last.
 //
-// **Every command on the line is a josh check or a filter after one.** The rewrite answers `allow`, so
-// anything else chained beside the check — `&& rm -r dist`, or a `git log | head` never written for
-// `pipefail` — would skip the permission prompt it would otherwise meet. Those lines are refused as before.
+// **Each masked check is wrapped on its own, and the rest of the line runs as typed.** Most of the
+// refusals left after #3570 were a check chained beside other work — `vitest …; pnpm josh lint:related
+// | tail -5; git status` — so the check's own pipeline becomes `(set -o pipefail; …)` and nothing else
+// on the line is put under a `pipefail` it was not written for (joshuafolkken/kit#3875). The envelope
+// carries no permission decision (`hook_decision.flow_rewrite_envelope`), so whatever else the line runs
+// meets its own permission prompt exactly as the typed call would have.
 //
-// **The raw line is read for what the cut cannot see.** `segments_of` does not split on a lone `&`, and
-// `time_shell.unquoted` blanks a double-quoted `$(…)`, so `| tail & curl …`, `| tail > ~/.zshrc` and
-// `| grep "$(cmd)"` all look like a filter after a check. Any `&`, redirection, backtick or `$(` beyond
-// the `&&` chain and the check's own `2>&1` leaves the line to the refusal.
-const PIPEFAIL_PREFIX = 'set -o pipefail; '
+// **The check's own pipeline is read for what the cut cannot see.** `parts_of` does not split on a lone
+// `&`, so `| tail & curl …`, `| tail > ~/.zshrc` and `| tail -n $(cmd)` look like a filter after a check.
+// Any `&`, redirection, backtick or `$(` there beyond the check's own `2>&1` leaves the line to the
+// refusal, as does a heredoc anywhere on it, whose body lines the cut would read as commands. An
+// unquoted `(` or `)` does too: the cut splits inside a group, so `(cd x && pnpm josh lint) | tail` would
+// wrap the inner check and leave the group's own pipe without `pipefail`.
+const PIPEFAIL_OPEN = '(set -o pipefail; '
+const PIPEFAIL_CLOSE = ')'
+const COMMENT_START = /(?:^|\s)#/u
 const FULL_READING_FILTER = /^(?:tail|grep)\b/u
 const EARLY_EXIT_GREP =
 	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
 
 const ALLOWED_OPERATORS = /2>&1|&&/gu
 const SIDE_EFFECT_SYNTAX = /[&<>`]|\$\(/u
+const GROUP_SYNTAX = /[()]/u
 
 const PIPEFAIL_NOTE =
-	'↻ piped verification: the josh check was piped, so `set -o pipefail;` was prefixed and the call ran ' +
-	"with the check's status carried to the exit code. Read the printed verdict, never the exit code " +
-	'alone — `prompts/collaboration-workflow/output-bounds.md`.'
+	'↻ piped verification: the josh check was piped, so its pipeline was wrapped in ' +
+	"`(set -o pipefail; …)` to carry the check's status, and the rest of the line ran as typed. Read " +
+	'the printed verdict, never the exit code alone — `prompts/collaboration-workflow/output-bounds.md`.'
 
 function reads_to_the_end(piece: string): boolean {
 	return FULL_READING_FILTER.test(piece) && !EARLY_EXIT_GREP.test(piece)
@@ -160,23 +168,69 @@ function has_side_effect_syntax(command: string): boolean {
 	return SIDE_EFFECT_SYNTAX.test(command.replaceAll(ALLOWED_OPERATORS, ' '))
 }
 
-function is_pipefail_rewritable(command: string): boolean {
-	return (
-		is_masked_verification(command) &&
-		!has_side_effect_syntax(command) &&
-		pipelines_of(command).every((pipeline) => is_filtered_check(pipeline))
-	)
+// The side-effect syntax is read on the typed part, since a double-quoted `$(cmd)` still runs; the pipe
+// cut and the grouping are read on the blanked one, since a quoted `|` or `(` is text.
+function is_rewritable_part(raw: string, judged: string): boolean {
+	const pipeline = judged.split('|').map((piece) => piece.trim())
+
+	return !has_side_effect_syntax(raw) && !GROUP_SYNTAX.test(judged) && is_filtered_check(pipeline)
 }
 
-// The call's input with the prefix in front, or `undefined` where the call is not a rewritable masking.
+// Where the part's code ends: an unquoted `#` opens a comment, which would swallow the closing `)`.
+function code_end(judged: string): number {
+	const comment = COMMENT_START.exec(judged)
+
+	return comment === null ? judged.length : comment.index
+}
+
+// The part with its surrounding whitespace and any trailing comment kept outside the subshell, so the
+// line reads as typed.
+function wrapped(raw: string, judged: string): string {
+	const code = raw.slice(0, code_end(judged))
+	const core = code.trim()
+	const lead = code.slice(0, code.indexOf(core))
+
+	return `${lead}${PIPEFAIL_OPEN}${core}${PIPEFAIL_CLOSE}${raw.slice(lead.length + core.length)}`
+}
+
+// One part of the line as it will run: as typed where it masks nothing, wrapped where it masks a check a
+// wrapper can carry, and `undefined` where it masks one no wrapper can.
+function rewritten_part(raw: string, judged: string): string | undefined {
+	if (!is_masked_verification(judged)) return raw
+
+	return is_rewritable_part(raw, judged) ? wrapped(raw, judged) : undefined
+}
+
+// The command with every masked check wrapped, judged on the quote-blanked line and cut from the typed
+// one at the same offsets — a `|` inside `grep -E "a|b"` is text, and the typed line keeps its quotes.
+function pipefail_command(command: string): string | undefined {
+	const judged = time_shell.blanked(command)
+
+	if (judged === undefined || !is_masked_verification(command)) return undefined
+
+	const offset = { at: 0 }
+	const parts = shell_segments.parts_of(judged).map((part) => {
+		const raw = command.slice(offset.at, offset.at + part.length)
+
+		offset.at += part.length
+
+		return rewritten_part(raw, part)
+	})
+
+	const rewritten = parts.includes(undefined) ? undefined : parts.join('')
+
+	// A line masked as a whole but in no part wraps nothing, so no note may claim a wrap.
+	return rewritten === command ? undefined : rewritten
+}
+
+// The call's input with each masked check wrapped, or `undefined` where the call is not a rewritable
+// masking.
 function pipefail_input(call: GuardedCall): Record<string, unknown> | undefined {
 	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
 
-	const command = time_shell.bash_command(call.input)
+	const command = pipefail_command(time_shell.bash_command(call.input))
 
-	if (!is_pipefail_rewritable(command)) return undefined
-
-	return { ...call.input, command: `${PIPEFAIL_PREFIX}${command}` }
+	return command === undefined ? undefined : { ...call.input, command }
 }
 
 const piped_verification = {

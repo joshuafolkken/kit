@@ -251,6 +251,23 @@ describe('hook_decision.notice_envelope', () => {
 	})
 })
 
+// joshuafolkken/kit#3875: the rewrite leaves the permission to the harness, so whatever else rides the
+// line meets its own prompt exactly as the typed call would have.
+describe('hook_decision.flow_rewrite_envelope', () => {
+	it('carries the rewritten input on both channels and decides nothing', () => {
+		const updated_input = { command: 'ls' }
+
+		expect(JSON.parse(hook_decision.flow_rewrite_envelope(updated_input, REASON))).toEqual({
+			systemMessage: REASON,
+			hookSpecificOutput: {
+				hookEventName: 'PreToolUse',
+				updatedInput: updated_input,
+				additionalContext: REASON,
+			},
+		})
+	})
+})
+
 // A guard that supplies a notify spec (joshuafolkken/kit#1848): for a call it does not refuse, it can
 // emit a non-blocking notice instead, on a record of its own so a notice never spends the refusal's
 // stamp. The batching guard supplies one for the whole-file write.

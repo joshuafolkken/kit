@@ -10,10 +10,11 @@ const FINDINGS = 'stamps/josh-ship-review-findings-x.txt'
 const LOW_ONLY = 'tests:low:a.ts'
 const MEDIUM_OPEN = 'bug-risks:medium:a.ts:3'
 const MEDIUM_FIXED = `fixed ${MEDIUM_OPEN}`
+const ISSUE = '3875'
 
 describe('run_ship_review.reviewer_prompt', () => {
 	it('is one launch-safe line naming the brief and the findings file', () => {
-		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS)
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
 
 		expect(prompt).not.toMatch(/\n/u)
 		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
@@ -150,10 +151,19 @@ describe('run_ship_review.read_verdict — a finding carries its description', (
 	})
 
 	it.each([
-		run_ship_review.reviewer_prompt(BRIEF, FINDINGS),
-		run_ship_review.verification_prompt(BRIEF, FINDINGS),
+		run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE),
+		run_ship_review.verification_prompt(BRIEF, FINDINGS, ISSUE),
 	])('asks each reviewer for the description after the spec', (prompt) => {
 		expect(prompt).toContain('<category>:<severity>:<file>[:<line>] — <one sentence')
+	})
+
+	// joshuafolkken/kit#3875: a body-only read of the Issue is refused by the issue-comments rule.
+	it.each([
+		run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE),
+		run_ship_review.verification_prompt(BRIEF, FINDINGS, ISSUE),
+	])('tells each reviewer to read the Issue with its comments', (prompt) => {
+		expect(prompt).toContain(`pnpm josh issue:read ${ISSUE}`)
+		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
 	})
 })
 
@@ -193,7 +203,7 @@ describe('run_ship_review.has_fixes — whether the reviewer edited the tree', (
 
 describe('run_ship_review — the two prompts', () => {
 	it('lets round 1 fix a local Medium and asks it to mark what it fixed', () => {
-		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS)
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
 
 		expect(prompt).toContain('Apply a fix only for a Medium finding')
 		expect(prompt).toContain(`"${run_ship_review.FIXED_PREFIX}"`)
@@ -202,14 +212,14 @@ describe('run_ship_review — the two prompts', () => {
 
 	// joshuafolkken/kit#2500: a fix comes back already green on the scoped pair, or not at all.
 	it('asks round 1 to leave its fixes green on the scoped pair, or revert them', () => {
-		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS)
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
 
 		expect(prompt).toContain('pnpm josh lint:related && pnpm josh test:related')
 		expect(prompt).toContain('revert a fix you cannot get green')
 	})
 
 	it('keeps round 2 a launch-safe, read-only verification pass', () => {
-		const prompt = run_ship_review.verification_prompt(BRIEF, FINDINGS)
+		const prompt = run_ship_review.verification_prompt(BRIEF, FINDINGS, ISSUE)
 
 		expect(prompt).not.toMatch(/\n/u)
 		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
