@@ -71,6 +71,15 @@ describe('working_tree.uncommitted_paths — the user’s own work', () => {
 
 		expect(working_tree.uncommitted_paths(root)).toEqual([NOTE])
 	})
+
+	it('reads every indexed file on an orphan branch of a repository with commits', () => {
+		const root = committed_repository()
+
+		git(root, ['checkout', '--orphan', 'fresh'])
+		write(root, NOTE, DRAFT)
+
+		expect(working_tree.uncommitted_paths(root)).toEqual([NOTE, '.gitignore', MANIFEST])
+	})
 })
 
 describe('working_tree.uncommitted_paths — a project below its repository’s top level', () => {
@@ -123,6 +132,6 @@ describe('working_tree.dirty_tree_refusal', () => {
 		expect(refusal).toContain(`${COMMAND} refuses to run`)
 		expect(refusal).toContain(`  ${MANIFEST}`)
 		expect(refusal).toContain(`  ${NOTE}`)
-		expect(refusal).toContain('git stash push -u')
+		expect(refusal).toContain('git stash push -u -- .')
 	})
 })

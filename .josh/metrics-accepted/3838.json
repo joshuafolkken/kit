@@ -1,7 +1,7 @@
 {
-	"reason": "New josh init refusal for an uncommitted working tree (#3838): the shared working-tree reader, its real-repository test fixture and the tests the acceptance criteria require",
+	"reason": "New josh init refusal for an uncommitted working tree (#3838): the shared working-tree reader, its real-repository test fixture, the tests the acceptance criteria require, and the orphan-branch read round 2 asked for",
 	"date": "2026-10-15",
 	"growth": {
-		"scripts.code_lines": 107
+		"scripts.code_lines": 123
 	}
 }
