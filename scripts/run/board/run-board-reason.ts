@@ -5,6 +5,7 @@ import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_setup } from './run-board-setup'
+import type { ItemStatus } from './run-board-status'
 
 // Why each waiting row waits — pure, so the words are tested apart from the screen. A row whose lane is
 // being opened says the stage that lane is at; any other says what `backlog:next` would answer for it,
@@ -63,10 +64,13 @@ function is_untriaged_candidate(child: EpicChild, read: ReasonRead): boolean {
 	return !epic_triage.is_triaged(child) && !run_board_layout.is_blocked(child, read)
 }
 
+// A child whose lane stands with no one in it still holds the paths it declared, as its open lane does.
+function holds_paths(status: ItemStatus): boolean {
+	return status.state === 'running' || status.lane !== undefined
+}
+
 function running_of(read: ReasonRead): Array<number> {
-	return [...read.statuses]
-		.filter(([, status]) => status.state === 'running')
-		.map(([issue]) => issue)
+	return [...read.statuses].filter(([, status]) => holds_paths(status)).map(([issue]) => issue)
 }
 
 function pool_of(read: ReasonRead): Pool {

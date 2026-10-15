@@ -153,6 +153,16 @@ describe('run_board_reason.reader — a row the pool keeps waiting', () => {
 		expect(reasons([child(HELD)], { plan, statuses: merged })).toStrictEqual([undefined])
 	})
 
+	// joshuafolkken/kit#3893: a child that died still holds its lane and the paths it declared.
+	it('weighs a declared path against a stopped child whose lane is still open', () => {
+		const plan = plan_of([child(HELD)], DECLARED)
+		const stopped = new Map<number, ItemStatus>([
+			[RUNNING, { state: 'stopped', lane: `lane ${String(RUNNING)}` }],
+		])
+
+		expect(reasons([child(HELD)], { plan, statuses: stopped })).toStrictEqual([OVERLAP])
+	})
+
 	it('says no lane is free once the open lanes reach the limit', () => {
 		expect(reasons([child(HELD)], { free_lanes: NO_LANE_LEFT })).toStrictEqual(['no free lane'])
 	})
