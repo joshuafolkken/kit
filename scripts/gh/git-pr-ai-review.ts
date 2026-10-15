@@ -89,6 +89,10 @@ async function fetch_review_comments(
 	return parsed?.map((comment) => to_review_comment(comment))
 }
 
+// The other choice both AI-review stops offer: a person who has looked records why and moves on.
+const IGNORE_ALTERNATIVE =
+	'Re-run `pnpm josh followup --ai-review-ignore-reason "<reason>"` if the gate does not apply'
+
 async function handle_blockers(input: {
 	branch_name: string
 	ignore_reason: string | undefined
@@ -105,7 +109,12 @@ async function handle_blockers(input: {
 		return
 	}
 
-	await git_pr_confirmation.notify_confirmation({ context: input.context, body })
+	await git_pr_confirmation.notify_confirmation({
+		context: input.context,
+		body,
+		recommended: 'Fix the findings and re-run `pnpm josh followup`',
+		alternatives: [IGNORE_ALTERNATIVE],
+	})
 
 	throw new Error(body)
 }
@@ -140,6 +149,8 @@ async function handle_unreadable_comments(input: {
 	await git_pr_confirmation.notify_confirmation({
 		context: input.context,
 		body: UNREADABLE_COMMENTS_BODY,
+		recommended: 'Re-run `pnpm josh followup` once the comments can be read',
+		alternatives: [IGNORE_ALTERNATIVE],
 	})
 
 	throw new Error(UNREADABLE_COMMENTS_BODY)

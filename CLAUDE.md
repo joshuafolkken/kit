@@ -82,5 +82,5 @@ Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflo
 Before pausing **any** run for the user — a command's stop, an upstream-Issue interrupt, a Tier C confirmation — send once per stop (skip when the user asked for the stop this turn):
 
 ```bash
-pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<one-line reason>\n<what is needed from the user>'
+pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"
 ```

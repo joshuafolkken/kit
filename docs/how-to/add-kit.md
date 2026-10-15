@@ -4,6 +4,13 @@
 
 You have a repository and want kit's AI rules, formatting and checks in it. This page only routes you; the setup guides hold the steps.
 
+## What kit changes in your project
+
+- **Files written:** settings per profile, including Prettier — always on `full`, and on `basic` only when the project has web files and no formatter of its own ([per profile](../init.md#project-profiles)); `--dry-run` previews them.
+- **Overwritten by `josh sync`:** the managed files, such as `.github/workflows/ci.yml` and `AGENTS.md` ([the list](../sync.md#ai-files-overwritten)).
+- **Permissions:** the Claude Code settings kit writes (with `josh start`, or on `full`) set `bypassPermissions` with `Bash(*)`, guarded by a deny list and a hook ([how to opt out](../init.md#claude-code-permission-mode)).
+- **On GitHub:** `josh start` adds labels, and on an existing `main` an Issue and a setup PR that you merge yourself ([the steps](../init.md#josh-init-or-josh-start)).
+
 ## Steps
 
 1. Pick the guide for your [project profile](../init.md#project-profiles):

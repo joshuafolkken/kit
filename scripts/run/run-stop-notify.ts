@@ -38,6 +38,8 @@ async function announce(notice: StopNotice): Promise<boolean> {
 		issue_title: STOP_TITLE,
 		body: notice.reason,
 		recovery: STOP_RECOVERY,
+		recommended: 'Resolve the reason above, then run `backlogrun` again',
+		alternatives: ['Leave the backlog stopped until a later session'],
 	})
 }
 

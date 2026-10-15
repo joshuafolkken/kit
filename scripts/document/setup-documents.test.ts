@@ -24,14 +24,17 @@ const AUTHENTICATION = 'docs/authentication.md'
 const INIT_GUIDE = 'docs/init.md'
 const COMMAND_CATALOG = 'docs/josh-command-catalog.md'
 const README_POSITIONING = "kit gives Claude Code or Codex your project's rules and checks."
-// joshuafolkken/kit#3829: the README sums up what adopting kit into an existing project touches,
-// one line each, and leaves the detail to the guide each line links to.
+// joshuafolkken/kit#3829: the README points in one line to the how-to guide, which sums up what
+// adopting kit into an existing project touches, one line each, linking each to its detail.
 const ADOPTION_HEADING = '### Adding kit to an existing project'
+const ADOPTION_GUIDE = 'docs/how-to/add-kit.md'
+const ADOPTION_GUIDE_HEADING = '## What kit changes in your project'
+const ADOPTION_GUIDE_ANCHOR = '#what-kit-changes-in-your-project'
 const ADOPTION_DETAILS: ReadonlyArray<string> = [
-	'docs/init.md#project-profiles',
-	'docs/sync.md#ai-files-overwritten',
-	'docs/init.md#claude-code-permission-mode',
-	'docs/init.md#josh-init-or-josh-start',
+	'../init.md#project-profiles',
+	'../sync.md#ai-files-overwritten',
+	'../init.md#claude-code-permission-mode',
+	'../init.md#josh-init-or-josh-start',
 ]
 // joshuafolkken/kit#3343: each repeated setup note has one home the other user pages link to. The
 // marker is a phrase only the full statement carries, never the link that replaces it.
@@ -46,8 +49,8 @@ function user_documents(): Array<string> {
 		.map((entry) => `docs/${entry}`)
 }
 
-function readme_section(heading: string, next_heading: string): string {
-	const text = read_document(README)
+function document_section(path: string, heading: string, next_heading: string): string {
+	const text = read_document(path)
 	const start = text.indexOf(heading)
 	const end = text.indexOf(next_heading, start + heading.length)
 
@@ -59,7 +62,7 @@ function readme_section(heading: string, next_heading: string): string {
 
 function quick_start_links(): Array<string> {
 	return document_scan
-		.link_targets(readme_section(QUICK_START_HEADING, NEXT_README_HEADING))
+		.link_targets(document_section(README, QUICK_START_HEADING, NEXT_README_HEADING))
 		.map((target) => target.replace(/^\.\//u, ''))
 }
 
@@ -88,9 +91,20 @@ describe('the setup guides', () => {
 		expect(linked_paths(path)).toContain(README)
 	})
 
-	it.each(ADOPTION_DETAILS)('the README adoption section links to %s', (target) => {
-		expect(readme_section(ADOPTION_HEADING, '\n#')).toContain(`](./${target})`)
+	it('the README adoption section links to the adoption guide', () => {
+		expect(document_section(README, ADOPTION_HEADING, '\n#')).toContain(
+			`](./${ADOPTION_GUIDE}${ADOPTION_GUIDE_ANCHOR})`,
+		)
 	})
+
+	it.each(ADOPTION_DETAILS)(
+		'the adoption guide section on what kit changes links to %s',
+		(target) => {
+			expect(document_section(ADOPTION_GUIDE, ADOPTION_GUIDE_HEADING, '\n## ')).toContain(
+				`](${target})`,
+			)
+		},
+	)
 })
 
 describe('the entry pages agree', () => {

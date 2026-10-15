@@ -326,13 +326,11 @@ Related: [`josh git`](josh-commands.md#josh-git), [`josh observations:flush`](#j
 
 ### `josh notify`
 
-Send a Telegram notification for planning, confirmation, failure, warning, and kickoff-retry alerts.
+Send a Telegram notification.
 
 ```bash
 pnpm josh notify --task-type planning --issue-url "https://..." --body="- bullet 1\n- bullet 2"
-pnpm josh notify --task-type confirmation --issue-url "https://..." --body="Waiting for approval"
-pnpm josh notify --task-type failure --issue-url "https://..." --body="Build failed"
-pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file reason.md
+pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file r.md --recommended "Go" --alternative "Wait"
 ```
 
 **Options:**
@@ -341,8 +339,9 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 - `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
 - `--body-file` — read the body from a file (`-` reads stdin); use whenever the body carries a backtick or `$`. Passing both body forms is refused.
 - `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
+- `--recommended` (required for `confirmation`) / `--alternative` (repeatable) — choices appended under `JOSH_SESSION_LANG` headings.
 
-**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or [`JOSH_NOTIFY=off`](environment-variables.md#notification-behavior) to skip.
+**Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `planning` / `completion` skip with exit 0 unless [`JOSH_NOTIFY_OPT_IN`](environment-variables.md#notification-behavior) names them. `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or `JOSH_NOTIFY=off` to skip.
 
 ### `josh observations:flush`
 

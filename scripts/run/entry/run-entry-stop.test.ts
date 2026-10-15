@@ -77,6 +77,17 @@ describe('run_entry_stop.stop — the stop carries its own chores', () => {
 		expect(info_lines).toStrictEqual([lane_park.COMMAND_NOTIFY_MARKER])
 	})
 
+	// joshuafolkken/kit#3861: the off-screen reader is told what to choose, not only why it stopped.
+	it('recommends re-running the stopped command and offers leaving it', async () => {
+		const stop_ports = ports({ is_sent: true })
+
+		await run_entry_stop.stop(notice(false), stop_ports)
+		const [call] = vi.mocked(stop_ports.notify).mock.calls
+
+		expect(call?.[0].recommended).toContain('again in a fresh session')
+		expect(call?.[0].alternatives).toHaveLength(1)
+	})
+
 	// A failed send must leave the `Stop` hook still asking for the notify, so the marker is withheld.
 	it('prints the failure note instead of the marker when the Telegram does not go out', async () => {
 		await run_entry_stop.stop(notice(false), ports({ is_sent: false }))

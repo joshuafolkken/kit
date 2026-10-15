@@ -1,0 +1,9 @@
+{
+	"reason": "#3861 adds the notify opt-in and confirmation-options modules and documents the required --recommended / repeatable --alternative flags",
+	"date": "2026-10-15",
+	"growth": {
+		"scripts.code_lines": 109,
+		"ai_cost.resident_bytes": 2,
+		"ai_cost.on_demand_bytes": 232
+	}
+}

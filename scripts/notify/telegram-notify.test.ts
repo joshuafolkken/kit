@@ -17,6 +17,8 @@ const BODY = '- Added foo\n- Changed bar'
 const BOT_TOKEN_KEY = 'TELEGRAM_BOT_TOKEN'
 const CHAT_ID_KEY = 'TELEGRAM_CHAT_ID'
 const NOTIFY_SWITCH_KEY = 'JOSH_NOTIFY'
+const OPT_IN_KEY = 'JOSH_NOTIFY_OPT_IN'
+const ALL_OPTIONAL_TYPES = 'planning,completion'
 const GATEWAY_TIMEOUT_STATUS = 504
 const REDACTION_MARKER = '<redacted>'
 const RECOVERY_HINT = 'send it by hand with `pnpm josh notify`'
@@ -29,11 +31,13 @@ const OK_STATUS = 200
 // environment back whatever it held.
 //
 // The opt-out switch is cleared here too, so a shell that disabled notifications cannot turn every
-// failure case below into a skip.
+// failure case below into a skip — and both optional types are opted in, so the `planning` base input
+// the cases send is not skipped before the path they test.
 function set_credentials(bot_token: string | undefined, chat_id: string | undefined): void {
 	vi.stubEnv(BOT_TOKEN_KEY, bot_token)
 	vi.stubEnv(CHAT_ID_KEY, chat_id)
 	vi.stubEnv(NOTIFY_SWITCH_KEY, undefined)
+	vi.stubEnv(OPT_IN_KEY, ALL_OPTIONAL_TYPES)
 }
 
 function stub_fetch(response: { ok: boolean; status: number; statusText: string }): void {

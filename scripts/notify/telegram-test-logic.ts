@@ -1,4 +1,5 @@
 import { cli_body } from '#scripts/josh/cli-body'
+import { confirmation_options } from './confirmation-options'
 import type { TelegramSendInput, TelegramTaskType } from './telegram-notify'
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -10,6 +11,8 @@ interface CliValues {
 	'body-file'?: string
 	'issue-url'?: string
 	'pr-url'?: string
+	recommended?: string
+	alternative?: Array<string>
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -67,12 +70,41 @@ function normalize_body(values: CliValues): string | undefined {
 	})
 }
 
+// **A confirmation without a recommended choice is refused, not sent**: the person it reaches is
+// off-screen, and a stop that names no choice leaves them to reconstruct one. `--alternative` may be
+// absent — a stop with one way forward says so — so only `--recommended` is required.
+function require_recommended(values: CliValues): string {
+	const recommended = values.recommended?.trim() ?? ''
+
+	if (recommended.length === 0) {
+		throw new Error('--task-type confirmation needs --recommended "<the recommended choice>".')
+	}
+
+	return recommended
+}
+
+function given_alternatives(values: CliValues): Array<string> {
+	return (values.alternative ?? []).filter((alternative) => alternative.trim().length > 0)
+}
+
+function build_choices(values: CliValues, task_type: TelegramTaskType): string | undefined {
+	if (task_type !== 'confirmation') return undefined
+
+	return confirmation_options.block({
+		recommended: require_recommended(values),
+		alternatives: given_alternatives(values),
+	})
+}
+
 function build_input(input: { values: CliValues; context: ResolvedContext }): TelegramSendInput {
+	const task_type = parse_task_type(input.values['task-type'])
+
 	return {
-		task_type: parse_task_type(input.values['task-type']),
+		task_type,
 		repo_name: coalesce(input.values['repo-name'], input.context.repo_name),
 		issue_title: coalesce(input.values['issue-title'], input.context.issue_title),
 		body: normalize_body(input.values),
+		choices: build_choices(input.values, task_type),
 		issue_url: input.values['issue-url'],
 		pr_url: input.values['pr-url'],
 	}
