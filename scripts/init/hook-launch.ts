@@ -9,18 +9,23 @@ import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 // Every path after the prefix is relative, so a hook fired from a
 // subdirectory would otherwise miss its script. The root is git's, resolved with the location
 // variables a git hook exports cleared first, and resolved with them only when that fails — git
-// metadata outside the work tree. The consumer rewrite (`hook-command-rewrite.ts`) keeps this prefix,
-// so both sides stay one mechanism for Claude Code and Codex alike.
+// metadata outside the work tree. When the cleared lookup succeeds the variables are cleared for the
+// hook too, so its own git calls act on the checkout it stands in. The consumer rewrite
+// (`hook-command-rewrite.ts`) keeps this prefix, so both sides stay one mechanism for Claude Code and
+// Codex alike.
 //
-// **Everything after the root is one script** (`scripts/hooks/run-hook.sh`):
-// clearing the location variables for the hook itself, the bundle-ready gate and the live-source
-// fallback live there once, so each hook command names only its hook.
+// **A hook runs on every tool call, so its launch spawns as little as it can** (joshuafolkken/kit#3946):
+// the shell's own `unset` clears the variables rather than an `env` process, and that one lookup
+// both finds the root and decides whether the variables stay — `git` starts once.
+//
+// **Everything after the root is one script** (`scripts/hooks/run-hook.sh`): the bundle-ready gate and
+// the live-source fallback live there once, so each hook command names only its hook.
 
 const HOOK_DIST_DIR = 'dist/hooks'
 const RUN_HOOK_SCRIPT = 'scripts/hooks/run-hook.sh'
-const UNSET_OPTIONS = GIT_LOCATION_VARIABLES.map((name) => `-u ${name}`).join(' ')
+const LOCATION_VARIABLES = GIT_LOCATION_VARIABLES.join(' ')
 const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
-const PROJECT_ROOT_PREFIX = `project_root="$(env ${UNSET_OPTIONS} ${ROOT_LOOKUP} 2>/dev/null || ${ROOT_LOOKUP})" && cd "$project_root" && `
+const PROJECT_ROOT_PREFIX = `if project_root="$(unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null)"; then unset ${LOCATION_VARIABLES}; else project_root="$(${ROOT_LOOKUP})"; fi && cd "$project_root" && `
 
 // `name` is the hook's bundle under `dist/hooks` without `.js` (e.g. `pretool-guard`), followed by any
 // arguments it takes (e.g. `codex-hook-adapter pretool`).
