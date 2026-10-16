@@ -94,6 +94,15 @@
 
 **実行証跡は「動くこと」の証拠であり、gate の緑ではない**（joshuafolkken/kit#2246）。同じ証跡を PR 本文の `## 実機証跡` 節（コマンド＋実出力のフェンス）にも置く。無い実行時の変更は `pnpm josh followup` がマージを拒否する（#2446）。
 
+### PR 本文の受け入れ条件の対応表
+
+`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）:
+
+```md
+- `ac-1a2b3c4d` <条件> — 満たした: <テスト名・`file:line`・実行出力のいずれか>
+- `ac-5e6f7a8b` <条件> — 見送り: #<切り出した Issue> <理由>
+```
+
 **`run:carry` の実行証跡は `JOSH_TEMP_ROOT` を新しい一時ディレクトリに向けて取る（必須）。** 状態レコードは本物の run と共有なので、`JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:carry --begin …` のように各コマンドの頭に付ける（`docs/environment-variables.md` → "Runs"）。`run:merge` は main の同期・lane の close・GitHub への書き込みを行うため、これでは切り離せない。
 
 ### 区切りの報告（完了報告と区別する・必須）

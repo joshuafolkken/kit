@@ -8,6 +8,7 @@ const REPORT_FORMAT_PATH = 'prompts/collaboration-workflow/report-format.md'
 const SUMMARY_RULES_HEADING = '作業前サマリはいつ・どう出すか'
 const SUMMARY_TEMPLATE_HEADING = '作業前サマリ（セッション向け・`JOSH_SESSION_LANG` の言語）'
 const COMPLETION_REPORT_HEADING = '完了報告（セッション向け）'
+const ACCEPTANCE_MAP_HEADING = 'PR 本文の受け入れ条件の対応表'
 
 // The heading goes in single quotes in the runnable form: the template heading carries backticks,
 // which a double-quoted shell argument would run as a command substitution.
@@ -16,6 +17,7 @@ function pointer(heading: string): string {
 }
 
 const report_format_reference = {
+	ACCEPTANCE_MAP_HEADING,
 	COMPLETION_REPORT_HEADING,
 	pointer,
 	REPORT_FORMAT_PATH,

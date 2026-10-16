@@ -17,6 +17,7 @@ vi.mock('./git-gh-command', () => ({
 		pr_ensure_classification: vi.fn(),
 		pr_update_body: vi.fn(),
 		issue_view_json: vi.fn(),
+		issue_get_body: vi.fn(),
 	},
 }))
 
@@ -68,6 +69,7 @@ beforeEach(() => {
 	)
 	vi.mocked(git_gh_command.pr_create).mockResolvedValue(CREATED_PR_URL)
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
+	vi.mocked(git_gh_command.issue_get_body).mockResolvedValue('')
 	vi.mocked(git_gh_command.issue_view_json).mockResolvedValue(
 		JSON.stringify({ labels: [{ name: 'bug' }], body: '' }),
 	)
@@ -111,6 +113,42 @@ describe('git_pr.create_with_issue_info — build_body behavior', () => {
 			FULL_BODY,
 			BUGFIX,
 		)
+	})
+})
+
+// joshuafolkken/kit#3954: a body without the acceptance-criteria table gets one pending row per
+// criterion, and a body that already carries one is left as written.
+describe('git_pr.create_with_issue_info — the acceptance-criteria table', () => {
+	const CRITERION = 'The followup refuses an unmapped criterion'
+	const MAP = '## 受け入れ条件の対応'
+
+	beforeEach(() => {
+		vi.mocked(git_gh_command.issue_get_body).mockResolvedValue(
+			`## 受け入れ条件\n\n- [ ] ${CRITERION}`,
+		)
+	})
+
+	it('appends a pending row for each criterion', async () => {
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, EXTRA_BODY)
+
+		const body = vi.mocked(git_gh_command.pr_create).mock.calls[0]?.[1] ?? ''
+
+		expect(body).toMatch(
+			new RegExp(`^${FULL_BODY}\\n\\n${MAP}\\n\\n- \`ac-[0-9a-f]{8}\` ${CRITERION} — 未記入$`, 'u'),
+		)
+	})
+
+	it('keeps a body that already carries the table', async () => {
+		const written = `${MAP}\n\n- row`
+
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, written)
+
+		expect(git_gh_command.pr_create).toHaveBeenCalledWith(
+			FAKE_ISSUE_COMMIT,
+			`${ISSUE_CLOSING}\n\n${written}`,
+			BUGFIX,
+		)
+		expect(git_gh_command.issue_get_body).not.toHaveBeenCalled()
 	})
 })
 

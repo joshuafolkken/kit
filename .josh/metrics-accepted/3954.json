@@ -1,0 +1,9 @@
+{
+	"reason": "Round-1 review fixes: the ship preflight asks the acceptance map before the review, a wrapped criterion is hashed whole, and chain-rule.md names the table the --body-file carries",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 225,
+		"rules.lines": 9,
+		"ai_cost.on_demand_bytes": 560
+	}
+}

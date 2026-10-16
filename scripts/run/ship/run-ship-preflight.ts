@@ -3,9 +3,11 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_pr } from '#scripts/gh/git-pr'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
+import { git_issue } from '#scripts/git/git-issue'
 import { git_preflight } from '#scripts/git/git-preflight'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -22,6 +24,7 @@ import { run_ship_scoped } from './run-ship-scoped'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
+const UNREADABLE = Symbol('unreadable body')
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the PR body has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
 const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section to a file and hand it to josh ship with --body-file <path>, or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
 
@@ -71,16 +74,39 @@ async function caught(problems: Promise<Array<string>>): Promise<Array<string>> 
 	}
 }
 
+async function readable_body(
+	body_path: string | undefined,
+): Promise<string | undefined | typeof UNREADABLE> {
+	try {
+		return await body_text(body_path)
+	} catch {
+		return UNREADABLE
+	}
+}
+
+// `followup`'s acceptance-map refusal, asked of the body this ship will deliver. A branch with no issue
+// number is `git_preflight`'s problem to name, and an unreadable body the evidence side's.
+async function acceptance_problems(body_path: string | undefined): Promise<Array<string>> {
+	const issue = git_issue.branch_number(await git_branch.current())
+	const body = await readable_body(body_path)
+
+	if (issue === undefined || body === UNREADABLE) return []
+	const problem = await acceptance_map_check.body_refusal(issue, body)
+
+	return problem === undefined ? [] : [problem]
+}
+
 // The lock file is asked here too, so a drift stops the ship before the gate
 // rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<string>> {
-	const [preflight, evidence, lock] = await Promise.all([
+	const [preflight, evidence, acceptance, lock] = await Promise.all([
 		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
 		caught(evidence_problems(request.body_path)),
+		caught(acceptance_problems(request.body_path)),
 		caught(run_ship_lock.lock_problems()),
 	])
 
-	return [...preflight, ...evidence, ...lock]
+	return [...preflight, ...evidence, ...acceptance, ...lock]
 }
 
 async function stage(request: PreflightRequest): Promise<JoshResult> {
