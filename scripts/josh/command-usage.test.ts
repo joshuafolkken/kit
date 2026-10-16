@@ -24,6 +24,12 @@ describe('command usage', () => {
 		)
 	})
 
+	it('renders a command from the backlog reference page', () => {
+		expect(command_usage.format_usage('epic')).toContain(
+			'pnpm josh epic --add 893 894 --before 891',
+		)
+	})
+
 	it('renders a command from the run reference page', () => {
 		expect(command_usage.format_usage('run:release')).toContain(
 			'pnpm josh run:release --force   # clear a record left by a run that has ended',
