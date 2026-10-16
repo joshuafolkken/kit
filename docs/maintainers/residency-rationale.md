@@ -1,11 +1,10 @@
 # Rule residency — rationale
 
 This is maintainer-only history behind `prompts/collaboration-workflow/residency.md`, the single
-source of where a rule is written and how much of it stays resident. It is never read during a run.
-**Three sections are the exception, because `residency.md` points here for their conditions** — "Trigger
-and pointer, and the narrow retirement route", "A pointer-only topic file is never cited" and "When the
-ceiling may be raised" are binding, so a change to them changes a rule; a change anywhere else here
-changes none. It used to close `.claude/skills/workflow-commands/rule-residency.md`,
+source of where a rule is written and how much of it stays resident. It is never read during a run,
+and `residency.md` states every binding condition itself — the retirement conditions, direct citation
+and the ceiling-raise conditions — so a change here changes no rule unless `residency.md` changes with
+it. It used to close `.claude/skills/workflow-commands/rule-residency.md`,
 which said of it that it was "retained as history, not as a live constraint"; that file was merged
 into `residency.md` and this text moved here unchanged (joshuafolkken/kit#2891). joshuafolkken/kit#3177
 cut `residency.md` down to its four questions and moved the rest here: the argument for the resident

@@ -1,7 +1,6 @@
 # An Issue's comments are part of the Issue
 
-**The single source of the comment read**, read before implementing a `#N` Issue. Rationale and
-history: `docs/maintainers/issue-comments-rationale.md` → "Why comments are read".
+Read before implementing a `#N` Issue.
 
 **Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun` and
 `kickoff`; a `backlogrun` named issue and epic child inherit it through `fullrun`. One call, in the same

@@ -2,8 +2,7 @@
 
 Read this when a filing's `epic:bundle` answer places the issue (`add_to_epic`, `create_epic`, or a
 choice between epics), or when `SKILL.md` → "`josh epic:bundle <N>` — does this new issue belong with
-one already filed?" does not settle it. `Nothing to bundle.` needs neither. Reasons:
-`docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why each answer reads as it does".
+one already filed?" does not settle it. `Nothing to bundle.` needs neither.
 
 **Only two things count as a signal**: one issue naming the other in its acceptance criteria
 (`## 受け入れ条件` / `## Acceptance criteria`) or its `parent: #N` / `親: #N` line, or a `blocked-by`

@@ -8,7 +8,7 @@
 }
 ```
 
-**8,000 文字**（harness の既定は 30,000、最大は 150,000。根拠は `docs/maintainers/output-bounds-rationale.md` → "Why 8,000"）。効くのは Bash ツールだけで、`Read` と `Agent` の結果には効かない。
+**8,000 文字**（harness の既定は 30,000、最大は 150,000）。効くのは Bash ツールだけで、`Read` と `Agent` の結果には効かない。
 
 ## 切り詰められたときにどうするか
 
@@ -34,8 +34,8 @@
 - パイプが避けられないなら `set -o pipefail` を前置する
 - どの形でも、印字された判定行を読む。終了コードだけを答えにしない
 
-対象は結果が合否を意味するコマンドだけ — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。`pnpm josh pretool:guard` は、後段が `tail` ／全行読みの `grep` だけの検証パイプラインを `(set -o pipefail; …)` で包み、他のパイプは拒否する（`rule-delivery.md`、`docs/maintainers/output-bounds-rationale.md` → "Why the pipe rule is delivered by a trigger"）。
+対象は結果が合否を意味するコマンドだけ — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。`pnpm josh pretool:guard` は、後段が `tail` ／全行読みの `grep` だけの検証パイプラインを `(set -o pipefail; …)` で包み、他のパイプは拒否する（`rule-delivery.md`）。
 
 ## 検査
 
-`scripts/lib/bash-output-cap.test.ts` が、配布設定の上限がこの文書の値と一致し、既定より小さく最大を超えないことを固定する（`docs/maintainers/output-bounds-rationale.md` → "What the tests pin"）。
+`scripts/lib/bash-output-cap.test.ts` が、配布設定の上限がこの文書の値と一致し、既定より小さく最大を超えないことを固定する。

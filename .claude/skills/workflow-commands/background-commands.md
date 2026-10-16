@@ -17,7 +17,6 @@
 - A lane child's hand-off or pre-gate cut is the sole turn boundary before the push (`chain-rule.md`).
 
 Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
-Where each rule came from: `docs/maintainers/background-commands-rationale.md` → "Where each rule came from".
 
 ## How the wait ends — the task's exit, never a regex over its output
 
@@ -27,8 +26,7 @@ limit.
 
 **Never hand-write a `while`/`until` … `sleep` loop over the output file** — a regex that never matches
 waits to the block limit, one that matches a mid-run line exits early. `pnpm josh rule:guard` refuses it
-(`prompts/collaboration-workflow/rule-delivery.md`; `docs/maintainers/background-commands-rationale.md`
-→ "Why a poll loop is refused").
+(`prompts/collaboration-workflow/rule-delivery.md`).
 
 **To glance at interim output, `Read` the output file once**, never in a sleep loop. CI is waited on by
 `pnpm josh followup`; a progress heartbeat is `run:progress --wait`'s job (`early-heartbeat` refuses a
@@ -37,8 +35,7 @@ hand-armed timer).
 ## The tail and what overlaps each wait
 
 **Never give a foreground call a timeout above the harness cap** — a larger number detaches it without
-the completion notification (`docs/maintainers/background-commands-rationale.md` → "Why the tail
-collects idle time").
+the completion notification.
 
 **The tail is emptied before `followup` is issued.** Each step is asked one question: **does it read the
 merge result?**
@@ -64,8 +61,7 @@ merge result?**
 **The turn never ends at the push.** The `pnpm josh git -y` completion resumes the run, and that turn
 goes straight through any branch-2 filing and `pnpm josh epic:bundle` to `pnpm josh followup`. `pnpm
 josh rule:guard` refuses the foreground push (`prompts/collaboration-workflow/rule-delivery.md`); the
-push reissued detached is not refused again (`docs/maintainers/background-commands-rationale.md` → "Why
-the push is guarded").
+push reissued detached is not refused again.
 
 **One turn does end before the push: a dispatched lane child's pre-gate cut** — `pre-gate-cut.md` →
 "Taking the cut".

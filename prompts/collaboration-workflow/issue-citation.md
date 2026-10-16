@@ -2,8 +2,6 @@
 
 ## セッション向け出力で Issue はリンク＋セッション言語の短い要約で参照する（joshuafolkken/kit#1758）
 
-理由は `docs/maintainers/issue-citation-rationale.md` → "Why the rule exists"、発火点の常駐理由は `docs/maintainers/issue-citation-rationale.md` → "Why the trigger is resident in CLAUDE.md"。
-
 **規則**: セッション向け出力で Issue を指すときは、次の 2 つを必ず添える（対応前の「これから走らせる」「待機中」「対象外」の言及も含む）。
 
 1. 番号にチケットへの markdown リンク
@@ -11,7 +9,7 @@
 
 - `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <その Issue が何をするものかの短い要約>`
 
-**この引用行は `pnpm josh issue:cite <N> [<N> ...]` が出す。** 複数 Issue は 1 呼び出しにまとめ、他リポジトリは `--repo <owner/repo>` か `owner/repo#N` 表記（`docs/maintainers/issue-citation-rationale.md` → "Why issue:cite prints the line"、詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite`）。タイトルは必要ならセッション言語に言い換える。素の `#N` の行（コミットメッセージ・PR 本文・イベント行・Telegram 本文）を写すときは引用形に直す（`docs/maintainers/issue-citation-rationale.md` → "Why josh prints the citation form itself"）。
+**この引用行は `pnpm josh issue:cite <N> [<N> ...]` が出す。** 複数 Issue は 1 呼び出しにまとめ、他リポジトリは `--repo <owner/repo>` か `owner/repo#N` 表記（詳細は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh issue:cite`）。タイトルは必要ならセッション言語に言い換える。素の `#N` の行（コミットメッセージ・PR 本文・イベント行・Telegram 本文）を写すときは引用形に直す。
 
 ### 適用範囲
 
@@ -25,4 +23,4 @@
 
 ### 停止時の担保（joshuafolkken/kit#2247）
 
-`Stop` フック `pnpm josh stop:guard` は返信の地の文に裸の `#N` があると、`issue:cite` と同じ処理で引用行を作り `systemMessage` として表示する（モデルの手番は使わない）。引用できない番号があったときだけ停止をブロックし、`pnpm josh issue:cite <N...>` の実行形を差し戻す。差し戻されたらその実行形で引用し直す（`docs/maintainers/issue-citation-rationale.md` → "How the Stop hook delivers it"、検出が外す範囲は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard`）。
+`Stop` フック `pnpm josh stop:guard` は返信の地の文に裸の `#N` があると、`issue:cite` と同じ処理で引用行を作り `systemMessage` として表示する（モデルの手番は使わない）。引用できない番号があったときだけ停止をブロックし、`pnpm josh issue:cite <N...>` の実行形を差し戻す。差し戻されたらその実行形で引用し直す（検出が外す範囲は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard`）。

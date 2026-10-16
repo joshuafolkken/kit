@@ -59,8 +59,6 @@ gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue
 - **An Issue carrying more than one counts as the lowest depth present.**
 - **An `epic` takes no depth label** and is excluded from the share's denominator.
 
-Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the depth label is applied at filing".
-
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — an Issue number or a run, never "this would slow runs down". **Cannot cite
   one, it is not filed**: it goes to the ledger (`observation-ledger.md`); the blockage arriving or a
@@ -74,12 +72,9 @@ Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the depth
   - **Cannot write both, it is not filed** — it goes to the ledger.
 - **This narrows depth 2 alone, and the exemptions above carry over unchanged.**
 
-Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why depth gates a discretionary filing".
-
 **It governs this route only — the fourth row of `prerequisite.md`'s table.** A review finding routed
 to branch 2 of `prompts/review.md` → "Review round cap" is filed under that section's own bar and
 **does not take the depth test**. **That bar is the reason, and the subject's depth is not.**
-Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a review branch-2 filing skips the depth test".
 
 **And a PR that *adds* a measurement names its reader in the same way** — the Issue that read the value
 to decide something, or the path of the rule that reads it. **A measurement with no reader is not
@@ -98,8 +93,6 @@ added.** `route:tier-a` and `route:interrupt` carry over unchanged.
 
 **Two readings of the same backlog give the same number.**
 
-Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why the depth-0 denominator is fixed".
-
 **What the number is for is not decided here** — no `backlog:next` change and no target value until it
 has been measured the same way more than once.
 
@@ -114,10 +107,3 @@ run's ceiling.
 appends what is left.** **The 10-per-run ceiling for this route is the parent's to count.** **Lines
 its own `review:record` and `measure:rerun` write are not this route** — they go to its issue's file in
 its lane (`observation-ledger.md` → "The ledger — where an observation that cannot cite a blockage goes").
-
-Rationale: `docs/maintainers/observation-filing-rationale.md` → "Why a delegated child neither files nor appends".
-
-**This file is the single source of every procedure above**; nothing under
-`prompts/collaboration-workflow/` restates it.
-
-Provenance: `docs/maintainers/observation-filing-rationale.md` → "Where each rule came from".

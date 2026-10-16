@@ -1,10 +1,5 @@
 # `backlogrun` — the manifest (named issues, epics and the opted-in backlog)
 
-**This file is the manifest, not the procedure**: the ordered flow as terse triggers, each naming the
-one section its moment reads. Rationale and provenance:
-`docs/maintainers/backlogrun-rationale.md` → "Why the loop's position is computed";
-`docs/maintainers/backlogrun-rationale.md` → "Where each rule came from".
-
 **`backlogrun` names either nothing, or the issues and epics to run first.** With no argument it runs
 whatever `pnpm josh backlog:next` offers — the whole opted-in backlog, every issue carrying `auto-ok`
 plus every child of an epic whose root carries it, ordered by dependency and grouped into waves. With
@@ -79,11 +74,3 @@ reference is read as a section").
 | Consecutive child failures | 3 | Stop and report; something is wrong with the environment, not the children. |
 
 A failure that is not consecutive parks its child and the run continues.
-
-## This file is the single source of the `backlogrun` procedure
-
-`CLAUDE.md` carries the keyword's row in the shorthand table and the explicit-invocation rule;
-`SKILL.md` → §1 routes here. This manifest names which children there are and in what order; each
-step's procedure is the section it names or `run:step` prints. Where any of them could disagree,
-the rule is that this manifest and `backlogrun-steps.md` add nothing to a child's procedure — they only say
-which children there are.

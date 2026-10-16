@@ -1,15 +1,6 @@
 # `backlogrun` — lanes and concurrency
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow". Reasons:
-
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane ceiling is shaped the way it is"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why CI concurrency is capped by the lane limit"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why a lane's review needs a brief and an attestation"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane branch is `<N>-lane` and never switched"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why lanes cost as well as buy throughput"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why `lane:launch` folds the lane steps into one"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why a committed child's lane is kept"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Where each rule came from"
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow".
 
 ## Concurrency: as many children per repository as it has free lanes
 
@@ -29,7 +20,6 @@ answer wrongly (a false green or a false red)? All three, and the issue carries 
 missing, and it carries `run:lane`. `backlog:next` and `epic:next --lanes` answer `triage` for an
 issue with neither, so a filed issue carries one of the two from its filing. **It stops the other
 lanes for one reason only: a batch run on broken verification leaves nobody's result trustworthy.**
-This section is the rule's single source; why: `docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
 
 ## Lanes — running more than one child at a time
 
