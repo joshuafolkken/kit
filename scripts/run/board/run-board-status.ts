@@ -22,7 +22,12 @@ type ItemState =
 
 interface ItemStatus {
 	state: ItemState
+	// When the child first launched in this run — a re-dispatch or a restart does not move it, so the
+	// row's time is the lane's whole time.
 	started_ms?: number | undefined
+	// The child's newest launch, present only where it launched again after `started_ms` — what the
+	// GitHub read is weighed against.
+	launched_ms?: number | undefined
 	ended_ms?: number | undefined
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
 	// it; the board does not draw it.
@@ -66,7 +71,8 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 }
 // A cut or a resume says the child is still running, on whatever phase it had reached.
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
-// A person's restart starts the child over in a fresh session, so its track starts over too.
+// A person's restart, and a re-dispatch after an outage, start the child over in a fresh session, so
+// its track starts over too; its time does not (`launched`).
 const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTART])
 // What the GitHub read may still settle: a running child, and one whose lane has no child left in it —
 // a child that merged and then died is drawn merged, not stopped.
@@ -76,12 +82,22 @@ function moment(event: RunEvent): number {
 	return Date.parse(event.at)
 }
 
-function launched(event: RunEvent): ItemStatus {
+// The newest launch carried on, where the child launched more than once.
+function relaunch_of(status: ItemStatus | undefined): Pick<ItemStatus, 'launched_ms'> {
+	const launched_ms = status?.launched_ms
+
+	return launched_ms === undefined ? {} : { launched_ms }
+}
+
+// joshuafolkken/kit#3971: a launch keeps the start of the child's first one in this run.
+function launched(previous: ItemStatus | undefined, event: RunEvent): ItemStatus {
 	const at_ms = moment(event)
+	const started_ms = previous?.started_ms ?? at_ms
 
 	return {
 		state: 'running',
-		started_ms: at_ms,
+		started_ms,
+		...(started_ms !== at_ms && { launched_ms: at_ms }),
 		track: [run_board_phase.LAUNCHED_PHASE],
 		phase_ms: at_ms,
 	}
@@ -100,7 +116,12 @@ function moved(previous: ItemStatus, track: ReadonlyArray<Phase>, event: RunEven
 function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
 	const track = previous?.track
 
-	return { state, started_ms: previous?.started_ms, ...(track !== undefined && { track }) }
+	return {
+		state,
+		started_ms: previous?.started_ms,
+		...relaunch_of(previous),
+		...(track !== undefined && { track }),
+	}
 }
 
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
@@ -110,7 +131,7 @@ function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEve
 function continued(previous: ItemStatus | undefined): ItemStatus {
 	const { started_ms, track, phase_ms } = previous ?? {}
 
-	return { state: 'running', started_ms, track, phase_ms }
+	return { state: 'running', started_ms, ...relaunch_of(previous), track, phase_ms }
 }
 
 // A stage line carrying its attempt redraws the track of any child launched on this stream — a settled
@@ -145,7 +166,7 @@ function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.
 function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
-	if (LAUNCH_KINDS.has(event.kind)) return launched(event)
+	if (LAUNCH_KINDS.has(event.kind)) return launched(previous, event)
 
 	const ending = ENDING_STATES[event.kind]
 
@@ -229,9 +250,14 @@ function is_listed_closed(issue: number, read: OpenRead): boolean {
 	return read.open_numbers !== undefined && !read.open_numbers.has(issue)
 }
 
-// The listing was read after the child launched, so what it says about the child is this run's.
+// When the child last launched — what a GitHub read is weighed against.
+function launch_ms(status: ItemStatus): number | undefined {
+	return status.launched_ms ?? status.started_ms
+}
+
+// The listing was read after the child last launched, so what it says about the child is current.
 function is_read_after_launch(status: ItemStatus, read: OpenRead): boolean {
-	return read.read_ms !== undefined && (status.started_ms ?? 0) <= read.read_ms
+	return read.read_ms !== undefined && (launch_ms(status) ?? 0) <= read.read_ms
 }
 
 // A child launched before the listing was read and missing from it has closed since.
@@ -259,9 +285,11 @@ function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus
 
 // A close dated before the launch is an earlier life of the issue, not how this run's child ended.
 function is_closed_before_launch(status: ItemStatus, closed: ClosedIssue): boolean {
-	if (closed.closed_ms === undefined || status.started_ms === undefined) return false
+	const launch = launch_ms(status)
 
-	return closed.closed_ms < status.started_ms
+	if (launch === undefined || closed.closed_ms === undefined) return false
+
+	return closed.closed_ms < launch
 }
 
 // A running child read closed ends when GitHub says it closed, merged or not.
