@@ -192,7 +192,10 @@ describe('josh_logic.run_command — the memory a command claims', () => {
 
 		await josh_logic.run_command('lint', [])
 
-		expect(reservation.mock.calls[0]?.[2]).toEqual({ memory_mb: core_budget.MEMORY_MB.lint })
+		expect(reservation.mock.calls[0]?.[2]).toEqual({
+			memory_mb: core_budget.MEMORY_MB.lint,
+			command: 'lint',
+		})
 	})
 })
 

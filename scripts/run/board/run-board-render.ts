@@ -24,6 +24,7 @@ import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_thanks } from './run-board-render-thanks'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_render_waits } from './run-board-render-waits'
 import { run_board_row_yield } from './run-board-row-yield'
 import type { Thanks } from './run-board-thanks-csv'
 
@@ -388,7 +389,11 @@ function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
+	const above = [
+		...run_board_header.header_lines(header),
+		...run_board_render_waits.wait_lines(header.budget_waits, header.link),
+		...resume_lines(view.resume),
+	]
 	const parts = {
 		above,
 		plan: plan_sections(header, view.size),

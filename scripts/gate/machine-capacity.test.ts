@@ -1,5 +1,18 @@
-import { describe, expect, it } from 'vitest'
-import { machine_capacity, type MachineReading } from './machine-capacity'
+import { hanging_execa } from '#scripts/test/hanging-execa'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { core_admission, type LedgerEntry } from './core-admission'
+import { machine_capacity, type MachineReading, type MemoryReading } from './machine-capacity'
+
+vi.mock('execa', async () => {
+	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+
+	return { execa: stand_in.spawn }
+})
+
+afterEach(() => {
+	hanging_execa.reset()
+	vi.restoreAllMocks()
+})
 
 // joshuafolkken/kit#3371: the core budget admitted against the core count whatever else the machine
 // was running, so three lanes reached a load average of 16.8 on 11 cores and swapped memory nobody
@@ -13,12 +26,13 @@ const AVAILABLE_MB = 4000
 const LEDGER_MEMORY_MB = 2400
 const LEDGER_CORES = 4
 const PAGE_BYTES = 4096
-// 256 + 512 pages of 4 KB: 3 MB swapped since boot.
+// 256 + 512 pages of 4 KB: 3 MB swapped since boot; 5 MB compressed since boot.
 const DARWIN_LEVEL = 'kern.memorystatus_level: 58'
 const DARWIN_SYSCTL = [
 	DARWIN_LEVEL,
 	'vm.compressor.swapper.swapins_total: 256',
 	'vm.compressor.swapper.swapouts_total: 512',
+	'vm.compressor_input_bytes: 5242880',
 	`hw.pagesize: ${String(PAGE_BYTES)}`,
 ].join('\n')
 
@@ -96,6 +110,7 @@ describe('machine_capacity memory readers', () => {
 
 		expect(reading.available_mb).toBeCloseTo((total_mb * level) / 100)
 		expect(reading.swapped_mb).toBe(3)
+		expect(reading.compressed_mb).toBe(5)
 	})
 
 	it('leaves a figure unread when its sysctl name is missing', () => {
@@ -107,6 +122,7 @@ describe('machine_capacity memory readers', () => {
 			available_mb: undefined,
 			swapped_mb: undefined,
 			pressure_level: undefined,
+			compressed_mb: undefined,
 		})
 	})
 
@@ -141,5 +157,116 @@ describe('machine_capacity.swapped_between', () => {
 	it('answers undefined when either reading is unread', () => {
 		expect(machine_capacity.swapped_between(undefined, 1)).toBeUndefined()
 		expect(machine_capacity.swapped_between(1, undefined)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3943: the level counted compressible pages as free, so 5.2 GB of reservations
+// were admitted while the compressor held 5.9 GB and churned 3.3 GB every three seconds.
+const NORMAL = 1
+const WARNING = 2
+const SWAPPED_MB = 100
+const COMPRESSED_MB = 300
+const CALM: MemoryReading = {
+	available_mb: AVAILABLE_MB,
+	swapped_mb: SWAPPED_MB,
+	pressure_level: NORMAL,
+	compressed_mb: COMPRESSED_MB,
+}
+const HEAVY_MB = 2000
+
+function claim(key: string, claimed_at: number): LedgerEntry {
+	return { key, reservation: { weight: 1, memory_mb: HEAVY_MB, claimed_at } }
+}
+
+function admits_second_claim(after: MemoryReading): boolean {
+	const available_mb = machine_capacity.pressured_available(CALM, after)
+	const reading = { busy_cores: 0, available_mb }
+	const ledger = { cores: 1, memory_mb: HEAVY_MB }
+	const budget = machine_capacity.machine_budget(CORES, reading, ledger)
+
+	return core_admission.is_admitted('second', [claim('first', 0), claim('second', 1)], budget)
+}
+
+describe('machine_capacity.pressured_available — memory under compression and swap pressure', () => {
+	it('answers the available memory when nothing is under pressure', () => {
+		expect(machine_capacity.pressured_available(CALM, CALM)).toBe(AVAILABLE_MB)
+	})
+
+	it('answers no free memory while the kernel reports pressure', () => {
+		const after = { ...CALM, pressure_level: WARNING }
+
+		expect(machine_capacity.pressured_available(CALM, after)).toBe(0)
+	})
+
+	it('answers no free memory when swap traffic across the window passes the threshold', () => {
+		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB + 1 }
+
+		expect(machine_capacity.pressured_available(CALM, after)).toBe(0)
+	})
+
+	it('answers the available memory under the trickle of a machine that swapped once', () => {
+		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB }
+
+		expect(machine_capacity.pressured_available(CALM, after)).toBe(AVAILABLE_MB)
+	})
+
+	// Round 2 of #3943: the incident's thrash was compressor traffic with the kernel's verdict normal
+	// and the swap counters quiet, so the swap threshold alone admitted it.
+	it('answers no free memory when compressor traffic alone passes the threshold, swap quiet', () => {
+		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB + 1
+
+		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(0)
+	})
+
+	it('answers the available memory under compressor traffic at the threshold', () => {
+		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB
+
+		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(
+			AVAILABLE_MB,
+		)
+	})
+
+	it('leaves memory that could not be read unread, so it sets no limit', () => {
+		const unread = { available_mb: undefined, swapped_mb: undefined, pressure_level: undefined }
+
+		expect(machine_capacity.pressured_available(unread, unread)).toBeUndefined()
+	})
+
+	it('holds a heavy claim back under pressure and admits it when there is none', () => {
+		expect(admits_second_claim({ ...CALM, pressure_level: WARNING })).toBe(false)
+		expect(admits_second_claim(CALM)).toBe(true)
+	})
+})
+
+const SWAPOUTS_TOTAL = 512
+const BYTES_PER_MB = 1_048_576
+// One megabyte past the threshold, in pages, swapped out during the window.
+const SWAPPED_PAGES = ((machine_capacity.SWAP_PRESSURE_MB + 1) * BYTES_PER_MB) / PAGE_BYTES
+const SWAPPING_SYSCTL = DARWIN_SYSCTL.replace(
+	`swapouts_total: ${String(SWAPOUTS_TOTAL)}`,
+	() => `swapouts_total: ${String(SWAPOUTS_TOTAL + SWAPPED_PAGES)}`,
+)
+
+// The real `read_machine` — the machine guard replaces it in every worker — with a sysctl whose swap
+// counter advances while the window is waited out.
+async function read_swapping_machine(): Promise<MachineReading> {
+	const actual = await vi.importActual<{ machine_capacity: typeof machine_capacity }>(
+		'./machine-capacity',
+	)
+
+	vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+	hanging_execa.answer_with('sysctl', DARWIN_SYSCTL)
+
+	return await actual.machine_capacity.read_machine(async () => {
+		hanging_execa.answer_with('sysctl', SWAPPING_SYSCTL)
+		await Promise.resolve()
+	})
+}
+
+describe('machine_capacity.read_machine — memory read at both ends of the window', () => {
+	it('answers no free memory when the swap counter advanced past the threshold during the window', async () => {
+		const reading = await read_swapping_machine()
+
+		expect(reading.available_mb).toBe(0)
 	})
 })
