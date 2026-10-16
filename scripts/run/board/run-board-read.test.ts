@@ -100,6 +100,7 @@ describe('run_board_read.read_local', () => {
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			idle_lanes: [],
+			earlier_lanes: [],
 			free_lanes: FREE_LANES,
 			occupied_lanes: ['3432'],
 			usual: new Map(),
@@ -230,5 +231,21 @@ describe('run_board_read.read_local idle lanes', () => {
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ idle_lanes: ['3432'] })
 		expect(idle_lanes).toHaveBeenCalledWith([lane('3432')])
+	})
+})
+
+// joshuafolkken/kit#3969: a lane an earlier run left behind was drawn as this run's child.
+describe('run_board_read.read_local earlier lanes', () => {
+	it('names the open lanes that last took a child before the run started', async () => {
+		const started_ms = Date.parse(STARTED_AT)
+
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
+			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
+			{ ...lane('3432'), dispatched_ms: started_ms + MINUTE_MS },
+			lane('3433'),
+		])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ earlier_lanes: ['3431'] })
 	})
 })

@@ -188,8 +188,9 @@ function fold_events(events: ReadonlyArray<RunEvent>): Map<number, ItemStatus> {
 	return statuses
 }
 
-// A lane is this run's only when its issue is on the run's stream or in the run's plan, so a lane left
-// over from an earlier day is not drawn as this run's child.
+// A lane is this run's only when its issue is on the run's stream or in `in_run`, so a lane left over
+// from an earlier day is not drawn as this run's child. `in_run` leaves out a planned issue whose lane
+// an earlier run dispatched (`run-board-github.ts`).
 function is_running_lane(
 	issue: number,
 	status: ItemStatus | undefined,
