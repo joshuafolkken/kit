@@ -8,6 +8,7 @@ import {
 import {
 	ESLINT_RELATED_CACHE_FILE,
 	ESLINT_RELATED_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import type { CrossFileRecheckOptions } from './cross-file-recheck'
 
@@ -94,8 +95,10 @@ function describe_scope(scope: ChangedFileScope, root: string): string {
 	return changed_file_scope.describe_scope(scope, root, VOCABULARY)
 }
 
+// The scoped run's own cache file, for the reason eslint's below gives: prettier too rewrites its
+// cache file whole, so a narrowed run sharing the gate's would discard entries a concurrent gate wrote.
 function prettier_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
-	return [...PRETTIER_ARGS, ...files]
+	return [...PRETTIER_ARGS, ...files, ...PRETTIER_RELATED_CACHE_FLAGS]
 }
 
 // The cache file is this command's own rather than the gate's, because the two run at the same time.

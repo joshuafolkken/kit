@@ -43,14 +43,14 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 	'issue:scout': {
 		examples: [
 			{ arguments: '"Stop the gate re-running after every edit"' },
-			{ arguments: '"<title>" --body "follows on from #1246"' },
+			{ arguments: '"<title>" --body "parent: #1246"' },
 			{ arguments: '"<title>" --body-file draft.md' },
 		],
 		flags: [
 			{
 				names: ['--body "<text>"'],
 				description:
-					'supply prose references (`#N`) so the epic half has a number to work from; without one it prints `Epic: not asked`.',
+					'supply references (`#N`) in a `parent: #N` line or an acceptance-criteria section so the epic half has a number to work from; without one there (a background mention does not count) it prints `Epic: not asked`.',
 			},
 			{
 				names: [BODY_FILE],

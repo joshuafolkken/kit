@@ -1,5 +1,9 @@
 import { project_checks } from '#scripts/gate/project-checks'
-import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_CACHE_FILE,
+	PRETTIER_CACHE_FILE,
+	PRETTIER_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,7 +21,7 @@ vi.mock('./cross-file-recheck', () => ({
 
 const { cross_file_recheck } = await import('./cross-file-recheck')
 const mocked_verify = vi.mocked(cross_file_recheck.verify)
-const { lint_parallel } = await import('./lint-parallel')
+const { lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -72,6 +76,18 @@ describe('run_lint_parallel_checks', () => {
 		await run_lint_parallel_checks()
 
 		expect(mocked_cache_run).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function))
+	})
+
+	// joshuafolkken/kit#3948: prettier hashes each file's absolute path into its cache entry, so a
+	// cache imported from another checkout misses on every file — it is cached, never shared.
+	it('checks prettier from its own content cache without sharing it', async () => {
+		mock_exit_codes(0, 0)
+
+		await run_lint_parallel_checks()
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(PRETTIER_ARGS)
+		expect(PRETTIER_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
+		expect(mocked_cache_run).not.toHaveBeenCalledWith(PRETTIER_CACHE_FILE, expect.any(Function))
 	})
 
 	it.each([

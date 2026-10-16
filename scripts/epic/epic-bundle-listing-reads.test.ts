@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { listing_of } from '#scripts/gh/git-gh-issue-list-fixture'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle_cli } from './epic-bundle-cli'
+import { epic_bundle_fixture } from './epic-bundle-fixture'
 
 // joshuafolkken/kit#1736: the open-issue listing `epic:bundle` already holds carries GitHub's own
 // `issue_dependencies_summary`, so an issue with no blockers can be answered from it instead of
@@ -141,7 +142,7 @@ async function report_with(
 	}
 }
 
-const FOLLOWS_RELATED = `follows #${String(RELATED)}`
+const FOLLOWS_RELATED = epic_bundle_fixture.in_acceptance(`follows #${String(RELATED)}`)
 const NO_EPICS: ReadonlyArray<Record<string, unknown>> = []
 
 // The command's own headline for an action, read from its table rather than spelled out again here —

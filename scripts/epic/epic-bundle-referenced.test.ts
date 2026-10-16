@@ -51,6 +51,19 @@ function context(overrides: Partial<ReferencedContext> = {}): ReferencedContext 
 	}
 }
 
+// Only a parent line or the acceptance criteria count as a signal, so background mentions written
+// ahead of one must not push it past the cap.
+describe('epic_bundle_referenced.referenced_lookups signal order', () => {
+	it('reads a signal reference before the background mentions ahead of it', () => {
+		const limit = epic_bundle_referenced.REFERENCED_LOOKUP_LIMIT
+		const numbers = Array.from({ length: limit + 5 }, (_, index) => index + 1)
+		const background = numbers.map((number) => `#${String(number)}`).join(' ')
+		const subject = issue(999, { body: `${background}\n\nparent: #500` })
+
+		expect(epic_bundle_referenced.referenced_lookups(subject, new Set()).numbers[0]).toBe(500)
+	})
+})
+
 describe('epic_bundle_referenced.referenced_lookups', () => {
 	it('names the issues the body cites that the listing did not carry', () => {
 		const subject = issue(943, { body: SUBJECT_BODY })

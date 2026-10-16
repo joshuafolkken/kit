@@ -5,11 +5,16 @@ choice between epics), or when `SKILL.md` → "`josh epic:bundle <N>` — does t
 one already filed?" does not settle it. `Nothing to bundle.` needs neither. Reasons:
 `docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why each answer reads as it does".
 
-**Only two things count as a signal**: the issues referring to each other in prose, or a `blocked-by`
-already recorded between them. **A similar title never counts on its own.**
+**Only two things count as a signal**: one issue naming the other in its acceptance criteria
+(`## 受け入れ条件` / `## Acceptance criteria`) or its `parent: #N` / `親: #N` line, or a `blocked-by`
+recorded between them. A reference elsewhere, or a similar title, never counts; the evidence line
+names the section.
+
+**A placing answer you do not follow** — check it against both issues first; record the reason as an
+`Auto-decided:` line on the issue.
 
 **The release issue is neither a candidate nor a subject**, like an epic — its `blocked-by` relations
-are mechanical. Any other `blocked-by` or prose reference still counts.
+are mechanical. Any other `blocked-by` or counted reference still counts.
 
 **The search is not limited to the open backlog.** Every number the subject's own body names is read
 (capped at twenty), whatever its state:
