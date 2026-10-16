@@ -28,6 +28,9 @@ interface GateStepResult extends BufferedProcessResult {
 	command: string
 	// Set when the check started past the machine-wide budget at the wait cap.
 	budget_note?: string | undefined
+	// Set when the check was not started because its inputs match the record taken at this time
+	// (`check-reuse.ts`).
+	reused_at?: string | undefined
 }
 
 function is_gate_step_failed(result: GateStepResult): boolean {
@@ -98,6 +101,12 @@ function is_unverified_skip(result: GateStepResult): boolean {
 	)
 }
 
+// Whether a passing check said nothing a green record would hide — the condition every record the
+// gate writes is withheld on (`verification-gate.ts` → `record_green_gate`, `check-reuse.ts`).
+function has_nothing_to_say(result: GateStepResult): boolean {
+	return !is_unverified_skip(result) && !has_checker_warning(result)
+}
+
 // **A check the verdict counts as skipped said nothing but that it checked nothing.** `is_skip_notice`
 // asks whether a check carries a skip notice, which is the right question for printing its body; it is
 // the wrong one for a count, twice over. A check can skip half of
@@ -154,8 +163,12 @@ function format_seconds(elapsed_ms: number): string {
 // and the log exists precisely to be read when the console's copy has been elided.
 function gate_step_header(result: GateStepResult): string {
 	const icon = is_gate_step_failed(result) ? FAIL_ICON : PASS_ICON
+	const timing =
+		result.reused_at === undefined
+			? format_seconds(result.elapsed_ms)
+			: `reused — inputs unchanged since it passed at ${result.reused_at}`
 
-	return `${icon} ${result.label} (pnpm ${result.command}) ${format_seconds(result.elapsed_ms)}`
+	return `${icon} ${result.label} (pnpm ${result.command}) ${timing}`
 }
 
 function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
@@ -267,8 +280,8 @@ const gate_report = {
 	format_budget_notes,
 	format_failure_actions,
 	has_checker_warning,
+	has_nothing_to_say,
 	is_gate_step_failed,
-	is_unverified_skip,
 	report_gate_steps,
 }
 

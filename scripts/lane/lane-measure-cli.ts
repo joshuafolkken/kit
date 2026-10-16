@@ -3,6 +3,7 @@ import { setInterval as every } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity } from './lane-capacity'
+import { lane_check_stats } from './lane-check-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
@@ -121,6 +122,7 @@ async function stats_command(
 			lane_stage_stats.table(entries, window),
 			lane_stop_stats.table(entries, window),
 			lane_process_stats.table(entries, window),
+			lane_check_stats.table(entries, window),
 		].join('\n\n'),
 	)
 

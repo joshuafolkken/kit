@@ -51,6 +51,7 @@ const TYPE_CHECK_LABEL = 'check'
 const UNIT_LABEL = 'test:unit'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
+const EXPORTS_LABEL = 'exports'
 
 // The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
 // (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
@@ -106,7 +107,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// program and walks it for about 5s, and it is over well before lint and the type check. A
 	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
 	// unit suite for the whole gate.
-	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
+	{ label: EXPORTS_LABEL, target: 'exports:unused', reserved_cores: 0 },
 	// **The metrics ratchet is kit's own**: it holds kit's repository-wide
 	// totals to the merge-base's. It is one in-process eslint pass with only `max-lines` enabled, over
 	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
@@ -440,6 +441,7 @@ function format_gate_plan(
 }
 
 const gate_plan = {
+	EXPORTS_LABEL,
 	GATE_CHECKS,
 	LINT_LABEL,
 	MEASURED_CORES,
