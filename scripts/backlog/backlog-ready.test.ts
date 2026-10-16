@@ -2,7 +2,9 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_limit_cli } from '#scripts/lane/lane-limit-cli'
 import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -85,6 +87,10 @@ describe('backlog_ready.drive_free_lane_count', () => {
 	})
 })
 
+function record(invocation: string): RunCarry {
+	return { invocation, started_at: EARLY, merged: 0, filed: 0, cuts: 0, failures: 0, outages: 0 }
+}
+
 function lane_of(issue: string): LaneInfo {
 	return {
 		issue,
@@ -107,6 +113,7 @@ describe('backlog_ready.free_lanes_beside', () => {
 	beforeEach(() => {
 		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(undefined)
 	})
 
 	it('answers the free count `lane:limit` prints', async () => {
@@ -123,6 +130,28 @@ describe('backlog_ready.free_lanes_beside', () => {
 		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
 
 		await expect(backlog_ready.free_lanes_beside(OPEN)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3967: a `--only` run waited on lanes an earlier run left with no child in them.
+describe('backlog_ready.live_lane_count under the live run', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+		vi.spyOn(run_event_stream_emit, 'scoped_current_events').mockResolvedValue([])
+		// Each lane's child is probed with `pgrep`: never a real process from a test.
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue(OPEN.map((lane) => lane.issue))
+	})
+
+	it('counts only the lanes a --only run names once every child is gone', async () => {
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun #3865 --only'))
+
+		await expect(backlog_ready.live_lane_count()).resolves.toBe(1)
+	})
+
+	it('counts every open lane under a run that drains the pool', async () => {
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun'))
+
+		await expect(backlog_ready.live_lane_count()).resolves.toBe(OPEN.length)
 	})
 })
 
@@ -157,10 +186,6 @@ describe('backlog_ready.print_ready_line', () => {
 })
 
 // joshuafolkken/kit#2472: a `--only` run's work is its named list, so the pool is never its pick-up.
-function record(invocation: string): RunCarry {
-	return { invocation, started_at: EARLY, merged: 0, filed: 0, cuts: 0, failures: 0, outages: 0 }
-}
-
 describe('backlog_ready.drains_pool', () => {
 	it('drains the pool without a record, or under a run that is not --only', () => {
 		expect(backlog_ready.drains_pool(undefined)).toBe(true)

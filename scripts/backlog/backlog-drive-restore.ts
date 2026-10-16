@@ -84,4 +84,10 @@ function restore(
 	)
 }
 
-export const backlog_drive_restore = { active_issues, restore, settled_issues, parked_issues }
+export const backlog_drive_restore = {
+	active_issues,
+	mentioned_issues,
+	restore,
+	settled_issues,
+	parked_issues,
+}
