@@ -183,6 +183,38 @@ const DEVELOPER_USAGE: Readonly<Record<string, CommandUsage>> = {
 	'lane:withdraw': {
 		examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 	},
+	'test:red': { examples: [{ arguments: '', note: 'red, green, no-test or test-only' }] },
+	start: {
+		examples: [
+			{ arguments: '', note: 'asks for the profile and the repository' },
+			{
+				arguments: '--yes --github --profile basic',
+				note: 'unattended, including the GitHub repository',
+			},
+		],
+		flags: [
+			{ names: ['--profile basic|full'], description: 'the profile, without asking.' },
+			{ names: ['--yes'], description: 'take the defaults — not consent to write to GitHub.' },
+			{ names: ['--github'], description: 'create the GitHub repository and push `main`.' },
+			{ names: ['--public'], description: 'create the repository public instead of private.' },
+			{
+				names: ['--init-command "<command>"'],
+				description: 'run this setup command in place of `josh init`.',
+			},
+			{
+				names: ['--push-preflight-command "<command>"'],
+				description:
+					'a check run before the first step when the plan pushes; a failure stops the run before it writes anything.',
+			},
+			{ names: ['--dry-run'], description: 'print the plan and change nothing.' },
+		],
+	},
+	latest: { examples: [{ arguments: '', note: 'full update (update + audit + pnpm)' }] },
+	'latest:corepack': { examples: [{ arguments: '', note: 'update pnpm only' }] },
+	'latest:update': { examples: [{ arguments: '', note: 'update dependencies only' }] },
+	'lane:restart': {
+		examples: [{ arguments: '3769', note: "prints the fresh child's pid" }],
+	},
 	'rule:value': {
 		examples: [
 			{ arguments: '' },

@@ -10,8 +10,7 @@ const GATE_USAGE = [
 	'pnpm josh gate --no-unit   # the static checks only (CI only)',
 	'```',
 ].join('\n')
-// A registered command the usage table does not cover yet.
-const UNCOVERED_COMMAND = 'stop:guard'
+const UNKNOWN_NAME = 'not-a-command'
 
 describe('command usage', () => {
 	it('aligns every example comment in one column', () => {
@@ -42,8 +41,16 @@ describe('command usage', () => {
 		)
 	})
 
-	it('answers undefined for a command with no usage', () => {
-		expect(command_usage.format_usage(UNCOVERED_COMMAND)).toBeUndefined()
+	it('registers a usage for every command in the map', () => {
+		const uncovered = Object.keys(COMMAND_MAP).filter(
+			(name) => command_usage.format_usage(name) === undefined,
+		)
+
+		expect(uncovered).toEqual([])
+	})
+
+	it('answers undefined for a name that is not a command', () => {
+		expect(command_usage.format_usage(UNKNOWN_NAME)).toBeUndefined()
 	})
 })
 
@@ -57,14 +64,7 @@ describe('command help', () => {
 		expect(help.endsWith(GATE_USAGE)).toBe(true)
 	})
 
-	it('prints the description alone for a command with no usage', () => {
-		const help = command_usage.format_command_help(UNCOVERED_COMMAND) ?? ''
-
-		expect(help).toContain(COMMAND_MAP[UNCOVERED_COMMAND]?.description)
-		expect(help).not.toContain('```')
-	})
-
 	it('answers undefined for an unknown name', () => {
-		expect(command_usage.format_command_help('not-a-command')).toBeUndefined()
+		expect(command_usage.format_command_help(UNKNOWN_NAME)).toBeUndefined()
 	})
 })
