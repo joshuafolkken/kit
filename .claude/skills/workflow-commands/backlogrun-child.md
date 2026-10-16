@@ -89,7 +89,8 @@ is unchanged.
 
 ## A delegated unit that stopped without reporting
 
-**Hand the child off without blocking, and poll** — a stopped unit leaves no notification. Once its
+**Hand the child off without blocking, and wait on `pnpm josh lane:await <N>`** — a stopped unit
+leaves no notification, so the await's exit is the wake. Once its
 output is unchanged for the silent-unit window, read `backlogrun-recovery.md` → "A delegated unit that
 stopped without reporting" and ask `pnpm josh run:liveness`.
 

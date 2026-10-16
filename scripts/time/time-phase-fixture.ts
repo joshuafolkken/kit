@@ -27,6 +27,7 @@ const UNVARIED = {
 	label: '',
 	josh_command: '',
 	josh_commands: [],
+	josh_signatures: [],
 	check_key: '',
 	marker: time_markers.NO_MARKER,
 	is_bundleable: false,

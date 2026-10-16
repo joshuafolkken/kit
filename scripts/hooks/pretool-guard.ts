@@ -7,6 +7,7 @@ import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
 import { rule_rewrite, type RuleRewrite } from '#scripts/rules/rule-rewrite'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
+import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { batch_outcome } from './batch-guard'
@@ -95,12 +96,14 @@ async function mark_phase(outcome: GuardOutcome): Promise<void> {
 // **The parent hand-off guard is the second asynchronous rule, asked after the watcher's**.
 // It reads the carry record to tell the `backlogrun` parent apart, so it sits
 // beside the watcher rather than among the synchronous rows; a stale watcher is the cheaper fix and is
-// surfaced first.
+// surfaced first. **The poll guard is third**: it reads the same carry record, and only for a call that
+// repeats a state read, so the hand-off still wins over it.
 async function async_reason(raw_payload: string): Promise<string | undefined> {
 	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload)
 	const cut = watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload))
+	const poll = cut ?? (await run_poll_hook.safe_poll_reason(raw_payload))
 
-	return cut ?? (await issue_watch_hook.watch_reason())
+	return poll ?? (await issue_watch_hook.watch_reason())
 }
 
 async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {

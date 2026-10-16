@@ -88,7 +88,7 @@ park** — nothing is labelled, stashed or filed.
 ### Picking the lanes up in the fresh session
 
 **Start no child again and open no lane already open.** In one turn: `pnpm josh lane:list` (a line
-with a path is a handed-over child, polled per `backlogrun-recovery.md` → "A delegated unit that stopped
+with a path is a handed-over child, waited on per `backlogrun-recovery.md` → "A delegated unit that stopped
 without reporting"), `pnpm josh run:progress --wait --output <handed-over paths>` in the background
 (`run:watcher:guard`), `pnpm josh run:liveness`, and `epic:next --lanes`, a lane per child it offers.
 **A carried-over child finishes in its own unit — never run its `followup` yourself**; one lost in the
@@ -104,7 +104,7 @@ the epic body; what merged the epic's task list.
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Polling interval | 60 s | **In flight, a floor between two asks, never a clock** — the wake is `lane:await`'s completion or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch is polled at this same interval. |
+| Re-ask floor | 60 s | **In flight, never a clock — the wait is `backlog:drive` or `lane:await`**, and the wake is their exit or the watcher's arrival exit, never a report; a state read repeated with nothing decided in between is refused. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch re-asks at this same floor. |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget. A failed publish never appears. |
@@ -112,7 +112,7 @@ the epic body; what merged the epic's task list.
 
 Each timeout **ends the wait and reports** — none is retried indefinitely. Rationale for the figures:
 `docs/maintainers/backlogrun-progress-rationale.md` → "Why the parent waits on classification, not a
-clock". A stale child's label is removed first, so the next poll can offer it. **A graph that has
+clock". A stale child's label is removed first, so the next ask can offer it. **A graph that has
 deadlocked on a cycle is not this loop's to untangle**: `epic:next` detects it and exits with an error.
 
 ## Who sends the summary, and who propagates

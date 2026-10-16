@@ -303,6 +303,7 @@ const UNVARIED_SPAN = {
 	category: time_spans.TOOL_CATEGORY,
 	josh_command: '',
 	josh_commands: [],
+	josh_signatures: [],
 	refusal_guard: '',
 	check_key: '',
 	marker: time_markers.NO_MARKER,

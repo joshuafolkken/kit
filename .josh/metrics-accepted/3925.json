@@ -1,0 +1,8 @@
+{
+	"reason": "#3925 adds the run-poll-hook PreToolUse guard (new module), keys it by per-segment josh signatures (command plus operands) carried on ToolCall so distinct reads are no repeat, and rewords the backlogrun wait docs from polling to blocking waits",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 104,
+		"ai_cost.on_demand_bytes": 276
+	}
+}

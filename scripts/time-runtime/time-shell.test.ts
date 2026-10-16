@@ -42,6 +42,27 @@ describe('josh_arguments', () => {
 	})
 })
 
+describe('josh_signatures_of', () => {
+	it('keeps the operands that tell two reads apart', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh lane:output 1 a.log')).toEqual([
+			'josh lane:output 1 a.log',
+		])
+	})
+
+	it('drops flags and redirections, which ask nothing new', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh run:board --chat 2>&1')).toEqual([
+			'josh run:board',
+		])
+	})
+
+	it('reads every segment of a chain', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh lint:related a.ts && pnpm josh gate')).toEqual([
+			'josh lint:related a.ts',
+			'josh gate',
+		])
+	})
+})
+
 // What a pipeline throws away (joshuafolkken/kit#1556). A shell reports a pipeline with its last
 // command's status, so the cases below are about which segments lose theirs — and, just as much,
 // about which ones do not, because a caller that read `||` or the final segment as discarded would

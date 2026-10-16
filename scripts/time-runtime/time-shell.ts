@@ -300,8 +300,8 @@ function drop_redirections(words: ReadonlyArray<string>): Array<string> {
 // **The match's own text is what is sliced off, not a fixed word count.** The prefix is two words in
 // `josh lint`, three in `pnpm josh lint` and four in `pnpm exec josh lint`, so counting words would
 // leave `josh` itself in the argument list for one of the three spellings.
-function josh_arguments(command: string): Array<string> {
-	const text = command_words(command_segment(command)).join(' ')
+function josh_arguments_of_segment(segment: string): Array<string> {
+	const text = command_words(segment).join(' ')
 	const match = JOSH_PATTERN.exec(text)
 
 	if (match === null) return []
@@ -314,6 +314,33 @@ function josh_arguments(command: string): Array<string> {
 	return drop_redirections(words)
 }
 
+function josh_arguments(command: string): Array<string> {
+	return josh_arguments_of_segment(command_segment(command))
+}
+
+// The josh subcommand one segment runs plus the operands it names, flags dropped, or `''` for a
+// segment that runs none. **The operands are what the call asks about**: `lane:output 1 a.log` and
+// `lane:output 2 b.log` read two children, while `run:board` and `run:board --chat` print one answer.
+function josh_signature_of_segment(segment: string): string {
+	const name = josh_command_of_segment(segment)
+
+	if (name === '') return ''
+
+	const operands = josh_arguments_of_segment(segment).filter(
+		(word) => !word.startsWith(FLAG_PREFIX),
+	)
+
+	return [name, ...operands].join(' ')
+}
+
+// Every segment's signature, read over the same unquoted chain `josh_commands_of` walks.
+function josh_signatures_of(command: string): Array<string> {
+	return unquoted(command)
+		.split(SEGMENT_PATTERN)
+		.map((segment) => josh_signature_of_segment(segment))
+		.filter((signature) => signature !== '')
+}
+
 const time_shell = {
 	JOSH_PREFIX,
 	bash_command,
@@ -324,6 +351,7 @@ const time_shell = {
 	josh_arguments,
 	josh_command_of,
 	josh_commands_of,
+	josh_signatures_of,
 	leading_word,
 	unquoted,
 }

@@ -125,6 +125,13 @@ describe('a live unit is never booked as stopped', () => {
 		)
 	})
 
+	it('sends a live unit back to the blocking lane:await, never to another poll', () => {
+		const { advice } = run_liveness.decide(arrange_traces({ is_output_frozen: false }))
+
+		expect(advice).toContain('pnpm josh lane:await')
+		expect(advice).not.toContain('poll')
+	})
+
 	// A `pnpm josh followup` waits on CI for up to 32 minutes and writes nothing while it
 	// does, which is longer than the silent window. The process trace is what keeps that from reading
 	// as a stop.

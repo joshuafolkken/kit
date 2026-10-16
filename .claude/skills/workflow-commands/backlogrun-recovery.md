@@ -4,7 +4,8 @@ Point-of-use, read one section at the failure that reaches it; the single source
 
 ## A delegated unit that stopped without reporting
 
-**A stop from outside leaves no notification behind, so the parent polls rather than waits.** Record
+**A stop from outside leaves no notification behind, so the parent waits on `lane:await`, whose exit
+covers it.** Record
 where a lane child writes with `pnpm josh lane:output <N> <path>` in the dispatch turn, and once its
 output has been unchanged for the silent-unit window (`backlogrun-progress.md` → "Waiting, and never
 waiting forever") **ask the command rather than combining the traces yourself**, in the checkout the
@@ -18,7 +19,7 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 
 | Answer | What the parent does |
 | --- | --- |
-| `alive` | Keep polling; touch nothing |
+| `alive` | Wait on `lane:await` again; touch nothing |
 | `settled` | Re-read with `pnpm josh run:status <N>` and take the branch its state section says |
 | `undetermined` | Read the trace that failed and ask again. **A second in a row on the same child is a fault in the check**: send a `confirmation` naming the trace and stop — never escalate it to `stopped` |
 | `stopped` | The recovery below |

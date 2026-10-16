@@ -7,6 +7,7 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
+import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { describe, expect, it } from 'vitest'
 
 // Every `PreToolUse` and `Stop` refusal or notice is read by the model, and stays in its context once
@@ -35,6 +36,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['duplicate read refusal', duplicate_reads.REASON],
 	['notice: duplicate read', duplicate_reads.NOTICE],
 	['parent cut', run_parent_cut_hook.PARENT_CUT_REASON],
+	['poll', run_poll_hook.POLL_REASON],
 ]
 
 const MODE_REASONS: ReadonlyArray<[string, string]> = lane_guard_policy.LANE_GUARD_POLICY.map(
