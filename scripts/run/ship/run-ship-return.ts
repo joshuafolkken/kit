@@ -69,11 +69,16 @@ function relaunched(lane: LaneInfo, stop: ShipStop): ReturnOutcome {
 // child's Bash tool, which Claude Code starts without the token, so a child started here could not sign
 // in where the token is the only credential (joshuafolkken/kit#3817).
 async function brokered(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
-	if (await lane_session_broker.request(lane.directory, lane.issue, { kind: 'relaunch', stop })) {
-		return 'relaunched'
-	}
+	const answer = await lane_session_broker.request(lane.directory, lane.issue, {
+		kind: 'relaunch',
+		stop,
+	})
 
-	note('the lane child could not be relaunched: the lane broker did not start it')
+	if (answer.is_success) return 'relaunched'
+
+	note(
+		`the lane child could not be relaunched: the lane broker did not start it — ${answer.reason}`,
+	)
 
 	return 'recorded'
 }

@@ -360,5 +360,5 @@ const detached_launch = {
 	note_of,
 }
 
-export type { LaunchArgv, LaunchRequest, LaunchResult }
+export type { AttachedLaunchResult, LaunchArgv, LaunchRequest, LaunchResult }
 export { detached_launch }
