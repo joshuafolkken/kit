@@ -4,6 +4,7 @@ import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
 import { lane_background } from './lane-background'
 import { reply_language } from './reply-language'
+import { stop_decision, type StopDecision } from './stop-decision'
 
 // The stop-time rules, delivered on the `Stop` hook.
 //
@@ -46,12 +47,19 @@ interface StopContext {
 	// The Issue the `run:hold` record for this working tree names (`held` or `stale`) — `new` for an
 	// unnumbered entry — or `undefined` when no record is in place.
 	hold_issue: string | undefined
+	// That record is this session's own run's, or its owner cannot be told (`run-hold-session.ts`). A
+	// hold another run took is that run's pause to announce and release, never this session's.
+	hold_owned: boolean
+	// The person opened this turn with a question: the reply answers someone at the session, not a
+	// pause waiting on them (`stop-decision.ts` → `is_question`).
+	answers_question: boolean
 	// `git status --porcelain` came back empty.
 	tree_clean: boolean
 	// That record carries a `prrun` stop mark: the run stopped at a green pull
 	// request and keeps the hold over a clean tree on purpose, so a person can look before it merges.
 	prrun_stopped: boolean
-	// A `confirmation` notify is on this run's transcript tail.
+	// A `confirmation` notify is on this run's transcript tail, or the hook's own send is recorded on the
+	// hold since the pause began (`run-hold-session.ts` → `is_notified_since`).
 	notified: boolean
 	// The turn's session-facing reply text.
 	message: string
@@ -60,7 +68,8 @@ interface StopContext {
 	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
 	// documents, so a run that will not comply is not blocked forever.
 	stop_hook_active: boolean
-	// A pre-gate cut record is in place for this work tree. A dispatched lane child ends its turn at
+	// This turn ended at a cut — its record is in place, or this turn relaunched the successor that may
+	// already have cleared it (`stop-guard.ts` → `is_cut_stop`). A dispatched lane child ends its turn at
 	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
 	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
 	cut_pending: boolean
@@ -96,7 +105,7 @@ interface StopContext {
 
 // The operations the hook runs itself instead of refusing — each carries what it acts on.
 type StopAction =
-	| { kind: 'notify'; issue: string; message: string }
+	| { kind: 'notify'; issue: string; message: string; decision: StopDecision }
 	| { kind: 'release'; issue: string }
 	| { kind: 'cite'; references: ReadonlyArray<string> }
 
@@ -262,12 +271,23 @@ function needs_filing(context: StopContext): boolean {
 //
 // **A lane handed to the detached ship stands them down too**: the hold now
 // belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
+//
+// **Another run's hold stands them down as well**: the pause and the claim are that run's.
 function is_held_idle(context: StopContext): boolean {
-	return context.hold_issue !== undefined && !context.agent_pending && !context.handed_off
+	if (context.hold_issue === undefined || !context.hold_owned) return false
+
+	return !context.agent_pending && !context.handed_off
 }
 
+// **A stop that answers the person's question is no pause** (joshuafolkken/kit#3961): they are reading
+// the reply where it was written, whatever the tree's hold says.
 function needs_notify(context: StopContext): boolean {
-	return is_held_idle(context) && !context.notified
+	return is_held_idle(context) && !context.notified && !context.answers_question
+}
+
+// The notify a stop owes but cannot send: its reply names no decision to announce.
+function needs_decision(context: StopContext): boolean {
+	return needs_notify(context) && stop_decision.decision_of(context.message) === undefined
 }
 
 function needs_release(context: StopContext): boolean {
@@ -292,6 +312,11 @@ function reply_reason(context: StopContext): string | undefined {
 	if (context.headless_agent) return undefined
 
 	return language_reason(context)
+}
+
+// Sent back once; past the loop-breaker the run has said nothing is awaited, and nothing is sent.
+function decision_reason(context: StopContext): string | undefined {
+	return needs_decision(context) ? stop_decision.DECISION_REASON : undefined
 }
 
 // The headless wait holds past the loop-breaker until the spin bound is reached.
@@ -325,13 +350,33 @@ function lane_reason(context: StopContext): string | undefined {
 	return undefined
 }
 
+// The refusals that need the model: the lane rules alone, else the reply's own and the decision
+// together. **Joined, since the loop-breaker grants one continuation**: a decision refusal queued behind
+// a language or filing refusal would never be sent, and its stop would pass with no notify.
+function model_reason(context: StopContext): string | undefined {
+	const lane = lane_reason(context)
+	if (lane !== undefined) return lane
+
+	const reasons = [reply_reason(context), decision_reason(context)].filter(
+		(reason) => reason !== undefined,
+	)
+
+	return reasons.length === 0 ? undefined : reasons.join('\n\n')
+}
+
+// The notify carries the reply's own decision; a reply with none sends nothing (`needs_decision`).
+function notify_actions(context: StopContext, issue: string): Array<StopAction> {
+	const decision = stop_decision.decision_of(context.message)
+	if (decision === undefined || !needs_notify(context)) return []
+
+	return [{ kind: 'notify', issue, message: context.message, decision }]
+}
+
 function hold_actions(context: StopContext): Array<StopAction> {
 	const issue = context.hold_issue
 	if (issue === undefined) return []
 
-	const notify: Array<StopAction> = needs_notify(context)
-		? [{ kind: 'notify', issue, message: context.message }]
-		: []
+	const notify = notify_actions(context, issue)
 
 	return needs_release(context) ? [...notify, { kind: 'release', issue }] : notify
 }
@@ -356,7 +401,7 @@ function block_reason(context: StopContext): string | undefined {
 	if (is_headless_held(context)) return HEADLESS_WAIT_REASON
 	if (context.stop_hook_active || context.cut_pending) return undefined
 
-	return lane_reason(context) ?? reply_reason(context)
+	return model_reason(context)
 }
 
 // **The actions run only on the stop that goes through**, so a refused stop never notifies a pause its

@@ -61,6 +61,7 @@ const {
 	report_held_cut,
 	report_incomplete,
 	report_over,
+	report_relaunched_cut,
 	report_reviewer,
 	report_stale,
 	report_under_threshold,
@@ -124,7 +125,7 @@ function relaunch(target: string, lane: LaneInfo, phase: string): number {
 
 	if (notes.length > 0) console.error(notes.join('\n'))
 
-	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+	return report_relaunched_cut()
 }
 
 const { is_lane_branch } = run_cut_ready
@@ -199,7 +200,7 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 	if (refused !== undefined) return refused
 
 	return lane_relaunch.is_openai_lane(lane)
-		? report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+		? report_relaunched_cut()
 		: relaunch(target, lane, request.phase)
 }
 

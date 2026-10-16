@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { stop_decision } from './stop-decision'
 import { stop_rules, type StopContext } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
@@ -78,13 +79,14 @@ describe('stop_rules.stop_outcome — filing offer stands down and ordering', ()
 		expect(outcome.reason).toBeUndefined()
 	})
 
-	// joshuafolkken/kit#3919: a refused stop runs no action, so the held run is not notified either.
+	// joshuafolkken/kit#3919: a refused stop runs no action, so the held run is not notified either;
+	// joshuafolkken/kit#3961: the held reply names no decision, so that refusal rides on the same one.
 	it('refuses ahead of the citation and hold actions, running none of them', () => {
 		const held = unattended({ hold_issue: '7', message: `${OFFER_MESSAGE} #7` })
 
 		expect(stop_rules.stop_outcome(held)).toEqual({
 			...stop_rules.NO_OUTCOME,
-			reason: stop_rules.FILING_OFFER_REASON,
+			reason: `${stop_rules.FILING_OFFER_REASON}\n\n${stop_decision.DECISION_REASON}`,
 		})
 	})
 })

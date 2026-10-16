@@ -4,6 +4,8 @@ import { stop_rules, type StopAction, type StopContext } from './stop-rules'
 // English test messages never trip the language rule.
 const BASE: StopContext = {
 	hold_issue: undefined,
+	hold_owned: true,
+	answers_question: false,
 	tree_clean: false,
 	prrun_stopped: false,
 	notified: false,
@@ -33,6 +35,10 @@ function action_kinds(overrides: Partial<StopContext>): ReadonlyArray<StopAction
 	return stop_rules.stop_outcome(context(overrides)).actions.map((action) => action.kind)
 }
 
-const stop_rules_fixture = { action_kinds, context }
+// A held stop's reply that names its decision, and the decision the notify carries from it.
+const DECISION_MESSAGE = 'paused\nRecommended: merge it'
+const DECISION = { recommended: 'merge it', alternative: undefined }
+
+const stop_rules_fixture = { DECISION, DECISION_MESSAGE, action_kinds, context }
 
 export { stop_rules_fixture }

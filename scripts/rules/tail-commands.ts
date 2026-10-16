@@ -30,6 +30,20 @@ function prior_bash_commands(tail: string): ReadonlyArray<string> {
 	return tail.split('\n').flatMap((line) => bash_commands_of(line))
 }
 
-const tail_commands = { is_bash_use, prior_bash_commands }
+// **Whether a call `is_call` names answered with the `token` line** — the call and its own result
+// paired off parsed blocks, so a transcript that merely quotes the command or the token does not
+// count. An unreadable text reads as no answer.
+function answered(text: string, is_call: (command: string) => boolean, token: string): boolean {
+	const blocks = time_transcript_line.parse_text(text).flatMap((line) => line.blocks)
+	const call_ids = new Set(
+		blocks
+			.filter((block) => is_call(time_shell.bash_command(block.input)))
+			.map((block) => block.id),
+	)
+
+	return blocks.some((block) => call_ids.has(block.result_id) && block.token_lines.includes(token))
+}
+
+const tail_commands = { answered, is_bash_use, prior_bash_commands }
 
 export { tail_commands }

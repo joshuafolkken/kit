@@ -40,6 +40,9 @@ interface LocalRead {
 	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
 	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
+	// The issues whose lanes hold a place under the limit (`backlog-occupied.ts`), named beside a row
+	// that waits for a free lane.
+	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
 }
@@ -90,6 +93,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes()
+	const occupied = await backlog_ready.occupied_lanes(lanes)
 
 	return {
 		started_ms: span.started_ms,
@@ -102,6 +106,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		idle_lanes: lane_spent.idle_lanes(lanes),
 		free_lanes: await backlog_ready.free_lanes_beside(lanes),
+		occupied_lanes: occupied.map((lane) => lane.issue),
 		usual: run_board_usual.read(repository),
 	}
 }
