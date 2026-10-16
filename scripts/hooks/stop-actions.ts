@@ -9,6 +9,9 @@ import { issue_citation } from '#scripts/rules/issue-citation'
 import { stop_rules, type StopAction, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { run_hold_session } from '#scripts/run/hold/run-hold-session'
+
+type NotifyAction = Extract<StopAction, { kind: 'notify' }>
 
 // The `Stop` hook running the operations whose answer is fixed (joshuafolkken/kit#3919): the
 // `confirmation` notify, the hold release and the citation lines, through the very calls
@@ -23,7 +26,6 @@ const SUMMARY_CHARS = 600
 // A `#N`, `owner/repo#N` or URL is a run of printable ASCII; a cut inside one would link the wrong Issue.
 const TOKEN_CHAR = /^[!-~]$/u
 const EMPTY_SUMMARY = 'The run stopped and is waiting for you.'
-const RECOMMENDED = 'Read the reply in the session and answer it'
 
 interface Settled {
 	notices: ReadonlyArray<string>
@@ -65,22 +67,38 @@ async function issue_url_of(issue: string): Promise<string | undefined> {
 }
 
 // The body is the reply's opening copied into a Telegram, so its bare `#N` are linked (`issue-citation.md`).
-function notify_values(issue_url: string | undefined, message: string): CliValues {
+// The choices are the reply's own decision lines (joshuafolkken/kit#3961).
+function notify_values(issue_url: string | undefined, action: NotifyAction): CliValues {
+	const { recommended, alternative } = action.decision
 	const values: CliValues = {
 		'task-type': 'confirmation',
-		body: session_cite.text(summary_of(message)),
-		recommended: RECOMMENDED,
+		body: session_cite.text(summary_of(action.message)),
+		recommended,
+		...(alternative !== undefined && { alternative: [alternative] }),
 	}
 
 	return issue_url === undefined ? values : { ...values, 'issue-url': issue_url }
 }
 
-async function notify(issue: string, message: string): Promise<string> {
-	const issue_url = await issue_url_of(issue)
+// The send is stamped on the hold, so a later stop of the same pause does not announce it again. A
+// stamp that fails does not fail the send: the Telegram is out, and a refused stop would send it twice.
+async function mark_notified(): Promise<void> {
+	try {
+		const directory = await run_hold.worktree_directory()
 
-	await telegram_test.send_values(notify_values(issue_url, message))
+		if (directory !== undefined) run_hold_session.mark_notified(run_hold.hold_path(directory))
+	} catch (error) {
+		console.warn(`stop:guard could not stamp the notify on the hold: ${String(error)}`)
+	}
+}
 
-	return `📱 stop:guard sent the confirmation notify (${issue_url ?? issue}).`
+async function notify(action: NotifyAction): Promise<string> {
+	const issue_url = await issue_url_of(action.issue)
+
+	await telegram_test.send_values(notify_values(issue_url, action))
+	await mark_notified()
+
+	return `📱 stop:guard sent the confirmation notify (${issue_url ?? action.issue}).`
 }
 
 async function release(issue: string): Promise<string | undefined> {
@@ -100,7 +118,7 @@ async function cite(references: ReadonlyArray<string>): Promise<string | undefin
 
 // An action's line for the person, or `undefined` when it did not take.
 async function run_action(action: StopAction): Promise<string | undefined> {
-	if (action.kind === 'notify') return await notify(action.issue, action.message)
+	if (action.kind === 'notify') return await notify(action)
 	if (action.kind === 'release') return await release(action.issue)
 
 	return await cite(action.references)

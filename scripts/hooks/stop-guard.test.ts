@@ -3,6 +3,7 @@ import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -10,10 +11,13 @@ import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
+import { stop_rules_fixture } from '#scripts/rules/stop-rules-fixture'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
@@ -28,6 +32,7 @@ const UNREAD_TRANSCRIPT = 'transcript-not-read'
 afterEach(() => {
 	Reflect.deleteProperty(process.env, SWITCH_KEY)
 	Reflect.deleteProperty(process.env, LANG_KEY)
+	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 })
 
@@ -203,30 +208,39 @@ const HELD: HoldRead = {
 	hold: { issue: '2962', taken_at: '2026-10-03T00:00:00.000Z', pid: process.pid },
 }
 
-// A quiet world on a tree held for `HELD`, whose transcript tail reads `tail`.
-function held_world(is_handed_off: boolean, tail: string): void {
+// A quiet world on a tree held as `read`, whose transcript tail reads `tail`. The session is `en`
+// and not headless, so the English decision reply passes the language rule whatever launched the suite.
+function held_world(is_handed_off: boolean, tail: string, read: HoldRead): void {
 	quiet_world()
+	process.env[LANG_KEY] = 'en'
+	vi.stubEnv(agent_headless.KEY, undefined)
 	vi.mocked(time_density_hook.read_tail).mockReturnValue(tail)
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(process.cwd())
-	vi.spyOn(run_hold, 'read_hold').mockReturnValue(HELD)
+	vi.spyOn(run_hold, 'read_hold').mockReturnValue(read)
+	vi.spyOn(run_hold_session, 'mark_notified').mockReturnValue(undefined)
 	vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(is_handed_off)
 	vi.spyOn(git_gh_repo, 'repo_get_name_with_owner').mockResolvedValue('joshuafolkken/kit')
 }
 
-// The stdout writes of one stop decision on a held tree, with the ship hand-off reading `is_handed_off`
-// and the hook's own notify sending, or failing when `is_send_failing`, over the transcript `tail`.
+// The stdout writes of one stop decision on a tree held as `read`, with the ship hand-off reading
+// `is_handed_off` and the hook's own notify sending, or failing when `is_send_failing`, over the
+// transcript `tail`. The reply names a decision, so a held stop of this session's own is announced.
 async function decide_held(
 	is_handed_off: boolean,
 	is_send_failing = false,
 	tail = '',
+	read: HoldRead = HELD,
 ): Promise<string> {
-	held_world(is_handed_off, tail)
+	held_world(is_handed_off, tail, read)
 	const send = vi.spyOn(telegram_test, 'send_values')
 	if (is_send_failing) send.mockRejectedValue(new Error('telegram down'))
 	else send.mockResolvedValue(undefined)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+	const message = stop_rules_fixture.DECISION_MESSAGE
 
-	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
+	await write_stop_decision(
+		JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT, last_assistant_message: message }),
+	)
 
 	return write.mock.calls.map((call) => String(call[0])).join('')
 }
@@ -298,6 +312,40 @@ describe('write_stop_decision — a relaunched cut whose record the successor al
 		await decide_held(false, false, [PROMPT_LINE, QUOTED_MARKER_LINE].join('\n'))
 
 		expect(telegram_test.send_values).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#3961: another session's hold, and a pause already announced, send nothing.
+describe('write_stop_decision — only this session’s unannounced pause is sent', () => {
+	beforeEach(() => {
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('neither notifies nor releases a clean tree another session holds', async () => {
+		vi.stubEnv(agent_session_environment.AGENT_PID_KEY, String(process.pid))
+		const release = vi.spyOn(run_hold_cli, 'run').mockResolvedValue(0)
+		const foreign: HoldRead = { kind: 'held', hold: { ...HELD.hold, owner_pid: 1 } }
+
+		const written = await decide_held(false, false, PROMPT_LINE, foreign)
+
+		expect(written).toBe('')
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
+		expect(release).not.toHaveBeenCalled()
+	})
+
+	it('sends nothing when the hold records a send after the last prompt', async () => {
+		const notified: HoldRead = {
+			kind: 'held',
+			hold: { ...HELD.hold, notified_at: '2099-01-01T00:00:00.000Z' },
+		}
+
+		await decide_held(false, false, PROMPT_LINE, notified)
+
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
 	})
 })
 

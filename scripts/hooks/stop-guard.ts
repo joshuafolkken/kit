@@ -15,12 +15,14 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { pre_gate_cut } from '#scripts/rules/pre-gate-cut'
+import { stop_decision } from '#scripts/rules/stop-decision'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { tail_commands } from '#scripts/rules/tail-commands'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
-import { run_hold } from '#scripts/run/hold/run-hold'
+import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
+import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
@@ -38,17 +40,38 @@ import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript
 // operations itself (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
 
-// The Issue the hold record for this working tree names, and whether it is a `prrun` stop's.
-// `unreadable` reads as absent: the safe direction for a stop guard is not to
-// act, and an unreadable record is not proof a run is holding.
-async function hold_facts(): Promise<Pick<StopContext, 'hold_issue' | 'prrun_stopped'>> {
+// The hold record for this working tree. `unreadable` reads as absent: the safe direction for a stop
+// guard is not to act, and an unreadable record is not proof a run is holding.
+async function held_record(): Promise<RunHold | undefined> {
 	const directory = await run_hold.worktree_directory()
-	const hold =
-		directory === undefined
-			? undefined
-			: run_halfrun_resume.hold_of(run_hold.read_hold(run_hold.hold_path(directory)))
+	if (directory === undefined) return undefined
 
-	return { hold_issue: hold?.issue, prrun_stopped: hold?.prrun_stop_head !== undefined }
+	return run_halfrun_resume.hold_of(run_hold.read_hold(run_hold.hold_path(directory)))
+}
+
+// The pause was announced: by a `josh notify` on the tail, or by this hook's own send, recorded on the
+// hold since the pause began (joshuafolkken/kit#3961).
+function was_notified(hold: RunHold | undefined, tail: string): boolean {
+	if (lane_park.mentions_confirmation_notify(tail)) return true
+
+	return (
+		hold !== undefined && run_hold_session.is_notified_since(hold, last_prompt.pause_start(tail))
+	)
+}
+
+// The Issue the hold names, whether it is a `prrun` stop's and this session's own, and whether its
+// pause was already announced.
+async function hold_facts(
+	tail: string,
+): Promise<Pick<StopContext, 'hold_issue' | 'hold_owned' | 'notified' | 'prrun_stopped'>> {
+	const hold = await held_record()
+
+	return {
+		hold_issue: hold?.issue,
+		hold_owned: hold === undefined || run_hold_session.is_session_hold(hold),
+		notified: was_notified(hold, tail),
+		prrun_stopped: hold?.prrun_stop_head !== undefined,
+	}
 }
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
@@ -103,11 +126,11 @@ async function build_context(
 	const tail = transcript_tail(transcript_path)
 
 	return {
-		...(await hold_facts()),
+		...(await hold_facts(tail)),
 		tree_clean: !(await run_hold.is_tree_dirty()),
-		notified: lane_park.mentions_confirmation_notify(tail),
 		message: payload_tail.message,
 		prompt: last_prompt.prompt_text(tail),
+		answers_question: stop_decision.is_question(last_prompt.turn_prompt(tail)),
 		stop_hook_active: payload_tail.stop_hook_active,
 		cut_pending: is_cut_stop(tail),
 		filed: was_filed(tail),
