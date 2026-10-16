@@ -20,6 +20,8 @@ const SUCCESS_EXIT_CODE = 0
 const NOTICE_SEPARATOR = '\n'
 // The reply is the stop's reason, but a Telegram is read at a glance — its opening is enough.
 const SUMMARY_CHARS = 600
+// A `#N`, `owner/repo#N` or URL is a run of printable ASCII; a cut inside one would link the wrong Issue.
+const TOKEN_CHAR = /^[!-~]$/u
 const EMPTY_SUMMARY = 'The run stopped and is waiting for you.'
 const RECOMMENDED = 'Read the reply in the session and answer it'
 
@@ -31,10 +33,26 @@ interface Settled {
 // One action at a time — the order is the rule order.
 const SEQUENTIAL = 1
 
+// Where the run of token characters `text` ends with starts.
+function token_start(text: string): number {
+	let index = text.length
+
+	while (index > 0 && TOKEN_CHAR.test(text.charAt(index - 1))) index -= 1
+
+	return index
+}
+
+// Cut before linking, on a boundary that keeps every reference whole: the character past the cut shows
+// whether the last token ran on, and a token that did is dropped rather than halved.
 function summary_of(message: string): string {
 	const trimmed = message.trim()
+	if (trimmed === '') return EMPTY_SUMMARY
+	if (trimmed.length <= SUMMARY_CHARS) return trimmed
 
-	return trimmed === '' ? EMPTY_SUMMARY : trimmed.slice(0, SUMMARY_CHARS)
+	const overshoot = trimmed.slice(0, SUMMARY_CHARS + 1)
+	const cut = overshoot.slice(0, Math.min(token_start(overshoot), SUMMARY_CHARS))
+
+	return cut === '' ? trimmed.slice(0, SUMMARY_CHARS) : cut
 }
 
 // The held Issue's URL, or `undefined` for a `new` entry or a repository that cannot be read.
@@ -46,11 +64,11 @@ async function issue_url_of(issue: string): Promise<string | undefined> {
 	return slug === undefined ? undefined : issue_cite.issue_url(slug, issue)
 }
 
-// The body is the reply copied into a Telegram, so its bare `#N` are linked first (`issue-citation.md`).
+// The body is the reply's opening copied into a Telegram, so its bare `#N` are linked (`issue-citation.md`).
 function notify_values(issue_url: string | undefined, message: string): CliValues {
 	const values: CliValues = {
 		'task-type': 'confirmation',
-		body: summary_of(session_cite.text(message)),
+		body: session_cite.text(summary_of(message)),
 		recommended: RECOMMENDED,
 	}
 

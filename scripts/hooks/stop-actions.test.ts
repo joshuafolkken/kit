@@ -53,6 +53,26 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('stop_actions.envelope_of — the Telegram body', () => {
+	beforeEach(() => {
+		vi.spyOn(repo_discovery, 'read_origin_url').mockReturnValue(KIT_ORIGIN)
+	})
+
+	it('links a bare #N the reply carries', async () => {
+		await envelope([{ ...NOTIFY, message: 'paused on #8' }])
+
+		expect(sent_values().body).toBe('paused on [#8](https://github.com/joshuafolkken/kit/issues/8)')
+	})
+
+	it('cuts the reply before linking, so a link near the cut keeps its whole URL', async () => {
+		await envelope([{ ...NOTIFY, message: `${'あ'.repeat(560)} #3919 ${'い'.repeat(100)}` }])
+
+		expect(sent_values().body).toContain(
+			'[#3919](https://github.com/joshuafolkken/kit/issues/3919)',
+		)
+	})
+})
+
 // joshuafolkken/kit#3919: the hook runs the fixed operations itself and lets the stop through.
 describe('stop_actions.envelope_of — the actions take', () => {
 	it('lets the stop through with a notice for each action', async () => {
@@ -73,14 +93,6 @@ describe('stop_actions.envelope_of — the actions take', () => {
 			'issue-url': 'https://github.com/joshuafolkken/kit/issues/7',
 			body: REPLY,
 		})
-	})
-
-	it('links a bare #N the reply carries into the Telegram body', async () => {
-		vi.spyOn(repo_discovery, 'read_origin_url').mockReturnValue(KIT_ORIGIN)
-
-		await envelope([{ ...NOTIFY, message: 'paused on #8' }])
-
-		expect(sent_values().body).toBe('paused on [#8](https://github.com/joshuafolkken/kit/issues/8)')
 	})
 
 	it('sends a new entry with no Issue URL and releases it bare', async () => {
@@ -165,8 +177,21 @@ describe('stop_actions.envelope_of — stdout stays the envelope', () => {
 })
 
 describe('stop_actions.summary_of', () => {
-	it('stands in a fixed line for an empty reply and cuts a long one', () => {
+	it('stands in a fixed line for an empty reply and cuts a long one at 600 characters', () => {
 		expect(stop_actions.summary_of('  ')).not.toBe('')
-		expect(stop_actions.summary_of('x'.repeat(1000)).length).toBeLessThan(1000)
+		expect(stop_actions.summary_of('x'.repeat(1000))).toHaveLength(600)
+		expect(stop_actions.summary_of('あ'.repeat(1000))).toHaveLength(600)
+	})
+
+	it('drops a reference the cut would halve instead of keeping its prefix', () => {
+		const opening = 'あ'.repeat(597)
+
+		expect(stop_actions.summary_of(`${opening} #3919 rest`)).toBe(`${opening} `)
+	})
+
+	it('keeps a reference that ends exactly at the cut', () => {
+		const opening = 'あ'.repeat(595)
+
+		expect(stop_actions.summary_of(`${opening}#3919 rest`)).toBe(`${opening}#3919`)
 	})
 })
