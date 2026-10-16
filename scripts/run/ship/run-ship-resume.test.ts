@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { josh_command } from '#scripts/josh/josh-run'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_overlap } from './run-ship-overlap'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
 
@@ -52,6 +53,8 @@ vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn().mockReturnValue(false) },
 }))
+// No lane overlaps (pinned in `run-ship-overlap.test.ts`), so no test lists this repository's work trees.
+vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
 
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
