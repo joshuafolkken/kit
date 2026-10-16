@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { command_usage } from '#scripts/josh/command-usage'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
+import { document_scan } from './document-scan'
 import { generate_command_usage } from './generate-command-usage'
 
 const STALE_PAGE = '### `josh lint`\n\n<!-- usage: lint -->\n\nstale\n\n<!-- /usage -->\n\nprose\n'
@@ -11,8 +12,29 @@ function sorted(names: ReadonlyArray<string>): Array<string> {
 	return names.toSorted((left, right) => left.localeCompare(right))
 }
 
+// A command's audience decides its page: the commands a person types (`developer`) render on the
+// developer reference, so the audience the catalog prints and the page a reader is sent to cannot
+// disagree (joshuafolkken/kit#3278).
+function developer_commands(): Array<string> {
+	return Object.entries(COMMAND_MAP)
+		.filter(([, entry]) => entry.reference[1] === 'developer')
+		.map(([name]) => name)
+}
+
 function page_text(page: string): string {
 	return readFileSync(generate_command_usage.page_path(page), 'utf8')
+}
+
+// The headings stay hand-written, so a section heading left behind on the wrong page carries no span
+// for the span checks to catch; a heading may name only the commands its page renders, once each, so
+// repeats are kept for a stale second section to surface as a duplicate. A heading naming a command
+// with arguments (`josh epic --add`) is a subsection of that command's section, not a section.
+function heading_commands(text: string): Array<string> {
+	const headings = text
+		.split('\n')
+		.filter((line) => /^#{2,4} /u.test(line) && !/`josh [^`\s]+ [^`]*`/u.test(line))
+
+	return headings.flatMap((line) => document_scan.command_references(line))
 }
 
 describe('generate command usage', () => {
@@ -76,10 +98,48 @@ describe('the usage spans cover the command map', () => {
 	})
 
 	it('renders exactly the developer-audience commands on the developer page', () => {
-		const developer = Object.entries(COMMAND_MAP)
-			.filter(([, entry]) => entry.reference[1] === 'developer')
-			.map(([name]) => name)
-
-		expect(sorted(command_usage.page_commands(DEVELOPER_PAGE))).toEqual(sorted(developer))
+		expect(sorted(command_usage.page_commands(DEVELOPER_PAGE))).toEqual(
+			sorted(developer_commands()),
+		)
 	})
+})
+
+describe('the section headings match the usage spans', () => {
+	it('reads every command a grouped heading names and none from the prose', () => {
+		const text = '### `josh run:hold` / `josh run:release`\n\nthen run `josh gate`'
+
+		expect(heading_commands(text)).toEqual(['run:hold', 'run:release'])
+	})
+
+	it('keeps a command headed twice so a stale second section is caught', () => {
+		const text = '### `josh gate`\n\nprose\n\n### `josh gate`'
+
+		expect(heading_commands(text)).toEqual(['gate', 'gate'])
+	})
+
+	it('reads a heading naming a command with arguments as a subsection of that command', () => {
+		const text = '### `josh epic`\n\n#### `josh epic --add` — insert children'
+
+		expect(heading_commands(text)).toEqual(['epic'])
+	})
+
+	it.each(generate_command_usage.USAGE_PAGES)(
+		'%s heads its sections with exactly the commands its spans render',
+		(page) => {
+			const text = page_text(page)
+
+			expect(sorted(heading_commands(text))).toEqual(
+				sorted(generate_command_usage.usage_spans(text)),
+			)
+		},
+	)
+})
+
+describe('the developer audience', () => {
+	it.each(['latest', 'latest:corepack', 'latest:update', 'overrides'])(
+		'treats %s as a command a person types',
+		(name) => {
+			expect(developer_commands()).toContain(name)
+		},
+	)
 })
