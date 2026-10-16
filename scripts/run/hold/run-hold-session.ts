@@ -23,8 +23,7 @@ function is_session_hold(hold: RunHold, owner: SessionOwner = run_hold.session_o
 }
 
 // **A pause is announced once, and a person's prompt ends it.** The hook's own send is recorded on the
-// hold, so a later stop of the same pause — a background notice that woke the session, a successor
-// process — finds it; a send before `pause_start` belongs to an earlier pause. An unknown start
+// hold, so a later stop of the same pause — a background notice that woke the session — finds it; a send before `pause_start` belongs to an earlier pause. An unknown start
 // announces again: a needless Telegram costs less than a silent wait.
 function is_notified_since(hold: RunHold, pause_start: string | undefined): boolean {
 	if (pause_start === undefined || hold.notified_at === undefined) return false
@@ -35,7 +34,7 @@ function is_notified_since(hold: RunHold, pause_start: string | undefined): bool
 // Stamps the send on the record in place; a tree no longer held has nothing to stamp.
 function mark_notified(target: string, now: Date = new Date()): void {
 	const read = run_hold.read_hold(target, now)
-	if (read.kind !== 'held' && read.kind !== 'stale') return
+	if (read.kind !== 'held') return
 
 	stamp_file.write_stamp(target, { ...read.hold, notified_at: now.toISOString() })
 }

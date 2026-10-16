@@ -23,6 +23,15 @@ describe('stop_decision.decision_of', () => {
 		})
 	})
 
+	it('reads a bold label that closes before its colon', () => {
+		const message = '**Recommended**: merge it\n_Alternative_: hold it'
+
+		expect(stop_decision.decision_of(message)).toEqual({
+			recommended: 'merge it',
+			alternative: 'hold it',
+		})
+	})
+
 	it('keeps the underscores and asterisks inside a choice', () => {
 		const message = '**Recommended: split `stop_rules` into a*b**'
 

@@ -16,8 +16,9 @@ interface StopDecision {
 	alternative: string | undefined
 }
 
-const RECOMMENDED_LABEL = 'recommended:'
-const ALTERNATIVE_LABEL = 'alternative:'
+// A label may close its emphasis before or after the colon: `**Recommended:**`, `**Recommended**:`.
+const RECOMMENDED_LABEL = /^recommended[*_]*:/iu
+const ALTERNATIVE_LABEL = /^alternative[*_]*:/iu
 // The list bullet and the Markdown emphasis a decision line may be written with. Emphasis is
 // stripped only at the edges of the label and the choice: an underscore inside a choice belongs to
 // a `snake_case` name the person is asked to approve.
@@ -38,12 +39,12 @@ function bare_line(line: string): string {
 }
 
 // The choice on the reply's first line labelled `label`, or `undefined` when none carries one.
-function choice_of(message: string, label: string): string | undefined {
+function choice_of(message: string, label: RegExp): string | undefined {
 	const line = message
 		.split('\n')
 		.map((one) => bare_line(one))
-		.find((one) => one.toLowerCase().startsWith(label))
-	const choice = line === undefined ? undefined : unwrapped(line.slice(label.length))
+		.find((one) => label.test(one))
+	const choice = line === undefined ? undefined : unwrapped(line.replace(label, ''))
 
 	return choice === '' ? undefined : choice
 }
