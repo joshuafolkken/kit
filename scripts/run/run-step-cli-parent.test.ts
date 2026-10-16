@@ -42,8 +42,9 @@ const BEGUN = { kind: 'carried', carry: { started_at: RUN_START, owner_pid: OWNE
 const info_mock = vi.fn()
 const error_mock = vi.fn()
 
+// The action line — the first thing printed; the governing section, where there is one, follows it.
 function printed(): string {
-	return info_mock.mock.calls.map((call) => String(call[0])).join('\n')
+	return String(info_mock.mock.calls[0]?.[0] ?? '')
 }
 
 function stream(events: ReadonlyArray<RunEvent>): void {
@@ -74,6 +75,12 @@ describe('run_step_cli.run — no issue number, the record this session began', 
 		expect(await run_step_cli.run([])).toBe(SUCCESS)
 		expect(printed()).toBe(run_step.HAND_OFF_COMMAND)
 		expect(gather_mock).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#3921: the parent's action carries its governing section, as a child's does.
+	it('prints the hand-off section after the hand-off line', async () => {
+		expect(await run_step_cli.run([])).toBe(SUCCESS)
+		expect(String(info_mock.mock.calls[1]?.[0])).toMatch(/^## The hand-off/u)
 	})
 
 	it('fires the owed retrospective at this invocation’s drain', async () => {

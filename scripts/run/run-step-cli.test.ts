@@ -115,8 +115,16 @@ function parts(overrides: Partial<PrepParts>): PrepParts {
 	}
 }
 
+// The action line — the first thing printed; the governing section, where there is one, follows it.
 function printed(): string {
-	return info_mock.mock.calls.map((call) => String(call[0])).join('\n')
+	return String(info_mock.mock.calls[0]?.[0] ?? '')
+}
+
+function section_printed(): string {
+	return info_mock.mock.calls
+		.slice(1)
+		.map((call) => String(call[0]))
+		.join('\n')
 }
 
 beforeEach(() => {
@@ -194,6 +202,25 @@ describe('run_step_cli.run', () => {
 		expect(await run_step_cli.run(['abc'])).toBe(FAILURE)
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(printed()).toBe('')
+	})
+})
+
+// joshuafolkken/kit#3921: the rule the action follows is printed with it, saving the read's turn.
+describe('run_step_cli.run — the governing section', () => {
+	it('prints the section governing the action after the action line', async () => {
+		read_carry_mock.mockReturnValue(carried())
+		read_events_mock.mockReturnValue([stream_event('pr-opened', RUN_START)])
+
+		expect(await run_step_cli.run([ISSUE])).toBe(SUCCESS)
+		expect(section_printed()).toMatch(/^## Run `pnpm josh followup`/u)
+	})
+
+	it('prints no section for an action with no rule beyond its line', async () => {
+		to_parts_mock.mockReturnValue(parts({ state: { ...OPEN_STATE, state: 'CLOSED' } }))
+
+		expect(await run_step_cli.run([ISSUE])).toBe(SUCCESS)
+		expect(printed()).toBe(run_step.ALREADY_DONE)
+		expect(section_printed()).toBe('')
 	})
 })
 

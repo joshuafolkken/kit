@@ -1,6 +1,6 @@
 # `backlogrun` — running a child (shared mechanics, delegation, liveness, session setup)
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table". Reasons:
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow". Reasons:
 
 - `docs/maintainers/backlogrun-child-rationale.md` → "Why the file is read by section"
 - `docs/maintainers/backlogrun-child-rationale.md` → "Why a bare Issue promotes itself under `backlogrun` but not under `fullrun`"
