@@ -98,6 +98,7 @@ describe('run_board_status.settle_closed after a relaunch', () => {
 			labels: [],
 			closed_ms: Date.parse(T2),
 			is_merged: false,
+			is_not_planned: false,
 		}
 		const read = read_between(new Map([[ISSUE, closed]]), NO_LABELS)
 

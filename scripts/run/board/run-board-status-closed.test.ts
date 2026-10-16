@@ -93,7 +93,12 @@ describe('run_board_status.settle_closed with a parked child', () => {
 		['not read closed though gone from the listing', read_closed(undefined)],
 		[
 			'still open and labelled with no in-progress',
-			{ open_numbers: new Set([ISSUE]), read_ms: T1, closed: new Map(), labels: NO_LABELS },
+			{
+				open_numbers: new Set([ISSUE]),
+				read_ms: T1,
+				closed: new Map(),
+				labels: new Map([[ISSUE, []]]),
+			},
 		],
 	])('keeps a parked child parked when it is %s', (_label, read) => {
 		expect(settle('parked', read)).toStrictEqual({ state: 'parked', started_ms: T0 })
