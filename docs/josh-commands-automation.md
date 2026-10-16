@@ -397,6 +397,10 @@ pnpm josh followup "PR title #N" --no-merge                                     
 
 **Live-execution evidence:** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
 
+**Acceptance-criteria map:** the Issue is re-read just before the merge. A merge is refused when one of its acceptance criteria has no row under the PR body's `## 受け入れ条件の対応`, or a deferral row names an issue that does not exist.
+
+Rows match by an identifier built from the criterion's text, so a criterion added or reworded later has no row. An Issue with no acceptance section merges as before. `josh pr` writes a pending row per criterion; the format is `prompts/collaboration-workflow/report-format.md` → "PR 本文の受け入れ条件の対応表".
+
 **Behavior:** waits for CI (every 10 s, a 32-minute budget, `JOSH_CI_TIMEOUT_SECONDS`), merges, then closes completed epics and the Issue, removes `in-progress` and flushes the ledger. A person's unacknowledged update stops it unmerged ([`josh issue:ack`](josh-commands-backlog.md#josh-issueack)). Give the call its longest timeout.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.

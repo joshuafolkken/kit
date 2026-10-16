@@ -12,6 +12,9 @@ const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>()
 const scoped_mock = vi.hoisted(() => vi.fn())
 const classification_mock = vi.hoisted(() => vi.fn<() => Promise<void>>())
 const lock_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
+const acceptance_mock = vi.hoisted(() =>
+	vi.fn<(issue: string, body: string | undefined) => Promise<string | undefined>>(),
+)
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -25,6 +28,9 @@ vi.mock('#scripts/gh/git-pr', () => ({
 }))
 vi.mock('#scripts/git/git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('2946-lane') },
+}))
+vi.mock('#scripts/review/acceptance-map-check', () => ({
+	acceptance_map_check: { body_refusal: acceptance_mock },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
@@ -67,6 +73,22 @@ beforeEach(() => {
 	scoped_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	classification_mock.mockReset().mockResolvedValue()
 	lock_mock.mockReset().mockResolvedValue([])
+	acceptance_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#3954: the body this ship delivers maps every acceptance criterion before the review
+// starts, not only at the merge.
+describe('run_ship_preflight.stage — the acceptance map', () => {
+	it('stops on an unmapped criterion, asking the body file of the branch issue', async () => {
+		acceptance_mock.mockResolvedValue('`ac-12345678` has no row')
+		const body = body_file(EVIDENCE_BODY)
+
+		const result = await run_ship_preflight.stage({ title: TITLE, body_path: body })
+
+		expect(result.code).toBe(FAILED)
+		expect(result.out).toContain('  - `ac-12345678` has no row')
+		expect(acceptance_mock).toHaveBeenCalledWith('2946', EVIDENCE_BODY)
+	})
 })
 
 // joshuafolkken/kit#3307: a drifted lock stops the ship before the gate, with its reason.

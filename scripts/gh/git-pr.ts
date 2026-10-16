@@ -5,6 +5,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
 import { json_value } from '#scripts/lib/json-value'
+import { acceptance_map } from '#scripts/review/acceptance-map'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
@@ -172,6 +173,17 @@ function build_body(issue_info: IssueInfo, extra_body?: string): string {
 	return `${closes}\n\n${extra_body}`
 }
 
+// A body without the acceptance-criteria table gets one pending row per criterion, so the author fills
+// in rows that already carry their identifiers — `josh followup` refuses the merge until they do.
+async function body_with_map(issue_info: IssueInfo, extra_body?: string): Promise<string> {
+	const body = build_body(issue_info, extra_body)
+
+	if (acceptance_map.has_map(body)) return body
+	const map = acceptance_map.skeleton(await git_gh_command.issue_get_body(issue_info.number))
+
+	return map === undefined ? body : `${body}\n\n${map}`
+}
+
 async function existing_pr_label(branch_name: string): Promise<ReleaseClassification | undefined> {
 	if (
 		!(await git_gh_command.pr_exists(branch_name)) ||
@@ -190,7 +202,7 @@ async function create_for_issue(
 ): Promise<void> {
 	await create(
 		build_title(issue_info),
-		build_body(issue_info, extra_body),
+		await body_with_map(issue_info, extra_body),
 		issue_info.branch_name,
 		{
 			label,

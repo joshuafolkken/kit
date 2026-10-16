@@ -41,7 +41,8 @@ Review results and successful pushes are never turn boundaries.
    **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>`).
 5. **The clean path ships in one call** — with no second round due, background
-   `pnpm josh ship "<title> #<N>" --body-file <evidence.md>`: PR preflight → gate → `git -y` →
+   `pnpm josh ship "<title> #<N>" --body-file <evidence.md>` — the file carries `## 実機証跡` and
+   `## 受け入れ条件の対応` (`report-format.md`), both asked at the preflight: PR preflight → gate → `git -y` →
    `followup` → `run:tail`, stopping at the first failure. `--review` runs both rounds. **Else a due
    round 2 does not fit `ship`**: the PR opens between the rounds — background
    `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then `pnpm josh followup`.
