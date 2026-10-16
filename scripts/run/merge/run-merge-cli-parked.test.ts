@@ -19,7 +19,10 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 }))
 
 vi.mock('#scripts/issue/issue-merged', () => ({
-	issue_merged: { read_merged: vi.fn().mockResolvedValue(false) },
+	issue_merged: {
+		read_merged: vi.fn().mockResolvedValue(false),
+		read_merge_state: vi.fn().mockResolvedValue(false),
+	},
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({

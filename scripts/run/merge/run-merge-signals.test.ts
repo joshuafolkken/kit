@@ -16,7 +16,7 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 }))
 
 vi.mock('#scripts/issue/issue-merged', () => ({
-	issue_merged: { read_merged: merged_mock },
+	issue_merged: { read_merge_state: merged_mock },
 }))
 
 vi.mock('./run-merge-steps', () => ({
@@ -31,8 +31,14 @@ const { run_merge_signals } = await import('./run-merge-signals')
 
 const CHILD = '3908'
 const CONTEXT = { child: CHILD, output: undefined }
-const OPEN_READ = { kind: 'state', state: { state: 'OPEN', labels: [] } } as const
-const CLOSED_READ = { kind: 'state', state: { state: 'CLOSED', labels: [] } } as const
+const OPEN_READ = {
+	kind: 'state',
+	state: { state: 'OPEN', labels: [], is_human_review: false },
+} as const
+const CLOSED_READ = {
+	kind: 'state',
+	state: { state: 'CLOSED', labels: [], is_human_review: false },
+} as const
 const UNREAD = { kind: 'unreadable' } as const
 const LAUNCH = 'child-launch'
 const WITHDRAW = 'withdraw'
@@ -71,20 +77,6 @@ describe('run_merge_signals.read_signals — the readings beside the GitHub stat
 		expect(await signals_of(OPEN_READ)).toMatchObject({ is_withdrawn: false })
 	})
 
-	it('reads a withdrawn child closed as not planned as withdrawn', async () => {
-		events_mock.mockResolvedValue([event(1, LAUNCH), event(2, WITHDRAW)])
-
-		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: true })
-		expect(merged_mock).toHaveBeenCalledWith(CHILD)
-	})
-
-	it('does not read a withdrawal on a child that merged before it was stopped', async () => {
-		events_mock.mockResolvedValue([event(1, LAUNCH), event(2, WITHDRAW)])
-		merged_mock.mockResolvedValue(true)
-
-		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: false })
-	})
-
 	it('reads the merged closing pull request of an open child', async () => {
 		closing_pr_mock.mockResolvedValue('3920')
 
@@ -98,6 +90,29 @@ describe('run_merge_signals.read_signals — the readings beside the GitHub stat
 	})
 })
 
+describe('run_merge_signals.read_signals — a closed withdrawn child', () => {
+	beforeEach(() => {
+		events_mock.mockResolvedValue([event(1, LAUNCH), event(2, WITHDRAW)])
+	})
+
+	it('reads a withdrawn child closed as not planned as withdrawn', async () => {
+		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: true })
+		expect(merged_mock).toHaveBeenCalledWith(CHILD)
+	})
+
+	it('does not read a withdrawal on a child that merged before it was stopped', async () => {
+		merged_mock.mockResolvedValue(true)
+
+		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: false })
+	})
+
+	it('leaves the withdrawal unset when its timeline could not be read', async () => {
+		merged_mock.mockResolvedValue(undefined)
+
+		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: undefined })
+	})
+})
+
 describe('run_merge_signals.outcome_of — the outcome the readings decide', () => {
 	it('settles an unread child a person withdrew', () => {
 		const outcome = run_merge_signals.outcome_of(UNREAD, {
@@ -107,5 +122,11 @@ describe('run_merge_signals.outcome_of — the outcome the readings decide', () 
 		})
 
 		expect(outcome).toBe('withdrawn')
+	})
+
+	it('asks again about a withdrawn child whose merge could not be read', () => {
+		const outcome = run_merge_signals.outcome_of(CLOSED_READ, { is_outage: false, is_cut: false })
+
+		expect(outcome).toBe('unresolved')
 	})
 })

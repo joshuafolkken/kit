@@ -1,8 +1,8 @@
 {
-	"reason": "#3908 adds the lane:withdraw command (new module, CLI, withdrawn classification), the post-reap re-read that leaves a merged close alone, and its one-paragraph recovery pointer in backlogrun-recovery.md",
+	"reason": "round-2 review fix: lane:withdraw leaves an issue unread after the reap open, and run:merge asks again when a withdrawn child's timeline cannot be read",
 	"date": "2026-10-16",
 	"growth": {
-		"scripts.code_lines": 238,
+		"scripts.code_lines": 243,
 		"ai_cost.on_demand_bytes": 215,
 		"prose.excess_bold": 1
 	}

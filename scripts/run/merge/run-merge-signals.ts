@@ -56,14 +56,16 @@ async function read_merged_pr(child: string, read: IssueRead): Promise<string | 
 }
 
 // A child that merged before `lane:withdraw` stopped it is merged, not withdrawn: the withdrawal's
-// event is already written, so only the timeline tells its merged close from the not-planned one.
-async function read_is_withdrawn(child: string, read: IssueRead): Promise<boolean> {
+// event is already written, so only the timeline tells its merged close from the not-planned one. An
+// unread timeline answers `undefined`, and `outcome_of` asks again rather than guessing.
+async function read_is_withdrawn(child: string, read: IssueRead): Promise<boolean | undefined> {
 	const events = await run_event_stream_emit.current_events()
 
 	if (!run_event_scope.is_withdrawn(events, child)) return false
 	if (read.kind !== 'state' || run_merge.classify_child(read.state) !== 'merged') return true
+	const is_merged = await issue_merged.read_merge_state(child)
 
-	return !(await issue_merged.read_merged(child))
+	return is_merged === undefined ? undefined : !is_merged
 }
 
 async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
@@ -77,8 +79,11 @@ async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingS
 	return { is_outage, is_cut, merged_pr, is_withdrawn }
 }
 
-// An unread state is `unresolved` unless a withdrawal already settled the child, which is read locally.
+// An unread state is `unresolved` unless a withdrawal already settled the child, which is read locally;
+// a withdrawn child whose timeline could not tell its merge (`is_withdrawn` unset) is `unresolved` too.
 function outcome_of(read: IssueRead, signals: EndingSignals): ChildOutcome {
+	if (signals.is_withdrawn === undefined) return 'unresolved'
+
 	return run_merge.classify_child(read.kind === 'state' ? read.state : undefined, signals)
 }
 

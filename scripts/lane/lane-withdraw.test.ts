@@ -193,4 +193,15 @@ describe('lane_withdraw.withdraw — what is left when a step fails', () => {
 		expect(close_lane).toHaveBeenCalledWith(ISSUE)
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('by hand')
 	})
+
+	it('leaves the issue open when it cannot be read again after the child is stopped', async () => {
+		read_issue
+			.mockResolvedValueOnce(state_read('OPEN'))
+			.mockResolvedValueOnce({ kind: 'unreadable' })
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(outcome).toMatchObject({ kind: 'withdrawn', is_closed: false, had_closed: false })
+		expect(close_not_planned).not.toHaveBeenCalled()
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('by hand')
+	})
 })

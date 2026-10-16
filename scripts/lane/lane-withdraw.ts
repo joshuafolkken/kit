@@ -81,7 +81,13 @@ async function refusal_of(issue: string): Promise<Refused | undefined> {
 async function close_open_issue(issue: string, reason: string): Promise<IssueSettled> {
 	const refusal = await refusal_of(issue)
 
-	if (refusal?.kind === CLOSED_KIND) return { is_closed: true, had_closed: true }
+	// An unread issue may have merged during the reap, so it is left open for a person to close.
+	if (refusal !== undefined) {
+		const is_closed = refusal.kind === CLOSED_KIND
+
+		return { is_closed, had_closed: is_closed }
+	}
+
 	const is_closed = await git_gh_issue_write.issue_close_not_planned(issue, close_comment(reason))
 
 	return { is_closed, had_closed: false }
