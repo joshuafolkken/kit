@@ -44,7 +44,7 @@ beforeEach(() => {
 	find_lane_mock.mockReset().mockResolvedValue(LANE)
 	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
 	serving_mock.mockReset().mockReturnValue(false)
-	request_mock.mockReset().mockResolvedValue(true)
+	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
@@ -108,10 +108,21 @@ describe('run_ship_return.return_control on a served lane', () => {
 
 	it('records the stop when the broker could not relaunch the child', async () => {
 		serving_mock.mockReturnValue(true)
-		request_mock.mockResolvedValue(false)
+		request_mock.mockResolvedValue({ is_success: false, reason: 'the relaunch did not start' })
 
 		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('recorded')
 		expect(relaunch_mock).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#3974: the ship log said only that the broker did not start the child.
+	it("writes the broker's reason to the ship log", async () => {
+		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+		serving_mock.mockReturnValue(true)
+		request_mock.mockResolvedValue({ is_success: false, reason: 'the issue is parked' })
+		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
+
+		expect(write).toHaveBeenCalledWith(expect.stringContaining('— the issue is parked'))
 	})
 })
 

@@ -24,10 +24,11 @@ const CLOSED_STATE = 'CLOSED'
 // failing every child it is handed rather than on failures scattered across a long run.
 const CONSECUTIVE_FAILURE_LIMIT = 3
 // Three outages in a row stop the run too — the same shape as the failure
-// guard, over its own streak. An outage is a child its environment ended — it could not reach the API,
-// its session was killed inside a turn, or its ship stopped with no relaunch — so a run of them is
-// the environment being down; stopping is what keeps the run from re-dispatching into a dead API
-// forever. A merge or a genuine child failure resets it (`run-carry.ts` → `next_outages`).
+// guard, over its own streak. An outage is a child its environment ended — it could not reach the API
+// or its session was killed inside a turn — so a run of them is the environment being down; stopping is
+// what keeps the run from re-dispatching into a dead API forever. A ship that stopped with no relaunch
+// is re-dispatched too but not counted: its child reached the API (joshuafolkken/kit#3974). A merge or
+// a genuine child failure resets it (`run-carry.ts` → `next_outages`).
 const CONSECUTIVE_OUTAGE_LIMIT = 3
 const ONE = 1
 
@@ -70,6 +71,8 @@ interface EndingSignals {
 	merged_pr?: string | undefined
 	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`).
 	is_withdrawn?: boolean | undefined
+	// The outage is a ship stop no relaunch answered, not an API the child could not reach.
+	is_unanswered?: boolean | undefined
 }
 
 const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }
