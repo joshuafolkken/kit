@@ -142,3 +142,14 @@ describe('lane_dispatch.describe — a dispatch on the default provider', () => 
 		expect(lane_dispatch.describe(outcome, ISSUE)).not.toContain(DEFAULTED)
 	})
 })
+
+describe('lane_dispatch.describe — the wait it hands the parent', () => {
+	it('names the blocking lane:await in the background, never a poll', async () => {
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+
+		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
+
+		expect(message).toContain(`lane:await ${ISSUE} --owner "$PPID"\` in the background`)
+		expect(message).not.toContain('poll')
+	})
+})
