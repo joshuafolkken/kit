@@ -1,3 +1,4 @@
+import { core_budget } from '#scripts/gate/core-budget'
 import {
 	CSPELL_CACHE_FLAGS,
 	CSPELL_COMMIT_CACHE_FLAGS,
@@ -67,6 +68,23 @@ describe('pre_commit_lint.run', () => {
 			pre_commit_lint.build_arguments('prettier', STAGED),
 			expect.objectContaining({ stdio: 'inherit' }),
 		)
+	})
+
+	// joshuafolkken/kit#3944: lefthook starts the three tools in parallel, each off the ledger until now.
+	it.each([
+		['cspell', 'spell_check'],
+		['prettier', 'format'],
+		['eslint', 'eslint_scan'],
+	] as const)('claims the core budget %s is declared under', async (tool, budget) => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation').mockResolvedValue(0)
+
+		expect(await pre_commit_lint.run([tool, ...STAGED])).toBe(0)
+		expect(reservation).toHaveBeenCalledWith(
+			core_budget.CORE_WEIGHTS[budget],
+			expect.any(Function),
+			expect.objectContaining({ memory_mb: core_budget.MEMORY_MB[budget] }),
+		)
+		reservation.mockRestore()
 	})
 
 	it('refuses an unknown tool with a usage error and runs nothing', async () => {
