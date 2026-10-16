@@ -9,9 +9,13 @@ vi.mock('node:child_process', async (original) => ({
 vi.mock('#scripts/run/launch-priority', () => ({ launch_priority: { lower: vi.fn() } }))
 vi.mock('./lane-dispatch-log', () => ({ lane_dispatch_log: { default_log_path: () => undefined } }))
 
+const { agent_diagnostics } = await import('#scripts/agent/agent-diagnostics')
 const { agent_role_profile } = await import('#scripts/agent/agent-role-profile')
 const { lane_child_invocation } = await import('./lane-child-invocation')
 const { lane_relaunch } = await import('./lane-relaunch')
+
+// The CLI version probe spawns the real `claude`, absent on CI — the launch under test is the argv check.
+vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 
 const ISSUE = '3964'
 const LANE = {
