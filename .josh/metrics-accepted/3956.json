@@ -1,8 +1,9 @@
 {
-	"reason": "#3956 adds section-aware reference reading (acceptance criteria and parent line) for epic:bundle signals, and the docs state the narrowed signal definition",
+	"reason": "Round-1 review fixes: single shared parent-line marker check for epic:audit and epic:bundle, signal-first ordering before the 20-lookup cap, and the follow-up filing rule naming the parent line",
 	"date": "2026-10-16",
 	"growth": {
-		"scripts.code_lines": 49,
-		"ai_cost.on_demand_bytes": 362
+		"scripts.code_lines": 56,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 443
 	}
 }

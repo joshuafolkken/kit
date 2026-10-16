@@ -191,13 +191,20 @@ interface SignalReference {
 	section: SignalSection
 }
 
-// Both spellings, for the same reason as `ACCEPTANCE_HEADINGS`.
-const PARENT_LINE_PATTERN = /^(?:parent|親)\s*[:：]/iu
+// What marks a line as naming the issue's parent, in both spellings for the same reason as
+// `ACCEPTANCE_HEADINGS`. Matched anywhere in the line, so `- **Parent:** #N` counts too. Shared with
+// `epic:audit`'s orphan search, so a line it reports as claiming a parent is one `epic:bundle` reads
+// as a parent line.
+const PARENT_MARKERS: ReadonlyArray<string> = ['親:', '親：', 'Parent:', 'parent:']
+
+function has_parent_marker(line: string): boolean {
+	return PARENT_MARKERS.some((marker) => line.includes(marker))
+}
 
 function parent_lines(body: string): string {
 	return markdown_section
 		.unfenced_lines(body)
-		.filter((line) => PARENT_LINE_PATTERN.test(line.trim()))
+		.filter((line) => has_parent_marker(line))
 		.join('\n')
 }
 
@@ -262,6 +269,7 @@ const epic_audit_logic = {
 	parse_references,
 	acceptance_section,
 	signal_references,
+	has_parent_marker,
 	depends_on,
 }
 

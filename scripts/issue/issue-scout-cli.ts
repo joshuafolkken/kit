@@ -103,7 +103,7 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 }
 
 // The epic beside a candidate is the placement answer for a draft that cites nothing: the epic half
-// below decides from prose references, and a title-only draft has none to give it.
+// below decides from signal references, and a title-only draft has none to give it.
 function format_duplicate(candidate: DuplicateCandidate): string {
 	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
 	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`

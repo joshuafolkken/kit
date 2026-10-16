@@ -116,13 +116,14 @@ describe('epic_audit_logic.acceptance_section', () => {
 
 describe('epic_audit_logic.signal_references', () => {
 	const IN_ACCEPTANCE = { number: 2, section: 'acceptance criteria' }
+	const PARENT_LINE = 'parent line'
 
 	it('reads the acceptance criteria and the parent line, each with its section', () => {
 		const body = 'parent: #9\n\n## 背景\n\nsee #1\n\n## 受け入れ条件\n\n- [ ] needs #2'
 
 		expect(epic_audit_logic.signal_references(body, REPO)).toEqual([
 			IN_ACCEPTANCE,
-			{ number: 9, section: 'parent line' },
+			{ number: 9, section: PARENT_LINE },
 		])
 	})
 
@@ -130,6 +131,12 @@ describe('epic_audit_logic.signal_references', () => {
 		const body = 'parent: #2\n\n## Acceptance criteria\n\n- [ ] needs #2'
 
 		expect(epic_audit_logic.signal_references(body, REPO)).toEqual([IN_ACCEPTANCE])
+	})
+
+	it('reads a bulleted, bold parent line, the shape the orphan search accepts', () => {
+		const [reference] = epic_audit_logic.signal_references('- **親:** #2', REPO)
+
+		expect(reference?.section).toBe(PARENT_LINE)
 	})
 
 	it('reads no parent line inside a code fence', () => {

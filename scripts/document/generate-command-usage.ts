@@ -7,7 +7,11 @@ import { command_usage } from '#scripts/josh/command-usage'
 // `josh help <command>` prints. The headings stay put because other documents point at them (#3932).
 // Run `tsx scripts/document/generate-command-usage.ts` to regenerate.
 
-const USAGE_PAGES: ReadonlyArray<string> = ['docs/josh-commands.md', 'docs/josh-commands-run.md']
+const USAGE_PAGES: ReadonlyArray<string> = [
+	'docs/josh-commands.md',
+	'docs/josh-commands-run.md',
+	'docs/josh-commands-backlog.md',
+]
 const USAGE_BLOCK = /<!-- usage: (?<name>\S+) -->\n[\s\S]*?<!-- \/usage -->/gu
 
 function usage_block(name: string): string {
