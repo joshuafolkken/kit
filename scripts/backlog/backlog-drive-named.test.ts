@@ -58,24 +58,29 @@ test('stops after all named issues when only mode is declared', () => {
 	expect(backlog_drive_named.offer(carry, state, false)).toBeUndefined()
 })
 
-test('records a named merge under the separate supervisor PID', async () => {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-named-'))
-	const target = run_carry.carry_path(directory)
-	const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
-	const supervisor = spawn('sleep', ['30'])
+// joshuafolkken/kit#3908: a child a person withdrew is as settled as a merged one, so the named run
+// moves past it rather than waiting on an issue that will never merge.
+test.each(['merged', 'withdrawn'] as const)(
+	'records a named %s child under the separate supervisor PID',
+	async (outcome) => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-named-'))
+		const target = run_carry.carry_path(directory)
+		const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
+		const supervisor = spawn('sleep', ['30'])
 
-	run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(supervisor.pid ?? 0))
+		run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(supervisor.pid ?? 0))
 
-	await backlog_drive_named.mark_done(
-		'1',
-		{ outcome: 'merged', code: 0, token: 'none', is_offer: true },
-		String(supervisor.pid),
-	)
-	expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
-	supervisor.kill()
-	read_directory.mockRestore()
-	rmSync(directory, { recursive: true, force: true })
-})
+		await backlog_drive_named.mark_done(
+			'1',
+			{ outcome, code: 0, token: 'none', is_offer: true },
+			String(supervisor.pid),
+		)
+		expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
+		supervisor.kill()
+		read_directory.mockRestore()
+		rmSync(directory, { recursive: true, force: true })
+	},
+)
 
 test('recovers a named merge from the event stream after an interrupted handoff', async () => {
 	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-reconcile-'))

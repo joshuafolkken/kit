@@ -150,6 +150,24 @@ describe('classify_child — merged while the issue stayed OPEN', () => {
 	})
 })
 
+// joshuafolkken/kit#3908: a child a person withdrew is read from the event stream ahead of GitHub — the
+// issue may still be OPEN when the parent collects it, or CLOSED as not planned, never merged.
+describe('classify_child — withdrawn by a person', () => {
+	const WITHDRAWN_SIGNALS = { ...OUTAGE, is_withdrawn: true }
+
+	it.each([
+		['OPEN', issue_state_of({ labels: [IN_PROGRESS] })],
+		['CLOSED', issue_state_of({ state: CLOSED })],
+		['unread', undefined],
+	])('reads a %s child as withdrawn', (_label, state) => {
+		expect(run_merge.classify_child(state, WITHDRAWN_SIGNALS)).toBe('withdrawn')
+	})
+
+	it('counts nothing for it', () => {
+		expect(run_merge.change_of('withdrawn')).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#2769: a park the driver makes is explained on the issue — why, what was read, and
 // what a person does next.
 describe('park_comment', () => {

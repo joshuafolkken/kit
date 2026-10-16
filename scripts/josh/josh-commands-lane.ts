@@ -83,6 +83,15 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue>', 'developer', ['files', 'git', 'processes', 'network']],
 	},
+	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so the lane is found.
+	'lane:withdraw': {
+		script: 'scripts/lane/lane-withdraw-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure',
+		category: 'AI tools',
+		reference: ['<issue> --reason <text>', 'developer', ['files', 'git', 'processes', 'network']],
+	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.
 	'lane:limit': {

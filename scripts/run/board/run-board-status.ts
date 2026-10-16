@@ -17,7 +17,8 @@ import { run_board_setup, type SetupRead } from './run-board-setup'
 // statuses are laid over is the slow GitHub half, and so is what a child that left the open listing
 // answers when read closed.
 
-type ItemState = 'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human' | 'stopped'
+type ItemState =
+	'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human' | 'stopped' | 'withdrawn'
 
 interface ItemStatus {
 	state: ItemState
@@ -61,6 +62,7 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 	[KIND.PARK]: 'parked',
 	[KIND.SPLIT]: 'done',
 	[KIND.STOP]: 'done',
+	[KIND.WITHDRAW]: 'withdrawn',
 }
 // A cut or a resume says the child is still running, on whatever phase it had reached.
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])

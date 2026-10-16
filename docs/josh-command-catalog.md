@@ -1275,6 +1275,16 @@ Print one table row of lane throughput, gate duration and machine load over a pe
 
 ---
 
+### `josh lane:withdraw` · `josh lwd`
+
+> **Audience:** developer · **Side effects:** files, git, processes, network
+
+`<issue> --reason <text>`
+
+Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure
+
+---
+
 ### `josh oracle:list`
 
 > **Audience:** automation · **Side effects:** none

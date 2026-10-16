@@ -40,7 +40,7 @@ const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const reap_child = vi.spyOn(lane_reap, 'reap_child')
 const is_child_running = vi.spyOn(lane_reap, 'is_child_running')
 const changes_probe = vi.spyOn(git_stash, 'has_changes')
-const push_work = vi.spyOn(lane_preserve, 'push_work')
+const push = vi.spyOn(git_stash, 'push')
 const announce = vi.spyOn(lane_preserve, 'announce')
 const claim_marker = vi.spyOn(lane_dispatch, 'claim_marker')
 const dispatch_child = vi.spyOn(lane_dispatch, 'dispatch_child')
@@ -59,7 +59,7 @@ function arrange_running_child(): void {
 
 function arrange_relaunch(): void {
 	changes_probe.mockResolvedValue(false)
-	push_work.mockResolvedValue(STASH)
+	push.mockResolvedValue()
 	announce.mockResolvedValue()
 	dispatch_child.mockResolvedValue(DISPATCHED)
 	emit.mockResolvedValue()
@@ -109,9 +109,9 @@ describe('lane_restart.restart — the work in the tree', () => {
 		changes_probe.mockResolvedValue(true)
 		const outcome = await lane_restart.restart(ISSUE)
 
-		expect(push_work).toHaveBeenCalledWith(ISSUE, DIRECTORY, 'lane restart')
+		expect(push).toHaveBeenCalledWith(STASH, DIRECTORY)
 		expect(announce).toHaveBeenCalledWith(ISSUE, STASH, expect.any(String))
-		expect(push_work.mock.invocationCallOrder[0]).toBeLessThan(
+		expect(push.mock.invocationCallOrder[0]).toBeLessThan(
 			dispatch_child.mock.invocationCallOrder[0] ?? 0,
 		)
 		expect(dispatch_child.mock.invocationCallOrder[0]).toBeLessThan(
@@ -152,7 +152,7 @@ describe('lane_restart.restart — refusals', () => {
 		const outcome = await lane_restart.restart(ISSUE)
 
 		expect(outcome).toStrictEqual(NOT_RUNNING)
-		expect(push_work).not.toHaveBeenCalled()
+		expect(push).not.toHaveBeenCalled()
 		expect(dispatch_child).not.toHaveBeenCalled()
 	})
 })
@@ -169,7 +169,7 @@ describe('lane_restart.restart — what stops before or after the kill', () => {
 
 	it('re-dispatches nothing when the work cannot be stashed', async () => {
 		changes_probe.mockResolvedValue(true)
-		push_work.mockRejectedValue(new Error(LOCK_ERROR))
+		push.mockRejectedValue(new Error(LOCK_ERROR))
 		const outcome = await lane_restart.restart(ISSUE)
 
 		expect(outcome).toMatchObject({ kind: 'unsaved', reason: LOCK_ERROR })

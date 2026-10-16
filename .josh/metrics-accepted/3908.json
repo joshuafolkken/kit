@@ -1,0 +1,9 @@
+{
+	"reason": "#3908 adds the lane:withdraw command (new module, CLI, withdrawn classification), the post-reap re-read that leaves a merged close alone, and its one-paragraph recovery pointer in backlogrun-recovery.md",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 238,
+		"ai_cost.on_demand_bytes": 215,
+		"prose.excess_bold": 1
+	}
+}

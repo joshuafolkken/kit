@@ -84,6 +84,21 @@ describe('run_board_status.statuses_of', () => {
 	})
 })
 
+// joshuafolkken/kit#3908: a child a person withdrew is drawn settled, not running.
+describe('run_board_status.statuses_of withdrawn', () => {
+	it('reads a child a person withdrew as withdrawn', () => {
+		const events = [
+			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
+			event_at(2, T1, KIND.WITHDRAW, '#3409 withdrawn by a person: superseded'),
+		]
+
+		expect(run_board_status.statuses_of(events, [], NONE).get(3409)).toMatchObject({
+			state: 'withdrawn',
+			ended_ms: Date.parse(T1),
+		})
+	})
+})
+
 describe('run_board_status.statuses_of lanes', () => {
 	it('leaves out a lane whose issue is neither on the stream nor in the run', () => {
 		const statuses = run_board_status.statuses_of([], ['3347'], new Set([3441]))

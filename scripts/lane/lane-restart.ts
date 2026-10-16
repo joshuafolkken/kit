@@ -1,14 +1,12 @@
-import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
-import { error_text } from '#scripts/lib/error-message'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
-import { lane_preserve } from './lane-preserve'
+import { lane_preserve, type KeptWork } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
@@ -38,11 +36,7 @@ const NO_LANE_KIND = 'no-lane'
 const NOT_RUNNING_KIND = 'not-running'
 const UNCLAIMED_KIND = 'unclaimed'
 
-interface Unsaved {
-	kind: 'unsaved'
-	directory: string
-	reason: string
-}
+type Unsaved = Extract<KeptWork, { kind: 'unsaved' }>
 
 interface Restarted {
 	kind: 'restarted'
@@ -55,7 +49,6 @@ type Refused =
 	| { kind: typeof NOT_RUNNING_KIND }
 	| { kind: typeof UNCLAIMED_KIND; reason: string }
 type RestartOutcome = Restarted | Unsaved | Refused
-type Saved = Unsaved | { kind: 'saved'; stash: string | undefined }
 
 // A cut the stopped child carried would hand its successor the old session's hand-off at
 // `run:cut --resume`; the fresh session has to start from the Issue instead.
@@ -65,22 +58,6 @@ function end_carried_cut(lane: LaneInfo): void {
 	if (carried !== undefined) run_cut.end_cut(carried.target)
 }
 
-async function stash_of(lane: LaneInfo): Promise<string | undefined> {
-	if (!(await git_stash.has_changes(lane.directory))) return undefined
-
-	return await lane_preserve.push_work(lane.issue, lane.directory, RESTART_OCCASION)
-}
-
-// A tree that could not be read or pushed is left as it is: re-dispatching into it would hand the fresh
-// session the stopped one's half-done work as though it were its own.
-async function save_work(lane: LaneInfo): Promise<Saved> {
-	try {
-		return { kind: 'saved', stash: await stash_of(lane) }
-	} catch (error) {
-		return { kind: 'unsaved', directory: lane.directory, reason: error_text.message_of(error) }
-	}
-}
-
 async function record_restart(issue: string): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.RESTART,
@@ -88,9 +65,11 @@ async function record_restart(issue: string): Promise<void> {
 	)
 }
 
+// A tree that could not be read or pushed is left as it is: re-dispatching into it would hand the fresh
+// session the stopped one's half-done work as though it were its own.
 async function relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 	end_carried_cut(lane)
-	const saved = await save_work(lane)
+	const saved = await lane_preserve.keep_work(lane.issue, lane.directory, RESTART_OCCASION)
 
 	if (saved.kind === 'unsaved') return saved
 	const dispatch = await lane_dispatch.dispatch_child(lane.issue, 'restart')

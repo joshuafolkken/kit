@@ -82,7 +82,7 @@ interface Drawn extends Overlay {
 	reason_of: ReasonOf | undefined
 }
 
-const SETTLED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'parked', 'done'])
+const SETTLED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'parked', 'done', 'withdrawn'])
 
 function is_settled(state: ItemState): boolean {
 	return SETTLED_STATES.has(state)
