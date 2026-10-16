@@ -5,7 +5,7 @@ import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { CSPELL_ARGS } from '#scripts/lint/cspell-cached'
 import { ESLINT_FIX_ARGS, PRETTIER_WRITE_ARGS } from '#scripts/lint/format'
-import { ESLINT_ARGS, WHOLE_TREE_PRETTIER } from '#scripts/lint/lint-parallel'
+import { ESLINT_ARGS, PRETTIER_ARGS } from '#scripts/lint/lint-parallel'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
 import {
@@ -13,8 +13,12 @@ import {
 	ESLINT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,
+	GATE_CACHE_SPECS,
 	IGNORED_CACHE_FILES,
+	PRETTIER_CACHE_FILE,
 	PRETTIER_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FILE,
+	SHARED_CACHE_SPECS,
 	TS_CACHE_FLAGS,
 } from './josh-command-types'
 
@@ -73,8 +77,17 @@ describe('verification gate cache flags', () => {
 
 	// joshuafolkken/kit#3948: a whole-tree `prettier --check .` was measured at 36 s cold.
 	it('checks and formats through one prettier content cache', () => {
-		expect(WHOLE_TREE_PRETTIER.args.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
+		expect(PRETTIER_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
 		expect(PRETTIER_WRITE_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
+	})
+
+	// Prettier hashes each file's absolute path into its entry, so a rebased copy from another
+	// checkout misses on every file: seeding or sharing one would only cost the copy.
+	it('neither seeds nor shares a prettier cache across checkouts', () => {
+		const portable = [...GATE_CACHE_SPECS, ...SHARED_CACHE_SPECS].map((spec) => spec.cache_file)
+
+		expect(portable).not.toContain(PRETTIER_CACHE_FILE)
+		expect(portable).not.toContain(PRETTIER_RELATED_CACHE_FILE)
 	})
 })
 

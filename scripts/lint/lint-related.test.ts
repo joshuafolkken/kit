@@ -122,7 +122,7 @@ describe('lint_related.run_related_lint', () => {
 		await lint_related.run_related_lint([])
 
 		expect(mocked_whole_tree).not.toHaveBeenCalled()
-		expect(mocked_scoped.mock.calls[0]?.[0].args).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_scoped.mock.calls[0]?.[0]).toContain(ABSOLUTE_SOURCE)
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
 		expect(mocked_scoped.mock.calls[0]?.[2].cache_file).toBe(ESLINT_RELATED_CACHE_FILE)
 		expect(mocked_scoped.mock.calls[0]?.[2].patterns).toContain(ABSOLUTE_SOURCE)

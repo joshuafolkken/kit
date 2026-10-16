@@ -165,27 +165,19 @@ const ESLINT_RELATED_CACHE_SPEC: GateCacheSpec = {
 	cache_file: ESLINT_RELATED_CACHE_FILE,
 	portability: ROOTED_JSON_PORTABILITY,
 }
-// Prettier writes the same `file-entry-cache` format ESLint does, keyed by absolute path.
-const PRETTIER_CACHE_SPEC: GateCacheSpec = {
-	cache_file: PRETTIER_CACHE_FILE,
-	portability: ROOTED_JSON_PORTABILITY,
-}
-const PRETTIER_RELATED_CACHE_SPEC: GateCacheSpec = {
-	cache_file: PRETTIER_RELATED_CACHE_FILE,
-	portability: ROOTED_JSON_PORTABILITY,
-}
+// **Prettier's caches are in neither list: they do not survive a move to another checkout.**
+// Prettier 3 hashes each file's resolved options, *its absolute `filepath` included*, into the entry,
+// so rebasing the keys as ESLint's are still leaves every entry a miss — two checkouts of one tree
+// were measured sharing none of their 3,526 option hashes. Each checkout keeps a warm cache of its own.
 const GATE_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
 	ESLINT_CACHE_SPEC,
 	TS_CACHE_SPEC,
 	CSPELL_CACHE_SPEC,
-	PRETTIER_CACHE_SPEC,
 ]
 const SHARED_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
 	ESLINT_CACHE_SPEC,
 	ESLINT_RELATED_CACHE_SPEC,
 	CSPELL_CACHE_SPEC,
-	PRETTIER_CACHE_SPEC,
-	PRETTIER_RELATED_CACHE_SPEC,
 ]
 const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => spec.cache_file)
 
@@ -223,6 +215,7 @@ const IGNORED_CACHE_FILES: ReadonlyArray<string> = [
 	...GATE_CACHE_FILES,
 	ESLINT_EDIT_CACHE_FILE,
 	ESLINT_RELATED_CACHE_FILE,
+	PRETTIER_CACHE_FILE,
 	PRETTIER_RELATED_CACHE_FILE,
 	CSPELL_COMMIT_CACHE_FILE,
 	ESLINT_COMMIT_CACHE_FILE,
