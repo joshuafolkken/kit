@@ -90,13 +90,13 @@ Before an issue is filed, answer the two questions every filing asks: has this a
 
 ```bash
 pnpm josh issue:scout "Stop the gate re-running after every edit"
-pnpm josh issue:scout "<title>" --body "follows on from #1246"
+pnpm josh issue:scout "<title>" --body "parent: #1246"
 pnpm josh issue:scout "<title>" --body-file draft.md
 ```
 
 **Options:**
 
-- `--body "<text>"` — supply prose references (`#N`) so the epic half has a number to work from; without one it prints `Epic: not asked`.
+- `--body "<text>"` — supply references (`#N`) in a `parent: #N` line or an acceptance-criteria section so the epic half has a number to work from; without one there (a background mention does not count) it prints `Epic: not asked`.
 - `--body-file <path>` — pass the whole draft, including its purpose, requirements and acceptance criteria. A file that cannot be read ends the command rather than being treated as "no candidates".
 
 <!-- /usage -->
@@ -430,7 +430,7 @@ pnpm josh epic:bundle 874
 
 <!-- /usage -->
 
-Only two things count as a signal: the two issues referring to each other in prose, or an already-recorded `blocked-by`. A similar title never counts on its own.
+Only two things count as a signal: one issue naming the other in its acceptance criteria (`## 受け入れ条件` / `## Acceptance criteria`) or its `parent: #N` / `親: #N` line, or an already-recorded `blocked-by`. A reference in any other section, or a similar title, never counts.
 
 | Candidates                                     | What to do                                          | Tier |
 | ---------------------------------------------- | --------------------------------------------------- | ---- |

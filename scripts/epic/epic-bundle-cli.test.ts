@@ -8,6 +8,7 @@ import { issue_citation } from '#scripts/rules/issue-citation'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
+import { epic_bundle_fixture } from './epic-bundle-fixture'
 
 // What the command prints for a decision, as distinct from what it decides.
 //
@@ -18,7 +19,7 @@ import { epic_bundle_cli } from './epic-bundle-cli'
 // green.
 
 const REPO = 'joshuafolkken/kit'
-const BODY_WITH_REFERENCE = 'refers to #891'
+const BODY_WITH_REFERENCE = epic_bundle_fixture.in_acceptance('refers to #891')
 const EPIC_LISTING = 'epic listing'
 const BACKLOG_LISTING = 'backlog listing'
 // The shape `warn_about_gaps` reads: a successful listing with nothing missing. Spread into each
@@ -113,7 +114,8 @@ describe('epic_bundle_cli — the `ask` verdict', () => {
 	})
 
 	it('gives a reason that agrees with the headline', () => {
-		const spread = epic_bundle.decide_bundle(issue(1, { body: 'refers to #2 and #3' }), [
+		const body = epic_bundle_fixture.in_acceptance('refers to #2 and #3')
+		const spread = epic_bundle.decide_bundle(issue(1, { body }), [
 			issue(2, { epic: 10 }),
 			issue(3, { epic: 20 }),
 		])
