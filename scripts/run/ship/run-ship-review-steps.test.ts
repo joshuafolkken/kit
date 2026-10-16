@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
-const resolve_in_mock = vi.hoisted(() => vi.fn())
+const review_in_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 // Unrecorded by default; a test that needs another answer sets it once.
@@ -16,7 +16,7 @@ const stamps = vi.hoisted(() => ({
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: stamps }))
-vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: resolve_in_mock } }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: review_in_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
 vi.mock('#scripts/gate/gate-tree', () => ({
 	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
@@ -84,7 +84,7 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	answer_with(undefined)
 	launch.mockReset().mockResolvedValue({ ...COMPLETED, exit_code: OK })
-	resolve_in_mock.mockReset().mockReturnValue({
+	review_in_mock.mockReset().mockReturnValue({
 		kind: 'argv',
 		argv: ARGV,
 		profile: { provider: 'anthropic', role: 'reviewer', model: 'claude-opus-5-5', effort: 'high' },
@@ -132,12 +132,18 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 		expect(commands()).toContain(`${RECORD} ${LOW}`)
 	})
 
-	it('launches under the reviewer role, handed the brief and findings paths', async () => {
+	it('launches under the round-1 reviewer, handed the brief and findings paths', async () => {
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
 		await run_ship_review_steps.review_stage(ISSUE)
 
-		const [prompt, role] = resolve_in_mock.mock.calls[0] as [string, string]
+		expect(stderr).toHaveBeenCalledWith(
+			expect.stringContaining('review round 1 · provider=anthropic'),
+		)
 
-		expect(role).toBe('reviewer')
+		const [prompt, round] = review_in_mock.mock.calls[0] as [string, number]
+
+		expect(round).toBe(1)
 		expect(prompt).toContain('josh-ship-review-brief-')
 		expect(prompt).toContain('josh-ship-review-findings-')
 	})
@@ -191,7 +197,7 @@ describe('run_ship_review_steps.review_stage — a reviewer error stops it', () 
 	})
 
 	it('stops when the reviewer profile is rejected', async () => {
-		resolve_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
+		review_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
 
 		expect(await stage_out()).toContain(PROFILE_NOTE)
 		expect(launch).not.toHaveBeenCalled()
@@ -331,7 +337,8 @@ describe('run_ship_review_steps.round_two_stage — the verification pass after 
 		expect(commands()).toStrictEqual([DECIDE, LINT, TEST, BRIEF_TWO, ATTEST, `${RECORD} --comment`])
 		expect(launch).toHaveBeenCalledOnce()
 		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)
-		expect(resolve_in_mock.mock.calls[0]?.[0]).toContain('round-2 verification pass')
+		expect(review_in_mock.mock.calls[0]?.[0]).toContain('round-2 verification pass')
+		expect(review_in_mock.mock.calls[0]?.[1]).toBe(2)
 	})
 
 	// joshuafolkken/kit#3645: the passing round above records with `--comment` — no commit is left for

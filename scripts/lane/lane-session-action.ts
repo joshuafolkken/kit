@@ -84,17 +84,14 @@ function reviewer_answer(result: AttachedLaunchResult): BrokerAnswer {
 
 async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<BrokerAnswer> {
 	const target = review_paths(lane.directory)
-	const built = agent_argv.resolve_in(
-		review_prompt(lane, round),
-		agent_role_profile.REVIEWER,
-		lane.directory,
-	)
+	const built = agent_argv.review_in(review_prompt(lane, round), Number(round), lane.directory)
 	if (built.kind === 'rejected') return failure(`the reviewer profile was rejected: ${built.note}`)
 
 	if (built.profile.provider !== provider_of(lane)) {
 		return failure(`the reviewer resolved to ${built.profile.provider}, not the lane's provider`)
 	}
 
+	console.error(agent_role_profile.describe_review(Number(round), built.profile))
 	const result = await detached_launch.launch_attached(
 		{
 			argv: built.argv,

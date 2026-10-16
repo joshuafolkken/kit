@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
-const resolve_in_mock = vi.hoisted(() => vi.fn())
+const review_in_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
@@ -14,7 +14,7 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 		write_text_stamp: vi.fn(),
 	},
 }))
-vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: resolve_in_mock } }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: review_in_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
 vi.mock('#scripts/gate/gate-tree', () => ({
 	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
@@ -61,7 +61,7 @@ function commands(): ReadonlyArray<string> {
 }
 
 function reviewer_on(profile: typeof ANTHROPIC_REVIEWER_PROFILE): void {
-	resolve_in_mock.mockReturnValue({ kind: 'argv', argv: ARGV, profile })
+	review_in_mock.mockReturnValue({ kind: 'argv', argv: ARGV, profile })
 }
 
 async function stage_code(): Promise<number> {

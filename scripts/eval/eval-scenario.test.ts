@@ -1,10 +1,12 @@
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { describe, expect, it } from 'vitest'
-import { eval_scenario } from './eval-scenario'
+import { eval_scenario, type Scenario } from './eval-scenario'
 import { FIXTURE_FILE_NAME, MINIMAL_SCENARIO } from './eval-scenario-fixture'
 
 const SCENARIO_DIRECTORY = path.join(PACKAGE_DIR, 'evals/scenarios')
+const QUOTING_LOW = 'tests:low:src/a.ts:1 — the name "x" is unclear.\n'
+const LATER_MEDIUM = 'bug-risks:medium:src/a.ts:2 — it breaks.\n'
 
 // kit#855's acceptance bar: at least four scenarios, each judged on observable behavior rather than
 // on wording. Both halves are asserted against the shipped suite, because a scenario file that
@@ -71,6 +73,38 @@ describe('the shipped scenario suite', () => {
 		'%s names the rule it measures',
 		(_name, scenario) => {
 			expect(scenario.rule.length).toBeGreaterThan(0)
+		},
+	)
+})
+
+// The Write input arrives JSON-encoded, so a finding that quotes text puts `\"` before any later
+// line; the blocking pattern has to read past it to the High or Medium written after. A pass
+// scenario forbids that Write and a block scenario requires it, so the pattern sits in either list.
+function blocks(scenario: Scenario, content: string): boolean {
+	const input = JSON.stringify({ file_path: 'findings.txt', content })
+	const patterns = [...scenario.should_call, ...scenario.should_not_call]
+		.map((expectation) => expectation.input_matches ?? '')
+		.filter((pattern) => pattern.includes(':(?:high|medium):'))
+
+	return patterns.some((pattern) => new RegExp(pattern, 'u').test(input))
+}
+
+describe('the verification-fix scenarios — the High/Medium blocking pattern', () => {
+	const scenarios = eval_scenario
+		.load_scenarios(SCENARIO_DIRECTORY)
+		.filter((scenario) => scenario.name.startsWith('verification-fix-'))
+
+	it.each(scenarios.map((scenario) => [scenario.name, scenario]))(
+		'%s blocks a Medium written after a line that quotes text',
+		(_name, scenario) => {
+			expect(blocks(scenario, `${QUOTING_LOW}${LATER_MEDIUM}`)).toBe(true)
+		},
+	)
+
+	it.each(scenarios.map((scenario) => [scenario.name, scenario]))(
+		'%s lets a Low-only findings file through',
+		(_name, scenario) => {
+			expect(blocks(scenario, QUOTING_LOW)).toBe(false)
 		},
 	)
 })

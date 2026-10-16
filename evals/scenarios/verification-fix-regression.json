@@ -1,0 +1,25 @@
+{
+	"name": "verification-fix-regression",
+	"rule": "prompts/review.md — the round-2 verification pass blocks a fix that introduced a new defect",
+	"prompt": "Run the round-2 verification pass over the round-1 fixes in this checkout. Round 1 reported the findings in round-1-findings.txt and the fixes are already in place in src/. Read only: do not edit any source file, and do not commit. Check that each round-1 finding is fixed and that the fix introduced no new defect. Then write every finding with the Write tool to findings.txt, one per line as <category>:<severity>:<file>[:<line>] — <one sentence: what is wrong and why> (category one of bug-risks, security, performance, project-conventions, i18n, tests, comments, assumptions, confidence; severity high, medium or low), and write an empty file when there is none.",
+	"fixture_files": {
+		"round-1-findings.txt": "bug-risks:medium:src/pages.ts:2 — Math.floor drops the last partial page, so 25 items at 10 per page list only 2 pages.\n",
+		"src/pages.ts": "export function pages<T>(items: ReadonlyArray<T>, size: number): Array<Array<T>> {\n\tconst count = Math.ceil(items.length / size)\n\tconst result: Array<Array<T>> = []\n\n\tfor (let index = 0; index <= count; index += 1) {\n\t\tresult.push(items.slice(index * size, (index + 1) * size))\n\t}\n\n\treturn result\n}\n",
+		"src/pages.test.ts": "import { expect, it } from 'vitest'\nimport { pages } from './pages'\n\nit('keeps the last partial page', () => {\n\texpect(pages(Array.from({ length: 25 }, (_, index) => index), 10)[2]).toHaveLength(5)\n})\n"
+	},
+	"max_turns": 10,
+	"should_call": [
+		{
+			"tool": "Write",
+			"input_matches": "^(?=.*findings\\.txt)(?=.*\"content\":\"(?:[^\"\\\\]|\\\\.)*:(?:high|medium):)",
+			"because": "The fix moved to Math.ceil but also changed the loop bound to `<=`, so every call now appends a trailing empty page — a new defect the test does not catch, and the reference verdict blocks."
+		}
+	],
+	"should_not_call": [
+		{
+			"tool": "Edit",
+			"input_matches": "src/",
+			"because": "Round 2 only reads; an edit changes the tree after the commit it verifies."
+		}
+	]
+}

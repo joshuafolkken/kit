@@ -44,7 +44,7 @@ vi.mock('#scripts/git/git-common-directory', () => ({
 }))
 vi.mock('#scripts/agent/agent-argv', () => ({
 	agent_argv: {
-		resolve_in: () => ({
+		review_in: () => ({
 			kind: 'argv',
 			argv: { command: 'claude', args: [] },
 			profile: ANTHROPIC_PROFILE,

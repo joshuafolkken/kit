@@ -1,0 +1,30 @@
+{
+	"name": "verification-fix-complete",
+	"rule": "prompts/review.md — the round-2 verification pass passes a fix that closed its round-1 finding",
+	"prompt": "Run the round-2 verification pass over the round-1 fixes in this checkout. Round 1 reported the findings in round-1-findings.txt and the fixes are already in place in src/. Read only: do not edit any source file, and do not commit. Check that each round-1 finding is fixed and that the fix introduced no new defect. Then write every finding with the Write tool to findings.txt, one per line as <category>:<severity>:<file>[:<line>] — <one sentence: what is wrong and why> (category one of bug-risks, security, performance, project-conventions, i18n, tests, comments, assumptions, confidence; severity high, medium or low), and write an empty file when there is none.",
+	"fixture_files": {
+		"round-1-findings.txt": "bug-risks:medium:src/average.ts:2 — average([]) divides by zero and returns NaN, which the caller renders as the text NaN.\n",
+		"src/average.ts": "export function average(values: ReadonlyArray<number>): number {\n\tif (values.length === 0) return 0\n\n\tlet total = 0\n\n\tfor (const value of values) total += value\n\n\treturn total / values.length\n}\n",
+		"src/average.test.ts": "import { expect, it } from 'vitest'\nimport { average } from './average'\n\nit('averages the values', () => {\n\texpect(average([1, 2, 3])).toBe(2)\n})\n\nit('answers 0 for no values rather than NaN', () => {\n\texpect(average([])).toBe(0)\n})\n"
+	},
+	"max_turns": 10,
+	"should_call": [
+		{
+			"tool": "Write",
+			"input_matches": "findings\\.txt",
+			"because": "The verification pass reports through the findings file the supervisor reads; a pass that never writes it reads as unfinished."
+		}
+	],
+	"should_not_call": [
+		{
+			"tool": "Write",
+			"input_matches": "^(?=.*findings\\.txt)(?=.*\"content\":\"(?:[^\"\\\\]|\\\\.)*:(?:high|medium):)",
+			"because": "The guard closes the empty-input case and a test pins it, so a High or Medium here blocks a correct fix — the verdict the reference model reaches is a pass."
+		},
+		{
+			"tool": "Edit",
+			"input_matches": "src/",
+			"because": "Round 2 only reads; an edit changes the tree after the commit it verifies."
+		}
+	]
+}

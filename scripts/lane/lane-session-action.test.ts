@@ -23,7 +23,7 @@ const LANE: LaneInfo = {
 	profile: undefined,
 }
 
-vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: argv_mock } }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: argv_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
@@ -46,6 +46,20 @@ afterEach(() => {
 function reason_of(answer: BrokerAnswer): string {
 	return answer.is_success ? '' : answer.reason
 }
+
+// joshuafolkken/kit#3926: the verification pass resolves its own profile, and the log names it.
+describe('lane_session_action.answer — a review round', () => {
+	it('resolves the reviewer for the round it starts and logs that round with its model', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(vi.fn())
+
+		await lane_session_action.answer(LANE, { kind: 'review', round: '2' })
+
+		expect(argv_mock.mock.calls[0]?.[1]).toBe(2)
+		expect(error).toHaveBeenCalledWith(
+			'review round 2 · provider=anthropic role=reviewer model=opus effort=high',
+		)
+	})
+})
 
 describe('lane_session_action.answer', () => {
 	it('answers success when the reviewer exits cleanly', async () => {

@@ -1,13 +1,8 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { z } from 'zod'
+import { agent_safe_text } from './agent-safe-text'
 
-const FIRST_PRINTABLE_CODE = 0x20
-const DELETE_CODE = 0x7f
-const FIRST_CODE_POINT = 0
 const EMPTY_LENGTH = 0
-const MAX_VALUE_LENGTH = 4096
-const LINE_FEED = '\n'
-const SPACE = ' '
 
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
 const PROVIDER_SCHEMA = z.enum(['anthropic', 'openai'])
@@ -34,6 +29,18 @@ type ProfileResult = { kind: 'profile'; profile: AgentProfile } | { kind: 'rejec
 type Rejected = Extract<ProfileResult, { kind: 'rejected' }>
 type EffortResult = Rejected | { kind: 'effort'; effort: AgentEffort }
 type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider; is_default?: true }
+type OverrideField = 'model' | 'effort'
+
+interface Override {
+	key: string
+	value: string | undefined
+}
+
+// What a resolution is keyed on beyond the role: the run phase (effort) and the review round (profile).
+interface AgentStage {
+	phase?: string | undefined
+	round?: number
+}
 
 const SCHEDULER: AgentRole = 'scheduler'
 const WORKER: AgentRole = 'worker'
@@ -74,6 +81,22 @@ const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
 
 const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES }
 
+// **The verification pass resolves a profile of its own** (joshuafolkken/kit#3926). A round after the
+// first only checks that the first round's findings were fixed, so its model and effort are set apart:
+// its own keys win, then the reviewer's, then its own default.
+const FIRST_REVIEW_ROUND = 1
+// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*` scenario its
+// pass/fail equals Opus's (100% agreement), and Opus passes all 4.
+const VERIFICATION_MODEL = 'claude-sonnet-5-5'
+const VERIFICATION_PROFILES: Readonly<Record<AgentProvider, AgentProfile>> = {
+	anthropic: { ...DEFAULT_PROFILES.reviewer, model: VERIFICATION_MODEL },
+	openai: OPENAI_PROFILES.reviewer,
+}
+const VERIFICATION_KEYS = {
+	model: 'JOSH_REVIEWER_VERIFICATION_MODEL',
+	effort: 'JOSH_REVIEWER_VERIFICATION_EFFORT',
+}
+
 // **Effort as a function of the run phase, not the role alone**. For the first
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
 // commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
@@ -95,51 +118,7 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
 
-function is_control_character(character: string): boolean {
-	const code = character.codePointAt(FIRST_CODE_POINT) ?? FIRST_PRINTABLE_CODE
-
-	return code < FIRST_PRINTABLE_CODE || code === DELETE_CODE
-}
-
-function is_line_feed(character: string): boolean {
-	return character === LINE_FEED
-}
-
-function is_never_allowed(): boolean {
-	return false
-}
-
-function is_refused(character: string, is_allowed: (character: string) => boolean): boolean {
-	return is_control_character(character) && !is_allowed(character)
-}
-
-function is_safe_text(value: string, is_allowed: (character: string) => boolean): boolean {
-	if (value.length === EMPTY_LENGTH || value.length > MAX_VALUE_LENGTH) return false
-
-	for (const character of value) if (is_refused(character, is_allowed)) return false
-
-	return true
-}
-
-function is_safe_value(value: string): boolean {
-	return is_safe_text(value, is_never_allowed)
-}
-
-// **An agent's prompt is the one value a line break belongs in.** A ship-stop prompt carries the failed
-// output's lines (joshuafolkken/kit#3964); every other control character is refused as in any value.
-function is_safe_prompt(value: string): boolean {
-	return is_safe_text(value, is_line_feed)
-}
-
-function printable_character(character: string): string {
-	return is_refused(character, is_line_feed) ? SPACE : character
-}
-
-// Command output made fit for a prompt: every control character but a line break becomes a space, so
-// the text passes `is_safe_prompt` whatever the command printed.
-function printable(text: string): string {
-	return Array.from(text, printable_character).join('')
-}
+const { MAX_VALUE_LENGTH, is_safe_prompt, is_safe_value, printable } = agent_safe_text
 
 function trimmed(value: string | undefined): string | undefined {
 	const result = value?.trim()
@@ -147,44 +126,53 @@ function trimmed(value: string | undefined): string | undefined {
 	return result === undefined || result.length === EMPTY_LENGTH ? undefined : result
 }
 
+function is_verification(role: AgentRole, round: number | undefined): boolean {
+	return role === REVIEWER && round !== undefined && round > FIRST_REVIEW_ROUND
+}
+
+// The keys an override is read from, first match wins: a worker falls back to its legacy lane keys, and
+// a verification round reads its own keys ahead of the reviewer's.
+function override_keys(
+	role: AgentRole,
+	field: OverrideField,
+	round: number | undefined,
+): readonly [string, ...Array<string>] {
+	const key = ENV_KEYS[role][field]
+	if (role === WORKER) return [key, LEGACY_WORKER_KEYS[field]]
+
+	return is_verification(role, round) ? [VERIFICATION_KEYS[field], key] : [key]
+}
+
 function override_value(
 	role: AgentRole,
-	field: 'model' | 'effort',
+	field: OverrideField,
 	environment: AgentEnvironment,
-): { key: string; value: string | undefined } {
-	const key = ENV_KEYS[role][field]
-	const value = trimmed(environment[key])
-	if (value !== undefined) return { key, value }
-	if (role !== WORKER) return { key, value: undefined }
+	round?: number,
+): Override {
+	const keys = override_keys(role, field, round)
+	const key = keys.find((candidate) => trimmed(environment[candidate]) !== undefined)
 
-	const legacy = LEGACY_WORKER_KEYS[field]
-	const legacy_value = trimmed(environment[legacy])
-
-	return legacy_value === undefined
-		? { key, value: undefined }
-		: { key: legacy, value: legacy_value }
+	return key === undefined
+		? { key: keys[0], value: undefined }
+		: { key, value: trimmed(environment[key]) }
 }
 
 function model_override(
 	role: AgentRole,
 	environment: AgentEnvironment,
 	provider: AgentProvider,
-): { key: string; value: string | undefined } {
-	const key = ENV_KEYS[role].model
-
+	round: number | undefined,
+): Override {
 	return provider === OPENAI_PROVIDER
-		? { key, value: undefined }
-		: override_value(role, 'model', environment)
+		? { key: ENV_KEYS[role].model, value: undefined }
+		: override_value(role, 'model', environment, round)
 }
 
 function rejection(key: string, value: string, expected: string): Rejected {
 	return { kind: 'rejected', note: `${key}=${value} ${expected}, so the agent was not started` }
 }
 
-function resolved_effort(
-	override: { key: string; value: string | undefined },
-	fallback: AgentEffort,
-): EffortResult {
+function resolved_effort(override: Override, fallback: AgentEffort): EffortResult {
 	const parsed = EFFORT_SCHEMA.safeParse(override.value ?? fallback)
 
 	return parsed.success
@@ -324,17 +312,27 @@ function with_phase_effort(
 	return { ...profile, effort: overridden_effort(profile, phase, environment) }
 }
 
-function resolve(
+function stage_defaults(
+	provider: AgentProvider,
 	role: AgentRole,
-	environment: AgentEnvironment = process.env,
-	phase?: string,
+	round: number | undefined,
+): AgentProfile {
+	return is_verification(role, round)
+		? VERIFICATION_PROFILES[provider]
+		: PROVIDER_PROFILES[provider][role]
+}
+
+function resolve_stage(
+	role: AgentRole,
+	environment: AgentEnvironment,
+	stage: AgentStage,
 ): ProfileResult {
 	const selected = resolve_provider(environment)
 	if (selected.kind === 'rejected') return selected
-	const defaults = PROVIDER_PROFILES[selected.provider][role]
-	const model = model_override(role, environment, selected.provider)
-	const effort = override_value(role, 'effort', environment)
-	const resolved = resolved_effort(effort, phase_effort(role, phase, defaults.effort))
+	const defaults = stage_defaults(selected.provider, role, stage.round)
+	const model = model_override(role, environment, selected.provider, stage.round)
+	const effort = override_value(role, 'effort', environment, stage.round)
+	const resolved = resolved_effort(effort, phase_effort(role, stage.phase, defaults.effort))
 
 	if (resolved.kind === 'rejected') return resolved
 
@@ -348,8 +346,27 @@ function resolve(
 	return validate(profile, model.key)
 }
 
+function resolve(
+	role: AgentRole,
+	environment: AgentEnvironment = process.env,
+	phase?: string,
+): ProfileResult {
+	return resolve_stage(role, environment, { phase })
+}
+
+// The reviewer for one review round: round 1 as `resolve(REVIEWER)` does, any later round the
+// verification pass's own profile.
+function resolve_review(round: number, environment: AgentEnvironment = process.env): ProfileResult {
+	return resolve_stage(REVIEWER, environment, { round })
+}
+
 function describe(profile: AgentProfile): string {
 	return `provider=${profile.provider} role=${profile.role} model=${profile.model} effort=${profile.effort}`
+}
+
+// The run-log line a review launch writes, so each round's model is on record beside its round.
+function describe_review(round: number, profile: AgentProfile): string {
+	return `review round ${String(round)} · ${describe(profile)}`
 }
 
 function parse(value: unknown): AgentProfile | undefined {
@@ -369,9 +386,11 @@ const agent_role_profile = {
 	PROFILE_SCHEMA,
 	REVIEWER,
 	SCHEDULER,
+	VERIFICATION_PROFILES,
 	WORKER,
 	default_notice,
 	describe,
+	describe_review,
 	handoff_environment,
 	has_completion_callback,
 	is_safe_prompt,
@@ -380,6 +399,7 @@ const agent_role_profile = {
 	printable,
 	resolve,
 	resolve_provider,
+	resolve_review,
 	warn_of_default,
 	with_phase_effort,
 }

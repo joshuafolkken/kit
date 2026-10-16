@@ -77,15 +77,18 @@ function note(text: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
-// Under the reviewer profile — the same model and effort (`JOSH_REVIEWER_*` included) the chain's
-// subagent is given — and waited on, so the join below runs only once the review has finished. Each
-// call is its own process, so round 2 is a fresh session by construction.
+// Under the round's reviewer profile — the same model and effort (`JOSH_REVIEWER_*` included) the
+// chain's subagent is given — and waited on, so the join below runs only once the review has finished.
+// Each call is its own process, so round 2 is a fresh session by construction.
 async function run_direct_session(
 	argv: AgentArgv,
 	profile: AgentProfile,
 	log_path: string,
+	round: Round,
 ): Promise<JoshResult> {
 	const request = { argv, cwd: PROJECT_ROOT, log_path, profile }
+
+	note(agent_role_profile.describe_review(Number(round), profile))
 	const result = await detached_launch.launch_attached(request, note)
 
 	if (result.kind === 'failed') return failure(`reviewer could not start: ${result.note}`)
@@ -110,11 +113,11 @@ async function run_session(
 	issue: string,
 	round: Round,
 ): Promise<JoshResult> {
-	const built = agent_argv.resolve_in(prompt, agent_role_profile.REVIEWER, PROJECT_ROOT)
+	const built = agent_argv.review_in(prompt, Number(round), PROJECT_ROOT)
 	if (built.kind === 'rejected') return failure(`reviewer profile rejected: ${built.note}`)
 
 	if (!is_brokered(built.profile, issue)) {
-		return await run_direct_session(built.argv, built.profile, log_path)
+		return await run_direct_session(built.argv, built.profile, log_path, round)
 	}
 
 	const answer = await lane_session_broker.request(PROJECT_ROOT, issue, { kind: 'review', round })

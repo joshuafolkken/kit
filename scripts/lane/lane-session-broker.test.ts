@@ -49,7 +49,7 @@ const SUCCESS = { is_success: true }
 vi.mock('#scripts/git/git-common-directory', () => ({
 	git_common_directory: { resolve: resolve_mock },
 }))
-vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: argv_mock } }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: argv_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
@@ -126,7 +126,7 @@ it('derives the reviewer command and checkout from the registered lane', async (
 	expect(await request_review(LANE, ROUND_ONE)).toStrictEqual(SUCCESS)
 	expect(argv_mock).toHaveBeenCalledWith(
 		expect.stringContaining('review:attest'),
-		'reviewer',
+		Number(ROUND_ONE.round),
 		LANE.directory,
 	)
 	expect(launch_mock.mock.calls[0]?.[0]).toMatchObject({ cwd: LANE.directory })
@@ -136,7 +136,7 @@ it('keeps the second review round read-only', async () => {
 	expect(await request_review(LANE, ROUND_TWO)).toStrictEqual(SUCCESS)
 	expect(argv_mock).toHaveBeenCalledWith(
 		expect.stringContaining('Do not edit any file.'),
-		'reviewer',
+		Number(ROUND_TWO.round),
 		LANE.directory,
 	)
 })
@@ -281,7 +281,7 @@ describe('lane_session_broker — a parked issue and a finished request', () => 
 
 		expect(argv_mock).toHaveBeenCalledWith(
 			expect.stringMatching(/the reviewer of lane #2654$/u),
-			'reviewer',
+			Number(ROUND_ONE.round),
 			LANE.directory,
 		)
 	})
