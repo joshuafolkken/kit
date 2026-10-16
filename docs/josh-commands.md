@@ -261,6 +261,14 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:declared` 
 
 Run the changed `*.test.ts` files on a temporary merge-base worktree and print `red`, `green`, `no-test` or `test-only`. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
 
+<!-- usage: test:red -->
+
+```bash
+pnpm josh test:red   # red, green, no-test or test-only
+```
+
+<!-- /usage -->
+
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in detail".
 
 ### `josh test:e2e`
@@ -377,10 +385,24 @@ pnpm josh profile
 
 Set a new or existing project up for the GitHub Issue workflow, so `kickoff new` works once the setup is on `main`. Use `josh init` for a project without the workflow or for a re-run — [init.md → `josh init` or `josh start`](./init.md#josh-init-or-josh-start) compares the two and lists the steps per starting state.
 
+<!-- usage: start -->
+
 ```bash
-pnpm exec josh start                                    # asks for the profile and the repository
-pnpm exec josh start --yes --github --profile basic    # unattended, including the GitHub repository
+pnpm josh start                                  # asks for the profile and the repository
+pnpm josh start --yes --github --profile basic   # unattended, including the GitHub repository
 ```
+
+**Options:**
+
+- `--profile basic|full` — the profile, without asking.
+- `--yes` — take the defaults — not consent to write to GitHub.
+- `--github` — create the GitHub repository and push `main`.
+- `--public` — create the repository public instead of private.
+- `--init-command "<command>"` — run this setup command in place of `josh init`.
+- `--push-preflight-command "<command>"` — a check run before the first step when the plan pushes; a failure stops the run before it writes anything.
+- `--dry-run` — print the plan and change nothing.
+
+<!-- /usage -->
 
 **Prerequisites:** the [gh CLI](https://cli.github.com/), signed in, and a Git author identity for a run that commits ([Tell Git who you are](./setup/prerequisites.md#4-tell-git-who-you-are)); without either it stops before changing anything.
 
@@ -395,7 +417,7 @@ The `full` profile's pre-push hook runs `josh audit`, which needs `osv-scanner`.
 5. The missing workflow and release-classification labels; existing ones are left unchanged
 6. The setup pull request — only while `main` has commits but no kit: an Issue, a commit of only kit's files on its branch, and the pull request. It never merges
 
-**Options:** `--profile basic|full`, `--yes` (the defaults, not consent to write to GitHub), `--github`, `--public`, `--init-command "<command>"`, `--push-preflight-command "<command>"` and `--dry-run` ([init.md → Preview with `--dry-run`](./init.md#preview-with---dry-run)).
+What `--dry-run` prints: [init.md → Preview with `--dry-run`](./init.md#preview-with---dry-run).
 
 **Existing state:** an existing GitHub origin is never replaced and `main` is never pushed to; a re-run after a failed commit hook resumes step 6. A non-GitHub origin, commits on a branch other than `main`, or — once the repository has a commit — a dirty working tree is refused before any change; the setup branch a failed commit left is exempt.
 
@@ -728,11 +750,13 @@ Checks effective overrides from `pnpm-workspace.yaml` against a saved snapshot a
 
 Update all dependencies to latest, run a security audit, then update pnpm with its self-update command. The pnpm bump runs last, right before the run is recorded, so a failed bump still lets the dependency update and the audit finish but leaves the run unrecorded and exits non-zero.
 
+<!-- usage: latest -->
+
 ```bash
-pnpm josh latest            # full update (update + audit + pnpm)
-pnpm josh latest:corepack   # update pnpm only
-pnpm josh latest:update     # update dependencies only
+pnpm josh latest   # full update (update + audit + pnpm)
 ```
+
+<!-- /usage -->
 
 `josh latest` never lowers a version — a would-be downgrade rolls the whole tree back — and fails when `pnpm-lock.yaml` no longer honours an unconditional override. Whether to update at all is [`josh latest:scope`](josh-commands-automation.md#josh-latestscope).
 
@@ -742,11 +766,27 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh latest` in deta
 
 Updates pnpm and pins `packageManager` to the newest release on the project's current major with `pnpm self-update`, keeping `devEngines.packageManager.version` aligned. A failure restores `package.json` and exits `1`.
 
+<!-- usage: latest:corepack -->
+
+```bash
+pnpm josh latest:corepack   # update pnpm only
+```
+
+<!-- /usage -->
+
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh latest:corepack` in detail".
 
 #### `josh latest:update`
 
 Runs `pnpm update --latest`, skipping held-back and overridden packages; a would-be downgrade restores `package.json` and the lockfile. It also moves the safe-chain installer pin in every workflow and composite action that carries it.
+
+<!-- usage: latest:update -->
+
+```bash
+pnpm josh latest:update   # update dependencies only
+```
+
+<!-- /usage -->
 
 When the update moved `@playwright/test`, it installs the browsers (`JOSH_PLAYWRIGHT_BROWSERS` widens the list); a failed install stops `josh latest`.
 
@@ -817,9 +857,13 @@ pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies aga
 
 Stop a running lane child and start its issue over in a fresh session — after correcting the Issue mid-run.
 
+<!-- usage: lane:restart -->
+
 ```bash
-pid=$(pnpm josh lane:restart 3769) || exit 1
+pnpm josh lane:restart 3769   # prints the fresh child's pid
 ```
+
+<!-- /usage -->
 
 - In order: it claims the `in-progress` marker, stops the child's process tree, ends any cut it carried, stashes the lane's uncommitted work as `<N>: uncommitted work at lane restart`, dispatches a fresh `fullrun #<N>` that never resumes the stopped session, then comments the `stash:pop` line on the Issue. A `restart` event follows its `child-launch`.
 - It is not a recovery: with no GitHub call between them, the stop and the dispatch fall inside `lane:await`'s 15 s re-confirm window, so `run:merge` never classifies the child — nothing is parked, and neither the failure count nor `CONSECUTIVE_OUTAGE_LIMIT` moves.

@@ -2,7 +2,7 @@
 
 The commands a person rarely types: the ones Claude Code hooks, git hooks, the issue-driven workflow runs (`fullrun`, `backlogrun`, …) and lanes call, plus the `maintainer` commands kit's own maintainers run. Where each command came from: `docs/maintainers/josh-commands-automation-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-automation.ts` and `scripts/josh/josh-usage-workflow.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-automation.ts`, `scripts/josh/josh-usage-workflow.ts` and `scripts/josh/josh-usage-hooks.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
 
 ## Development
 
@@ -26,6 +26,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh refa
 
 Format the single file an agent just edited. Not run by hand: `.claude/settings.json` wires it to `PostToolUse` and pipes the tool call as JSON on stdin; it reads `tool_input.file_path` and runs `eslint --fix` then `prettier --write` on that path alone.
 
+<!-- usage: format:edited -->
+
+```bash
+pnpm josh format:edited   # run by the PostToolUse hook, the tool call as JSON on stdin
+```
+
+<!-- /usage -->
+
 ```json
 "PostToolUse": [
 	{
@@ -44,6 +52,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh form
 ### `josh batch:guard`
 
 Refuse a tool call that would make a third consecutive single-call turn. Not wired standalone: it is one of the guards `josh pretool:guard` runs.
+
+<!-- usage: batch:guard -->
+
+```bash
+pnpm josh batch:guard   # run inside pretool:guard, not wired on its own
+```
+
+<!-- /usage -->
 
 ```json
 "PreToolUse": [
@@ -104,6 +120,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh time
 
 Refuse a file read once the run has read the threshold's worth of un-edited files since its last delegated unit, pushing bulk investigation into a delegated unit. Wired to `PreToolUse`, fed the pending call as JSON on stdin.
 
+<!-- usage: investigation:guard -->
+
+```bash
+pnpm josh investigation:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
+```
+
+<!-- /usage -->
+
 ```json
 "PreToolUse": [
 	{
@@ -125,6 +149,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh inve
 
 Refuse the second whole-file `Read` of a path whose content has not changed since the run last read it — the re-read returns text the run already holds, and across the latest five lanes a run re-read the same unchanged path 8.0 times on average. It runs inside `pretool:guard` (composed alongside `batch:guard`, `investigation:guard` and `rule:guard`), not as a separate `PreToolUse` entry.
 
+<!-- usage: duplicate-read:guard -->
+
+```bash
+pnpm josh duplicate-read:guard   # run inside pretool:guard, not wired on its own
+```
+
+<!-- /usage -->
+
 - The transcript gives the instant the path was last read; the filesystem's `mtime` says whether it has changed since. A file whose `mtime` predates that read is refused; one that has been edited, merged or grown by a background task — anything that moves the `mtime` — is let through.
 - A read carrying an `offset` or `limit` reads a different region, so it is never refused. A stat that fails (a deleted or unreadable file) allows the call — the fallback is allow, never refuse.
 - One refusal per accumulation: a run refused once and reading on anyway is not refused again, and the refusal re-arms when a fresh successful read of the target lands after it — the same shape as `investigation:guard`.
@@ -134,6 +166,14 @@ Refuse the second whole-file `Read` of a path whose content has not changed sinc
 ### `josh rule:guard`
 
 Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` every turn. Wired to `PreToolUse` (on `Bash` alone), fed the pending call as JSON on stdin.
+
+<!-- usage: rule:guard -->
+
+```bash
+pnpm josh rule:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
+```
+
+<!-- /usage -->
 
 ```json
 "PreToolUse": [
@@ -164,9 +204,25 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh rule
 
 Print the trigger-delivered rules `rule-delivery.md` points at: one item per guard row of `scripts/rules/delivered-rules.ts`, then the `Stop` hook's rows — single source, hook, trigger, silence. The prose comes from `scripts/rules/rule-registry.ts`, joined by `id`; a row with no entry prints as missing and fails `rule-list.test.ts`. A hookless agent reads it as its checklist.
 
+<!-- usage: rule:list -->
+
+```bash
+pnpm josh rule:list   # print every trigger-delivered rule
+```
+
+<!-- /usage -->
+
 ### `josh pretool:guard`
 
 The `PreToolUse` dispatcher that routes each pending tool call to the delivered-rule guards (`batch:guard`, `investigation:guard`, `duplicate-read:guard`, `rule:guard`). A refusal leaves through `hookSpecificOutput.permissionDecision`; an unclaimed call writes nothing.
+
+<!-- usage: pretool:guard -->
+
+```bash
+pnpm josh pretool:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
+```
+
+<!-- /usage -->
 
 **How each guard behaves in a dispatched lane child is an enumeration** in `scripts/lane/lane-guard-policy.ts` — `refuse`, `notice` or `off` per guard; `lane-guard-policy.test.ts` pins it to the guards' live behavior.
 
@@ -176,9 +232,26 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 
 The Codex counterpart of `pretool:guard` and `format:edited`: `pretool` or `posttool` reads a Codex hook payload on stdin, runs the same guard the Claude Code hook runs, and answers in Codex's hook format. `.codex/hooks.json` launches it as `sh scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the launcher's live-source fallback when the bundle cannot run.
 
+<!-- usage: codex:hook-adapter -->
+
+```bash
+pnpm josh codex:hook-adapter pretool    # a Codex PreToolUse payload on stdin
+pnpm josh codex:hook-adapter posttool   # a Codex PostToolUse payload on stdin
+```
+
+<!-- /usage -->
+
 ### `josh stop:guard`
 
 The `Stop` hook: one process delivering the stop-time rules. It runs the stop notify, the hold release and the citation lines itself, blocking only when one fails; the rules that need the model block the stop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+
+<!-- usage: stop:guard -->
+
+```bash
+pnpm josh stop:guard   # run by the Stop hook, the stop payload as JSON on stdin
+```
+
+<!-- /usage -->
 
 `backlogrun`'s ordinary parent loop and the fetch of the next issue are handled by the supervisor process, so `stop:guard` does not count fetching the next issue toward a block. When a named epic is handed to a headless session for a decision, the lane-child wait protection still applies. Stall and leftover detection runs at the `Stop` event.
 
@@ -187,6 +260,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh stop
 ### `josh session:lang`
 
 Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wired to `UserPromptSubmit`; the `ja` default prints nothing.
+
+<!-- usage: session:lang -->
+
+```bash
+pnpm josh session:lang   # run by the UserPromptSubmit hook; `ja` prints nothing
+```
+
+<!-- /usage -->
 
 ```json
 { "type": "command", "command": "pnpm josh session:lang", "timeout": 10 }
@@ -372,6 +453,14 @@ AI-assisted git and notification helpers used in the day-to-day development loop
 
 Use one label (see PR template). Bots may omit it; label changes rerun only the `Release classification` workflow (`.github/workflows/pr-classification.yml`), never CI.
 
+<!-- usage: pr:classification -->
+
+```bash
+pnpm josh pr:classification   # run by CI on a pull request; fails without one label
+```
+
+<!-- /usage -->
+
 ### `josh followup`
 
 AI-assisted PR follow-up workflow: waits for CI, checks AI-reviewer findings, sends the completion notification, and merges.
@@ -475,6 +564,19 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh meas
 ### `josh observation:record`
 
 Count a `- k:<key>` sighting across `.josh/observations/`, append it, and print `file` (the second sighting — file it) or `ledger`; earlier sightings go to stderr. A malformed or `k:example` line is refused with exit 1. `--checkout <path>` uses another repository's ledger. The rule: `.claude/skills/workflow-commands/observation-ledger.md`.
+
+<!-- usage: observation:record -->
+
+```bash
+pnpm josh observation:record flaky-e2e d1 'tests/e2e/login.test.ts' 'times out on CI only'
+pnpm josh observation:record flaky-e2e d1 'src/app.ts' 'fails there too' --checkout ~/Development/app   # another repository's ledger
+```
+
+**Options:**
+
+- `--checkout <path>` — count and append in that repository's `.josh/observations/` instead.
+
+<!-- /usage -->
 
 ### `josh review:record`
 
@@ -583,6 +685,14 @@ pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 
 Create the GitHub Release for a tag `josh release` cut, with notes from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives.
 
+<!-- usage: release:github -->
+
+```bash
+pnpm josh release:github   # run by CI with GH_TOKEN, RELEASE_TAG and GITHUB_REPOSITORY set
+```
+
+<!-- /usage -->
+
 ```bash
 GH_TOKEN=… RELEASE_TAG=v1.2.0 GITHUB_REPOSITORY=owner/repo pnpm josh release:github
 ```
@@ -679,6 +789,21 @@ Tripwire hashes live in `.template-source-manifest.json` (kit-internal, not dist
 
 The update itself — [`josh latest`](josh-commands.md#josh-latest) — is a command you type.
 
+<!-- usage: latest:scope -->
+
+```bash
+pnpm josh latest:scope            # required or skip, the reason on stderr
+pnpm josh latest:scope --record   # note a finished josh latest run
+pnpm josh latest:scope --json     # the verdict and the reason as JSON
+```
+
+**Options:**
+
+- `--record` — write the completion record `josh latest` ends with.
+- `--json` — emit the verdict and its reason as JSON.
+
+<!-- /usage -->
+
 Prints `required` or `skip` (reason on stderr) — whether this checkout must update; read it with `$(pnpm josh latest:scope)`. A completion record younger than **12 hours** (`JOSH_LATEST_MAX_AGE_HOURS`) answers `skip`; `--record` writes it.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh latest:scope` in detail".
@@ -686,6 +811,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh late
 ### `josh latest:guard`
 
 Fronts the `josh latest` chain and refuses inside a lane; a lane's per-root stamp always reads stale.
+
+<!-- usage: latest:guard -->
+
+```bash
+pnpm josh latest:guard   # refuses inside a lane
+```
+
+<!-- /usage -->
 
 ---
 
@@ -695,19 +828,53 @@ Fronts the `josh latest` chain and refuses inside a lane; a lane's per-root stam
 
 Blocks direct commits to `main`. Installed as a pre-commit hook by `josh init`.
 
+<!-- usage: prevent-main-commit -->
+
+```bash
+pnpm josh prevent-main-commit   # run by the pre-commit hook
+```
+
+<!-- /usage -->
+
 ### `josh check-commit-message`
 
 Validates commit message format. Installed as a commit-msg hook by `josh init`.
 
+<!-- usage: check-commit-message -->
+
+```bash
+pnpm josh check-commit-message .git/COMMIT_EDITMSG   # run by the commit-msg hook
+```
+
+<!-- /usage -->
+
 ### `josh secretlint-scan`
 
 Runs [secretlint](https://github.com/secretlint/secretlint) over the staged paths passed as arguments. Wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`. When secretlint is installed the scan runs and its exit code is forwarded, so a detected secret blocks the commit; when it is not installed the wrapper prints a notice and exits `0`.
+
+<!-- usage: secretlint-scan -->
+
+```bash
+pnpm josh secretlint-scan src/app.ts .env.example   # the staged paths
+```
+
+<!-- /usage -->
 
 **Options:** always passes `--no-glob` so lefthook's literal paths (e.g. SvelteKit `(app)` / `[id]` directories) are not treated as glob patterns.
 
 ### `josh pre-commit-lint`
 
 Runs cspell, prettier or eslint over the staged paths for the pre-commit hook, with a content-strategy cache. Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_files}`; the tool's exit code is forwarded.
+
+<!-- usage: pre-commit-lint -->
+
+```bash
+pnpm josh pre-commit-lint cspell src/app.ts
+pnpm josh pre-commit-lint prettier src/app.ts
+pnpm josh pre-commit-lint eslint src/app.ts
+```
+
+<!-- /usage -->
 
 - `cspell` and `eslint` write `.cspellcache.commit` and `.eslintcache.commit`. A staged-files run would prune the gate's cspell cache, and `eslint --quiet` would store reports without their warnings in the gate's cache.
 - `prettier` shares `.prettiercache` with `josh lint`, so a commit right after a green gate re-checks nothing.

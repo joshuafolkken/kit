@@ -7,13 +7,30 @@ import { command_usage } from '#scripts/josh/command-usage'
 // `josh help <command>` prints. The headings stay put because other documents point at them (#3932).
 // Run `tsx scripts/document/generate-command-usage.ts` to regenerate.
 
-const USAGE_PAGES: ReadonlyArray<string> = [
-	'docs/josh-commands.md',
-	'docs/josh-commands-run.md',
-	'docs/josh-commands-backlog.md',
-	'docs/josh-commands-automation.md',
-]
+const { USAGE_PAGES } = command_usage
 const USAGE_BLOCK = /<!-- usage: (?<name>\S+) -->\n[\s\S]*?<!-- \/usage -->/gu
+
+// Where a page's usage spans disagree with the tables tied to it: a command of its tables with no span
+// (`missing`), and a span naming a command its tables do not hold (`misplaced`).
+interface SpanMismatch {
+	missing: Array<string>
+	misplaced: Array<string>
+}
+
+// The commands a page renders — the spans the generator fills, not a marker quoted in prose.
+function usage_spans(text: string): Array<string> {
+	return [...text.matchAll(USAGE_BLOCK)].map((match) => match.groups?.['name'] ?? '')
+}
+
+function span_mismatch(page: string, text: string): SpanMismatch {
+	const expected = command_usage.page_commands(page)
+	const spans = usage_spans(text)
+
+	return {
+		missing: expected.filter((name) => !spans.includes(name)),
+		misplaced: spans.filter((name) => !expected.includes(name)),
+	}
+}
 
 function usage_block(name: string): string {
 	const usage = command_usage.format_usage(name)
@@ -40,6 +57,12 @@ function regenerate_pages(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) regenerate_pages()
 
-const generate_command_usage = { USAGE_PAGES, fill_usage_blocks, page_path }
+const generate_command_usage = {
+	USAGE_PAGES,
+	fill_usage_blocks,
+	page_path,
+	span_mismatch,
+	usage_spans,
+}
 
 export { generate_command_usage }

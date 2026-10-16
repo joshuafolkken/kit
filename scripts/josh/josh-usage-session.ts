@@ -198,6 +198,18 @@ const SESSION_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ names: ['--json'], description: 'the run tree, machine-readable.' },
 		],
 	},
+	'cost:audit': {
+		examples: [
+			{ arguments: '', note: 'the last 7 days against the 7 before' },
+			{ arguments: '--period 30', note: 'the last 30 days against the 30 before' },
+		],
+		flags: [
+			{
+				names: ['--period <days>'],
+				description: 'the length of each period, a positive whole number of days (default 7).',
+			},
+		],
+	},
 	retrospective: {
 		examples: [{ arguments: '', note: 'the digest for the run this checkout carries' }],
 	},
