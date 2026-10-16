@@ -24,6 +24,12 @@ describe('command usage', () => {
 		)
 	})
 
+	it('renders a command from the run reference page', () => {
+		expect(command_usage.format_usage('run:release')).toContain(
+			'pnpm josh run:release --force   # clear a record left by a run that has ended',
+		)
+	})
+
 	it('answers undefined for a command with no usage', () => {
 		expect(command_usage.format_usage(UNCOVERED_COMMAND)).toBeUndefined()
 	})

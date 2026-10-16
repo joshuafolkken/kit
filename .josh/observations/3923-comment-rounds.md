@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/run/ship/run-ship-stop-context.ts:125 | 2026-10-16 | #3923
+- rf:bug-risks | low | scripts/run/ship/run-ship-stop-context.ts:43 | 2026-10-16 | #3923
+- rf:tests | low | scripts/run/ship/run-ship-stop-context.test.ts:66 | 2026-10-16 | #3923
