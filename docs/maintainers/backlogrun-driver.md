@@ -4,7 +4,7 @@ This document is maintainer-only: it describes what `pnpm josh run:wake`, `backl
 `backlog:offer`, `run:carry` and `run:merge` do on their own, so that the procedure documents an AI
 parent reads carry only the branches it has to judge (joshuafolkken/kit#3396). It is never read during a
 run — each command prints its own answer, and the route the parent follows is `backlogrun.md` →
-"The route table". A change to a rule is made in the procedure document first.
+"The manifest — the ordered flow". A change to a rule is made in the procedure document first.
 
 ## The carry record across a cut
 

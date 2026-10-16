@@ -1,7 +1,7 @@
 # `backlogrun` — the manifest (named issues, epics and the opted-in backlog)
 
-**This file is the manifest, not the procedure**: the ordered flow as terse triggers, and the route
-table naming the one section each moment reads. Rationale and provenance:
+**This file is the manifest, not the procedure**: the ordered flow as terse triggers, each naming the
+one section its moment reads. Rationale and provenance:
 `docs/maintainers/backlogrun-rationale.md` → "Why the loop's position is computed";
 `docs/maintainers/backlogrun-rationale.md` → "Where each rule came from".
 
@@ -12,9 +12,9 @@ plus every child of an epic whose root carries it, ordered by dependency and gro
 that same backlog. **`--only` stops it after the named list**, draining nothing.
 
 **The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
-reads where the run is from the event stream, the carry record and the issue state, and prints the next
-single action — a runnable command, or the one point a person has to judge. **With no `<N>` it answers
-for the parent itself**, from the carry record alone.
+reads it from the event stream, the carry record and the issue state, and prints the next single
+action — a runnable command, or the one point a person has to judge — followed by the section that
+governs it. With no `<N>` it answers for the parent itself, from the carry record alone.
 
 **A named item may be a single issue or an epic.** A single-issue item is one `fullrun`; **a named epic runs its children in
 dependency order across the free lanes, and the run does not advance to the next named item until
@@ -29,52 +29,46 @@ is still that one invocation (`backlogrun-steps.md` → "The session cut is insi
 
 ## The manifest — the ordered flow
 
+A section `run:step` prints is not fetched again. Every other one is read at its step with
+`pnpm josh doc:section <file> "<heading>"` — never a whole document (`SKILL.md` → "A section
+reference is read as a section").
+
 1. **Claim nothing at the entry — this parent orchestrates and never implements.** The working-tree
    hold, the split assessment and `fullrun.md` are read by a dispatched child inside its own delegated
    `fullrun` unit, never at the parent's entry.
 2. **Begin the carry record before the plan** — `pnpm josh run:carry --begin "<invocation>" --owner
-   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`.
+   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`. Its answers:
+   `backlogrun-steps.md` → "The session cut is inside the invocation"; a resumed session:
+   `backlogrun-progress.md` → "Resuming after a cut".
 3. **What this invocation approves** — the opted-in pool, a run's own filings once bundled, and the
-   brake that bounds the amount; the route table's row points at the single source of the `auto-ok` rule.
+   brake that bounds the amount: `backlogrun-steps.md` → "What one invocation approves".
 4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass, recording `blocked-by`, `run:solo` and
-   `run:lane` in the same pass.
+   `run:lane` in the same pass: `backlogrun-steps.md` → "The plan, before the first child starts";
+   `run:solo`: `backlogrun-lanes.md` → "A solo run".
 5. **Named issues run first, in order** — each as a delegated `fullrun`, one at a time, then the pool;
    `--only` stops after the list.
+   - Once per session: `backlogrun-steps.md` → "What runs once per session, not once per issue" and
+     `backlogrun-child.md` → "`josh latest` runs once per session, not once per child"
+     (`latest-gate.md` whole on `required`).
+   - The watcher: `progress-watcher.md` → "Progress while the run is quiet".
+   - Lanes: `backlogrun-lanes.md` → "Once per repository, before the first lane opens", by hand
+     `backlogrun-lanes.md` → "Opening one lane and dispatching its child".
+   - Dispatch: `backlogrun-child.md` → "Each child runs in a delegated unit".
 6. **The loop belongs to the supervisor — hand it over with what the bare `pnpm josh run:step`
    prints**, whatever the plan held: `run:wake` runs `backlog:drive`, which returns a branch to an AI
-   session only when it needs judgment.
+   session only when it needs judgment (`backlogrun-steps.md` → "The loop").
+   - An `epic #N` hand-back or a `merge` branch: `backlogrun-progress.md` → "Running a named epic's
+     children".
+   - A merge answered `over`: `backlogrun-progress.md` → "The hand-off".
+   - A unit gone silent: `backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
+   - A child that cannot finish: `backlogrun-park.md` → "park and continue".
 7. **End the record when the run ends** — `run:report`, then `run:carry --end` (or `--end --stopped
-   "<reason>"`) and `run:wake --stop`. An empty plan is not that end; the driver's idle watch decides it.
-   A person stops a run from the terminal with `pnpm josh backlogrun --stop`, which makes both calls.
-
-## The route table
-
-**Read one section, at the moment its row names, with `pnpm josh doc:section <file> "<heading>"`** —
-never a whole document (`SKILL.md` → "A section reference is read as a section"):
-
-| The moment | Read |
-| --- | --- |
-| The entry: the carry record and its answers | `backlogrun-steps.md` → "The session cut is inside the invocation" |
-| What the invocation may merge, and the `auto-ok` rule | `backlogrun-steps.md` → "What one invocation approves" |
-| Before the first child: the plan and the decision pass | `backlogrun-steps.md` → "The plan, before the first child starts" |
-| The driver hands a branch back | `backlogrun-steps.md` → "The loop" |
-| Once per session | `backlogrun-steps.md` → "What runs once per session, not once per issue" |
-| `josh latest:scope` answers `required` | `latest-gate.md` (whole) |
-| Starting the progress watcher | `progress-watcher.md` → "Progress while the run is quiet" |
-| The run ends | `backlogrun-steps.md` → "End the record when the run ends" |
-| Labelling an issue `run:solo` | `backlogrun-lanes.md` → "A solo run" |
-| Before the first lane opens | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
-| Opening a lane by hand | `backlogrun-lanes.md` → "Opening one lane and dispatching its child" |
-| The first child is in hand | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
-| Dispatching a child | `backlogrun-child.md` → "Each child runs in a delegated unit" |
-| An `epic #N` hand-back, a `merge` branch, or a `run:merge` token | `backlogrun-progress.md` → "Running a named epic's children" |
-| A merge answered `over` | `backlogrun-progress.md` → "The hand-off" |
-| A resumed session | `backlogrun-progress.md` → "Resuming after a cut" |
-| The run's last merge | `backlogrun-progress.md` → "Who sends the summary, and who propagates" |
-| `josh release:scope`, after the last merge | `followup.md` → "When `pnpm josh release` runs" |
-| A unit went silent | `backlogrun-recovery.md` → "A delegated unit that stopped without reporting" |
-| A child cannot finish | `backlogrun-park.md` → "park and continue" |
+   "<reason>"`) and `run:wake --stop`: `backlogrun-steps.md` → "End the record when the run ends".
+   - An empty plan is not that end; the driver's idle watch decides it. A person stops a run from the
+     terminal with `pnpm josh backlogrun --stop`, which makes both calls.
+   - The last merge: `backlogrun-progress.md` → "Who sends the summary, and who propagates", then
+     `followup.md` → "When `pnpm josh release` runs".
 
 ## Guards
 
@@ -90,6 +84,6 @@ A failure that is not consecutive parks its child and the run continues.
 
 `CLAUDE.md` carries the keyword's row in the shorthand table and the explicit-invocation rule;
 `SKILL.md` → §1 routes here. This manifest names which children there are and in what order; each
-step's procedure is the section its route-table row names. Where any of them could disagree, the rule
-is that this manifest and `backlogrun-steps.md` add nothing to a child's procedure — they only say
+step's procedure is the section it names or `run:step` prints. Where any of them could disagree,
+the rule is that this manifest and `backlogrun-steps.md` add nothing to a child's procedure — they only say
 which children there are.

@@ -15,6 +15,12 @@ const confirm_mock = vi.hoisted(() => vi.fn())
 const mark_mock = vi.hoisted(() => vi.fn())
 const emit_plan_mock = vi.hoisted(() => vi.fn())
 const record_baseline_mock = vi.hoisted(() => vi.fn())
+const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
+const ENTRY_KEY = vi.hoisted(() => 'entry')
+
+vi.mock('#scripts/run/run-step-section', () => ({
+	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock },
+}))
 
 vi.mock('#scripts/issue/issue-watch', () => ({
 	issue_watch: { record_baseline_here: record_baseline_mock },
@@ -112,9 +118,7 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 			.mockResolvedValueOnce(HELD)
 			.mockResolvedValueOnce(UNDER)
 
-		const code = await run_entry_cli.run([ISSUE])
-
-		expect(code).toBe(OK)
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(calls()).toStrictEqual([
 			['run:cut', '--resume', ISSUE],
 			['run:hold', ISSUE, '--fullrun'],
@@ -129,6 +133,8 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 			stage_line('fresh', 'fullrun', 'plan'),
 			`entry ${CITED} — hold: hold · cost: under · verdict: implement\n\n${PREP_BODY}`,
 		])
+		// joshuafolkken/kit#3921: the entry's own read follows the report, saving its turn.
+		expect(print_section_mock).toHaveBeenCalledExactlyOnceWith(ENTRY_KEY)
 	})
 })
 
@@ -138,9 +144,7 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 		is_pending_mock.mockResolvedValue(true)
 		adopt_mock.mockResolvedValue(true)
 
-		const code = await run_entry_cli.run([ISSUE])
-
-		expect(code).toBe(OK)
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(adopt_mock).toHaveBeenCalledWith(ISSUE)
 		expect(calls()).toStrictEqual([
 			['run:cut', '--resume', ISSUE],
@@ -157,9 +161,7 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce({ code: OK, out: 'over' })
 		is_pending_mock.mockResolvedValue(true)
 
-		const code = await run_entry_cli.run([ISSUE])
-
-		expect(code).not.toBe(OK)
+		expect(await run_entry_cli.run([ISSUE])).not.toBe(OK)
 		expect(adopt_mock).not.toHaveBeenCalled()
 		expect(info_lines[1]).toContain('cost: over')
 		expect(calls()).not.toContainEqual(RELEASE_CALL)
@@ -172,9 +174,7 @@ describe('run_entry_cli.run — a prrun stop is resumed rather than claimed (jos
 		prrun_token_mock.mockResolvedValue(PRRUN_TOKEN)
 		prrun_adopt_mock.mockResolvedValue(true)
 
-		const code = await run_entry_cli.run([ISSUE])
-
-		expect(code).toBe(OK)
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(prrun_adopt_mock).toHaveBeenCalledWith(ISSUE)
 		expect(josh_run_mock).toHaveBeenCalledTimes(2)
 		expect(gather_mock).not.toHaveBeenCalled()
@@ -278,9 +278,7 @@ describe('run_entry_cli.run — a stop already made is resumed or reported (josh
 		is_pending_mock.mockResolvedValue(true)
 		adopt_mock.mockResolvedValue(true)
 
-		const code = await run_entry_cli.run([ISSUE, '--to', 'prrun'])
-
-		expect(code).toBe(OK)
+		expect(await run_entry_cli.run([ISSUE, '--to', 'prrun'])).toBe(OK)
 		expect(info_lines).toStrictEqual([
 			stage_line(run_stage.HALFRUN_STOPPED, 'prrun', 'gate'),
 			`entry ${CITED} — resume: ${run_entry_cli.HALFRUN_RESUME_TOKEN}`,
@@ -291,9 +289,7 @@ describe('run_entry_cli.run — a stop already made is resumed or reported (josh
 		josh_run_mock.mockResolvedValueOnce(FRESH)
 		prrun_token_mock.mockResolvedValue(PRRUN_TOKEN)
 
-		const code = await run_entry_cli.run([ISSUE, '--to', 'prrun'])
-
-		expect(code).toBe(OK)
+		expect(await run_entry_cli.run([ISSUE, '--to', 'prrun'])).toBe(OK)
 		expect(calls()).toStrictEqual([['run:cut', '--resume', ISSUE]])
 		expect(prrun_adopt_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([stage_line(run_stage.PRRUN_STOPPED, 'prrun', 'reached')])
