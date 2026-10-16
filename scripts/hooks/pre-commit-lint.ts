@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { core_budget } from '#scripts/gate/core-budget'
 import {
 	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_COMMIT_CACHE_FLAGS,
@@ -34,6 +35,17 @@ const TOOL_ARGUMENTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	eslint: ['exec', 'eslint', '--quiet', ...ESLINT_COMMIT_CACHE_FLAGS],
 }
 
+// **Each tool claims its place in the core budget** (joshuafolkken/kit#3944): lefthook starts the three
+// in parallel, and off the ledger every other lane's admission saw them only as foreign load. Each is
+// one process over the staged files — eslint over 40 of them took 16.9s of CPU over 14.0s of wall at
+// 1,225 MB, the one-process shape the whole-tree scan's weight already names.
+// The key is the one `CORE_WEIGHTS` and `MEMORY_MB` both declare the tool under.
+const TOOL_BUDGETS: Readonly<Record<string, 'spell_check' | 'format' | 'eslint_scan'>> = {
+	cspell: 'spell_check',
+	prettier: 'format',
+	eslint: 'eslint_scan',
+}
+
 const USAGE = `Usage: josh pre-commit-lint <${Object.keys(TOOL_ARGUMENTS).join('|')}> [files...]`
 
 function build_arguments(
@@ -46,19 +58,28 @@ function build_arguments(
 	return [...tool_arguments, ...staged_files]
 }
 
+async function run_tool(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const result = await execa(PNPM, command_arguments, { stdio: 'inherit', reject: false })
+
+	return resolve_spawn_exit(PNPM, result)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [tool = '', ...staged_files] = argv
 	const command_arguments = build_arguments(tool, staged_files)
+	const budget = TOOL_BUDGETS[tool]
 
-	if (command_arguments === undefined) {
+	if (command_arguments === undefined || budget === undefined) {
 		console.error(USAGE)
 
 		return USAGE_ERROR_EXIT_CODE
 	}
 
-	const result = await execa(PNPM, command_arguments, { stdio: 'inherit', reject: false })
-
-	return resolve_spawn_exit(PNPM, result)
+	return await core_budget.with_command_reservation(
+		core_budget.CORE_WEIGHTS[budget],
+		async () => await run_tool(command_arguments),
+		{ memory_mb: core_budget.MEMORY_MB[budget], command: `pre-commit ${tool}` },
+	)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

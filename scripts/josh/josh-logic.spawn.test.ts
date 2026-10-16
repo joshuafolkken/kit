@@ -129,6 +129,8 @@ const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
 	'cspell:dot',
 	'test:unit',
 	'test:related',
+	// joshuafolkken/kit#3944
+	'retrospective',
 ]
 
 function declared_weight(command: string): number | undefined {

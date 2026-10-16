@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -86,6 +87,36 @@ describe('install_dependencies — what it asks for', () => {
 	// nothing committed, so the flag is pinned rather than left to whatever pnpm defaults to.
 	it('refuses to let the install rewrite the lock it was cut from', () => {
 		expect(INSTALL_ARGUMENTS).toStrictEqual(['install', '--frozen-lockfile'])
+	})
+})
+
+// joshuafolkken/kit#3944: a batch opens its lanes together, and each install ran off the ledger.
+describe('install_dependencies — the core budget it claims', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('claims the install weight around the install', async () => {
+		process_answers(SUCCESS_EXIT_CODE, DONE_LINE)
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		const result = await lane_install.install_dependencies(lane.directory)
+
+		expect(reservation).toHaveBeenCalledWith(
+			core_budget.CORE_WEIGHTS.install,
+			expect.any(Function),
+			expect.objectContaining({ memory_mb: core_budget.MEMORY_MB.install }),
+		)
+		expect(result.is_installed).toBe(true)
+	})
+
+	it('claims nothing for a lane with no manifest', async () => {
+		remove_manifest()
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await lane_install.install_dependencies(lane.directory)
+
+		expect(reservation).not.toHaveBeenCalled()
 	})
 })
 
