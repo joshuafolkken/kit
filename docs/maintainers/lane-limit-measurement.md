@@ -188,3 +188,14 @@ period whose samples carried no breakdown prints the header alone.
 **The decision the table is for**: what is loading the machine beyond the core budget's ledger
 ([#3874](https://github.com/joshuafolkken/kit/issues/3874)) — a kind with a high mean that nothing
 reserves is the next thing to put on the budget.
+
+## Which check a gate waited on
+
+A `gate` entry's `checks` is one row per check it ran — its label, duration, verdict and whether it was
+reused from its own green record (`scripts/gate/check-reuse.ts`). Under the process table, `lane:stats`
+prints a fifth: one row per check, in the order they first appear, with the median and maximum duration
+in seconds, how many runs and how many of them were reused.
+
+**A reused check is counted, never timed** — it started no process, so its zero would pull the median
+toward a check that never ran. A check that was only ever reused prints `not measured`. A gate recorded
+before the field existed contributes no row.
