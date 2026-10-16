@@ -29,3 +29,4 @@
 | コマンド出力が文脈へ持ち込む量の上限                       | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)           |
 | 運用ルール                                                 | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)       |
 | 用語集 — lane・cut・hold・park など                        | [`glossary.md`](./collaboration-workflow/glossary.md)                     |
+| headless のレーン子・レビューの起動時の規則セット          | [`lane-instructions.md`](./collaboration-workflow/lane-instructions.md)   |
