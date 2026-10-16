@@ -15,6 +15,7 @@ describe('issue classification', () => {
 	it.each([
 		{ declaration: '- 目的: 機能追加', labels: [ENHANCEMENT_LABEL] },
 		{ declaration: FEATURE_IMPROVEMENT, labels: [ENHANCEMENT_LABEL] },
+		{ declaration: '- 目的: 時間短縮', labels: [ENHANCEMENT_LABEL] },
 		{ declaration: BREAKING_CHANGE, labels: [BREAKING_CHANGE_LABEL] },
 		{ declaration: '- 種別: 不具合', labels: ['bug'] },
 		{

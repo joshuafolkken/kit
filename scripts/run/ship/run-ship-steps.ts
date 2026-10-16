@@ -65,7 +65,7 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.SYNC,
 		header: run_ship.SYNC_HEADER,
-		run: async () => await run_ship_sync.sync_stage(),
+		run: async (args) => await run_ship_sync.sync_stage(args.number),
 	},
 	{
 		stage: STAGE.GATE,

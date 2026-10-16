@@ -1,0 +1,9 @@
+{
+	"reason": "#3909 adds the expected-effect lint (new module) and its template section and declaration row; the growth is the feature itself",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 40,
+		"rules.lines": 10,
+		"ai_cost.on_demand_bytes": 355
+	}
+}
