@@ -58,8 +58,12 @@ interface Parsed {
 // A finding spec is `<category>:<severity>:<file>`; the file field keeps any `:line` a citation
 // carries, so only the first two colons separate fields.
 function to_finding(category: string, severity: string, file: string): Finding | undefined {
-	if (!review_finding_ledger.is_category(category)) return undefined
-	if (!review_finding_ledger.is_severity(severity)) return undefined
+	if (
+		!review_finding_ledger.is_category(category) ||
+		!review_finding_ledger.is_severity(severity)
+	) {
+		return undefined
+	}
 
 	return review_finding_ledger.is_valid_file(file) ? { category, severity, file } : undefined
 }

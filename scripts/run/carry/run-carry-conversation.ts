@@ -76,8 +76,13 @@ function is_same_conversation(carry: RunCarry, owner: CarryOwner): boolean {
 // a new one, so the record goes on naming a live process once the conversation falls quiet. A record a
 // cut handed off is the successor's to take, never the cutting conversation's to take back.
 function reclaim_owner(carry: RunCarry, owner: CarryOwner): RunCarry {
-	if (carry.is_handed_off === true || !is_same_conversation(carry, owner)) return carry
-	if (owner.pid === carry.owner_pid) return carry
+	if (
+		carry.is_handed_off === true ||
+		!is_same_conversation(carry, owner) ||
+		owner.pid === carry.owner_pid
+	) {
+		return carry
+	}
 
 	return { ...carry, owner_pid: owner.pid, owner_start: owner.start }
 }

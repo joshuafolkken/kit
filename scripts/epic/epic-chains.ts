@@ -190,8 +190,12 @@ function find_position_ambiguity(
 	chains: Chains,
 	position: InsertPosition | undefined,
 ): string | undefined {
-	if (position?.kind !== 'before') return undefined
-	if (chains_containing(chains, position.target).length < AMBIGUOUS_MATCH_COUNT) return undefined
+	if (
+		position?.kind !== 'before' ||
+		chains_containing(chains, position.target).length < AMBIGUOUS_MATCH_COUNT
+	) {
+		return undefined
+	}
 
 	return to_ambiguous_position_error(position)
 }

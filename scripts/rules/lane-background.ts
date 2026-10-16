@@ -109,9 +109,9 @@ function foreground_input(
 	call: GuardedCall,
 	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
 ): Record<string, unknown> | undefined {
-	if (!is_backgrounded_ship(call) || !json_value.is_record(call.input)) return undefined
-
-	if (!is_lane_child()) return undefined
+	if (!is_backgrounded_ship(call) || !json_value.is_record(call.input) || !is_lane_child()) {
+		return undefined
+	}
 
 	return { ...call.input, [BACKGROUND_KEY]: false, [TIMEOUT_KEY]: FOREGROUND_TIMEOUT_MS }
 }

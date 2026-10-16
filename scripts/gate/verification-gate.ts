@@ -328,8 +328,13 @@ interface GateOptions {
 // `--force` is the caller saying to run regardless. `scoped_green` owns the record and the `JOSH_SCOPED_GREEN`
 // escape hatch, so a person can always get past a record that is wrong about their tree.
 function scoped_precheck_refusal(tree: GateTree, options: GateOptions): string | undefined {
-	if (options.is_scoped_enforced !== true) return undefined
-	if (options.is_forced === true || options.is_unit_included === false) return undefined
+	if (
+		options.is_scoped_enforced !== true ||
+		options.is_forced === true ||
+		options.is_unit_included === false
+	) {
+		return undefined
+	}
 
 	return scoped_green.refusal_for(tree.files, tree.base, options.scoped_sources)
 }

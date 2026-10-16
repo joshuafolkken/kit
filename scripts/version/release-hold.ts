@@ -51,8 +51,10 @@ function resolve_installable(
 	minimum_age_minutes: number,
 	now_ms: number,
 ): string | undefined {
-	if (times === undefined) return undefined
-	if (!is_latest_withheld(times, latest, minimum_age_minutes, now_ms)) return undefined
+	if (times === undefined || !is_latest_withheld(times, latest, minimum_age_minutes, now_ms)) {
+		return undefined
+	}
+
 	const installable = release_age.select_aged_version(times, undefined, minimum_age_minutes, now_ms)
 
 	return installable === latest ? undefined : installable
@@ -122,8 +124,13 @@ function build_release_hold_notes(
 	installable: string | undefined,
 	minimum_age_minutes: number,
 ): Array<string> {
-	if (version === undefined || installable === undefined) return []
-	if (!is_release_age_hold(version, latest, installable)) return []
+	if (
+		version === undefined ||
+		installable === undefined ||
+		!is_release_age_hold(version, latest, installable)
+	) {
+		return []
+	}
 
 	return [format_release_hold_note(version, latest, installable, minimum_age_minutes)]
 }

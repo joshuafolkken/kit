@@ -27,8 +27,7 @@ const STOP_RECOVERY =
 // this type is for the run that halted needing a person. An `unreadable` record is not announced: with
 // nothing readable there is no run this can honestly say stopped.
 function plan(read: CarryRead, reason: string | undefined): StopNotice | undefined {
-	if (reason === undefined || reason.length === 0) return undefined
-	if (read.kind !== 'carried') return undefined
+	if (reason === undefined || reason.length === 0 || read.kind !== 'carried') return undefined
 
 	return { reason }
 }

@@ -186,8 +186,9 @@ function worker_arguments(
 	vitest_arguments: ReadonlyArray<string>,
 	share: number | undefined,
 ): Array<string> {
-	if (share === undefined) return []
-	if (vitest_arguments.some((argument) => is_worker_flag(argument))) return []
+	if (share === undefined || vitest_arguments.some((argument) => is_worker_flag(argument))) {
+		return []
+	}
 
 	return [`${WORKER_FLAG}=${String(share)}`]
 }

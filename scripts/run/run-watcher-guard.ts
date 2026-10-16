@@ -49,9 +49,12 @@ async function owes_watcher(): Promise<boolean> {
 // `run_progress_clock.life_target_of(git_directory)`. Passed in rather than resolved here so the
 // caller can use whichever resolution fits its sync/async context.
 async function check(life_target: string): Promise<GuardResult> {
-	if (!(await owes_watcher())) return OK_RESULT
-
-	if (run_progress_clock.is_life_fresh(life_target, STALE_THRESHOLD_MS)) return OK_RESULT
+	if (
+		!(await owes_watcher()) ||
+		run_progress_clock.is_life_fresh(life_target, STALE_THRESHOLD_MS)
+	) {
+		return OK_RESULT
+	}
 
 	return { kind: 'stale', note: STALE_NOTE }
 }

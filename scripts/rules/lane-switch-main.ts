@@ -61,8 +61,12 @@ const FLAG_PREFIX = '-'
 function switch_target(segment: string): string | undefined {
 	const call = git_argv.parse(segment)
 
-	if (call?.subcommand !== SWITCH_SUBCOMMAND) return undefined
-	if (call.args.some((argument) => NON_COLLIDING_FLAGS.has(argument))) return undefined
+	if (
+		call?.subcommand !== SWITCH_SUBCOMMAND ||
+		call.args.some((argument) => NON_COLLIDING_FLAGS.has(argument))
+	) {
+		return undefined
+	}
 
 	return call.args.find((argument) => !argument.startsWith(FLAG_PREFIX))
 }

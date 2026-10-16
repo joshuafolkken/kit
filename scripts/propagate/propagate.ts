@@ -277,8 +277,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	const plan = plan_run(options)
-	if (plan === undefined) return FAILURE_EXIT_CODE
-	if (!(await resolve_publish(plan, options))) return FAILURE_EXIT_CODE
+	if (plan === undefined || !(await resolve_publish(plan, options))) return FAILURE_EXIT_CODE
 
 	return propagate_to_consumers(plan, options.is_dry_run)
 }

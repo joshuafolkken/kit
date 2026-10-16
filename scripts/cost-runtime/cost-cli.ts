@@ -56,8 +56,7 @@ interface RunContext {
 // `--over=` does not arrive as "hand off after any request" and stop an unattended run after its
 // first child.
 function to_threshold(raw: string | undefined): number | undefined {
-	if (raw === undefined) return undefined
-	if (raw.trim() === '') return undefined
+	if (raw === undefined || raw.trim() === '') return undefined
 
 	const parsed = Number(raw)
 

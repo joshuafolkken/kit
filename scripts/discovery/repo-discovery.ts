@@ -138,8 +138,10 @@ function resolve_current_owner(repository_path: string): string | undefined {
 // all — the very failure this function exists to close, moved somewhere else.
 function main_worktree(repository_path: string): string {
 	const git_directory = resolve_git_directory(repository_path)
-	if (git_directory === undefined) return repository_path
-	if (path.basename(git_directory) !== GIT_DIRECTORY) return repository_path
+
+	if (git_directory === undefined || path.basename(git_directory) !== GIT_DIRECTORY) {
+		return repository_path
+	}
 
 	return path.dirname(git_directory)
 }

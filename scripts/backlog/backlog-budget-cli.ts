@@ -157,8 +157,7 @@ function build_input(values: ParsedValues, now_ms: number): BudgetInput | undefi
 
 	const started_at_ms = to_time_ms(cli_flags.string_of(values.started))
 
-	if (started_at_ms === undefined) return undefined
-	if (!are_values_readable(values)) return undefined
+	if (started_at_ms === undefined || !are_values_readable(values)) return undefined
 
 	return input_of(values, { answer, now_ms, started_at_ms })
 }

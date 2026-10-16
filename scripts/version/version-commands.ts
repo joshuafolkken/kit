@@ -101,8 +101,10 @@ function build_upstream_effective(
 	context: UpstreamHookContext,
 ): UpstreamEffective | undefined {
 	const { resolve_effective_version, resolve_global_upgrade_command } = upstream
-	if (resolve_effective_version === undefined) return undefined
-	if (resolve_global_upgrade_command === undefined) return undefined
+
+	if (resolve_effective_version === undefined || resolve_global_upgrade_command === undefined) {
+		return undefined
+	}
 
 	return {
 		version: resolve_effective_version(context),
@@ -264,8 +266,14 @@ function describe_effective_outcome(
 	snapshot: VersionSnapshot,
 ): Array<string> {
 	const { resolve_effective_version } = upstream
-	if (resolve_effective_version === undefined || report === undefined) return []
-	if (version_check_logic.build_effective_upgrade_commands(report).length === 0) return []
+
+	if (
+		resolve_effective_version === undefined ||
+		report === undefined ||
+		version_check_logic.build_effective_upgrade_commands(report).length === 0
+	) {
+		return []
+	}
 
 	const after = resolve_effective_version({
 		latest: snapshot.latest,

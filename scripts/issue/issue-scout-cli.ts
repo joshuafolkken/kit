@@ -73,8 +73,9 @@ function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined
 	const { values, positionals } = parsed
 	const [title] = positionals
 
-	if (has_invalid_arguments(title, values.body, values['body-file'])) return undefined
-	if (title === undefined) return undefined
+	if (title === undefined || has_invalid_arguments(title, values.body, values['body-file'])) {
+		return undefined
+	}
 
 	return { title, body: values.body ?? '', body_file: values['body-file'] }
 }

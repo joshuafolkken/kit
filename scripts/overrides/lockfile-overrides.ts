@@ -42,9 +42,7 @@ function find_entry_mismatch(
 	specifier: string,
 	override: string | undefined,
 ): Array<SpecifierMismatch> {
-	if (override === undefined) return []
-	if (is_non_registry(specifier)) return []
-	if (specifier === override) return []
+	if (override === undefined || specifier === override || is_non_registry(specifier)) return []
 
 	return [{ importer, name, lockfile_specifier: specifier, override }]
 }

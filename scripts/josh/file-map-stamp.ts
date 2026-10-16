@@ -211,9 +211,7 @@ function is_own_record(stamp: FileMapStamp): boolean {
 function complete_at(target: string): string | undefined {
 	const stamp = read_at(target)
 
-	if (stamp === undefined) return undefined
-
-	if (!is_own_record(stamp)) return undefined
+	if (stamp === undefined || !is_own_record(stamp)) return undefined
 
 	return stamp_file.write_stamp(target, { ...stamp, completed_at: new Date().toISOString() })
 }

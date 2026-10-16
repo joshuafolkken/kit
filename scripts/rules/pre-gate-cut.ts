@@ -133,9 +133,7 @@ function dispatched_issue(state: LaneCutState): string | undefined {
 function uncut_lane_issue(state: LaneCutState): string | undefined {
 	const issue = lane_paths.lane_issue_of(state.directory)
 
-	if (issue === undefined) return undefined
-
-	if (dispatched_issue(state) !== issue) return undefined
+	if (issue === undefined || dispatched_issue(state) !== issue) return undefined
 
 	return state.carried()?.issue === issue ? undefined : issue
 }
