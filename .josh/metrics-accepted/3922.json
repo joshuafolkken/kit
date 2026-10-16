@@ -1,0 +1,7 @@
+{
+	"reason": "New main-merge-regenerate module auto-resolves generated-file merge conflicts (#3922)",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}

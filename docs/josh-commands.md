@@ -470,7 +470,7 @@ Bring the repository's default branch into the branch this checkout is on: fetch
 pnpm josh main:merge
 ```
 
-**Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict or uncommitted work on an incoming path fails.
+**Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict only on generated files (`scripts/git/main-merge-regenerate.ts`) is regenerated and committed; any other conflict, or uncommitted work on an incoming path, fails.
 
 ---
 
