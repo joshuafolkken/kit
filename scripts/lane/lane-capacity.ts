@@ -73,8 +73,14 @@ function seated_limit(limit: number): number {
 // Never negative: a repository holding more `in-progress` issues than the limit allows — the limit
 // was lowered, or a stale label outlived its run — has no free lane, and a negative count read as
 // "how many to offer" would be a slice nobody meant.
-function free_lanes(limit: number, occupied: number): number {
-	return Math.max(NO_LANES, seated_limit(limit) - occupied)
+//
+// **A lane that holds no place under the limit still holds its port seat** (joshuafolkken/kit#3967):
+// `seated` counts every open lane, so the free count never offers more launches than seats are left.
+function free_lanes(limit: number, occupied: number, seated = occupied): number {
+	const by_limit = seated_limit(limit) - occupied
+	const by_seats = lane_seed_policy.LAST_LANE_SEAT - seated
+
+	return Math.max(NO_LANES, Math.min(by_limit, by_seats))
 }
 
 const lane_capacity = {

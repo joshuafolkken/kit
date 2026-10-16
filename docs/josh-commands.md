@@ -807,6 +807,7 @@ pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies aga
 
 - The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes the parent within a minute to fill the freed lanes.
 - Lowering it stops no running child: a lane that finishes is simply not refilled.
+- The lanes in use are the open lane work trees, except that under a `--only` run a lane with no child working in it, whose issue the run neither names nor has launched, is not counted — its tree and branch stay for the next run that names the issue. `run:board` names the lanes in use after `no free lane`.
 - A limit above the nine port seats is shown and counted at the seats, as `JOSH_LANE_LIMIT` already is. A value that is not a positive integer is refused by the same rule.
 - The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
 
