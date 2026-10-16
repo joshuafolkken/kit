@@ -55,7 +55,7 @@ const DEFAULT_PORTS: LimitPorts = {
 	read_override: lane_limit_override.read_override,
 	write_override: lane_limit_override.write_override,
 	emit_raise: lane_limit_override.emit_raise,
-	lane_use: async () => await backlog_ready.lane_use(),
+	lane_use: backlog_ready.lane_use,
 }
 
 function refuse(message: string): number {

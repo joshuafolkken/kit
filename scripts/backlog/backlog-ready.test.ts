@@ -134,7 +134,7 @@ describe('backlog_ready.free_lanes_beside', () => {
 })
 
 // joshuafolkken/kit#3967: a `--only` run waited on lanes an earlier run left with no child in them.
-describe('backlog_ready.live_lane_count under the live run', () => {
+describe('backlog_ready.lane_use under the live run', () => {
 	beforeEach(() => {
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
 		vi.spyOn(run_event_stream_emit, 'scoped_current_events').mockResolvedValue([])
@@ -145,13 +145,20 @@ describe('backlog_ready.live_lane_count under the live run', () => {
 	it('counts only the lanes a --only run names once every child is gone', async () => {
 		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun #3865 --only'))
 
-		await expect(backlog_ready.live_lane_count()).resolves.toBe(1)
+		// The uncounted lanes still hold their seats.
+		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
+			occupied: 1,
+			seated: OPEN.length,
+		})
 	})
 
 	it('counts every open lane under a run that drains the pool', async () => {
 		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun'))
 
-		await expect(backlog_ready.live_lane_count()).resolves.toBe(OPEN.length)
+		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
+			occupied: OPEN.length,
+			seated: OPEN.length,
+		})
 	})
 })
 

@@ -59,13 +59,6 @@ async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {
 	return { occupied: occupied.length, seated: open.filter((lane) => !lane.is_stranded).length }
 }
 
-// The lanes in use: the open worktrees that hold a place. `josh lane:limit` prints it.
-async function live_lane_count(): Promise<number> {
-	const use = await lane_use()
-
-	return use.occupied
-}
-
 function free_of(limit: number, use: LaneUse): number {
 	return lane_capacity.free_lanes(limit, use.occupied, use.seated)
 }
@@ -216,7 +209,6 @@ const backlog_ready = {
 	free_lane_count,
 	free_lanes_beside,
 	lane_use,
-	live_lane_count,
 	occupied_lanes,
 	drive_free_lane_count,
 	drains_pool,
