@@ -18,10 +18,13 @@ interface ClosedIssue {
 	closed_ms: number | undefined
 	// Closed by a merged pull request, rather than closed by hand.
 	is_merged: boolean
+	// Closed as not planned — withdrawn rather than finished (joshuafolkken/kit#3958).
+	is_not_planned: boolean
 }
 
-const CLOSED_FIELDS = 'title,state,closedAt,labels'
+const CLOSED_FIELDS = 'title,state,stateReason,closedAt,labels'
 const CLOSED_STATE = 'CLOSED'
+const NOT_PLANNED_REASON = 'not_planned'
 const STILL_OPEN = 'open' as const
 
 // What one issue answered: closed, still open, or `undefined` when it could not be read.
@@ -41,6 +44,7 @@ const READ_CONCURRENCY = 4
 const closed_schema = z.looseObject({
 	title: z.string(),
 	state: z.string(),
+	stateReason: z.string().nullish(),
 	closedAt: z.string().nullish(),
 	labels: z.array(issue_label_schema).default([]),
 })
@@ -69,7 +73,9 @@ async function read_closed(issue: number): Promise<ClosedRead> {
 
 	const labels = view.labels.map((label) => label.name)
 
-	return { title: view.title, labels, closed_ms: closed_ms_of(view), is_merged }
+	const is_not_planned = view.stateReason === NOT_PLANNED_REASON
+
+	return { title: view.title, labels, closed_ms: closed_ms_of(view), is_merged, is_not_planned }
 }
 
 async function read_all(

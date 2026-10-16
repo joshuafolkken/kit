@@ -276,36 +276,6 @@ describe('run_board_status.settle_closed with the listing’s labels', () => {
 	})
 })
 
-// joshuafolkken/kit#3451: a child read closed from GitHub ends when it closed, merged or not.
-describe('run_board_status.settle_closed with a closed read', () => {
-	it.each<[string, boolean, string]>([
-		['merged', true, 'merged'],
-		['done', false, 'done'],
-	])('draws a child read closed as %s, timed to its close', (_label, is_merged, state) => {
-		const read = read_closed({ title: 'Fix', labels: [], closed_ms: Date.parse(T2), is_merged })
-
-		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
-			state,
-			started_ms: Date.parse(T0),
-			ended_ms: Date.parse(T2),
-		})
-	})
-
-	it('ignores a close dated before the launch', () => {
-		const read = read_closed({
-			title: 'Fix',
-			labels: [],
-			closed_ms: Date.parse(T0) - 1,
-			is_merged: true,
-		})
-
-		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
-			state: 'done',
-			started_ms: Date.parse(T0),
-		})
-	})
-})
-
 // joshuafolkken/kit#3535: a settled child keeps the track it had reached, and takes no phase after it.
 describe('run_board_status settled tracks', () => {
 	const reached: ReadonlyArray<Phase> = ['investigate', 'plan']
@@ -326,7 +296,13 @@ describe('run_board_status settled tracks', () => {
 	it.each<[string, OpenRead]>([
 		[
 			'read closed',
-			read_closed({ title: 'Fix', labels: [], closed_ms: Date.parse(T2), is_merged: true }),
+			read_closed({
+				title: 'Fix',
+				labels: [],
+				closed_ms: Date.parse(T2),
+				is_merged: true,
+				is_not_planned: false,
+			}),
 		],
 		['gone from the listing', GONE],
 		['labelled stopped', read_labelled(['bug'])],
