@@ -192,19 +192,23 @@ interface SignalReference {
 }
 
 // What marks a line as naming the issue's parent, in both spellings for the same reason as
-// `ACCEPTANCE_HEADINGS`. Matched anywhere in the line, so `- **Parent:** #N` counts too. Shared with
-// `epic:audit`'s orphan search, so a line it reports as claiming a parent is one `epic:bundle` reads
-// as a parent line.
+// `ACCEPTANCE_HEADINGS`. `epic:audit`'s orphan search matches it anywhere in the line, then asks
+// whether the same line names the epic.
 const PARENT_MARKERS: ReadonlyArray<string> = ['親:', '親：', 'Parent:', 'parent:']
 
 function has_parent_marker(line: string): boolean {
 	return PARENT_MARKERS.some((marker) => line.includes(marker))
 }
 
-function parent_lines(body: string): string {
+// The reference written directly after a parent marker, bold markup allowed (`- **Parent:** #N`).
+// Only that reference is the parent: a background sentence that mentions `parent:` and names an
+// issue elsewhere on the line is not a parent line.
+const PARENT_REFERENCE = /(?:親|Parent|parent)\**[:：]\**\s*(?:[\w.-]+\/[\w.-]+)?#\d+/gu
+
+function parent_references(body: string): string {
 	return markdown_section
 		.unfenced_lines(body)
-		.filter((line) => has_parent_marker(line))
+		.flatMap((line) => [...line.matchAll(PARENT_REFERENCE)].map((match) => match[0]))
 		.join('\n')
 }
 
@@ -217,7 +221,7 @@ function references_in(text: string, repo: string, section: SignalSection): Arra
 function signal_references(body: string, repo = ''): Array<SignalReference> {
 	const read = [
 		...references_in(acceptance_section(body), repo, 'acceptance criteria'),
-		...references_in(parent_lines(body), repo, 'parent line'),
+		...references_in(parent_references(body), repo, 'parent line'),
 	]
 
 	return read.filter((reference, index) => {

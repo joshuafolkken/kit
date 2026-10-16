@@ -139,6 +139,15 @@ describe('epic_audit_logic.signal_references', () => {
 		expect(reference?.section).toBe(PARENT_LINE)
 	})
 
+	it('reads only the reference written directly after the parent marker', () => {
+		const body =
+			'parent: #9 — see #10\n\n## 背景\n\n#3956 で `parent:` 行の参照だけを signal にした'
+
+		expect(epic_audit_logic.signal_references(body, REPO)).toEqual([
+			{ number: 9, section: PARENT_LINE },
+		])
+	})
+
 	it('reads no parent line inside a code fence', () => {
 		expect(epic_audit_logic.signal_references('```\nparent: #2\n```', REPO)).toEqual([])
 	})
