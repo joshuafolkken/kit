@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -106,6 +106,7 @@ describe('reading the open lanes', () => {
 		const lanes = await lane_registry.list_lanes()
 
 		expect(lanes[0]?.is_stranded).toBe(true)
+		expect(lanes[0]?.dispatched_ms).toBeUndefined()
 		expect(lane_registry.used_seats(lanes)).toStrictEqual([])
 	})
 
@@ -119,6 +120,22 @@ describe('reading the open lanes', () => {
 
 		expect(lanes[0]?.seat).toBeUndefined()
 		expect(lane_registry.unreadable_lanes(lanes).map((lane) => lane.issue)).toStrictEqual(['1490'])
+	})
+})
+
+// joshuafolkken/kit#3969: when the lane last took a child is its `.env`'s last write, so the board can
+// tell an earlier run's lane from this run's.
+describe('reading when a lane last took a child', () => {
+	it('reads it from the lane own .env', async () => {
+		const dispatched = new Date('2026-10-16T09:29:00.000Z')
+
+		open_on_disk('1490', '6')
+		utimesSync(path.join(LANE_ROOT, '1490', '.env'), dispatched, dispatched)
+		list_of(lane_block('1490'))
+
+		const lanes = await lane_registry.list_lanes()
+
+		expect(lanes[0]?.dispatched_ms).toBe(dispatched.getTime())
 	})
 })
 
