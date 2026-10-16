@@ -78,10 +78,24 @@ describe('run_step_section — an unresolved heading fails', () => {
 	it('fails when the named heading is gone from the document', () => {
 		expect(run_step_section.print_section(run_step_section.ENTRY, root)).toBe(FAILURE)
 	})
+})
 
-	it('fails when a document named by its project path is gone', () => {
-		const action = { kind: 'command' as const, line: 'pnpm josh review:round2' }
+describe('run_step_section — a consumer-shaped root', () => {
+	let root = ''
 
-		expect(run_step_section.print_for(action, root)).toBe(FAILURE)
+	beforeEach(() => {
+		root = mkdtempSync(path.join(tmpdir(), 'run-step-section-consumer-'))
+		writeFileSync(path.join(root, 'package.json'), '{}\n')
 	})
+
+	afterEach(() => {
+		rmSync(root, { recursive: true, force: true })
+	})
+
+	it.each([...run_step_section.GOVERNING_SECTIONS.keys()])(
+		'prints the %s row from the kit package when the root ships no copy',
+		(key) => {
+			expect(run_step_section.print_section(key, root)).toBe(SUCCESS)
+		},
+	)
 })

@@ -50,3 +50,15 @@ describe.each(HEADINGS)('josh doc:section %s', (heading) => {
 		expect(capped_print_fixture.restored(printed())).toBe(section_text(heading))
 	})
 })
+
+describe('josh doc:section — the kit package fallback', () => {
+	const REVIEW_DOCUMENT = 'prompts/review.md'
+
+	it('resolves a document the root does not ship against the kit package', () => {
+		const consumer = path.join(ROOT, 'no-such-consumer')
+
+		expect(document_section_cli.resolve_document(REVIEW_DOCUMENT, consumer, ROOT)).toBe(
+			path.join(ROOT, REVIEW_DOCUMENT),
+		)
+	})
+})
