@@ -47,8 +47,13 @@ function ledger_arguments(
 	common_directory: string | undefined,
 	profile: AgentProfile,
 ): ReadonlyArray<string> {
-	if (common_directory === undefined || profile.role !== agent_role_profile.WORKER) return []
-	if (path.basename(common_directory) !== GIT_DIRECTORY) return []
+	if (
+		common_directory === undefined ||
+		profile.role !== agent_role_profile.WORKER ||
+		path.basename(common_directory) !== GIT_DIRECTORY
+	) {
+		return []
+	}
 
 	const directory = path.join(path.dirname(common_directory), LEDGER_DIRECTORY)
 

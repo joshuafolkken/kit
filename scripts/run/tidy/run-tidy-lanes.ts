@@ -95,8 +95,9 @@ async function tidy_lane(
 	is_merged: IsMerged,
 	in_flight: ReadonlySet<string>,
 ): Promise<Outcome | undefined> {
-	if (in_flight.has(lane.issue)) return undefined
-	if (lane.is_stranded || !(await is_merged(lane.issue))) return undefined
+	if (in_flight.has(lane.issue) || lane.is_stranded || !(await is_merged(lane.issue))) {
+		return undefined
+	}
 
 	return { target: `lane ${session_cite.issue(lane.issue)}`, verdict: await settle(lane) }
 }

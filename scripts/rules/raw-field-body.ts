@@ -35,13 +35,9 @@ function posts_at_path_literally(command: string): boolean {
 // it reads as unbelievable — the call succeeds and returns a URL while posting the path as text.
 const RAW_FIELD_BODY_REASON =
 	'⛔ literal @path body: this passes `body=@<path>` to `gh api` with a raw field flag (`-f` / ' +
-	'`--raw-field`), which sends the value verbatim — the string `@<path>` is posted as the comment, ' +
-	'not the file it points at. `-F` / `--field` is the flag that reads the file, and the two spellings ' +
-	'differ by one character while `gh` exits 0 and returns a comment URL either way, so the break is ' +
-	'invisible until a person reads the issue (joshuafolkken/kit#2304 lost two park comments this way). ' +
-	'Post an issue or PR comment with `pnpm josh issue:comment <N> --body-file <path>` — the one ' +
-	'spelling, which cannot take the wrong flag. The rule and the safe forms are in ' +
-	'`prompts/collaboration-workflow/shell-body.md`. This rule fires on every occurrence, not once per run.'
+	'`--raw-field`), which posts the string `@<path>` rather than the file. Post the comment with ' +
+	'`pnpm josh issue:comment <N> --body-file <path>`; this rule fires on every occurrence ' +
+	'(`prompts/collaboration-workflow/shell-body.md`).'
 
 const ROW = {
 	id: 'raw-field-body',

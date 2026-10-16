@@ -2,6 +2,7 @@ import type { machine_capacity } from '#scripts/gate/machine-capacity'
 import { hanging_execa } from '#scripts/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_load } from './lane-load'
+import { lane_process_load } from './lane-process-load'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
 // joshuafolkken/kit#3355: a load sample sets the machine's load beside the lanes with a child working.
@@ -41,9 +42,12 @@ async function read_admission(): Promise<number | undefined> {
 	return reading.available_mb
 }
 
+const PROCESSES = [{ kind: 'vitest', cpu_percent: 300, rss_mb: 1024, count: 4 }]
+
 beforeEach(() => {
 	hanging_execa.reset()
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([])
+	vi.spyOn(lane_process_load, 'read').mockResolvedValue(PROCESSES)
 })
 
 afterEach(() => {
@@ -77,6 +81,13 @@ describe('lane_load.sample', () => {
 			lanes: 0,
 		})
 		expect(hanging_execa.calls()).toHaveLength(0)
+	})
+
+	// joshuafolkken/kit#3874: the load the core budget's ledger does not explain is read back by kind.
+	it('carries the heaviest process kinds beside the load', async () => {
+		stub_platform('win32')
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({ processes: PROCESSES })
 	})
 })
 

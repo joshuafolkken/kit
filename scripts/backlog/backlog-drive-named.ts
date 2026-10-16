@@ -1,5 +1,4 @@
-import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
-import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_parked } from '#scripts/lane/lane-parked'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
@@ -98,9 +97,8 @@ function skip_after_failure(target: string, issue: string, owner: string): void 
 async function should_skip(issue: string, outcome: MergeResult['outcome']): Promise<boolean> {
 	if (outcome === 'failed') return true
 	if (outcome !== 'parked') return false
-	const read = await issue_state_cli.read_issue(issue)
 
-	return read.kind === 'state' && has_label_name(read.state.labels, NEEDS_DECISION_LABEL)
+	return await lane_parked.is_parked(issue)
 }
 
 async function mark_done(issue: string, result: MergeResult, owner: string): Promise<void> {

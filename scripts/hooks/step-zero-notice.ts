@@ -65,8 +65,9 @@ function notice(raw_payload: string, root: string = process.cwd()): string | und
 
 	const target = STAMP.path(transcript)
 
-	if (STAMP.last_ms(target) !== hook_decision.NEVER_MS) return undefined
-	if (!STAMP.record(target, Date.now())) return undefined
+	if (STAMP.last_ms(target) !== hook_decision.NEVER_MS || !STAMP.record(target, Date.now())) {
+		return undefined
+	}
 
 	return NOTICE
 }

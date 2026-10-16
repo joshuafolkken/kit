@@ -69,7 +69,7 @@ function should_notify(
 // A dispatched lane child ends its turn on a denial, so
 // the same guidance is carried without a `permissionDecision`: the read proceeds and the child is nudged
 // to delegate rather than killed. It carries no ⛔, so a person watching reads it as advice.
-const NOTICE = `💡 investigation: files read and not edited, or search turns, since the last delegated unit reached the threshold, so the reading from here should go to a unit of its own. This is a notice, not a refusal — the read proceeds, because a dispatched lane child ends its turn on a denial. Ask \`pnpm josh delegate investigation\`, then dispatch the \`${investigation_reads.INVESTIGATOR_AGENT}\` agent (\`kit:${investigation_reads.INVESTIGATOR_AGENT}\` in a consumer) with a brief of what the main line has already concluded and what is left to find out; it returns the conclusion plus its \`file:line\` citations, never the file text. Keep a read in the main line only where this run will edit that file. This recurs on the next accumulation.`
+const NOTICE = `💡 investigation: files read and not edited, or search turns, since the last delegated unit reached the threshold; the read proceeds. Run \`pnpm josh delegate investigation\`, then dispatch the \`${investigation_reads.INVESTIGATOR_AGENT}\` agent (\`kit:${investigation_reads.INVESTIGATOR_AGENT}\` in a consumer); it returns \`file:line\` citations, never the file text. Keep main-line reads to files you will edit.`
 
 // The notice as it reaches the model: the base guidance with the concrete unedited reads named, so a
 // lane child is shown *which* reads to send to a unit rather than only told to delegate. An empty

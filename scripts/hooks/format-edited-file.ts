@@ -251,8 +251,13 @@ function plan_daemon_restart(
 ): ReadonlyArray<FormatCommand> {
 	const relative = relative_to_root(project_root, file_path)
 
-	if (relative === undefined || !is_eslint_config_input(relative)) return []
-	if (resolve_daemon_cli(ESLINT_DAEMON, project_root) === undefined) return []
+	if (
+		relative === undefined ||
+		!is_eslint_config_input(relative) ||
+		resolve_daemon_cli(ESLINT_DAEMON, project_root) === undefined
+	) {
+		return []
+	}
 
 	return [{ bin: ESLINT_DAEMON, command_arguments: [DAEMON_RESTART] }]
 }
@@ -325,8 +330,9 @@ async function run_command(command: FormatCommand, project_root: string): Promis
 // something to say. A start failure (non-zero, empty) has already been retried and carries no
 // problems, and prettier's stdout is the list of files it wrote rather than anything to act on.
 function eslint_unfixed(command: FormatCommand, outcome: CommandOutcome): string | undefined {
-	if (command.bin !== ESLINT_BIN) return undefined
-	if (outcome.exit_code === 0 || outcome.stdout.length === 0) return undefined
+	if (command.bin !== ESLINT_BIN || outcome.exit_code === 0 || outcome.stdout.length === 0) {
+		return undefined
+	}
 
 	return outcome.stdout
 }

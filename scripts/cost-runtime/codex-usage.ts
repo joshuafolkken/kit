@@ -56,8 +56,10 @@ function measurement_from(
 		return parsed.success ? [parsed.data.payload.info] : []
 	})
 	const session = metadata.find((entry) => entry.payload.id === thread_id)
-	if (session === undefined || usages.length === 0) return undefined
-	if (!same_project(session.payload.cwd, target)) return undefined
+
+	if (session === undefined || usages.length === 0 || !same_project(session.payload.cwd, target)) {
+		return undefined
+	}
 
 	return { billed_input_per_request: billed_per_request(usages) }
 }

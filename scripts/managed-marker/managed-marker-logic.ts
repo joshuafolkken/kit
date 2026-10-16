@@ -46,8 +46,7 @@ function apply_marker_for_destination(
 	text: string,
 	package_name: string,
 ): string {
-	if (!is_workflow_destination(destination)) return text
-	if (is_marked(text)) return text
+	if (!is_workflow_destination(destination) || is_marked(text)) return text
 
 	return `${marker_block(package_name)}${text}`
 }

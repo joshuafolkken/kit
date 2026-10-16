@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
-import { git_command } from '#scripts/git/git-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -12,9 +11,11 @@ import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
-import { run_cut, type CutState, type RunCut } from './run-cut'
+import { run_cut, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
+import { run_cut_decline } from './run-cut-decline'
 import { run_cut_handoff } from './run-cut-handoff'
+import { run_cut_ready } from './run-cut-ready'
 import { run_cut_report } from './run-cut-report'
 
 // `josh run:cut` — the record that lets a lane child end its process before the gate and a fresh one
@@ -57,6 +58,7 @@ const {
 	report_busy,
 	report_fault,
 	report_handed_off,
+	report_held_cut,
 	report_incomplete,
 	report_over,
 	report_reviewer,
@@ -125,11 +127,8 @@ function relaunch(target: string, lane: LaneInfo, phase: string): number {
 	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
 }
 
-async function is_lane_branch(state: CutState): Promise<boolean> {
-	const default_branch = await git_command.get_default_branch()
-
-	return state.branch !== default_branch && state.is_dirty
-}
+const { is_lane_branch } = run_cut_ready
+const { declined } = run_cut_decline
 
 // An expired record is a fresh process that never started; it is cleared so the next cut can begin
 // rather than being wedged behind a stale file the exclusive create would refuse forever.
@@ -204,16 +203,6 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 		: relaunch(target, lane, request.phase)
 }
 
-// The cut outside a lane is taken, and nothing is relaunched: the session that took it is the one a
-// person is watching, so the run is handed on the way `fullrun`'s entry `over` stop hands it on.
-function report_held_cut(issue: string): number {
-	console.error(
-		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain(issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
-	)
-
-	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
-}
-
 // **A `fullrun` held in its own checkout takes the implementation cut too**, so a run a person started
 // has a bound on its context mid-implementation. The hold naming this issue is what marks the run — a
 // tree nobody holds for it, and the pre-gate phase (which a held run's gate reaches in the same
@@ -228,8 +217,11 @@ async function cut_outside_lane(
 
 	const state = await run_cut.current_state()
 
-	if (state.held_issue !== request.issue) return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
-	if (!(await is_lane_branch(state))) return refuse_unready(state)
+	if (state.held_issue !== request.issue) {
+		return await declined(request, state, report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE))
+	}
+
+	if (!(await is_lane_branch(state))) return await declined(request, state, refuse_unready(state))
 
 	clear_expired(target)
 
@@ -250,7 +242,10 @@ async function cut(
 
 	const state = await run_cut.current_state()
 
-	if (!(await is_lane_branch(state))) return refuse_unready(state)
+	if (!(await is_lane_branch(state))) {
+		return await declined({ issue, phase }, state, refuse_unready(state))
+	}
+
 	if (skips_pre_gate_cut(phase)) return report_under_threshold()
 
 	clear_expired(target)

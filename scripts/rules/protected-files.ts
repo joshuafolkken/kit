@@ -119,21 +119,17 @@ function is_protected_file_call(
 }
 
 const PROTECTED_FILE_REASON =
-	'⛔ protected file: `.env` holds the Telegram bot token, and a `.env.*` variant or `.dev.vars` ' +
-	'holds the same kind of secret, so reading one — with the Read tool or a shell reader such as ' +
-	'`cat` / `grep` / `source` — puts a secret in the transcript — the scripts that need it load it ' +
-	'in their own process (the tracked `.env.example` and `.env.test` stay readable). ' +
-	'`.claude/settings.json` in a ' +
-	'consumer repository is the deny list and the hooks every other rule rests on, so a run must not ' +
-	'rewrite it; `josh sync` owns it, and a change belongs upstream in kit (`CLAUDE.md` → "Route ' +
-	'distributed-doc / config changes upstream to kit"). Leave these files alone, or ask the user. ' +
-	'**This rule fires on every occurrence, not once per run.**'
+	'⛔ protected file: `.env`, a `.env.*` variant and `.dev.vars` hold secrets, and a consumer ' +
+	'`.claude/settings.json` is owned by `josh sync` (a change belongs upstream in kit). Leave these ' +
+	'files alone, or ask the user. It fires on every occurrence.'
 
 const ROW = {
 	id: 'protected-file',
 	is_trigger: is_protected_file_call,
 	reason: PROTECTED_FILE_REASON,
 	decide: (): boolean => true,
+	// The opening the reason carried before it was cut to the action and the next command.
+	former_reasons: ['⛔ protected file: `.env` holds the Telegram bot token'],
 }
 
 const protected_files = { ROW, is_protected_file_call }

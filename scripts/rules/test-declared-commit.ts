@@ -30,16 +30,10 @@ function is_untested_commit(call: GuardedCall): boolean {
 
 const REASON =
 	'⛔ test declared: this commits a runtime code change with no test beside it — `pnpm josh ' +
-	'test:declared` reads the working tree as `required` (a changed file that is neither a test — ' +
-	'`*.test.ts` / `*.e2e.ts` — nor a mechanically-exempt non-runtime path). `CLAUDE.md` → Code ' +
-	'Change Rules requires a test for ALL code changes: a bug fix gets a regression test, a refactor ' +
-	'gets tests pinning behavior first, logic gets a unit test, an observable UI/timing change gets an ' +
-	'E2E. Add the declared test and reissue this commit. **If the change genuinely touches no ' +
-	'executable runtime path** it is the pre-approved non-runtime exception — declare it in your Step ' +
-	'0 work summary with the reason it is exempt (non-executable config, a cosmetic asset swap) and ' +
-	'reissue; the exception is a presentation, not a stop. Run `pnpm josh test:declared` to see the ' +
-	'files it names. The procedure is `prompts/collaboration-workflow/rule-delivery.md` → ' +
-	'"配送されている規則". This fires once per run, so reissuing will not repeat on the call in hand.'
+	'test:declared` reads it `required` and names the files. Tests are required for ALL code changes: ' +
+	'add the test and reissue, or, for a change that touches no runtime path, declare the non-runtime ' +
+	'exception in your Step 0 work summary and reissue. It fires once per run (`CLAUDE.md` → Code ' +
+	'Change Rules).'
 
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry rather than restating the
 // trigger and reason it already single-sources here. Once per run (the default delivery) for the

@@ -101,13 +101,8 @@ function decide(_call: unknown, run: GuardRun): boolean {
 
 const LANE_SPLIT_PARK_REASON =
 	'⛔ lane split park: this session is a dispatched lane child that promoted its own Issue to an epic ' +
-	'this run, and a split is not a park — do not apply `needs-decision` to the promoted epic and do not ' +
-	'send a `confirmation` Telegram. The parent reads an open Issue carrying `epic` as a split and ' +
-	'continues through its children; a question here has nobody to answer it (joshuafolkken/kit#3296, ' +
-	'measured 2026-10-06 when the child for #3255 parked its promoted epic). If what remains of the ' +
-	'original work needs a person, park that child issue instead, then end the turn. The procedure is ' +
-	'`.claude/skills/workflow-commands/backlogrun-park.md` → "Splitting a child mid-run". This rule fires ' +
-	'on every occurrence, not once per run.'
+	'this run, and a split is not a park: no `needs-decision` on the epic, no `confirmation` Telegram, ' +
+	'on every occurrence. Park a child issue if the rest needs a person, else end the turn (`.claude/skills/workflow-commands/backlogrun-park.md` → "Splitting a child mid-run").'
 
 // It declares no `keeps`: not parking is the absence of a call, so the row is reported unmeasured
 // rather than scored on an act that does not exist (`lane-carry-conflict.ts`).

@@ -6,9 +6,8 @@ else, but three things a laptop supplies quietly are not there by default: an ou
 policy that reaches the hosts the pre-push audit needs, the `osv-scanner` binary, and, in some
 containers, the `gh` CLI itself.
 
-Everything below was measured in real containers while working joshuafolkken/kit#1505. **Two sessions
-of the same product differed from each other** — one had `gh` and no scanner, the next had the
-scanner and no `gh` — so read each section as a thing to check rather than a thing to assume.
+Check each section in your own container: two sessions of the same product can differ — one with
+`gh` and no scanner, the next with the scanner and no `gh`.
 
 ## Network policy — the hosts to allow
 

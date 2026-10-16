@@ -1,10 +1,11 @@
 import { Linter } from 'eslint'
 import unicorn from 'eslint-plugin-unicorn'
 import { describe, expect, it } from 'vitest'
-import { NAME_REPLACEMENTS_ALLOW_LIST, unicorn_rules } from './unicorn.js'
+import { NAME_REPLACEMENTS_ALLOW_LIST, unicorn_rules, unicorn_test_rules } from './unicorn.js'
 
 const NO_EMPTY_FILE = 'unicorn/no-empty-file'
 const NAME_REPLACEMENTS = 'unicorn/name-replacements'
+const CONSISTENT_BOOLEAN_NAME = 'unicorn/consistent-boolean-name'
 
 interface NameReplacementsOptions {
 	allowList: Record<string, boolean>
@@ -103,6 +104,20 @@ describe('unicorn_rules — name-replacements keeps repo (issue #3273)', () => {
 		expect(lint_with_rule(NAME_REPLACEMENTS, 'export const req_count = 1\n')).toEqual([
 			NAME_REPLACEMENTS,
 		])
+	})
+})
+
+// unicorn checks a binding that holds a boolean-returning function as a boolean variable, which
+// unicorn 78 extends to vitest mocks and spies; test files opt out, other code stays checked (#3882).
+describe('unicorn_test_rules — consistent-boolean-name (issue #3882)', () => {
+	it('turns the rule off for test files', () => {
+		expect(unicorn_test_rules[CONSISTENT_BOOLEAN_NAME]).toBe('off')
+	})
+
+	it('still reports a function-valued boolean binding under the shared rules', () => {
+		const code = 'const write = () => true\nexport { write }\n'
+
+		expect(lint_with_rule(CONSISTENT_BOOLEAN_NAME, code)).toEqual([CONSISTENT_BOOLEAN_NAME])
 	})
 })
 

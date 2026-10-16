@@ -97,21 +97,18 @@ function is_destructive_command(command: string): boolean {
 }
 
 const DESTRUCTIVE_COMMAND_REASON =
-	'⛔ destructive command: a recursive forced `rm` (`rm -rf`, `rm -fr`, `rm -r -f`, `rm --recursive ' +
-	'--force`), `gh repo delete` / `archive`, `gh repo edit --visibility`, `gh pr close`, or a `gh api ' +
-	'-X DELETE repos/…` call deletes or closes something that cannot be restored, which is Tier C and ' +
-	'needs explicit current-turn user instruction (`prompts/collaboration-workflow/operating-rules.md`). ' +
-	'The `.claude/settings.json` deny list matches prefix globs, so it misses these spellings; this row ' +
-	'reads the argv instead. Remove a file or directory one path at a time without `-f`, or ask the user ' +
-	'to run the command in their own terminal. `gh issue close` and removing a label from an Issue ' +
-	'(`DELETE repos/<o>/<r>/issues/<N>/labels/<name>`) are not refused. **This rule fires on every ' +
-	'occurrence, not once per run.**'
+	'⛔ destructive command: a recursive forced `rm`, a `gh repo delete` / `archive` / visibility edit, ' +
+	'`gh pr close` or a `gh api -X DELETE` cannot be undone, which is Tier C. Remove one path at a ' +
+	'time without `-f`, or ask the user to run it. It fires on every occurrence ' +
+	'(`prompts/collaboration-workflow/operating-rules.md`).'
 
 const ROW = {
 	id: 'destructive-command',
 	is_trigger: bash_triggers.on_bash_command(is_destructive_command),
 	reason: DESTRUCTIVE_COMMAND_REASON,
 	decide: (): boolean => true,
+	// The opening the reason carried before it was cut to the action and the next command.
+	former_reasons: ['⛔ destructive command: a recursive forced `rm` (`rm -rf`'],
 }
 
 const destructive_command = { DESTRUCTIVE_COMMAND_REASON, ROW, is_destructive_command }

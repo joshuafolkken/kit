@@ -12,6 +12,9 @@ const API = 'gh api repos/joshuafolkken/kit/issues/1319'
 const COMMENTS = 'gh api repos/joshuafolkken/kit/issues/1319/comments'
 const ISSUE_READ = 'pnpm josh issue:read 1319'
 const GATE = 'pnpm josh gate'
+// joshuafolkken/kit#3875: both print the bundled report carrying the body and every comment.
+const RUN_ENTRY = 'pnpm josh run:entry 1319 --to fullrun'
+const RUN_PREP = 'pnpm josh run:prep 1319'
 
 // A tail whose Bash calls are the given commands, one per turn — the shape the guard reads at delivery.
 function tail_of(...commands: ReadonlyArray<string>): string {
@@ -33,6 +36,8 @@ describe('issue_numbers_of', () => {
 		[API, [1319]],
 		[COMMENTS, [1319]],
 		['pnpm josh issue:read 1876 1900', [1876, 1900]],
+		[RUN_ENTRY, [1319]],
+		[RUN_PREP, [1319]],
 		[GATE, []],
 	])('reads %j as %j', (command, expected) => {
 		expect(numbers_of(command)).toEqual(expected)
@@ -40,7 +45,7 @@ describe('issue_numbers_of', () => {
 })
 
 describe('fetches_comments', () => {
-	it.each([COMMENTS, 'gh issue view 1319 --comments', ISSUE_READ])(
+	it.each([COMMENTS, 'gh issue view 1319 --comments', ISSUE_READ, RUN_ENTRY, RUN_PREP])(
 		'reads %j as a comment fetch',
 		(command) => {
 			expect(prior_comment_read.fetches_comments(command)).toBe(true)
@@ -59,6 +64,10 @@ describe('already_read_comments_for', () => {
 
 	it('is true across the gh comment-endpoint spelling', () => {
 		expect(prior_comment_read.already_read_comments_for(tail_of(COMMENTS), API)).toBe(true)
+	})
+
+	it.each([RUN_ENTRY, RUN_PREP])('is true when the tail opened the run with %j', (prior) => {
+		expect(prior_comment_read.already_read_comments_for(tail_of(prior), API)).toBe(true)
 	})
 
 	it('is false when the earlier read was a different Issue', () => {

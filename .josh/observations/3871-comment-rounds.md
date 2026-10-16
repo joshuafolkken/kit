@@ -1,0 +1,5 @@
+- rf:bug-risks | low | .claude/skills/workflow-commands/backlogrun-lanes.md:122 | 2026-10-15 | #3871
+- rf:bug-risks | low | .claude/skills/epic-commands/SKILL.md:117 | 2026-10-15 | #3871
+- rf:bug-risks | low | .claude/skills/workflow-commands/working-tree-hold.md:70 | 2026-10-15 | #3871
+- rf:bug-risks | low | .claude/skills/workflow-commands/observation-ledger.md:47 | 2026-10-15 | #3871
+- rf:comments | low | .claude/skills/workflow-commands/kickoff.md | 2026-10-15 | #3871

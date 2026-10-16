@@ -2,10 +2,12 @@ import { loadavg } from 'node:os'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { lane_await } from './lane-await'
 import type { LoadEntry } from './lane-ledger'
+import { lane_process_load } from './lane-process-load'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
 // One machine-load sample for the lane-limit measurement: the one-minute load
-// average, available memory, the swap counter and how many lanes have a child working, read at one
+// average, available memory, the swap counter, how many lanes have a child working and the heaviest
+// process kinds (`lane-process-load.ts`), read at one
 // instant so `josh lane:stats` can set the load beside the lane count that produced it.
 //
 // **The memory is `machine_capacity`'s reading, the one the gate admits against.** `os.freemem()` reads
@@ -38,7 +40,11 @@ function rounded(megabytes: number | undefined): number | undefined {
 }
 
 async function sample(at: string): Promise<LoadEntry> {
-	const [memory, lanes] = await Promise.all([machine_capacity.read_memory(), read_lanes()])
+	const [memory, lanes, processes] = await Promise.all([
+		machine_capacity.read_memory(),
+		read_lanes(),
+		lane_process_load.read(),
+	])
 	const [load = 0] = loadavg()
 
 	return {
@@ -48,6 +54,7 @@ async function sample(at: string): Promise<LoadEntry> {
 		available_mb: rounded(memory.available_mb),
 		swapped_mb: rounded(memory.swapped_mb),
 		lanes,
+		processes,
 	}
 }
 

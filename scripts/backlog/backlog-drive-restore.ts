@@ -54,14 +54,32 @@ function parked_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
 	)
 }
 
+// The issues this invocation launched or settled — any other dispatched lane was carried in from an
+// earlier invocation.
+function mentioned_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<string> {
+	const tracked = events.filter(
+		(event) =>
+			event.kind === run_event_stream.EVENT_KIND.CHILD_LAUNCH || SETTLED_KINDS.has(event.kind),
+	)
+
+	return new Set(tracked.map((event) => issue_of(event)).filter((issue) => issue !== undefined))
+}
+
+// The lanes still in flight: launched by this invocation and not settled, or dispatched by an earlier
+// one and never seen by this one — a lane nobody collects otherwise waits forever.
 function restore(
 	lanes: ReadonlyArray<string>,
 	events: ReadonlyArray<RunEvent>,
 	merged_issues: ReadonlyArray<number>,
+	dispatched: ReadonlyArray<string> = [],
 ): ReadonlyArray<string> {
 	const active = active_issues(events)
+	const mentioned = mentioned_issues(events)
+	const carried = new Set(dispatched.filter((issue) => !mentioned.has(issue)))
 
-	return lanes.filter((issue) => active.has(issue) && !merged_issues.includes(Number(issue)))
+	return lanes.filter(
+		(issue) => (active.has(issue) || carried.has(issue)) && !merged_issues.includes(Number(issue)),
+	)
 }
 
 export const backlog_drive_restore = { active_issues, restore, settled_issues, parked_issues }

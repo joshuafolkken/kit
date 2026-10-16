@@ -59,7 +59,7 @@ const ROUND_ONE_RECORDED_NOTE =
 // single-sourced with the preflight and gate stages.
 const { run_phases, scoped_pair } = run_ship_scoped
 
-type PromptOf = (brief_path: string, findings_path: string) => string
+type PromptOf = (brief_path: string, findings_path: string, issue: string) => string
 
 function failure(out: string): JoshResult {
 	return { code: FAILURE_EXIT_CODE, out }
@@ -138,7 +138,12 @@ async function launch_reviewer(
 	stamp_file.write_text_stamp(target.brief, brief)
 	stamp_file.remove_stamp(target.findings)
 
-	return await run_session(prompt_of(target.brief, target.findings), target.log, issue, round)
+	return await run_session(
+		prompt_of(target.brief, target.findings, issue),
+		target.log,
+		issue,
+		round,
+	)
 }
 
 function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
@@ -153,8 +158,12 @@ function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
 async function join_gate(): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
-	if (joined.code === SUCCESS_EXIT_CODE) return joined
-	if (!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))) return joined
+	if (
+		joined.code === SUCCESS_EXIT_CODE ||
+		!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))
+	) {
+		return joined
+	}
 
 	note(FIXED_JOIN_NOTE)
 

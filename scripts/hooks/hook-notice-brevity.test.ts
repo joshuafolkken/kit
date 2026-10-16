@@ -14,7 +14,7 @@ const RULE_POINTER = 'prompts/collaboration-workflow/turn-batching.md'
 // Characters, set a little above each text as written so a wording tweak fits but a re-paste does not.
 // The lane notice recurs on every single-call turn, so it is held to about 40 tokens.
 const LIMITS: ReadonlyArray<[string, string, number]> = [
-	['the refusal', time_batch_guard.REASON, 450],
+	['the refusal', time_batch_guard.REASON, 400],
 	['the Write notice', time_batch_guard.NOTICE, 240],
 	['the lane notice', time_batch_guard.LANE_NOTICE, 160],
 ]

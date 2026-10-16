@@ -126,8 +126,13 @@ function merge_project_config(existing: string, workspace: string): string {
 	const aikido = yaml_document.parse_yaml(existing)
 	const safe_chain = read_mapping(aikido['safe-chain'], 'safe-chain')
 	const merged = merge_age(merge_exclusions(safe_chain, exclusions), workspace)
-	if (JSON.stringify(merged) === JSON.stringify(safe_chain)) return existing
-	if (has_nothing_to_write(existing, exclusions, workspace)) return existing
+
+	if (
+		JSON.stringify(merged) === JSON.stringify(safe_chain) ||
+		has_nothing_to_write(existing, exclusions, workspace)
+	) {
+		return existing
+	}
 
 	return replace_safe_chain_block(existing, merged)
 }

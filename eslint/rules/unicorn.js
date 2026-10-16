@@ -205,3 +205,19 @@ export const unicorn_rules = {
 	// たびにエディタと衝突し、可読性の利得なく差分ノイズだけを生むため無効化する（joshuafolkken/kit#3273）。
 	'unicorn/no-asterisk-prefix-in-documentation-comments': 'off',
 }
+
+// unicorn 78 のベースライン方針（joshuafolkken/kit#3882）: 78 は新ルール 2 つ
+// （no-unnecessary-default-arguments / no-repeated-call-wrappers）に加え、型解決とコメントを含む
+// コードの検査を広げたため、既存ルールが新たに報告する。prefer-combined-guards /
+// prefer-minimal-ternary / no-negated-condition / prefer-default-parameters は正当な
+// クリーンアップなので採用し、コードを直す。consistent-boolean-name だけは下記のとおり
+// テストファイルで外す。
+export const unicorn_test_rules = {
+	// 78 は vi.fn() / vi.spyOn() / vi.mocked() の戻り型を解決できるようになり、真偽値を返す関数の
+	// モックやスパイ（`const write = vi.spyOn(process.stdout, 'write')`）を真偽値の束縛として報告する。
+	// 関数値の const を checkVariables で検査するのはプラグインの文書どおりの仕様（77 でも
+	// `const f = () => true` は報告される）で、誤検知ではない。ただしテストの束縛はほぼすべて
+	// 差し替える関数を名前で示すテストダブルで、`is_write` のような名前は述語の結果のように読めて
+	// 誤解を招く。kit が関数名を検査しない（checkFunctions: 'never'）のと同じ理由でテストでは外す。
+	'unicorn/consistent-boolean-name': 'off',
+}

@@ -41,17 +41,12 @@ function is_interactive_ask(
 // `backlogrun-park.md` → "park and continue", and a second copy here would be the clone `CLAUDE.md`
 // prohibits. The one command is spelled so the child is not left to reconstruct it from a doc read.
 const LANE_INTERACTIVE_ASK_REASON =
-	'⛔ lane child interactive ask: this session is a dispatched lane child and cannot ask a person, so ' +
-	'this call is refused. Left to run it would end the turn with nothing on the Issue — the parent then ' +
-	'finds an OPEN Issue with `in-progress` and no question (joshuafolkken/kit#2201; joshuafolkken/kit#2034 ' +
-	'placed the same rule one tool-call too late). Do not ask: park the decision instead. Apply ' +
-	'`needs-decision` and post a comment carrying the question, the options and whether work was stashed — ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'` then " +
-	'`pnpm josh issue:comment <N> --body-file <path>` — then send the ' +
-	'`confirmation` Telegram and stop. The procedure is ' +
-	'`.claude/skills/workflow-commands/pre-gate-cut.md` → "A lane child records its park before it stops", ' +
-	'and the park itself is `backlogrun-park.md` → "park and continue". This rule fires on every ' +
-	'occurrence, not once per run.'
+	'⛔ lane child interactive ask: this session is a dispatched lane child and cannot ask a ' +
+	'person, so park instead: ' +
+	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'`, " +
+	'`pnpm josh issue:comment <N> --body-file <path>`, ' +
+	'the `confirmation` Telegram, stop. It fires on every occurrence ' +
+	'(`.claude/skills/workflow-commands/pre-gate-cut.md`, `backlogrun-park.md`).'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
 // occurrence; it declares no `keeps` — not asking is the absence of a call, not a call, so the row is

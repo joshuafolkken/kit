@@ -104,12 +104,9 @@ function decide(_call: unknown, run: GuardRun): boolean {
 }
 
 const FILING_CAP_REASON =
-	`⛔ filing cap: this run has already filed ${String(FILING_CAP)} Issues, the per-run ceiling — on ` +
-	'reaching it, stop and report rather than filing more. Automatic filing is capped so a run cannot ' +
-	'manufacture Issues faster than they can be closed (`.claude/skills/workflow-commands/SKILL.md` → ' +
-	"`prerequisite.md`, `observation-filing.md`). A further Issue that genuinely must exist is a person's call, not " +
-	"this run's. **This rule fires on every filing past the cap, not once per run**, so reissuing the " +
-	'same filing will be refused again.'
+	`⛔ filing cap: this run has already filed ${String(FILING_CAP)} Issues, the per-run ceiling. Stop ` +
+	"filing and report; a further Issue is a person's call. It fires on every occurrence " +
+	'(`.claude/skills/workflow-commands/observation-filing.md`).'
 
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry rather than restating the
 // trigger and reason it already single-sources here. It declares no `keeps`: staying under a cap is

@@ -259,8 +259,7 @@ function restore_package_json(
 
 function decode_integrity(encoded: string): string | undefined {
 	const bytes = Buffer.from(encoded, 'base64')
-	if (bytes.length !== SHA512_BYTES) return undefined
-	if (bytes.toString('base64') !== encoded) return undefined
+	if (bytes.length !== SHA512_BYTES || bytes.toString('base64') !== encoded) return undefined
 
 	return `sha512.${bytes.toString('hex')}`
 }

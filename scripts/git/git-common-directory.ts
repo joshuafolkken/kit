@@ -88,9 +88,9 @@ function select_linked(found: ReadonlyArray<string>): string | undefined {
 	const own_directory = found[OWN_GIT_DIRECTORY]
 	const common = found[COMMON_GIT_DIRECTORY]
 
-	return own_directory !== undefined && common !== undefined && own_directory !== common
-		? common
-		: undefined
+	return own_directory === undefined || common === undefined || own_directory === common
+		? undefined
+		: common
 }
 
 function resolve(cwd: string): string | undefined {

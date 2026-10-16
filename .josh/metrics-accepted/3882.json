@@ -1,0 +1,7 @@
+{
+	"reason": "unicorn 78 prefer-combined-guards merges one-line guards; merged conditions over 100 chars are formatted as multi-line blocks (#3882)",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 95
+	}
+}

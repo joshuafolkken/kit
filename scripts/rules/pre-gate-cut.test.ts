@@ -454,7 +454,7 @@ describe('PRE_GATE_CUT_REASON', () => {
 		['end the turn immediately'],
 		// joshuafolkken/kit#3734: a cut that resumes itself leaves a person nothing to act on.
 		['no Telegram is owed'],
-		// The five verdicts that leave this process holding the run.
+		// Two of the verdicts that leave this process holding the run.
 		['not-a-lane'],
 		['busy'],
 		// The pointer, and the reissue sentence every delivery needs.

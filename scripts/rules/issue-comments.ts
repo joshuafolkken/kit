@@ -89,21 +89,11 @@ function reads_issue_comments(command: string): boolean {
 // the fix. The label keeps `time_transcript_line.guard_from_refusal` naming this guard, not the command.
 const ISSUE_COMMENTS_REASON =
 	'⛔ issue comments: pnpm josh issue:read <N>\n' +
-	"Run that in place of this read: <N> is the Issue it names, and an Issue's comments are part of " +
-	'the Issue, so the body and every comment come back together. Without josh, add ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, " +
-	"body}'` beside the body read, or `gh issue view <N> --comments` where GraphQL is reachable.\n" +
-	'Why: a decision recorded after the body was written lives only in a comment — a corrected ' +
-	'diagnosis (joshuafolkken/kit#1537), a changed default and an added acceptance criterion ' +
-	'(joshuafolkken/kit#1520), a scope handed to another Issue (joshuafolkken/kit#1304) — and ' +
-	'nothing in the body says it was superseded, so a body-only reader builds the wrong thing and ' +
-	'sees no contradiction. ' +
-	'Then the later text is the agreement in force — a comment supersedes the body it contradicts — ' +
-	"except for two answers that are not the run's to make: work a comment reassigns to another " +
-	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
-	'reason to exist stops the run with a `confirmation` Telegram. The procedure is ' +
-	'`.claude/skills/workflow-commands/issue-comments.md`. ' +
-	'Every body-only read is refused until the comments are read.'
+	"Run that in place of this read — an Issue's comments are part of it, and a later comment " +
+	'supersedes the body it contradicts; refused until that command is on the transcript. Without ' +
+	'josh, read ' +
+	'`gh api repos/{owner}/{repo}/issues/<N>/comments` beside the body ' +
+	'(`.claude/skills/workflow-commands/issue-comments.md`).'
 
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry. `already_satisfied` stands it
 // down once the comments are on the transcript tail, and until then it refuses every body-only read.

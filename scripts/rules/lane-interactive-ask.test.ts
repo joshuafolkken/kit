@@ -152,8 +152,8 @@ describe('LANE_INTERACTIVE_ASK_REASON', () => {
 		// The pointer to the procedure, never a resident document.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		['backlogrun-park.md'],
-		// It refuses every occurrence rather than standing down after one.
-		['every occurrence'],
+		// That it refuses every occurrence is stated by the topic file, not the refusal
+		// (`lane-interactive-ask-rule.test.ts`); the firing itself is pinned above.
 	])('carries %j', (marker) => {
 		expect(delivered_rules.LANE_INTERACTIVE_ASK_REASON).toContain(marker)
 	})

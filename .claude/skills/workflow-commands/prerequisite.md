@@ -34,10 +34,8 @@ open), then stash, comment and `pnpm josh run:release <M>` as for a prerequisite
 `halfrun` stop, `backlogrun` continues. Closing the release Issue once a person has published it hands
 `<M>` back to `backlog:next` (`docs/josh-commands-backlog.md` → `josh issue:release`).
 
-**File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during implementation
-stays countable by filing route afterwards. **This paragraph belongs to the prerequisite row, not to
-the table** — the label means a filing the run is *blocked by*, so the observation row carries no
-`route:` label of its own (`observation-filing.md`):
+**File the prerequisite with the `route:tier-a` label** — it means a filing the run is *blocked by*,
+so the observation row carries no `route:` label (`observation-filing.md`):
 
 ```bash
 pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route tier-a
@@ -47,9 +45,9 @@ The command lints the body against `prompts/collaboration-workflow/issue-templat
 classification labels it declares, and runs the duplicate scan and `epic:bundle` itself
 (`docs/josh-commands-backlog.md` → `josh issue:file`).
 
-Every *file the prerequisite* step below means that labelled filing, and it always happens **first**: the
-steps after it name a number that does not exist until it is. **Its duplicate scan is read exactly as
-it is for a `new` entry** (`issue-scout.md`): a filing made mid-run is the one most likely to duplicate something.
+Every *file the prerequisite* step below means that filing, and it always happens **first** — the
+later steps name its number. **Its duplicate scan is read exactly as it is for a `new` entry**
+(`issue-scout.md`).
 
 **Each entry point's own branch stays in that entry's file:**
 
@@ -63,16 +61,13 @@ it is for a `new` entry** (`issue-scout.md`): a filing made mid-run is the one m
   command to type (`fullrun.md` / `halfrun.md`). Typing `fullrun` approved implementing **one** Issue;
   a batch is a different authorization, so the stop stays.
 
-**Two steps every entry's procedure turns on**, both load-bearing rather than tidy-up:
+**Two steps every entry's procedure turns on:**
 
 - **`git stash push -u` — the `-u` is not optional.** The work in progress almost always includes a
-  new `*.test.ts`, which is untracked, and a stash without `-u` leaves exactly those files in the tree
-  for the next child's `pnpm josh ms` to refuse.
-- **The Issue comment is what gets the stash popped, not the Telegram.** The run that later picks the
-  paused Issue up reads that comment and pops before implementing — **by message,
-  `pnpm josh stash:pop "<the -m message>"`, never a positional `git stash pop`**, because the stash is
-  a repository-wide stack every lane shares and a positional pop takes whichever lane last pushed. Say
-  it in the Telegram too — the comment is the record.
+  new, untracked `*.test.ts`, which a stash without `-u` leaves for the next `pnpm josh ms` to refuse.
+- **The Issue comment is what gets the stash popped, not the Telegram.** The run that picks the Issue up
+  reads it and pops before implementing — **by message, `pnpm josh stash:pop "<the -m message>"`, never
+  a positional `git stash pop`** (the stack is shared by every lane). Say it in the Telegram too.
 
 **Automatic filing is capped at 10 Issues per run** at every entry point; `pnpm josh rule:guard`
 refuses the eleventh filing (`prompts/collaboration-workflow/rule-delivery.md`). On reaching it, stop

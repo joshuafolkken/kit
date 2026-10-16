@@ -53,8 +53,9 @@ const INDEX_ASSERTION_NAME = 'no-direct-git-index-mutation'
 // a tool result, or a call to any tool but `Bash`. Read through `json_value.is_record` so a malformed
 // input is treated as absent rather than throwing mid-scan.
 function command_of(block: Block): string | undefined {
-	if (block.type !== TOOL_USE || block.name !== BASH_TOOL) return undefined
-	if (!json_value.is_record(block.input)) return undefined
+	if (block.type !== TOOL_USE || block.name !== BASH_TOOL || !json_value.is_record(block.input)) {
+		return undefined
+	}
 
 	const command = block.input[COMMAND_KEY]
 

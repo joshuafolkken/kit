@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { core_budget } from '#scripts/gate/core-budget'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { gate_skip, type GateReuse } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { hook_gate_reuse } from '#scripts/gate/hook-gate-reuse'
@@ -123,6 +125,18 @@ function format_miss(reason: string): string {
 	return `↻ running the whole unit suite — the green gate record does not cover this push: ${reason}.`
 }
 
+// **The whole suite claims its place in the core budget, the one `josh test:unit` claims.** Without it
+// a push's suite ran beside other lanes' gates off the ledger, so their admission saw its workers only
+// as foreign load (joshuafolkken/kit#3874). Only the miss reserves: a reused record runs nothing, and a
+// claim there could make a push wait out a full ledger for a suite it then skips.
+async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Promise<number> {
+	return await core_budget.with_command_reservation(
+		gate_plan.direct_unit_weight(),
+		async () => await test_unit_guard.run_guarded_unit(process.cwd(), vitest_arguments),
+		{ memory_mb: gate_plan.direct_unit_memory() },
+	)
+}
+
 async function run_pre_push_unit(
 	extra_arguments: ReadonlyArray<string> = [],
 	source?: string,
@@ -132,10 +146,7 @@ async function run_pre_push_unit(
 	if ('miss' in reuse) {
 		process.stdout.write(`${format_miss(reuse.miss)}\n`)
 
-		return await test_unit_guard.run_guarded_unit(
-			process.cwd(),
-			forwarded_arguments(extra_arguments),
-		)
+		return await run_reserved_suite(forwarded_arguments(extra_arguments))
 	}
 
 	process.stdout.write(`${format_skip(reuse.stamp.taken_at)}\n`)

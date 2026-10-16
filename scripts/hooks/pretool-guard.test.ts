@@ -52,6 +52,8 @@ function outcome(
 	return { reason, notice, fault }
 }
 
+const CLEAR = outcome(undefined, undefined, undefined)
+
 function in_lane(): boolean {
 	return true
 }
@@ -86,32 +88,43 @@ function edit_payload_with_transcript(): string {
 	return JSON.stringify({ tool_name: 'Edit', tool_input: { file_path }, transcript_path })
 }
 
+const RULE_REFUSAL = 'rule refused'
+const batch_refused = outcome('batch refused', undefined, undefined)
+const later_refused = outcome('later refused', undefined, undefined)
+const batch_notice = outcome(undefined, 'whole-file notice', undefined)
+const later_notice = outcome(undefined, 'lane-child notice', undefined)
+const later_fault = outcome(undefined, undefined, 'stamp unwritable')
+
 describe('combine_outcomes', () => {
 	it('shows the batch reason first, over any other refusal', () => {
-		const batch = outcome('batch refused', undefined, undefined)
-
-		expect(combine_outcomes(batch, 'other refused')).toEqual(batch)
+		expect(combine_outcomes([batch_refused, later_refused], RULE_REFUSAL)).toEqual(batch_refused)
 	})
 
-	it('surfaces the extra refusal when the batch guard did not refuse', () => {
-		const batch = outcome(undefined, undefined, undefined)
-		const rule_refusal = 'rule refused'
-
-		expect(combine_outcomes(batch, rule_refusal)).toEqual(
-			outcome(rule_refusal, undefined, undefined),
+	it('surfaces the rule refusal when no guard outcome refused', () => {
+		expect(combine_outcomes([CLEAR, later_notice], RULE_REFUSAL)).toEqual(
+			outcome(RULE_REFUSAL, undefined, undefined),
 		)
 	})
 
-	it('passes the batch notice through when nothing refuses', () => {
-		const batch = outcome(undefined, 'whole-file notice', undefined)
-
-		expect(combine_outcomes(batch, undefined)).toEqual(batch)
+	it("lets a later guard's refusal win over an earlier guard's notice", () => {
+		expect(combine_outcomes([batch_notice, later_refused], undefined)).toEqual(later_refused)
 	})
 
-	it('passes the batch fault through when nothing refuses', () => {
-		const batch = outcome(undefined, undefined, 'could not read transcript')
+	it('passes the batch notice and fault through when nothing refuses', () => {
+		const batch_fault = outcome(undefined, undefined, 'could not read transcript')
 
-		expect(combine_outcomes(batch, undefined)).toEqual(batch)
+		expect(combine_outcomes([batch_notice, CLEAR], undefined)).toEqual(batch_notice)
+		expect(combine_outcomes([batch_fault, CLEAR], undefined)).toEqual(batch_fault)
+	})
+
+	// joshuafolkken/kit#3877: a later guard's notice or fault used to be dropped on the floor.
+	it("passes a later guard's notice and fault through when nothing earlier spoke", () => {
+		expect(combine_outcomes([CLEAR, later_notice], undefined)).toEqual(later_notice)
+		expect(combine_outcomes([CLEAR, later_fault], undefined)).toEqual(later_fault)
+	})
+
+	it("keeps an earlier guard's notice over a later one", () => {
+		expect(combine_outcomes([batch_notice, later_notice], undefined)).toEqual(batch_notice)
 	})
 })
 
@@ -279,6 +292,7 @@ describe('pretool_guard.foreground_rewrite', () => {
 const PIPED_LINT = 'pnpm josh lint:related 2>&1 | tail -5'
 const PIPED_HEAD = 'pnpm josh lint:related 2>&1 | head -5'
 const DENY_DECISION = '"permissionDecision":"deny"'
+const PERMISSION_DECISION = '"permissionDecision"'
 const { PIPED_VERIFICATION_REASON, PIPEFAIL_NOTE } = piped_verification
 
 function payload_on(transcript_path: string, command: string): string {
@@ -297,11 +311,11 @@ async function written(raw_payload: string): Promise<string> {
 }
 
 describe('pretool_guard.respond — the pipefail rewrite', () => {
-	it('allows a `| tail` check with `set -o pipefail;` prefixed and the note attached', async () => {
+	it('rewrites a `| tail` check into `(set -o pipefail; …)`, deciding nothing, with the note attached', async () => {
 		const envelope = await written(payload_with_transcript(PIPED_LINT))
 
-		expect(envelope).toContain(ALLOW_DECISION)
-		expect(envelope).toContain(JSON.stringify(`set -o pipefail; ${PIPED_LINT}`))
+		expect(envelope).not.toContain(PERMISSION_DECISION)
+		expect(envelope).toContain(JSON.stringify(`(set -o pipefail; ${PIPED_LINT})`))
 		expect(envelope).toContain(JSON.stringify(PIPEFAIL_NOTE).slice(1, -1))
 	})
 
@@ -351,10 +365,12 @@ describe('pretool_guard.emit — the pipefail rewrite beside other guards', () =
 		expect(envelope).not.toContain('pipefail;')
 	})
 
-	it('refuses a check chained beside another command instead of allowing it', async () => {
+	// joshuafolkken/kit#3875: only the check is wrapped, and with no decision the rest of the line still
+	// meets its own permission prompt.
+	it('wraps a check chained beside another command and leaves the permission to the harness', async () => {
 		const envelope = await written(payload_with_transcript(`${PIPED_LINT} && rm -r dist`))
 
-		expect(envelope).toContain(DENY_DECISION)
-		expect(envelope).not.toContain(ALLOW_DECISION)
+		expect(envelope).not.toContain(PERMISSION_DECISION)
+		expect(envelope).toContain(JSON.stringify(`(set -o pipefail; ${PIPED_LINT}) && rm -r dist`))
 	})
 })

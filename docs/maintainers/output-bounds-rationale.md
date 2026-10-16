@@ -73,15 +73,19 @@ would have committed a red tree.
 
 **The commonest shape is rewritten instead of refused** (joshuafolkken/kit#3570). Almost every
 refusal was a check narrowed with `| tail` or `| grep`, and each one cost a round trip only to arrive at
-the call `set -o pipefail;` in front would have made — the prefix _is_ the rule's outcome. So when every
-pipeline on the line is a check followed only by filters that read their input to the end, the hook returns that call as
-`updatedInput` and attaches a note. **An early-exit filter stays refused**: `head`, or a `grep` that
-stops at its first match (`-q` / `-m` / `-l` / `-L`), closes the pipe on a check still writing, and
-under `pipefail` the check's SIGPIPE turns a passing run into exit 141 — and `head` also cuts the
-verdict line josh prints last. **A line that runs anything besides checks is refused too** — a listing
-(`git log | head`) would be put under a `pipefail` it was not written for, and since the rewrite
-answers `allow`, a command chained beside the check (`&& rm -r dist`) would skip its own permission
-prompt. The Codex adapter cannot apply a
+the call `set -o pipefail;` in front would have made — `pipefail` _is_ the rule's outcome. So each check
+pipeline whose filters all read their input to the end is wrapped in `(set -o pipefail; …)`, the hook
+returns that call as `updatedInput`, and attaches a note. **The rest of the line runs as typed**
+(joshuafolkken/kit#3875): most refusals left after the first rewrite were a check chained beside other
+work (`vitest …; pnpm josh lint:related | tail -5; git status`), and wrapping only the check keeps a
+listing beside it (`git log | head`) out of a `pipefail` it was not written for. **The rewrite carries
+no `permissionDecision`**, so a command chained beside the check (`&& rm -r dist`) meets its own
+permission prompt exactly as the typed call would have. **An early-exit filter stays refused**: `head`,
+or a `grep` that stops at its first match (`-q` / `-m` / `-l` / `-L`), closes the pipe on a check still
+writing, and under `pipefail` the check's SIGPIPE turns a passing run into exit 141 — and `head` also
+cuts the verdict line josh prints last. So does a check pipeline carrying `&`, a redirection or a
+command substitution beyond its own `2>&1`, and any line with a heredoc, whose body lines the cut would
+read as commands. The Codex adapter cannot apply a
 rewritten input, so it keeps refusing. Every other guard judges the rewritten call, so another rule's
 refusal still wins and the piped-verification row spends no delivery on a call it rewrote.
 

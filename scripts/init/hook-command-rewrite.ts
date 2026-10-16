@@ -65,8 +65,12 @@ function rewrite_command_value(value: string): string {
 		.split(PNPM_JOSH_PREFIX)
 		.join(BUNDLE_INVOCATION)
 
-	if (!rewritten.includes(claude_plugin_config.MARKETPLACE_PATH)) return rewritten
-	if (rewritten.includes(MISSING_INSTALL_GUARD)) return rewritten
+	if (
+		!rewritten.includes(claude_plugin_config.MARKETPLACE_PATH) ||
+		rewritten.includes(MISSING_INSTALL_GUARD)
+	) {
+		return rewritten
+	}
 
 	return `${MISSING_INSTALL_GUARD}${rewritten}`
 }

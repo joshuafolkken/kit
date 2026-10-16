@@ -1,5 +1,6 @@
 import { session_language_cli } from '#scripts/josh/session-language-cli'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import type { ProseTotals } from './prose-density'
 
 // The pure half of `josh metrics`. ESLint and Sonar hold each function and file to an absolute limit, but nothing measures the repository-wide totals, so a slow growth in
 // code, comments and rules shows up nowhere. These totals are the measurement that growth needs.
@@ -51,6 +52,7 @@ interface Metrics {
 	rules: RuleTotals
 	guards: number
 	ai_cost: AiCostTotals
+	prose: ProseTotals
 }
 
 function is_measured_script(relative_path: string): boolean {
@@ -120,13 +122,14 @@ function ai_cost_totals(
 }
 
 function render(metrics: Metrics): string {
-	const { scripts, rules, ai_cost } = metrics
+	const { scripts, rules, ai_cost, prose } = metrics
 
 	return [
 		`scripts  ${String(scripts.files)} files · ${String(scripts.code_lines)} code lines · ${String(scripts.comment_lines)} comment lines · comment ratio ${scripts.comment_ratio.toFixed(RATIO_DIGITS)}`,
 		`rules    ${String(rules.files)} files · ${String(rules.lines)} lines`,
 		`guards   ${String(metrics.guards)}`,
 		`ai cost  ${String(ai_cost.resident_bytes)} resident bytes · ${String(ai_cost.on_demand_bytes)} on-demand bytes`,
+		`prose    ${String(prose.long_paragraphs)} long paragraphs · ${String(prose.excess_bold)} excess bold spans`,
 	].join(NEWLINE)
 }
 

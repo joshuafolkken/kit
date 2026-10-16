@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/run/board/run-board-tick.ts:47 | 2026-10-15 | #3893
+- rf:performance | low | scripts/run/board/run-board-read.ts:103 | 2026-10-15 | #3893

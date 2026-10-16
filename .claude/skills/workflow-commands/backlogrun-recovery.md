@@ -43,23 +43,16 @@ Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why the poll
 
 ## Conflicts are not predicted
 
-**The child merges `origin/main` into its lane before its gate now, so this path is the fallback rather
-than the first line.** Every `fullrun` runs `pnpm josh main:merge` ahead of the gate
-(`chain-rule.md` → "origin/main is merged in before the gate", the single source), so an overlap
-already on `main` is resolved before the gate reads the tree. What this section covers is an overlap
-that lands on `main` *after* it, which `followup` still reports as a conflict.
+**This path is the fallback**: every `fullrun` runs `pnpm josh main:merge` ahead of the gate
+(`chain-rule.md` → "origin/main is merged in before the gate"), so it covers an overlap that lands on
+`main` *after* it. **Nothing here forecasts which children will overlap** — a conflicting pull request
+comes back `mergeStateStatus: DIRTY`, which `git-pr-checks-eval.ts` reads as a **failure**, so `pnpm josh
+followup` ends that child with a named conflict in about ten seconds.
 
-**Nothing here forecasts which children will overlap.** The overlap surfaces where GitHub already
-reports it: a pull request that conflicts with its base comes back `mergeStateStatus: DIRTY`, which
-`git-pr-checks-eval.ts` reads as a **failure** rather than polling through it — so `pnpm josh followup`
-ends that child with a named conflict in about ten seconds.
-
-**That child does not stop: it resolves the conflict in its own lane.** It is **not** counted against
-the consecutive-failure guard either way.
-
-**The merge direction is `origin/main` into the lane's branch, never a rebase**, and no step below
-rewrites a pushed commit. Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why a conflict
-is resolved in the lane rather than handed to a person".
+**That child does not stop: it resolves the conflict in its own lane**, uncounted by the
+consecutive-failure guard. **The merge direction is `origin/main` into the lane's branch, never a
+rebase**; no step rewrites a pushed commit (`docs/maintainers/backlogrun-recovery-rationale.md` → "Why a
+conflict is resolved in the lane rather than handed to a person").
 
 1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, resolve
    in place. Do not close the lane, open another, or switch its branch.
@@ -96,7 +89,5 @@ Meeting any of the four, the child is parked — `needs-decision` plus a comment
 it was, read against `backlogrun-park.md` → "Only a person's judgement carries `needs-decision`" — and its lane is **kept**, because the pushed branch is the resume path
 (`backlogrun-lanes.md` → "What happens to a lane").
 
-**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4.**
-Conditions 1 and 2 are read mid-merge with conflict markers still in the tree, condition 4 after a merge
-that is resolved but not committed; condition 3 fires before any merge is started, so there is nothing
-to abort.
+**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4**
+(condition 3 fires before any merge starts).

@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
@@ -83,12 +84,23 @@ function findings_instruction(findings_path: string, fixed_clause: string): stri
 	].join(' ')
 }
 
+// The rubric's requirement check sends the reviewer to the Issue, and a body-only read there is refused
+// by the issue-comments rule — so the prompt names the read that carries the comments with the body
+// (joshuafolkken/kit#3875).
+function issue_read_instruction(issue: string): string {
+	return [
+		`Read Issue ${issue_cite.plain(issue)} with \`pnpm josh issue:read ${issue}\`, which prints the body and every`,
+		`comment together — never a body-only \`gh api …/issues/${issue}\` read.`,
+	].join(' ')
+}
+
 // One line, because `detached_launch` refuses an argument carrying a control character: the multi-line
 // brief travels by path, never inline.
-function reviewer_prompt(brief_path: string, findings_path: string): string {
+function reviewer_prompt(brief_path: string, findings_path: string, issue: string): string {
 	return [
 		`Run a /code-review of this checkout: read the review brief at ${brief_path} and follow it exactly —`,
 		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
+		issue_read_instruction(issue),
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
 		'added test, an added guard; never fix a High or a change that reaches beyond one place, and never',
 		'commit, stage or push. After any fix, run `pnpm josh lint:related && pnpm josh test:related` and',
@@ -98,11 +110,12 @@ function reviewer_prompt(brief_path: string, findings_path: string): string {
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
-function verification_prompt(brief_path: string, findings_path: string): string {
+function verification_prompt(brief_path: string, findings_path: string, issue: string): string {
 	return [
 		`Run a /code-review of this checkout — the round-2 verification pass over the round-1 fixes: read the`,
 		`review brief at ${brief_path} and follow it exactly — the level on its first line, the rubric it`,
 		'names, the checkout it pins and its review:attest step. Do not edit any file.',
+		issue_read_instruction(issue),
 		findings_instruction(findings_path, ''),
 	].join(' ')
 }

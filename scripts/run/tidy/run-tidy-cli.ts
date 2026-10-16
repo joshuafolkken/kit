@@ -33,12 +33,12 @@ function memoized(read: IsMerged): IsMerged {
 
 async function sweep(): Promise<void> {
 	try {
-		const read_merged = memoized(issue_merged.read_merged)
+		const is_merged = memoized(issue_merged.read_merged)
 		const in_flight = backlog_drive_restore.active_issues(
 			await run_event_stream_emit.current_events(),
 		)
-		const lanes = await run_tidy_lanes.tidy_lanes(read_merged, in_flight)
-		const stashes = await run_tidy_stashes.tidy_stashes(read_merged)
+		const lanes = await run_tidy_lanes.tidy_lanes(is_merged, in_flight)
+		const stashes = await run_tidy_stashes.tidy_stashes(is_merged)
 		const report = run_tidy.format_report([...lanes, ...stashes])
 
 		if (report !== undefined) console.error(report)

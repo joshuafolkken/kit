@@ -61,8 +61,12 @@ const FLAG_PREFIX = '-'
 function switch_target(segment: string): string | undefined {
 	const call = git_argv.parse(segment)
 
-	if (call?.subcommand !== SWITCH_SUBCOMMAND) return undefined
-	if (call.args.some((argument) => NON_COLLIDING_FLAGS.has(argument))) return undefined
+	if (
+		call?.subcommand !== SWITCH_SUBCOMMAND ||
+		call.args.some((argument) => NON_COLLIDING_FLAGS.has(argument))
+	) {
+		return undefined
+	}
 
 	return call.args.find((argument) => !argument.startsWith(FLAG_PREFIX))
 }
@@ -103,16 +107,9 @@ function is_switch_away_from_lane(
 // prohibits. Apostrophes are avoided so the single-quoted literal needs no escaping, as the siblings do.
 const LANE_SWITCH_MAIN_REASON =
 	'⛔ lane child on `git switch main`: this session is a dispatched lane child, and switching to the ' +
-	'default branch here always fails — a lane is a linked work tree, the primary checkout holds the ' +
-	'default branch, and git allows one branch in one work tree at a time (`fatal: main is already used ' +
-	'by worktree at <the primary checkout>`, measured 11 times in the 2026-09-21 backlogrun). Do not ' +
-	'switch: the lane is already on its own issue branch, branched from a fresh default before it opened, ' +
-	'and the latest default is brought in during the gate by `pnpm josh main:merge`. So skip this step ' +
-	'and keep implementing on the current branch — no `git switch`, no `git pull`. `pnpm josh main:sync` ' +
-	'(`josh ms`) is refused in a lane for the same reason, and a lane is finished with `pnpm josh ' +
-	'lane:close <issue-number>`. The parent runs `pnpm josh ms` in the primary checkout ' +
-	'before each lane opens, never the child — `backlogrun-lanes.md` and `backlogrun-child.md` are the ' +
-	'single sources. This rule fires on every occurrence, not once per run.'
+	'default branch here always fails (`already used by worktree`: the primary checkout holds it). Skip ' +
+	'this step and keep implementing on the current branch; `pnpm josh main:merge` brings the default ' +
+	'in during the gate. Refused on every occurrence (`backlogrun-lanes.md`, `backlogrun-child.md`).'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `is_trigger` reads the input through
 // `on_bash_command` — the `Bash` tool-name gate every command row shares — and `decide` returns true so

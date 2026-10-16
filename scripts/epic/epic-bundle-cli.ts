@@ -323,12 +323,11 @@ async function widen_with_referenced(
 	backlog: FetchedBacklog,
 ): Promise<FetchedBacklog> {
 	const { context } = backlog
-	if (context === undefined) return backlog
 	// An issue an epic already tracks has nothing to bundle — `decide_bundle` answers from that alone
 	// and never looks at the candidates. Widening first spends a request per reference on a verdict
 	// that ignores them, and prints "⚠ Could not read #891." above "Already in an epic", which reads
 	// as a gap in an answer the read was never part of.
-	if (subject.epic !== undefined) return backlog
+	if (context === undefined || subject.epic !== undefined) return backlog
 	const known = new Set(backlog.issues.map((issue) => issue.number))
 	const found = await epic_bundle_referenced.referenced_candidates(subject, known, context)
 	if (found === undefined) return backlog

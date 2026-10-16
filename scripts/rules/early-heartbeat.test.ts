@@ -274,5 +274,6 @@ describe('EARLY_HEARTBEAT_REASON — the watcher it hands over', () => {
 
 		expect(reason).toContain('`pnpm josh run:progress --once`')
 		expect(reason).toContain('under `backlogrun`, `pnpm josh run:board --chat`')
+		expect(reason).not.toContain('kit#')
 	})
 })

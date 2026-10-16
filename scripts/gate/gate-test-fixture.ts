@@ -46,7 +46,8 @@ interface CapturedOutput {
 // run printed has to hold the whole transcript rather than the last chunk.
 function capture_stdout(): CapturedOutput {
 	const chunks: Array<string> = []
-	const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+
+	vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
 		chunks.push(String(chunk))
 
 		return true
@@ -55,7 +56,7 @@ function capture_stdout(): CapturedOutput {
 	return {
 		text: (): string => chunks.join(''),
 		restore: (): void => {
-			spy.mockRestore()
+			vi.mocked(process.stdout.write).mockRestore()
 		},
 	}
 }

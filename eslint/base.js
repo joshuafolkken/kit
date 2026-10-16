@@ -29,7 +29,7 @@ import {
 	SPEC_FILENAME_PATTERNS,
 } from './rules/test-filename.js'
 import { typescript_rules } from './rules/typescript.js'
-import { unicorn_rules } from './rules/unicorn.js'
+import { unicorn_rules, unicorn_test_rules } from './rules/unicorn.js'
 
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
@@ -234,6 +234,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				// `expect(x).toBe(0.05)` compares deterministic config constants, not computed
 				// floats; working around the rule only weakens the assertion.
 				'sonarjs/no-floating-point-equality': 'off',
+				...unicorn_test_rules,
 			},
 		},
 		{

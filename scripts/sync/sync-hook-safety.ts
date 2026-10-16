@@ -65,8 +65,14 @@ function hook_write_warning(
 	filename: string,
 ): string | undefined {
 	const installed_version = installed_consumer_version(project_root)
-	if (writing_version === undefined || installed_version === undefined) return undefined
-	if (is_safe_to_write_hooks(writing_version, installed_version)) return undefined
+
+	if (
+		writing_version === undefined ||
+		installed_version === undefined ||
+		is_safe_to_write_hooks(writing_version, installed_version)
+	) {
+		return undefined
+	}
 
 	return outdated_install_warning(writing_version, installed_version, filename)
 }

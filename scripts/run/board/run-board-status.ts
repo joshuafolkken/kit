@@ -66,6 +66,9 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
 // A person's restart starts the child over in a fresh session, so its track starts over too.
 const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTART])
+// What the GitHub read may still settle: a running child, and one whose lane has no child left in it —
+// a child that merged and then died is drawn merged, not stopped.
+const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'stopped'])
 
 function moment(event: RunEvent): number {
 	return Date.parse(event.at)
@@ -175,13 +178,25 @@ function is_running_lane(
 	return in_run.has(issue) && !run_board_setup.is_lane_pending(events, issue)
 }
 
+// A lane no child is working in is stopped whatever the stream last said: a child that died writes no
+// ending, so its row would otherwise run — and its phase time grow — for as long as the lane stays.
+function lane_status(status: ItemStatus | undefined, lane: string, is_idle: boolean): ItemStatus {
+	const held = { lane: `lane ${lane}` }
+
+	return is_idle
+		? { ...settled_as(status, 'stopped'), ...held }
+		: { state: 'running', ...status, ...held }
+}
+
 // Every child the run has touched, with the lane each running child holds. A lane the stream never saw
 // launched — a run restored after the stream rolled — still reads as running while its issue is in the
-// run's plan (`in_run`); one the run is still setting up for stays waiting until its launch.
+// run's plan (`in_run`); one the run is still setting up for stays waiting until its launch. A lane in
+// `idle` has no child working in it (`lane-spent.ts`).
 function statuses_of(
 	events: ReadonlyArray<RunEvent>,
 	lanes: ReadonlyArray<string>,
 	in_run: ReadonlySet<number>,
+	idle: ReadonlyArray<string> = [],
 ): ReadonlyMap<number, ItemStatus> {
 	const statuses = fold_events(events)
 
@@ -190,7 +205,7 @@ function statuses_of(
 		const status = statuses.get(issue)
 
 		if (is_running_lane(issue, status, events, in_run)) {
-			statuses.set(issue, { state: 'running', ...status, lane: `lane ${lane}` })
+			statuses.set(issue, lane_status(status, lane, idle.includes(lane)))
 		}
 	}
 
@@ -260,7 +275,7 @@ function closed_status(
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	if (status.state !== 'running') return status
+	if (!UNSETTLED_STATES.has(status.state)) return status
 
 	const from_closed = closed_status(status, read.closed.get(issue))
 

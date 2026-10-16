@@ -178,25 +178,14 @@ function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean 
 }
 
 // The instruction in the shape a refusal can carry: what the call is about to do, what already does it
-// properly, and the one command an explicit ask is answered with. The observed failure is named
-// because it is what makes the rule believable.
+// properly, and the one command an explicit ask is answered with. The observed failure behind it is in
+// `docs/maintainers/rule-delivery-rationale.md`.
 const EARLY_HEARTBEAT_REASON =
-	'⛔ early heartbeat: this call arms a wait timer of its own, and the progress clock is not yours ' +
-	'to keep. `pnpm josh run:progress --wait` keeps it for you ' +
-	'(`JOSH_PROGRESS_INTERVAL_MINUTES`, or `josh.progress_interval_minutes` in `package.json`, ' +
-	'default 20 minutes): start it once in the background and it reports the five labelled lines to ' +
-	"the run's event stream on its own, without waking you — relay nothing, and start it again only " +
-	'after it exits, which it does when newly runnable work arrives. Two timers armed at ' +
-	'once is what produced reports 3–5 minutes apart on a 15-minute setting ' +
-	'(joshuafolkken/kit#1570): a new one was armed on the turn a timer fired and again on the turn a ' +
-	"child's completion woke the run, and `--mark` recorded each report without anything refusing the " +
-	'early ones. **An explicit ask is not a heartbeat**: if the person asked for progress now, run ' +
-	'`pnpm josh run:progress --once`, which prints the five labelled lines whatever the clock says — ' +
-	'under `backlogrun`, `pnpm josh run:board --chat` instead. If you are ' +
-	'waiting on something rather than on a clock, wait on the thing itself — `pnpm josh followup` ' +
-	'waits for CI. The procedure is `.claude/skills/workflow-commands/backlogrun.md` → "Progress while ' +
-	'the run is quiet". **This rule fires on every early arm, not once per run**, so reissuing the ' +
-	'same sleep will be refused again.'
+	'⛔ early heartbeat: this call arms a wait timer of its own. Start `pnpm josh run:progress --wait` ' +
+	"once in the background: it reports to the run's event stream on its own — relay nothing. When " +
+	'asked, `pnpm josh run:progress --once` — under `backlogrun`, `pnpm josh run:board --chat`; ' +
+	'for CI, `pnpm josh followup`. It fires on every occurrence ' +
+	'(`.claude/skills/workflow-commands/progress-watcher.md`).'
 
 // **Keeping this rule is letting the watcher hold the clock** — `pnpm josh run:progress --wait` waits
 // the interval out, and `--once` answers an explicit ask. `--mark` is neither: it records a report

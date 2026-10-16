@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { lane_broker_server, type BrokerServer } from './lane-broker-server'
 import { lane_child_invocation, type ShipStop } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
+import { lane_parked } from './lane-parked'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
 
@@ -105,14 +106,22 @@ function provider_of(lane: LaneInfo): AgentProvider {
 
 // **The reviewer carries the lane's mark explicitly**: the supervisor serving a Claude lane is no lane child,
 // so a reviewer inheriting its environment would descend from the carry record's owner unmarked and be
-// read as the `backlogrun` parent by every hook.
+// read as the `backlogrun` parent by every hook. **Its prompt ends with the review invocation**, so the
+// lane's liveness read and the park's reap find it as they find the child (joshuafolkken/kit#3878).
 
-async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<boolean> {
+function review_prompt(lane: LaneInfo, round: ReviewRound): string {
 	const target = review_paths(lane.directory)
 	const prompt_of =
 		round === '1' ? run_ship_review.reviewer_prompt : run_ship_review.verification_prompt
+	const tail = lane_child_invocation.review_invocation(lane.issue)
+
+	return `${prompt_of(target.brief, target.findings, lane.issue)} This is ${tail}`
+}
+
+async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<boolean> {
+	const target = review_paths(lane.directory)
 	const built = agent_argv.resolve_in(
-		prompt_of(target.brief, target.findings),
+		review_prompt(lane, round),
 		agent_role_profile.REVIEWER,
 		lane.directory,
 	)
@@ -143,7 +152,11 @@ function relaunch(lane: LaneInfo, stop: ShipStop): boolean {
 	return result.kind === 'launched'
 }
 
+// **A parked issue gets no session**: a request can be read long after it was written, so the park is
+// read when the action runs, never when it was asked for (joshuafolkken/kit#3878).
 async function perform(lane: LaneInfo, action: BrokerAction): Promise<boolean> {
+	if (await lane_parked.is_parked(lane.issue)) return false
+
 	if (action.kind === 'relaunch') return relaunch(lane, action.stop)
 
 	return await launch_review(lane, action.round)
@@ -336,6 +349,13 @@ function is_serving(directory: string, issue: string): boolean {
 	return target !== undefined && live_response(target) !== undefined
 }
 
+// **A request nobody waits for any more is taken back**: a server busy with an earlier request reads the
+// file only once it is free, and a relaunch the ship had already given up on then started a session in a
+// lane the run had parked in the meantime (joshuafolkken/kit#3878). A newer request is left alone.
+function withdraw(pending: string, nonce: string): void {
+	if (read_record(pending, request_schema)?.nonce === nonce) stamp_file.remove_stamp(pending)
+}
+
 async function request(directory: string, issue: string, action: BrokerAction): Promise<boolean> {
 	const target = response_path(directory, issue)
 	const response = target === undefined ? undefined : live_response(target)
@@ -344,10 +364,14 @@ async function request(directory: string, issue: string, action: BrokerAction): 
 
 	const nonce = randomUUID()
 	const body = { session: response.session, nonce, action }
+	const pending = request_path(directory, issue)
 
-	stamp_file.replace_stamp(request_path(directory, issue), body)
+	stamp_file.replace_stamp(pending, body)
+	const is_success = await wait_response(target, response.session, nonce)
 
-	return await wait_response(target, response.session, nonce)
+	withdraw(pending, nonce)
+
+	return is_success
 }
 
 const lane_session_broker = {

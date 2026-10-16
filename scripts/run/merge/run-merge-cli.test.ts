@@ -15,7 +15,6 @@ const ask_next_mock = vi.hoisted(() => vi.fn())
 const is_over_budget_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
-const read_exit_mock = vi.hoisted(() => vi.fn())
 const is_outage_mock = vi.hoisted(() => vi.fn())
 const has_resumable_cut_mock = vi.hoisted(() => vi.fn())
 const resume_cut_mock = vi.hoisted(() => vi.fn())
@@ -28,13 +27,16 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 
 vi.mock('#scripts/issue/issue-closing-pr')
 vi.mock('#scripts/lane/lane-ledger')
+vi.mock('./run-merge-ship')
 
 vi.mock('#scripts/agent/api-outage', () => ({ api_outage: { is_outage: is_outage_mock } }))
 
-vi.mock('#scripts/run/run-ending', () => ({ run_ending: { read_exit: read_exit_mock } }))
+vi.mock('#scripts/run/run-ending', () => ({
+	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn() },
+}))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: emit_mock },
+	run_event_stream_emit: { emit: emit_mock, current_events: async () => [] },
 }))
 
 vi.mock('./run-merge-steps', () => ({
@@ -96,7 +98,6 @@ beforeEach(() => {
 	ask_next_mock.mockReset().mockResolvedValue(NEXT)
 	is_over_budget_mock.mockReset().mockResolvedValue(false)
 	emit_mock.mockReset().mockResolvedValue(undefined)
-	read_exit_mock.mockReset().mockReturnValue(undefined)
 
 	vi.spyOn(console, 'info').mockImplementation(info_mock.mockReset())
 })

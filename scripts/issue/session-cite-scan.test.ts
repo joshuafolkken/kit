@@ -60,7 +60,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-plan.ts', 1],
 	['epic/epic-parse.ts', 1],
 	['issue/issue-file-cli.ts', 1],
-	['lane/lane-child-invocation.ts', 5],
+	['lane/lane-child-invocation.ts', 6],
 	['lane/lane-dispatch.ts', 2],
 	['lane/lane-phase.ts', 1],
 	['lane/lane-restart.ts', 1],
@@ -68,7 +68,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The run board's frame, which a person watches in a terminal or on Telegram; `run:board --chat`
 	// answers with it inside one code block, where nothing is linked.
 	['run/board/run-board-now.ts', 1],
-	['run/cut/run-cut-cli.ts', 3],
+	['run/cut/run-cut-cli.ts', 2],
+	['run/cut/run-cut-report.ts', 1],
 	['run/entry/run-entry-stop.ts', 4],
 	['run/event/run-event-checks.ts', 1],
 	['run/event/run-event-filed.ts', 1],
@@ -78,6 +79,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/merge/run-merge-cli.ts', 7],
 	['run/merge/run-merge.ts', 1],
 	['run/ship/run-ship-detach.ts', 1],
+	// The reviewer child's prompt, which an agent reads.
+	['run/ship/run-ship-review.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],
 	['run/ship/run-ship-stop-text.ts', 1],
 	// Printed through `session_cite.text` or `issue_citation.linkify` by the caller that prints it.

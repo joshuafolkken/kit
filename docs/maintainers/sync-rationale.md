@@ -327,3 +327,68 @@ One process, `pnpm josh pretool:guard`, runs all three, each switchable off by i
   to carry**: `CLAUDE.md` costs every turn, a refusal only at the call that binds it. It reads the
   command string, so a rule keeps a one-line trigger resident for the calls it cannot see.
   `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and its criterion.
+
+## The self-sync refusal
+
+Inside the source repository every copy runs backwards. The mapped workflows are written from
+`templates/workflows/` over `.github/workflows/`, the authoritative side the pins are resolved from
+(joshuafolkken/kit#747); the path transformation rewrites the package's own `` `prompts/…` ``
+references to `node_modules/@joshuafolkken/kit/prompts/…`, where nothing resolves; and
+`tsconfig.json` is pointed at a copy of kit inside kit. joshuafolkken/kit#868 reproduced it on a
+clean checkout: 14 files, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` and both mapped workflows among them.
+
+The name carries the check because the incident ran a globally installed copy against the source
+repository, so the two directories were unrelated and only the name matched. Only a project root
+inside the package directory refuses; the reverse is the ordinary consumer layout. `josh init` calls
+the sync writers directly, so the guard on the sync entry point never covered it, and it also rewrites
+`package.json` (joshuafolkken/kit#879). An empty directory has no readable manifest, so only the
+location fallbacks apply there. The detection is an export so app-kit and game-kit apply the same rule
+rather than re-implementing it.
+
+## The merged config files
+
+- **`.secretlintrc.json` and `.vscode/tasks.json` are created when missing.** The pre-commit secret
+  scan ships to every consumer through `lefthook/base.yml` and cannot run without the config; the
+  run board task is the point of distributing `tasks.json`, and a project without the file has no
+  tasks to protect.
+- **The `.npmrc` credential line is kept.** kit does not distribute it — pnpm ignores an env-var
+  credential in a project `.npmrc` unless `npmrcAuthFile` trusts the file — but a consumer that opted
+  in owns a live credential there, often configured in a deploy platform invisible to sync. The four
+  settings lines are removed because pnpm 12 reads them only from `pnpm-workspace.yaml`
+  (joshuafolkken/kit#3267).
+- **Object-valued `.vscode/settings.json` keys merge entry by entry** because they are registries of
+  independent entries (`files.associations`, `editor.codeActionsOnSave`, `[typescript]`); otherwise a
+  project that customized one would never receive a later kit addition inside it. Arrays stay
+  create-only, since combining a list like `eslint.validate` would guess at intent.
+- **Formatting is per filename.** prettier prints `package.json` with its `json-stringify` printer,
+  one array element per line, and `tsconfig.json` / `.vscode/*.json` with the `json` printer, which
+  keeps a short array inline (joshuafolkken/kit#797).
+- **A merge rewrites only the value it changes.** Until joshuafolkken/kit#798 these merges wrote the
+  whole parsed object back, deleting every comment — including the block `sv create` ships. A file
+  that arrives badly formatted keeps its layout, the same trade that keeps the comments.
+- **`.jsonc` presets are rewritten to `.json`.** Playwright ≥ 1.62 appends `.json` to any `extends`
+  entry not ending in it, so a `.jsonc` preset resolved to `*.jsonc.json` and `playwright.config.ts`
+  failed to load. The presets ship as `*.json` since kit 1.23.
+- **The kit base is added only once.** Every `@joshuafolkken/*` preset embeds, imports or extends kit
+  base, so a second reference is redundant for cspell / tsconfig and a hard crash for lefthook
+  ("possible recursion in extends"). The check reads the consumer's config, not its dependency tree,
+  so it works for any overlay without a hard-coded package name.
+
+## The pnpm-workspace.yaml and .aikido merge
+
+pnpm 12 reads `minimumReleaseAge` and `engineStrict` only from `pnpm-workspace.yaml`
+(joshuafolkken/kit#3267). The block-style `allowBuilds` merge is joshuafolkken/kit#2710; a flow-style
+`{ … }` map is left whole. The workspace's `minimumReleaseAge` is copied into `.aikido` so Safe Chain
+accepts every version pnpm resolved instead of applying its own 48-hour default; an explicit `0`
+writes `0`. Older Safe Chain shims (1.2.2, the former CI pin 1.5.1) ignore the project setting.
+`trustLockfile: true` skips the install-time re-verification pnpm 11.5 introduced, which clean CI
+environments such as Cloudflare Workers Builds fail when they cannot authenticate GitHub Packages.
+
+## The package.json migrations
+
+Each is there so a project initialized before a fix receives it without re-running `josh init`.
+pnpm compares `packageManager` and `devEngines.packageManager` as raw strings, so any drift — a
+stripped `+sha512…` suffix included — brings back its "Cannot use both" warning. `onFail: "download"`
+is joshuafolkken/kit#3388. The tool list is the one `josh init` reads, at kit's own development
+ranges (joshuafolkken/kit#3711); `lefthook` is the tool that prompted it. kit's optional ESLint peers
+are not added because pnpm does not install optional peers on its own.

@@ -212,21 +212,18 @@ describe('LANE_CARRY_CONFLICT_REASON', () => {
 		['Continue implementing this Issue'],
 		['no `needs-decision`'],
 		['not to a competing run'],
-		// The pointers to the procedure, never a resident document.
-		['.claude/skills/workflow-commands/pre-gate-cut.md'],
-		['backlogrun-progress.md'],
 		// It refuses every occurrence rather than standing down after one.
 		['every occurrence'],
-		// The evidence route it lets through (joshuafolkken/kit#3458).
+		// The evidence route it lets through, and the command it never lets through.
 		['`JOSH_TEMP_ROOT`'],
 		['`run:merge` is refused under any root'],
 	])('carries %j', (marker) => {
 		expect(REASON).toContain(marker)
 	})
 
-	// The pointer, not the resident document: this rule was never in `CLAUDE.md`, because it binds only
-	// after a lane child is already running.
-	it('names the topic file rather than the resident document', () => {
+	// Never the resident document: this rule was never in `CLAUDE.md`, because it binds only after a
+	// lane child is already running.
+	it('does not name the resident document', () => {
 		expect(REASON).not.toContain('CLAUDE.md')
 	})
 })

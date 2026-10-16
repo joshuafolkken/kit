@@ -133,9 +133,7 @@ function dispatched_issue(state: LaneCutState): string | undefined {
 function uncut_lane_issue(state: LaneCutState): string | undefined {
 	const issue = lane_paths.lane_issue_of(state.directory)
 
-	if (issue === undefined) return undefined
-
-	if (dispatched_issue(state) !== issue) return undefined
+	if (issue === undefined || dispatched_issue(state) !== issue) return undefined
 
 	return state.carried()?.issue === issue ? undefined : issue
 }
@@ -159,26 +157,14 @@ function is_uncut_gate(command: string, state: LaneCutState = current_state()): 
 	return warrants_the_cut(state.context_verdict())
 }
 
-// The instruction in the shape a refusal can carry: what the cut is for, what each verdict means, and
-// the reissue sentence every delivery needs. **The verdicts are spelled out rather than pointed at**,
-// because `cut` is the only one that ends the turn and a run told merely to "take the cut" would have
-// to go and read which of the other five leave it holding the run — the same reason the WIP cap's
-// delivery names its three interrupt tests instead of naming the file they live in.
+// The instruction in the shape a refusal can carry: the cut, the one verdict that ends the turn, and
+// the reissue sentence every delivery needs. `cut` is the only verdict that ends the turn, so the
+// refusal says so rather than leaving a run to look up which of the others leave it holding the run.
 const PRE_GATE_CUT_REASON =
 	'⛔ pre-gate cut: this checkout is a lane dispatched for this issue and the gate is the boundary to ' +
-	'cut at, so take the cut before running it. `pnpm josh run:cut <N>` ends this process and ' +
-	'relaunches a fresh one that resumes from the gate, dropping the thinking built up while ' +
-	'implementing rather than carrying it on every later request — joshuafolkken/kit#1839 measured ' +
-	'176K of 204K output riding across that boundary, and joshuafolkken/kit#1864 measured the step ' +
-	'itself firing 0 times in 6 lane children while it was carried as prose. Issue ' +
-	'`pnpm josh run:cut <N>` now, and read the verdict: on `cut`, **end the turn immediately** — the ' +
-	'fresh process owns the run from there and must not be waited for, and **no Telegram is owed** for a cut that resumes itself; on `not-a-lane`, `unready`, ' +
-	'`busy`, `failed` or `unknown`, this process carries the run on and the gate is simply the next ' +
-	'call. Never relaunch a second process after `busy`. This fired because the dispatch mark names ' +
-	'this lane; a person working here carries no mark and sees no refusal, so there is no ' +
-	'human-or-child judgement left to make. The procedure is ' +
-	'`.claude/skills/workflow-commands/pre-gate-cut.md`. Reissue the gate once the cut has answered — ' +
-	'this fires once per run, so it cannot repeat on the call in hand.'
+	'cut at. Issue `pnpm josh run:cut <N>`: on `cut`, end the turn immediately — no Telegram is owed; ' +
+	'on any other verdict (`not-a-lane`, `busy`, …), reissue the gate — this fires once per run ' +
+	'(`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
 // **The pre-gate cut is two acts, one call apart**, so its `rule:value`
 // denominator is only the runs that reached the boundary: a run that issues the cut's entry check and,

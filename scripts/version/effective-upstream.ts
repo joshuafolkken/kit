@@ -23,8 +23,7 @@ function read_matching_version(manifest_path: string, package_name: string): str
 	const parsed = package_named_version_schema.safeParse(
 		json_value.parse_or_undefined(readFileSync(manifest_path, 'utf8')),
 	)
-	if (!parsed.success) return undefined
-	if (parsed.data.name !== package_name) return undefined
+	if (!parsed.success || parsed.data.name !== package_name) return undefined
 
 	return parsed.data.version
 }
@@ -45,10 +44,10 @@ function walk_up_for_version(start_directory: string, package_name: string): str
 function resolve_from_base(
 	base_url: string,
 	package_name: string,
-	resolve_marker: string | undefined,
+	resolve_marker = package_name,
 ): string | undefined {
 	try {
-		return createRequire(base_url).resolve(resolve_marker ?? package_name)
+		return createRequire(base_url).resolve(resolve_marker)
 	} catch {
 		return undefined
 	}
