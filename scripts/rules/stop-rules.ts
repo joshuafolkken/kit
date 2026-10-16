@@ -60,7 +60,8 @@ interface StopContext {
 	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
 	// documents, so a run that will not comply is not blocked forever.
 	stop_hook_active: boolean
-	// A pre-gate cut record is in place for this work tree. A dispatched lane child ends its turn at
+	// This turn ended at a cut — its record is in place, or this turn relaunched the successor that may
+	// already have cleared it (`stop-guard.ts` → `is_cut_stop`). A dispatched lane child ends its turn at
 	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
 	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
 	cut_pending: boolean

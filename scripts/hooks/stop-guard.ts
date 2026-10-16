@@ -14,9 +14,12 @@ import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
+import { pre_gate_cut } from '#scripts/rules/pre-gate-cut'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
+import { tail_commands } from '#scripts/rules/tail-commands'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
@@ -62,6 +65,19 @@ function was_filed(tail: string): boolean {
 	return filing_cap.turn_filing_count(tail) > 0
 }
 
+// This turn ended at a cut — a record still `carried`, or this turn's `run:cut` relaunching a successor.
+// The second covers the successor's resume clearing the record before this stop (joshuafolkken/kit#3936);
+// the held cut outside a lane prints no marker, so its person is still notified.
+function is_cut_stop(tail: string): boolean {
+	if (run_cut.carried_cut_sync() !== undefined) return true
+
+	return tail_commands.answered(
+		filing_cap.current_turn(tail),
+		pre_gate_cut.takes_the_cut,
+		run_cut_report.RELAUNCHED_CUT_MARKER,
+	)
+}
+
 // The session language the refusal is written for — `write_stop_decision` has already loaded the `.env`.
 function session_lang(): string {
 	return session_language.resolve_session_lang().lang
@@ -93,7 +109,7 @@ async function build_context(
 		message: payload_tail.message,
 		prompt: last_prompt.prompt_text(tail),
 		stop_hook_active: payload_tail.stop_hook_active,
-		cut_pending: run_cut.carried_cut_sync() !== undefined,
+		cut_pending: is_cut_stop(tail),
 		filed: was_filed(tail),
 		session_owner: repo_party.current_owner(),
 		...(await session_role_facts()),
