@@ -89,6 +89,13 @@ describe('discarded_commands', () => {
 			' echo done ',
 		])
 	})
+
+	// A newline ends a command as `;` does, so the line before the pipe is not part of what it swallows.
+	it('reads only the line the pipe sits on', () => {
+		expect(time_shell.discarded_commands('echo hi\npnpm josh lint | tail')).toEqual([
+			'pnpm josh lint ',
+		])
+	})
 })
 
 // The two forms this reader stands down on. Both matter to the caller that refuses a masked check:

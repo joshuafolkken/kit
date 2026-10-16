@@ -5,6 +5,7 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 import { delivered_rules, type MeasuredRule } from './delivered-rules'
 import { hook_context_line } from './hook-context-line'
+import { rule_rewrite } from './rule-rewrite'
 
 // What a rule is worth on the channel that carries it when its delivery has not fired.
 //
@@ -287,7 +288,7 @@ function rewritten_id(text: string): string | undefined {
 	return found?.id
 }
 
-function observe_rewrite(states: Map<string, RuleState>, text: string): void {
+function observe_note(states: Map<string, RuleState>, text: string): void {
 	const id = rewritten_id(text)
 	const state = id === undefined ? undefined : states.get(id)
 
@@ -295,6 +296,11 @@ function observe_rewrite(states: Map<string, RuleState>, text: string): void {
 
 	state.is_rewritten = true
 	state.is_triggered = true
+}
+
+// One line can be rewritten by several rows, whose notes `rule-rewrite.ts` joins into one context.
+function observe_rewrite(states: Map<string, RuleState>, text: string): void {
+	for (const note of text.split(rule_rewrite.NOTE_SEPARATOR)) observe_note(states, note)
 }
 
 function observe_for_rule(

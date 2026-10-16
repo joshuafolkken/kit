@@ -26,6 +26,20 @@ function parts_of(command: string): Array<string> {
 	return command.split(SEGMENT_PARTS)
 }
 
+/**
+ * The line's first command as the shell runs it — cut where the quote-blanked line puts the first
+ * separator, so one inside a quoted string does not cut it — or `undefined` for a heredoc line.
+ */
+function first_of(command: string): string | undefined {
+	const plain = time_shell.blanked(command)
+
+	if (plain === undefined) return undefined
+
+	const cut = plain.search(SEGMENT_SEPARATOR)
+
+	return (cut === -1 ? command : command.slice(0, cut)).trim()
+}
+
 // **Both spellings match, and the expansion is not this file's.** `josh_command_of` expands the alias
 // in the command it reads, so `pnpm josh ga` arrives as `josh gate` and a caller's canonical set
 // matches it as it is. Widening as well would be a second copy of one rule, and the caller that
@@ -41,6 +55,7 @@ function is_josh_command(segment: string, names: ReadonlySet<string>): boolean {
 }
 
 const shell_segments = {
+	first_of,
 	is_josh_command,
 	parts_of,
 	segments_of,

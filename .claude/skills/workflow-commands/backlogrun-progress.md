@@ -1,6 +1,6 @@
 # `backlogrun` — progress, the hand-off, resume and waiting
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table"; the heartbeat is `progress-watcher.md` → "Progress while the run is quiet".
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow"; the heartbeat is `progress-watcher.md` → "Progress while the run is quiet".
 
 ## Running a named epic's children
 

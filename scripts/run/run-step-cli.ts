@@ -14,15 +14,16 @@ import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
 import { run_step, type ParentInput, type StepInput } from './run-step'
+import { run_step_section } from './run-step-section'
 
-// `josh run:step [<N>]` — print the run's next single action, computed from the event stream, the carry
+// `josh run:step [<N>]` — print the run's next single action, followed by the section that governs it
+// (`run-step-section.ts`), computed from the event stream, the carry
 // record and the issue state. It reads exactly those three, never the
 // conversation: the issue facts through `run:prep`'s own gather (so this and `run:next` never answer
 // from different reads), the newest event off the stream, and the carry record's kind. The reader runs
 // the printed line, returns the result through `run:event`, and asks again — the loop `run:step`
 // exists to close.
 
-const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
@@ -154,14 +155,29 @@ function parent_input(directory: string | undefined): ParentInput {
 // `unknown` is the one answer with nothing to run — no record this session drives — so it exits non-zero
 // with the usage, exactly as a position missing its issue state does.
 async function run_parent(): Promise<number> {
-	const { line } = run_step.parent_action(parent_input(await run_carry.repository_directory()))
+	const action = run_step.parent_action(parent_input(await run_carry.repository_directory()))
 
-	console.info(line)
-	if (line !== run_step.UNKNOWN) return SUCCESS_EXIT_CODE
+	console.info(action.line)
+	if (action.line !== run_step.UNKNOWN) return run_step_section.print_for(action)
 
 	console.error(USAGE)
 
 	return FAILURE_EXIT_CODE
+}
+
+function report({ input, ship_problems }: Gathered): number {
+	const action = run_step.next_action(input)
+
+	console.info(action.line)
+	// On stderr, so stdout stays the action line and its rule: what `josh ship` would
+	// refuse on is said at every step, while it is still cheap to meet.
+	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
+
+	// A state that could not be read exits non-zero, exactly as `run:prep` and `run:next` exit on the
+	// same failure, so a position missing its issue state is never read as a confident next step.
+	if (input.state === undefined) return FAILURE_EXIT_CODE
+
+	return run_step_section.print_for(action)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -175,16 +191,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const { input, ship_problems } = await gather(issue_number)
-
-	console.info(run_step.next_action(input).line)
-	// On stderr, so stdout stays the one action line: what `josh ship` would
-	// refuse on is said at every step, while it is still cheap to meet.
-	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
-
-	// A state that could not be read exits non-zero, exactly as `run:prep` and `run:next` exit on the
-	// same failure, so a position missing its issue state is never read as a confident next step.
-	return input.state === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+	return report(await gather(issue_number))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

@@ -236,6 +236,30 @@ describe('lane_session_broker — the relaunch action', () => {
 	})
 })
 
+describe('lane_session_broker — the relaunch carries the stop context', () => {
+	// joshuafolkken/kit#3923: the stop's context crosses the request file and reaches the prompt.
+	it('carries the stop context through to the relaunched prompt', async () => {
+		const relaunch = vi
+			.spyOn(lane_relaunch, 'relaunch')
+			.mockReturnValue({ kind: 'launched', pid: 1 })
+		const context = { excerpt: ['FAIL gate'], changed: ['scripts/a.ts'], more_changed: 0 }
+		const action = { kind: 'relaunch', stop: { ...RELAUNCH.stop, context } } as const
+
+		expect(
+			await lane_session_broker.with_server(
+				CLAUDE_LANE,
+				async () => await lane_session_broker.request(LANE.directory, ISSUE, action),
+			),
+		).toBe(true)
+		expect(relaunch).toHaveBeenCalledWith(
+			CLAUDE_LANE,
+			expect.stringContaining('\nFAIL gate\n'),
+			'implementation',
+			expect.any(Function),
+		)
+	})
+})
+
 // joshuafolkken/kit#3878: a parked lane got a reviewer and then a relaunch from requests read late.
 describe('lane_session_broker — a parked issue and a finished request', () => {
 	it('ends the reviewer prompt with the review invocation the liveness pattern matches', async () => {

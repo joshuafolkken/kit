@@ -124,6 +124,8 @@ function keeps_verdict_intact(command: string): boolean {
 // **Only a filter that reads its input to the end qualifies.** One that exits early — `head`, or a
 // `grep` stopping at its first match — closes the pipe on a check still writing, and under `pipefail` the
 // check's SIGPIPE turns a passing run into exit 141; `head` also cuts the verdict line josh prints last.
+// `cut`, `sort`, `uniq` and `wc` read to the end as well, and a `grep … | cut -c1-250` narrowing was the
+// commonest masking still refused after #3875 (joshuafolkken/kit#3920).
 //
 // **Each masked check is wrapped on its own, and the rest of the line runs as typed.** Most of the
 // refusals left after #3570 were a check chained beside other work — `vitest …; pnpm josh lint:related
@@ -141,7 +143,7 @@ function keeps_verdict_intact(command: string): boolean {
 const PIPEFAIL_OPEN = '(set -o pipefail; '
 const PIPEFAIL_CLOSE = ')'
 const COMMENT_START = /(?:^|\s)#/u
-const FULL_READING_FILTER = /^(?:tail|grep)\b/u
+const FULL_READING_FILTER = /^(?:tail|grep|cut|sort|uniq|wc)\b/u
 const EARLY_EXIT_GREP =
 	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
 

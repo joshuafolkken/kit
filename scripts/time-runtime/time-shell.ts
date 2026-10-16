@@ -32,8 +32,9 @@ const SEGMENT_PATTERN = /&&|\|\||;|\|/u
 // last, while `||` keeps the first command's and runs the second only when it failed. `|&` is a pipe
 // and is cut here, its `&` left in the fragment that follows.
 const PIPE_PATTERN = /(?<!\|)\|(?!\|)/u
-// What `SEGMENT_PATTERN` cuts on minus the pipe, for reading *inside* one pipe segment.
-const CHAIN_PATTERN = /&&|\|\||;/u
+// What `SEGMENT_PATTERN` cuts on minus the pipe, for reading *inside* one pipe segment — plus the
+// newline, which ends a command as `;` does, so a line typed before the piped check is not read as it.
+const CHAIN_PATTERN = /&&|\|\||;|\n/u
 // A quoted span is text, not shell syntax, and it is removed before the pipe reading below. This
 // repository's issue bodies, comment bodies and commit messages quote command chains constantly, so
 // `--body "cd x && pnpm josh gate | tail"` is a `gh` call and nothing else — a reader that split its
