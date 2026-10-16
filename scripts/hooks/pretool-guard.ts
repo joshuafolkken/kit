@@ -3,10 +3,9 @@ import { investigation_outcome } from '#scripts/delegation/investigation-guard'
 import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_phase } from '#scripts/lane/lane-phase'
-import { json_value } from '#scripts/lib/json-value'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
-import { piped_verification } from '#scripts/rules/piped-verification'
+import { rule_rewrite, type RuleRewrite } from '#scripts/rules/rule-rewrite'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -159,59 +158,32 @@ function foreground_rewrite(
 	)
 }
 
-interface PipefailRewrite {
-	payload: string
-	input: Record<string, unknown>
-}
-
-// A piped josh check the hook runs under `set -o pipefail` instead of refusing it:
-// the rewritten input, and the payload that carries it. The rewrite is the
-// rule guard's delivery, so the rule guard's switch turns it off too.
-function pipefail_rewrite(raw_payload: string): PipefailRewrite | undefined {
-	if (!delivered_rules.is_enabled()) return undefined
-
-	const call = guarded_call(raw_payload)
-	const input = call === undefined ? undefined : piped_verification.pipefail_input(call)
-	const payload = json_value.parse_or_undefined(raw_payload)
-
-	if (input === undefined || !json_value.is_record(payload)) return undefined
-
-	return { payload: JSON.stringify({ ...payload, tool_input: input }), input }
-}
-
-function pipefail_envelope(
+// The rows' rewrite carries no permission decision: whatever else the line runs meets its own prompt.
+function rule_envelope(
 	outcome: GuardOutcome,
-	input: Record<string, unknown> | undefined,
+	rewrite: RuleRewrite | undefined,
 ): string | undefined {
-	if (input === undefined || outcome.reason !== undefined) return undefined
+	if (rewrite === undefined || outcome.reason !== undefined) return undefined
 
-	return hook_decision.flow_rewrite_envelope(
-		input,
-		rewrite_context(piped_verification.PIPEFAIL_NOTE, outcome),
-	)
+	return hook_decision.flow_rewrite_envelope(rewrite.input, rewrite_context(rewrite.note, outcome))
 }
 
 // The hook's one write: a rewrite where one applies, the outcome's own envelope otherwise.
-function emit(
-	raw_payload: string,
-	outcome: GuardOutcome,
-	pipefail_input?: Record<string, unknown>,
-): void {
-	const rewrite =
-		pipefail_envelope(outcome, pipefail_input) ?? foreground_rewrite(outcome, raw_payload)
+function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite): void {
+	const envelope = rule_envelope(outcome, rewrite) ?? foreground_rewrite(outcome, raw_payload)
 
-	if (rewrite === undefined) hook_decision.emit_outcome(outcome)
-	else process.stdout.write(`${rewrite}\n`)
+	if (envelope === undefined) hook_decision.emit_outcome(outcome)
+	else process.stdout.write(`${envelope}\n`)
 }
 
-// **The guards judge the call that will run.** A rewritable piped check reaches every guard already
-// prefixed, so the piped-verification row stays quiet on it while any other guard's refusal still wins
-// over the rewrite. The Codex adapter cannot rewrite a call, so it goes on judging the call as typed.
+// **The guards judge the call that will run.** A rewritten call reaches every guard already made
+// right, so the rewriting row stays quiet on it while any other guard's refusal still wins over the
+// rewrite. The Codex adapter cannot rewrite a call, so it goes on judging the call as typed.
 async function respond(raw_payload: string): Promise<void> {
-	const pipefail = pipefail_rewrite(raw_payload)
-	const judged = pipefail?.payload ?? raw_payload
+	const rewrite = rule_rewrite.rewrite(raw_payload)
+	const judged = rewrite?.payload ?? raw_payload
 
-	emit(judged, await pretool_outcome_async(judged), pipefail?.input)
+	emit(judged, await pretool_outcome_async(judged), rewrite)
 }
 
 const pretool_guard = {
@@ -219,7 +191,6 @@ const pretool_guard = {
 	emit,
 	foreground_rewrite,
 	mark_phase,
-	pipefail_rewrite,
 	pretool_outcome,
 	respond,
 }
