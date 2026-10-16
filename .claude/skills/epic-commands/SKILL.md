@@ -5,9 +5,6 @@ description: Procedures for `josh epic:audit`, `epic:next` and `epic:bundle`. Re
 
 # The `josh epic:*` commands
 
-This skill is the single source for the three commands. Reasons: `docs/maintainers/epic-commands-rationale.md`
-→ "Where each rule came from".
-
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `prrun`, `backlogrun` — live in the
 `workflow-commands` skill.
 
@@ -61,8 +58,7 @@ pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered  # argument order is the d
 
 After any hand edit run `pnpm josh epic:check <E>` (exit 1 when the body no longer parses).
 `pnpm josh followup` closes the epic once every task-list child is closed; one tracking a
-cross-repository child is closed by hand. Without `josh`: `issue-template.md`; the format's history:
-`docs/maintainers/epic-commands-rationale.md` → "Creating an epic by hand".
+cross-repository child is closed by hand. Without `josh`: `issue-template.md`.
 
 ## `josh epic:audit <E>` — contradictions across the children
 
@@ -97,8 +93,6 @@ The two `orphan search` findings are about the search, not the children:
 **It cannot check** that when a child introduces a new label, command, state or artifact, some child
 owns updating the existing code referencing that concept — do that at planning. Label names live in
 `scripts/issue/issue-labels.ts`.
-
-History: `docs/maintainers/epic-commands-rationale.md` → "`epic:audit` — why the children are read across".
 
 ## `josh epic:next <E…>` — what is runnable
 
@@ -143,8 +137,6 @@ Two things stop the command: a **circular dependency**, and a **disagreement bet
 and the `blocked-by` relations**. Only a line that is *nothing but* a chain is a declaration — a prose
 line recommending an execution order is a suggestion, not a dependency.
 
-Why: `docs/maintainers/epic-commands-rationale.md` → "`epic:next` — why it answers as it does".
-
 ## Epics that span repositories
 
 Write cross-repository children as `owner/repo#N` or a full issue URL. Their state is read through
@@ -163,7 +155,7 @@ branch declares is in the registry** (checked in that order; that exact version)
 bumps the version, so the target is the release that includes the blocker. **Unless that repository
 publishes nothing**: no `package.json` on its default branch, or `private`, resolves on close — read
 from its manifest, never the registry; a failed manifest read (not a 404) still waits. The publish
-check is `josh propagate`'s. History: `docs/maintainers/epic-commands-rationale.md` → "Cross-repository epics".
+check is `josh propagate`'s.
 
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
@@ -181,7 +173,3 @@ when that step printed `⚠`. **It recommends; it writes nothing.**
 | **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |
 
 **A placing answer is acted on with `epic-bundle.md`**. `Nothing to bundle.` needs no further read.
-
-History: `docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why issues filed apart are bundled afterwards";
-the reasons behind `epic-bundle.md`: `docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why each answer reads as it does";
-behind `execution-waves.md`: `docs/maintainers/epic-commands-rationale.md` → "Execution waves — why a wave is not a mechanism".

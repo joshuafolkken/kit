@@ -23,9 +23,6 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 | `undetermined` | Read the trace that failed and ask again. **A second in a row on the same child is a fault in the check**: send a `confirmation` naming the trace and stop — never escalate it to `stopped` |
 | `stopped` | The recovery below |
 
-Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why liveness needs silence and no
-process together".
-
 **On `stopped`, re-read with `pnpm josh run:status <N>`.** **A re-read carrying `needs-decision`** — the
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
 
@@ -38,8 +35,6 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
    `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `needs-decision` and counted), and drops
    the stale `in-progress` itself.
 3. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
-
-Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why the poll routes through `run:merge`".
 
 ## A person withdraws a running child
 
@@ -56,8 +51,7 @@ followup` ends that child with a named conflict in about ten seconds.
 
 **That child does not stop: it resolves the conflict in its own lane**, uncounted by the
 consecutive-failure guard. **The merge direction is `origin/main` into the lane's branch, never a
-rebase**; no step rewrites a pushed commit (`docs/maintainers/backlogrun-recovery-rationale.md` → "Why a
-conflict is resolved in the lane rather than handed to a person").
+rebase**; no step rewrites a pushed commit.
 
 1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, resolve
    in place. Do not close the lane, open another, or switch its branch.

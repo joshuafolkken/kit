@@ -1,8 +1,6 @@
 # `needs-human-review` — the child that stops before its commit
 
-**The single source of the label**, read at its point of use — the moment `pnpm josh issue:state <N>`
-answers `human_review: yes`. Rationale and history: `docs/maintainers/needs-human-review-rationale.md`
-→ "Why the label exists".
+Read the moment `pnpm josh issue:state <N>` answers `human_review: yes`.
 
 An issue carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop, whichever entry
 point reached it — `fullrun` or `backlogrun` — and the label may be applied **only by a person**.
@@ -46,8 +44,7 @@ gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f
 **It is not `needs-decision`**: `needs-decision` withholds a run's *start*; this withholds its *end*.
 So a `needs-human-review` issue is still offered, and a child stopped by it **goes on holding its
 repository** — `scripts/issue/issue-labels.ts` keeps it out of `NOT_DIRECTLY_RUNNABLE_LABELS` and
-`scripts/epic/epic-busy.ts` keeps it out of the parked set (`docs/maintainers/needs-human-review-rationale.md`
-→ "Why it is not `needs-decision`").
+`scripts/epic/epic-busy.ts` keeps it out of the parked set.
 
 Each entry point's own branch stays in its own file — `fullrun.md`, `halfrun.md`,
 `backlogrun.md` — and routes here for the definition.

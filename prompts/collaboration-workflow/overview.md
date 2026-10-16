@@ -24,7 +24,7 @@
   2. コード内コメント、テストタイトル（`describe` / `it` / `expect`）、コミットメッセージ
   3. スクリプトが出力する固定文字列: Telegram のヘッダーラベル（`Planning` / `Completion` など）、`Issue:` / `PR:` の URL ラベル、`--notify-message` 省略時の既定メッセージ
 
-`JOSH_SESSION_LANG` は開発者個人の設定で、`.env`（gitignore 済み）に置く。設定値は毎ターン `UserPromptSubmit` フック（`scripts/hooks/run-hook.sh session-lang`、Codex は `.codex/hooks.json`）が差し込み、未設定なら出さない。フックが走らないハーネス（Gemini / Cursor）は `.env` を読む。既定の理由は `docs/maintainers/overview-rationale.md` → "Why the session language defaults the way it does"。
+`JOSH_SESSION_LANG` は開発者個人の設定で、`.env`（gitignore 済み）に置く。設定値は毎ターン `UserPromptSubmit` フック（`scripts/hooks/run-hook.sh session-lang`、Codex は `.codex/hooks.json`）が差し込み、未設定なら出さない。フックが走らないハーネス（Gemini / Cursor）は `.env` を読む。
 
 ### 配布ドキュメントの層ごとの言語（joshuafolkken/kit#2997）
 

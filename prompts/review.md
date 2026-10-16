@@ -48,8 +48,7 @@ review, its severity tests and the round cap are unchanged.
 Run `pnpm josh review:brief --level-only` and use what it prints — `low` or `medium`, from the changed
 paths only, never "this one is small". `--staged` classifies the staged diff, `--json` adds the reason;
 inside a workflow `pnpm josh review:brief` prints the level on its first line. `low` gets 1 round,
-`medium` up to 2. Derivation (inert paths, documentation at `medium`):
-`docs/maintainers/review-history.md` → "The level is decided from the changed paths".
+`medium` up to 2. A diff that touches documentation is not inert: it stays at `medium`.
 
 ```bash
 pnpm josh review:brief --level-only            # the branch diff
@@ -94,8 +93,7 @@ deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot i
   as code).
 
 One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
-code line, or a source file whose comment-free text cannot be read. Why: `docs/maintainers/review-history.md`
-→ "The two skip arms".
+code line, or a source file whose comment-free text cannot be read.
 
 Record a skipped round on the Issue:
 

@@ -1,9 +1,7 @@
 # The dependency update — when `josh latest` runs
 
 `josh latest` updates every dependency, the published ranges, `pnpm audit` and pnpm, in that
-order and over the network. This file is the **single source** of when it runs; every entry point
-references it and none restates it. History: `docs/maintainers/latest-gate-rationale.md` → "Where
-each rule came from".
+order and over the network.
 
 ## Ask the command; do not decide
 
@@ -59,8 +57,6 @@ merge is CI**: the `Security Audit` job runs on every pull request and is one of
 
 **The lock file the update rewrites lands with whichever issue ran it.** `josh latest` leaves
 `pnpm-lock.yaml` modified and that issue's `pnpm josh git -y` commits it. Should the issue then fail
-CI on a bump rather than on its own change, fix it forward before parking the issue for it. Rationale
-for the elapsed-time window: `docs/maintainers/latest-gate-rationale.md` → "Why an elapsed-time
-window rather than once per batch".
+CI on a bump rather than on its own change, fix it forward before parking the issue for it.
 
 `docs/josh-commands-automation.md` documents the command itself.

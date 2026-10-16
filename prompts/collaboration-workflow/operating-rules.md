@@ -12,10 +12,6 @@
 - 修正できたら修正内容を、できなかったら失敗チェック名・原因・未解決である旨を `--notify-message` に書く。**完了コメントに失敗を隠してはならない**
 - ユーザーへの報告でも失敗を「成功」として扱わない
 
-### ほかの単一ソースにある規則
-
-auto-merge と `completion` 通知・明示的な起動・`confirmation` 通知・作業ツリーの保持・overrides の保護の置き場は `docs/maintainers/operating-rules-rationale.md` → "Rules that moved to their single source"。
-
 ### 指示されていない行動は取らない
 
 `CLAUDE.md` → "Git Rules" の細則。対象には共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更も含む。
@@ -28,7 +24,7 @@ auto-merge と `completion` 通知・明示的な起動・`confirmation` 通知�
 
 ### no-self-staging — git index を勝手に変更しない（自律 staging の禁止）
 
-`CLAUDE.md` → "Git Rules" の細則。index には履歴がなく、上書きされたステージ状態は復元できない（`docs/maintainers/operating-rules-rationale.md` → "Why the index is the user's"）。
+`CLAUDE.md` → "Git Rules" の細則。index には履歴がなく、上書きされたステージ状態は復元できない。
 
 - **調査目的の staging はしない。** 読み取り専用コマンドを使う: `git status --short`、`git diff` / `git diff --stat` / `git diff HEAD`、`git diff --staged`、未追跡ファイルは `git diff --no-index /dev/null <new-file>` か直接読む
 - staging してよいのは次の 2 ケースだけ。それ以外は実行せずに確認する:
@@ -44,7 +40,7 @@ auto-merge と `completion` 通知・明示的な起動・`confirmation` 通知�
 
   1〜3 は直後に `pnpm josh stash:pop "<メッセージ>"` で復元する。stash は全 work tree が共有する 1 本のスタックなので、位置指定や引数なしの `git stash pop` は使わない（joshuafolkken/kit#2050）。4 は復元しない — 代わりに stash を子の Issue にコメントで記録する（`prerequisite.md` の stash と同じく、記録だけが後で pop させる手がかり）
 
-- **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**（`docs/maintainers/operating-rules-rationale.md` → "Why a handed-over stash is popped"）
+- **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**
   - 計画には復元手順としてこの 1 行だけを書く。`git stash apply` / `git stash pop` も「drop しない」という条件も書かない
   - 計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。`needs-decision` では止まらない
   - stash を残すのは持ち主の判断だけ。持ち主が計画に理由を書き、ランはそこで止まって確認する

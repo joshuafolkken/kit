@@ -2,13 +2,9 @@
 
 When this run files a new Issue, file it with `pnpm josh issue:file`, which lints the body and applies the classification labels it declares beside the `--depth` and `--route` labels; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification.
 
-`halfrun` sits between `kickoff` (plan only) and `fullrun` (full execution with auto-merge). It
-implements the change and runs the full verification gate, then **stops before commit** — nothing is
-committed, pushed, or opened as a PR — so a person verifies the working tree by hand. Use it when a change needs human eyes before shipping.
-
-**This file is the manifest.** The entry sequence and the stop branches are `entry-sequence.md`,
-shared with `fullrun` and `prrun`; this file names only what is `halfrun`'s own. History:
-`docs/maintainers/halfrun-rationale.md` → "Where each rule came from".
+`halfrun` implements the change and runs the full verification gate, then **stops before commit** —
+nothing is committed, pushed, or opened as a PR — so a person verifies the working tree by hand. The
+entry sequence and the stop branches are `entry-sequence.md`.
 
 ## The difference — the entry
 

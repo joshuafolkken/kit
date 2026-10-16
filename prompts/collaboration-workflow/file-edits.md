@@ -32,8 +32,6 @@ PY
 - ファイル全体の作り直し — 変更後の本文が元とほとんど共有しない場合
 - 部分編集のほうが大きくなる場合 — `old_string` / `new_string` の合計が全文を超えるとき（このときも Write で書く）
 
-実測は `docs/maintainers/file-edits-rationale.md` → "Measured cost of whole-file rewrites"（joshuafolkken/kit#1260）。
-
 ### `sed -i` を使う前に満たす 4 条件
 
 `sed` は一致した全行を書き換え、一致 0 件でも黙って成功する。使う前に次を満たす。
@@ -57,4 +55,4 @@ PY
 
 ### なぜコストが二重になるか
 
-書き戻す形は本文がコマンドとファイルの両方に載り、コマンドは以降の全リクエストで読み直される。内訳は `docs/maintainers/file-edits-rationale.md` → "Measured breakdown of command text"、常駐の根拠は `docs/maintainers/file-edits-rationale.md` → "Why it is resident"、固定内容は `docs/maintainers/file-edits-rationale.md` → "Marker tests"。
+書き戻す形は本文がコマンドとファイルの両方に載り、コマンドは以降の全リクエストで読み直される。

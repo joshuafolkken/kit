@@ -5,10 +5,7 @@ description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlo
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
-package's collaboration workflow is built on. **This file is their manifest — triggers and pointers,
-never a procedure**: each rule is stated once, in the file its row names. History:
-`docs/maintainers/workflow-commands-rationale.md` → "Where each rule came from".
+Each rule is stated once, in the file its row names.
 
 ## 0. The rule that fires before any of them — explicit invocation
 

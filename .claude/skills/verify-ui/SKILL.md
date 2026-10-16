@@ -7,8 +7,7 @@ argument-hint: '[route] [route...]'
 # Verify the rendered screen
 
 A rendered-UI change is not done until someone has looked at it (`CLAUDE.md` → completion gate);
-passing tests are not that look. Rationale: `docs/maintainers/verify-ui-rationale.md` → "Why the skill
-reads as it does".
+passing tests are not that look.
 
 ## 1. Decide which routes to capture
 

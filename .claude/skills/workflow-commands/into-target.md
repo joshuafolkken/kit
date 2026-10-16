@@ -2,8 +2,7 @@
 
 **This file is the suffix's single source, read at its point of use — the moment a `new` entry is
 typed with an `into <target>` suffix, not at any entry.** A run given a `#N` or a bare `new` never
-reaches it. `SKILL.md` → §2's table keeps the trigger and points here. Rationale:
-`docs/maintainers/into-target-rationale.md` → "Why the suffix reads as it does".
+reaches it.
 
 `kickoff new` / `fullrun new` / `halfrun new` accept a suffix naming the epic the run's artifact
 belongs to. Without it the artifact belongs to no epic, and `epic:next` only ever offers an epic's

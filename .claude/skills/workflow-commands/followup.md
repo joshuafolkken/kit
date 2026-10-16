@@ -2,8 +2,7 @@
 
 Everything between a green CI and a merged PR: the command, the merge it authorizes, the notifications,
 the reviewer scan, the config report and the release ask. `fullrun` and `backlogrun` end here; `halfrun`
-stops before the commit. This file is the single source. Where each rule came from:
-`docs/maintainers/followup-rationale.md` → "Where each rule came from".
+stops before the commit.
 
 ## Run `pnpm josh followup`
 
@@ -106,15 +105,13 @@ pnpm josh notify --task-type failure --issue-url "<issue-url>" --body-file <reas
   non-zero; with it, the reason is posted and the run proceeds.
 - **A comment listing that could not be read is a standing blocker**.
 - **Temporary**: CodeRabbit is non-blocking end to end — out of the default required checks
-  (restore via `JOSH_REQUIRED_CHECKS`); its findings are audit notes. Reverting it:
-  `docs/maintainers/followup-rationale.md` → "The temporary CodeRabbit exemption".
+  (restore via `JOSH_REQUIRED_CHECKS`); its findings are audit notes.
 
 ## Config file reporting
 
 `followup` matches every changed path against what `josh sync` distributes (`AI_COPY_FILES`,
 `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`) and **reports** the claimed paths in the
-notification and the Issue report. **It stops nothing** (`docs/maintainers/followup-rationale.md` →
-"Why config claims are reported, not stopped"). `pnpm josh sync:scope` gives the same answer.
+notification and the Issue report. **It stops nothing.** `pnpm josh sync:scope` gives the same answer.
 
 ## When `pnpm josh release` runs
 

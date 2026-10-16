@@ -3,7 +3,7 @@
 This is the maintainer-only rationale behind `.claude/skills/workflow-commands/backlogrun-recovery.md`:
 the reasons behind the failure-only procedures a run reads when a delegated unit goes silent or a
 lane's pull request conflicts with `main`. It is never read during a run — the procedure document
-carries every trigger, command, bound and prohibition, and points here only for why they are what
+carries every trigger, command, bound and prohibition; this file holds only why they are what
 they are. The sections moved here from `backlogrun-child-rationale.md` and
 `backlogrun-lanes-rationale.md` with their procedures (joshuafolkken/kit#3175).
 

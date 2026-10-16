@@ -23,8 +23,7 @@
   読み手がそのまま打つ書き方
 - 引用の形（そのままでよい）— 「`gh issue create` は使わない」のような禁止の引用や、CLI の対応状況の記録
 
-文書ガードはフェンス付きコードブロックだけを走査するので、散文は書き手がこの区別で守る
-（`docs/maintainers/gh-rest-rationale.md` → "Why the document guard scans fences only"）。
+文書ガードはフェンス付きコードブロックだけを走査するので、散文は書き手がこの区別で守る。
 
 書き換えるときは先に `pnpm josh` のコマンドで置き換えられないかを見る（例: `gh issue view` ではなく
 `pnpm josh issue:state <N>`）。
