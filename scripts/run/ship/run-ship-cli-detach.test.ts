@@ -70,7 +70,7 @@ vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } })
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 	git_gh_pr_read: { pr_get_merge_state: vi.fn().mockResolvedValue(undefined) },
 }))
-vi.mock('./run-ship-return', () => ({ run_ship_return: { return_control: return_mock } }))
+vi.mock('./run-ship-return', () => ({ run_ship_return: { hand_back: return_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_lane_child_mock },
 }))
@@ -285,11 +285,12 @@ describe('run_ship_cli.run — only a supervised ship hands a failed stage back'
 		const flags = ['--body-file', 'evidence.md', '--cite', '2500']
 
 		expect(await run_ship_cli.run([TITLE, ...flags])).toBe(FAILED)
-		expect(return_mock).toHaveBeenCalledWith(NUMBER, 'gate', {
-			title: TITLE,
-			flags,
-			is_review: false,
-		})
+		expect(return_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ number: NUMBER, title: TITLE, is_review: false }),
+			'gate',
+			expect.anything(),
+		)
+		expect(JSON.stringify(return_mock.mock.calls[0]?.[2])).toContain('lint red')
 	})
 
 	it('hands nothing back from a ship run in the agent’s own turn', async () => {

@@ -75,6 +75,35 @@ describe('the process pattern read as the extended regex pgrep applies', () => {
 	})
 })
 
+// joshuafolkken/kit#3923: the failed output and the changed files ride in the prompt itself.
+describe('the ship-stop prompt with its stop context', () => {
+	it('puts the failed output and the changed files in the ship-stop prompt', () => {
+		const context = { excerpt: ['FAIL gate'], changed: ['scripts/a.ts'], more_changed: 0 }
+		const prompt = lane_child_invocation.ship_stop_invocation(ISSUE, {
+			...STOP,
+			title: `Some work #${ISSUE}`,
+			context,
+		})
+
+		expect(prompt).toContain('Fix the gate failure shown in the output below')
+		expect(prompt).not.toContain(`pnpm josh ship --log ${ISSUE}`)
+		expect(prompt).toContain('\nFAIL gate\n')
+		expect(prompt).toContain('Changed files on the branch: scripts/a.ts.')
+		expect(prompt.endsWith(`fullrun #${ISSUE}`)).toBe(true)
+	})
+
+	it('still points at the stopped report when the stage printed nothing', () => {
+		const context = { excerpt: [], changed: [], more_changed: 0 }
+		const prompt = lane_child_invocation.ship_stop_invocation(ISSUE, {
+			...STOP,
+			title: `Some work #${ISSUE}`,
+			context,
+		})
+
+		expect(prompt).toContain(`pnpm josh ship --log ${ISSUE}`)
+	})
+})
+
 // joshuafolkken/kit#3878: a brokered reviewer outlives a ship that stopped waiting, so the pattern the
 // liveness read and the reaper share finds it by the tail its prompt ends with.
 describe('the review invocation', () => {
