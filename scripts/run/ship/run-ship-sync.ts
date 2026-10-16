@@ -4,6 +4,7 @@ import { git_command } from '#scripts/git/git-command'
 import { main_merge, type MergeOutcome } from '#scripts/git/main-merge'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { run_ship_overlap } from './run-ship-overlap'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship` keeps the branch current with the default branch itself: a default branch that moves
@@ -66,12 +67,19 @@ function sync_note(outcome: Exclude<MergeOutcome, { kind: 'conflict' }>): string
 // touches, and once that work is committed the followup merges again on a clean tree. A merge that changed
 // the tree is checked by the gate stage that follows, so the commit never carries
 // an unchecked merge and the gate's record names the merge base the push carries.
-async function sync_stage(): Promise<StepResult> {
+//
+// The merge waits first for any lane whose open pull request changes the same paths
+// (`run-ship-overlap.ts`), so it brings that pull request in before the gate rather than meeting it
+// as `DIRTY` after CI.
+async function sync_stage(issue: string): Promise<StepResult> {
+	const waited = run_ship_overlap.note(await run_ship_overlap.await_overlap(issue))
 	const outcome = await merge_outcome()
 
-	if (outcome.kind === 'conflict') return conflict_result(outcome.files, '')
+	if (outcome.kind === 'conflict') return conflict_result(outcome.files, waited)
 
-	return { code: SUCCESS_EXIT_CODE, out: sync_note(outcome) }
+	const out = [waited, sync_note(outcome)].filter((line) => line !== '').join('\n')
+
+	return { code: SUCCESS_EXIT_CODE, out }
 }
 
 // Any read that fails answers "not conflicting": the followup failure then stands as it was.

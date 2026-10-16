@@ -24,6 +24,13 @@ function is_ship_running(issue: string, directory: string): boolean {
 	)
 }
 
+// When the detached ship for `issue` that is still live was launched, or `undefined` where none is.
+function ship_running_since(issue: string, directory: string): number | undefined {
+	const repository = git_common_directory.repository(directory)
+
+	return repository === undefined ? undefined : run_ship_detach.running_since(repository, issue)
+}
+
 // This session is the dispatched lane child for `directory` and its own ship is running.
 function is_handed_off(directory: string, source: MarkerSource = process.env): boolean {
 	const issue = lane_child_marker.marked_issue(source)
@@ -33,6 +40,6 @@ function is_handed_off(directory: string, source: MarkerSource = process.env): b
 	return is_ship_running(issue, directory)
 }
 
-const lane_handoff = { is_handed_off, is_ship_running }
+const lane_handoff = { is_handed_off, is_ship_running, ship_running_since }
 
 export { lane_handoff }

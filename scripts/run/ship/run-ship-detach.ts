@@ -183,6 +183,14 @@ function current_record(repository: string, number: string): ShipRecord | undefi
 	return record?.launch_id === process.env[LAUNCH_ID_KEY] ? record : undefined
 }
 
+// When the ship for `number` that is still running was launched — `undefined` where none is running or
+// its record carries no launch time. `run-ship-overlap.ts` orders two running ships by it.
+function running_since(repository: string, number: string): number | undefined {
+	const record = read_record(repository, number)
+
+	return record !== undefined && result_of(record) === 'running' ? record.launched_at : undefined
+}
+
 function is_pending(record: ShipRecord | undefined): boolean {
 	return record !== undefined && record.pid === undefined
 }
@@ -362,6 +370,7 @@ const run_ship_detach = {
 	last_launch,
 	log_path,
 	read_log,
+	running_since,
 	supervisor_argv,
 }
 

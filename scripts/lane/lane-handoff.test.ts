@@ -51,6 +51,24 @@ describe('lane_handoff.is_ship_running', () => {
 	})
 })
 
+describe('lane_handoff.ship_running_since', () => {
+	const LAUNCHED_AT = 1000
+
+	it('reads the running ship launch time from the checkout repository', () => {
+		vi.spyOn(git_common_directory, 'repository').mockReturnValue(REPOSITORY)
+		const since = vi.spyOn(run_ship_detach, 'running_since').mockReturnValue(LAUNCHED_AT)
+
+		expect(lane_handoff.ship_running_since(ISSUE, DIRECTORY)).toBe(LAUNCHED_AT)
+		expect(since).toHaveBeenCalledWith(REPOSITORY, ISSUE)
+	})
+
+	it('reads a directory outside a repository as no running ship', () => {
+		vi.spyOn(git_common_directory, 'repository').mockReturnValue(undefined)
+
+		expect(lane_handoff.ship_running_since(ISSUE, DIRECTORY)).toBeUndefined()
+	})
+})
+
 describe('lane_handoff.is_handed_off', () => {
 	it('reads the lane child whose own ship is running as handed off', () => {
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)

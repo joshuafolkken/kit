@@ -1,0 +1,7 @@
+{
+	"reason": "Overlap wait in front of the ship sync, plus launch-time ordering so two overlapping ships in their sync never wait on each other (round-1 review medium finding)",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 168
+	}
+}

@@ -167,6 +167,12 @@ the resumption of the old stop. A stop late in the period whose resumption falls
 **The decision the table is for**: which stop reason to remove next — the reason whose runs times
 median is largest costs the lanes the most time.
 
+An `overlap` entry is the wait that targets the `conflict` row. Before its sync, a ship waits for every
+lane whose open pull request changes a path its own change does (`run-ship-overlap.ts`).
+
+The entry names the lanes, the shared paths, `waited_ms` and whether the wait cleared. Read it against
+the `conflict` row of the same period.
+
 ## What the load is made of
 
 A `load` sample's `processes` is the machine's process list at that minute, grouped by the kind of

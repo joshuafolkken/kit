@@ -160,6 +160,17 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 			{ kind: 'stop', issue: 7, reason: 'conflict' },
 		])
 	})
+
+	// joshuafolkken/kit#3901: a ship's wait for an overlapping open pull request is recorded with what
+	// overlapped and how it ended, beside the `conflict` stops it exists to reduce.
+	it('records an overlap wait naming the lanes, the shared paths and whether it cleared', async () => {
+		const target = ledger('overlap')
+		const overlap = { issue: 7, lanes: [8], paths: ['a.ts'], waited_ms: 30_000, is_cleared: true }
+
+		await lane_ledger.record_overlap(overlap, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'overlap', ...overlap }])
+	})
 })
 
 describe('lane_ledger.target', () => {
