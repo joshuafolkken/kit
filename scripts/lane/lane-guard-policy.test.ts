@@ -22,7 +22,7 @@ const DUPLICATE_READ = 'duplicate-read'
 
 describe('lane_guard_policy.mode_in_lane_child', () => {
 	it.each([
-		['investigation', 'notice'],
+		['investigation', 'refuse'],
 		['batching', 'off'],
 		['rule', 'refuse'],
 		[DUPLICATE_READ, 'notice'],
@@ -30,11 +30,10 @@ describe('lane_guard_policy.mode_in_lane_child', () => {
 		expect(lane_guard_policy.mode_in_lane_child(id)).toBe(mode)
 	})
 
-	// **The #2382 non-regression: investigation may never refuse in a lane child.** It was `off` from
-	// #2138 to #2382 and is `notice` now; whatever a future edit changes it to, a refusal would end a
-	// headless child's turn (kit#2138), so it is asserted on its own like the batching row above.
-	it('never refuses investigation in a lane child, so a child is not killed by it (kit#2382)', () => {
-		expect(lane_guard_policy.mode_in_lane_child('investigation')).not.toBe('refuse')
+	// **kit#3927: investigation refuses in a lane child.** It was `off` from #2138 and a notice from
+	// #2382; the notice was measured not to move the reading, so the row names that measurement.
+	it('records why investigation refuses in a lane child (kit#3927)', () => {
+		expect(lane_guard_policy.entry_for('investigation')?.because).toContain('notice')
 	})
 
 	// **The #2164 non-regression, pinned at the enumeration.** kit#2138 measured a child killed before
@@ -92,7 +91,7 @@ describe('lane_guard_policy — the enumeration is the whole of it', () => {
 describe('lane_guard_policy.mode_here', () => {
 	// In a marked lane child every guard takes its enumerated mode — this is the table the wrappers read.
 	it.each([
-		['investigation', 'notice'],
+		['investigation', 'refuse'],
 		['batching', 'off'],
 		['rule', 'refuse'],
 		[DUPLICATE_READ, 'notice'],
@@ -120,7 +119,7 @@ describe('lane_guard_policy.is_suppressed_here', () => {
 	// `is_suppressed_here` is the `off` mode alone — the guard says nothing at all. Batching is `off` in a
 	// lane child since kit#2405 (its notice was cut off after the re-measurement missed 1.40), so that row
 	// reads `true` below while every `notice`- and `refuse`-mode guard reads `false`.
-	it('does not suppress the notice-mode investigation guard in a marked lane child (kit#2382)', () => {
+	it('does not suppress the refuse-mode investigation guard in a marked lane child (kit#3927)', () => {
 		expect(
 			lane_guard_policy.is_suppressed_here('investigation', LANE_DIRECTORY, LANE_CHILD_SOURCE),
 		).toBe(false)

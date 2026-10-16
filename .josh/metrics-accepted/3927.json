@@ -1,0 +1,8 @@
+{
+	"reason": "Review round 1 fix: reviewer sessions stand down from the investigation guard (plus test), and chain-rule names the Agent tool's model alias",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 21,
+		"ai_cost.on_demand_bytes": 157
+	}
+}

@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
-import { lane_guard_policy, type LaneGuardMode } from '#scripts/lane/lane-guard-policy'
+import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { investigation_reads } from './investigation-reads'
 
@@ -21,68 +22,29 @@ import { investigation_reads } from './investigation-reads'
 // file — debugging the guard itself, or a session whose reading really is all edit targets.
 const SWITCH_ENV_KEY = 'JOSH_INVESTIGATION_GUARD'
 
-// This guard's refusal record, and the notice's own record — distinct so a lane-child notice never
-// spends the refusal's stamp, the same split the batching guard keeps.
 const STAMP_PREFIX = 'josh-investigation-guard-'
-const NOTICE_STAMP_PREFIX = 'josh-investigation-guard-notice-'
 
-// **How the guard behaves for the session in hand, decided from the one-place enumeration**.
-// Outside a lane child the mode is `refuse` and the
-// guard refuses; in a dispatched lane child it is `notice`, because a lane child does read unedited
-// files and can dispatch sub-agents, so the reading is there to send out. The enumeration reads `JOSH_LANE_CHILD` against this checkout's own
-// issue only for a guard whose mode it would change, so a person working in a lane sees the guard
-// unchanged. It wraps `investigation_reads.should_block` here rather than inside it so the pure counting
-// rule stays free of process state and its own suite keeps testing it directly.
-function investigation_mode(): LaneGuardMode {
-	return lane_guard_policy.mode_here('investigation')
-}
-
-// A refusable call is refused only where the mode is `refuse` — the main line. A lane child is
-// `notice`, so it reaches the notice branch and is withheld the refusal that would end its headless
-// turn; an `off` some future enumeration sets stays silent here too.
+// **How the guard behaves for the session in hand, decided from the one-place enumeration**. It is
+// `refuse` in a dispatched lane child too (joshuafolkken/kit#3927): a hook denial returns to the model
+// as guidance, and the notice it replaced was measured not to move the reading. It wraps
+// `investigation_reads.should_block` here rather than inside it so the pure counting rule stays free of
+// process state and its own suite keeps testing it directly. A reviewer session stands down: reading
+// the diff's files is its whole task, and it carries the lane's marker, so it would otherwise be refused
+// like the child it reviews — the stand-down `implementation-cut.ts` takes for the same session.
 function should_block(
 	tail: string,
 	call: GuardedCall,
 	refused_at_ms: number,
 	run?: GuardRun,
 ): boolean {
-	if (investigation_mode() !== 'refuse') return false
+	if (
+		agent_session_role.is_reviewer() ||
+		lane_guard_policy.mode_here('investigation') !== 'refuse'
+	) {
+		return false
+	}
 
 	return investigation_reads.should_block(tail, call, refused_at_ms, run)
-}
-
-// The lane-child notice: the same threshold, delivered without a `permissionDecision`. It
-// reads the notify stamp's own record, so a notice never spends the refusal's stamp and re-arms on the
-// next accumulation exactly as the refusal does.
-function should_notify(
-	tail: string,
-	call: GuardedCall,
-	notified_at_ms: number,
-	run?: GuardRun,
-): boolean {
-	if (investigation_mode() !== 'notice') return false
-
-	return investigation_reads.should_block(tail, call, notified_at_ms, run)
-}
-
-// **The lane-child counterpart of REASON, delivered as a notice rather than a refusal**.
-// A dispatched lane child ends its turn on a denial, so
-// the same guidance is carried without a `permissionDecision`: the read proceeds and the child is nudged
-// to delegate rather than killed. It carries no ⛔, so a person watching reads it as advice.
-const NOTICE = `💡 investigation: files read and not edited, or search turns, since the last delegated unit reached the threshold; the read proceeds. Run \`pnpm josh delegate investigation\`, then dispatch the \`${investigation_reads.INVESTIGATOR_AGENT}\` agent (\`kit:${investigation_reads.INVESTIGATOR_AGENT}\` in a consumer); it returns \`file:line\` citations, never the file text. Keep main-line reads to files you will edit.`
-
-// The notice as it reaches the model: the base guidance with the concrete unedited reads named, so a
-// lane child is shown *which* reads to send to a unit rather than only told to delegate. An empty
-// set names nothing and the notice falls back to its guidance alone. The call is part of the notify
-// contract but this guard's wording depends on the tail alone.
-function notice_text(_call: GuardedCall, tail: string): string {
-	const pending = investigation_reads
-		.tally_of(tail)
-		.pending.map((absolute) => investigation_reads.repository_relative(absolute))
-
-	return pending.length === 0
-		? NOTICE
-		: `${NOTICE} Read and not edited so far: ${pending.join(' ')}.`
 }
 
 const GUARD = hook_decision.create_transcript_guard({
@@ -91,21 +53,11 @@ const GUARD = hook_decision.create_transcript_guard({
 	is_candidate: investigation_reads.is_refusable_call,
 	should_block,
 	reason: investigation_reads.REASON,
-	// The lane-child notice fires where the refusal is withheld, on a record of its own so it
-	// never spends the refusal's stamp.
-	notify: {
-		prefix: NOTICE_STAMP_PREFIX,
-		should_notify,
-		text: notice_text,
-	},
 })
 
 const investigation_refusal = GUARD.refusal
 const investigation_outcome = GUARD.outcome
 const { is_enabled, refusal_path } = GUARD
-// The notice's stamp path, exposed the way `refusal_path` is so a test can clean it apart from the
-// refusal's record.
-const investigation_notice_path = hook_decision.create_refusal_stamp(NOTICE_STAMP_PREFIX).path
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -115,13 +67,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 export {
 	deny_envelope,
-	investigation_notice_path,
 	investigation_outcome,
 	investigation_refusal,
 	is_enabled,
 	load_environment_file,
 	refusal_path,
 	DISABLED_VALUES,
-	NOTICE,
 	SWITCH_ENV_KEY,
 }

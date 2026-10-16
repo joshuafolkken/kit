@@ -37,15 +37,13 @@ classification lives in `backlogrun-child.md` → "Each child runs in a delegate
 main line.** The unit returns conclusions with `file:line` citations, never the file text. It may run
 a temporary probe script and return its output.
 
-**The threshold is 3 files, and it is a count, not a forecast.** When the next read reaches it,
-delegate the unread investigation. Brief the unit on what was already read; do not re-read it there.
-**A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard` counts
-unedited files and search turns and refuses the threshold call. `pnpm josh delegate --list` prints
-the threshold.
+**The threshold is 3 files, and it is a count, not a forecast.** Brief the unit on what was already
+read. **A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard`
+refuses the threshold call, in a lane child too (`pnpm josh delegate --list`; counting:
+`docs/josh-commands-automation.md` → "`josh investigation:guard`").
 
-**Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — the parent's
-model at a lowered effort, read-only.
-`docs/josh-commands-automation.md` → "`josh investigation:guard`" carries the command's counting details.
+**Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — read-only, on
+the `model` its definition names.
 
 **The main line does not idle while the unit reads:** read files this run will edit, then verify the
 unit's cited lines. Independent investigations launch together; a brief that needs another unit's
@@ -54,3 +52,8 @@ answer waits for that answer.
 **When the Issue already names the file, function or rule, read that edit target in the main line.**
 It is not `survey`, and it is not `diagnosis`: the unit describes how the subject works;
 the main line decides what that means and what to change.
+
+## A `general-purpose` subagent names its model
+
+**A `general-purpose` dispatch → set `model`**: `sonnet` for routine work, `opus` for judgment; a review
+takes the `model` its brief prints. Delivered by the `agent-model` row of `pnpm josh rule:guard`.
