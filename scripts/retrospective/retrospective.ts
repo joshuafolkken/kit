@@ -48,7 +48,8 @@ interface RetrospectiveInputs {
 	scope: EventScope
 	// The selected run's sessions with their parsed transcripts.
 	sessions: ReadonlyArray<SessionTranscript>
-	// `josh cost:audit`'s summary line — the trend across runs this run sits in.
+	// `josh cost:audit`'s summary line — the trend across runs this run sits in — and, on a
+	// regression, the filing line `retrospective.md` acts on.
 	audit_summary: string
 }
 

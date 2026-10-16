@@ -82,11 +82,13 @@ async function measure(cwd: string, days: number, now_ms: number): Promise<Audit
 	return cost_audit.audit({ sessions, days, now_ms, merges })
 }
 
-// The default period's summary line, for `josh retrospective`.
+// The default period's summary line, for `josh retrospective`, with the filing line a regression adds.
 async function summary(cwd: string, now_ms: number = Date.now()): Promise<string> {
 	const audit = await measure(cwd, cost_audit.DEFAULT_PERIOD_DAYS, now_ms)
 
-	return cost_audit_format.summary_line(audit)
+	return [cost_audit_format.summary_line(audit), ...cost_audit_format.filing_lines(audit)].join(
+		'\n',
+	)
 }
 
 async function run(

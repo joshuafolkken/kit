@@ -50,6 +50,9 @@ describe('oracle:list is registered', () => {
 		for (const oracle of decision_oracle.DECISION_ORACLES) {
 			expect(lines.some((line) => line.includes(oracle.name))).toBe(true)
 		}
+
+		expect(lines.at(-1)).toBe(oracle_list_cli.AUTOMATION_ORDER)
+		expect(oracle_list_cli.AUTOMATION_ORDER).toContain('"automate-first"')
 	})
 })
 

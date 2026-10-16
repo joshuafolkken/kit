@@ -14,6 +14,12 @@
 
 そうであれば、規則はドライバの状態遷移に書き、文書は導線 1 行だけにする。`pnpm josh run:step <N>` が次の 1 手を計算する（`scripts/run/run-step.ts`、joshuafolkken/kit#2248）。
 
+### 自動化の問い（順序の問いの次に問う）
+
+> **その手順は、AI の判断なしに実行できるか。**
+
+できるなら、コマンドかフックの自動実行にし、文書にも差し戻しガードにもしない（`principles.md` →「automate-first」）。文書やガードとして置くのは、自動化できない理由を示せるときだけである。ガードの理由は `scripts/rules/guard-remedy.ts` の `why` が必須項目として持ち、`pnpm josh rule:list` が `not automated` として印字する。理由のないガードは `guard-remedy.test.ts` が落とす。
+
 ### 第 1 問 — 引き金を名指しできるか
 
 > **その規則が効き始める瞬間を、1 件のツール呼び出しとして名指しできるか。**
