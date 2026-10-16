@@ -1,5 +1,11 @@
 import path from 'node:path'
-import { ESLINT_CACHE_FLAGS, ESLINT_RELATED_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_CACHE_FLAGS,
+	ESLINT_RELATED_CACHE_FLAGS,
+	PRETTIER_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FILE,
+	PRETTIER_RELATED_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
 import { describe, expect, it } from 'vitest'
 import { lint_related_scope } from './lint-related-scope'
 
@@ -43,17 +49,27 @@ describe('lint_related_scope.scope_inputs', () => {
 	})
 })
 
-describe('lint_related_scope.prettier_arguments', () => {
+describe('lint_related_scope.prettier_run', () => {
 	it('checks the given files rather than the tree', () => {
-		const args = lint_related_scope.prettier_arguments(FILES)
+		const { args } = lint_related_scope.prettier_run(FILES)
 
 		expect(args).toContain('--check')
-		expect(args.slice(-FILES.length)).toEqual([...FILES])
+		expect(args).toEqual(expect.arrayContaining([...FILES]))
 		expect(args).not.toContain(WHOLE_TREE)
 	})
 
 	it('skips a file prettier cannot parse instead of failing on it', () => {
-		expect(lint_related_scope.prettier_arguments(FILES)).toContain('--ignore-unknown')
+		expect(lint_related_scope.prettier_run(FILES).args).toContain('--ignore-unknown')
+	})
+
+	// joshuafolkken/kit#3948: the scoped run is called while `josh gate` checks the whole tree, and
+	// prettier rewrites its cache file whole — so it caches into its own file, never the gate's.
+	it('caches into its own file, which the lane shares, rather than the gate one', () => {
+		const run = lint_related_scope.prettier_run(FILES)
+
+		expect(run.args.join(' ')).toContain(PRETTIER_RELATED_CACHE_FLAGS.join(' '))
+		expect(run.cache_file).toBe(PRETTIER_RELATED_CACHE_FILE)
+		expect(run.args).not.toContain(PRETTIER_CACHE_FLAGS.at(-1))
 	})
 })
 

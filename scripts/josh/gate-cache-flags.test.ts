@@ -4,8 +4,8 @@ import { plan_commands } from '#scripts/hooks/format-edited-file'
 import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { CSPELL_ARGS } from '#scripts/lint/cspell-cached'
-import { ESLINT_FIX_ARGS } from '#scripts/lint/format'
-import { ESLINT_ARGS } from '#scripts/lint/lint-parallel'
+import { ESLINT_FIX_ARGS, PRETTIER_WRITE_ARGS } from '#scripts/lint/format'
+import { ESLINT_ARGS, WHOLE_TREE_PRETTIER } from '#scripts/lint/lint-parallel'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
 import {
@@ -14,6 +14,7 @@ import {
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,
 	IGNORED_CACHE_FILES,
+	PRETTIER_CACHE_FLAGS,
 	TS_CACHE_FLAGS,
 } from './josh-command-types'
 
@@ -68,6 +69,12 @@ describe('verification gate cache flags', () => {
 
 	it('formats through the same eslint cache the lint check uses', () => {
 		expect(ESLINT_FIX_ARGS.join(' ')).toContain(ESLINT_CACHE_FLAGS.join(' '))
+	})
+
+	// joshuafolkken/kit#3948: a whole-tree `prettier --check .` was measured at 36 s cold.
+	it('checks and formats through one prettier content cache', () => {
+		expect(WHOLE_TREE_PRETTIER.args.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
+		expect(PRETTIER_WRITE_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
 	})
 })
 

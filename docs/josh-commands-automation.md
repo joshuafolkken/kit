@@ -599,6 +599,13 @@ Runs [secretlint](https://github.com/secretlint/secretlint) over the staged path
 
 **Options:** always passes `--no-glob` so lefthook's literal paths (e.g. SvelteKit `(app)` / `[id]` directories) are not treated as glob patterns.
 
+### `josh pre-commit-lint`
+
+Runs cspell, prettier or eslint over the staged paths for the pre-commit hook, with a content-strategy cache. Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_files}`; the tool's exit code is forwarded.
+
+- `cspell` and `eslint` write `.cspellcache.commit` and `.eslintcache.commit`. A staged-files run would prune the gate's cspell cache, and `eslint --quiet` would store reports without their warnings in the gate's cache.
+- `prettier` shares `.prettiercache` with `josh lint`, so a commit right after a green gate re-checks nothing.
+
 ### `josh pre-push-unit`
 
 Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`](josh-commands.md#josh-gate) recorded that exact, clean tree green.

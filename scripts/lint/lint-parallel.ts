@@ -1,7 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
-import { ESLINT_CACHE_FILE, ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_CACHE_FILE,
+	ESLINT_CACHE_FLAGS,
+	PRETTIER_CACHE_FILE,
+	PRETTIER_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import {
 	buffered_process,
@@ -11,7 +16,6 @@ import {
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
 
-const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
 // cache flags come from the same constant the ignore rules are asserted against.
 // A copy here would keep writing the old location the day that constant
@@ -21,6 +25,18 @@ const ESLINT_ARGS = ['exec', 'eslint', WHOLE_TREE, ...ESLINT_CACHE_FLAGS] as con
 const WHOLE_TREE_RECHECK: CrossFileRecheckOptions = {
 	cache_file: ESLINT_CACHE_FILE,
 	patterns: [WHOLE_TREE],
+}
+
+// What one prettier run is made of: the child's arguments, and the cache file they write, which the
+// lane shares with the main checkout around the run exactly as it does eslint's.
+interface PrettierRun {
+	args: ReadonlyArray<string>
+	cache_file: string
+}
+
+const WHOLE_TREE_PRETTIER: PrettierRun = {
+	args: ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CACHE_FLAGS],
+	cache_file: PRETTIER_CACHE_FILE,
 }
 
 // What one eslint run is made of: the child's arguments, and what re-reading a cached cross-file report
@@ -50,12 +66,15 @@ function skipped(check: string, reason: string): BufferedProcessResult {
 
 async function run_prettier(
 	directory: string,
-	prettier_args: ReadonlyArray<string>,
+	prettier: PrettierRun,
 ): Promise<BufferedProcessResult> {
 	const reason = project_checks.prettier_skip_reason(directory)
 	if (reason !== undefined) return skipped('prettier', reason)
 
-	return await buffered_process.run_buffered_process(prettier_args)
+	return await lane_cache_run.run(
+		prettier.cache_file,
+		async () => await buffered_process.run_buffered_process(prettier.args),
+	)
 }
 
 async function run_checked_eslint(
@@ -101,13 +120,13 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 // files can hold both the reported file and the one it reads, and fixing the second leaves the
 // first's cached report standing.
 async function run_lint_checks(
-	prettier_args: ReadonlyArray<string>,
+	prettier_run: PrettierRun,
 	eslint_args: ReadonlyArray<string>,
 	recheck: CrossFileRecheckOptions,
 ): Promise<number> {
 	const directory = process.cwd()
 	const [prettier, eslint] = await Promise.all([
-		run_prettier(directory, prettier_args),
+		run_prettier(directory, prettier_run),
 		run_checked_eslint(directory, { args: eslint_args, recheck }),
 	])
 
@@ -118,7 +137,7 @@ async function run_lint_checks(
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, WHOLE_TREE_RECHECK)
+	return await run_lint_checks(WHOLE_TREE_PRETTIER, ESLINT_ARGS, WHOLE_TREE_RECHECK)
 }
 
 // `process.exitCode` rather than `process.exit()`: both reports are buffered and written here in
@@ -132,4 +151,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const lint_parallel = { run_lint_checks, run_lint_parallel_checks }
 
-export { ESLINT_ARGS, lint_parallel }
+export type { PrettierRun }
+export { ESLINT_ARGS, lint_parallel, WHOLE_TREE_PRETTIER }

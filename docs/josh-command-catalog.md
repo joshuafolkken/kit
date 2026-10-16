@@ -715,6 +715,16 @@ Git hook: validate commit message
 
 ---
 
+### `josh pre-commit-lint`
+
+> **Audience:** automation · **Side effects:** files
+
+`<cspell|prettier|eslint> [paths...]`
+
+Git hook: run cspell, prettier or eslint over staged files from a content cache
+
+---
+
 ### `josh pre-commit-type-check`
 
 > **Audience:** automation · **Side effects:** processes

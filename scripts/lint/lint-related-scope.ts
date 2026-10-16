@@ -8,8 +8,11 @@ import {
 import {
 	ESLINT_RELATED_CACHE_FILE,
 	ESLINT_RELATED_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FILE,
+	PRETTIER_RELATED_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import type { CrossFileRecheckOptions } from './cross-file-recheck'
+import type { PrettierRun } from './lint-parallel'
 
 // `josh lint` reads the whole repository on every call, and an implementation loop calls it after
 // every few edits — re-reading files the change never touched.
@@ -94,8 +97,13 @@ function describe_scope(scope: ChangedFileScope, root: string): string {
 	return changed_file_scope.describe_scope(scope, root, VOCABULARY)
 }
 
-function prettier_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
-	return [...PRETTIER_ARGS, ...files]
+// The scoped run's own cache file, for the reason eslint's below gives: prettier too rewrites its
+// cache file whole, so a narrowed run sharing the gate's would discard entries a concurrent gate wrote.
+function prettier_run(files: ReadonlyArray<string>): PrettierRun {
+	return {
+		args: [...PRETTIER_ARGS, ...files, ...PRETTIER_RELATED_CACHE_FLAGS],
+		cache_file: PRETTIER_RELATED_CACHE_FILE,
+	}
 }
 
 // The cache file is this command's own rather than the gate's, because the two run at the same time.
@@ -130,7 +138,7 @@ const lint_related_scope = {
 	describe_scope,
 	eslint_arguments,
 	is_lintable,
-	prettier_arguments,
+	prettier_run,
 	scope_inputs,
 }
 

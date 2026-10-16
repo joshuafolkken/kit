@@ -128,6 +128,13 @@ const TS_BUILD_INFO_FILE = '.tsbuildinfo'
 const CSPELL_CACHE_FILE = '.cspellcache'
 const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
 const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
+const PRETTIER_CACHE_FILE = '.prettiercache'
+const PRETTIER_RELATED_CACHE_FILE = '.prettiercache.related'
+// The pre-commit hook's own, because a staged-files run on the gate's file degrades it: cspell prunes
+// every entry the run did not visit (measured 892 KB down to 18 KB), and `eslint --quiet` stores a
+// report without its warnings under the same config hash the gate reads.
+const CSPELL_COMMIT_CACHE_FILE = '.cspellcache.commit'
+const ESLINT_COMMIT_CACHE_FILE = '.eslintcache.commit'
 
 type GateCachePortability = 'raw' | 'rooted-json'
 
@@ -158,15 +165,27 @@ const ESLINT_RELATED_CACHE_SPEC: GateCacheSpec = {
 	cache_file: ESLINT_RELATED_CACHE_FILE,
 	portability: ROOTED_JSON_PORTABILITY,
 }
+// Prettier writes the same `file-entry-cache` format ESLint does, keyed by absolute path.
+const PRETTIER_CACHE_SPEC: GateCacheSpec = {
+	cache_file: PRETTIER_CACHE_FILE,
+	portability: ROOTED_JSON_PORTABILITY,
+}
+const PRETTIER_RELATED_CACHE_SPEC: GateCacheSpec = {
+	cache_file: PRETTIER_RELATED_CACHE_FILE,
+	portability: ROOTED_JSON_PORTABILITY,
+}
 const GATE_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
 	ESLINT_CACHE_SPEC,
 	TS_CACHE_SPEC,
 	CSPELL_CACHE_SPEC,
+	PRETTIER_CACHE_SPEC,
 ]
 const SHARED_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
 	ESLINT_CACHE_SPEC,
 	ESLINT_RELATED_CACHE_SPEC,
 	CSPELL_CACHE_SPEC,
+	PRETTIER_CACHE_SPEC,
+	PRETTIER_RELATED_CACHE_SPEC,
 ]
 const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => spec.cache_file)
 
@@ -194,14 +213,19 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 //
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
 // `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
-// whole tree before any commit.
+// whole tree before any commit. The scoped lint's prettier cache is its own for the same reason:
+// prettier rewrites its cache file whole as well.
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
-// written from. The gate's three, the edit hook's, and the scoped lint's — a cache file that is not
-// ignored is committed, or spell-checked, which is a red gate with nothing misspelled in the tree.
+// written from. The gate's, the edit hook's, the scoped lint's and the pre-commit hook's — a cache
+// file that is not ignored is committed, or spell-checked, which is a red gate with nothing
+// misspelled in the tree.
 const IGNORED_CACHE_FILES: ReadonlyArray<string> = [
 	...GATE_CACHE_FILES,
 	ESLINT_EDIT_CACHE_FILE,
 	ESLINT_RELATED_CACHE_FILE,
+	PRETTIER_RELATED_CACHE_FILE,
+	CSPELL_COMMIT_CACHE_FILE,
+	ESLINT_COMMIT_CACHE_FILE,
 ]
 
 // `--cache --cache-strategy content` is one convention rather than two coincidences: cspell adopted
@@ -209,11 +233,11 @@ const IGNORED_CACHE_FILES: ReadonlyArray<string> = [
 const CONTENT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
 const CACHE_LOCATION_FLAG = '--cache-location'
 
-// Four locations are written with these same four flags — the gate's eslint cache, the scoped lint's,
-// the edit hook's and the spell check's — so the sequence is built here once. Spelled out per
-// location, a fix to the order would have to be made four times and each copy fails silently: a flag
-// and its value are one unit, and a wrong order makes the tool read `--cache-strategy` as the file
-// name rather than erroring.
+// Every location is written with these same four flags — the eslint, prettier and spell-check caches
+// of the gate, the scoped lint, the edit hook and the pre-commit hook — so the sequence is built here
+// once. Spelled out per location, a fix to the order would have to be made once per location and
+// each copy fails silently: a flag and its value are one unit, and a wrong order makes the tool read
+// `--cache-strategy` as the file name rather than erroring.
 function content_cache_flags(cache_file: string): ReadonlyArray<string> {
 	return [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, cache_file]
 }
@@ -223,6 +247,10 @@ const ESLINT_EDIT_CACHE_FLAGS = content_cache_flags(ESLINT_EDIT_CACHE_FILE)
 const ESLINT_RELATED_CACHE_FLAGS = content_cache_flags(ESLINT_RELATED_CACHE_FILE)
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
 const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
+const PRETTIER_CACHE_FLAGS = content_cache_flags(PRETTIER_CACHE_FILE)
+const PRETTIER_RELATED_CACHE_FLAGS = content_cache_flags(PRETTIER_RELATED_CACHE_FILE)
+const CSPELL_COMMIT_CACHE_FLAGS = content_cache_flags(CSPELL_COMMIT_CACHE_FILE)
+const ESLINT_COMMIT_CACHE_FLAGS = content_cache_flags(ESLINT_COMMIT_CACHE_FILE)
 
 export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
@@ -235,8 +263,10 @@ export {
 	COMMAND_SIDE_EFFECTS,
 	CSPELL_CACHE_FILE,
 	CSPELL_CACHE_FLAGS,
+	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FILE,
@@ -245,6 +275,10 @@ export {
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
 	OPTIONAL_ENV_FILE_FLAGS,
+	PRETTIER_CACHE_FILE,
+	PRETTIER_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FILE,
+	PRETTIER_RELATED_CACHE_FLAGS,
 	SHARED_CACHE_SPECS,
 	TS_BUILD_INFO_FILE,
 	TS_CACHE_FLAGS,

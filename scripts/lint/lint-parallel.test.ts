@@ -1,5 +1,9 @@
 import { project_checks } from '#scripts/gate/project-checks'
-import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_CACHE_FILE,
+	PRETTIER_CACHE_FILE,
+	PRETTIER_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,7 +21,7 @@ vi.mock('./cross-file-recheck', () => ({
 
 const { cross_file_recheck } = await import('./cross-file-recheck')
 const mocked_verify = vi.mocked(cross_file_recheck.verify)
-const { lint_parallel } = await import('./lint-parallel')
+const { lint_parallel, WHOLE_TREE_PRETTIER } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -74,6 +78,17 @@ describe('run_lint_parallel_checks', () => {
 		expect(mocked_cache_run).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function))
 	})
 
+	// joshuafolkken/kit#3948: a whole-tree prettier check took 36 s cold on every gate.
+	it('checks prettier from its content cache and shares it around the prettier process', async () => {
+		mock_exit_codes(0, 0)
+
+		await run_lint_parallel_checks()
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(WHOLE_TREE_PRETTIER.args)
+		expect(WHOLE_TREE_PRETTIER.args.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
+		expect(mocked_cache_run).toHaveBeenCalledWith(PRETTIER_CACHE_FILE, expect.any(Function))
+	})
+
 	it.each([
 		['prettier fails', 1, 0],
 		['eslint fails', 0, 1],
@@ -107,17 +122,19 @@ describe('run_lint_parallel_checks — the cross-file recheck', () => {
 describe('run_lint_checks', () => {
 	const TARGET = 'scripts/thing.ts'
 	const RECHECK = { cache_file: '.eslintcache.related', patterns: [TARGET] }
+	const PRETTIER_RELATED = '.prettiercache.related'
 
 	it('runs the targets it was given instead of the whole tree', async () => {
-		const prettier_args = ['exec', 'prettier', '--check', TARGET]
+		const prettier = { args: ['exec', 'prettier', '--check', TARGET], cache_file: PRETTIER_RELATED }
 		const eslint_args = ['exec', 'eslint', TARGET]
 
 		mock_exit_codes(0, 0)
 
-		await run_lint_checks(prettier_args, eslint_args, RECHECK)
+		await run_lint_checks(prettier, eslint_args, RECHECK)
 
-		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(prettier_args)
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(prettier.args)
 		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(eslint_args)
+		expect(mocked_cache_run).toHaveBeenCalledWith(PRETTIER_RELATED, expect.any(Function))
 	})
 
 	// One change's files can hold both sides of a cycle, so a narrowed run's cached report is
@@ -127,7 +144,7 @@ describe('run_lint_checks', () => {
 		mocked_verify.mockResolvedValueOnce({ output: '', exit_code: 0, elapsed_ms: 0 })
 
 		const code = await run_lint_checks(
-			['exec', 'prettier', TARGET],
+			{ args: ['exec', 'prettier', TARGET], cache_file: PRETTIER_RELATED },
 			['exec', 'eslint', TARGET],
 			RECHECK,
 		)
@@ -218,10 +235,11 @@ describe('basic project lint over the changed files', () => {
 		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
 		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
-		const code = await run_lint_checks(['exec', 'prettier', 'a.py'], ['exec', 'eslint', 'a.py'], {
-			cache_file: ESLINT_CACHE_FILE,
-			patterns: ['a.py'],
-		})
+		const code = await run_lint_checks(
+			{ args: ['exec', 'prettier', 'a.py'], cache_file: PRETTIER_CACHE_FILE },
+			['exec', 'eslint', 'a.py'],
+			{ cache_file: ESLINT_CACHE_FILE, patterns: ['a.py'] },
+		)
 
 		expect(code).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()
