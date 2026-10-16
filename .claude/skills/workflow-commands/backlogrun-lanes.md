@@ -1,6 +1,6 @@
 # `backlogrun` — lanes and concurrency
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table". Reasons:
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow". Reasons:
 
 - `docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane ceiling is shaped the way it is"
 - `docs/maintainers/backlogrun-lanes-rationale.md` → "Why CI concurrency is capped by the lane limit"

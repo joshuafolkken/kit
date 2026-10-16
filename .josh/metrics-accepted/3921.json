@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 fix: doc:section resolves documents against the kit package; find_package_directory moves to a leaf module so the bundled doc:section closure carries no other main guard",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 74
+	}
+}

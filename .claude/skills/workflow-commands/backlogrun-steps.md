@@ -1,6 +1,6 @@
 # `backlogrun` — the detailed procedure behind the manifest
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table"; how the driver runs the loop on its own is `docs/maintainers/backlogrun-driver.md`. Reasons:
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow"; how the driver runs the loop on its own is `docs/maintainers/backlogrun-driver.md`. Reasons:
 
 - `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way"
 - `docs/maintainers/backlogrun-steps-rationale.md` → "Why a session cut does not end the run"

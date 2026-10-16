@@ -19,8 +19,9 @@ alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 ## 1. Which file to read
 
 Read this file, then the files the typed command's row names. A command file is a **manifest** of
-terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action, computed
-from the event stream, the carry record and the issue state, never the conversation.
+terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action and the
+section that governs it, computed from the event stream, the carry record and the issue state, never
+the conversation; a section it prints is not fetched again.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -31,8 +32,8 @@ from the event stream, the carry record and the issue state, never the conversat
 | `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` — its dispatched child reads `fullrun.md` + `split-assessment.md` in its own unit, not the parent at entry |
 
 `entry-sequence.md` holds the entry sequence and stop branches `fullrun`, `halfrun` and `prrun` share;
-each manifest carries only its difference. `split-assessment.md` → "The question" is read at the
-entry as a section, its split-handling detail only when a split is found.
+each manifest carries only its difference. `split-assessment.md` → "The question" is printed by
+`pnpm josh run:entry` at the entry, its split-handling detail read only when a split is found.
 
 ### The fetch is one `Read` call per file
 
