@@ -99,6 +99,11 @@ const SESSION_USAGE: Readonly<Record<string, CommandUsage>> = {
 				description:
 					'role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.',
 			},
+			{
+				names: ['JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}'],
+				description:
+					'review round 2 and later (the verification pass); Anthropic defaults are `claude-sonnet-5-5` / `high`, falling back to `JOSH_REVIEWER_*`.',
+			},
 		],
 	},
 	'lane:await': {

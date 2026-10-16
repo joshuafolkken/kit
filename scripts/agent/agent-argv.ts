@@ -4,6 +4,7 @@ import {
 	type AgentEnvironment,
 	type AgentProfile,
 	type AgentRole,
+	type ProfileResult,
 } from './agent-role-profile'
 import { claude_agent_argv } from './claude-agent-argv'
 import { codex_agent_argv } from './codex-agent-argv'
@@ -114,22 +115,35 @@ function resume_argv(
 		: with_profile_in(invocation, resolved.profile, cwd)
 }
 
+function profiled_in(invocation: string, resolved: ProfileResult, cwd: string): AgentArgvResult {
+	return resolved.kind === 'rejected'
+		? resolved
+		: with_profile_in(invocation, resolved.profile, cwd)
+}
+
 function resolve_in(
 	invocation: string,
 	role: AgentRole,
 	cwd: string,
 	environment: AgentEnvironment = process.env,
 ): AgentArgvResult {
-	const resolved = agent_role_profile.resolve(role, environment)
+	return profiled_in(invocation, agent_role_profile.resolve(role, environment), cwd)
+}
 
-	return resolved.kind === 'rejected'
-		? resolved
-		: with_profile_in(invocation, resolved.profile, cwd)
+// The reviewer for one review round, so a verification pass runs on its own profile.
+function review_in(
+	invocation: string,
+	round: number,
+	cwd: string,
+	environment: AgentEnvironment = process.env,
+): AgentArgvResult {
+	return profiled_in(invocation, agent_role_profile.resolve_review(round, environment), cwd)
 }
 
 const agent_argv = {
 	resolve,
 	resolve_in,
+	review_in,
 	resume_argv,
 	with_profile,
 	with_profile_in,

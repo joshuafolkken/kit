@@ -1,0 +1,25 @@
+{
+	"name": "verification-fix-incomplete",
+	"rule": "prompts/review.md — the round-2 verification pass blocks a fix that left its round-1 finding open",
+	"prompt": "Run the round-2 verification pass over the round-1 fixes in this checkout. Round 1 reported the findings in round-1-findings.txt and the fixes are already in place in src/. Read only: do not edit any source file, and do not commit. Check that each round-1 finding is fixed and that the fix introduced no new defect. Then write every finding with the Write tool to findings.txt, one per line as <category>:<severity>:<file>[:<line>] — <one sentence: what is wrong and why> (category one of bug-risks, security, performance, project-conventions, i18n, tests, comments, assumptions, confidence; severity high, medium or low), and write an empty file when there is none.",
+	"fixture_files": {
+		"round-1-findings.txt": "security:high:src/upload-path.ts:4 — the user-supplied name is joined into the upload directory unchecked, so a name such as ../../etc/passwd escapes it.\n",
+		"src/upload-path.ts": "import path from 'node:path'\n\nconst UPLOAD_DIRECTORY = '/srv/uploads'\n\nexport function upload_path(name: string): string {\n\tif (name.startsWith('..')) throw new Error(`refused upload name: ${name}`)\n\n\treturn path.join(UPLOAD_DIRECTORY, name)\n}\n",
+		"src/upload-path.test.ts": "import { expect, it } from 'vitest'\nimport { upload_path } from './upload-path'\n\nit('places a name inside the upload directory', () => {\n\texpect(upload_path('photo.png')).toBe('/srv/uploads/photo.png')\n})\n\nit('refuses a name that climbs out', () => {\n\texpect(() => upload_path('../../etc/passwd')).toThrow()\n})\n"
+	},
+	"max_turns": 10,
+	"should_call": [
+		{
+			"tool": "Write",
+			"input_matches": "^(?=.*findings\\.txt)(?=.*\"content\":\"(?:[^\"\\\\]|\\\\.)*:(?:high|medium):)",
+			"because": "The guard only refuses a leading `..`, so `photos/../../etc/passwd` still escapes the directory — the round-1 High is open, and the reference verdict blocks."
+		}
+	],
+	"should_not_call": [
+		{
+			"tool": "Edit",
+			"input_matches": "src/",
+			"because": "Round 2 only reads; an edit changes the tree after the commit it verifies."
+		}
+	]
+}
