@@ -83,6 +83,7 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_DEBUG`                     | No       | off                                                              | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged.                                                       |
 | `JOSH_TEMP_ROOT`                 | No       | `/tmp` (`os.tmpdir()` on Windows or when `/tmp` is not writable) | The directory every host-wide record goes to, the run's state among them. Point it at a fresh `mktemp -d` to take live evidence of `run:carry` without touching the running run (it does not isolate `run:merge`). |
 | `JOSH_CORE_RESERVED`             | No       | unset                                                            | Set by josh, never by hand: `1` marks a child whose parent already holds its share of the machine-wide core budget, so it does not reserve a second time.                                                          |
+| `JOSH_CORE_RESERVATION`          | No       | unset                                                            | Set by josh, never by hand: the ledger key of the claim a command holds for its children, so a unit suite reading the machine's free cores leaves its own not-yet-busy claim out of the ledger.                    |
 
 ### Merge, release and dependency updates
 

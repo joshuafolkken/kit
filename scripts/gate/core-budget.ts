@@ -11,6 +11,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
 import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
+import { held_mark } from './held-mark'
 import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
 
 // A machine-wide weighted core budget with admission control.
@@ -75,13 +76,6 @@ const MEMORY_MB = {
 	eslint_scan: 2400,
 	unit_worker: 350,
 } as const
-
-// **The environment mark that says a parent already holds this process's cores**
-// `josh gate` reserves per check and then spawns `pnpm josh lint`. Without
-// the mark, that child's own dispatch would claim a second place for the cores its parent already
-// holds. Every holder sets it, and every child inherits it through the environment and claims nothing.
-const HELD_KEY = 'JOSH_CORE_RESERVED'
-const HELD_VALUE = '1'
 
 // `memory_mb` and `admitted_at` are optional so a marker an older `josh` wrote still reads: it holds no
 // declared memory, and it counts as load from outside the ledger until it is gone.
@@ -377,43 +371,18 @@ function release(handle: Handle): void {
 
 // The whole reservation lifetime around a step: claim a place, wait for admission, run, and free the
 // place on any exit. `finally`, so a step that threw still releases its cores. The step is told how it was
-// admitted, so the gate can report one that started past the budget.
+// admitted, so the gate can report one that started past the budget, and the claim's ledger key.
 async function with_core_reservation<T>(
 	weight: number,
-	run: (admission: Admission) => Promise<T>,
+	run: (admission: Admission, key: string) => Promise<T>,
 	options: ReserveOptions = {},
 ): Promise<T> {
 	const handle = await reserve(weight, options)
 
 	try {
-		return await run(handle.admission)
+		return await run(handle.admission, path.basename(handle.target))
 	} finally {
 		release(handle)
-	}
-}
-
-function is_held(): boolean {
-	return process.env[HELD_KEY] === HELD_VALUE
-}
-
-// A function of its own so the restoring write does not sit after an `await`, where
-// `require-atomic-updates` reads any write to `process` as a possible race — the reason `josh.ts`
-// gives `record_exit_code`.
-function set_held_mark(value: string): void {
-	process.env[HELD_KEY] = value
-}
-
-// Marks this process, and every child it spawns, as running inside a held reservation. The previous
-// value comes back afterwards, so a nested holder never clears the mark its outer holder set.
-async function with_held_mark<T>(run: () => Promise<T>): Promise<T> {
-	const previous = process.env[HELD_KEY] ?? ''
-
-	set_held_mark(HELD_VALUE)
-
-	try {
-		return await run()
-	} finally {
-		set_held_mark(previous)
 	}
 }
 
@@ -428,28 +397,32 @@ async function with_command_reservation<T>(
 	run: () => Promise<T>,
 	options: ReserveOptions = {},
 ): Promise<T> {
-	if (is_held() || unit_worker_share.is_nested_run()) return await run()
+	if (held_mark.is_held() || unit_worker_share.is_nested_run()) return await run()
 
-	return await with_core_reservation(weight, async () => await with_held_mark(run), options)
+	return await with_core_reservation(
+		weight,
+		async (_admission, key) => await held_mark.with_held_mark(run, key),
+		options,
+	)
 }
 
 const core_budget = {
 	CORE_WEIGHTS,
-	HELD_KEY,
-	HELD_VALUE,
+	HELD_KEY: held_mark.HELD_KEY,
+	HELD_VALUE: held_mark.HELD_VALUE,
 	MEMORY_MB,
 	RESERVED_PREFIX,
 	admitted_keys: core_admission.admitted_keys,
 	admitted_load: core_admission.admitted_load,
 	budget_waits,
 	describe_overflow: core_admission.describe_overflow,
-	is_held,
+	is_held: held_mark.is_held,
 	live_reservations,
 	release,
 	reserve,
 	with_command_reservation,
 	with_core_reservation,
-	with_held_mark,
+	with_held_mark: held_mark.with_held_mark,
 }
 
 export type { LiveReservation, Reservation, ReserveOptions }
