@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { stop_rules } from './stop-rules'
+import { stop_rules_fixture } from './stop-rules-fixture'
 
 const NO_REPRINT = 'do not repeat your previous reply'
 
 // joshuafolkken/kit#3919: an action the hook could not run falls back to the refusal it replaced.
 describe('stop_rules.fallback_reason', () => {
 	it('falls back to the stop notification for a notify', () => {
-		const reason = stop_rules.fallback_reason({ kind: 'notify', issue: '7', message: 'm' })
+		const decision = stop_rules_fixture.DECISION
+		const reason = stop_rules.fallback_reason({
+			kind: 'notify',
+			issue: '7',
+			message: 'm',
+			decision,
+		})
 
 		expect(reason).toBe(stop_rules.STOP_NOTIFY_REASON)
 	})

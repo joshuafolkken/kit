@@ -35,6 +35,8 @@ const TASK_ID = 'bxj18z032'
 const AGENT_ID = 'a6b97a47275a1a193'
 const DROPS_FINISHED_AGENT = 'drops a subagent whose finish notice is on the tail'
 const { action_kinds, context } = stop_rules_fixture
+// A held stop whose reply names its decision — the one a notify is sent for (joshuafolkken/kit#3961).
+const HELD_DECISION = { hold_issue: '7', message: stop_rules_fixture.DECISION_MESSAGE }
 
 function background_call(command: string): { name: string; input: Record<string, unknown> } {
 	return { name: BASH, input: { command, run_in_background: true } }
@@ -282,7 +284,7 @@ describe('stop_rules.stop_outcome — lane background wait', () => {
 		['nothing running', {}],
 		['only a command running, which may never end', { background_pending: true }],
 	])('still sends the notify of a held run with %s', (_label, pending) => {
-		expect(action_kinds({ ...pending, hold_issue: '7' })).toEqual(['notify'])
+		expect(action_kinds({ ...pending, ...HELD_DECISION })).toEqual(['notify'])
 	})
 
 	it('still cites a bare issue number while a subagent runs', () => {

@@ -4,12 +4,15 @@ import { issue_cite_cli } from '#scripts/issue/issue-cite-cli'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
 import { stop_rules, type StopAction, type StopOutcome } from '#scripts/rules/stop-rules'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stop_actions } from './stop-actions'
 
 const REPLY = 'paused for a decision'
-const NOTIFY: StopAction = { kind: 'notify', issue: '7', message: REPLY }
+const DECISION = { recommended: 'merge it', alternative: undefined }
+const NOTIFY: StopAction = { kind: 'notify', issue: '7', message: REPLY, decision: DECISION }
 const RELEASE: StopAction = { kind: 'release', issue: '7' }
 const CITE: StopAction = { kind: 'cite', references: ['#7'] }
 const CITATION_LINE = '[#7](https://github.com/joshuafolkken/kit/issues/7) — title'
@@ -46,6 +49,8 @@ beforeEach(() => {
 	vi.spyOn(git_gh_repo, 'repo_get_name_with_owner').mockResolvedValue('joshuafolkken/kit')
 	vi.spyOn(telegram_test, 'send_values').mockResolvedValue(undefined)
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(0)
+	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue('git-dir')
+	vi.spyOn(run_hold_session, 'mark_notified').mockReturnValue(undefined)
 	vi.spyOn(issue_cite_cli, 'cite').mockResolvedValue({ lines: [CITATION_LINE], failures: [] })
 })
 
@@ -97,7 +102,7 @@ describe('stop_actions.envelope_of — the actions take', () => {
 
 	it('sends a new entry with no Issue URL and releases it bare', async () => {
 		await envelope([
-			{ kind: 'notify', issue: 'new', message: '' },
+			{ ...NOTIFY, issue: 'new', message: '' },
 			{ kind: 'release', issue: 'new' },
 		])
 
@@ -109,6 +114,30 @@ describe('stop_actions.envelope_of — the actions take', () => {
 		await envelope([RELEASE])
 
 		expect(run_hold_cli.run).toHaveBeenCalledWith(['--release', '7'])
+	})
+})
+
+// joshuafolkken/kit#3961: the reply's own choices, never a fixed placeholder.
+describe('stop_actions.envelope_of — the reply’s decision (#3961)', () => {
+	it('carries the reply’s recommended choice, and its alternative only when it names one', async () => {
+		await envelope([NOTIFY])
+
+		expect(sent_values()).toMatchObject({ recommended: 'merge it' })
+		expect(sent_values()).not.toHaveProperty('alternative')
+	})
+
+	it('carries the alternative the reply names', async () => {
+		const decision = { recommended: 'merge it', alternative: 'hold it' }
+
+		await envelope([{ ...NOTIFY, decision }])
+
+		expect(sent_values()).toMatchObject({ recommended: 'merge it', alternative: ['hold it'] })
+	})
+
+	it('stamps the send on the hold so the same pause is not announced again', async () => {
+		await envelope([NOTIFY])
+
+		expect(run_hold_session.mark_notified).toHaveBeenCalledOnce()
 	})
 })
 

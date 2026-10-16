@@ -65,6 +65,10 @@ interface RunHold {
 	// fields, or by a claim made outside an agent session.
 	owner_pid?: number | undefined
 	owner_start?: string | undefined
+	// When the `Stop` hook last sent this run's `confirmation` Telegram — its own send leaves no command
+	// on the transcript, so the record is what keeps one pause from being announced twice
+	// (`run-hold-session.ts`).
+	notified_at?: string | undefined
 }
 
 type HoldRead =
@@ -107,6 +111,7 @@ const run_hold_schema = z.object({
 	prrun_stop_head: z.string().optional(),
 	owner_pid: z.number().optional(),
 	owner_start: z.string().optional(),
+	notified_at: z.string().optional(),
 })
 
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
@@ -342,6 +347,7 @@ const run_hold = {
 	race_message,
 	read_hold,
 	release_hold,
+	session_owner,
 	stale_message,
 	uncommitted_message,
 	unknown_message,
@@ -350,5 +356,5 @@ const run_hold = {
 	write_hold,
 }
 
-export type { HoldRead, RunHold, StopMarkFields }
+export type { HoldRead, RunHold, SessionOwner, StopMarkFields }
 export { run_hold }
