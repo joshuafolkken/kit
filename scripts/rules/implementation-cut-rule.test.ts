@@ -51,11 +51,7 @@ describe(`${RATIONALE_FILE} — the measurement behind the rule`, () => {
 describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
-	it.each([
-		TOPIC_HEADING,
-		`${RATIONALE_FILE}\` → "Why the rules are guards, not prose"`,
-		'pnpm josh rule:guard',
-	])('states %j', (marker) => {
+	it.each([TOPIC_HEADING, 'pnpm josh rule:guard'])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 

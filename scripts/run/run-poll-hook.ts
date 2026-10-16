@@ -37,14 +37,47 @@ const POLL_REASON =
 	'occurrence. Wait on `pnpm josh backlog:drive`, or `pnpm josh lane:await <N...> --owner "$PPID"` in ' +
 	'the background, and end the turn; its exit is the wake.'
 
-function is_state_read(signature: string): boolean {
-	return [...STATE_READS].some((name) => signature === name || signature.startsWith(`${name} `))
+// The flags that make a state-read command write: `run:carry --filed` twice is two filings, and
+// `run:carry --cut` after `run:carry --json` is the hand-off, so neither is a re-read.
+const WRITING_FLAGS: ReadonlySet<string> = new Set([
+	'--begin',
+	'--cut',
+	'--done',
+	'--end',
+	'--every',
+	'--filed',
+	'--loop',
+	'--mark',
+	'--merged',
+	'--resume',
+	'--retrospective',
+	'--start',
+	'--stop',
+	'--wait',
+])
+
+const FLAG_PREFIX = '-'
+const NAME_WORDS = 2
+const SIGNATURE_SEPARATOR = ' '
+
+// A state read keyed by the command and its operands, or `undefined` for a call that is none.
+// **Operands, not flags**: `lane:output 1 <path>` then `lane:output 2 <path>` read two children, while
+// `run:board` and `run:board --chat` print one answer.
+function read_key(signature: string): string | undefined {
+	const words = signature.split(SIGNATURE_SEPARATOR)
+	const name = words.slice(0, NAME_WORDS).join(SIGNATURE_SEPARATOR)
+
+	if (!STATE_READS.has(name) || words.some((word) => WRITING_FLAGS.has(word))) return undefined
+
+	return words.filter((word) => !word.startsWith(FLAG_PREFIX)).join(SIGNATURE_SEPARATOR)
 }
 
-// Keyed by signature, not by bare name: `lane:output 1 <path>` then `lane:output 2 <path>` read two
-// children, which is no repeat.
+function read_keys(signatures: ReadonlyArray<string>): Array<string> {
+	return signatures.map((signature) => read_key(signature)).filter((key) => key !== undefined)
+}
+
 function state_reads_of(command: string): ReadonlyArray<string> {
-	return time_shell.josh_signatures_of(command).filter((signature) => is_state_read(signature))
+	return read_keys(time_shell.josh_signatures_of(command))
 }
 
 function command_of(input: unknown): string {
@@ -75,7 +108,9 @@ function repeats_last_call(tail: string, reads: ReadonlyArray<string>): boolean 
 
 	if (last?.category !== time_spans.TOOL_CATEGORY) return false
 
-	return reads.some((signature) => last.josh_signatures.includes(signature))
+	const last_reads = read_keys(last.josh_signatures)
+
+	return reads.some((key) => last_reads.includes(key))
 }
 
 // Every cheap test first: the carry record is read only for a call that already repeats a state read.

@@ -10,6 +10,7 @@ const { josh_call_line, prompt_line, result_line, error_result_line } = time_tra
 const BRANCH = '3925-lane'
 const BOARD = 'pnpm josh run:board --chat'
 const AWAIT = 'pnpm josh lane:await 1'
+const CARRY_JSON = 'pnpm josh run:carry --json'
 const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'run-poll-hook-'))
 const sequence = { value: 0 }
 
@@ -64,8 +65,8 @@ describe('run_poll_hook.poll_reason — a repeated state read', () => {
 		expect(reason).toBe(run_poll_hook.POLL_REASON)
 	})
 
-	it('refuses a repeat that differs only in its flags', async () => {
-		const raw = payload(after('pnpm josh run:carry --json'), { command: 'pnpm josh run:carry' })
+	it('refuses a repeat that differs only in a reading flag', async () => {
+		const raw = payload(after(CARRY_JSON), { command: 'pnpm josh run:carry' })
 
 		expect(await run_poll_hook.poll_reason(raw, parent)).toBe(run_poll_hook.POLL_REASON)
 	})
@@ -147,6 +148,23 @@ describe('run_poll_hook.safe_poll_reason', () => {
 		})
 
 		expect(await run_poll_hook.safe_poll_reason(raw)).toBeUndefined()
+	})
+})
+
+describe('run_poll_hook.poll_reason — a writing flag', () => {
+	it('allows the hand-off write after a read of the same command', async () => {
+		const raw = payload(after(CARRY_JSON), {
+			command: 'pnpm josh run:carry --cut --owner "$PPID"',
+		})
+
+		expect(await run_poll_hook.poll_reason(raw, parent)).toBeUndefined()
+	})
+
+	it('allows a second filing, which counts once more', async () => {
+		const filed = 'pnpm josh run:carry --filed --owner "$PPID"'
+		const raw = payload(after(filed), { command: filed })
+
+		expect(await run_poll_hook.poll_reason(raw, parent)).toBeUndefined()
 	})
 })
 

@@ -1,14 +1,6 @@
 # `backlogrun` — running a child (shared mechanics, delegation, liveness, session setup)
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow". Reasons:
-
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the file is read by section"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why a bare Issue promotes itself under `backlogrun` but not under `fullrun`"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why each child runs in a delegated unit"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the summary is bounded the way it is"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the audit runs before the first child"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why `josh latest` is hoisted to the session"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the preflight is part of the claim"
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow".
 
 ## Running a child — the shared mechanics
 

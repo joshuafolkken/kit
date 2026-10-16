@@ -318,19 +318,15 @@ function josh_arguments(command: string): Array<string> {
 	return josh_arguments_of_segment(command_segment(command))
 }
 
-// The josh subcommand one segment runs plus the operands it names, flags dropped, or `''` for a
-// segment that runs none. **The operands are what the call asks about**: `lane:output 1 a.log` and
-// `lane:output 2 b.log` read two children, while `run:board` and `run:board --chat` print one answer.
+// The josh subcommand one segment runs plus every argument it passes, redirections dropped, or `''`
+// for a segment that runs none. **Flags are kept**: which of them ask nothing new (`run:board --chat`)
+// and which turn a read into a write (`run:carry --cut`) is the reader's rule, not this one's.
 function josh_signature_of_segment(segment: string): string {
 	const name = josh_command_of_segment(segment)
 
 	if (name === '') return ''
 
-	const operands = josh_arguments_of_segment(segment).filter(
-		(word) => !word.startsWith(FLAG_PREFIX),
-	)
-
-	return [name, ...operands].join(' ')
+	return [name, ...josh_arguments_of_segment(segment)].join(' ')
 }
 
 // Every segment's signature, read over the same unquoted chain `josh_commands_of` walks.

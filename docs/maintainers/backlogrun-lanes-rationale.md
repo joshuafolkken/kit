@@ -2,7 +2,7 @@
 
 This is the maintainer-only rationale behind `.claude/skills/workflow-commands/backlogrun-lanes.md`:
 the reasons, the history and the arguments that justify its rules. It is never read during a run —
-the procedure document carries every trigger, command, bound and prohibition, and points here only for
+the procedure document carries every trigger, command, bound and prohibition; this file holds only
 why they are what they are. The procedure became a point-of-use document, never an entry read, in
 joshuafolkken/kit#2010.
 

@@ -19,7 +19,8 @@ Review results and successful pushes are never turn boundaries.
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), run the final scoped lint/test pair and
    `pnpm josh run:review`: it starts `pnpm josh gate` in the background and prints the `/code-review`
    brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
-   agent type with that brief (every tool, so `--fix` applies; never a guessed type name).
+   agent type with that brief and the alias of its `model=` id (`claude-opus-5-5` → `opus`) (every
+   tool, so `--fix` applies; never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
@@ -56,9 +57,7 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 ## Orchestration facts single-sourced here
 
 These are the gate → review → PR → merge facts other documents cite; this file is their single source
-(`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric). Where each
-rule came from and why it holds: `docs/maintainers/chain-rule-rationale.md` → "Where each rule came
-from", `docs/maintainers/chain-rule-rationale.md` → "Why the orchestration facts hold".
+(`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric).
 
 - **The gate runs beside this review, not in front of it** — started with the review, joined before the
   commit. A red gate is fixed and re-run whatever the review concluded.

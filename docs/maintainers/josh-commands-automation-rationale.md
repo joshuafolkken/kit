@@ -19,13 +19,14 @@ reach the turn it would pack.
 In the main line the guard once fired once per run and fell silent for the rest of a run that ignored
 it; it now re-fires, the notice on a tighter interval than the refusal (joshuafolkken/kit#2276).
 
-## The investigation guard is a notice in a lane child
+## The investigation guard refuses in a lane child
 
 It was `off` from joshuafolkken/kit#2138 to joshuafolkken/kit#2382, on the reason that a child cannot
 dispatch a sub-unit to read its own edit targets. joshuafolkken/kit#2382 re-measured six lane
 children each reading 4–17 unedited files, so the reading was there to send out, and the guard became
-a notice naming those files. It is re-measured on the next backlogrun and redesigned rather than kept
-if it misses the target.
+a notice naming those files. joshuafolkken/kit#3927 measured the notice not moving the reading — 52%
+of lane cost stayed in main-line exploration — so the child is refused at the unchanged threshold. A
+hook denial returns to the model as guidance, and the refusal fires once per accumulation.
 
 ## Where each command came from
 
@@ -37,7 +38,7 @@ the behavior.
 | --------------------------- | ---------------------------------------------------------------- |
 | `josh batch:guard`          | #2138, #2164, #2178, #2276, #2405, #2984 (the hook launch shape) |
 | `josh time:density`         | #2405                                                            |
-| `josh investigation:guard`  | #2138, #2382                                                     |
+| `josh investigation:guard`  | #2138, #2382, #3927                                              |
 | `josh duplicate-read:guard` | #2298                                                            |
 | `josh rule:guard`           | #2297, #2385, #2807                                              |
 | `josh pretool:guard`        | #2138, #2164, #2178, #2276, #2298, #2382, #2405                  |
@@ -73,7 +74,7 @@ Report tool calls per round trip across the recent lane sessions — the density
 
 ## `josh investigation:guard` in detail
 
-- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, so the guard delivers the same guidance as a non-blocking notice — the read proceeds with the guidance attached, and the notice names the concrete unedited files the run read. Why: "The investigation guard is a notice in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
+- **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`), at the same threshold. Why: "The investigation guard refuses in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 
 ## `josh rule:guard` in detail
 
@@ -83,7 +84,7 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deli
 
 ## `josh pretool:guard` in detail
 
-**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it names the concrete unedited files rather than refusing), `batching` is `off` (a notice is structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `refuse` (its notice was measured not to move the reading), `batching` is `off` (a notice is structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ## `josh stop:guard` in detail
 

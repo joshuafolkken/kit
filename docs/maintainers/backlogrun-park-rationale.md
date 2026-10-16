@@ -2,8 +2,8 @@
 
 This is the maintainer-only rationale behind `.claude/skills/workflow-commands/backlogrun-park.md`:
 the reasons and history behind what a run does with a child that cannot finish. It is never read
-during a run — the procedure document carries every trigger, command and prohibition, and points here
-only for why they are what they are. A change to this file changes no rule.
+during a run — the procedure document carries every trigger, command and prohibition; this file holds
+only why they are what they are. A change to this file changes no rule.
 
 ## Why `needs-human-review` ends the run instead of parking
 

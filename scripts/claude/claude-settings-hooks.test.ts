@@ -70,10 +70,10 @@ const FORMAT_TOOLS = ['Edit', 'Write']
 // (joshuafolkken/kit#1798); `Write` earns the batching guard's non-blocking notice
 // (joshuafolkken/kit#1848); `AskUserQuestion` is where the lane-child interactive-ask rule binds
 // (joshuafolkken/kit#2201) — without it in the matcher the hook never sees the ask a headless child
-// must be routed away from. Each composed guard self-gates on the tool name inside its own candidate
-// test, so naming the union is safe — a guard the call does not concern returns "allow" without ever
-// reading the transcript.
-const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion']
+// must be routed away from; `Agent` / `Task` is where the `agent-model` row binds (joshuafolkken/kit#3927).
+// Each composed guard self-gates on the tool name inside its own candidate test, so naming the union is
+// safe — a guard the call does not concern returns "allow" without ever reading the transcript.
+const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion', 'Agent', 'Task']
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
 // rather than a push that dies after the unit suite has already run. It goes through the shared

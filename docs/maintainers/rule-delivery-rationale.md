@@ -43,7 +43,7 @@ was delivered.
   `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
   `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
   entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
-  `Bash|Edit|Read|Write|AskUserQuestion`. A
+  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task`. A
   batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
   still honors its own environment switch.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
@@ -292,11 +292,11 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
 
 `lane-guard-policy.ts` gives each mode a one-sentence `because`; the measurements behind it:
 
-- `investigation` → `notice`. A refusal ends a child turn (joshuafolkken/kit#2138), so it was `off`
-  until joshuafolkken/kit#2382 re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372
-  #2374 #2375):
-  every one read 4–17 files it never edited, over the threshold of 3. The notice names the concrete
-  files (the #2276 precedent), since a generic "delegate" did not move the number (#2164 → #2178).
+- `investigation` → `refuse`. It was `off` (joshuafolkken/kit#2138) until joshuafolkken/kit#2382
+  re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372 #2374 #2375): every one read
+  4–17 files it never edited, over the threshold of 3, so it became a notice naming those files.
+  joshuafolkken/kit#3927 measured the notice not moving the reading (52% of lane cost in main-line
+  exploration), so it refuses at the same threshold, once per accumulation.
 - `batching` → `off`. A notice (joshuafolkken/kit#2164), taken off (joshuafolkken/kit#2178), restored
   (joshuafolkken/kit#2276) and re-measured (joshuafolkken/kit#2405) at 1.13 calls per round trip
   against a 1.40 target, as every advisory attempt before it (joshuafolkken/kit#1304, #1329, #1337,

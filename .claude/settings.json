@@ -74,7 +74,7 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task",
 				"hooks": [
 					{
 						"type": "command",

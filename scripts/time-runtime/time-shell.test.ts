@@ -49,9 +49,9 @@ describe('josh_signatures_of', () => {
 		])
 	})
 
-	it('drops flags and redirections, which ask nothing new', () => {
-		expect(time_shell.josh_signatures_of('pnpm josh run:board --chat 2>&1')).toEqual([
-			'josh run:board',
+	it('keeps flags and drops redirections', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh run:carry --cut 2>&1')).toEqual([
+			'josh run:carry --cut',
 		])
 	})
 

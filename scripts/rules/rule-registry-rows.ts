@@ -158,6 +158,16 @@ const GUARD_ROWS: ReadonlyArray<RegisteredRule> = [
 		quiet: 'not a lane child, or not an interactive tool',
 	},
 	{
+		id: 'agent-model',
+		title: 'Subagent model named',
+		topic:
+			'`.claude/skills/workflow-commands/delegation.md` → "A `general-purpose` subagent names its model"',
+		entry: RULE_GUARD,
+		fires:
+			'an `Agent` / `Task` call of the `general-purpose` type with no `model`. Every occurrence',
+		quiet: 'a named agent type, or a `model` set',
+	},
+	{
 		id: 'lane-carry-conflict',
 		title: 'Lane child carry commands',
 		topic: BACKLOGRUN_LANES,

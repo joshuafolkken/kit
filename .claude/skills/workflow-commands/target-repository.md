@@ -2,8 +2,7 @@
 
 **This file is the prefix's single source, read at its point of use — the moment an entry is typed with an
 `owner/repo#` prefix (or a short `repo#` name), not at any entry.** A run given a bare `#N` or `new`
-targets the session's own repository and never reaches it. `SKILL.md` → §2's table keeps the trigger and
-points here. Rationale: `docs/maintainers/target-repository-rationale.md` → "Why the prefix reads as it does".
+targets the session's own repository and never reaches it.
 
 Every entry point takes the target repository in front of the Issue reference. Without it the target
 is the repository the session runs in.
