@@ -23,6 +23,7 @@ vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 const { git_command } = await import('./git-command')
 const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
+const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
 
 const CHANGED_FILE = 'scripts/a.ts'
@@ -122,6 +123,17 @@ describe('the outcome of one merge', () => {
 		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
 
 		expect(await main_merge.merge()).toStrictEqual({ kind: 'conflict', files: [CHANGED_FILE] })
+	})
+
+	// joshuafolkken/kit#3922: a conflict only on generated files is regenerated rather than stopped on.
+	it('answers merged once a conflict on generated files alone is regenerated', async () => {
+		merge_branch.mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
+		vi.mocked(git_spawn.read).mockResolvedValue(CHANGED_FILE)
+		const resolve = vi.spyOn(main_merge_regenerate, 'resolve').mockResolvedValueOnce(true)
+
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'merged', branch: 'main' })
+		expect(resolve).toHaveBeenCalledWith([CHANGED_FILE])
 	})
 
 	it('rethrows a merge failure that left no unmerged path', async () => {
