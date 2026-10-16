@@ -1,4 +1,5 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_hold, type RunHold, type SessionOwner } from './run-hold'
 
 // What the `Stop` hook asks of a hold beyond "is one in place" (joshuafolkken/kit#3961): whether it is
@@ -31,12 +32,13 @@ function is_notified_since(hold: RunHold, pause_start: string | undefined): bool
 	return Date.parse(hold.notified_at) >= Date.parse(pause_start)
 }
 
-// Stamps the send on the record in place; a tree no longer held has nothing to stamp.
+// Stamps the send on the record in place; a tree no longer held has nothing to stamp. A stale record is
+// stamped too: the hook reads it as the hold (`hold_of`), so a run past the expiry age still finds its send.
 function mark_notified(target: string, now: Date = new Date()): void {
-	const read = run_hold.read_hold(target, now)
-	if (read.kind !== 'held') return
+	const hold = run_halfrun_resume.hold_of(run_hold.read_hold(target, now))
+	if (hold === undefined) return
 
-	stamp_file.write_stamp(target, { ...read.hold, notified_at: now.toISOString() })
+	stamp_file.write_stamp(target, { ...hold, notified_at: now.toISOString() })
 }
 
 const run_hold_session = { is_notified_since, is_session_hold, mark_notified }

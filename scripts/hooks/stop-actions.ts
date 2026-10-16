@@ -80,11 +80,16 @@ function notify_values(issue_url: string | undefined, action: NotifyAction): Cli
 	return issue_url === undefined ? values : { ...values, 'issue-url': issue_url }
 }
 
-// The send is stamped on the hold, so a later stop of the same pause does not announce it again.
+// The send is stamped on the hold, so a later stop of the same pause does not announce it again. A
+// stamp that fails does not fail the send: the Telegram is out, and a refused stop would send it twice.
 async function mark_notified(): Promise<void> {
-	const directory = await run_hold.worktree_directory()
+	try {
+		const directory = await run_hold.worktree_directory()
 
-	if (directory !== undefined) run_hold_session.mark_notified(run_hold.hold_path(directory))
+		if (directory !== undefined) run_hold_session.mark_notified(run_hold.hold_path(directory))
+	} catch (error) {
+		console.warn(`stop:guard could not stamp the notify on the hold: ${String(error)}`)
+	}
 }
 
 async function notify(action: NotifyAction): Promise<string> {

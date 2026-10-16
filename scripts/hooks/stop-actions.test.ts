@@ -172,6 +172,18 @@ describe('stop_actions.envelope_of — an action fails', () => {
 		expect(await field_of([NOTIFY], 'reason')).toContain(stop_rules.STOP_NOTIFY_REASON)
 	})
 
+	it('keeps a sent notify done when its stamp on the hold fails', async () => {
+		vi.mocked(run_hold_session.mark_notified).mockImplementation(() => {
+			throw new Error('stamp race')
+		})
+		vi.spyOn(console, 'warn').mockReturnValue(undefined)
+
+		const written = await envelope([NOTIFY])
+
+		expect(written).not.toHaveProperty('decision')
+		expect(String(written[NOTICE_KEY])).toContain(NOTIFY_NOTICE)
+	})
+
 	it('falls back on a citation with any number left unanswered', async () => {
 		vi.mocked(issue_cite_cli.cite).mockResolvedValue({ lines: [CITATION_LINE], failures: ['#8'] })
 

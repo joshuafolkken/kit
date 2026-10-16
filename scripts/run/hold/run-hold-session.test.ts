@@ -74,6 +74,18 @@ describe('run_hold_session.mark_notified', () => {
 		expect(read.kind === 'held' ? read.hold.notified_at : undefined).toBe(NOTIFIED_AT)
 	})
 
+	it('stamps the send on a record past the expiry age', () => {
+		const now = new Date(Date.parse(TAKEN_AT) + run_hold.HOLD_MAX_AGE_MS + 1)
+
+		run_hold.write_hold(TARGET, '7', new Date(TAKEN_AT))
+		run_hold_session.mark_notified(TARGET, now)
+
+		expect(run_hold.read_hold(TARGET, now)).toMatchObject({
+			kind: 'stale',
+			hold: { notified_at: now.toISOString() },
+		})
+	})
+
 	it('writes nothing on a free tree', () => {
 		const free = path.join(scratch, 'free.json')
 
