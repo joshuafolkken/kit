@@ -11,6 +11,8 @@ import { codex_agent_argv } from './codex-agent-argv'
 interface AgentArgv {
 	command: string
 	args: ReadonlyArray<string>
+	// The invocation is the last element, so `detached-launch.ts` lets that one break lines.
+	ends_with_prompt: true
 }
 
 type AgentArgvResult =

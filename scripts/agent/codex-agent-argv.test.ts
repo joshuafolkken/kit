@@ -61,6 +61,7 @@ describe('Codex argv construction', () => {
 				'--json',
 				INVOCATION,
 			],
+			ends_with_prompt: true,
 		})
 	})
 

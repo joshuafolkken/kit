@@ -6,6 +6,8 @@ const DELETE_CODE = 0x7f
 const FIRST_CODE_POINT = 0
 const EMPTY_LENGTH = 0
 const MAX_VALUE_LENGTH = 4096
+const LINE_FEED = '\n'
+const SPACE = ' '
 
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
 const PROVIDER_SCHEMA = z.enum(['anthropic', 'openai'])
@@ -99,12 +101,44 @@ function is_control_character(character: string): boolean {
 	return code < FIRST_PRINTABLE_CODE || code === DELETE_CODE
 }
 
-function is_safe_value(value: string): boolean {
+function is_line_feed(character: string): boolean {
+	return character === LINE_FEED
+}
+
+function is_never_allowed(): boolean {
+	return false
+}
+
+function is_refused(character: string, is_allowed: (character: string) => boolean): boolean {
+	return is_control_character(character) && !is_allowed(character)
+}
+
+function is_safe_text(value: string, is_allowed: (character: string) => boolean): boolean {
 	if (value.length === EMPTY_LENGTH || value.length > MAX_VALUE_LENGTH) return false
 
-	for (const character of value) if (is_control_character(character)) return false
+	for (const character of value) if (is_refused(character, is_allowed)) return false
 
 	return true
+}
+
+function is_safe_value(value: string): boolean {
+	return is_safe_text(value, is_never_allowed)
+}
+
+// **An agent's prompt is the one value a line break belongs in.** A ship-stop prompt carries the failed
+// output's lines (joshuafolkken/kit#3964); every other control character is refused as in any value.
+function is_safe_prompt(value: string): boolean {
+	return is_safe_text(value, is_line_feed)
+}
+
+function printable_character(character: string): string {
+	return is_refused(character, is_line_feed) ? SPACE : character
+}
+
+// Command output made fit for a prompt: every control character but a line break becomes a space, so
+// the text passes `is_safe_prompt` whatever the command printed.
+function printable(text: string): string {
+	return Array.from(text, printable_character).join('')
 }
 
 function trimmed(value: string | undefined): string | undefined {
@@ -340,8 +374,10 @@ const agent_role_profile = {
 	describe,
 	handoff_environment,
 	has_completion_callback,
+	is_safe_prompt,
 	is_safe_value,
 	parse,
+	printable,
 	resolve,
 	resolve_provider,
 	warn_of_default,
