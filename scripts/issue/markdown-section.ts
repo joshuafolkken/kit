@@ -3,6 +3,9 @@
 // way, so the slicing lives in one place rather than being written twice.
 
 const HEADING_PREFIX = '## '
+// A body saved from GitHub's web editor ends its lines with CRLF; a kept `\r` would end every line's
+// text with it and defeat each `$`-anchored match downstream.
+const LINE_BREAK_PATTERN = /\r?\n/u
 
 function is_heading(line: string): boolean {
 	return line.trimStart().startsWith(HEADING_PREFIX)
@@ -29,19 +32,29 @@ function next_fence(line: string, fence: string): string | undefined {
 	return undefined
 }
 
-function unfenced_lines(body: string): ReadonlyArray<string> {
+function lines_of(body: string): ReadonlyArray<string> {
+	return body.split(LINE_BREAK_PATTERN)
+}
+
+// The body's lines with every fenced line, fences included, blanked. Indentation is kept, so a list
+// item's indented continuation survives.
+function fence_free_lines(body: string): ReadonlyArray<string> {
 	let fence = ''
 	const visible: Array<string> = []
 
-	for (const line of body.split('\n')) {
+	for (const line of lines_of(body)) {
 		const next = next_fence(line, fence)
-		const visible_line = line.replace(/^(?: {4}|\t).*/u, '')
 
-		visible.push(next === undefined && fence === '' ? visible_line : '')
+		visible.push(next === undefined && fence === '' ? line : '')
 		fence = next ?? fence
 	}
 
 	return visible
+}
+
+// As `fence_free_lines`, with an indented code line (4 spaces or a tab) blanked too.
+function unfenced_lines(body: string): ReadonlyArray<string> {
+	return fence_free_lines(body).map((line) => line.replace(/^(?: {4}|\t).*/u, ''))
 }
 
 function has_unfenced_line(body: string, text: string): boolean {
@@ -59,7 +72,7 @@ function section_lines_matching(
 	body: string,
 	is_target: (line: string) => boolean,
 ): ReadonlyArray<string> {
-	const lines = body.split('\n')
+	const lines = lines_of(body)
 	const visible = unfenced_lines(body)
 	const start = visible.findIndex((line) => is_target(line))
 
@@ -80,6 +93,7 @@ function section_lines(body: string, heading: string): ReadonlyArray<string> {
 const markdown_section = {
 	section_lines,
 	section_lines_matching,
+	fence_free_lines,
 	unfenced_lines,
 	has_line,
 	has_unfenced_line,

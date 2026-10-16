@@ -9,6 +9,7 @@ const FIRST = 'The followup refuses an unmapped criterion'
 const SECOND = 'An issue with no acceptance section passes'
 const SPLIT_OFF = 'joshuafolkken/kit#4000'
 const STALE_ID = 'ac-00000000'
+const WRAPPED = 'The followup refuses it'
 const ADDED = 'A criterion added during the review is refused'
 const EVIDENCE = 'acceptance-map.test.ts `refuses a missing row`'
 
@@ -69,7 +70,7 @@ describe('acceptance_map.criteria_of', () => {
 		)
 
 		expect(acceptance_map.criteria_of(body).map((criterion) => criterion.text)).toEqual([
-			'The followup refuses it',
+			WRAPPED,
 			SECOND,
 		])
 	})
@@ -85,6 +86,31 @@ describe('acceptance_map.criteria_of', () => {
 		const ticked = acceptance_map.criteria_of(`## 受け入れ条件\n\n- [x] ${FIRST}`)
 
 		expect(ticked[0]?.id).toBe(id(FIRST))
+	})
+})
+
+describe('acceptance_map.criteria_of — line shapes', () => {
+	it('reads a CRLF body like an LF one', () => {
+		const crlf = issue_with([FIRST, SECOND]).replaceAll('\n', '\r\n')
+
+		expect(acceptance_map.criteria_of(crlf)).toEqual(
+			acceptance_map.criteria_of(issue_with([FIRST, SECOND])),
+		)
+	})
+
+	it('keeps a continuation line indented four spaces in the criterion', () => {
+		const before = acceptance_map.criteria_of('## 受け入れ条件\n\n- The followup\n    refuses it')
+		const after = acceptance_map.criteria_of('## 受け入れ条件\n\n- The followup\n    passes it')
+
+		expect(before.map((criterion) => criterion.text)).toEqual([WRAPPED])
+		expect(after[0]?.id).not.toBe(before[0]?.id)
+	})
+
+	it('does not join a heading, table row or HTML comment onto the criterion above', () => {
+		const body = [`- ${FIRST}`, '### Notes', '| a |', '<!-- note -->', `+ ${SECOND}`]
+		const criteria = acceptance_map.criteria_of(`## 受け入れ条件\n\n${body.join('\n')}`)
+
+		expect(criteria.map((criterion) => criterion.text)).toEqual([FIRST, SECOND])
 	})
 })
 

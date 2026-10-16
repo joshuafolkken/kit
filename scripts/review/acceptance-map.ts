@@ -25,8 +25,9 @@ const ID_PREFIX = 'ac-'
 const ID_HEX_LENGTH = 8
 const BACKTICK = '`'
 // A top-level list item only: a nested item is detail under a criterion, not one of its own.
-const CRITERION_PATTERN = /^(?:[-*]|\d+\.)\s+(?:\[[ xX]\]\s+)?(?<text>\S.*)$/u
-const LIST_ITEM_PATTERN = /^\s*(?:[-*]|\d+\.)\s/u
+const CRITERION_PATTERN = /^(?:[-*+]|\d+\.)\s+(?:\[[ xX]\]\s+)?(?<text>\S.*)$/u
+// A list item, heading, table row or HTML comment opens a block of its own, never a wrapped line.
+const BLOCK_START_PATTERN = /^\s*(?:(?:[-*+]|\d+\.)\s|#|\||<!--)/u
 // The criterion's text may sit between the identifier and the status for the reader, so the status is
 // the last status word on the line — a criterion quoting the row format stays text.
 const ROW_PATTERN = new RegExp(
@@ -73,7 +74,7 @@ function criterion_id(text: string): string {
 }
 
 function joins(last: string | undefined, line: string): boolean {
-	const is_continuation = line.trim() !== '' && !LIST_ITEM_PATTERN.test(line)
+	const is_continuation = line.trim() !== '' && !BLOCK_START_PATTERN.test(line)
 
 	return is_continuation && last !== undefined && CRITERION_PATTERN.test(last)
 }
@@ -91,8 +92,9 @@ function unwrapped(lines: ReadonlyArray<string>): ReadonlyArray<string> {
 }
 
 function criteria_of(issue_body: string | undefined): ReadonlyArray<Criterion> {
-	// A list item inside a code fence is an example the Issue quotes, not a criterion.
-	const lines = markdown_section.unfenced_lines(epic_audit_logic.acceptance_section(issue_body))
+	// A list item inside a code fence is an example the Issue quotes, not a criterion. An indented line
+	// outside one is a wrapped criterion's continuation, so it is kept.
+	const lines = markdown_section.fence_free_lines(epic_audit_logic.acceptance_section(issue_body))
 	const texts = unwrapped(lines).map((line) => CRITERION_PATTERN.exec(line)?.groups?.['text'])
 
 	return texts
