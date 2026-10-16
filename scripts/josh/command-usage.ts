@@ -1,11 +1,13 @@
 import { canonical_command, COMMAND_MAP } from './josh-command-map'
 import type { CommandUsage } from './josh-command-types'
+import { AUTOMATION_USAGE } from './josh-usage-automation'
 import { BACKLOG_USAGE } from './josh-usage-backlog'
 import { DEVELOPER_USAGE } from './josh-usage-developer'
 import { ISSUE_USAGE } from './josh-usage-issue'
 import { REVIEW_USAGE } from './josh-usage-review'
 import { RUN_USAGE } from './josh-usage-run'
 import { SESSION_USAGE } from './josh-usage-session'
+import { WORKFLOW_USAGE } from './josh-usage-workflow'
 
 // The single renderer of a command's usage. `josh help <command>` prints it and
 // `scripts/document/generate-command-usage.ts` writes it between a reference page's usage markers,
@@ -18,6 +20,8 @@ const COMMAND_USAGE: Readonly<Record<string, CommandUsage>> = {
 	...ISSUE_USAGE,
 	...BACKLOG_USAGE,
 	...REVIEW_USAGE,
+	...AUTOMATION_USAGE,
+	...WORKFLOW_USAGE,
 }
 const NOTE_GAP = 3
 

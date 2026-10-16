@@ -16,8 +16,8 @@ describe('generate command usage', () => {
 
 	it('refuses a span naming a command with no registered usage', () => {
 		expect(() =>
-			generate_command_usage.fill_usage_blocks('<!-- usage: followup -->\n<!-- /usage -->'),
-		).toThrow('josh followup')
+			generate_command_usage.fill_usage_blocks('<!-- usage: stop:guard -->\n<!-- /usage -->'),
+		).toThrow('josh stop:guard')
 	})
 
 	it.each(generate_command_usage.USAGE_PAGES)(
