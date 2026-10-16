@@ -360,7 +360,7 @@ as a `ship-stage` trace event.
 
 `--review` runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.
 
-`--detach` (implied in a lane child): a supervisor; a stop emits `ship-stop` (`--log <N>`). The preflight, type check and doc tests run before the hand-off; a stop returns to the same session.
+`--detach` (implied in a lane child): a supervisor; a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell and guard tests run before the hand-off; a stop returns to the same session.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".
 
