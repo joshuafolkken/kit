@@ -1,0 +1,5 @@
+- rf:bug-risks | low | scripts/run/board/run-board-read.ts:108 | 2026-10-16 | #3967
+- rf:bug-risks | low | scripts/lane/lane-limit-cli.ts:101 | 2026-10-16 | #3967
+- rf:tests | low | scripts/backlog/backlog-ready.test.ts:136 | 2026-10-16 | #3967
+- rf:project-conventions | low | scripts/lane/lane-limit-cli.ts:58 | 2026-10-16 | #3967
+- rf:project-conventions | low | scripts/backlog/backlog-ready.ts:63 | 2026-10-16 | #3967

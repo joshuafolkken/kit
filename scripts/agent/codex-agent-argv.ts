@@ -19,6 +19,7 @@ const LEDGER_DIRECTORY = path.dirname(OBSERVATION_LEDGER_DIRECTORY)
 interface CodexArgv {
 	command: string
 	args: ReadonlyArray<string>
+	ends_with_prompt: true
 }
 
 function effort_config(profile: AgentProfile): string {
@@ -91,6 +92,7 @@ function build(invocation: string, profile: AgentProfile, cwd?: string): CodexAr
 			JSON_FLAG,
 			invocation,
 		],
+		ends_with_prompt: true,
 	}
 }
 
