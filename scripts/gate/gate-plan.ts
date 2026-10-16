@@ -398,6 +398,25 @@ function resolve_gate_plan(
 	}
 }
 
+// The unit cap bounded by the cores free of load from outside the core budget's ledger
+// (`free-cores.ts`), so the run count's share is never wider than what is free. A plan with no unit
+// step carries no cap, and an unread machine leaves the cap as resolved (`unit_worker_share.cap_to_free`).
+function bound_by_free(
+	plan: GatePlan,
+	available_cores: number,
+	free_cores: number | undefined,
+): GatePlan {
+	if (!has_unit_check(plan.checks)) return plan
+
+	const unit_worker_cap = unit_worker_share.cap_to_free(
+		plan.unit_worker_cap,
+		free_cores,
+		available_cores,
+	)
+
+	return { ...plan, unit_worker_cap }
+}
+
 // Printed once per run, so a gate that was slow on someone else's machine can be read without
 // re-deriving the plan from their core count.
 //
@@ -451,6 +470,7 @@ const gate_plan = {
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
 	WARNING_CHECKER_LABELS,
+	bound_by_free,
 	check_memory,
 	check_weight,
 	direct_unit_memory,
