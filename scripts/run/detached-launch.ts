@@ -4,6 +4,7 @@ import { agent_launch_environment } from '#scripts/agent/agent-launch-environmen
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { launch_priority } from '#scripts/run/launch-priority'
 
 // Starting a process that outlives this one, and keeping what it writes.
 //
@@ -251,6 +252,7 @@ async function attached_spawn(
 		child.once('exit', (exit_code) => {
 			resolve({ kind: 'completed', pid: child.pid ?? 0, exit_code })
 		})
+		launch_priority.lower(child.pid)
 		notify_spawn(child.pid, on_spawn, on_error)
 	})
 }
@@ -287,6 +289,7 @@ function spawned(
 		on_error(note_of(error))
 	})
 	child.unref()
+	launch_priority.lower(child.pid)
 
 	return child.pid === undefined ? { kind: 'failed', note: NO_PID_NOTE } : launched(child.pid)
 }
