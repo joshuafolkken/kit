@@ -1,12 +1,18 @@
 import { canonical_command, COMMAND_MAP } from './josh-command-map'
 import type { CommandUsage } from './josh-command-types'
 import { DEVELOPER_USAGE } from './josh-usage-developer'
+import { RUN_USAGE } from './josh-usage-run'
+import { SESSION_USAGE } from './josh-usage-session'
 
 // The single renderer of a command's usage. `josh help <command>` prints it and
 // `scripts/document/generate-command-usage.ts` writes it between a reference page's usage markers,
 // so the terminal and the page are one text (#3932).
 
-const COMMAND_USAGE: Readonly<Record<string, CommandUsage>> = { ...DEVELOPER_USAGE }
+const COMMAND_USAGE: Readonly<Record<string, CommandUsage>> = {
+	...DEVELOPER_USAGE,
+	...RUN_USAGE,
+	...SESSION_USAGE,
+}
 const NOTE_GAP = 3
 
 interface ExampleLine {
