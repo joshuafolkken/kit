@@ -64,6 +64,10 @@ const EVENT_KIND = {
 	// (`lane:restart`). It follows the fresh dispatch's `CHILD_LAUNCH`, so it is a launch to the parent and
 	// the board, and — like that launch — a batch record a lane child never reads as its own position.
 	RESTART: 'restart',
+	// A person withdrew a lane child — stopped it and closed its issue as not planned (`lane:withdraw`).
+	// It is written before the stop, so `run:merge` settles the child as withdrawn whatever GitHub says
+	// by the time the parent collects it, and counts it as neither a merge, a failure nor an outage.
+	WITHDRAW: 'withdraw',
 	// The backlog emptied while nothing of the run's own was in flight — the drain. It marks the position
 	// at which the end-of-run retrospective is owed, *before* the idle watch opens, so `run:step` fires
 	// the retrospective at the drain rather than after the watch runs its course. It is not itself a

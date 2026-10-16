@@ -94,6 +94,7 @@ const KIND = run_event_stream.EVENT_KIND
 const BATCH_RECORD_KINDS: ReadonlySet<string> = new Set([
 	KIND.CHILD_LAUNCH,
 	KIND.RESTART,
+	KIND.WITHDRAW,
 	KIND.PARK,
 	KIND.SPLIT,
 	KIND.RETROSPECTIVE,
@@ -167,12 +168,14 @@ function last_issue_event(
 }
 
 // A child's launch and the endings `run:merge` settles it with — the ones `run:board` stops drawing it
-// running on. A park or a split already ran `run:merge`, so a child closed after one owes nothing.
+// running on. A park or a split already ran `run:merge`, so a child closed after one owes nothing; a
+// withdrawal settles the child itself, its issue closed by the person who withdrew it.
 const LAUNCH_OR_SETTLE_KINDS: ReadonlySet<string> = new Set([
 	KIND.CHILD_LAUNCH,
 	KIND.MERGE,
 	KIND.PARK,
 	KIND.SPLIT,
+	KIND.WITHDRAW,
 ])
 
 // Whether this invocation's newest launch of the issue has not yet been settled.
@@ -186,9 +189,24 @@ function is_merge_owed(events: ReadonlyArray<RunEvent>, scope: EventScope, issue
 	return newest?.kind === KIND.CHILD_LAUNCH
 }
 
+function is_launch_or_withdrawal(event: RunEvent, issue: string): boolean {
+	const is_kind = event.kind === KIND.CHILD_LAUNCH || event.kind === KIND.WITHDRAW
+
+	return is_kind && names_issue(event, issue)
+}
+
+// Whether a person withdrew the issue's newest launch (`lane:withdraw`): its newest launch or withdrawal
+// is a withdrawal. A launch after it is a fresh attempt, which the old withdrawal does not settle.
+function is_withdrawn(events: ReadonlyArray<RunEvent>, issue: string): boolean {
+	const newest = events.findLast((event) => is_launch_or_withdrawal(event, issue))
+
+	return newest?.kind === KIND.WITHDRAW
+}
+
 const run_event_scope = {
 	UNKNOWN_EVENT_SCOPE,
 	is_merge_owed,
+	is_withdrawn,
 	issue_named,
 	last_issue_event,
 	last_scoped_event,

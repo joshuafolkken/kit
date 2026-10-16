@@ -683,6 +683,19 @@ pid=$(pnpm josh lane:restart 3769) || exit 1
 
 **Output / exit codes:** the fresh child's pid on stdout, exit 0. No lane, no running child or a refused marker: child untouched, exit 1. Work that cannot be stashed, or a failed dispatch, leaves the stopped child for `run:merge` and exits 1.
 
+### `josh lane:withdraw`
+
+Take a running lane child's issue out of the run for good — after deciding mid-run the issue should not be done.
+
+```bash
+pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
+```
+
+- In order: it records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, closes the Issue as not planned with a `- Why: <reason>` comment, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
+- The event comes first: `run:merge` books the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
+
+**Output / exit codes:** every explanation on stderr; exit 0 once the Issue is closed. A closed issue, no open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the Issue open and the lane in place, exit 1.
+
 ### `josh rule:value`
 
 Print each delivered rule's **unaided compliance** (`scripts/rules/rule-value.ts`): per rule, the runs that reached it, the rate it was kept before its trigger fired, and the refusals the hook delivered.

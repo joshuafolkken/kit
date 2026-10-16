@@ -21,7 +21,7 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: emit_mock },
+	run_event_stream_emit: { emit: emit_mock, current_events: vi.fn().mockResolvedValue([]) },
 }))
 
 vi.mock('#scripts/lane/lane-ledger', () => ({

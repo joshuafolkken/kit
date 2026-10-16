@@ -9,7 +9,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // blanks on any other row.
 
 const { finish_of, text_of } = run_board_usage_text
-const FINISHED: ReadonlySet<ItemState> = new Set(['merged', 'done'])
+const FINISHED: ReadonlySet<ItemState> = new Set(['merged', 'done', 'withdrawn'])
 const BLANK = ' '
 
 // What one frame's column is drawn from: each lane's usage, and the running rows the frame draws —

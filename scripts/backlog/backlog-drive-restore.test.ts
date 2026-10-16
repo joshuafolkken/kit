@@ -44,3 +44,18 @@ it('does not restore a split child whose lane remains registered', () => {
 
 	expect(backlog_drive_restore.restore([CHILD], events, [])).toStrictEqual([])
 })
+
+// joshuafolkken/kit#3908: `lane:withdraw` settles the child itself, so a driver restarted after it
+// neither waits on the lane nor offers the closed issue again in a named run.
+const WITHDRAWN = [
+	event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
+	event(2, 'withdraw', '#2508 withdrawn by a person: superseded'),
+]
+
+it('does not restore a child a person withdrew whose lane remains registered', () => {
+	expect(backlog_drive_restore.restore([CHILD], WITHDRAWN, [])).toStrictEqual([])
+})
+
+it('reads a child a person withdrew as settled', () => {
+	expect(backlog_drive_restore.settled_issues(WITHDRAWN)).toStrictEqual(new Set([Number(CHILD)]))
+})

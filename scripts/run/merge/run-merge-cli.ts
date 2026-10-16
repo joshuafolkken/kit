@@ -1,22 +1,18 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { api_outage } from '#scripts/agent/api-outage'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_ending } from '#scripts/run/run-ending'
 import { run_label } from '#scripts/run/run-label'
-import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
-import { run_merge_ship } from './run-merge-ship'
+import { run_merge, type ChildOutcome } from './run-merge'
+import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
 
@@ -191,61 +187,6 @@ async function offered(ctx: MergeContext): Promise<OfferVerdict> {
 	return { token: await run_merge_steps.ask_next(ctx), code: SUCCESS_EXIT_CODE, is_offer: true }
 }
 
-// Whether the child's session ended through its environment — read only when `--output` named the
-// transcript, off otherwise: its exit record shows it could not reach the API, or the session was
-// killed inside a turn. The path is validated inside `run_ending`, so a missing output is "no".
-function read_is_outage(output: string | undefined): boolean {
-	if (output === undefined) return false
-
-	return api_outage.is_outage(run_ending.read_exit(output)) || run_ending.ended_mid_turn(output)
-}
-
-async function child_outages(child: string): Promise<number> {
-	const events = await run_event_stream_emit.current_events()
-
-	return events.filter(
-		(event) =>
-			event.kind === run_event_stream.EVENT_KIND.OUTAGE &&
-			run_event_scope.issue_named(event) === child,
-	).length
-}
-
-// An outage child is re-dispatched only so many times: one that ends the same way on every dispatch is
-// parked, since merges in other lanes reset the run-wide outage streak and would never stop it.
-async function read_is_retryable(child: string, output: string | undefined): Promise<boolean> {
-	const is_interrupted =
-		read_is_outage(output) || (await run_merge_ship.is_unanswered(child, output))
-
-	if (!is_interrupted) return false
-
-	return (await child_outages(child)) < run_merge.CONSECUTIVE_OUTAGE_LIMIT
-}
-
-type IssueRead = Awaited<ReturnType<typeof issue_state_cli.read_issue>>
-
-// The timeline is read only for an OPEN, unparked child — the one classification a merged closing pull
-// request changes. A CLOSED child was closed by GitHub, so it must carry no `merged_pr` for
-// `do_merged` to close again.
-async function read_merged_pr(child: string, read: IssueRead): Promise<string | undefined> {
-	if (read.kind !== 'state' || run_merge.classify_child(read.state) !== 'failed') return undefined
-
-	return await issue_closing_pr.read_closing_pr(child)
-}
-
-async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
-	const [is_cut, merged_pr, is_outage] = await Promise.all([
-		run_merge_steps.has_resumable_cut(ctx.child),
-		read_merged_pr(ctx.child, read),
-		read_is_retryable(ctx.child, ctx.output),
-	])
-
-	return { is_outage, is_cut, merged_pr }
-}
-
-function outcome_of(read: IssueRead, signals: EndingSignals): ChildOutcome {
-	return read.kind === 'state' ? run_merge.classify_child(read.state, signals) : 'unresolved'
-}
-
 // A refused count means this session is not the carry record's owner, so the whole operation is
 // rejected — the lane is not closed and no next child is offered.
 function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
@@ -397,6 +338,13 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
+// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its issue
+// and lane and put itself on the stream, so nothing is counted or written here and its seat goes to the
+// next child.
+async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
+	return await offered(ctx)
+}
+
 // The child's own ending: it stopped before its commit for a person to look at, so nothing is counted
 // and no next child is offered.
 async function on_human_review(): Promise<MergeVerdict> {
@@ -422,6 +370,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	split: on_skipped,
 	unresolved: on_unresolved,
 	shipping: on_shipping,
+	withdrawn: on_withdrawn,
 }
 
 // The whole merge event for one returned child, in-process: read its state, classify it, and run the
@@ -432,8 +381,8 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	}
 
 	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
-	const signals = await read_signals(ctx, read)
-	const outcome = outcome_of(read, signals)
+	const signals = await run_merge_signals.read_signals(ctx, read)
+	const outcome = run_merge_signals.outcome_of(read, signals)
 
 	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr: signals.merged_pr })) }
 }
@@ -461,7 +410,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const run_merge_cli = {
 	merge_child,
 	parse,
-	read_merged_pr,
+	read_merged_pr: run_merge_signals.read_merged_pr,
 	record_merged,
 	run,
 }

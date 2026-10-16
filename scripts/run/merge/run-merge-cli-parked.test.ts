@@ -8,6 +8,7 @@ const unmark_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
+const events_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -17,8 +18,15 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 	issue_closing_pr: { read_closing_pr: vi.fn().mockResolvedValue(undefined) },
 }))
 
+vi.mock('#scripts/issue/issue-merged', () => ({
+	issue_merged: {
+		read_merged: vi.fn().mockResolvedValue(false),
+		read_merge_state: vi.fn().mockResolvedValue(false),
+	},
+}))
+
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: emit_mock },
+	run_event_stream_emit: { emit: emit_mock, current_events: events_mock },
 }))
 
 vi.mock('#scripts/lane/lane-ledger', () => ({
@@ -63,6 +71,32 @@ beforeEach(() => {
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
 	do_failed_mock.mockReset()
 	emit_mock.mockReset().mockResolvedValue(undefined)
+	events_mock.mockReset().mockResolvedValue([])
+})
+
+// joshuafolkken/kit#3908: a child a person withdrew is settled by `lane:withdraw`, so `run:merge` offers
+// the next child and counts, parks and records nothing — whatever GitHub's state reads.
+describe('run_merge_cli.merge_child — a child a person withdrew', () => {
+	const WITHDRAW_EVENT = {
+		pos: 1,
+		at: '2026-10-16T00:00:00.000Z',
+		kind: 'withdraw',
+		text: `#${CHILD} withdrawn by a person: x`,
+	}
+
+	it.each([
+		['OPEN', open_with([IN_PROGRESS])],
+		['CLOSED', CLOSED_STATE],
+	])('offers the next child for a withdrawn %s issue', async (_label, state) => {
+		read_issue_mock.mockResolvedValue(state)
+		events_mock.mockResolvedValue([WITHDRAW_EVENT])
+
+		const result = await run_merge_cli.merge_child(context())
+
+		expect(result).toStrictEqual({ outcome: 'withdrawn', token: '2039', code: 0, is_offer: true })
+		expect(do_failed_mock).not.toHaveBeenCalled()
+		expect(record_merge_mock).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#3502: a child released to wait on an open blocker is settled without a count, so

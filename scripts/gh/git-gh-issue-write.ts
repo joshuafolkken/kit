@@ -36,6 +36,7 @@ const LABEL_NAMES_FILTER = '.[].name'
 const LABELS_SEGMENT = '/labels'
 const COMMENTS_SEGMENT = '/comments'
 const CLOSED_STATE = 'closed'
+const NOT_PLANNED_REASON = 'not_planned'
 const COLOR_HASH = '#'
 const UNPROCESSABLE_STATUS = 422
 const ALREADY_EXISTS_CODE = 'already_exists'
@@ -99,14 +100,34 @@ async function issue_try_comment(issue_number: string, body: string): Promise<bo
 // It is a required parameter that may be `undefined` rather than an optional one: skipping the
 // announcement is a decision the caller makes from what it read, never something a call site can
 // fall into by leaving an argument off.
-async function issue_close(issue_number: string, comment: string | undefined): Promise<boolean> {
+async function close_with(
+	issue_number: string,
+	comment: string | undefined,
+	state: Readonly<Record<string, string>>,
+): Promise<boolean> {
 	return await did_write_succeed(async () => {
 		if (comment !== undefined) await issue_comment(issue_number, comment)
 		await git_gh_exec.exec_gh_api({
 			path: git_gh_api_path.issue_api_path(issue_number),
 			method: PATCH_METHOD,
-			body: JSON.stringify({ state: CLOSED_STATE }),
+			body: JSON.stringify(state),
 		})
+	})
+}
+
+async function issue_close(issue_number: string, comment: string | undefined): Promise<boolean> {
+	return await close_with(issue_number, comment, { state: CLOSED_STATE })
+}
+
+// The same close as "not planned" — the reason `issue-merged.ts` reads as no merge, so a closed issue
+// that was withdrawn is never taken for one whose work landed.
+async function issue_close_not_planned(
+	issue_number: string,
+	comment: string | undefined,
+): Promise<boolean> {
+	return await close_with(issue_number, comment, {
+		state: CLOSED_STATE,
+		state_reason: NOT_PLANNED_REASON,
 	})
 }
 
@@ -336,6 +357,7 @@ const git_gh_issue_write = {
 	issue_comment,
 	issue_try_comment,
 	issue_close,
+	issue_close_not_planned,
 	label_ensure,
 	issue_create_request,
 	issue_create_with_label,

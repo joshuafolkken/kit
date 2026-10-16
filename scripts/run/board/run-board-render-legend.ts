@@ -32,6 +32,7 @@ const STATE_LEGEND: ReadonlyArray<readonly [ItemState, keyof Words]> = [
 	['merged', 'merged'],
 	['parked', 'parked'],
 	['done', 'done'],
+	['withdrawn', 'withdrawn'],
 	['running', 'in_progress'],
 	['stopped', 'stopped'],
 	['waiting', 'waiting'],

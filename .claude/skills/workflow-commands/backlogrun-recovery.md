@@ -41,6 +41,11 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
 
 Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why the poll routes through `run:merge`".
 
+## A person withdraws a running child
+
+On a person's instruction to drop a running child's issue, run `pnpm josh lane:withdraw <N>
+--reason "<their reason>"` — `docs/josh-commands.md` → "`josh lane:withdraw`".
+
 ## Conflicts are not predicted
 
 **This path is the fallback**: every `fullrun` runs `pnpm josh main:merge` ahead of the gate
