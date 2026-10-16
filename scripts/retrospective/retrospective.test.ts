@@ -72,6 +72,8 @@ const FINDINGS: ReadonlyArray<CategoryCount> = [
 	{ category: 'i18n', count: 1 },
 ]
 
+const AUDIT_SUMMARY = 'Cost audit (7d): $12.0000 (+30.0%); regressions: total'
+
 function inputs(overrides: Partial<RetrospectiveInputs>): RetrospectiveInputs {
 	return {
 		cost: cost_report([role('parent', 0.5, 0.3)]),
@@ -81,6 +83,7 @@ function inputs(overrides: Partial<RetrospectiveInputs>): RetrospectiveInputs {
 		events: [event('park'), event('park'), event('outage')],
 		scope: since(RUN_START),
 		sessions: [],
+		audit_summary: AUDIT_SUMMARY,
 		...overrides,
 	}
 }
@@ -109,6 +112,10 @@ describe('retrospective.compose — the four sections are aggregated', () => {
 
 		expect(digest).toContain('Run cost & time: 1 session(s), 12 min')
 		expect(digest).toContain('parent:')
+	})
+
+	it('carries the cost audit summary line beside the run cost', () => {
+		expect(retrospective.compose(inputs({}))).toContain(AUDIT_SUMMARY)
 	})
 
 	it('carries the review findings with their zero-finding denominator', () => {

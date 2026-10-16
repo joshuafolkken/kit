@@ -11,6 +11,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bp": "bump",
     "by": "bytes",
     "c": "check",
+    "ca": "cost:audit",
     "dr": "doctor",
     "eu": "exports:unused",
     "ev": "eval",
@@ -227,6 +228,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "cost": [
       "(--cut | --over <tokens-per-request>) [--path <dir>]",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "cost:audit": [
+      "[--period <days>]",
+      "maintainer",
       [
         "none",
       ],

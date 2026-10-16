@@ -80,6 +80,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['(--cut | --over <tokens-per-request>) [--path <dir>]', 'automation', ['none']],
 	},
+	'cost:audit': {
+		script: 'scripts/cost-audit/cost-audit-cli.ts',
+		description:
+			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
+		category: 'AI tools',
+		reference: ['[--period <days>]', 'maintainer', ['none']],
+		// Kit-only: it reads kit's own transcript store, like `josh retrospective`, which carries its
+		// summary line.
+		is_kit_only: true,
+	},
 	...DOCUMENT_COMMANDS,
 	time: {
 		script: 'scripts/time/time-cli.ts',

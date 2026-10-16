@@ -810,6 +810,23 @@ The run driver prints this at the stop position (`josh run:step`), once per invo
 
 **Output:** four sections — the run tree's cost and time by role (flagging a role whose time share runs ahead of its cost share), the recurring review findings with their zero-finding denominator, the count of observation-ledger entries held, and the run's friction events (parks, outages, cuts, review rounds) — closed by a pointer to weigh them against `retrospective.md`.
 
+The cost and time section ends with the `josh cost:audit` summary line for the last seven days, so the run is read against its trend.
+
+### `josh cost:audit`
+
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. It reads kit's own transcript store, kit-lanes included.
+
+Report what AI work cost over a period, set against the period before it, so a cost reduction can be watched after it lands rather than measured once by hand.
+
+```bash
+pnpm josh cost:audit               # the last 7 days against the 7 before
+pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
+```
+
+It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`scripts/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
+
+It exits `0` on a report, and `1` with the usage on a `--period` that is not a positive whole number of days.
+
 ### `josh eval`
 
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository.

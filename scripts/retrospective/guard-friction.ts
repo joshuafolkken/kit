@@ -26,6 +26,13 @@ interface SessionTranscript {
 	lines: ReadonlyArray<TranscriptLine>
 }
 
+// What the tally reads of a session — its priced records and its lines — so a reader with no run tree
+// (`josh cost:audit`) hands sessions in without inventing a role for them.
+interface GuardSource {
+	node: Pick<RunNode, 'records'>
+	lines: ReadonlyArray<TranscriptLine>
+}
+
 interface GuardRow {
 	guard: string
 	refusals: number
@@ -73,7 +80,7 @@ function share_usd(answer: UsageRecord | undefined, counts: Map<UsageRecord, num
 
 // Hits refused in parallel are answered by one request, so its cost is split among them rather
 // than charged to each — the session's round-trip total counts each answering request once.
-function priced_hits(session: SessionTranscript): Array<[GuardHit, number]> {
+function priced_hits(session: GuardSource): Array<[GuardHit, number]> {
 	const hits = hits_of(session.lines)
 	const answers = hits.map((one) => answer_of(one.at_ms, session.node.records))
 	const counts = share_counts(answers)
@@ -101,7 +108,7 @@ function total_hits(row: GuardRow): number {
 }
 
 // Every guard that fired in the given sessions, the most frequent first.
-function guard_rows(sessions: ReadonlyArray<SessionTranscript>): Array<GuardRow> {
+function guard_rows(sessions: ReadonlyArray<GuardSource>): Array<GuardRow> {
 	const rows = new Map<string, GuardRow>()
 
 	for (const session of sessions) {
@@ -132,5 +139,5 @@ function report_lines(rows: ReadonlyArray<GuardRow>): Array<string> {
 
 const guard_friction = { guard_rows, report_lines }
 
-export type { GuardRow, SessionTranscript }
+export type { GuardRow, GuardSource, SessionTranscript }
 export { guard_friction }

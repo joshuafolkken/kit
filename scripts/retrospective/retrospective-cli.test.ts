@@ -20,6 +20,9 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: { repository_directory: vi.fn().mockResolvedValue(undefined) },
 }))
 vi.mock('#scripts/cost/cost-run-tree', () => ({ cost_run_tree: { load: vi.fn(() => undefined) } }))
+vi.mock('#scripts/cost-audit/cost-audit-cli', () => ({
+	cost_audit_cli: { summary: vi.fn().mockResolvedValue('Cost audit (7d): $0.0000') },
+}))
 
 const { retrospective_cli } = await import('./retrospective-cli')
 
