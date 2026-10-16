@@ -108,7 +108,11 @@ async function run_reserved_step(
 			...(await run_gate_step(reserved.step)),
 			budget_note: core_budget.describe_overflow(admission),
 		}),
-		{ budget: budget.available_cores, memory_mb: reserved.memory_mb },
+		{
+			budget: budget.available_cores,
+			memory_mb: reserved.memory_mb,
+			command: `gate ${reserved.step.label}`,
+		},
 	)
 }
 

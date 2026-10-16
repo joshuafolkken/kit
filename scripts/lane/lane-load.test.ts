@@ -61,13 +61,13 @@ describe('lane_load.sample', () => {
 
 		const sample = await lane_load.sample(AT)
 		const available_mb = await read_admission()
-		const [sampled, admitted] = hanging_execa.calls()
+		// The admission reads the memory at both ends of its window, to see swapping across it.
+		const [sampled, ...admitted] = hanging_execa.calls()
 
 		expect(available_mb).toBeGreaterThan(0)
 		expect(sample.available_mb).toBe(Math.round(available_mb ?? 0))
 		expect(sample.swapped_mb).toBe(SWAPPED_MB)
-		expect(hanging_execa.calls()).toHaveLength(2)
-		expect(sampled).toStrictEqual(admitted)
+		expect(admitted).toStrictEqual([sampled, sampled])
 	})
 
 	it('records the sample without memory on a platform the reading does not cover', async () => {

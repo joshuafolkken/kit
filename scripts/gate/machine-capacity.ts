@@ -24,7 +24,8 @@ import { execa } from 'execa'
 // admits without looking at memory, exactly as before.
 //
 // **`run:board` draws its machine gauges from the same reading**, so what the
-// board shows a person is what the gate admits against. The board takes a sample with no window and
+// board shows a person is what the gate admits against — the gate reading the free memory as none
+// while the board's pressure and swap gauges show why. The board takes a sample with no window and
 // draws the difference from its previous one. `lane:sample` records the memory half of it, so the
 // lane-limit measurement sets the same figures beside the lane count.
 
@@ -59,12 +60,18 @@ const PAGE_SIZE_NAME = 'hw.pagesize'
 // The kernel's memory-pressure verdict — 1 normal, 2 warning, 4 critical — the one Activity Monitor
 // colors its "memory pressure" graph by.
 const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
+const PRESSURE_WARNING = 2
+// The swap traffic across one window that reads as pressure. A machine that swapped once still pages a
+// few megabytes back in as old pages are touched; the 2026-10-16 thrash moved about 275 MB a window.
+const SWAP_PRESSURE_MB = 16
 const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME, PRESSURE_NAME]
 const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 
+// `memory_pressured` says why `available_mb` read none, so a claim that waits can name the pressure.
 interface MachineReading {
 	busy_cores: number | undefined
 	available_mb: number | undefined
+	memory_pressured?: boolean | undefined
 }
 
 // The memory half of a reading. `swapped_mb` is a counter — every page swapped in or out since boot —
@@ -84,6 +91,7 @@ interface LedgerLoad {
 interface MachineBudget {
 	cores: number
 	memory_mb: number
+	memory_pressured?: boolean | undefined
 }
 
 interface CpuTimes {
@@ -256,16 +264,39 @@ async function default_sleep(ms: number): Promise<void> {
 	})
 }
 
+function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
+	if ((after.pressure_level ?? 0) >= PRESSURE_WARNING) return true
+
+	return (swapped_between(before.swapped_mb, after.swapped_mb) ?? 0) > SWAP_PRESSURE_MB
+}
+
+// **Memory under compression and swap pressure has nothing free to admit against.** The level counts
+// compressible pages as available, so on 2026-10-16 it read 5.4 GB free while the compressor held
+// 5.9 GB and swap moved 3.3 GB every three seconds, and 5.2 GB of reservations were admitted on top.
+// A reading the kernel calls pressured, or one with swap traffic across the window, answers no free
+// memory: what the ledger holds keeps running and a heavy claim waits for the pressure to pass.
+function pressured_available(before: MemoryReading, after: MemoryReading): number | undefined {
+	if (after.available_mb === undefined) return undefined
+
+	return is_pressured(before, after) ? 0 : after.available_mb
+}
+
+// Memory is read at both ends of the window, so the swap counter's difference is the activity during it.
 async function read_machine(
 	sleep: (ms: number) => Promise<void> = default_sleep,
 ): Promise<MachineReading> {
 	const before = cpu_times()
-	const [memory] = await Promise.all([read_memory(), sleep(SAMPLE_WINDOW_MS)])
+	const [memory_before] = await Promise.all([read_memory(), sleep(SAMPLE_WINDOW_MS)])
+	const memory_after = await read_memory()
 	const busy_cores = is_unquoted()
 		? busy_cores_between(before, cpu_times(), cpus().length)
 		: undefined
 
-	return { busy_cores, available_mb: memory.available_mb }
+	return {
+		busy_cores,
+		available_mb: pressured_available(memory_before, memory_after),
+		memory_pressured: is_pressured(memory_before, memory_after),
+	}
 }
 
 async function read_sample(): Promise<MachineSample> {
@@ -291,6 +322,7 @@ function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLo
 		cores: cores - external_cores(reading.busy_cores, ledger.cores),
 		memory_mb:
 			reading.available_mb === undefined ? Infinity : reading.available_mb + ledger.memory_mb,
+		memory_pressured: reading.memory_pressured,
 	}
 }
 
@@ -303,9 +335,11 @@ const machine_capacity = {
 	parse_darwin_memory,
 	parse_linux_available,
 	parse_linux_swapped,
+	pressured_available,
 	read_machine,
 	read_memory,
 	read_sample,
+	SWAP_PRESSURE_MB,
 	swapped_between,
 }
 

@@ -2,6 +2,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { styleText } from 'node:util'
+import { core_budget } from '#scripts/gate/core-budget'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
@@ -51,6 +52,7 @@ const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
 	read_local: run_board_read.read_local,
 	read_machine: machine_capacity.read_sample,
+	read_waits: () => core_budget.budget_waits(),
 	read_usage: run_board_usage_read.usage_reader(),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),

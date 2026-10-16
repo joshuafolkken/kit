@@ -78,6 +78,7 @@ async function run_reserved(argv: ReadonlyArray<string>): Promise<number> {
 	return await core_budget.with_core_reservation(
 		parsed.weight,
 		async () => await run_command(parsed.command),
+		{ command: parsed.command.join(' ') },
 	)
 }
 

@@ -133,7 +133,7 @@ async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Prom
 	return await core_budget.with_command_reservation(
 		gate_plan.direct_unit_weight(),
 		async () => await test_unit_guard.run_guarded_unit(process.cwd(), vitest_arguments),
-		{ memory_mb: gate_plan.direct_unit_memory() },
+		{ memory_mb: gate_plan.direct_unit_memory(), command: 'pre-push test:unit' },
 	)
 }
 

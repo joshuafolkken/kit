@@ -82,8 +82,10 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 	const at_ms = ports.now()
 	const machine = { sample: await ports.read_machine(), at_ms }
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
+	const budget_waits = ports.read_waits?.() ?? []
+	const usages = await read_usages(state, ports)
 
-	return { ...state, ...(await read_usages(state, ports)), machine, gauges, sampled_ms: now_ms }
+	return { ...state, ...usages, machine, gauges, budget_waits, sampled_ms: now_ms }
 }
 
 // The state of the run on screen; a different run starts its plan state from nothing, so no row, count
@@ -192,6 +194,7 @@ function header_of(
 		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
 		usages: state.usages,
+		budget_waits: state.budget_waits,
 		form: redraw.ports.form,
 		repo: state.plan?.context.repo,
 		spinner: redraw.ports.is_tty ? SPOT : undefined,
