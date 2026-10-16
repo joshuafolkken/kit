@@ -56,4 +56,5 @@ the main line decides what that means and what to change.
 ## A `general-purpose` subagent names its model
 
 **A `general-purpose` dispatch → set `model`**: `sonnet` for routine work, `opus` for judgment; a review
-takes the `model` its brief prints. Delivered by the `agent-model` row of `pnpm josh rule:guard`.
+takes the alias of the `model=` id its brief prints (`claude-opus-5-5` → `opus`). Delivered by the
+`agent-model` row of `pnpm josh rule:guard`.

@@ -54,16 +54,14 @@ function batching_mode(): LaneGuardMode {
 	return lane_guard_policy.mode_here('batching')
 }
 
-// A guard the enumeration turns fully `off` says nothing at all. Batching is `notice` in a lane child
-// since kit#2276, so a candidate call is reached there; only a guard some future enumeration sets to
-// `off` is skipped. On the main line the mode is `refuse`.
+// A guard the enumeration turns fully `off` says nothing at all. The lane-child mode and its reason
+// live in `lane-guard-policy.ts`; on the main line the mode is `refuse`.
 function is_candidate(call: GuardedCall): boolean {
 	return is_batch_candidate(call) && batching_mode() !== 'off'
 }
 
-// A refusable call is refused only where the mode is `refuse`. A lane child is `notice` (kit#2276), so
-// it reaches here and is withheld the refusal — the notice branch below carries the guidance instead,
-// because a refusal ends a headless child's turn (kit#2138).
+// A refusable call is refused only where the mode is `refuse`. Under any other mode it is withheld the
+// refusal; why a lane child takes that mode is its `because` in `lane-guard-policy.ts`.
 function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
 	if (batching_mode() !== 'refuse') return false
 
@@ -71,8 +69,7 @@ function should_block_here(tail: string, call: GuardedCall, refused_at_ms: numbe
 }
 
 // The whole-file write earns a notice on every run. The second branch turns a
-// refusable call into a notice under a `notice`-mode guard, which is the mode batching takes in a lane
-// child again since kit#2276. Both read the notice's own record, so a notice never spends the refusal's
+// refusable call into a notice under a `notice`-mode guard. Both read the notice's own record, so a notice never spends the refusal's
 // stamp and re-fires on the notice's own `NOTICE_REFIRE_EVERY` cadence.
 function should_notify_here(tail: string, call: GuardedCall, notified_at_ms: number): boolean {
 	if (time_batch_guard.should_notify(tail, call, notified_at_ms)) return true

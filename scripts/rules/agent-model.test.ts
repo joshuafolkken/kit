@@ -35,6 +35,11 @@ describe('agent_model.is_unnamed_model — the refusal', () => {
 			'a named agent type, whose definition carries its model',
 			agent_call({ subagent_type: 'investigator' }),
 		],
+		[
+			'the named `claude` type with no model, whose definition decides its model',
+			agent_call({ subagent_type: 'claude' }),
+		],
+		['a `fork`, which inherits the parent by design', agent_call({ subagent_type: 'fork' })],
 		['a call of another tool', { name: 'Bash', input: { command: 'ls' } }],
 		['an input that is not an object', { name: 'Agent', input: PROMPT }],
 	])('lets %s through', (_case, call) => {

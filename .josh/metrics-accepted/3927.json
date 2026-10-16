@@ -1,8 +1,8 @@
 {
-	"reason": "Review round 1 fix: reviewer sessions stand down from the investigation guard (plus test), and chain-rule names the Agent tool's model alias",
+	"reason": "delegation.md names the model-id alias a review dispatch takes (claude-opus-5-5 -> opus), closing the round-2 review finding that the agent-model refusal's cited page left it out",
 	"date": "2026-10-16",
 	"growth": {
 		"scripts.code_lines": 21,
-		"ai_cost.on_demand_bytes": 157
+		"ai_cost.on_demand_bytes": 205
 	}
 }
