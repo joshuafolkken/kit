@@ -9,15 +9,18 @@
 // time is the whole point of the check.
 
 // **The hook-deliverable set — the single source is the list `pnpm josh rule:list` renders.** The
-// `PreToolUse` guard is wired to `Bash|Edit|Read|Write` (`scripts/hooks/pretool-guard.ts`), and the
-// lane-child interactive-ask row triggers on `AskUserQuestion`. A firing point naming one of these can
-// be delivered at the moment it binds; anything else cannot.
+// `PreToolUse` guard is wired to `Bash|Edit|Read|Write` (`scripts/hooks/pretool-guard.ts`), the
+// lane-child interactive-ask row triggers on `AskUserQuestion`, and the `agent-model` row on
+// `Agent|Task`. A firing point naming one of these can be delivered at the moment it binds; anything
+// else cannot.
 const HOOK_DELIVERABLE_TOOLS: ReadonlyArray<string> = [
 	'Bash',
 	'Edit',
 	'Read',
 	'Write',
 	'AskUserQuestion',
+	'Agent',
+	'Task',
 ]
 
 // **Known Claude Code tool calls that a hook cannot deliver a rule on.** They are real tools, so a
@@ -31,8 +34,6 @@ const KNOWN_UNDELIVERABLE_TOOLS: ReadonlyArray<string> = [
 	'WebFetch',
 	'WebSearch',
 	'TodoWrite',
-	'Task',
-	'Agent',
 	'NotebookEdit',
 ]
 

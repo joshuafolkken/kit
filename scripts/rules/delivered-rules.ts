@@ -2,6 +2,7 @@ import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { direct_filing } from './direct-filing'
 import { early_heartbeat } from './early-heartbeat'
@@ -153,6 +154,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	lane_split_park.ROW,
 	lane_park.ROW,
 	lane_interactive_ask.ROW,
+	agent_model.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.

@@ -7,6 +7,11 @@ describe('firing_point.classify', () => {
 		expect(firing_point.classify('Bash')).toBe('delivered')
 	})
 
+	// joshuafolkken/kit#3927: the `agent-model` row binds on the subagent tool, in both spellings.
+	it.each([['Agent'], ['Task']])('matches the %s subagent tool', (name) => {
+		expect(firing_point.classify(name)).toBe('delivered')
+	})
+
 	it('reports a real but undeliverable tool as a mismatch', () => {
 		expect(firing_point.classify('WebFetch')).toBe('not-delivered')
 	})

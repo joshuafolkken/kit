@@ -21,11 +21,12 @@ import { step_zero_notice } from './step-zero-notice'
 //
 // **The verdict is identical to running the three in turn**, and that is the whole point. Each guard
 // self-gates on the tool name inside its own `is_candidate` / trigger, so running all three on the
-// union matcher (`Bash|Edit|Read|Write|AskUserQuestion`) refuses exactly what the three separate
-// entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask row,
-// and the batching and investigation guards self-gate away from it. A
-// refusal from any guard wins first; only when none refuses is a guard's non-blocking notice or fault
-// (the whole-file-write notice, a lane child's investigation notice) emitted. Each guard still honours its own
+// union matcher (`Bash|Edit|Read|Write|AskUserQuestion|Agent|Task`) refuses exactly what the three
+// separate entries did — `AskUserQuestion` is matched for the rule guard's lane-child interactive-ask
+// row and `Agent|Task` for its `agent-model` row, and the batching and investigation guards self-gate
+// away from both. A refusal from any guard wins first; only when none refuses is a guard's non-blocking
+// notice or fault (the whole-file-write notice, a lane child's duplicate-read notice) emitted. Each
+// guard still honours its own
 // switch (`JOSH_BATCH_GUARD` / `JOSH_INVESTIGATION_GUARD` / `JOSH_RULE_GUARD`) internally, so this
 // process needs no switch of its own.
 

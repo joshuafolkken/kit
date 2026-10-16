@@ -64,7 +64,7 @@ pnpm josh batch:guard   # run inside pretool:guard, not wired on its own
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash|Edit|Read|Write|AskUserQuestion",
+		"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task",
 		"hooks": [
 			{
 				"type": "command",
@@ -140,7 +140,7 @@ pnpm josh investigation:guard   # run by the PreToolUse hook, the pending tool c
 - On the `Bash` side only read-only lines are refused (`bat`, `cat`, `head`, `less`, `more`, `nl`, `sed`, `tail`); a delegation clears the pending set.
 - **Search turns are counted as well** (`fd`, `find`, `grep`, `rg`): the third search turn since the last delegation or successful write is refused, parallel searches in one turn counting once. Every read-only search counts, the run's own instructions included — a search's named files cannot show a bare directory beside them, so no search can be proven to touch the instructions alone.
 - The refusal points at the `investigator` agent (`.claude/agents/investigator.md`, shipped through the plugin as `kit:investigator`): `model: sonnet`, with `effort: low` and read-only tools. Excludes the run's own instructions (`CLAUDE.md`, `prompts/`, `.claude/skills/`) and harness session files.
-- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`), naming the unedited files read. Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The investigation guard is a notice in a lane child".
+- **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The investigation guard refuses in a lane child".
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh investigation:guard` in detail".
