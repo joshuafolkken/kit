@@ -34,7 +34,7 @@ jobs:
 
       # Kept as long as GitHub lets a run be re-run, so re-running a failed publish job still finds
       # the tarball instead of forcing a full re-run that republishes an existing version.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: kit-package
           path: ${{ runner.temp }}/kit.tgz
