@@ -16,6 +16,7 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 }))
 
 const { run_ship_stop_context } = await import('./run-ship-stop-context')
+const { agent_role_profile } = await import('#scripts/agent/agent-role-profile')
 
 // joshuafolkken/kit#3923: a relaunched child's prompt carries the failed output's tail and the changed
 // files, bounded, so the session starts at the fix rather than at `josh ship --log` and `git diff`.
@@ -27,6 +28,8 @@ const EXTRA_LINES = 5
 const CHANGED_FILE = 'scripts/a.ts'
 const RED = '\u{1B}[31m'
 const RESET = '\u{1B}[0m'
+const LINE_PADDING = 100
+const BUDGET = 1000
 
 function numbered(count: number, prefix: string): Array<string> {
 	return Array.from({ length: count }, (_, index) => `${prefix}${String(index + 1)}`)
@@ -153,5 +156,29 @@ describe('run_ship_stop_context.describe — an omitted head', () => {
 		})
 
 		expect(text).toContain(`are in the stopped report (\`pnpm josh ship --log ${ISSUE}\`)`)
+	})
+})
+
+// joshuafolkken/kit#3964: the prompt is one argv element — refused past its cap and on any control
+// character but a line break — so the excerpt is made printable and fitted to the budget it is given.
+describe('run_ship_stop_context — fit for one argv element', () => {
+	it('turns control characters a check printed into spaces and cuts an overlong line', async () => {
+		const wide = 'w'.repeat(agent_role_profile.MAX_VALUE_LENGTH)
+		const context = await run_ship_stop_context.build(ISSUE, `FAIL\tgate\u{7}\n${wide}\n`)
+
+		expect(context.excerpt[0]).toBe('FAIL gate ')
+		expect(context.excerpt[1]?.length).toBeLessThan(wide.length)
+	})
+
+	it('drops the head of the excerpt to fit the budget and widens the omitted range', async () => {
+		const lines = long_output().map((line) => `${line} ${'x'.repeat(LINE_PADDING)}`)
+		const context = await run_ship_stop_context.build(ISSUE, lines.join('\n'))
+		const text = run_ship_stop_context.describe(ISSUE, context, BUDGET)
+		const shown = text.split('\n').filter((line) => line.startsWith('line '))
+
+		expect(text.length).toBeLessThanOrEqual(BUDGET)
+		expect(shown.at(-1)).toBe(lines.at(-1))
+		expect(text).toContain(`its last ${String(shown.length)} lines`)
+		expect(text).toContain(`lines 1-${String(lines.length - shown.length)} are in`)
 	})
 })

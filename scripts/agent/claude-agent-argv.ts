@@ -63,6 +63,7 @@ const PROJECT_MCP_FILE = '.mcp.json'
 interface ClaudeArgv {
 	command: string
 	args: ReadonlyArray<string>
+	ends_with_prompt: true
 }
 
 type ClaudeArgvResult =
@@ -105,6 +106,7 @@ function build(
 			profile.effort,
 			invocation,
 		],
+		ends_with_prompt: true,
 	}
 }
 
@@ -129,6 +131,7 @@ function build_resume(
 			profile.effort,
 			invocation,
 		],
+		ends_with_prompt: true,
 	}
 }
 

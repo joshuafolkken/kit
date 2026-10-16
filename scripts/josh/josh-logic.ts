@@ -276,6 +276,7 @@ function declared(value: number | (() => number) | undefined): number | undefine
 // without claiming a place. A command under a parent that already holds its cores claims nothing:
 // `core_budget.with_command_reservation` reads the mark that parent set.
 async function dispatch_entry(
+	command: string,
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
@@ -286,7 +287,7 @@ async function dispatch_entry(
 	return await core_budget.with_command_reservation(
 		weight,
 		async () => await run_entry(entry, subcommand_arguments),
-		{ memory_mb: declared(entry.memory_mb) },
+		{ memory_mb: declared(entry.memory_mb), command },
 	)
 }
 
@@ -303,7 +304,7 @@ async function run_command(
 	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
 	if (early_exit !== undefined) return early_exit
 
-	return await dispatch_entry(entry, subcommand_arguments)
+	return await dispatch_entry(resolved, entry, subcommand_arguments)
 }
 
 const josh_logic = {

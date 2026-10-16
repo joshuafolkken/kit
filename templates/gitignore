@@ -43,13 +43,17 @@ project.inlang/cache/
 *storybook.log
 storybook-static
 
-# Verification gate caches (josh lint / josh check / josh cspell:dot), plus the edit hook's own
-# eslint cache (josh format:edited), which is kept apart from the gate's on purpose
+# Verification gate caches (josh lint / josh check / josh cspell:dot), plus the edit hook's, the
+# scoped lint's and the pre-commit hook's own, which are kept apart from the gate's on purpose
 .eslintcache
 .eslintcache.edit
 .eslintcache.related
+.eslintcache.commit
 .tsbuildinfo
 .cspellcache
+.cspellcache.commit
+.prettiercache
+.prettiercache.related
 
 # Bundle analysis
 stats-client.html

@@ -1,0 +1,8 @@
+{
+	"reason": "New josh pre-commit-lint command (#3948): its implementation and tests add the code lines, and its generated catalog entry carries the standard Audience/Side effects bold header every command has",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 103,
+		"prose.excess_bold": 1
+	}
+}

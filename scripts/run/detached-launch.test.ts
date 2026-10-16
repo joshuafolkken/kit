@@ -27,8 +27,20 @@ describe('the shared detached launcher', () => {
 describe('the argv safety gate', () => {
 	it('refuses control characters and empty arguments', () => {
 		expect(detached_launch.is_safe_argv(built('backlogrun\u{0}--rm'))).toBe(false)
-		expect(detached_launch.is_safe_argv(built('backlogrun\nrm -rf /'))).toBe(false)
+		expect(detached_launch.is_safe_argv(built('backlogrun\t--rm'))).toBe(false)
 		expect(detached_launch.is_safe_value('')).toBe(false)
+	})
+
+	// joshuafolkken/kit#3964: a ship-stop prompt carries the failed output's lines.
+	it('lets line breaks into an agent vector prompt and nowhere else', () => {
+		const argv = built('Fix the gate failure\nFAIL gate\nfullrun #2070')
+
+		expect(detached_launch.is_safe_argv(argv)).toBe(true)
+		expect(detached_launch.is_safe_argv({ ...argv, args: ['--model\n', ...argv.args] })).toBe(false)
+		expect(detached_launch.is_safe_argv({ command: 'node', args: ['a\nb'] })).toBe(false)
+		const oversized = built(`a\n${'x'.repeat(agent_role_profile.MAX_VALUE_LENGTH)}`)
+
+		expect(detached_launch.is_safe_argv(oversized)).toBe(false)
 	})
 
 	it('accepts a vector composed by the Claude adapter', () => {

@@ -70,3 +70,17 @@ describe('cost_audit_format.summary_line — the line josh retrospective carries
 		)
 	})
 })
+
+describe('cost_audit_format.filing_lines — a regression is a filing the retrospective owes', () => {
+	it('names every regression and the command that reproduces it', () => {
+		const audit = audit_with({ guards: [row('batching', 3, 1, true)] })
+
+		expect(cost_audit_format.filing_lines(audit)).toStrictEqual([
+			'File a cost regression: guard batching — reproduce with `pnpm josh cost:audit`',
+		])
+	})
+
+	it('adds nothing when no row regressed', () => {
+		expect(cost_audit_format.filing_lines(audit_with())).toStrictEqual([])
+	})
+})

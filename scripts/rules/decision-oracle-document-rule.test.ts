@@ -10,6 +10,7 @@ import { rule_list } from './rule-list'
 // that file going back to saying only two questions exist — has no file left to watch.
 
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
+const PRINCIPLES = 'prompts/collaboration-workflow/principles.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CLAUDE = 'CLAUDE.md'
 const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
@@ -27,6 +28,23 @@ describe('residency.md carries question 0 as the single source', () => {
 
 	it('names oracle:list as the enumeration command', () => {
 		expect(read_repo_file(RESIDENCY)).toContain(ORACLE_COMMAND)
+	})
+
+	// joshuafolkken/kit#3931: a rule becomes a document line or a guard only with a reason it cannot be
+	// automated, and the guard's reason is a field a test enforces rather than prose.
+	it('asks the automation question and points at the enforced guard reason', () => {
+		const residency = read_repo_file(RESIDENCY)
+
+		expect(residency).toContain('### 自動化の問い')
+		expect(residency).toContain('AI の判断なしに実行できるか')
+		expect(residency).toContain('`scripts/rules/guard-remedy.ts` の `why`')
+	})
+
+	it('has principles.md carry the automation order the question cites', () => {
+		const principles = read_repo_file(PRINCIPLES)
+
+		expect(principles).toContain('## automate-first — 判断の要らない手順は AI に渡さず自動化する')
+		expect(principles).toMatch(/コマンド[\s\S]*フックの自動実行[\s\S]*差し戻しガード[\s\S]*文書/u)
 	})
 
 	it('names the decision oracle count to show it is not empty', () => {

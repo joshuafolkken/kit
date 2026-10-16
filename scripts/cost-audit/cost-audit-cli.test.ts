@@ -48,13 +48,15 @@ describe('cost_audit_cli.merged_query — the GitHub search for merged pull requ
 	})
 })
 
+function stub_sources(): void {
+	vi.clearAllMocks()
+	load.mockReturnValue(SESSIONS)
+	repo_name.mockResolvedValue('o/r')
+	exec_gh_api.mockResolvedValue(JSON.stringify({ total_count: 2 }))
+}
+
 describe('cost_audit_cli.run — the printed report', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-		load.mockReturnValue(SESSIONS)
-		repo_name.mockResolvedValue('o/r')
-		exec_gh_api.mockResolvedValue(JSON.stringify({ total_count: 2 }))
-	})
+	beforeEach(stub_sources)
 
 	it('prints the report with the per-merge row and exits 0', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -78,6 +80,19 @@ describe('cost_audit_cli.run — the printed report', () => {
 
 		expect(await cost_audit_cli.run(['--period', '0'], '/repo', NOW_MS)).toBe(1)
 		expect(error).toHaveBeenCalledWith(cost_audit_cli.USAGE)
+	})
+})
+
+describe('cost_audit_cli.summary — the lines josh retrospective carries', () => {
+	beforeEach(stub_sources)
+
+	it('follows the summary line with the filing line a regression owes', async () => {
+		const summary = await cost_audit_cli.summary('/repo', NOW_MS)
+
+		expect(summary.split('\n')).toStrictEqual([
+			expect.stringMatching(/^Cost audit \(7d\): /u),
+			'File a cost regression: total, per merge, kind fullrun, tool reply — reproduce with `pnpm josh cost:audit`',
+		])
 	})
 })
 

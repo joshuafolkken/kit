@@ -1,3 +1,4 @@
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_ship_next, type ShipResume } from '#scripts/run/ship/run-ship-next'
@@ -10,6 +11,7 @@ interface ShipStop extends ShipResume {
 }
 
 const CHILD_INVOCATION = 'fullrun'
+const LINE_BREAK = '\n'
 // What a brokered reviewer's prompt ends with, so the one pattern below finds it too.
 const REVIEW_INVOCATION = 'the reviewer of lane'
 const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
@@ -85,30 +87,37 @@ function outage_resume_invocation(issue: string): string {
 // **A stop that carries its context puts it in the prompt too** — the failed output's
 // tail and the changed files (`run-ship-stop-context.ts`), so the session starts at the fix rather than
 // at `josh ship --log` and `git diff` (joshuafolkken/kit#3923).
-function known_stop_lines(issue: string, stop: ShipStop): ReadonlyArray<string> {
+//
+// The context gets what the rest of the prompt leaves of the one argv element's cap, so the whole
+// prompt still launches (joshuafolkken/kit#3964).
+function known_stop_lines(
+	issue: string,
+	stop: ShipStop,
+	frame: ReadonlyArray<string>,
+): ReadonlyArray<string> {
 	const { context } = stop
 	const is_excerpted = run_ship_stop_context.has_excerpt(context)
 	const next = run_ship_next.next_step(issue, stop.stage, stop, is_excerpted)
 
 	if (context === undefined) return [next]
 
-	return [next, run_ship_stop_context.describe(issue, context)]
+	const fixed = [...frame, next].join(LINE_BREAK).length + LINE_BREAK.length
+	const budget = agent_role_profile.MAX_VALUE_LENGTH - fixed
+
+	return [next, run_ship_stop_context.describe(issue, context, budget)]
 }
 
 function ship_stop_invocation(issue: string, stop?: ShipStop): string {
 	const opening = `Resuming the lane child for issue ${issue_cite.plain(issue)} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
+	const closing = `Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`
 	const middle =
 		stop === undefined
 			? [
 					`Run \`pnpm josh run:step ${issue}\` and read the stopped report it names, fix what stopped the ship, then hand the region back per chain-rule.md.`,
 				]
-			: known_stop_lines(issue, stop)
+			: known_stop_lines(issue, stop, [opening, closing])
 
-	return [
-		opening,
-		...middle,
-		`Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`,
-	].join('\n')
+	return [opening, ...middle, closing].join(LINE_BREAK)
 }
 
 const lane_child_invocation = {

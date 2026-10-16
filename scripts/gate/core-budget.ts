@@ -10,6 +10,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
+import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
 import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
 
 // A machine-wide weighted core budget with admission control.
@@ -84,16 +85,23 @@ const HELD_VALUE = '1'
 
 // `memory_mb` and `admitted_at` are optional so a marker an older `josh` wrote still reads: it holds no
 // declared memory, and it counts as load from outside the ledger until it is gone.
+// `command`, `checkout`, `lane`, `lanes_root` and `wait_reason` name a waiting claim on `run:board`
+// (`core-wait.ts`).
 const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
 	claimed_at: z.number(),
 	memory_mb: z.number().optional(),
 	admitted_at: z.number().optional(),
+	command: z.string().optional(),
+	checkout: z.string().optional(),
+	lane: z.string().optional(),
+	lanes_root: z.string().optional(),
+	wait_reason: z.enum(core_wait.WAIT_REASONS).optional(),
 })
 
 type Reservation = z.infer<typeof reservation_schema>
 
-type ReservationFields = Pick<Reservation, 'weight' | 'claimed_at' | 'memory_mb' | 'admitted_at'>
+type ReservationFields = Omit<Reservation, 'pid' | 'process_start'>
 
 interface LiveReservation extends LedgerEntry {
 	reservation: Reservation
@@ -102,6 +110,9 @@ interface LiveReservation extends LedgerEntry {
 interface ReserveOptions {
 	budget?: number
 	memory_mb?: number | undefined
+	// What the claim is for, named on the waiting line and on `run:board`.
+	command?: string | undefined
+	report?: (line: string) => void
 	read_machine?: () => Promise<MachineReading>
 	wait_cap_ms?: number
 	poll_interval_ms?: number
@@ -195,6 +206,10 @@ function write_reservation(target: string, fields: ReservationFields): void {
 	stamp_file.replace_stamp(target, { ...process_identity.own_fields(), ...fields })
 }
 
+function report_wait(line: string): void {
+	process.stderr.write(`${line}\n`)
+}
+
 // The clock and cadence a wait runs on, resolved apart from the ledger fields so `reserve` stays under
 // the complexity limit — each default is a branch.
 interface TimingConfig {
@@ -206,6 +221,7 @@ interface TimingConfig {
 
 interface WaitContext extends TimingConfig {
 	read_machine: () => Promise<MachineReading>
+	report: (line: string) => void
 	key: string
 	target: string
 	directory: string
@@ -259,6 +275,19 @@ function overflow_of(
 	}
 }
 
+// The marker records why the claim waits, rewritten only when the reason changes, and the command says
+// so once, when its wait starts.
+function mark_waiting(context: WaitContext, reason: WaitReason): void {
+	const previous = context.fields.wait_reason
+
+	if (previous === reason) return
+
+	context.fields = { ...context.fields, wait_reason: reason }
+	write_reservation(context.target, context.fields)
+
+	if (previous === undefined) context.report(core_wait.wait_line(context.fields.command, reason))
+}
+
 async function poll_admission(context: WaitContext): Promise<Admission | undefined> {
 	const reservations = live_reservations(context.directory)
 	const budget = await current_budget(context, reservations)
@@ -268,6 +297,8 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 	if (context.now() >= context.deadline) {
 		return admit(context, overflow_of(context, reservations, budget))
 	}
+
+	mark_waiting(context, core_wait.wait_reason(context.key, reservations, budget))
 
 	return undefined
 }
@@ -288,13 +319,33 @@ async function await_admission(context: WaitContext): Promise<Admission> {
 	return admission
 }
 
+// What a wait reads the machine through and reports its start to.
+function resolve_ports(options: ReserveOptions): Pick<WaitContext, 'read_machine' | 'report'> {
+	return {
+		read_machine: options.read_machine ?? machine_capacity.read_machine,
+		report: options.report ?? report_wait,
+	}
+}
+
+// The checkout the claim runs in, so `run:board` can say whose claim waits. The ledger is the
+// machine's, so the checkout may be another repository's (`core-wait.ts` → `where_of`).
+function claim_fields(
+	weight: number,
+	claimed_at: number,
+	options: ReserveOptions,
+): ReservationFields {
+	const { memory_mb, command } = options
+
+	return { weight, claimed_at, memory_mb, command, ...core_wait.where_of(process.cwd()) }
+}
+
 async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
 	const timing = resolve_timing(options)
 	const directory = options.directory ?? PLATFORM_TEMP_ROOT
 	const claimed_at = timing.now()
 	const name = marker_name(randomUUID())
 	const target = path.join(directory, name)
-	const fields = { weight, claimed_at, memory_mb: options.memory_mb }
+	const fields = claim_fields(weight, claimed_at, options)
 
 	write_reservation(target, fields)
 	const admission = await await_admission({
@@ -305,10 +356,19 @@ async function reserve(weight: number, options: ReserveOptions = {}): Promise<Ha
 		budget: normalize_budget(options.budget ?? availableParallelism()),
 		deadline: claimed_at + timing.wait_cap_ms,
 		fields,
-		read_machine: options.read_machine ?? machine_capacity.read_machine,
+		...resolve_ports(options),
 	})
 
 	return { target, admission }
+}
+
+// The claims waiting in the ledger now, for a `run:board` running in `home`.
+function budget_waits(
+	directory: string = PLATFORM_TEMP_ROOT,
+	now: number = Date.now(),
+	home: string = process.cwd(),
+): Array<BudgetWait> {
+	return core_wait.waits_of(live_reservations(directory), now, home)
 }
 
 function release(handle: Handle): void {
@@ -381,6 +441,7 @@ const core_budget = {
 	RESERVED_PREFIX,
 	admitted_keys: core_admission.admitted_keys,
 	admitted_load: core_admission.admitted_load,
+	budget_waits,
 	describe_overflow: core_admission.describe_overflow,
 	is_held,
 	live_reservations,

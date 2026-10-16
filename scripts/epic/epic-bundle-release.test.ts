@@ -4,6 +4,7 @@ import { RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
+import { epic_bundle_fixture } from './epic-bundle-fixture'
 import { epic_bundle_referenced } from './epic-bundle-referenced'
 import type { EpicIssue } from './epic-issue'
 
@@ -55,7 +56,9 @@ describe('epic_bundle.decide_bundle — the release issue is never a candidate',
 	})
 
 	it('still bundles over a reference written in prose', () => {
-		const subject = issue(SUBJECT, { body: `follows #${String(RELATED)}` })
+		const subject = issue(SUBJECT, {
+			body: epic_bundle_fixture.in_acceptance(`follows #${String(RELATED)}`),
+		})
 		const backlog = [release_waiting_on(SUBJECT), issue(RELATED)]
 
 		expect(epic_bundle.decide_bundle(subject, backlog).candidates).toEqual([RELATED])

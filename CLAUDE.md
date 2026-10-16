@@ -80,7 +80,7 @@ Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflo
 
 #### Mid-workflow stop notification (`confirmation`)
 
-The `Stop` hook sends it from the reply's opening when a held run pauses — lead with the reason and recommended choice. Send it yourself only when the hook refuses the stop:
+The `Stop` hook sends it when your held run awaits a decision — lead with the reason, end with `Recommended: <choice>`. Send it yourself only when the hook refuses the stop:
 
 ```bash
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"

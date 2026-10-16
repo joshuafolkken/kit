@@ -30,6 +30,10 @@ and anything the run surfaced that lives outside it).
 **The filing condition is the existing depth test, unchanged** (`observation-filing.md` → "The depth
 test"). What cannot pass it is not filed — not a shortfall, just not yet a finding.
 
+**A cost regression is filed.** The digest's `File a cost regression: …` line passes the depth test as
+printed — measured, with the command it names as the reproduction — and ranks first: one Issue names
+every regressed row, and the scout keeps a repeat sighting from filing twice.
+
 **Order what passes by effect, and file the top two.** **The third onward is stacked in the observation
 ledger** (drained by `pnpm josh observations:flush`). **File nothing when nothing passes.**
 `docs/maintainers/retrospective-rationale.md` → "Why the top two are a selection, not a ration".

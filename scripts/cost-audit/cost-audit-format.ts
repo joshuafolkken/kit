@@ -93,6 +93,16 @@ function summary_line(audit: Audit): string {
 	return `Cost audit (${String(audit.days)}d): ${total}${merge}; regressions: ${regression_text(audit)}`
 }
 
-const cost_audit_format = { report_lines, summary_line }
+// A regression is a filing the retrospective owes, not a figure to weigh (`retrospective.md`), so the
+// digest names it as one; a period with none adds nothing.
+function filing_lines(audit: Audit): Array<string> {
+	const names = regression_names(audit)
+
+	if (names.length === 0) return []
+
+	return [`File a cost regression: ${names.join(', ')} — reproduce with \`pnpm josh cost:audit\``]
+}
+
+const cost_audit_format = { filing_lines, report_lines, summary_line }
 
 export { cost_audit_format }

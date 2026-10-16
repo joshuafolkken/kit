@@ -21,6 +21,11 @@ describe('rule_list.render — every delivered row is listed', () => {
 		expect(rendered).not.toContain(rule_list.MISSING)
 	})
 
+	it('prints why each row is not automated, with none missing', () => {
+		expect(rendered).toContain('  - not automated: ')
+		expect(rendered).not.toContain(rule_list.MISSING_WHY)
+	})
+
 	it('names each entry point', () => {
 		for (const entry of ['rule:guard', 'stop:guard', 'batch:guard', 'investigation:guard']) {
 			expect(rendered).toContain(`pnpm josh ${entry}`)
