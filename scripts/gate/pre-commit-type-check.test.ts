@@ -1,6 +1,7 @@
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { core_budget } from './core-budget'
 import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
 import { TSC_ARGS } from './type-check-command'
@@ -330,6 +331,37 @@ describe('a record that cannot speak for this tree', () => {
 		const [code] = await run_hook()
 
 		expect(code).toBe(TYPE_CHECK_EXIT_CODE)
+	})
+})
+
+// joshuafolkken/kit#3944: the check claims the place `josh check` claims, beside lefthook's other hooks,
+// and only when it runs — a skipped check must not wait out a full ledger.
+describe('the core budget the type check claims', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('claims the type check’s place before it runs', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await run_hook()
+
+		expect(reservation).toHaveBeenCalledWith(
+			core_budget.CORE_WEIGHTS.type_check,
+			expect.any(Function),
+			expect.objectContaining({ memory_mb: core_budget.MEMORY_MB.type_check }),
+		)
+		expect(check_run_count()).toBe(CHECK_RAN)
+	})
+
+	it('claims nothing for a check a green record lets it skip', async () => {
+		record_green(CHANGED_TREE, BASE)
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await run_hook()
+
+		expect(reservation).not.toHaveBeenCalled()
+		expect(check_run_count()).toBe(NOTHING_RAN)
 	})
 })
 

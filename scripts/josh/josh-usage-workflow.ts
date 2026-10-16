@@ -8,6 +8,7 @@ const PR_TITLE = '"PR title #N"'
 const ISSUE_URL = '--issue-url "https://..."'
 const REVIEW_ISSUE = '--issue 2325'
 const CHECK = '--check'
+const JSON_FLAG = '--json'
 const BODY_FILE_NOTE =
 	'(`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.'
 
@@ -156,6 +157,55 @@ const WORKFLOW_USAGE: Readonly<Record<string, CommandUsage>> = {
 		],
 	},
 	'pre-commit-type-check': { examples: [{ arguments: '' }] },
+	'pr:classification': {
+		examples: [{ arguments: '', note: 'run by CI on a pull request; fails without one label' }],
+	},
+	'observation:record': {
+		examples: [
+			{ arguments: "flaky-e2e d1 'tests/e2e/login.test.ts' 'times out on CI only'" },
+			{
+				arguments: "flaky-e2e d1 'src/app.ts' 'fails there too' --checkout ~/Development/app",
+				note: "another repository's ledger",
+			},
+		],
+		flags: [
+			{
+				names: ['--checkout <path>'],
+				description: "count and append in that repository's `.josh/observations/` instead.",
+			},
+		],
+	},
+	'release:github': {
+		examples: [
+			{ arguments: '', note: 'run by CI with GH_TOKEN, RELEASE_TAG and GITHUB_REPOSITORY set' },
+		],
+	},
+	'latest:scope': {
+		examples: [
+			{ arguments: '', note: 'required or skip, the reason on stderr' },
+			{ arguments: '--record', note: 'note a finished josh latest run' },
+			{ arguments: JSON_FLAG, note: 'the verdict and the reason as JSON' },
+		],
+		flags: [
+			{ names: ['--record'], description: 'write the completion record `josh latest` ends with.' },
+			{ names: [JSON_FLAG], description: 'emit the verdict and its reason as JSON.' },
+		],
+	},
+	'latest:guard': { examples: [{ arguments: '', note: 'refuses inside a lane' }] },
+	'prevent-main-commit': { examples: [{ arguments: '', note: 'run by the pre-commit hook' }] },
+	'check-commit-message': {
+		examples: [{ arguments: '.git/COMMIT_EDITMSG', note: 'run by the commit-msg hook' }],
+	},
+	'secretlint-scan': {
+		examples: [{ arguments: 'src/app.ts .env.example', note: 'the staged paths' }],
+	},
+	'pre-commit-lint': {
+		examples: [
+			{ arguments: 'cspell src/app.ts' },
+			{ arguments: 'prettier src/app.ts' },
+			{ arguments: 'eslint src/app.ts' },
+		],
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

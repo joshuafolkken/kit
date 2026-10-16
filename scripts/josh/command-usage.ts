@@ -3,6 +3,7 @@ import type { CommandUsage } from './josh-command-types'
 import { AUTOMATION_USAGE } from './josh-usage-automation'
 import { BACKLOG_USAGE } from './josh-usage-backlog'
 import { DEVELOPER_USAGE } from './josh-usage-developer'
+import { HOOK_USAGE } from './josh-usage-hooks'
 import { ISSUE_USAGE } from './josh-usage-issue'
 import { REVIEW_USAGE } from './josh-usage-review'
 import { RUN_USAGE } from './josh-usage-run'
@@ -13,16 +14,23 @@ import { WORKFLOW_USAGE } from './josh-usage-workflow'
 // `scripts/document/generate-command-usage.ts` writes it between a reference page's usage markers,
 // so the terminal and the page are one text (#3932).
 
-const COMMAND_USAGE: Readonly<Record<string, CommandUsage>> = {
-	...DEVELOPER_USAGE,
-	...RUN_USAGE,
-	...SESSION_USAGE,
-	...ISSUE_USAGE,
-	...BACKLOG_USAGE,
-	...REVIEW_USAGE,
-	...AUTOMATION_USAGE,
-	...WORKFLOW_USAGE,
+type UsageTable = Readonly<Record<string, CommandUsage>>
+
+// Which reference page renders each usage table — the one place a table is tied to its page, so the
+// generator's coverage check and `josh help` read the same set (#3981).
+/* eslint-disable @typescript-eslint/naming-convention */
+const USAGE_PAGE_TABLES: Readonly<Record<string, ReadonlyArray<UsageTable>>> = {
+	'docs/josh-commands.md': [DEVELOPER_USAGE],
+	'docs/josh-commands-run.md': [RUN_USAGE, SESSION_USAGE],
+	'docs/josh-commands-backlog.md': [ISSUE_USAGE, BACKLOG_USAGE, REVIEW_USAGE],
+	'docs/josh-commands-automation.md': [AUTOMATION_USAGE, WORKFLOW_USAGE, HOOK_USAGE],
 }
+/* eslint-enable @typescript-eslint/naming-convention */
+const COMMAND_USAGE: UsageTable = Object.fromEntries(
+	Object.values(USAGE_PAGE_TABLES)
+		.flat()
+		.flatMap((table) => Object.entries(table)),
+)
 const NOTE_GAP = 3
 
 interface ExampleLine {
@@ -85,9 +93,18 @@ function format_command_help(input: string): string | undefined {
 	return [head, '', entry.description, ...(usage === undefined ? [] : ['', usage])].join('\n')
 }
 
+// The commands whose usage blocks a reference page renders — the keys of the tables tied to it.
+function page_commands(page: string): Array<string> {
+	const tables = Object.hasOwn(USAGE_PAGE_TABLES, page) ? USAGE_PAGE_TABLES[page] : undefined
+
+	return (tables ?? []).flatMap((table) => Object.keys(table))
+}
+
 const command_usage = {
+	USAGE_PAGES: Object.keys(USAGE_PAGE_TABLES),
 	format_command_help,
 	format_usage,
+	page_commands,
 }
 
 export { command_usage }

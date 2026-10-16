@@ -1061,10 +1061,18 @@ The cost and time section ends with the `josh cost:audit` summary line for the l
 
 Report what AI work cost over a period, set against the period before it, so a cost reduction can be watched after it lands rather than measured once by hand.
 
+<!-- usage: cost:audit -->
+
 ```bash
 pnpm josh cost:audit               # the last 7 days against the 7 before
 pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
 ```
+
+**Options:**
+
+- `--period <days>` — the length of each period, a positive whole number of days (default 7).
+
+<!-- /usage -->
 
 It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`scripts/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
 
