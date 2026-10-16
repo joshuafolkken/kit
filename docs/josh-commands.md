@@ -8,7 +8,9 @@ See also:
 - [Issue, epic, backlog and review command reference](josh-commands-backlog.md) — the commands a workflow run calls to file issues, track epics, plan a backlog and brief a review.
 - [Command Catalog](josh-command-catalog.md) — auto-generated index of every command (name, aliases, synopsis, audience, side effects).
 
-`josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal. How the dispatcher runs a command in kit's own checkout, and the shape a new script keeps: `docs/maintainers/josh-commands-rationale.md` → "How a command runs".
+`josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal, and `pnpm josh help <command>` for one command's usage. How the dispatcher runs a command in kit's own checkout, and the shape a new script keeps: `docs/maintainers/josh-commands-rationale.md` → "How a command runs".
+
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-developer.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
 
 ## Development
 
@@ -18,12 +20,16 @@ These commands replace the corresponding `package.json` scripts; consumer projec
 
 Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) (kit only) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
 
+<!-- usage: gate -->
+
 ```bash
 pnpm josh gate
 pnpm josh gate --verbose   # every check's output, passing ones included
 pnpm josh gate --force     # re-run even on a tree already recorded green
 pnpm josh gate --no-unit   # the static checks only (CI only)
 ```
+
+<!-- /usage -->
 
 - Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`, `pnpm josh metrics` (in kit only); the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
@@ -42,18 +48,26 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail
 
 Check code with prettier and eslint.
 
+<!-- usage: lint -->
+
 ```bash
 pnpm josh lint
 ```
+
+<!-- /usage -->
 
 ### `josh lint:related`
 
 Check only the files the change touched — the lint check an implementation loop repeats between edits. Added in front of the whole-tree `josh lint`, never in place of it.
 
+<!-- usage: lint:related -->
+
 ```bash
 pnpm josh lint:related
-pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
+pnpm josh lint:related scripts/thing.ts   # narrow by the given files instead
 ```
+
+<!-- /usage -->
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - Falls back to the whole tree (naming which case) when no changed file is lintable.
@@ -63,9 +77,13 @@ pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
 
 Print how many code lines a file has against the `max-lines` limit and how many remain — so splitting is decided before writing.
 
+<!-- usage: lines -->
+
 ```bash
 pnpm josh lines scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts
 ```
+
+<!-- /usage -->
 
 ```
 limit 300 code lines · near from 255
@@ -78,10 +96,14 @@ scripts/hooks/format-edited-file.ts  230/300 code lines (76%), 70 to spare
 
 Print how many bytes an agent-read document has against its recorded byte ceiling and how many remain — the byte counterpart of `josh lines`, so a mandated documentation update that would cross the ceiling is seen right after the edit rather than at the gate.
 
+<!-- usage: bytes -->
+
 ```bash
-pnpm josh bytes docs/josh-commands.md           # one document
-pnpm josh bytes                                 # scan: every budgeted document near its ceiling
+pnpm josh bytes docs/josh-commands.md   # one document
+pnpm josh bytes                         # scan: every budgeted document near its ceiling
 ```
+
+<!-- /usage -->
 
 ```
 docs/josh-commands.md  34492/36864 bytes · 2372 left
@@ -98,10 +120,14 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh bytes` in detai
 
 Print the repository-wide quality totals no per-function or per-file limit sees — code lines, comment lines and the comment ratio for the non-test files under `scripts/`, the lines of the rule documents (`CLAUDE.md` and `prompts/**/*.md`), the number of `*:guard` commands, and the AI cost in bytes (resident, on demand) — and hold them to the same totals measured on the merge-base.
 
+<!-- usage: metrics -->
+
 ```bash
 pnpm josh metrics                             # print the totals and check them against the merge-base's
 pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and why
 ```
+
+<!-- /usage -->
 
 - **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
 - **kit only**: it counts kit's own rule documents and guards, so a consumer's gate leaves the step out.
@@ -115,17 +141,25 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics` in det
 
 Format code with prettier and eslint. A `basic` project without Prettier or ESLint skips that tool for the reason `josh lint` prints.
 
+<!-- usage: format -->
+
 ```bash
 pnpm josh format
 ```
+
+<!-- /usage -->
 
 ### `josh cspell:dot`
 
 Run spell check, including dotfiles.
 
+<!-- usage: cspell:dot -->
+
 ```bash
-pnpm josh cspell:dot      # includes dotfiles
+pnpm josh cspell:dot   # includes dotfiles
 ```
+
+<!-- /usage -->
 
 - Runs with `--no-progress`, so it prints only the unknown-word lines and the summary — not the per-file `N/1607 <path> cached` progress that once filled the whole output past the tool's truncation cap.
 
@@ -133,9 +167,13 @@ pnpm josh cspell:dot      # includes dotfiles
 
 Check the current run's recorded transcript against the behavior assertions and report where any broke — with **no live Claude session and no model call**. It is one of `pnpm josh gate`'s checks, so behavior regressions are caught every run rather than only by eye.
 
+<!-- usage: behavior -->
+
 ```bash
 pnpm josh behavior
 ```
+
+<!-- /usage -->
 
 - **The data is what every run already writes.** Claude Code files each session's transcript under `~/.claude/projects/**/*.jsonl`; an assertion read off a recorded transcript is deterministic, re-runnable and never calls a model — which is exactly what joshuafolkken/kit#1922 removed the slow five-live-session `josh eval` path for lacking.
 - **The scope is the current run** — the newest session transcript — not the whole corpus.
@@ -149,9 +187,13 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh behavior` in de
 
 Report every member of an exported namespace object that nothing in the program reads. It is one of `pnpm josh gate`'s checks, so a dead namespace member fails the gate rather than accumulating.
 
+<!-- usage: exports:unused -->
+
 ```bash
 pnpm josh exports:unused
 ```
+
+<!-- /usage -->
 
 - **Why its own check**: the namespace convention (`const git_prompt = { confirm_push }` exported as `export { git_prompt }`) keeps the namespace itself imported everywhere, so an ordinary unused-export tool never sees a member nobody calls.
 - **Scanned**: `snake_case`, un-annotated object-literal constants exported through a bare `export { x }` in a `.ts` file of the `tsconfig.json` program. An `UPPER_CASE` constant, a type-annotated table, a public `index.ts` entry and a test file declare no namespace it checks.
@@ -164,9 +206,13 @@ pnpm josh exports:unused
 
 Run vitest unit tests. Without `vitest`: **skips (exit 0)**; a `basic` project runs its [`test` script](./setup/basic.md#3-verify). With `vitest` and a test file: `vitest run`.
 
+<!-- usage: test:unit -->
+
 ```bash
 pnpm josh test:unit
 ```
+
+<!-- /usage -->
 
 - `vitest` with **no** `*.{test,spec}.{ts,js}` file fails; `basic` projects skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
@@ -179,11 +225,15 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:unit` in d
 
 Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits. Added in front of the whole `josh test:unit`, never in place of it.
 
+<!-- usage: test:related -->
+
 ```bash
 pnpm josh test:related
-pnpm josh test:related scripts/thing.ts    # narrow by the given files instead
-pnpm josh test:related --silent            # flags are forwarded to vitest
+pnpm josh test:related scripts/thing.ts   # narrow by the given files instead
+pnpm josh test:related --silent           # flags are forwarded to vitest
 ```
+
+<!-- /usage -->
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when no changed file is importable; a narrowed run matching nothing prints `No test files found` and exits 0.
 
@@ -191,11 +241,15 @@ pnpm josh test:related --silent            # flags are forwarded to vitest
 
 Report whether the working-tree change needs a test — `required`, `exempt` or `satisfied` — from changed paths alone; `pnpm josh git -y` refuses on `required`. Verify a declaration with `pnpm josh test:declared --match < summary.md`.
 
+<!-- usage: test:declared -->
+
 ```bash
 pnpm josh test:declared
 pnpm josh test:declared --match   # check Step 0 declarations on stdin
 pnpm josh test:declared --help    # print usage, including the --match stdin form
 ```
+
+<!-- /usage -->
 
 An unknown flag is refused with the usage rather than ignored, the same convention `josh time` follows.
 
@@ -213,17 +267,25 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in de
 
 Run E2E tests with Playwright. **Skips gracefully (exit 0)** when `@playwright/test` is not installed or no `*.e2e.{ts,js}` files exist. Once both are present, runs `playwright test`.
 
+<!-- usage: test:e2e -->
+
 ```bash
 pnpm josh test:e2e
 ```
+
+<!-- /usage -->
 
 ### `josh test`
 
 Run unit tests followed by E2E tests.
 
+<!-- usage: test -->
+
 ```bash
 pnpm josh test
 ```
+
+<!-- /usage -->
 
 `josh test` is a **composite command** and takes no extra arguments — pass runner flags to the stage that understands them:
 
@@ -239,18 +301,26 @@ See [Composite commands and extra arguments](#composite-commands-and-extra-argum
 
 Type-check with `tsc --noEmit`. A `basic` project with nothing to check is skipped as `josh gate` does; a listed, uninstalled tool fails. SvelteKit type-checking is not part of kit's framework-agnostic `josh` CLI: SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit).
 
+<!-- usage: check -->
+
 ```bash
 pnpm josh check
 ```
+
+<!-- /usage -->
 
 ### `josh port`
 
 Print the port this project's dev or preview server runs on, resolved from `PORT_SEED`.
 
+<!-- usage: port -->
+
 ```bash
 pnpm josh port dev       # 5173 with no seed set
 pnpm josh port preview   # 4173 with no seed set
 ```
+
+<!-- /usage -->
 
 - `PORT_SEED` is a personal `.env` integer; the offset on both ports is `seed × 10 + lane`, where `lane` is `JOSH_LANE_SEAT` (`0` for the main tree).
 
@@ -295,9 +365,13 @@ Commands for setting up and maintaining a project.
 
 Show the project profile and reason. A saved `josh.profile` takes precedence; `--profile` overrides it. A `basic` project also gets a `compat: profile: static (…)` line, so a `ci.yml` synced before the profiles were renamed ([#2829](https://github.com/joshuafolkken/kit/issues/2829)) still recognizes it.
 
+<!-- usage: profile -->
+
 ```bash
 pnpm josh profile
 ```
+
+<!-- /usage -->
 
 ### `josh start`
 
@@ -333,9 +407,13 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh start` in detai
 
 Initialize project config, selecting a profile and reporting applicable repository settings.
 
+<!-- usage: init -->
+
 ```bash
 pnpm josh init   # create/merge config files, install and format (--no-install skips both, --dry-run only prints the plan)
 ```
+
+<!-- /usage -->
 
 **Output / exit codes:** exits non-zero inside the distribution package's own repository, where it writes nothing, and when its `pnpm install` fails.
 
@@ -345,9 +423,13 @@ See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor
 
 Migrate an existing project from GitHub Packages to public npm: check that every locked `@joshuafolkken` package is on public npm, then update `.npmrc` and the lockfile, restoring both if resolution fails.
 
+<!-- usage: registry:migrate -->
+
 ```bash
 pnpm josh registry:migrate
 ```
+
+<!-- /usage -->
 
 **Output / exit codes:** exits non-zero without changing settings when a locked scoped package version is unavailable on public npm, configuration is ambiguous, or the resolved lockfile still points to GitHub Packages. Re-running a completed migration is a no-op. See [authentication.md](./authentication.md) for the setup being replaced.
 
@@ -357,9 +439,13 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh registry:migrat
 
 Overwrite managed files with the latest versions from the package. Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, workflow templates, and other managed files. Also realigns `devEngines.packageManager.version` with the `packageManager` pin, and creates missing labels as [`josh start`](#josh-start) does.
 
+<!-- usage: sync -->
+
 ```bash
 pnpm josh sync   # overwrite managed files
 ```
+
+<!-- /usage -->
 
 **Output / exit codes:** exits non-zero inside the distribution package's own repository, where syncing would overwrite the source with its own derived templates.
 
@@ -369,10 +455,14 @@ See [sync.md](./sync.md) for the full file list.
 
 Remove what kit added to a project. It prints three lists before it changes anything — what it removes, what it keeps, and what is left for you to review — and removes only the first.
 
+<!-- usage: uninstall -->
+
 ```bash
 pnpm josh uninstall         # show the plan, then ask
 pnpm josh uninstall --yes   # remove without asking
 ```
+
+<!-- /usage -->
 
 - **Remove:** each distributed file that is still byte for byte what kit writes, the `@joshuafolkken/kit` dependency and the `josh.profile` record in `package.json`, and the git hooks lefthook installed (`lefthook uninstall`, where `lefthook.yml` is one kit wrote or merged into). A directory the last removed file leaves empty goes with it.
 - **Keep:** a distributed file that differs from what kit writes — one you edited, or one of your own that kit merged entries into.
@@ -386,14 +476,18 @@ pnpm josh uninstall --yes   # remove without asking
 
 Upgrade every `@joshuafolkken/*` toolkit in **this** repository to latest, sync its managed files, run [`josh latest`](#josh-latest), verify, and open the issue and pull request — the consumer-side counterpart of [`josh propagate`](josh-commands-automation.md#josh-propagate).
 
+<!-- usage: adopt -->
+
 ```bash
 pnpm josh adopt
-pnpm josh adopt --dry-run # report the steps without touching anything
+pnpm josh adopt --dry-run   # report the steps without touching anything
 ```
 
 **Options:**
 
 - `--dry-run` — report the plan without writing.
+
+<!-- /usage -->
 
 Steps: working-tree check, `pnpm add -D <toolkit>@latest` per toolkit, `pnpm josh sync`, `pnpm install`, `pnpm josh latest`, [`josh gate`](#josh-gate), open issue, `pnpm josh git`, return to the default branch.
 
@@ -411,18 +505,22 @@ AI-assisted git and notification helpers used in the day-to-day development loop
 
 Interactive AI-assisted git commit workflow: stages changes, generates a commit message, opens the pull request, and optionally pushes. When no issue argument is given, the issue number and title are derived from the current branch name (`<N>-<slug>`).
 
+<!-- usage: git -->
+
 ```bash
-pnpm josh git                            # interactive
-pnpm josh git -y                         # unattended (no TTY required)
-pnpm josh git -y "title"                 # set commit message prefix
-pnpm josh git -y "<title> #<N>"          # follow-up commit on the same branch
-pnpm josh git -y --skip-commit --skip-push  # open the PR without committing/pushing
+pnpm josh git                                # interactive
+pnpm josh git -y                             # unattended (no TTY required)
+pnpm josh git -y "title"                     # set commit message prefix
+pnpm josh git -y "<title> #<N>"              # follow-up commit on the same branch
+pnpm josh git -y --skip-commit --skip-push   # open the PR without committing/pushing
 ```
 
 **Options:**
 
 - `-y` / `--yes` — run non-interactively; works without a TTY (agent or CI shell).
 - `--skip-commit` / `--skip-push` — recover/open a PR without a new commit or push.
+
+<!-- /usage -->
 
 **Behavior:** returns as soon as the PR is open and prints its URL — it does not wait for checks (`josh followup` does). Re-running on the same branch makes a follow-up commit and reuses the open PR. Each push is bounded at 120 s and retried once on timeout, the failure naming the command to re-run by hand.
 
@@ -432,9 +530,13 @@ Related: [`josh followup`](josh-commands-automation.md#josh-followup), [`josh pr
 
 Create the pull request for the current issue branch — a recovery/standalone counterpart to `josh git` for when the branch is already committed and pushed. It derives the issue number and title from the branch name (`<N>-<slug>`) and generates the `closes #N` line.
 
+<!-- usage: pr -->
+
 ```bash
 pnpm josh pr   # open the PR for the current <N>-<slug> branch
 ```
+
+<!-- /usage -->
 
 **Behavior:** reports an existing open PR for the branch instead of opening a second one.
 
@@ -442,9 +544,13 @@ pnpm josh pr   # open the PR for the current <N>-<slug> branch
 
 Count the recorded review findings by category — the reader over what `josh review:record` wrote. It reads the observation ledger, tallies each recurring category most-frequent-first, and prints the number of zero-finding rounds, which tells a genuinely quiet category apart from one nobody looked at.
 
+<!-- usage: review:findings -->
+
 ```bash
 pnpm josh review:findings
 ```
+
+<!-- /usage -->
 
 **Behavior:** counts only `- rf:` lines, ignoring the `- k:` observation lines in the same file. The `none` sentinel lines are excluded from the category tally and reported as the zero-finding round count instead. A ledger with no finding lines prints `no review findings recorded yet`.
 
@@ -454,9 +560,13 @@ Related: [`josh review:record`](josh-commands-automation.md#josh-reviewrecord).
 
 Checkout the default branch and pull the latest changes with `git pull --ff-only` (the strategy is named by the command, not read from git config).
 
+<!-- usage: main:sync -->
+
 ```bash
 pnpm josh main:sync
 ```
+
+<!-- /usage -->
 
 **Behavior:** refused inside a lane. Pulls with `--ff-only` — the opposite of [`josh main:merge`](#josh-mainmerge) — then prunes local branches whose upstream is gone, that are merged, and that no work tree has checked out.
 
@@ -466,9 +576,13 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh main:sync` in d
 
 Bring the repository's default branch into the branch this checkout is on: fetches `origin/<default>` and merges it into the current branch.
 
+<!-- usage: main:merge -->
+
 ```bash
 pnpm josh main:merge
 ```
+
+<!-- /usage -->
 
 **Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict only on generated files (`scripts/git/main-merge-regenerate.ts`) is regenerated and committed; any other conflict, or uncommitted work on an incoming path, fails.
 
@@ -482,6 +596,8 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh main:merge` in 
 
 Show the global-install, project and latest published versions, plus the **running binary**. A stale install gets a `Run:` hint; a shadowing `josh` on `PATH` points to [`josh doctor --fix`](#josh-doctor).
 
+<!-- usage: version -->
+
 ```bash
 pnpm josh version
 pnpm josh version --upgrade   # upgrade global + project to latest, then re-run fix-gh-packages
@@ -491,6 +607,8 @@ pnpm josh version --upgrade   # upgrade global + project to latest, then re-run 
 
 - `--upgrade` — upgrade both the global install (`pnpm add -g`) and the project devDependency (`pnpm add -D` + `fix-gh-packages`); already-current or not-installed targets are skipped.
 
+<!-- /usage -->
+
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh version` in detail".
 
 ### `josh ranges`
@@ -499,9 +617,13 @@ Check that every dependency range this package **publishes** still resolves for 
 
 In a package built on a `@joshuafolkken/*` toolkit it also fails when a published `peerDependencies` floor sits below the toolkit's.
 
+<!-- usage: ranges -->
+
 ```bash
 pnpm josh ranges
 ```
+
+<!-- /usage -->
 
 **Output / exit codes:** fails closed — a probe that cannot answer is unresolvable. Probing `@joshuafolkken/*` needs `NODE_AUTH_TOKEN` (`export NODE_AUTH_TOKEN=$(gh auth token)`).
 
@@ -515,18 +637,22 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh ranges` in deta
 
 Diagnose — and optionally repair — PATH shadowing of the global `josh`.
 
-```bash
-pnpm josh doctor          # diagnose only
-pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
-pnpm josh doctor --ports  # also print the per-repository port-seed table
-```
+<!-- usage: doctor -->
 
-`doctor` reports the running binary, the `josh` first on `PATH` and the pnpm-global install; in a kit consumer it adds a **Consumer setup** section and repository settings, including the [`josh ruleset:check`](josh-commands-automation.md#josh-rulesetcheck) report. None of these fails the command or changes a setting.
+```bash
+pnpm josh doctor           # diagnose only
+pnpm josh doctor --fix     # reclaim the global josh by removing a stale kit shim
+pnpm josh doctor --ports   # also print the per-repository port-seed table
+```
 
 **Options:**
 
 - `--fix` — remove a shadowing binary **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script); any other binary is left and reported for manual review. Also the one-shot recovery for an old project that re-created the global shim.
 - `--ports` — additionally print the port-seed table (see below).
+
+<!-- /usage -->
+
+`doctor` reports the running binary, the `josh` first on `PATH` and the pnpm-global install; in a kit consumer it adds a **Consumer setup** section and repository settings, including the [`josh ruleset:check`](josh-commands-automation.md#josh-rulesetcheck) report. None of these fails the command or changes a setting.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh doctor` in detail".
 
@@ -569,9 +695,13 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "The discovered reposi
 
 Run a security audit against the lockfile.
 
+<!-- usage: audit -->
+
 ```bash
 pnpm josh audit
 ```
+
+<!-- /usage -->
 
 The scanner is looked up on `PATH` first, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`). With neither present the audit exits non-zero and prints how to get one — it is never skipped or weakened.
 
@@ -579,16 +709,20 @@ The scanner is looked up on `PATH` first, then in the `josh audit:provision` cac
 
 Check that the dependency overrides have not drifted after a dependency update.
 
-```bash
-pnpm josh overrides           # verify overrides unchanged
-pnpm josh overrides --save    # snapshot current merged overrides
-```
+<!-- usage: overrides -->
 
-Checks effective overrides from `pnpm-workspace.yaml` against a saved snapshot and reports ignored `pnpm.overrides` entries in `package.json` separately. pnpm 11 and 12 do not apply the package field. An empty `pnpm.overrides` is never treated as "no overrides" without reading the workspace.
+```bash
+pnpm josh overrides          # verify overrides unchanged
+pnpm josh overrides --save   # snapshot current merged overrides
+```
 
 **Options:**
 
 - `--save` — write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
+
+<!-- /usage -->
+
+Checks effective overrides from `pnpm-workspace.yaml` against a saved snapshot and reports ignored `pnpm.overrides` entries in `package.json` separately. pnpm 11 and 12 do not apply the package field. An empty `pnpm.overrides` is never treated as "no overrides" without reading the workspace.
 
 ### `josh latest`
 
@@ -626,12 +760,16 @@ Helpers for AI-assisted development workflows.
 
 Start a `backlogrun` from the terminal and watch it on [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the background in the main checkout, its output going to a log file, and the board takes over the terminal at once.
 
+<!-- usage: backlogrun -->
+
 ```bash
-pnpm josh backlogrun                    # start in Claude, then show the board
-pnpm josh backlogrun 3437 --only        # the arguments go to backlogrun as typed
-pnpm josh backlogrun --agent codex      # start in Codex
-pnpm josh backlogrun --stop             # stop the run in this repository
+pnpm josh backlogrun                 # start in Claude, then show the board
+pnpm josh backlogrun 3437 --only     # the arguments go to backlogrun as typed
+pnpm josh backlogrun --agent codex   # start in Codex
+pnpm josh backlogrun --stop          # stop the run in this repository
 ```
+
+<!-- /usage -->
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number in the named list is read as `#<n>`, since an unquoted `#` starts a shell comment.
 - `--agent claude|codex` picks the agent; the default is `claude`. The start command is built by `scripts/agent/agent-argv.ts`, the same builder that starts lane children, and the choice is handed to the run as `JOSH_AGENT_PROVIDER`.
@@ -657,11 +795,15 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh backlogrun` in 
 
 Change a running `backlogrun`'s lane limit without stopping it. The run keeps the environment it started with, so `JOSH_LANE_LIMIT` cannot change under it; this writes an override onto the run's record, which every lane-limit read takes over the environment.
 
+<!-- usage: lane:limit -->
+
 ```bash
-pnpm josh lane:limit 8        # raise or lower the live run's limit to 8
-pnpm josh lane:limit          # print the limit, the lanes in use and the free lanes
-pnpm josh lane:limit --reset  # clear the override; JOSH_LANE_LIMIT applies again
+pnpm josh lane:limit 8         # raise or lower the live run's limit to 8
+pnpm josh lane:limit           # print the limit, the lanes in use and the free lanes
+pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies again
 ```
+
+<!-- /usage -->
 
 - The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes the parent within a minute to fill the freed lanes.
 - Lowering it stops no running child: a lane that finishes is simply not refilled.
@@ -687,9 +829,13 @@ pid=$(pnpm josh lane:restart 3769) || exit 1
 
 Take a running lane child's issue out of the run for good — after deciding mid-run the issue should not be done.
 
+<!-- usage: lane:withdraw -->
+
 ```bash
 pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 ```
+
+<!-- /usage -->
 
 - In order: it records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, closes the Issue as not planned with a `- Why: <reason>` comment, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
 - The event comes first: `run:merge` books the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
@@ -700,10 +846,14 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 Print each delivered rule's **unaided compliance** (`scripts/rules/rule-value.ts`): per rule, the runs that reached it, the rate it was kept before its trigger fired, and the refusals the hook delivered.
 
+<!-- usage: rule:value -->
+
 ```bash
 pnpm josh rule:value
 pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
 ```
+
+<!-- /usage -->
 
 - Transcripts are grouped by the run they belong to, so a lane's transcript counts with the parent that dispatched it rather than as a run of its own.
 - It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
