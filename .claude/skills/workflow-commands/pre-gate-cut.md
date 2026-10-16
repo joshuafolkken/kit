@@ -127,7 +127,9 @@ Same `cost_verdict.per_request_cost` through `cost_cli.session_verdict` as `back
 **The trigger**: `pnpm josh rule:guard` refuses an `Edit` / `Write` in a dispatched lane child over
 threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>`. `cut` ends the turn; the
 fresh process's `run:cut --resume <N>` answers `resume-impl` — **the implementation resume clears the
-record**, so the cut may fire again. **A cut that relaunches its successor owes no Telegram**. Outside a
+record**, so the cut may fire again. **A cut that relaunches its successor owes no Telegram** — the
+`Stop` hook reads the relaunch off the turn's own `run:cut` output, not off the record the resume
+clears. Outside a
 lane, `run:cut --impl` prints the held run's instruction: on `over`, keep the hold, send a
 `confirmation` Telegram naming `fullrun #<N>`, end the turn. **It fires on every threshold crossing,
 not once per run**; **An edit reissued right after a refusal passes**; **An unmeasurable session

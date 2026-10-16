@@ -120,7 +120,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/rules/oracle-list-cli.ts',
 	'scripts/rules/permission-guards.ts',
 	'scripts/rules/rule-guard.ts',
-	'scripts/rules/tail-commands.ts',
 	'scripts/rules/test-declared-commit.ts',
 	'scripts/run/run-stranded-cli.ts',
 	'scripts/run/run-watcher-guard-cli.ts',

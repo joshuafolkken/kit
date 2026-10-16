@@ -12,10 +12,12 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
 
@@ -201,14 +203,24 @@ const HELD: HoldRead = {
 	hold: { issue: '2962', taken_at: '2026-10-03T00:00:00.000Z', pid: process.pid },
 }
 
-// The stdout writes of one stop decision on a held tree, with the ship hand-off reading `is_handed_off`
-// and the hook's own notify sending, or failing when `is_send_failing`.
-async function decide_held(is_handed_off: boolean, is_send_failing = false): Promise<string> {
+// A quiet world on a tree held for `HELD`, whose transcript tail reads `tail`.
+function held_world(is_handed_off: boolean, tail: string): void {
 	quiet_world()
+	vi.mocked(time_density_hook.read_tail).mockReturnValue(tail)
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(process.cwd())
 	vi.spyOn(run_hold, 'read_hold').mockReturnValue(HELD)
 	vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(is_handed_off)
 	vi.spyOn(git_gh_repo, 'repo_get_name_with_owner').mockResolvedValue('joshuafolkken/kit')
+}
+
+// The stdout writes of one stop decision on a held tree, with the ship hand-off reading `is_handed_off`
+// and the hook's own notify sending, or failing when `is_send_failing`, over the transcript `tail`.
+async function decide_held(
+	is_handed_off: boolean,
+	is_send_failing = false,
+	tail = '',
+): Promise<string> {
+	held_world(is_handed_off, tail)
 	const send = vi.spyOn(telegram_test, 'send_values')
 	if (is_send_failing) send.mockRejectedValue(new Error('telegram down'))
 	else send.mockResolvedValue(undefined)
@@ -241,6 +253,51 @@ describe('write_stop_decision — the ship hand-off is wired', () => {
 
 	it('falls back to demanding the notify when the send fails', async () => {
 		expect(await decide_held(false, true)).toContain('mid-workflow stop notification')
+	})
+})
+
+// The cut tail is read from a typed prompt and a `run:cut` call whose result relaunched its successor.
+const { BRANCH } = time_transcript_fixture
+const PROMPT_LINE = time_transcript_fixture.prompt_line(0, BRANCH)
+const RELAUNCHED_CUT_LINE = [
+	time_transcript_fixture.josh_call_line(1, BRANCH, 'pnpm josh run:cut --impl 2962', 'call-cut'),
+	time_transcript_fixture.result_line(
+		2,
+		BRANCH,
+		'call-cut',
+		`${run_cut_report.RELAUNCHED_CUT_MARKER}\ncut`,
+	),
+].join('\n')
+// A turn that only printed the marker — a source read, a grep — relaunched nothing.
+const QUOTED_MARKER_LINE = [
+	time_transcript_fixture.josh_call_line(1, BRANCH, 'grep -rn cut-relaunched scripts', 'call-grep'),
+	time_transcript_fixture.result_line(2, BRANCH, 'call-grep', run_cut_report.RELAUNCHED_CUT_MARKER),
+].join('\n')
+
+// joshuafolkken/kit#3936: the successor's resume clears the record before the old session's turn ends,
+// so the record reads absent while the hold stands — the cut is read off the turn instead.
+describe('write_stop_decision — a relaunched cut whose record the successor already cleared', () => {
+	beforeEach(() => {
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+	})
+
+	it('sends no notify and demands none when this turn relaunched the successor', async () => {
+		const written = await decide_held(false, false, [PROMPT_LINE, RELAUNCHED_CUT_LINE].join('\n'))
+
+		expect(written).toBe('')
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
+	})
+
+	it('still notifies when the relaunched cut belongs to an earlier turn', async () => {
+		await decide_held(false, false, [RELAUNCHED_CUT_LINE, PROMPT_LINE].join('\n'))
+
+		expect(telegram_test.send_values).toHaveBeenCalledOnce()
+	})
+
+	it('still notifies when this turn only printed the marker outside a run:cut call', async () => {
+		await decide_held(false, false, [PROMPT_LINE, QUOTED_MARKER_LINE].join('\n'))
+
+		expect(telegram_test.send_values).toHaveBeenCalledOnce()
 	})
 })
 
