@@ -22,6 +22,7 @@ const EXCLUDED_PREFIXES = [
 	'scripts/eval/',
 	'scripts/time/',
 	'scripts/cost/',
+	'scripts/cost-audit/',
 	'scripts/retrospective/',
 	'scripts/dogfood/',
 	'evals/',

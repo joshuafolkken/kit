@@ -80,6 +80,7 @@
 		"!scripts/eval",
 		"!scripts/time",
 		"!scripts/cost",
+		"!scripts/cost-audit",
 		"!scripts/retrospective",
 		"!scripts/dogfood",
 		"!scripts/metrics",

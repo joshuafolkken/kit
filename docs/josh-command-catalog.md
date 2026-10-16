@@ -885,6 +885,16 @@ Say whether the next turn of a run crosses the context-cut threshold (--cut) or 
 
 ---
 
+### `josh cost:audit` · `josh ca`
+
+> **Audience:** maintainer · **Side effects:** none · **kit only**
+
+`[--period <days>]`
+
+Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before
+
+---
+
 ### `josh defect:rate`
 
 > **Audience:** automation · **Side effects:** network
