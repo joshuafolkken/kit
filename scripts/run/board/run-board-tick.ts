@@ -138,6 +138,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		statuses,
 		events: local.events,
 		free_lanes: local.free_lanes,
+		occupied_lanes: local.occupied_lanes,
 		is_stopped: activity_here(local).is_stopped,
 	})
 

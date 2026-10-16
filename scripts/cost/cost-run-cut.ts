@@ -1,8 +1,7 @@
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { implementation_cut } from '#scripts/rules/implementation-cut'
+import { tail_commands } from '#scripts/rules/tail-commands'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
-import { time_shell } from '#scripts/time-runtime/time-shell'
-import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
 
 // Whether a lane session was ended by the implementation-phase cut.
 //
@@ -18,27 +17,10 @@ import { time_transcript_line, type Block } from '#scripts/time-runtime/time-tra
 
 const { CUT_VERDICT } = run_cut_report
 
-function blocks_of(text: string): Array<Block> {
-	return time_transcript_line.parse_text(text).flatMap((line) => line.blocks)
-}
-
-function is_impl_cut_call(block: Block): boolean {
-	return implementation_cut.takes_the_impl_cut(time_shell.bash_command(block.input))
-}
-
-function is_cut_answer(block: Block, call_ids: ReadonlySet<string>): boolean {
-	return call_ids.has(block.result_id) && block.token_lines.includes(CUT_VERDICT)
-}
-
 // An unreadable transcript reads as no cut: it is already reported as not measured through
 // `is_readable`, and inventing a cut for it would skew the comparison the other way.
 function took_cut_text(text: string): boolean {
-	const blocks = blocks_of(text)
-	const call_ids = new Set(
-		blocks.filter((block) => is_impl_cut_call(block)).map((block) => block.id),
-	)
-
-	return blocks.some((block) => is_cut_answer(block, call_ids))
+	return tail_commands.answered(text, implementation_cut.takes_the_impl_cut, CUT_VERDICT)
 }
 
 function took_cut(file: SessionFile): boolean {

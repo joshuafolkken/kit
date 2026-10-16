@@ -25,6 +25,7 @@ const ONE_LANE_LEFT = 1
 const UNTRIAGED_WORD = 'untriaged'
 const HELD_WORD = 'held by triage'
 const OPENING_WORD = 'opening lane'
+const NO_LANE_WORD = 'no free lane'
 const OVERLAP = `overlaps ${String(RUNNING)} (${SHARED})`
 const DECLARED = new Map([
 	[RUNNING, new Set([SHARED])],
@@ -164,7 +165,7 @@ describe('run_board_reason.reader — a row the pool keeps waiting', () => {
 	})
 
 	it('says no lane is free once the open lanes reach the limit', () => {
-		expect(reasons([child(HELD)], { free_lanes: NO_LANE_LEFT })).toStrictEqual(['no free lane'])
+		expect(reasons([child(HELD)], { free_lanes: NO_LANE_LEFT })).toStrictEqual([NO_LANE_WORD])
 	})
 
 	it('says nothing of the lanes where the limit could not be read', () => {
@@ -217,5 +218,21 @@ describe('run_board_reason.reader — a lane that is no longer being opened', ()
 
 	it('says no stage of a stopped run, whose stream only ends on one', () => {
 		expect(stage_of([OPENING_STEP], { is_stopped: true })).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#3967: a `--only` run's rows read `no free lane` while lanes an earlier run left
+// filled the limit, and nothing on the row said which lanes those were.
+describe('run_board_reason.reader names the lanes that fill the limit', () => {
+	it('lists the occupying issues after no free lane', () => {
+		const full = { free_lanes: NO_LANE_LEFT, occupied_lanes: ['3943', '3948'] }
+
+		expect(reasons([child(HELD)], full)).toStrictEqual(['no free lane — 3943 3948'])
+	})
+
+	it('keeps the bare words when no occupying lane is known', () => {
+		const full = { free_lanes: NO_LANE_LEFT, occupied_lanes: [] }
+
+		expect(reasons([child(HELD)], full)).toStrictEqual([NO_LANE_WORD])
 	})
 })

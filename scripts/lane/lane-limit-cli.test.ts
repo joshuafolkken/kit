@@ -36,7 +36,7 @@ function ports_of(run: FakeRun): LimitPorts {
 			return run.is_live
 		}),
 		emit_raise: vi.fn(async () => undefined),
-		live_lane_count: vi.fn(async () => IN_USE),
+		lane_use: vi.fn(async () => ({ occupied: IN_USE, seated: IN_USE })),
 	}
 }
 

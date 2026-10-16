@@ -36,7 +36,8 @@ describe('stop_rules.stop_outcome — reply wording in a headless agent', () => 
 	})
 
 	it('keeps the mid-workflow stop notification for a headless agent', () => {
-		const held = { headless_agent: true, hold_issue: '7', message: BARE_CITATION }
+		const message = `${BARE_CITATION}\n${stop_rules_fixture.DECISION_MESSAGE}`
+		const held = { headless_agent: true, hold_issue: '7', message }
 
 		expect(action_kinds(held)).toEqual(['notify'])
 	})

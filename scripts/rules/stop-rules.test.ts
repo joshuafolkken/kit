@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stop_rules } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
-const { action_kinds, context } = stop_rules_fixture
+const { DECISION, DECISION_MESSAGE, action_kinds, context } = stop_rules_fixture
 
 // joshuafolkken/kit#2329: every stop reason ends on this, so a correction never reprints the reply.
 const NO_REPRINT = 'do not repeat your previous reply'
@@ -12,10 +12,11 @@ const QUOTING_PROMPT = 'explain this log: closed #7'
 describe('stop_rules.stop_outcome — stop notification', () => {
 	// joshuafolkken/kit#3919: the hook sends it itself rather than refusing the stop.
 	it('sends the notify for a held tree that stopped without notifying', () => {
-		const outcome = stop_rules.stop_outcome(context({ hold_issue: '7', message: 'paused' }))
+		const outcome = stop_rules.stop_outcome(context({ hold_issue: '7', message: DECISION_MESSAGE }))
+		const notify = { kind: 'notify', issue: '7', message: DECISION_MESSAGE, decision: DECISION }
 
 		expect(outcome.reason).toBeUndefined()
-		expect(outcome.actions).toEqual([{ kind: 'notify', issue: '7', message: 'paused' }])
+		expect(outcome.actions).toEqual([notify])
 		expect(outcome.blocks_on_failure).toBe(true)
 	})
 
@@ -51,7 +52,7 @@ describe('stop_rules.stop_outcome — hand-off to the detached ship', () => {
 	})
 
 	it('still demands the notify from a lane child that parks for a decision', () => {
-		const parked = context({ lane_child: true, hold_issue: '7', handed_off: false })
+		const parked = { lane_child: true, hold_issue: '7', message: DECISION_MESSAGE }
 
 		expect(action_kinds(parked)).toEqual(['notify'])
 	})
@@ -68,7 +69,9 @@ describe('stop_rules.stop_outcome — hold release', () => {
 	})
 
 	it('sends the notify ahead of the release that ends the hold it reports', () => {
-		expect(action_kinds({ hold_issue: '7', tree_clean: true })).toEqual(['notify', 'release'])
+		const held = { hold_issue: '7', tree_clean: true, message: DECISION_MESSAGE }
+
+		expect(action_kinds(held)).toEqual(['notify', 'release'])
 	})
 
 	it('is silent when the tree is dirty (halfrun / needs-human-review)', () => {
@@ -88,7 +91,12 @@ describe('stop_rules.stop_outcome — hold release', () => {
 	})
 
 	it('still demands the notify at a prrun stop', () => {
-		const prrun = { hold_issue: '7', tree_clean: true, prrun_stopped: true }
+		const prrun = {
+			hold_issue: '7',
+			tree_clean: true,
+			prrun_stopped: true,
+			message: DECISION_MESSAGE,
+		}
 
 		expect(action_kinds(prrun)).toEqual(['notify'])
 	})
@@ -97,7 +105,12 @@ describe('stop_rules.stop_outcome — hold release', () => {
 describe('stop_rules.stop_outcome — loop breaker', () => {
 	it('still runs the actions once stop_hook_active is set, never blocking on their failure', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ hold_issue: '7', tree_clean: true, stop_hook_active: true }),
+			context({
+				hold_issue: '7',
+				tree_clean: true,
+				stop_hook_active: true,
+				message: DECISION_MESSAGE,
+			}),
 		)
 
 		expect(outcome.reason).toBeUndefined()
@@ -145,7 +158,9 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 	})
 
 	it('cites after the hold actions', () => {
-		expect(action_kinds({ hold_issue: '7', message: 'paused #7' })).toEqual(['notify', 'cite'])
+		const held = { hold_issue: '7', message: `${DECISION_MESSAGE} #7` }
+
+		expect(action_kinds(held)).toEqual(['notify', 'cite'])
 	})
 })
 

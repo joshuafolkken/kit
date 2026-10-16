@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
 import { run_cut_cli_fixture } from './run-cut-cli-fixture'
+import { run_cut_report } from './run-cut-report'
 
 // joshuafolkken/kit#1839: these drive `josh run:cut` end to end with the git and lane reads spied, so
 // what runs for real is the record logic and the branch each verdict takes — the cut relaunches once,
@@ -27,6 +28,7 @@ const {
 	find_open_lane,
 	launch,
 	session_verdict,
+	printed_errors,
 	verdict,
 	worker_argv,
 	existing_cut,
@@ -129,6 +131,16 @@ describe('the pre-gate cut is conditional on the current context', () => {
 
 		expect(code).toBe(0)
 		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+	})
+})
+
+// joshuafolkken/kit#3936: the successor may clear the record before this turn ends, so the `Stop` hook
+// reads the relaunch off this line instead.
+describe('the relaunch the cut reports', () => {
+	it('says on standard error that a successor was relaunched', async () => {
+		await run_cut_cli.run([ISSUE])
+
+		expect(printed_errors()).toContain(run_cut_report.RELAUNCHED_CUT_MARKER)
 	})
 })
 

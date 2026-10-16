@@ -117,12 +117,11 @@ async function run_session(
 		return await run_direct_session(built.argv, built.profile, log_path)
 	}
 
-	const is_success = await lane_session_broker.request(PROJECT_ROOT, issue, {
-		kind: 'review',
-		round,
-	})
+	const answer = await lane_session_broker.request(PROJECT_ROOT, issue, { kind: 'review', round })
 
-	return is_success ? { code: SUCCESS_EXIT_CODE, out: '' } : failure('isolated reviewer failed')
+	return answer.is_success
+		? { code: SUCCESS_EXIT_CODE, out: '' }
+		: failure(`isolated reviewer failed: ${answer.reason}`)
 }
 
 // The brief goes to a file and the previous round's findings are removed, so a reviewer that writes

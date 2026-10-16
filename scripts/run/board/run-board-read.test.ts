@@ -101,6 +101,7 @@ describe('run_board_read.read_local', () => {
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			idle_lanes: [],
 			free_lanes: FREE_LANES,
+			occupied_lanes: ['3432'],
 			usual: new Map(),
 		})
 	})

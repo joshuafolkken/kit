@@ -5,6 +5,7 @@ import { run_cut } from './run-cut'
 import { run_cut_cli } from './run-cut-cli'
 import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 import { run_cut_decline } from './run-cut-decline'
+import { run_cut_report } from './run-cut-report'
 
 const {
 	BRANCH,
@@ -91,6 +92,8 @@ describe('the implementation cut outside a lane', () => {
 
 		expect(printed_errors()).toContain('`confirmation` Telegram')
 		expect(printed_errors()).toContain(`fullrun #${ISSUE}`)
+		// joshuafolkken/kit#3936: nothing was relaunched, so the `Stop` hook must still notify.
+		expect(printed_errors()).not.toContain(run_cut_report.RELAUNCHED_CUT_MARKER)
 	})
 
 	it('resumes that cut back into implementation in the fresh session', async () => {
