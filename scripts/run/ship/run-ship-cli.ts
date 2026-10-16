@@ -8,7 +8,6 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
-import { run_ship_next } from './run-ship-next'
 import { run_ship_pre_detach } from './run-ship-pre-detach'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
@@ -295,19 +294,13 @@ async function stopped(
 	step: Step,
 	context: ShipContext,
 ): Promise<ReadonlyArray<ShipSection>> {
-	const conflicts = sections.at(-1)?.conflicts
+	const failed = sections.at(-1)
 
-	await record_stop(args, step.stage, conflicts)
+	await record_stop(args, step.stage, failed?.conflicts)
 
 	if (run_ship_detach.is_supervised()) {
-		const resume = run_ship_next.resume_of(args)
-
 		record(context.target, run_ship_stage.end_attempt)
-		await run_ship_return.return_control(
-			args.number,
-			step.stage,
-			conflicts === undefined ? resume : { ...resume, conflicts },
-		)
+		await run_ship_return.hand_back(args, step.stage, failed)
 	}
 
 	return sections
