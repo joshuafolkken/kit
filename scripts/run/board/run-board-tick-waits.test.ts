@@ -9,7 +9,7 @@ import { run_board_tick } from './run-board-tick'
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
 const WAITS: Array<BudgetWait> = [
-	{ command: 'gate lint', lane: '3943', waited_ms: 5000, reason: 'pressure' },
+	{ command: 'gate lint', lane: '3943', elsewhere: undefined, waited_ms: 5000, reason: 'pressure' },
 ]
 
 describe('run_board_tick.tick budget waits', () => {

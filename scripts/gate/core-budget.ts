@@ -6,7 +6,6 @@ import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_paths } from '#scripts/lane/lane-paths'
 import { json_value } from '#scripts/lib/json-value'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
@@ -86,14 +85,17 @@ const HELD_VALUE = '1'
 
 // `memory_mb` and `admitted_at` are optional so a marker an older `josh` wrote still reads: it holds no
 // declared memory, and it counts as load from outside the ledger until it is gone.
-// `command`, `lane` and `wait_reason` name a waiting claim on `run:board` (`core-wait.ts`).
+// `command`, `checkout`, `lane`, `lanes_root` and `wait_reason` name a waiting claim on `run:board`
+// (`core-wait.ts`).
 const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
 	claimed_at: z.number(),
 	memory_mb: z.number().optional(),
 	admitted_at: z.number().optional(),
 	command: z.string().optional(),
+	checkout: z.string().optional(),
 	lane: z.string().optional(),
+	lanes_root: z.string().optional(),
 	wait_reason: z.enum(core_wait.WAIT_REASONS).optional(),
 })
 
@@ -325,7 +327,8 @@ function resolve_ports(options: ReserveOptions): Pick<WaitContext, 'read_machine
 	}
 }
 
-// The lane is the checkout's own, so `run:board` can say whose claim waits.
+// The checkout the claim runs in, so `run:board` can say whose claim waits. The ledger is the
+// machine's, so the checkout may be another repository's (`core-wait.ts` → `where_of`).
 function claim_fields(
 	weight: number,
 	claimed_at: number,
@@ -333,7 +336,7 @@ function claim_fields(
 ): ReservationFields {
 	const { memory_mb, command } = options
 
-	return { weight, claimed_at, memory_mb, command, lane: lane_paths.lane_issue_of(process.cwd()) }
+	return { weight, claimed_at, memory_mb, command, ...core_wait.where_of(process.cwd()) }
 }
 
 async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
@@ -359,12 +362,13 @@ async function reserve(weight: number, options: ReserveOptions = {}): Promise<Ha
 	return { target, admission }
 }
 
-// The claims waiting in the ledger now, for `run:board`.
+// The claims waiting in the ledger now, for a `run:board` running in `home`.
 function budget_waits(
 	directory: string = PLATFORM_TEMP_ROOT,
 	now: number = Date.now(),
+	home: string = process.cwd(),
 ): Array<BudgetWait> {
-	return core_wait.waits_of(live_reservations(directory), now)
+	return core_wait.waits_of(live_reservations(directory), now, home)
 }
 
 function release(handle: Handle): void {

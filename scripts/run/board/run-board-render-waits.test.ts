@@ -9,8 +9,21 @@ import { run_board_render_waits } from './run-board-render-waits'
 
 const { header, lines_of } = run_board_render_fixture
 const WAITS: ReadonlyArray<BudgetWait> = [
-	{ command: 'gate lint', lane: '3943', waited_ms: 12_400, reason: 'pressure' },
-	{ command: 'check', lane: undefined, waited_ms: 3000, reason: 'cores' },
+	{
+		command: 'gate lint',
+		lane: '3943',
+		elsewhere: undefined,
+		waited_ms: 12_400,
+		reason: 'pressure',
+	},
+	{ command: 'check', lane: undefined, elsewhere: undefined, waited_ms: 3000, reason: 'cores' },
+	{
+		command: 'audit',
+		lane: undefined,
+		elsewhere: '.app-kit-lanes/12',
+		waited_ms: 0,
+		reason: 'memory',
+	},
 ]
 
 function linked(reference: string): string {
@@ -23,6 +36,7 @@ describe('run_board_render_waits.wait_lines', () => {
 			'',
 			'🚧 gate lint  #3943  12s  memory under pressure',
 			'🚧 check  main  3s  not enough free cores',
+			'🚧 audit  .app-kit-lanes/12  0s  not enough free memory',
 		])
 	})
 
