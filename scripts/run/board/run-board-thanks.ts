@@ -17,8 +17,13 @@ type ThanksState = Pick<BoardState, 'thanks' | 'thanks_fetch' | 'thanks_attempte
 function launch_thanks(state: BoardState, ports: BoardPorts, now_ms: number): BoardState {
 	const { read_thanks } = ports
 
-	if (read_thanks === undefined || state.thanks_fetch !== undefined) return state
-	if (!is_due(state.thanks_attempted_ms, TTL_MS, now_ms)) return state
+	if (
+		read_thanks === undefined ||
+		state.thanks_fetch !== undefined ||
+		!is_due(state.thanks_attempted_ms, TTL_MS, now_ms)
+	) {
+		return state
+	}
 
 	const thanks_fetch: Fetch<Thanks> = run_board_fetch.launch(read_thanks, state.thanks)
 

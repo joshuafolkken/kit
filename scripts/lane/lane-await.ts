@@ -89,8 +89,9 @@ function process_trace_default(issue: string): ProcessTrace {
 
 	process_tools.throw_if_missing(PGREP_COMMAND, result.error)
 
-	if (result.status === PROCESS_FOUND) return PROCESS_ALIVE
-	if (lane_handoff.is_ship_running(issue, process.cwd())) return PROCESS_ALIVE
+	if (result.status === PROCESS_FOUND || lane_handoff.is_ship_running(issue, process.cwd())) {
+		return PROCESS_ALIVE
+	}
 
 	return result.status === PROCESS_NOT_FOUND ? PROCESS_NONE : PROCESS_UNKNOWN
 }

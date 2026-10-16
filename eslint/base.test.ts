@@ -185,6 +185,14 @@ describe('create_base_config — tests block (issue #3273)', () => {
 	})
 })
 
+describe('create_base_config — tests block (issue #3882)', () => {
+	it('disables consistent-boolean-name so test doubles keep the name of what they replace', () => {
+		const rules = rules_of(find_tests_block(build_config()))
+
+		expect(rules['unicorn/consistent-boolean-name']).toBe('off')
+	})
+})
+
 const EXPLICIT_RETURN_TYPE_RULE = '@typescript-eslint/explicit-function-return-type'
 const EXPLICIT_BOUNDARY_RULE = '@typescript-eslint/explicit-module-boundary-types'
 

@@ -65,8 +65,7 @@ function declared_toolkits(project_root: string): ReadonlyArray<string> {
 // declares one, so a toolkit shipping several CLIs still resolves to one deterministically.
 function pick_bin_name(package_name: string, bin: string | Record<string, string>): string {
 	const unscoped = path.basename(package_name)
-	if (typeof bin === 'string') return unscoped
-	if (bin[unscoped] !== undefined) return unscoped
+	if (typeof bin === 'string' || bin[unscoped] !== undefined) return unscoped
 
 	return Object.keys(bin)[0] ?? unscoped
 }
@@ -99,8 +98,7 @@ function has_runnable_cli(project_root: string, bin_name: string): boolean {
 // spawning it would fail the sync step rather than say what is wrong.
 function resolve_toolkit(project_root: string, package_name: string): Release | undefined {
 	const bin_name = read_bin_name(project_root, package_name)
-	if (bin_name === undefined) return undefined
-	if (!has_runnable_cli(project_root, bin_name)) return undefined
+	if (bin_name === undefined || !has_runnable_cli(project_root, bin_name)) return undefined
 
 	return { package_name, version: LATEST_VERSION, bin_name }
 }

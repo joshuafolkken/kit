@@ -343,8 +343,7 @@ async function read_candidate(
 ): Promise<ChildState | undefined> {
 	const state = await read_pr_of_branch(name)
 
-	if (state.pr_state !== NO_PR) return state
-	if (await has_commits_beyond(context.base, references)) return state
+	if (state.pr_state !== NO_PR || (await has_commits_beyond(context.base, references))) return state
 
 	return (await is_held_dirty(name, context.lane)) ? state : undefined
 }

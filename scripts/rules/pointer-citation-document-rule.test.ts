@@ -104,9 +104,11 @@ function cites_pointer(document_path: string, pointer: PointerTopic): boolean {
 
 	// Inside the topic directory a bare file name is already a citation; from anywhere else it takes
 	// the directory in front of it, and that segment is what the absolute and relative forms share.
-	return document_path.startsWith(`${WORKFLOW_PROMPT_DIRECTORY}/`)
-		? content.includes(name)
-		: content.includes(`${TOPIC_DIRECTORY_NAME}/${name}`)
+	return content.includes(
+		document_path.startsWith(`${WORKFLOW_PROMPT_DIRECTORY}/`)
+			? name
+			: `${TOPIC_DIRECTORY_NAME}/${name}`,
+	)
 }
 
 describe('a canonical topic file that has become a pointer', () => {

@@ -102,8 +102,7 @@ function overview_lines(summary: string): ReadonlyArray<string> {
 function item_sentence(line: string): string {
 	const open = line.indexOf(BOLD_MARKER)
 	const close = open === -1 ? -1 : line.indexOf(BOLD_MARKER, open + BOLD_MARKER.length)
-	const raw =
-		close === -1 ? line.slice(ITEM_LINE_PREFIX.length) : line.slice(close + BOLD_MARKER.length)
+	const raw = line.slice(close === -1 ? ITEM_LINE_PREFIX.length : close + BOLD_MARKER.length)
 
 	return raw.replace(LEADING_LABEL_PUNCTUATION, '').trim()
 }
@@ -199,8 +198,12 @@ function break_condition_count(lines: ReadonlyArray<string>): number {
 }
 
 function case_line_violations(summary: string): ReadonlyArray<string> {
-	if (!has_changes_section(summary)) return []
-	if (changes_region_lines(summary).some((line) => line.includes(CASE_LABEL))) return []
+	if (
+		!has_changes_section(summary) ||
+		changes_region_lines(summary).some((line) => line.includes(CASE_LABEL))
+	) {
+		return []
+	}
 
 	return [`✖ no case tier (${CASE_LABEL}:) in ${CHANGES_LABEL}`]
 }

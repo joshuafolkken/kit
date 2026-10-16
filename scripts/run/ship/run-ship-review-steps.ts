@@ -158,8 +158,12 @@ function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
 async function join_gate(): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
-	if (joined.code === SUCCESS_EXIT_CODE) return joined
-	if (!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))) return joined
+	if (
+		joined.code === SUCCESS_EXIT_CODE ||
+		!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))
+	) {
+		return joined
+	}
 
 	note(FIXED_JOIN_NOTE)
 

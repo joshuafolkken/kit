@@ -81,8 +81,10 @@ interface ProbeCall {
 }
 
 function read_fields(options: unknown): string | undefined {
-	if (typeof options !== 'object' || options === null) return undefined
-	if (!('json_fields' in options)) return undefined
+	if (typeof options !== 'object' || options === null || !('json_fields' in options)) {
+		return undefined
+	}
+
 	const { json_fields: fields } = options
 
 	return typeof fields === 'string' ? fields : undefined

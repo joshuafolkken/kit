@@ -175,9 +175,14 @@ function parse_block(block: string, root: string): LaneInfo | undefined {
 	const branch = line_value(lines, BRANCH_PREFIX)
 	const issue = branch_issue(branch)
 
-	if (directory === undefined || branch === undefined || issue === undefined) return undefined
-
-	if (!is_lane_directory(root, issue, directory)) return undefined
+	if (
+		directory === undefined ||
+		branch === undefined ||
+		issue === undefined ||
+		!is_lane_directory(root, issue, directory)
+	) {
+		return undefined
+	}
 
 	return build_lane(issue, branch, directory, is_gone(directory))
 }

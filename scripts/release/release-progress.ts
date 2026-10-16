@@ -145,8 +145,9 @@ async function wait_for_github_release(version: string): Promise<boolean> {
 async function wait_for_distribution(version: string): Promise<number> {
 	const manifest = read_manifest(process.cwd())
 
-	if (!(await wait_for_npm(manifest, version))) return FAILURE_EXIT_CODE
-	if (!(await wait_for_github_release(version))) return FAILURE_EXIT_CODE
+	if (!(await wait_for_npm(manifest, version)) || !(await wait_for_github_release(version))) {
+		return FAILURE_EXIT_CODE
+	}
 
 	console.info(complete_line(version))
 

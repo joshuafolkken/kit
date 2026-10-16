@@ -1,0 +1,4 @@
+- rf:tests | low | scripts/hooks/hook-refusal-brevity.test.ts:53 | 2026-10-15 | #3867
+- rf:comments | low | scripts/rules/implementation-cut.ts:206 | 2026-10-15 | #3867
+- rf:assumptions | low | scripts/delegation/investigation-reads.ts:11 | 2026-10-15 | #3867
+- rf:comments | low | scripts/rules/file-body.ts:26 | 2026-10-15 | #3867

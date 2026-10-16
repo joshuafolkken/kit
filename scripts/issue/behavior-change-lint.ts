@@ -76,9 +76,12 @@ function firing_point_problem(body: string): string | undefined {
 }
 
 function baseline_problem(body: string): string | undefined {
-	if (!markdown_section.has_line(body, BASELINE_HEADING)) return undefined
-
-	if (baseline_measure.has_command_value(body)) return undefined
+	if (
+		!markdown_section.has_line(body, BASELINE_HEADING) ||
+		baseline_measure.has_command_value(body)
+	) {
+		return undefined
+	}
 
 	return 'baseline must be written as `command → value`, not prose (it has to be re-runnable)'
 }
@@ -86,9 +89,12 @@ function baseline_problem(body: string): string | undefined {
 // The reproduction section is checked for format only where the heading is present — a missing heading
 // is already reported by `heading_problems`, so reporting it here too would double the message.
 function reproduction_problem(body: string): string | undefined {
-	if (!markdown_section.has_line(body, REPRODUCTION_HEADING)) return undefined
-
-	if (reproduction_measure.has_command_output(body)) return undefined
+	if (
+		!markdown_section.has_line(body, REPRODUCTION_HEADING) ||
+		reproduction_measure.has_command_output(body)
+	) {
+		return undefined
+	}
 
 	return 'reproduction must be a command and its actual output (a fenced block), not prose ("確認した" is not re-runnable)'
 }

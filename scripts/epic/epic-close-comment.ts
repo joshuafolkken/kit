@@ -66,8 +66,7 @@ function marker_children(line: string): Array<string> | undefined {
 	if (indent_of(line) >= INDENTED_CODE_SPACES) return undefined
 
 	const trimmed = line.trim()
-	if (!trimmed.startsWith(MARKER_OPEN)) return undefined
-	if (!trimmed.endsWith(MARKER_CLOSE)) return undefined
+	if (!trimmed.startsWith(MARKER_OPEN) || !trimmed.endsWith(MARKER_CLOSE)) return undefined
 
 	const listed = trimmed.slice(MARKER_OPEN.length, -MARKER_CLOSE.length)
 

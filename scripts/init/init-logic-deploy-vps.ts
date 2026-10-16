@@ -30,8 +30,10 @@ function patch_deploy_vps_pnpm(content: string): string {
 	const with_pnpm12 = content.replaceAll(PNPM_INSTALL_PATTERN, (command) =>
 		replace_outdated_install(command),
 	)
-	if (with_pnpm12.includes(VERSION_CHECK_MARKER)) return with_pnpm12
-	if (!OLD_PNPM_CHECK_PATTERN.test(with_pnpm12)) return with_pnpm12
+
+	if (with_pnpm12.includes(VERSION_CHECK_MARKER) || !OLD_PNPM_CHECK_PATTERN.test(with_pnpm12)) {
+		return with_pnpm12
+	}
 
 	return with_pnpm12
 		.replace(OLD_MAJOR_LINE_PATTERN, '')

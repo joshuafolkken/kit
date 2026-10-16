@@ -269,9 +269,7 @@ function to_named_request(values: ParsedValues, owner: CarryOwner): Request | un
 }
 
 function to_request(values: ParsedValues): Request | undefined {
-	if (group_count(values) > ONE_GROUP) return undefined
-
-	if (!is_summary_paired(values)) return undefined
+	if (group_count(values) > ONE_GROUP || !is_summary_paired(values)) return undefined
 
 	const owner = to_owner(values.owner)
 

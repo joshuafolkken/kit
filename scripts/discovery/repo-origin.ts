@@ -68,8 +68,7 @@ function parse_scp_like(url: string): RepoIdentity | undefined {
 	const user_end = url.indexOf(USER_SEPARATOR)
 	const authority = user_end === NOT_FOUND ? url : url.slice(user_end + 1)
 	const host_end = authority.indexOf(HOST_SEPARATOR)
-	if (host_end === NOT_FOUND) return undefined
-	if (!is_github_ssh_host(authority.slice(0, host_end))) return undefined
+	if (host_end === NOT_FOUND || !is_github_ssh_host(authority.slice(0, host_end))) return undefined
 
 	return to_identity(authority.slice(host_end + 1))
 }
@@ -115,8 +114,7 @@ function origin_section_lines(lines: ReadonlyArray<string>): Array<string> {
 // the first separator rather than matched, for the reason `parse_scp_like` is split by hand.
 function url_value(line: string): string | undefined {
 	const separator = line.indexOf('=')
-	if (separator === NOT_FOUND) return undefined
-	if (line.slice(0, separator).trim() !== URL_KEY) return undefined
+	if (separator === NOT_FOUND || line.slice(0, separator).trim() !== URL_KEY) return undefined
 
 	return line.slice(separator + 1).trim()
 }

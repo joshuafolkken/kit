@@ -69,9 +69,12 @@ function decide_reclaim(
 	global_josh: string | undefined,
 	shim_content: string,
 ): ReclaimDecision {
-	if (!is_shadowed(path_josh, global_josh)) return { action: 'none', reason: NO_SHADOW_REASON }
-	// is_shadowed already guarantees path_josh is defined; this narrows the type for the return.
-	if (path_josh === undefined) return { action: 'none', reason: NO_SHADOW_REASON }
+	// is_shadowed already implies path_josh is defined; the undefined check narrows the type for the
+	// return.
+	if (path_josh === undefined || !is_shadowed(path_josh, global_josh)) {
+		return { action: 'none', reason: NO_SHADOW_REASON }
+	}
+
 	if (!is_kit_shim(shim_content)) return { action: 'none', reason: NOT_KIT_SHIM_REASON }
 
 	return { action: 'remove', target: path_josh, reason: RECLAIM_REASON }

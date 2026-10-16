@@ -31,9 +31,7 @@ function cache_at(index: number): string {
 }
 
 function cache_content(cache_file: string, root: string, content: string): string {
-	return cache_file === ESLINT_CACHE_FILE
-		? JSON.stringify([path.join(root, content)])
-		: JSON.stringify(content)
+	return JSON.stringify(cache_file === ESLINT_CACHE_FILE ? [path.join(root, content)] : content)
 }
 
 function source_cache(cache_file: string, content: string): void {

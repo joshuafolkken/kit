@@ -13,8 +13,14 @@ const SELF_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
 function read_shadow_warning(): string | undefined {
 	const path_josh = doctor_io.resolve_path_josh()
 	const global_josh = doctor_io.resolve_pnpm_global_josh()
-	if (path_josh === undefined || global_josh === undefined) return undefined
-	if (!doctor_logic.is_shadowed(path_josh, global_josh)) return undefined
+
+	if (
+		path_josh === undefined ||
+		global_josh === undefined ||
+		!doctor_logic.is_shadowed(path_josh, global_josh)
+	) {
+		return undefined
+	}
 
 	return doctor_logic.format_shadow_warning(path_josh, global_josh)
 }

@@ -1,0 +1,2 @@
+- rf:comments | low | docs/maintainers/principles-rationale.md:59 | 2026-10-15 | #3865
+- rf:project-conventions | low | CLAUDE.md:10 | 2026-10-15 | #3865

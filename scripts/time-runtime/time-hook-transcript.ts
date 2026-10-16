@@ -68,8 +68,9 @@ function fork_path(transcript_path: string, agent_id: string): string {
 // **A path that is not a transcript is answered with itself**, since nothing can be derived from it and
 // guessing would name a file in some other layout entirely.
 function transcript_of(transcript_path: string, agent_id: string | null | undefined): string {
-	if (!is_agent_id(agent_id)) return transcript_path
-	if (!transcript_path.endsWith(TRANSCRIPT_EXTENSION)) return transcript_path
+	if (!is_agent_id(agent_id) || !transcript_path.endsWith(TRANSCRIPT_EXTENSION)) {
+		return transcript_path
+	}
 
 	return fork_path(transcript_path, agent_id)
 }
