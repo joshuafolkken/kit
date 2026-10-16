@@ -11,6 +11,7 @@ const USAGE_PAGES: ReadonlyArray<string> = [
 	'docs/josh-commands.md',
 	'docs/josh-commands-run.md',
 	'docs/josh-commands-backlog.md',
+	'docs/josh-commands-automation.md',
 ]
 const USAGE_BLOCK = /<!-- usage: (?<name>\S+) -->\n[\s\S]*?<!-- \/usage -->/gu
 

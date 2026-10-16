@@ -2,6 +2,8 @@
 
 The commands a person rarely types: the ones Claude Code hooks, git hooks, the issue-driven workflow runs (`fullrun`, `backlogrun`, …) and lanes call, plus the `maintainer` commands kit's own maintainers run. Where each command came from: `docs/maintainers/josh-commands-automation-rationale.md` → "Where each command came from".
 
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-automation.ts` and `scripts/josh/josh-usage-workflow.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
+
 ## Development
 
 These commands replace the corresponding `package.json` scripts; consumer projects need not add them manually.
@@ -10,9 +12,13 @@ These commands replace the corresponding `package.json` scripts; consumer projec
 
 Compute the refactoring candidates of `prompts/refactoring.md` §4.1–§4.3 over the changed files and answer `verdict: clear` / `verdict: candidates`. Reports and never fails.
 
+<!-- usage: refactor:scan -->
+
 ```bash
 pnpm josh refactor:scan
 ```
+
+<!-- /usage -->
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh refactor:scan` in detail".
 
@@ -72,11 +78,24 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh batc
 
 Report tool calls per round trip across the ten most recent lane sessions — the density the batching guard is measured on. Kit-only.
 
+<!-- usage: time:density -->
+
+```bash
+pnpm josh time:density
+pnpm josh time:density --lanes 5   # the five most recent lanes
+```
+
+**Options:**
+
+- `--lanes <n>` — average over a different count of recent qualifying lanes (default 10).
+- `--path <dir>` — read another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.
+
+<!-- /usage -->
+
 ```
 lanes=10 round_trips=634 tools/turn=1.13 batched=63/634
 ```
 
-- `--lanes <n>` averages over a different count of recent qualifying lanes (default 10); `--path <dir>` reads another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.
 - `tools/turn` is the canonical calls-per-round-trip density (floor 1.5), so it runs a little above the Issue's per-assistant-message frame (1.04), whose denominator also counts text-only turns. Use it as a behavior-change Issue's baseline so `josh measure:rerun` carries a before/after without a paste.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh time:density` in detail".
@@ -180,9 +199,13 @@ Print the language this session writes in, resolved from `JOSH_SESSION_LANG`. Wi
 
 Report whether the preview server process died during a failed E2E attempt. Invoked by the distributed `ci.yml` between the two attempts of its E2E job.
 
+<!-- usage: e2e:retry-check -->
+
 ```bash
 pnpm josh e2e:retry-check
 ```
+
+<!-- /usage -->
 
 - Reads the preview server debug log (`WRANGLER_LOG_PATH`, default `e2e-web-server-logs`) and matches only when `Error in ProxyController` **and** `Network connection lost.` are in the same file. Verdict written to `$GITHUB_OUTPUT` as `crashed`; a missing/unreadable log ends at "no crash".
 
@@ -194,10 +217,12 @@ Commands for setting up and maintaining a project.
 
 Report whether the current change touches a file `josh sync` distributes.
 
+<!-- usage: sync:scope -->
+
 ```bash
-pnpm josh sync:scope           # the branch diff
-pnpm josh sync:scope --staged  # the staged diff instead
-pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
+pnpm josh sync:scope            # the branch diff
+pnpm josh sync:scope --staged   # the staged diff instead
+pnpm josh sync:scope --json     # {"scope":"managed","reason":"..."}
 ```
 
 **Options:**
@@ -205,15 +230,21 @@ pnpm josh sync:scope --json    # {"scope":"managed","reason":"..."}
 - `--staged` — inspect the staged diff instead of the branch diff.
 - `--json` — emit `{"scope","reason"}` as JSON.
 
+<!-- /usage -->
+
 **Output / exit codes:** the answer (`managed` or `clean`) goes to stdout, the reason to stderr. Exit status is `0` for both — this reports, it does not gate.
 
 ### `josh dogfood:commit`
 
 Make the first commit of a test project a dogfood run created itself. Kit-only.
 
+<!-- usage: dogfood:commit -->
+
 ```bash
 pnpm josh dogfood:commit ~/Development/kit-test-html-start
 ```
+
+<!-- /usage -->
 
 An agent's own `git add` / `git commit` is refused wherever it points — the index guard cannot tell a throwaway project from the user's work — so this is the sanctioned route to a dogfood project's `Initial commit`. It runs `git init --initial-branch=main` when the directory has no `.git`, stages everything, commits `Initial commit` and names the branch `main`.
 
@@ -227,11 +258,13 @@ It refuses, changing nothing and exiting `1`, unless the directory:
 
 Run one install scenario in a Docker container of a machine with nothing installed — no Node.js, pnpm, git or gh — and keep every command and its output as a log. Needs Docker on the machine it is run from.
 
+<!-- usage: fresh:run -->
+
 ```bash
-pnpm josh fresh:run --list                                # kit's six patterns
-pnpm josh fresh:run kit-test-html-init                    # one pattern, the packed checkout
-pnpm josh fresh:run kit-test-html-start                   # a GitHub pattern, the latest published version
-pnpm josh fresh:run --spec fresh/html-init.json           # a scenario another toolkit wrote
+pnpm josh fresh:run --list                        # kit's six patterns
+pnpm josh fresh:run kit-test-html-init            # one pattern, the packed checkout
+pnpm josh fresh:run kit-test-html-start           # a GitHub pattern, the latest published version
+pnpm josh fresh:run --spec fresh/html-init.json   # a scenario another toolkit wrote
 ```
 
 **Options:**
@@ -241,6 +274,8 @@ pnpm josh fresh:run --spec fresh/html-init.json           # a scenario another t
 - `--package-version <version>` — the published version a `package_source: published` scenario installs. Default: the registry's latest version of the package the command is run from.
 - `--log-dir <dir>` — where the log is written. Default: `.claude/tmp/fresh-machine`.
 - `--rebuild` — build the machine image without the layer cache.
+
+<!-- /usage -->
 
 **Output / exit codes:** the session is written to `<log-dir>/<scenario>-<n>.log`, whose path is the last line. The exit status is the container's; a setup problem exits `1`.
 
@@ -252,10 +287,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh fres
 
 Run `claude setup-token` (a browser sign-in) and save the token to the macOS keychain — never shown, never in a file — for `fresh:run`'s `requires_claude` scenarios.
 
+<!-- usage: auth:setup -->
+
 ```bash
 pnpm josh auth:setup           # sign in and save the token
 pnpm josh auth:setup --check   # ok: … saved on <date>, or missing: … and exit 1
 ```
+
+<!-- /usage -->
 
 **Exit codes:** `0` once saved; `1` on no token or no keychain (then set `CLAUDE_CODE_OAUTH_TOKEN`). Full handling: [maintainers/fresh-machine.md](./maintainers/fresh-machine.md#claude-code).
 
@@ -263,17 +302,25 @@ pnpm josh auth:setup --check   # ok: … saved on <date>, or missing: … and ex
 
 Fetch the SonarCloud hotspots on a pull request and print each one's Step B branch (`excluded` / `local` / `fix` / `defer`); a failed read prints `unreadable`, distinct from finding none. The project key comes from `sonar-project.properties` and the upstream-synced branch key from `sync:scope`'s own detection. Full handling: `prompts/sonar-hotspot-handling.md`.
 
+<!-- usage: sonar:hotspots -->
+
 ```bash
 pnpm josh sonar:hotspots 42
 ```
+
+<!-- /usage -->
 
 ### `josh sonar:new-code`
 
 Fail when a pull request adds any new SonarCloud issue or duplicated block, printing `clean` (exit `0`), `findings: …` or `unreadable: …` (exit `1`). Handling: `prompts/sonar-hotspot-handling.md`.
 
+<!-- usage: sonar:new-code -->
+
 ```bash
 pnpm josh sonar:new-code 42
 ```
+
+<!-- /usage -->
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh sonar:new-code` in detail".
 
@@ -281,10 +328,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh sona
 
 List the screenshot-target routes the change touches: a changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived" rather than guessing; the `verify-ui` skill's §1 narrows the list.
 
+<!-- usage: ui:routes -->
+
 ```bash
 pnpm josh ui:routes            # the branch diff
 pnpm josh ui:routes --staged   # the staged diff instead
 ```
+
+<!-- /usage -->
 
 ### `josh propagate`
 
@@ -292,11 +343,13 @@ Carry the release this repository just published into every consumer repository 
 
 Staged delivery: kit → app-kit → joshuafolkken-com / game-kit → waneccha. A toolkit also carries its base packages, pinned to its installed versions. Each consumer is delivered by the topmost toolkit it installs; lower runs report it `skipped`, naming that toolkit.
 
+<!-- usage: propagate -->
+
 ```bash
 pnpm josh propagate
-pnpm josh propagate --dry-run           # report targets and steps, write nothing
-pnpm josh propagate --skip-publish-wait # release already known to be published
-pnpm josh propagate --target app-kit    # carry the release into one consumer only
+pnpm josh propagate --dry-run             # report targets and steps, write nothing
+pnpm josh propagate --skip-publish-wait   # release already known to be published
+pnpm josh propagate --target app-kit      # carry the release into one consumer only
 ```
 
 **Options:**
@@ -304,6 +357,8 @@ pnpm josh propagate --target app-kit    # carry the release into one consumer on
 - `--dry-run` — report targets and steps without writing; skips the publish wait, opens no issues.
 - `--skip-publish-wait` — skip the registry poll for an already-published release.
 - `--target <repo>` — process only that consumer (`app-kit` or `joshuafolkken/app-kit`); the rest are reported `skipped` and left untouched. An unknown, ambiguous or non-dependent name fails before the publish wait, writing nothing.
+
+<!-- /usage -->
 
 Per consumer, in order: working-tree check, `pnpm add -D <package>@<version>` per carried package, `pnpm <bin> sync` per carried package (base first), verification gate, open upgrade issue, `pnpm josh git`, return to default branch. One consumer's failure never stops another; each is reported as `propagated`, `failed` (with the step, reason, and what it left behind), or `skipped`.
 
@@ -321,12 +376,14 @@ Use one label (see PR template). Bots may omit it; label changes rerun only the 
 
 AI-assisted PR follow-up workflow: waits for CI, checks AI-reviewer findings, sends the completion notification, and merges.
 
+<!-- usage: followup -->
+
 ```bash
-pnpm josh followup "PR title #N"                                    # merges (default)
+pnpm josh followup "PR title #N"                                                 # merges (default)
 pnpm josh followup "PR title #N" --notify-message "Implemented X:\n- change 1"
 pnpm josh followup "PR title #N" --notify-message-file completion.md
 pnpm josh followup "PR title #N" --ai-review-ignore-reason "false positive"
-pnpm josh followup "PR title #N" --no-merge                         # do the work, leave the PR open
+pnpm josh followup "PR title #N" --no-merge                                      # do the work, leave the PR open
 ```
 
 **Options:**
@@ -335,6 +392,8 @@ pnpm josh followup "PR title #N" --no-merge                         # do the wor
 - `--notify-message` — inline completion body; `\n` expands to newlines.
 - `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
+
+<!-- /usage -->
 
 **Live-execution evidence:** a merge is refused when the branch changes a runtime path (`josh test:declared`'s classification) and the PR body lacks a `## 実機証跡` section of a backticked command plus its fenced output (`issue:lint`'s `## 再現` parser). Pass it with `josh git -y --body-file <path>`.
 
@@ -350,6 +409,8 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh foll
 
 Send a Telegram notification.
 
+<!-- usage: notify -->
+
 ```bash
 pnpm josh notify --task-type planning --issue-url "https://..." --body="- bullet 1\n- bullet 2"
 pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file r.md --recommended "Go" --alternative "Wait"
@@ -359,9 +420,11 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 - `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.
 - `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
-- `--body-file` — read the body from a file (`-` reads stdin); use whenever the body carries a backtick or `$`. Passing both body forms is refused.
+- `--body-file` — read the body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
-- `--recommended` (required for `confirmation`) / `--alternative` (repeatable) — choices appended under `JOSH_SESSION_LANG` headings.
+- `--recommended` / `--alternative` — the choices appended under `JOSH_SESSION_LANG` headings; `--recommended` is required for `confirmation`, `--alternative` is repeatable.
+
+<!-- /usage -->
 
 **Output / exit codes:** a send that reached nobody exits non-zero. `planning` / `completion` skip unless [`JOSH_NOTIFY_OPT_IN`](environment-variables.md#notification-behavior) names them. Needs `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or `JOSH_NOTIFY=off`.
 
@@ -371,9 +434,13 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh noti
 
 Commit the observation ledger lines no run's own commit carried (`.josh/observations/`) as a pull request of its own and merge it. A run's lines ride its own commit, so only lines written outside any run are left here.
 
+<!-- usage: observations:flush -->
+
 ```bash
 pnpm josh observations:flush
 ```
+
+<!-- /usage -->
 
 **Behavior:** refused off the default branch or beside any other change; prints `clean` when there is nothing to commit. `pnpm josh run:tail` runs it after a merge.
 
@@ -385,9 +452,13 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh obse
 
 Re-run a behavior-change Issue's declared baseline after it merges and print the before/after pair. It reads the Issue's `## ベースライン` section, runs each `` `<command>` → <value> `` entry, and prints the recorded value beside the re-measured one — the merge-time re-read a prose rule never gets.
 
+<!-- usage: measure:rerun -->
+
 ```bash
 pnpm josh measure:rerun 2212
 ```
+
+<!-- /usage -->
 
 **Trust:** a baseline is shell, so it runs only for an `OWNER` / `MEMBER` / `COLLABORATOR` author; any other author, or an unreadable issue, exits 1 before any command runs. A command over its one-minute budget prints `(command failed: …)` and the rest still run.
 
@@ -405,12 +476,16 @@ Count a `- k:<key>` sighting across `.josh/observations/`, append it, and print 
 
 Record a `/code-review` round's findings as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings.
 
+<!-- usage: review:record -->
+
 ```bash
 pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.test.ts
-pnpm josh review:record --issue 2325          # a zero-finding round — records one `none` line
-pnpm josh review:record --issue 2325 --comment  # a round that passed after the PR opened — an Issue comment, no append
-pnpm josh review:record --check --issue 2325  # the merge gate: was it recorded?
+pnpm josh review:record --issue 2325                                                      # a zero-finding round — records one `none` line
+pnpm josh review:record --issue 2325 --comment                                            # a round that passed after the PR opened — an Issue comment, no append
+pnpm josh review:record --check --issue 2325                                              # the merge gate: was it recorded?
 ```
+
+<!-- /usage -->
 
 **Behavior:** each positional is `<category>:<severity>:<file>`; no findings writes one `- rf:none` line. `--comment` posts the lines on the issue instead, for a round after the pull request opened.
 
@@ -426,11 +501,15 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh revi
 
 Bump the package version in `package.json`. Not part of the child flow — `josh release` raises the version instead.
 
+<!-- usage: bump -->
+
 ```bash
 pnpm josh bump major
 pnpm josh bump minor
 pnpm josh bump patch
 ```
+
+<!-- /usage -->
 
 After bumping, update `docs/` to reflect any behavior changes before committing.
 
@@ -449,17 +528,24 @@ Release everything main has taken since the version last changed: raise the vers
 
 A package whose `package.json` says `private: true` is not published to npm, so its npm stage is skipped.
 
+<!-- usage: release -->
+
 ```bash
 pnpm josh release
 pnpm josh release --dry-run   # count and report, write nothing
 ```
 
-**Runs in its own work tree, never the root checkout**, so a release can run beside a [`backlogrun`](how-to/run-issues.md) on a dirty root.
-
 **Options:**
 
 - `--dry-run` — count and report only; writes nothing, fetches nothing, and creates no work tree.
 - `--help` / `-h` — print the usage line and exit 0 without fetching or releasing. Any other argument is refused with the usage line and a non-zero exit, before anything is fetched.
+
+<!-- /usage -->
+
+**Runs in its own work tree, never the root checkout**, so a release can run beside a [`backlogrun`](how-to/run-issues.md) on a dirty root.
+
+The watch budgets are read from the environment:
+
 - `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (env) — tag-watch budget, default 30 minutes.
 - `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (env) — npm-publish watch budget, default 30 minutes.
 - `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (env) — GitHub Release watch budget, default 30 minutes.
@@ -472,10 +558,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh rele
 
 Say whether a release is owed, so the moment one is cut is not a judgement. Reads the same fetch-then-count as `josh followup`, so the two never disagree.
 
+<!-- usage: release:scope -->
+
 ```bash
 pnpm josh release:scope          # → required | skip | unknown
 pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 ```
+
+<!-- /usage -->
 
 | It answers | When                                                             |
 | ---------- | ---------------------------------------------------------------- |
@@ -518,10 +608,18 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh rele
 
 Check that the default branch requires every status check kit's distributed workflows report.
 
+<!-- usage: ruleset:check -->
+
 ```bash
 pnpm josh ruleset:check           # report only
 pnpm josh ruleset:check --apply   # add the missing checks to the existing rule
 ```
+
+**Options:**
+
+- `--apply` — append the missing checks to the ruleset's required-checks rule (or to the branch protection's contexts). It never creates a ruleset: with none, create one under Settings → Rules → Rulesets, then rerun. Writing a repository setting needs admin access, so only this flag writes — `josh sync` and `josh doctor` never do.
+
+<!-- /usage -->
 
 A distributed workflow's check gates nothing until the repository requires it — a per-repository setting. `ruleset:check` reads the default branch's rules — its rulesets first, classic branch protection when no ruleset requires a check — and compares them with the checks of the distributed workflows the repository actually has:
 
@@ -535,13 +633,11 @@ A workflow the repository does not have contributes nothing. `E2E` is safe to re
 
 It exits `0` when every expected check is required and `1` otherwise — when one is missing, nothing requires checks at all, or the rules could not be read (a failed read is never reported as missing).
 
-**Options:**
-
-- `--apply` — append the missing checks to the ruleset's required-checks rule (or to the branch protection's contexts). It never creates a ruleset: with none, create one under Settings → Rules → Rulesets, then rerun. Writing a repository setting needs admin access, so only this flag writes — `josh sync` and `josh doctor` never do.
-
 ### `josh audit:provision`
 
 Install the pinned `osv-scanner` when `josh audit` cannot find one. Wired to the `SessionStart` hook of the distributed `.claude/settings.json` so the pre-push audit has a scanner.
+
+<!-- usage: audit:provision -->
 
 ```bash
 pnpm josh audit:provision           # no-op if a scanner is already present
@@ -552,20 +648,26 @@ pnpm josh audit:provision --force   # ignore backoff, allow a longer download
 
 - `--force` — ignore the 6-hour failure backoff and allow a longer download window; the command to run after fixing a network problem.
 
+<!-- /usage -->
+
 **Output / exit codes:** the version is pinned and its SHA256 verified before install. Any failure (network, non-OK response, checksum mismatch, no published build) is reported and exits `0` — the missing scanner surfaces at the pre-push audit instead.
 
 ### `josh reconcile-templates`
 
 Keep the distributed templates in sync with the root files they come from. **Copy pairs** are byte-for-byte copies regenerated automatically (`.gitignore` → `templates/gitignore`); **tripwire pairs** intentionally diverge and only force a conscious review via a recorded hash (`sonar-project.properties` → `templates/sonar-project.properties`).
 
+<!-- usage: reconcile-templates -->
+
 ```bash
 pnpm josh reconcile-templates           # regenerate copy templates + record tripwire hashes
-pnpm josh reconcile-templates --check    # verify templates are in sync; non-zero on drift
+pnpm josh reconcile-templates --check   # verify templates are in sync; non-zero on drift
 ```
 
 **Options:**
 
 - `--check` — verify only; exits non-zero on drift. A pre-commit hook runs this when a tracked source or copy template is staged.
+
+<!-- /usage -->
 
 Tripwire hashes live in `.template-source-manifest.json` (kit-internal, not distributed).
 
@@ -610,9 +712,16 @@ Runs cspell, prettier or eslint over the staged paths for the pre-commit hook, w
 
 Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`](josh-commands.md#josh-gate) recorded that exact, clean tree green.
 
+<!-- usage: pre-push-unit -->
+
 ```bash
 pnpm josh pre-push-unit
-JOSH_PRE_PUSH_FORCE=1 git push             # run the suite even on a tree recorded green
+```
+
+<!-- /usage -->
+
+```bash
+JOSH_PRE_PUSH_FORCE=1 git push   # run the suite even on a tree recorded green
 ```
 
 **Output:** on reuse, prints that the tree is already green and nothing was re-run.
@@ -623,10 +732,14 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pre-
 
 Runs a command while holding a place in the machine-wide core budget ([`josh gate`](josh-commands.md#josh-gate)'s), for the pre-push install and audit.
 
+<!-- usage: reserved-run -->
+
 ```bash
-pnpm josh reserved-run 2 -- pnpm install       # hold 2 cores while installing
-pnpm josh reserved-run 1 -- pnpm josh audit    # hold 1 core while scanning
+pnpm josh reserved-run 2 -- pnpm install      # hold 2 cores while installing
+pnpm josh reserved-run 1 -- pnpm josh audit   # hold 1 core while scanning
 ```
+
+<!-- /usage -->
 
 - `<weight> -- <command...>`: the cores to reserve, then the command to run while holding them. The weight is the caller's — a conservative reservation for these two, not a measurement.
 - Claims a place before the command starts and waits while the budget is full, exactly as a gate check does; the place is released when the command exits, on success or failure, and its exit code is forwarded.
@@ -638,9 +751,16 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh rese
 
 Type-checks the whole project for the pre-commit hook (`pnpm exec tsc --noEmit`), reusing the result when [`josh gate`](josh-commands.md#josh-gate) recorded that exact, fully staged tree green.
 
+<!-- usage: pre-commit-type-check -->
+
 ```bash
 pnpm josh pre-commit-type-check
-JOSH_PRE_COMMIT_FORCE=1 git commit          # type-check even on a tree recorded green
+```
+
+<!-- /usage -->
+
+```bash
+JOSH_PRE_COMMIT_FORCE=1 git commit   # type-check even on a tree recorded green
 ```
 
 **Output:** on reuse, prints that the tree is already green and nothing was re-run.
@@ -659,11 +779,15 @@ Says whether a repository is **first-party** or **third-party** — computed by 
 judged. Prints one of `first-party` / `third-party` / `unknown`
 on stdout, and the two owners it compared on stderr.
 
+<!-- usage: repo:party -->
+
 ```bash
-pnpm josh repo:party joshuafolkken/kit     # → first-party (in the kit session)
-pnpm josh repo:party sveltejs/kit          # → third-party
-pnpm josh repo:party                        # no argument: the session's own repository
+pnpm josh repo:party joshuafolkken/kit   # → first-party (in the kit session)
+pnpm josh repo:party sveltejs/kit        # → third-party
+pnpm josh repo:party                     # no argument: the session's own repository
 ```
+
+<!-- /usage -->
 
 The target's owner equals the session repository's owner → `first-party`; it differs → `third-party`;
 either owner cannot be read (no `origin`, an unreadable config, a malformed argument) → `unknown`,

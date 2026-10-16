@@ -11,7 +11,7 @@ const GATE_USAGE = [
 	'```',
 ].join('\n')
 // A registered command the usage table does not cover yet.
-const UNCOVERED_COMMAND = 'followup'
+const UNCOVERED_COMMAND = 'stop:guard'
 
 describe('command usage', () => {
 	it('aligns every example comment in one column', () => {
@@ -27,6 +27,12 @@ describe('command usage', () => {
 	it('renders a command from the backlog reference page', () => {
 		expect(command_usage.format_usage('epic')).toContain(
 			'pnpm josh epic --add 893 894 --before 891',
+		)
+	})
+
+	it('renders a command from the automation reference page', () => {
+		expect(command_usage.format_usage('followup')).toContain(
+			'pnpm josh followup "PR title #N" --no-merge',
 		)
 	})
 
