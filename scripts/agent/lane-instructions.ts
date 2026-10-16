@@ -1,12 +1,10 @@
-import { createHash } from 'node:crypto'
-import { existsSync, renameSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cost_tokens } from '#scripts/cost-runtime/cost-tokens'
 import { document_section } from '#scripts/document/document-section'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { find_package_directory } from '#scripts/josh/package-directory'
+import { stamp_file } from '#scripts/josh/stamp-file'
 
 interface LaneSet {
 	text: string
@@ -25,7 +23,8 @@ const POINTER_FILE = 'AGENTS.md'
 const INCLUDE_PATTERN = /^<!-- include: CLAUDE\.md → "(?<wanted>.+)" -->$/u
 const PROMPT_FILE_FLAG = '--append-system-prompt-file'
 const SETTINGS_FLAG = '--settings'
-const HASH_LENGTH = 16
+const PROMPT_FILE_PREFIX = 'josh-lane-instructions-'
+const PROMPT_FILE_SUFFIX = '.md'
 const PACKAGE_DIRECTORY = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
 
 // An include that resolves to nothing is `undefined`, never an empty string, so a renamed heading
@@ -83,41 +82,37 @@ function composed_in(
 	return composed_set(cwd, package_directory)?.text
 }
 
-// Named by its content, so concurrent launches of the same text share one file and a changed
-// `CLAUDE.md` never reuses a stale one. An existing file already holds this text, and a new one is
-// renamed into place whole, so a child never reads it half-written. A file rather than the text
-// itself, because the launcher refuses a line break in any argv element but the prompt.
-function written(text: string): string {
-	const digest = createHash('sha256').update(text).digest('hex').slice(0, HASH_LENGTH)
-	const file_path = path.join(tmpdir(), `josh-lane-instructions-${digest}.md`)
+// Named by its content and this account, so concurrent launches of the same text share one file and a
+// changed `CLAUDE.md` never reuses a stale one. The name is predictable in a temp directory other
+// accounts may write to, so an existing file is reused only when it is this account's own regular file
+// holding exactly this text; anything else is replaced through `stamp_file`, which refuses another
+// account's file and renames a new one into place whole. A file rather than the text itself, because
+// the launcher refuses a line break in any argv element but the prompt.
+function written(text: string): string | undefined {
+	const file_path = stamp_file.stamp_path(PROMPT_FILE_PREFIX, text, PROMPT_FILE_SUFFIX)
 
-	if (existsSync(file_path)) return file_path
+	if (stamp_file.read_stamp_text(file_path) === text) return file_path
 
-	const partial = `${file_path}.${String(process.pid)}`
-
-	writeFileSync(partial, text)
-	renameSync(partial, file_path)
-
-	return file_path
+	try {
+		return stamp_file.replace_text_stamp(file_path, text)
+	} catch {
+		return undefined
+	}
 }
 
 function excluded_settings(rules_path: string, cwd: string): string {
 	return JSON.stringify({ claudeMdExcludes: [rules_path, path.join(cwd, POINTER_FILE)] })
 }
 
-// No flags when the set cannot be composed: the child then loads `CLAUDE.md` as before, which costs
-// tokens but never loses a rule.
+// No flags when the set cannot be composed or safely written: the child then loads `CLAUDE.md` as
+// before, which costs tokens but never loses a rule.
 function flags(cwd: string = process.cwd()): ReadonlyArray<string> {
 	const set = composed_set(cwd, PACKAGE_DIRECTORY)
+	const prompt_file = set === undefined ? undefined : written(set.text)
 
-	if (set === undefined) return []
+	if (set === undefined || prompt_file === undefined) return []
 
-	return [
-		PROMPT_FILE_FLAG,
-		written(set.text),
-		SETTINGS_FLAG,
-		excluded_settings(set.rules_path, cwd),
-	]
+	return [PROMPT_FILE_FLAG, prompt_file, SETTINGS_FLAG, excluded_settings(set.rules_path, cwd)]
 }
 
 function tokens_of(text: string): string {

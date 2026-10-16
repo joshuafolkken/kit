@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -30,6 +38,7 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..')
 const KIT_RULES = readFileSync(path.join(REPO_ROOT, RULES_FILE), 'utf8')
 const IMPORTED_RULES = 'node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
 const AGENTS_FILE = 'AGENTS.md'
+const PLANTED_TEXT = 'Planted instructions.'
 
 function checkout_with(rules: string): string {
 	const directory = mkdtempSync(path.join(tmpdir(), 'lane-instructions-'))
@@ -106,5 +115,36 @@ describe('lane instruction launch flags', () => {
 		expect(lane_instructions.resident_line(REPO_ROOT)).toMatch(
 			/lane instructions [\d,]+ tok in place of CLAUDE\.md [\d,]+ tok/u,
 		)
+	})
+})
+
+function prompt_file_of(cwd: string): string {
+	return value_after(lane_instructions.flags(cwd), lane_instructions.PROMPT_FILE_FLAG)
+}
+
+describe('lane instruction prompt file', () => {
+	it('replaces a symlink planted at the predicted path instead of reusing or following it', () => {
+		const cwd = checkout_with(KIT_RULES)
+		const prompt_file = prompt_file_of(cwd)
+		const decoy = path.join(checkout_with(RULES), 'planted.md')
+
+		writeFileSync(decoy, PLANTED_TEXT)
+		rmSync(prompt_file)
+		symlinkSync(decoy, prompt_file)
+
+		expect(prompt_file_of(cwd)).toBe(prompt_file)
+		expect(lstatSync(prompt_file).isSymbolicLink()).toBe(false)
+		expect(readFileSync(prompt_file, 'utf8')).toContain(QUALITY_LIMITS)
+		expect(readFileSync(decoy, 'utf8')).toBe(PLANTED_TEXT)
+	})
+
+	it('rewrites an own file at the predicted path that holds other text', () => {
+		const cwd = checkout_with(KIT_RULES)
+		const prompt_file = prompt_file_of(cwd)
+
+		writeFileSync(prompt_file, PLANTED_TEXT)
+
+		expect(prompt_file_of(cwd)).toBe(prompt_file)
+		expect(readFileSync(prompt_file, 'utf8')).toContain(QUALITY_LIMITS)
 	})
 })
