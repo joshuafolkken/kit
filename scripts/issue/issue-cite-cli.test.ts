@@ -105,6 +105,26 @@ describe('issue_cite_cli.run — the citation lines', () => {
 	})
 })
 
+// joshuafolkken/kit#3919: the `Stop` hook prints the lines itself, so `cite` hands them back unprinted.
+describe('issue_cite_cli.cite', () => {
+	it('returns the lines and the failures apart, printing nothing', async () => {
+		classified_mock.mockImplementation(async (number: string) =>
+			number === ISSUE_A ? title_read('Fine') : UNREADABLE,
+		)
+
+		const cited = await issue_cite_cli.cite([ISSUE_A, ISSUE_B])
+
+		expect(cited?.lines).toEqual([expect.stringContaining(`${LOCAL_BASE}/${ISSUE_A}`)])
+		expect(cited?.failures).toEqual([expect.stringContaining(`#${ISSUE_B}`)])
+		expect(info_mock).not.toHaveBeenCalled()
+		expect(error_mock).not.toHaveBeenCalled()
+	})
+
+	it('answers undefined for a line nobody can read', async () => {
+		expect(await issue_cite_cli.cite(['oops'])).toBeUndefined()
+	})
+})
+
 describe('issue_cite_cli.run — the failures', () => {
 	it('names an unreadable number on stderr and exits non-zero', async () => {
 		classified_mock.mockImplementation(async (number: string) =>

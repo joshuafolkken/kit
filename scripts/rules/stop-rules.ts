@@ -19,11 +19,14 @@ import { reply_language } from './reply-language'
 // permission envelope. The stop guard is a second *entry* on the one foundation, exactly as
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
-// **Every rule refuses**. Missing the stop notification or leaving a hold
-// on a clean tree costs a person a silent wait or a trampled tree; a bare `#N` in the reply reaches
-// the person watching but not the model that could fix it, so it too blocks — `{"decision":"block"}`
-// is the one channel a `Stop` hook has to the model, and `stop_hook_active` caps a false positive at a
-// single wasted turn. The detection is tightened to match (`issue-citation.ts`, `filing-offer.ts`).
+// **A rule whose answer is fixed acts; only a rule that needs judgement refuses** (joshuafolkken/kit#3919).
+// The stop notification, the hold release and the citation lines are each one mechanical operation the
+// hook can run itself, so they come back as `actions` and the stop goes through: a refusal is a whole
+// model turn spent re-reading the context to run a command the hook already knew. `stop-actions.ts`
+// runs them, and only an action that fails falls back to its refusal. The rest — the reply's language,
+// an unattended filing offer, a lane's index request or running task, a headless parent's wait — need
+// the model, so they still block with `{"decision":"block"}`, the one channel a `Stop` hook has to it;
+// `stop_hook_active` caps a false positive at a single wasted turn.
 
 const SWITCH_ENV_KEY = 'JOSH_STOP_GUARD'
 const BLOCK_DECISION = 'block'
@@ -40,8 +43,9 @@ type StopPayload = z.infer<typeof stop_payload_schema>
 
 // What one stop looks like to the rules, computed once by the CLI from the payload and the world.
 interface StopContext {
-	// The `run:hold` record for this working tree is still in place (`held` or `stale`).
-	hold_present: boolean
+	// The Issue the `run:hold` record for this working tree names (`held` or `stale`) — `new` for an
+	// unnumbered entry — or `undefined` when no record is in place.
+	hold_issue: string | undefined
 	// `git status --porcelain` came back empty.
 	tree_clean: boolean
 	// That record carries a `prrun` stop mark: the run stopped at a green pull
@@ -90,15 +94,26 @@ interface StopContext {
 	backlog_parent: boolean
 }
 
+// The operations the hook runs itself instead of refusing — each carries what it acts on.
+type StopAction =
+	| { kind: 'notify'; issue: string; message: string }
+	| { kind: 'release'; issue: string }
+	| { kind: 'cite'; references: ReadonlyArray<string> }
+
+// `reason` refuses the stop; otherwise `actions` run, and `blocks_on_failure` says whether a failed one
+// falls back to its refusal — never past the loop-breaker.
 interface StopOutcome {
 	reason: string | undefined
+	actions: ReadonlyArray<StopAction>
+	blocks_on_failure: boolean
 }
 
-const NO_OUTCOME: StopOutcome = { reason: undefined }
+const NO_OUTCOME: StopOutcome = { reason: undefined, actions: [], blocks_on_failure: false }
 
 // **A mid-workflow stop is announced off-screen before it happens.** `CLAUDE.md` → "Mid-workflow stop
 // notification" requires the `confirmation` Telegram before any pause; the hold is what says a run is
-// mid-workflow, and the transcript is what says the notify was sent.
+// mid-workflow, and the transcript is what says the notify was sent. The hook sends it; this reason is
+// only the fallback for a send that failed.
 const STOP_NOTIFY_REASON =
 	'⛔ mid-workflow stop notification: this working tree is still held by a run and no `confirmation` ' +
 	'Telegram was sent this turn. Send ' +
@@ -109,13 +124,14 @@ const STOP_NOTIFY_REASON =
 // **A clean tree that still holds is a tree the next run will trample.** `working-tree-hold.md`: a stop that
 // leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop
 // keep it because their tree is dirty, which is why this row is silent whenever the tree is not clean.
+// The hook releases it; this reason is only the fallback for a release that failed.
 const HOLD_RELEASE_REASON =
 	'⛔ working-tree hold not released: this working tree is clean but its `run:hold` record is still in ' +
 	'place. Release it with `pnpm josh run:release <N>` (bare for a `new` entry; ' +
 	'`working-tree-hold.md`), then confirm in one line that it was released — do not repeat your ' +
 	'previous reply.'
 
-// **A refusal that corrects rather than advises**. The bare `#N` is already
+// **The fallback when the hook could not print the citation lines itself**. The bare `#N` is already
 // on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
 // it names the numbers it detected and hands over the exact `issue:cite` call that prints the
 // paste-ready lines, then asks for the corrected citation lines alone — not the whole reply reissued.
@@ -247,7 +263,7 @@ function needs_filing(context: StopContext): boolean {
 // **A lane handed to the detached ship stands them down too**: the hold now
 // belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
 function is_held_idle(context: StopContext): boolean {
-	return context.hold_present && !context.agent_pending && !context.handed_off
+	return context.hold_issue !== undefined && !context.agent_pending && !context.handed_off
 }
 
 function needs_notify(context: StopContext): boolean {
@@ -258,30 +274,24 @@ function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
-function citation_reason(context: StopContext): string | undefined {
-	const references = issue_citation.unquoted_references(context.message, context.prompt)
-	if (references.length === 0) return undefined
+// The bare references the citation lines are printed for. **A headless agent's reply has no reader**:
+// its text lands in a stream-json log, so correcting its citations or its language costs a turn and
+// reaches nobody. The artifacts a person does read — a Telegram, an Issue, a pull request — are held
+// to the same rules by their own guards, not here.
+function bare_references(context: StopContext): ReadonlyArray<string> {
+	if (context.headless_agent) return []
 
-	return build_citation_reason(references)
+	return issue_citation.unquoted_references(context.message, context.prompt)
 }
 
-// The two rules on how a reply is written. **A headless agent's reply has no reader**:
-// its text lands in a stream-json log, so correcting its citations or its
-// language costs a turn and reaches nobody. The artifacts a person does read — a Telegram, an Issue, a
-// pull request — are held to the same rules by their own guards, not here.
-function wording_reason(context: StopContext): string | undefined {
-	if (context.headless_agent) return undefined
-
-	return citation_reason(context) ?? language_reason(context)
-}
-
-// The three rules that read the reply itself, filing offer first and the language last. A drifted reply
+// The two rules that read the reply and need the model, the filing offer first. A drifted reply
 // refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
 // session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
+	if (context.headless_agent) return undefined
 
-	return wording_reason(context)
+	return language_reason(context)
 }
 
 // The headless wait holds past the loop-breaker until the spin bound is reached.
@@ -306,24 +316,36 @@ function needs_background_wait(context: StopContext): boolean {
 	return context.lane_child && context.background_pending
 }
 
-// The two hold rules, notify ahead of release — behind the lane index route
-// and the lane background wait, since the notify they would ask for announces
-// a pause the run has no reason to take.
-function hold_reason(context: StopContext): string | undefined {
+// The two lane rules that mean the run is not pausing at all — ahead of every action, since the notify
+// would announce a pause the run has no reason to take.
+function lane_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
 	if (needs_background_wait(context)) return lane_background.LANE_BACKGROUND_STOP_REASON
-	if (needs_notify(context)) return STOP_NOTIFY_REASON
-	if (needs_release(context)) return HOLD_RELEASE_REASON
 
 	return undefined
 }
 
-// First-wins across every rule. Two things stand every rule down: `stop_hook_active` (the
-// loop-breaker, so a run that already got one continuation this prompt may stop) and a pre-gate cut in
-// flight (a lane child's automatic turn-end, not a person-waiting pause). The two hold rules keep their
-// order ahead of the reply rules, so a stop that both still owes its notify and holds a bare `#N` still
-// reports the notify first; the filing offer goes ahead of the citation, since the filing it forces
-// produces the citation the reply then needs.
+function hold_actions(context: StopContext): Array<StopAction> {
+	const issue = context.hold_issue
+	if (issue === undefined) return []
+
+	const notify: Array<StopAction> = needs_notify(context)
+		? [{ kind: 'notify', issue, message: context.message }]
+		: []
+
+	return needs_release(context) ? [...notify, { kind: 'release', issue }] : notify
+}
+
+// The actions in the order they run: the notify ahead of the release that ends the hold it reports.
+function stop_actions(context: StopContext): ReadonlyArray<StopAction> {
+	const references = bare_references(context)
+	const cite: Array<StopAction> = references.length > 0 ? [{ kind: 'cite', references }] : []
+
+	return [...hold_actions(context), ...cite]
+}
+
+// First-wins across the refusals. `stop_hook_active` is the loop-breaker, so a run that already got one
+// continuation this prompt may stop; the lane rules go first, then the filing offer, then the language.
 //
 // **The headless wait comes first and outlasts `stop_hook_active` up to its spin bound**.
 // The loop-breaker exists so a person is not wedged behind a rule the run will not satisfy; a headless
@@ -334,18 +356,49 @@ function block_reason(context: StopContext): string | undefined {
 	if (is_headless_held(context)) return HEADLESS_WAIT_REASON
 	if (context.stop_hook_active || context.cut_pending) return undefined
 
-	return hold_reason(context) ?? reply_reason(context)
+	return lane_reason(context) ?? reply_reason(context)
+}
+
+// **The actions run only on the stop that goes through**, so a refused stop never notifies a pause its
+// continuation then cancels, while the continuation's own stop, past the loop-breaker, still runs them
+// and a failure there no longer refuses. A lane child still waiting on its own work runs none, and a
+// pre-gate cut in flight stands everything but the headless wait down: it is a lane child's automatic
+// turn-end, not a person-waiting pause.
+function runs_actions(context: StopContext, reason: string | undefined): boolean {
+	return reason === undefined && !context.cut_pending && lane_reason(context) === undefined
 }
 
 function stop_outcome(context: StopContext): StopOutcome {
-	return { reason: block_reason(context) }
+	const reason = block_reason(context)
+	if (!runs_actions(context, reason)) return { ...NO_OUTCOME, reason }
+
+	const actions = stop_actions(context)
+	if (actions.length === 0) return NO_OUTCOME
+
+	return { reason, actions, blocks_on_failure: !context.stop_hook_active }
+}
+
+// The refusal an action falls back to when the hook could not run it.
+function fallback_reason(action: StopAction): string {
+	if (action.kind === 'notify') return STOP_NOTIFY_REASON
+	if (action.kind === 'release') return HOLD_RELEASE_REASON
+
+	return build_citation_reason(action.references)
 }
 
 // The documented shape a `Stop` hook blocks with: `reason` is fed back to Claude, which then continues
 // instead of stopping. Plain stdout is not it — only this envelope holds the stop. Every reason leaves
 // with the session-language note, so no rule can hand the model an English-only turn.
-function block_envelope(reason: string, lang: string): string {
-	return JSON.stringify({ decision: BLOCK_DECISION, reason: `${reason} ${language_note(lang)}` })
+// `notice` is what the hook already did on this stop, shown to the person alongside.
+function block_envelope(reason: string, lang: string, notice?: string): string {
+	const refusal = { decision: BLOCK_DECISION, reason: `${reason} ${language_note(lang)}` }
+
+	return JSON.stringify(notice === undefined ? refusal : { ...refusal, systemMessage: notice })
+}
+
+// The shape a `Stop` hook shows the person a line in without holding the stop: `systemMessage` alone.
+function notice_envelope(notice: string): string {
+	return JSON.stringify({ systemMessage: notice })
 }
 
 function parse_stop_payload(raw_payload: string): StopPayload | undefined {
@@ -371,10 +424,12 @@ const stop_rules = {
 	block_envelope,
 	build_language_reason,
 	count_headless_refusals,
+	fallback_reason,
 	is_enabled,
+	notice_envelope,
 	parse_stop_payload,
 	stop_outcome,
 }
 
-export type { StopContext, StopOutcome }
+export type { StopAction, StopContext, StopOutcome }
 export { stop_rules }

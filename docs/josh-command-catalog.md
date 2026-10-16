@@ -211,7 +211,7 @@ Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context,
 
 _No arguments._
 
-Claude Code Stop hook: deliver the three stop-time rules — hold notify/release and issue citation (reads the Stop payload on stdin)
+Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin)
 
 ---
 

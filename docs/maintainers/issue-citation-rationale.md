@@ -43,6 +43,9 @@ section, short, and the body lives in the topic file.
 
 ## How the Stop hook delivers it
 
-`{"decision":"block"}` is the only path by which a `Stop` hook can hand text back to the model, and
-`stop_hook_active` breaks the loop, so even a false positive stalls for at most one turn
-(joshuafolkken/kit#2247).
+The hook prints the citation lines itself, through the same `issue_cite_cli.cite` that `josh issue:cite`
+runs, as a `systemMessage` the person sees under the reply (joshuafolkken/kit#3919). A refusal cost a
+whole model turn to run a command whose arguments the hook already had. Only when a number cannot be
+cited does it fall back to `{"decision":"block"}` — the only path by which a `Stop` hook can hand text
+back to the model — naming the `issue:cite` call; `stop_hook_active` breaks the loop, so even a false
+positive stalls for at most one turn (joshuafolkken/kit#2247).

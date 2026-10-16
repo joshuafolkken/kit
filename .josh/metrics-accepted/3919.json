@@ -1,0 +1,10 @@
+{
+	"reason": "Stop hook now performs notify/hold-release/citation itself: new stop-actions module (incl. citation pass on the notify body from review), extracted cite/send helpers, and the docs describing the act-instead-of-refuse rows",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 165,
+		"ai_cost.on_demand_bytes": 180,
+		"prose.long_paragraphs": 3,
+		"prose.excess_bold": 1
+	}
+}
