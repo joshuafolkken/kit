@@ -1,0 +1,5 @@
+- rf:bug-risks | low | scripts/run/ship/run-ship-overlap.ts:148 | 2026-10-16 | #3901
+- rf:bug-risks | low | scripts/run/ship/run-ship-overlap.ts:172 | 2026-10-16 | #3901
+- rf:assumptions | low | scripts/run/ship/run-ship-overlap.ts:102 | 2026-10-16 | #3901
+- rf:confidence | low | scripts/run/ship/run-ship-overlap.ts:151 | 2026-10-16 | #3901
+- rf:tests | low | scripts/run/ship/run-ship-running-since.test.ts:16 | 2026-10-16 | #3901

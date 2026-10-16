@@ -95,3 +95,34 @@ describe('issue:lint classification failures', () => {
 		expect(report).toHaveBeenCalledWith('✖ bug and enhancement declarations cannot be combined')
 	})
 })
+
+const SHORTENING_BODY = `${VALID_BODY}- 種別: 非不具合\n- 目的: 時間短縮\n${REQUIRED_SECTIONS}`
+const EXPECTED_EFFECT_SECTION =
+	'## 期待効果\n\n- 効く率: 19%\n- 1 回あたりの得: 2.0 分\n- 外れたときの損: CI 1 回\n- 出典: `pnpm josh lane:stats` → 2.0\n'
+
+async function lint_body(body: string): Promise<number> {
+	const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-expected-effect-'))
+
+	TEMP_PATHS.push(directory)
+	const body_path = path.join(directory, 'issue.md')
+
+	await writeFile(body_path, body)
+
+	return await issue_lint_cli.run(body_path)
+}
+
+describe('issue:lint expected effect (joshuafolkken/kit#3909)', () => {
+	it('rejects a run-time-shortening body without the expected-effect section', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await lint_body(SHORTENING_BODY)).toBe(1)
+		expect(report).toHaveBeenCalledWith('✖ missing heading: ## 期待効果')
+	})
+
+	it('accepts it with the section and labels it an enhancement', async () => {
+		const report = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await lint_body(`${SHORTENING_BODY}${EXPECTED_EFFECT_SECTION}`)).toBe(0)
+		expect(report).toHaveBeenCalledWith(ENHANCEMENT_OUTPUT)
+	})
+})

@@ -2,7 +2,7 @@ import { issue_bug_label } from './issue-bug-label'
 import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL, has_label_name } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
-const FEATURE_DECLARATIONS = ['- 目的: 機能追加', '- 目的: 機能改善']
+const FEATURE_DECLARATIONS = ['- 目的: 機能追加', '- 目的: 機能改善', '- 目的: 時間短縮']
 const BREAKING_DECLARATION = '- 互換性: 破壊的変更'
 const NON_BUG_DECLARATION = '- 種別: 非不具合'
 const CLASSIFICATION_LABELS = [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]
