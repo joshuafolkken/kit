@@ -381,8 +381,8 @@ function should_detach(args: ShipArguments): boolean {
 
 // The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
 // hand-off — a stop it finds is fixed by the same session instead of relaunching one from the
-// supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The type
-// check and the document tests follow it here for the same reason; they are not a stage, so the
+// supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The fast
+// checks (`run-ship-pre-detach.ts`) follow it here for the same reason; they are not a stage, so the
 // supervisor's gate runs them again rather than passing over them.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
