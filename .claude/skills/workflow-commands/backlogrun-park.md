@@ -1,10 +1,7 @@
 # `backlogrun` — a child that cannot finish
 
 **Read this file in full when a child cannot finish** — before parking it, before a
-`needs-human-review` stop, or before recording a mid-run prerequisite or split. Point-of-use, never an
-entry read (`backlogrun.md` points here). Single source of park-and-continue, the `needs-human-review`
-stop, a stale `in-progress`, a mid-run prerequisite and a mid-run split. Provenance:
-`docs/maintainers/backlogrun-park-rationale.md` → "Where each rule came from".
+`needs-human-review` stop, or before recording a mid-run prerequisite or split.
 
 ## What happens to a child that cannot finish
 
@@ -33,8 +30,6 @@ parks, re-dispatches or files.
 A child carrying **`needs-human-review`** stops `halfrun`-shaped and **the whole run ends there**:
 implementation and the gate run, nothing is committed, the tree is left dirty and unstashed, a
 `confirmation` Telegram carries the resume command, and the remaining children are not started.
-Rationale: `docs/maintainers/backlogrun-park-rationale.md` → "Why `needs-human-review` ends the run
-instead of parking".
 
 **The child goes on holding its repository**, and **its lane is left open and untouched**. **Name the
 lane directory in the stop report and in the Telegram.** Lanes in flight finish; no new lane opens.
@@ -90,8 +85,7 @@ It never carries:
 
 **When in doubt, it is Tier A**: decide, comment the decision, and continue. **A label a mechanical step
 applied** (a failed or abandoned child, a lost merge race) is read against this list once its reason is
-known, and removed when the reason is not on it. Rationale:
-`docs/maintainers/backlogrun-park-rationale.md` → "Why a run spends no attention on a non-finding".
+known, and removed when the reason is not on it.
 
 ## `in-progress` is removed by whoever finds it stale
 

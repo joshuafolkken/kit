@@ -56,9 +56,7 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 ## Orchestration facts single-sourced here
 
 These are the gate → review → PR → merge facts other documents cite; this file is their single source
-(`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric). Where each
-rule came from and why it holds: `docs/maintainers/chain-rule-rationale.md` → "Where each rule came
-from", `docs/maintainers/chain-rule-rationale.md` → "Why the orchestration facts hold".
+(`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric).
 
 - **The gate runs beside this review, not in front of it** — started with the review, joined before the
   commit. A red gate is fixed and re-run whatever the review concluded.

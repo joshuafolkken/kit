@@ -1,7 +1,5 @@
 # 原則
 
-経緯と適用例は [`docs/maintainers/principles-rationale.md`](../../docs/maintainers/principles-rationale.md) の各節にあり、実行中には読まない。
-
 ## no-clones — クローン禁止・単一ソース化
 
 既存の非自明なロジック（別ファイル・別モジュール・上流依存を含む別パッケージにあるもの）を、ソースを変えずに済ませるために**コピー・移植・再実装しない**。複製したくなったら、全消費者が import する共有モジュール／export／パッケージへ単一ソース化する。
@@ -11,11 +9,11 @@
 - 「X を触るな」という制約でクローンを黙って正当化しない。「クリーンな修正は kit の変更が必要、代替はクローン、どちらにする？」と先に提示する
 - 複製は、単一ソース化の代替案とコストを提示し、ユーザーの明示承認を得た後にのみ行う
 
-計測は `pnpm josh clone:scan`（`pnpm josh oracle:list` の決定オラクル）。リポジトリ内と `JOSH_REPO_PATHS` の他リポジトリを跨いだ複製の件数と各 `file:line`（`[same-file|cross-file|cross-repo]`、なしは `clean`）を印字する（`docs/maintainers/principles-rationale.md` → "Why clone:scan exists"）。
+計測は `pnpm josh clone:scan`（`pnpm josh oracle:list` の決定オラクル）。リポジトリ内と `JOSH_REPO_PATHS` の他リポジトリを跨いだ複製の件数と各 `file:line`（`[same-file|cross-file|cross-repo]`、なしは `clean`）を印字する。
 
 ## elegant-design — 設計はエレガント・シンプルを第一目標にする
 
-フック・ガード・ルール・抽象化を足す前に、**原因側を直せばその仕組みが要らなくならないか**を問う。要らなくなるなら足さず、原因を直す。検出・通知・叱責を強化する前に、その入力を生んでいる側を断つ。適用例は `docs/maintainers/principles-rationale.md` → "An application of simplicity-first"。
+フック・ガード・ルール・抽象化を足す前に、**原因側を直せばその仕組みが要らなくならないか**を問う。要らなくなるなら足さず、原因を直す。検出・通知・叱責を強化する前に、その入力を生んでいる側を断つ。
 
 書かれたコードの可読性は `prompts/coding-standards.md` の担当で、ここはどの仕組みをどこへ足すかの規則である。互いの本文を写さず、指すだけにする。
 
@@ -53,12 +51,10 @@ AI の判断が要らない手順は、AI に読ませて実行させない。�
 docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 
 - 本文には、いつ何をするか（条件と動作）だけを書く
-- 理由と経緯は rationale 文書に置き、本文からは見出しで指す
+- 理由と経緯は rationale 文書に置き、本文からは指さない — 根拠文書（`docs/maintainers/`）の側から手順を指す
 - 太字は 1 節に 1 つまで。箇条書き先頭の見出し語は数えない。`→ "…"` で引かれている太字は消さない
 - 同じ内容を言い換えて繰り返さない
 - ファイルや節が自分自身を説明する文（「このファイルは〜である」）を書かない
-
-導入時のベースラインは `docs/maintainers/principles-rationale.md` → "Why concise-prose exists"。
 
 ## consult-vs-execute — 相談と実行を区別する
 
@@ -98,7 +94,6 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 **規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md`・`GEMINI.md`・`.cursorrules` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」と「規則を書き戻さない」だけを書いた導線である（`.cursorrules` は Svelte MCP の案内だけを足す）。
 
 - 規則の追加・変更・節の追加は `CLAUDE.md` に 1 回だけ書き、導線文書には書き戻さない
-- 経緯と機械的な検査は `docs/maintainers/principles-rationale.md` → "Why AGENTS and GEMINI are pointers"、`@CLAUDE.md` 行と他ツールでの未検証は `docs/maintainers/principles-rationale.md` → "The include line, and what has not been verified"
 
 ### Claude Code 以外のエージェントでの読み替え
 

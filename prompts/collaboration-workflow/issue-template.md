@@ -124,5 +124,3 @@
    ```
 
 4. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`
-
-各手順の理由は kit の `docs/maintainers/epic-commands-rationale.md` →「Creating an epic by hand」。

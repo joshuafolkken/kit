@@ -17,12 +17,13 @@ import { lane_child_read_set } from './lane-child-read-set'
 // Lowered from 18KB in joshuafolkken/kit#3566, which moved history out of `latest-gate.md` and
 // `progress-watcher.md`: the documents the child skips got smaller, so skipping them saves less.
 // Lowered from 17KB in joshuafolkken/kit#3871, which condensed the skill files — `progress-watcher.md`
-// among the skipped documents — for the same reason.
+// among the skipped documents — for the same reason. Lowered from 16KB in joshuafolkken/kit#3928,
+// which stripped the rationale pointers and preambles from the skipped documents too.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
-const REQUIRED_SAVING_BYTES = 16 * BYTES_PER_KB
+const REQUIRED_SAVING_BYTES = 15 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
 // Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
 // per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in
@@ -92,7 +93,7 @@ describe('lane_child_read_set.costed — the SKILL.md section trim', () => {
 })
 
 describe('lane_child_read_set.costed — the whole reduction', () => {
-	it('reads at least 17KB less than a fullrun that also read what the child reaches', () => {
+	it('reads at least 15KB less than a fullrun that also read what the child reaches', () => {
 		const child = lane_child_read_set.costed(ROOT)
 		const reached = child.point_of_use
 			.filter((one) => lane_child_read_set.REACHED_POINT_OF_USE.has(one.file))

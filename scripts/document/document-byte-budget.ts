@@ -80,7 +80,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 8192 },
+	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },

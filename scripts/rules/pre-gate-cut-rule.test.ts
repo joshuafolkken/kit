@@ -60,13 +60,12 @@ describe(`${RATIONALE_FILE} — the measurement behind the rule`, () => {
 describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
-	it.each([
-		'### The gate refuses until the cut has been taken',
-		`${RATIONALE_FILE}\` → "Why the rules are guards, not prose"`,
-		GUARD_COMMAND,
-	])('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
+	it.each(['### The gate refuses until the cut has been taken', GUARD_COMMAND])(
+		'states %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
 
 	// **The two silent states are what make the row worth having rather than worth removing.** A rule
 	// that fired in an ordinary checkout would refuse the gate of every interactive run, which this
