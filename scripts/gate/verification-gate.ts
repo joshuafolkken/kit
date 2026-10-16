@@ -1,19 +1,18 @@
 #!/usr/bin/env tsx
-import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
-import { buffered_process, FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
+import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { core_budget } from './core-budget'
+import { check_reuse, type CheckRecords } from './check-reuse'
 import { gate_ledger, type GateLedgerStart } from './gate-ledger'
 import { gate_plan, type GatePlan } from './gate-plan'
-import { gate_report, type GateStep, type GateStepResult } from './gate-report'
+import { gate_report, type GateStepResult } from './gate-report'
+import { gate_run_steps, type ReusedChecks } from './gate-run-steps'
 import { gate_skip } from './gate-skip'
 import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -35,25 +34,6 @@ const { GATE_CHECKS } = gate_plan
 
 const GATE_TARGETS: ReadonlyArray<string> = GATE_CHECKS.map((check) => check.target)
 
-async function run_gate_step(step: GateStep): Promise<GateStepResult> {
-	if (step.skip_reason !== undefined) {
-		return {
-			label: step.label,
-			command: step.command_args.join(' '),
-			output: project_checks.skip_notice('check', step.skip_reason),
-			exit_code: 0,
-			elapsed_ms: 0,
-		}
-	}
-
-	const result = await buffered_process.run_buffered_process(
-		step.command_args,
-		step.cwd === undefined ? {} : { cwd: step.cwd },
-	)
-
-	return { label: step.label, command: step.command_args.join(' '), ...result }
-}
-
 // The record `josh review:brief` reads, written only on a fully green run and only with the tree it
 // was green on. `/code-review` runs in a forked process that reads none of
 // this repository's documents, so "the unit tests already passed" reaches it only if the invocation
@@ -65,7 +45,7 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 // visible on the console, and a record erasing it would have the brief tell a review agent not to
 // re-run tests that never ran. A skip of a tool the project does not use (`NOT_USED_MARKER` — eslint
 // with no ESLint configuration) is not one: nothing went unverified, so it withholds nothing
-// (`gate_report.is_unverified_skip`). A step that passed **with a checker's warnings** is withheld for the
+// (`gate_report.has_nothing_to_say`). A step that passed **with a checker's warnings** is withheld for the
 // same reason one place further on: since the record is reused instead of the checks being re-run, a
 // warning printed once would never be printed again on that tree, and hiding an eslint or
 // svelte-check finding is the same failure as hiding a skip. It is `has_checker_warning`, not
@@ -81,17 +61,13 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 //
 // The destination is a parameter so a test can exercise the record without overwriting the one a
 // real run may be relying on — `josh gate` and `josh review:brief` share one path by design.
-function has_nothing_to_say(result: GateStepResult): boolean {
-	return !gate_report.is_unverified_skip(result) && !gate_report.has_checker_warning(result)
-}
-
 async function record_green_gate(
 	results: ReadonlyArray<GateStepResult>,
 	before: Record<string, string>,
 	target?: string,
 	base?: string,
 ): Promise<void> {
-	if (results.some((result) => !has_nothing_to_say(result))) return
+	if (results.some((result) => !gate_report.has_nothing_to_say(result))) return
 
 	try {
 		const after = await review_tree.read_changed_tree()
@@ -151,94 +127,6 @@ async function with_gate_marker<T>(
 	} finally {
 		clear_gate_running(target)
 	}
-}
-
-// This gate's share of the machine, resolved once at the gate's entry and carried down as one value.
-// `available_cores` is the budget every check reserves against; `is_reserved`
-// is false for a gate nested inside another gate's unit suite — this repository's own gate tests — so
-// the outer gate reserves and every gate beneath it does not. Captured before this gate sets
-// `JOSH_UNIT_RUN_MARKED`, which is why it is read at entry rather than re-derived here.
-interface BudgetContext {
-	available_cores: number
-	is_reserved: boolean
-}
-
-function default_budget(): BudgetContext {
-	return {
-		available_cores: availableParallelism(),
-		is_reserved: !unit_worker_share.is_nested_run() && !core_budget.is_held(),
-	}
-}
-
-// A gate step paired with the cores it reserves from the machine-wide budget while it runs.
-// The weight travels with the step so `run_gate_steps` never has to re-pair a
-// step with its check by index.
-interface ReservedStep {
-	step: GateStep
-	weight: number
-	memory_mb: number
-}
-
-async function build_reserved_steps(
-	start_directory: string,
-	plan: GatePlan,
-	available_cores: number,
-): Promise<ReadonlyArray<ReservedStep>> {
-	return await Promise.all(
-		plan.checks.map(async (check) => ({
-			step: await build_gate_step(check, start_directory, plan),
-			weight: gate_plan.check_weight(check, plan, available_cores),
-			memory_mb: gate_plan.check_memory(check, plan, available_cores),
-		})),
-	)
-}
-
-// **A nested gate takes no reservation, and the budget is what makes that necessary rather than
-// merely tidy**. The unit step spawns the suite, which runs this repository's
-// own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
-// claimed would wait for cores the outer gate cannot free until the suite — this test included —
-// finishes.
-async function run_reserved_step(
-	reserved: ReservedStep,
-	budget: BudgetContext,
-): Promise<GateStepResult> {
-	if (!budget.is_reserved) return await run_gate_step(reserved.step)
-
-	return await core_budget.with_core_reservation(
-		reserved.weight,
-		async (admission) => ({
-			...(await run_gate_step(reserved.step)),
-			budget_note: core_budget.describe_overflow(admission),
-		}),
-		{ budget: budget.available_cores, memory_mb: reserved.memory_mb },
-	)
-}
-
-// `bounded_pool` rather than a bare `Promise.all`, so the plan's `concurrency` is what decides how
-// many run at once. **The all-failures-in-one-pass property survives the
-// change** because no check ever rejects: `buffered_process` reports a non-zero exit as a value, so
-// the pool's first-failure abort — written for callers that spawn real Claude sessions — never
-// fires here and every queued check still runs. Results come back in input order however they
-// finished, which is what keeps the printed sections in declaration order. Each step first claims its
-// place in the machine-wide budget and waits while the budget is full.
-async function run_gate_steps(
-	plan: GatePlan,
-	budget: BudgetContext = default_budget(),
-): Promise<ReadonlyArray<GateStepResult>> {
-	const reserved = await build_reserved_steps(process.cwd(), plan, budget.available_cores)
-
-	// **The checks run under the held mark, so a check's own dispatch claims nothing**.
-	// Each check is a `pnpm josh <target>` child, and a target that declares
-	// a weight would otherwise claim a second place for the cores reserved for it here. A nested gate
-	// sets the mark too, since its checks are covered by the outer gate's reservation.
-	return await core_budget.with_held_mark(
-		async () =>
-			await bounded_pool.bounded_map(
-				reserved,
-				plan.concurrency,
-				async (entry) => await run_reserved_step(entry, budget),
-			),
-	)
 }
 
 // **Both markers are claims about the unit suite, so a gate that is not running it makes neither**.
@@ -319,6 +207,31 @@ interface GateOptions {
 	// The lane ledger a finished gate's duration is appended to. Only the CLI
 	// entry resolves it, so a suite driving the gate never writes a measurement of checks that never ran.
 	ledger_path?: string | undefined
+	// Where each check's own green record lives (`check-reuse.ts`). Only the CLI entry resolves it, for
+	// the ledger's reason: a suite whose checks never ran must not record them green on the live tree.
+	check_records?: CheckRecords | undefined
+}
+
+// **Per-check records belong to the full local gate alone**: CI's `--no-unit` gate is the safety net
+// under the local reuse and stays as it was, so it neither reads nor writes one.
+function check_records_of(plan: GatePlan, options: GateOptions): CheckRecords | undefined {
+	return gate_plan.has_unit_check(plan.checks) ? options.check_records : undefined
+}
+
+async function checks_to_reuse(
+	plan: GatePlan,
+	tree: GateTree,
+	options: GateOptions,
+): Promise<ReusedChecks> {
+	const records = check_records_of(plan, options)
+
+	if (records === undefined || options.is_forced === true) return new Map()
+
+	return await check_reuse.reusable_checks(
+		plan.checks.map((check) => check.label),
+		tree,
+		records,
+	)
 }
 
 // **The gate refuses to start when the scoped pair has not been green on this tree**
@@ -374,6 +287,10 @@ async function settle_gate(
 
 	await gate_ledger.record(options.ledger, results, { elapsed_ms, is_passed })
 
+	const records = check_records_of(plan, options)
+
+	if (records !== undefined) await check_reuse.record_green_checks(results, tree, records)
+
 	if (!is_passed) return FAIL_EXIT_CODE
 
 	await record_whole_gate(plan, results, tree, options)
@@ -396,8 +313,9 @@ async function run_checked_gate(
 	const ledger = await gate_ledger.start(options.ledger_path)
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
 	// unit suite reads the flag as set and reserves nothing.
-	const budget = default_budget()
+	const budget = gate_run_steps.default_budget()
 	const plan = announce_gate_plan(is_unit_included, budget.available_cores)
+	const reused = await checks_to_reuse(plan, tree, options)
 
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
 	// would write it is a subprocess started a second or so after the count above, so two lanes launched
@@ -406,7 +324,7 @@ async function run_checked_gate(
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run.
 	async function run_and_settle(): Promise<number> {
-		const results = await run_gate_steps(plan, budget)
+		const results = await gate_run_steps.run_gate_steps(plan, budget, reused)
 
 		return await settle_gate(plan, results, tree, { ...options, started_at, ledger })
 	}
@@ -506,6 +424,7 @@ async function run_gate_command(
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX), {
 		ledger_path: await lane_ledger.target(),
+		check_records: check_reuse.DEFAULT_RECORDS,
 	})
 }
 
@@ -519,11 +438,11 @@ const verification_gate = {
 	clear_gate_running,
 	mark_gate_running,
 	record_green_gate,
-	run_gate_steps,
+	run_gate_steps: gate_run_steps.run_gate_steps,
 	scoped_precheck_refusal,
 	with_gate_marker,
 	run_gate_command,
-	run_gate_step,
+	run_gate_step: gate_run_steps.run_gate_step,
 	run_verification_gate,
 }
 

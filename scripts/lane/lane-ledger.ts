@@ -40,6 +40,12 @@ const KIND = {
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
+const check_schema = z.object({
+	label: z.string(),
+	elapsed_ms: z.number(),
+	is_passed: z.boolean(),
+	is_reused: z.boolean().optional(),
+})
 const gate_schema = z.object({
 	kind: z.literal(KIND.GATE),
 	at: z.string(),
@@ -51,6 +57,9 @@ const gate_schema = z.object({
 	// The whole cores busy outside this gate, beyond the machine's baseline, at its start or its end —
 	// whichever was higher. Absent when the machine could not be read.
 	external_cores: z.number().optional(),
+	// Each check's own duration and verdict, so `josh lane:stats` can name the check a slow gate waited
+	// on. A reused check started no process: its row says so, and its zero is no timing.
+	checks: z.array(check_schema).optional(),
 })
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
@@ -131,6 +140,7 @@ type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
+type GateCheckRecord = z.infer<typeof check_schema>
 type StageRecord = Omit<StageEntry, 'kind' | 'at'>
 type StopRecord = Omit<StopEntry, 'kind' | 'at'>
 type OverlapRecord = Omit<OverlapEntry, 'kind' | 'at'>
@@ -253,6 +263,7 @@ const lane_ledger = {
 
 export type {
 	DispatchEntry,
+	GateCheckRecord,
 	GateEntry,
 	LedgerEntry,
 	LoadEntry,
