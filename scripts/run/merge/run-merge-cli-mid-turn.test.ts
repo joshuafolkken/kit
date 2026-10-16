@@ -81,6 +81,16 @@ it('re-dispatches a child whose ship stopped with no relaunch to fix it', async 
 	await merge_child()
 
 	expect(do_outage_mock).toHaveBeenCalledOnce()
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_unanswered: true }))
+})
+
+// joshuafolkken/kit#3974: a child that reached the API is not booked as the environment being down.
+it('books a child killed inside a turn as an outage the streak counts', async () => {
+	vi.mocked(run_ending.ended_mid_turn).mockReturnValue(true)
+	vi.mocked(run_merge_ship.is_unanswered).mockResolvedValue(true)
+	await merge_child()
+
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_unanswered: false }))
 })
 
 it('parks a child once it has been re-dispatched as an outage three times', async () => {

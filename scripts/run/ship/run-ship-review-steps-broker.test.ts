@@ -42,6 +42,7 @@ const ISSUE = '2427'
 const OPEN = 'run:review'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
 const ROUND_ONE = { kind: 'review', round: '1' }
+const UNSERVED = 'no broker serves this lane'
 const ANTHROPIC_REVIEWER_PROFILE = {
 	provider: 'anthropic',
 	role: 'reviewer',
@@ -77,14 +78,14 @@ beforeEach(() => {
 	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
 	reviewer_on(ANTHROPIC_REVIEWER_PROFILE)
 	is_child_mock.mockReset().mockReturnValue(true)
-	broker_request.mockReset().mockResolvedValue(false)
+	broker_request.mockReset().mockResolvedValue({ is_success: false, reason: UNSERVED })
 	broker_serving.mockReset().mockReturnValue(false)
 })
 
 describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 	it('uses the registered reviewer broker instead of a nested Codex launch', async () => {
 		reviewer_on(OPENAI_REVIEWER_PROFILE)
-		broker_request.mockResolvedValue(true)
+		broker_request.mockResolvedValue({ is_success: true })
 
 		expect(await stage_code()).toBe(OK)
 		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, ROUND_ONE)
@@ -98,6 +99,14 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 		expect(commands()).toStrictEqual([OPEN])
 		expect(launch).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#3974: the broker's reason reaches the ship log instead of a bare failure.
+	it("names the broker's reason when the isolated reviewer fails", async () => {
+		reviewer_on(OPENAI_REVIEWER_PROFILE)
+		const result = await run_ship_review_steps.review_stage(ISSUE)
+
+		expect(result.out).toContain(`isolated reviewer failed: ${UNSERVED}`)
+	})
 })
 
 // joshuafolkken/kit#3817: a Claude lane child's ship never received the token, so the reviewer is asked
@@ -105,7 +114,7 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 describe('run_ship_review_steps.review_stage — Claude lane child', () => {
 	it('asks the serving broker for the reviewer instead of launching it', async () => {
 		broker_serving.mockReturnValue(true)
-		broker_request.mockResolvedValue(true)
+		broker_request.mockResolvedValue({ is_success: true })
 
 		expect(await stage_code()).toBe(OK)
 		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, ROUND_ONE)

@@ -6,7 +6,7 @@ import { process_identity_fixture } from '#scripts/josh/process-identity-fixture
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_broker_server } from './lane-broker-server'
 import type { LaneInfo } from './lane-registry'
-import { lane_session_broker } from './lane-session-broker'
+import { lane_session_broker, type BrokerAnswer } from './lane-session-broker'
 
 // Whether a ship reads the server as live: the server record, the legacy heartbeat beside it, and a
 // review the server is still running however long it writes nothing (joshuafolkken/kit#3840).
@@ -96,7 +96,10 @@ describe('lane_session_broker — a response whose server is gone', () => {
 	it('rejects it once its process is gone, however fresh its heartbeat', async () => {
 		leave_response(Date.now(), { pid: process_identity_fixture.DEAD_PID })
 
-		expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
+		expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toStrictEqual({
+			is_success: false,
+			reason: 'no broker serves this lane',
+		})
 		expect(launch_mock).not.toHaveBeenCalled()
 	})
 
@@ -124,7 +127,9 @@ describe('lane_session_broker — a response from a supervisor that predates the
 	it('rejects a response after its heartbeat expires', async () => {
 		leave_response(Date.now() - EXPIRED_MS)
 
-		expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
+		await expect(
+			lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
+		).resolves.toMatchObject({ is_success: false })
 		expect(launch_mock).not.toHaveBeenCalled()
 	})
 })
@@ -139,6 +144,18 @@ function response_fields(): ReadonlyArray<string> {
 
 it('publishes a response in the shape a ship that predates the server record reads', async () => {
 	const fields = await lane_session_broker.with_server(LANE, async () => response_fields())
+
+	expect(fields).toStrictEqual(['heartbeat_at', 'is_success', 'nonce', 'session'])
+})
+
+// joshuafolkken/kit#3974: the failure's reason is kept out of the response an older ship parses.
+it('keeps that shape after answering a failure with its reason', async () => {
+	launch_mock.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 1 })
+	const fields = await lane_session_broker.with_server(LANE, async () => {
+		await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)
+
+		return response_fields()
+	})
 
 	expect(fields).toStrictEqual(['heartbeat_at', 'is_success', 'nonce', 'session'])
 })
@@ -176,7 +193,7 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 		const reviewer = held_reviewer()
 
 		vi.useFakeTimers(SILENT_TIMERS)
-		const is_success = await lane_session_broker.with_server(LANE, async () => {
+		const answer = await lane_session_broker.with_server(LANE, async () => {
 			const pending = lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)
 
 			await review_started()
@@ -186,14 +203,14 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 			return await pending
 		})
 
-		expect(is_success).toBe(true)
+		expect(answer.is_success).toBe(true)
 	})
 
 	// joshuafolkken/kit#3817: a server told to stop while its reviewer still runs keeps its response
 	// until the reviewer answers, so the waiting ship reads the verdict rather than a dead server.
 	it('answers the review it was serving when it was told to stop', async () => {
 		const reviewer = held_reviewer()
-		const asked = { pending: Promise.resolve(false) }
+		const asked = { pending: Promise.resolve<BrokerAnswer>({ is_success: false, reason: '' }) }
 
 		vi.useFakeTimers(SILENT_TIMERS)
 		const stopping = lane_session_broker.with_server(LANE, async () => {
@@ -204,7 +221,7 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 		await stay_silent()
 		reviewer.finish()
 
-		expect(await asked.pending).toBe(true)
+		await expect(asked.pending).resolves.toStrictEqual({ is_success: true })
 		await stopping
 	})
 })
