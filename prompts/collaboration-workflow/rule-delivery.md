@@ -12,7 +12,7 @@
 
 ## 機構 — 1 本だけ、新規に作らない
 
-入口は `PreToolUse` の `pnpm josh pretool:guard`（バッチング ／ 調査 ／ 規則の 3 ガード）と Stop フックの `pnpm josh stop:guard` の 2 つ。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**である。配送は呼び出しの書き換え（`updatedInput`）でもよい — 規則の結果そのものを機械的に作れる形に限る。書き換えは `pnpm josh rule:value` が `rewritten` として数える。配線・停止スイッチ・拒否の優先順位: `docs/maintainers/rule-delivery-rationale.md` → "The mechanism"。
+入口は `PreToolUse` の `pnpm josh pretool:guard`（バッチング ／ 調査 ／ 規則の 3 ガード）と Stop フックの `pnpm josh stop:guard` の 2 つ。**2 本目の配送経路を作るのは `CLAUDE.md` →「No clones」が禁じるクローン**である。配送は呼び出しの書き換え（`updatedInput`）でもよい — 規則の結果そのものを機械的に作れる形に限る。書き換えは `pnpm josh rule:value` が `rewritten` として数える。どのガードが書き換えるかは `scripts/rules/guard-remedy.ts` の分類表が単一ソース。配線・停止スイッチ・拒否の優先順位: `docs/maintainers/rule-delivery-rationale.md` → "The mechanism"。
 
 ## 配送されている規則
 

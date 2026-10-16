@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { issue_comments } from '#scripts/rules/issue-comments'
 import { piped_verification } from '#scripts/rules/piped-verification'
+import { rule_rewrite } from '#scripts/rules/rule-rewrite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
 import { step_zero_notice } from './step-zero-notice'
@@ -331,7 +333,7 @@ describe('pretool_guard.respond — the pipefail rewrite', () => {
 
 	it('rewrites nothing while the rule guard is switched off', () => {
 		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, 'off')
-		const rewrite = pretool_guard.pipefail_rewrite(payload_with_transcript(PIPED_LINT))
+		const rewrite = rule_rewrite.rewrite(payload_with_transcript(PIPED_LINT))
 
 		vi.unstubAllEnvs()
 
@@ -339,23 +341,17 @@ describe('pretool_guard.respond — the pipefail rewrite', () => {
 	})
 
 	it('rewrites nothing for a call that runs no check', () => {
-		expect(
-			pretool_guard.pipefail_rewrite(payload_with_transcript('git log | tail')),
-		).toBeUndefined()
+		expect(rule_rewrite.rewrite(payload_with_transcript('git log | tail'))).toBeUndefined()
 	})
 })
 
 describe('pretool_guard.emit — the pipefail rewrite beside other guards', () => {
 	it("lets another guard's refusal win over the rewrite", () => {
 		const raw_payload = payload_with_transcript(PIPED_LINT)
-		const rewrite = pretool_guard.pipefail_rewrite(raw_payload)
+		const rewrite = rule_rewrite.rewrite(raw_payload)
 		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
-		pretool_guard.emit(
-			raw_payload,
-			outcome(SHELL_BODY_REASON, undefined, undefined),
-			rewrite?.input,
-		)
+		pretool_guard.emit(raw_payload, outcome(SHELL_BODY_REASON, undefined, undefined), rewrite)
 		const envelope = write.mock.calls.map((call) => String(call[0])).join('')
 
 		write.mockRestore()
@@ -372,5 +368,23 @@ describe('pretool_guard.emit — the pipefail rewrite beside other guards', () =
 
 		expect(envelope).not.toContain(PERMISSION_DECISION)
 		expect(envelope).toContain(JSON.stringify(`(set -o pipefail; ${PIPED_LINT}) && rm -r dist`))
+	})
+})
+
+const BODY_READ = 'gh api repos/o/r/issues/7 --jq .body'
+
+describe('pretool_guard.respond — the issue-comments rewrite', () => {
+	it("prepends the Issue's comments read to a body read, deciding nothing, with the note attached", async () => {
+		const envelope = await written(payload_with_transcript(BODY_READ))
+
+		expect(envelope).not.toContain(PERMISSION_DECISION)
+		expect(envelope).toContain('gh api --paginate repos/o/r/issues/7/comments')
+		expect(envelope).toContain(JSON.stringify(issue_comments.COMMENTS_NOTE).slice(1, -1))
+	})
+
+	it('still refuses a `gh issue view` body read', async () => {
+		const envelope = await written(payload_with_transcript('gh issue view 7'))
+
+		expect(envelope).toContain(DENY_DECISION)
 	})
 })

@@ -1,3 +1,7 @@
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { json_value } from '#scripts/lib/json-value'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { gh_api } from './gh-api'
 import { prior_comment_read } from './prior-comment-read'
@@ -77,6 +81,9 @@ function reads_issue_comments(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => fetches_issue_comments(segment))
 }
 
+const RULE_DOC = '`.claude/skills/workflow-commands/issue-comments.md`'
+const COMMENTS_FALLBACK = 'gh api repos/{owner}/{repo}/issues/<N>/comments'
+
 // **The refusal hands over the command that fixes it**, because reading is not the same as
 // obeying: a sentence saying "also read the comments" is prose that moves nothing, while a refused
 // body read leaves the run holding the reissue that makes the comments *present*. The conflict rule
@@ -88,12 +95,62 @@ function reads_issue_comments(command: string): boolean {
 // being the Issue the refused call named — so a run that reads only the opening still leaves holding
 // the fix. The label keeps `time_transcript_line.guard_from_refusal` naming this guard, not the command.
 const ISSUE_COMMENTS_REASON =
-	'⛔ issue comments: pnpm josh issue:read <N>\n' +
-	"Run that in place of this read — an Issue's comments are part of it, and a later comment " +
-	'supersedes the body it contradicts; refused until that command is on the transcript. Without ' +
-	'josh, read ' +
-	'`gh api repos/{owner}/{repo}/issues/<N>/comments` beside the body ' +
-	'(`.claude/skills/workflow-commands/issue-comments.md`).'
+	`⛔ issue comments: pnpm josh issue:read <N>\n` +
+	`Run that in place of this read — an Issue's comments are part of it, and a later comment ` +
+	`supersedes the body it contradicts; refused until that command is on the transcript. Without ` +
+	`josh, read \`${COMMENTS_FALLBACK}\` beside the body (${RULE_DOC}).`
+
+// **A `gh api` body read is rewritten rather than refused** (joshuafolkken/kit#3920): the fix is the
+// same Issue's comments endpoint, read on the same line, and the path the call already names is all
+// it needs. Prepended on lines of their own, so a trailing comment or a `&&` chain on the typed line
+// cannot swallow or skip them, and the typed line stays last — its exit status is still the call's.
+// A `gh issue view` read is left to the refusal — its global flags (`--repo`) and its `--json`
+// projection have no one comments spelling to add.
+const COMMENTS_JQ = String.raw`'.[] | "— \(.user.login) \(.created_at)\n\(.body)\n"'`
+
+const COMMENTS_NOTE =
+	"↻ issue comments: this read returned only the Issue's body, so the Issue's comments were fetched " +
+	`on the same line — a later comment supersedes the body it contradicts (${RULE_DOC}).`
+
+// **Only a line that opens with the body read is rewritten.** Prepended ahead of a `cd` or a
+// subshell, the comments read would resolve `{owner}/{repo}` in another directory and print another
+// repository's comments; and the line is cut on its quote-blanked reading, so a body-read spelling
+// quoted in a string or a heredoc body is never prepended as a real call. Every other line keeps the
+// refusal.
+function rewritable_path(command: string): string | undefined {
+	const read = shell_segments.first_of(command)
+
+	if (read === undefined || ISSUE_VIEW_COMMAND.test(read)) return undefined
+
+	return is_body_read_segment(read) ? ISSUE_BODY_PATH.exec(read)?.[0] : undefined
+}
+
+function comments_command(command: string): string | undefined {
+	if (!is_body_only_issue_read(command)) return undefined
+
+	const path = rewritable_path(command)
+
+	if (path === undefined) return undefined
+
+	return `gh api --paginate ${path}/comments --jq ${COMMENTS_JQ}\n${command}`
+}
+
+// The call's input with the comments read prepended, or `undefined` where the comments are already on
+// the tail or the read has no rewritable spelling.
+function comments_input(
+	call: GuardedCall,
+	tail: () => string,
+): Record<string, unknown> | undefined {
+	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
+
+	const command = comments_command(time_shell.bash_command(call.input))
+
+	if (command === undefined || prior_comment_read.already_read_for_call(tail(), call)) {
+		return undefined
+	}
+
+	return { ...call.input, command }
+}
 
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry. `already_satisfied` stands it
 // down once the comments are on the transcript tail, and until then it refuses every body-only read.
@@ -103,13 +160,17 @@ const ROW = {
 	reason: ISSUE_COMMENTS_REASON,
 	already_satisfied: prior_comment_read.already_read_for_call,
 	keeps: bash_triggers.on_bash_command(reads_issue_comments),
+	rewrite: comments_input,
+	rewrite_note: COMMENTS_NOTE,
 	// The opening the reason carried before it led with the command.
 	former_reasons: ["⛔ an Issue's comments are part of the Issue: read them before implementing"],
 }
 
 const issue_comments = {
+	COMMENTS_NOTE,
 	ISSUE_COMMENTS_REASON,
 	ROW,
+	comments_input,
 	is_body_only_issue_read,
 }
 

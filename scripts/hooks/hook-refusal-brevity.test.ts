@@ -2,6 +2,7 @@ import { duplicate_reads } from '#scripts/delegation/duplicate-read-guard'
 import { NOTICE as INVESTIGATION_NOTICE } from '#scripts/delegation/investigation-guard'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { issue_comments } from '#scripts/rules/issue-comments'
 import { lane_background } from '#scripts/rules/lane-background'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { stop_rules } from '#scripts/rules/stop-rules'
@@ -29,6 +30,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['stop: lane background', lane_background.LANE_BACKGROUND_STOP_REASON],
 	['notice: lane background foreground', lane_background.FOREGROUND_NOTE],
 	['notice: pipefail rewrite', piped_verification.PIPEFAIL_NOTE],
+	['notice: issue-comments rewrite', issue_comments.COMMENTS_NOTE],
 	['notice: investigation', INVESTIGATION_NOTICE],
 	['duplicate read refusal', duplicate_reads.REASON],
 	['notice: duplicate read', duplicate_reads.NOTICE],
