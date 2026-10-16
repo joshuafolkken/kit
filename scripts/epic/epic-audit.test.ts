@@ -114,6 +114,33 @@ describe('epic_audit_logic.acceptance_section', () => {
 	})
 })
 
+describe('epic_audit_logic.signal_references', () => {
+	const IN_ACCEPTANCE = { number: 2, section: 'acceptance criteria' }
+
+	it('reads the acceptance criteria and the parent line, each with its section', () => {
+		const body = 'parent: #9\n\n## 背景\n\nsee #1\n\n## 受け入れ条件\n\n- [ ] needs #2'
+
+		expect(epic_audit_logic.signal_references(body, REPO)).toEqual([
+			IN_ACCEPTANCE,
+			{ number: 9, section: 'parent line' },
+		])
+	})
+
+	it('reports a number both places name once', () => {
+		const body = 'parent: #2\n\n## Acceptance criteria\n\n- [ ] needs #2'
+
+		expect(epic_audit_logic.signal_references(body, REPO)).toEqual([IN_ACCEPTANCE])
+	})
+
+	it('reads no parent line inside a code fence', () => {
+		expect(epic_audit_logic.signal_references('```\nparent: #2\n```', REPO)).toEqual([])
+	})
+
+	it('reads nothing from the other sections', () => {
+		expect(epic_audit_logic.signal_references('## 現象\n\n#1\n\n## Origin\n\n#2', REPO)).toEqual([])
+	})
+})
+
 describe('epic_audit_logic.depends_on', () => {
 	const one = child(1, '')
 	const two = child(2, '', [1])

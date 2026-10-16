@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import type { SignalSection } from './epic-audit'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 
 // The facts the bundle decision was already made from, printed beside the order it prints.
@@ -20,10 +21,26 @@ import { epic_bundle, type BacklogIssue } from './epic-bundle'
 type EvidenceKind = 'dependency' | 'reference'
 
 // One fact, and the order it points to. `first` is the issue the fact puts ahead of `second`.
+// `section` is where a reference was read, so the reader sees it was the acceptance criteria or the
+// parent line that counted, not a mention elsewhere in the body.
 interface OrderingEvidence {
 	kind: EvidenceKind
 	first: number
 	second: number
+	section?: SignalSection
+}
+
+// What one directed test found: nothing, or the fact with whatever detail it carries.
+type EvidenceFound = Pick<OrderingEvidence, 'section'> | undefined
+
+function blocker_found(from: BacklogIssue, to: BacklogIssue): EvidenceFound {
+	return epic_bundle.names_as_blocker(from, to) ? {} : undefined
+}
+
+function reference_found(from: BacklogIssue, to: BacklogIssue): EvidenceFound {
+	const section = epic_bundle.reference_section(from, to)
+
+	return section === undefined ? undefined : { section }
 }
 
 // The two readings, each written as a directed test of one issue against another. Both are
@@ -34,13 +51,27 @@ interface OrderingEvidence {
 // `blocked-by` says so outright: the blocker has to land before the issue that declares it. A
 // reference says it by having been written — the issue that names another was drafted with that
 // other one already in existence, so the named one is the earlier of the two.
-const EVIDENCE_TESTS: ReadonlyArray<{
+interface EvidenceTest {
 	kind: EvidenceKind
-	holds: (from: BacklogIssue, to: BacklogIssue) => boolean
-}> = [
-	{ kind: 'dependency', holds: (from, to) => epic_bundle.names_as_blocker(from, to) },
-	{ kind: 'reference', holds: (from, to) => epic_bundle.names_in_body(from, to) },
+	find: (from: BacklogIssue, to: BacklogIssue) => EvidenceFound
+}
+
+const EVIDENCE_TESTS: ReadonlyArray<EvidenceTest> = [
+	{ kind: 'dependency', find: blocker_found },
+	{ kind: 'reference', find: reference_found },
 ]
+
+// One test in one direction: the fact it found, or none.
+function directed_evidence(
+	test: EvidenceTest,
+	from: BacklogIssue,
+	to: BacklogIssue,
+): Array<OrderingEvidence> {
+	const found = test.find(from, to)
+	if (found === undefined) return []
+
+	return [{ kind: test.kind, first: to.number, second: from.number, ...found }]
+}
 
 // Both directions of one pair, because both are facts. Two issues that name each other produce two
 // lines pointing opposite ways, which is the honest report: the reader is the one deciding.
@@ -50,10 +81,8 @@ function pair_evidence(subject: BacklogIssue, other: BacklogIssue): Array<Orderi
 		{ from: other, to: subject },
 	]
 
-	return EVIDENCE_TESTS.flatMap(({ kind, holds }) =>
-		directions
-			.filter((pair) => holds(pair.from, pair.to))
-			.map((pair) => ({ kind, first: pair.to.number, second: pair.from.number })),
+	return EVIDENCE_TESTS.flatMap((test) =>
+		directions.flatMap((pair) => directed_evidence(test, pair.from, pair.to)),
 	)
 }
 
@@ -85,8 +114,8 @@ function ordering_evidence(
 	return member_pairs(members).flatMap((pair) => pair_evidence(pair.left, pair.right))
 }
 
-// How each kind reads. `where` says the fact came from prose rather than from a recorded relation,
-// and the two `order_*` halves say how strongly the fact settles the order.
+// How each kind reads. The two `order_*` halves say how strongly the fact settles the order; where a
+// reference was read comes from the fact itself (`section_phrase`).
 //
 // **A recorded dependency states the order; a reference only points at it.** A `blocked-by` says
 // outright that the blocker lands first. A reference says it by having been written — which holds
@@ -95,20 +124,14 @@ function ordering_evidence(
 // the reference line reports the direction it points to and asserts nothing further; deciding is
 // still the reader's.
 const EVIDENCE_WORDING: Readonly<
-	Record<EvidenceKind, { verb: string; where: string; order_prefix: string; order_suffix: string }>
+	Record<EvidenceKind, { verb: string; order_prefix: string; order_suffix: string }>
 > = {
-	dependency: {
-		verb: 'is recorded as blocked by',
-		where: '',
-		order_prefix: '',
-		order_suffix: ' comes first',
-	},
-	reference: {
-		verb: 'names',
-		where: ' in its body',
-		order_prefix: 'that points to ',
-		order_suffix: ' first',
-	},
+	dependency: { verb: 'is recorded as blocked by', order_prefix: '', order_suffix: ' comes first' },
+	reference: { verb: 'names', order_prefix: 'that points to ', order_suffix: ' first' },
+}
+
+function section_phrase(item: OrderingEvidence): string {
+	return item.section === undefined ? '' : ` in its ${item.section}`
 }
 
 const EVIDENCE_HEADING = '  Evidence:'
@@ -117,12 +140,12 @@ const EVIDENCE_INDENT_WIDTH = 4
 const EVIDENCE_INDENT = ' '.repeat(EVIDENCE_INDENT_WIDTH)
 
 function format_one(item: OrderingEvidence): string {
-	const { verb, where, order_prefix, order_suffix } = EVIDENCE_WORDING[item.kind]
+	const { verb, order_prefix, order_suffix } = EVIDENCE_WORDING[item.kind]
 	const first = issue_cite.plain(item.first)
 	const second = issue_cite.plain(item.second)
 	const order = `${order_prefix}${first}${order_suffix}`
 
-	return `${EVIDENCE_INDENT}${second} ${verb} ${first}${where} — ${order}`
+	return `${EVIDENCE_INDENT}${second} ${verb} ${first}${section_phrase(item)} — ${order}`
 }
 
 // The block that goes under `Order:`. Empty when neither reading found anything, which leaves the

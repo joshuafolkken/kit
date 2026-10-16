@@ -1,3 +1,4 @@
+import { epic_bundle_fixture } from '#scripts/epic/epic-bundle-fixture'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import {
@@ -96,10 +97,17 @@ async function printed_with_cut(
 
 // The draft that reaches a placing verdict: it cites an open issue, and one epic already tracks that
 // issue. Reused by every case below so only the cut varies between them.
-const CITING_DRAFT = [DRAFT_TITLE, '--body', `follows on from #${String(RELATED_NUMBER)}`]
+function drafted(body: string): Array<string> {
+	return [DRAFT_TITLE, '--body', body]
+}
+
+const { in_acceptance } = epic_bundle_fixture
+const CITING_DRAFT = drafted(in_acceptance(`follows #${String(RELATED_NUMBER)}`))
 const CITED_BACKLOG = [row(RELATED_NUMBER, 'Print each verification-gate check elapsed time')]
-const MISSING_DRAFT = [DRAFT_TITLE, '--body', `follows on from #${String(MISSING_NUMBER)}`]
-const NAMED_EPIC_DRAFT = [DRAFT_TITLE, '--body', `part of epic #${String(EPIC_NUMBER)}`]
+const MISSING_DRAFT = drafted(in_acceptance(`follows #${String(MISSING_NUMBER)}`))
+const NAMED_EPIC_DRAFT = drafted(`parent: #${String(EPIC_NUMBER)}`)
+// The epic named only as the example that prompted the filing, which places nothing.
+const BACKGROUND_EPIC_DRAFT = drafted(`## Background\n\nsee #${String(EPIC_NUMBER)}`)
 const NAMED_EPIC_BACKLOG = [row(EPIC_NUMBER, 'Epic: make a run answer before it files')]
 const UNRELATED_BACKLOG = [row(UNRELATED_NUMBER, UNRELATED_TITLE)]
 
@@ -187,11 +195,9 @@ describe('issue_scout_cli.run — the closed listing has its own limits', () => 
 			kind: 'missing',
 		})
 
-		const output = await printed(
-			[DRAFT_TITLE, '--body', `follows on from #${String(RELATED_NUMBER)}`],
-			[],
-			{ closed: [row(RELATED_NUMBER, NEAR_DUPLICATE_TITLE)] },
-		)
+		const output = await printed(CITING_DRAFT, [], {
+			closed: [row(RELATED_NUMBER, NEAR_DUPLICATE_TITLE)],
+		})
 
 		expect(output).toContain(issue_scout_cli.NO_EPIC_LINE)
 	})
@@ -367,11 +373,16 @@ describe('issue_scout_cli.run — a draft that cites nothing', () => {
 		expect(output).not.toContain(issue_scout_cli.NO_EPIC_LINE)
 	})
 
+	// A background mention is no citation, so the guidance to cite one is owed rather than "standalone".
+	it('says the epic half was not asked when the summary mentions an epic only as background', async () => {
+		const output = await printed(BACKGROUND_EPIC_DRAFT, NAMED_EPIC_BACKLOG)
+
+		expect(output).not.toContain(`names ${link(EPIC_NUMBER)}`)
+		expect(output).toContain(issue_scout_cli.NO_REFERENCE_LINE)
+	})
+
 	it('answers both halves in one run', async () => {
-		const output = await printed(
-			[DRAFT_TITLE, '--body', `follows on from #${String(RELATED_NUMBER)}`],
-			[row(RELATED_NUMBER, NEAR_DUPLICATE_TITLE)],
-		)
+		const output = await printed(CITING_DRAFT, [row(RELATED_NUMBER, NEAR_DUPLICATE_TITLE)])
 
 		expect(output).toContain('Duplicates:')
 		expect(output).toContain('Epic:')

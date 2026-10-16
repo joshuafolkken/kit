@@ -180,6 +180,44 @@ function acceptance_section(body: string | undefined): string {
 	return markdown_section.section_lines_matching(body, is_acceptance_heading).join('\n')
 }
 
+// Where a body reference that counts as a relation was written. Only these two places state what the
+// issue delivers or where it belongs; a number in the background, symptom or origin section is the
+// example that prompted the filing, and reading it as a relation bundled issues whose work never
+// overlaps.
+type SignalSection = 'acceptance criteria' | 'parent line'
+
+interface SignalReference {
+	number: number
+	section: SignalSection
+}
+
+// Both spellings, for the same reason as `ACCEPTANCE_HEADINGS`.
+const PARENT_LINE_PATTERN = /^(?:parent|親)\s*[:：]/iu
+
+function parent_lines(body: string): string {
+	return markdown_section
+		.unfenced_lines(body)
+		.filter((line) => PARENT_LINE_PATTERN.test(line.trim()))
+		.join('\n')
+}
+
+function references_in(text: string, repo: string, section: SignalSection): Array<SignalReference> {
+	return parse_references(text, repo).map((number) => ({ number, section }))
+}
+
+// The same-repository references a body makes in the places that count as a relation, each with the
+// section it was read from. A number both places name is reported once, at the first.
+function signal_references(body: string, repo = ''): Array<SignalReference> {
+	const read = [
+		...references_in(acceptance_section(body), repo, 'acceptance criteria'),
+		...references_in(parent_lines(body), repo, 'parent line'),
+	]
+
+	return read.filter((reference, index) => {
+		return read.findIndex((other) => other.number === reference.number) === index
+	})
+}
+
 // Everything `node` depends on, directly or through a chain. Walked iteratively so a graph that
 // still contains a cycle terminates — `epic:next` rejects one first, but an auditor must not hang on
 // the input it exists to examine.
@@ -223,8 +261,9 @@ const epic_audit_logic = {
 	parse_issue_references,
 	parse_references,
 	acceptance_section,
+	signal_references,
 	depends_on,
 }
 
-export type { AuditFinding, FindingLevel, ReferenceState }
+export type { AuditFinding, FindingLevel, ReferenceState, SignalReference, SignalSection }
 export { epic_audit_logic }

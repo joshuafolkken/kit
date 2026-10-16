@@ -1,0 +1,8 @@
+{
+	"reason": "#3956 adds section-aware reference reading (acceptance criteria and parent line) for epic:bundle signals, and the docs state the narrowed signal definition",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 49,
+		"ai_cost.on_demand_bytes": 362
+	}
+}
