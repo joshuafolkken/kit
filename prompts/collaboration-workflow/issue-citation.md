@@ -25,4 +25,4 @@
 
 ### 停止時の担保（joshuafolkken/kit#2247）
 
-`Stop` フック `pnpm josh stop:guard` は返信の地の文に裸の `#N` があると停止をブロックし、`pnpm josh issue:cite <N...>` の実行形を差し戻す。差し戻されたらその実行形で引用し直す（`docs/maintainers/issue-citation-rationale.md` → "How the Stop hook delivers it"、検出が外す範囲は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard`）。
+`Stop` フック `pnpm josh stop:guard` は返信の地の文に裸の `#N` があると、`issue:cite` と同じ処理で引用行を作り `systemMessage` として表示する（モデルの手番は使わない）。引用できない番号があったときだけ停止をブロックし、`pnpm josh issue:cite <N...>` の実行形を差し戻す。差し戻されたらその実行形で引用し直す（`docs/maintainers/issue-citation-rationale.md` → "How the Stop hook delivers it"、検出が外す範囲は [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard`）。

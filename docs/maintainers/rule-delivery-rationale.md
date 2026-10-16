@@ -70,15 +70,25 @@ read come from `hook-decision.ts`; whether a message is a stop notice comes from
 `lane-park.ts`; whether a hold is in place comes from the `run:hold` record — **no second verdict
 mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
 repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
-payload carries no tool call, and all four rows answer with `{"decision":"block","reason":…}`. That
-is the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
+payload carries no tool call. A row that needs the model answers with `{"decision":"block","reason":…}`,
+the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
+
+**A row whose answer is fixed acts instead of refusing** (joshuafolkken/kit#3919). The stop
+notification, the hold release and the citation lines are each one operation whose arguments the hook
+already holds, so `stop-actions.ts` runs them in process — the same `send_values`, `run_hold_cli.run`
+and `issue_cite_cli.cite` the commands call, since three `pnpm` launches would spend most of the
+20-second budget — and reports them as a `systemMessage`. A refusal there cost a whole model turn to
+run a command the hook already knew. Only an action that fails falls back to its old refusal, and
+never past `stop_hook_active`. The actions run only on a stop that goes through, so a refused stop
+never notifies a pause its continuation cancels; the stdout of the reused calls is sent to stderr,
+since the hook's stdout is the decision envelope.
 
 **Two entry points, one foundation.** "One route, never a new one" forbids a second copy of the
 shared part, not an entry point per event. The four `stop:guard` rows are triggered by **the run
 stopping**, not by a shell call, so they live in `stop-rules.ts` rather than in `DELIVERED_RULES` in
-`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): each
-of the four blocking rows resolves itself (send the notice, release the hold, file the Issue, fix the
-citation and reissue the reply), and `stop_hook_active` stops an endless loop.
+`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): the
+hook runs the fixed rows itself, each blocking row resolves itself (file the Issue, rewrite the reply),
+and `stop_hook_active` stops an endless loop.
 
 `backlogrun`'s ordinary parent loop and the fetch of the next Issue are handled by the supervisor
 process, so the Stop verdict that made a run fetch the next Issue was removed. On the route that hands
@@ -394,8 +404,8 @@ test file pins:
   notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
   and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
   `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
-  silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
-  `stop_hook_active` is silent; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
-  repository or an unknown owner is silent; a bare `#N` blocks, while one in link form, a code fence,
+  silence (hold × no notice sends the notify; clean × hold releases it; dirty or notified is silent;
+  `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
+  repository or an unknown owner is silent; a bare `#N` prints the citation lines, while one in link form, a code fence,
   inline code, a quoted line or a PR reference is silent), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

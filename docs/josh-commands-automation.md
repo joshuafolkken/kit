@@ -159,7 +159,7 @@ The Codex counterpart of `pretool:guard` and `format:edited`: `pretool` or `post
 
 ### `josh stop:guard`
 
-The `Stop` hook: one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation — each of which **blocks** the stop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook: one process delivering the stop-time rules. It runs the stop notify, the hold release and the citation lines itself, blocking only when one fails; the rules that need the model block the stop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 `backlogrun`'s ordinary parent loop and the fetch of the next issue are handled by the supervisor process, so `stop:guard` does not count fetching the next issue toward a block. When a named epic is handed to a headless session for a decision, the lane-child wait protection still applies. Stall and leftover detection runs at the `Stop` event.
 

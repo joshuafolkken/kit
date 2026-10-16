@@ -5,6 +5,7 @@ import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
+import { stop_actions } from '#scripts/hooks/stop-actions'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -23,27 +24,28 @@ import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 
-// The `Stop` hook entry: one process that delivers the three stop-time rules.
+// The `Stop` hook entry: one process that delivers the stop-time rules, running the fixed ones itself
+// (`stop-actions.ts`).
 // It is the stop-time counterpart of `pretool-guard.ts` — a second entry on the same `hook_decision`
 // foundation, not a second copy of it.
 //
 // **Every failure allows the stop.** A missing transcript, an unreadable hold record, a git status
 // that will not read — each ends as "no block", for the same reason the PreToolUse guard fails open:
-// a hook that failed closed would wedge a run over its own plumbing. The block rules are self-
-// resolving (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
+// a hook that failed closed would wedge a run over its own plumbing. The hook runs the fixed
+// operations itself (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
 
-// The hold record for this working tree is still in place, and whether it is a `prrun` stop's.
+// The Issue the hold record for this working tree names, and whether it is a `prrun` stop's.
 // `unreadable` reads as absent: the safe direction for a stop guard is not to
-// block, and an unreadable record is not proof a run is holding.
-async function hold_facts(): Promise<Pick<StopContext, 'hold_present' | 'prrun_stopped'>> {
+// act, and an unreadable record is not proof a run is holding.
+async function hold_facts(): Promise<Pick<StopContext, 'hold_issue' | 'prrun_stopped'>> {
 	const directory = await run_hold.worktree_directory()
 	const hold =
 		directory === undefined
 			? undefined
 			: run_halfrun_resume.hold_of(run_hold.read_hold(run_hold.hold_path(directory)))
 
-	return { hold_present: hold !== undefined, prrun_stopped: hold?.prrun_stop_head !== undefined }
+	return { hold_issue: hold?.issue, prrun_stopped: hold?.prrun_stop_head !== undefined }
 }
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
@@ -167,17 +169,17 @@ async function run_report_checks(): Promise<void> {
 	await run_stranded_detect.run_stranded_check()
 }
 
-// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop
-// is being held — all three rules block, so a bare `#N` is reported the same way.
+// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop is
+// held or the hook acted on it (`stop-actions.ts`).
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
 	await run_report_checks()
 
-	const { reason } = await outcome_of(raw_payload)
+	const envelope = await stop_actions.envelope_of(await outcome_of(raw_payload), session_lang())
 
-	if (reason === undefined) return
+	if (envelope === undefined) return
 
-	process.stdout.write(`${stop_rules.block_envelope(reason, session_lang())}\n`)
+	process.stdout.write(`${envelope}\n`)
 }
 
 const stop_guard = { outcome_of, stop_outcome_for_payload }

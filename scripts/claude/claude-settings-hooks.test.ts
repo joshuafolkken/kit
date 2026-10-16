@@ -28,8 +28,9 @@ const FORMAT_HOOK_COMMAND = hook_launch.hook_launch_command('format-edited')
 // launches on every consumer's Bash call became one. Launched from its own bundle with a `pnpm josh`
 // fallback (joshuafolkken/kit#2023).
 const PRETOOL_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command('pretool-guard')
-// The Stop hook (joshuafolkken/kit#2121): one process delivering the three stop-time rules — the two
-// hold-based refusals and the issue-citation notice. It is the stop-time counterpart of the PreToolUse
+// The Stop hook (joshuafolkken/kit#2121): one process delivering the stop-time rules — the hold notify
+// and release and the issue citation it runs itself (joshuafolkken/kit#3919), and the refusals that need
+// the model. It is the stop-time counterpart of the PreToolUse
 // guard, launched from its own bundle with a `pnpm josh` fallback.
 const STOP_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command('stop-guard')
 // Derived from the script's own per-spawn bound rather than written as a number: raising that bound

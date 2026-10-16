@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stop_rules } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
-const { context } = stop_rules_fixture
+const { action_kinds, context } = stop_rules_fixture
 
 // joshuafolkken/kit#2329: every stop reason ends on this, so a correction never reprints the reply.
 const NO_REPRINT = 'do not repeat your previous reply'
@@ -10,14 +10,17 @@ const BARE_MESSAGE = 'done in #7'
 const QUOTING_PROMPT = 'explain this log: closed #7'
 
 describe('stop_rules.stop_outcome — stop notification', () => {
-	it('refuses a held tree that stopped without notifying', () => {
-		const { reason } = stop_rules.stop_outcome(context({ hold_present: true }))
+	// joshuafolkken/kit#3919: the hook sends it itself rather than refusing the stop.
+	it('sends the notify for a held tree that stopped without notifying', () => {
+		const outcome = stop_rules.stop_outcome(context({ hold_issue: '7', message: 'paused' }))
 
-		expect(reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+		expect(outcome.reason).toBeUndefined()
+		expect(outcome.actions).toEqual([{ kind: 'notify', issue: '7', message: 'paused' }])
+		expect(outcome.blocks_on_failure).toBe(true)
 	})
 
 	it('is silent when the confirmation notify is on the tail', () => {
-		const outcome = stop_rules.stop_outcome(context({ hold_present: true, notified: true }))
+		const outcome = stop_rules.stop_outcome(context({ hold_issue: '7', notified: true }))
 
 		expect(outcome).toEqual(stop_rules.NO_OUTCOME)
 	})
@@ -30,7 +33,7 @@ describe('stop_rules.stop_outcome — stop notification', () => {
 // joshuafolkken/kit#2962: a lane child that handed its region to the detached ship waits on nobody.
 describe('stop_rules.stop_outcome — hand-off to the detached ship', () => {
 	it('demands no notify from a lane child handed to a running ship', () => {
-		const handed_off = context({ lane_child: true, hold_present: true, handed_off: true })
+		const handed_off = context({ lane_child: true, hold_issue: '7', handed_off: true })
 
 		expect(stop_rules.stop_outcome(handed_off)).toEqual(stop_rules.NO_OUTCOME)
 	})
@@ -38,7 +41,7 @@ describe('stop_rules.stop_outcome — hand-off to the detached ship', () => {
 	it('demands no hold release either, since the supervisor owns the hold', () => {
 		const handed_off = context({
 			lane_child: true,
-			hold_present: true,
+			hold_issue: '7',
 			tree_clean: true,
 			notified: true,
 			handed_off: true,
@@ -48,24 +51,29 @@ describe('stop_rules.stop_outcome — hand-off to the detached ship', () => {
 	})
 
 	it('still demands the notify from a lane child that parks for a decision', () => {
-		const parked = context({ lane_child: true, hold_present: true, handed_off: false })
+		const parked = context({ lane_child: true, hold_issue: '7', handed_off: false })
 
-		expect(stop_rules.stop_outcome(parked).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+		expect(action_kinds(parked)).toEqual(['notify'])
 	})
 })
 
 describe('stop_rules.stop_outcome — hold release', () => {
-	it('refuses a clean tree that still holds', () => {
+	it('releases a clean tree that still holds', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ hold_present: true, tree_clean: true, notified: true }),
+			context({ hold_issue: '7', tree_clean: true, notified: true }),
 		)
 
-		expect(outcome.reason).toBe(stop_rules.HOLD_RELEASE_REASON)
+		expect(outcome.reason).toBeUndefined()
+		expect(outcome.actions).toEqual([{ kind: 'release', issue: '7' }])
+	})
+
+	it('sends the notify ahead of the release that ends the hold it reports', () => {
+		expect(action_kinds({ hold_issue: '7', tree_clean: true })).toEqual(['notify', 'release'])
 	})
 
 	it('is silent when the tree is dirty (halfrun / needs-human-review)', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ hold_present: true, tree_clean: false, notified: true }),
+			context({ hold_issue: '7', tree_clean: false, notified: true }),
 		)
 
 		expect(outcome.reason).toBeUndefined()
@@ -73,62 +81,53 @@ describe('stop_rules.stop_outcome — hold release', () => {
 
 	it('is silent for a prrun stop that keeps its hold over a clean tree', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ hold_present: true, tree_clean: true, notified: true, prrun_stopped: true }),
+			context({ hold_issue: '7', tree_clean: true, notified: true, prrun_stopped: true }),
 		)
 
 		expect(outcome.reason).toBeUndefined()
 	})
 
 	it('still demands the notify at a prrun stop', () => {
-		const outcome = stop_rules.stop_outcome(
-			context({ hold_present: true, tree_clean: true, prrun_stopped: true }),
-		)
+		const prrun = { hold_issue: '7', tree_clean: true, prrun_stopped: true }
 
-		expect(outcome.reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+		expect(action_kinds(prrun)).toEqual(['notify'])
 	})
 })
 
 describe('stop_rules.stop_outcome — loop breaker', () => {
-	it('does not refuse once stop_hook_active is set', () => {
+	it('still runs the actions once stop_hook_active is set, never blocking on their failure', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ hold_present: true, tree_clean: true, stop_hook_active: true }),
+			context({ hold_issue: '7', tree_clean: true, stop_hook_active: true }),
 		)
 
 		expect(outcome.reason).toBeUndefined()
+		expect(outcome.actions.map((action) => action.kind)).toEqual(['notify', 'release'])
+		expect(outcome.blocks_on_failure).toBe(false)
 	})
 })
 
 describe('stop_rules.stop_outcome — pre-gate cut', () => {
-	it('does not refuse a lane child ending its turn at the cut', () => {
+	it('neither refuses nor acts for a lane child ending its turn at the cut', () => {
 		const outcome = stop_rules.stop_outcome(
-			context({ hold_present: true, tree_clean: true, cut_pending: true }),
+			context({ hold_issue: '7', tree_clean: true, cut_pending: true, message: 'cut #7' }),
 		)
 
-		expect(outcome.reason).toBeUndefined()
+		expect(outcome).toEqual(stop_rules.NO_OUTCOME)
 	})
 })
 
 describe('stop_rules.stop_outcome — issue citation', () => {
-	it('blocks a bare #N by naming it and the issue:cite call that fixes it', () => {
-		const { reason } = stop_rules.stop_outcome(context({ message: 'done in #123 and #456' }))
+	it('prints the citation lines for a bare #N instead of refusing', () => {
+		const outcome = stop_rules.stop_outcome(context({ message: 'done in #123 and #456' }))
 
-		expect(reason).toContain('#123, #456')
-		expect(reason).toContain('pnpm josh issue:cite 123 456')
-		expect(reason).toContain('issue-citation.md')
+		expect(outcome.reason).toBeUndefined()
+		expect(outcome.actions).toEqual([{ kind: 'cite', references: ['#123', '#456'] }])
 	})
 
-	it('carries an owner/repo#N reference through to the issue:cite argument', () => {
-		const { reason } = stop_rules.stop_outcome(context({ message: 'see joshuafolkken/kit#45' }))
+	it('carries an owner/repo#N reference through to the cite action', () => {
+		const { actions } = stop_rules.stop_outcome(context({ message: 'see joshuafolkken/kit#45' }))
 
-		expect(reason).toContain('pnpm josh issue:cite joshuafolkken/kit#45')
-	})
-
-	// joshuafolkken/kit#2329: the fix follows the bare copy as a correction, not a reprint of the whole
-	// reply — reprinting is what read as a duplicate.
-	it('asks for the correction alone, not the whole reply reissued', () => {
-		const { reason } = stop_rules.stop_outcome(context({ message: BARE_MESSAGE }))
-
-		expect(reason).toContain(NO_REPRINT)
+		expect(actions).toEqual([{ kind: 'cite', references: ['joshuafolkken/kit#45'] }])
 	})
 
 	it('is silent on a link-form citation', () => {
@@ -145,10 +144,8 @@ describe('stop_rules.stop_outcome — issue citation', () => {
 		expect(outcome.reason).toBeUndefined()
 	})
 
-	it('lets an earlier block rule take precedence over the citation rule', () => {
-		const outcome = stop_rules.stop_outcome(context({ hold_present: true, message: 'paused #7' }))
-
-		expect(outcome.reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	it('cites after the hold actions', () => {
+		expect(action_kinds({ hold_issue: '7', message: 'paused #7' })).toEqual(['notify', 'cite'])
 	})
 })
 
@@ -162,13 +159,12 @@ describe('stop_rules.stop_outcome — issue citation quoted from the prompt', ()
 		expect(outcome.reason).toBeUndefined()
 	})
 
-	it('still blocks a bare #N the prompt did not carry', () => {
-		const { reason } = stop_rules.stop_outcome(
+	it('still cites a bare #N the prompt did not carry', () => {
+		const { actions } = stop_rules.stop_outcome(
 			context({ message: 'done in #7 and #8', prompt: QUOTING_PROMPT }),
 		)
 
-		expect(reason).toContain('pnpm josh issue:cite 8')
-		expect(reason).not.toContain('issue:cite 7')
+		expect(actions).toEqual([{ kind: 'cite', references: ['#8'] }])
 	})
 })
 
@@ -257,10 +253,13 @@ describe('stop_rules.stop_outcome — lane index permission', () => {
 		expect(reason).toContain(NO_REPRINT)
 	})
 
-	it('goes ahead of the stop notification a held lane would owe', () => {
-		const held = context({ lane_child: true, hold_present: true, message: INDEX_REQUEST })
+	it('goes ahead of the stop notification a held lane would owe, which is not sent', () => {
+		const held = context({ lane_child: true, hold_issue: '7', message: INDEX_REQUEST })
 
-		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.LANE_INDEX_REASON)
+		expect(stop_rules.stop_outcome(held)).toEqual({
+			...stop_rules.NO_OUTCOME,
+			reason: stop_rules.LANE_INDEX_REASON,
+		})
 	})
 
 	it('asks the same in Japanese', () => {

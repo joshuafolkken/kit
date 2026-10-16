@@ -2,10 +2,12 @@ import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
+import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { telegram_test } from '#scripts/notify/telegram-test'
 import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
@@ -199,12 +201,17 @@ const HELD: HoldRead = {
 	hold: { issue: '2962', taken_at: '2026-10-03T00:00:00.000Z', pid: process.pid },
 }
 
-// The stdout writes of one stop decision on a held tree, with the ship hand-off reading `is_handed_off`.
-async function decide_held(is_handed_off: boolean): Promise<string> {
+// The stdout writes of one stop decision on a held tree, with the ship hand-off reading `is_handed_off`
+// and the hook's own notify sending, or failing when `is_send_failing`.
+async function decide_held(is_handed_off: boolean, is_send_failing = false): Promise<string> {
 	quiet_world()
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(process.cwd())
 	vi.spyOn(run_hold, 'read_hold').mockReturnValue(HELD)
 	vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(is_handed_off)
+	vi.spyOn(git_gh_repo, 'repo_get_name_with_owner').mockResolvedValue('joshuafolkken/kit')
+	const send = vi.spyOn(telegram_test, 'send_values')
+	if (is_send_failing) send.mockRejectedValue(new Error('telegram down'))
+	else send.mockResolvedValue(undefined)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
 	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
@@ -222,8 +229,18 @@ describe('write_stop_decision — the ship hand-off is wired', () => {
 		expect(await decide_held(true)).toBe('')
 	})
 
-	it('still demands the notify on a held tree that was not handed off', async () => {
-		expect(await decide_held(false)).toContain('mid-workflow stop notification')
+	// joshuafolkken/kit#3919: the hook sends it itself and lets the stop through.
+	it('sends the notify itself on a held tree that was not handed off', async () => {
+		const written: unknown = JSON.parse(await decide_held(false))
+
+		const [values] = vi.mocked(telegram_test.send_values).mock.calls[0] ?? []
+
+		expect(written).toHaveProperty('systemMessage')
+		expect(values?.['issue-url']).toBe('https://github.com/joshuafolkken/kit/issues/2962')
+	})
+
+	it('falls back to demanding the notify when the send fails', async () => {
+		expect(await decide_held(false, true)).toContain('mid-workflow stop notification')
 	})
 })
 
