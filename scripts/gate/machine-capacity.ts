@@ -51,20 +51,33 @@ const PAGE_SIZE_ARGUMENTS = ['PAGESIZE']
 // every second. `kern.memorystatus_level` is the kernel's own memory-pressure figure: the percentage of
 // memory still available, compressible and purgeable pages included — what `os.freemem()` leaves out on
 // macOS, where it reads near zero on a machine with gigabytes to spare. The swapper counters are the
-// pages swapped in and out since boot, `vm_stat`'s `Swapins` / `Swapouts`. The names stay in the output
+// pages swapped in and out since boot, `vm_stat`'s `Swapins` / `Swapouts`; `vm.compressor_input_bytes` is
+// the bytes the compressor has taken in since boot, `vm_stat`'s `Compressions`. The names stay in the output
 // (no `-n`), so a name an older macOS lacks drops only its own line.
 const LEVEL_NAME = 'kern.memorystatus_level'
 const SWAP_IN_NAME = 'vm.compressor.swapper.swapins_total'
 const SWAP_OUT_NAME = 'vm.compressor.swapper.swapouts_total'
+const COMPRESSED_NAME = 'vm.compressor_input_bytes'
 const PAGE_SIZE_NAME = 'hw.pagesize'
 // The kernel's memory-pressure verdict — 1 normal, 2 warning, 4 critical — the one Activity Monitor
 // colors its "memory pressure" graph by.
 const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
 const PRESSURE_WARNING = 2
-// The swap traffic across one window that reads as pressure. A machine that swapped once still pages a
-// few megabytes back in as old pages are touched; the 2026-10-16 thrash moved about 275 MB a window.
+// The swap traffic across one window that reads as pressure — 64 MB a second paged to disk. A machine
+// that swapped once still pages a few megabytes back in as old pages are touched.
 const SWAP_PRESSURE_MB = 16
-const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME, PRESSURE_NAME]
+// The compressor traffic across one window that reads as pressure. An idle machine compresses nothing
+// across a window; the 2026-10-16 thrash compressed about 240,000 16 KB pages every three seconds, about
+// 310 MB a window, with no swap figure to show for it.
+const COMPRESSION_PRESSURE_MB = 64
+const SYSCTL_ARGUMENTS = [
+	LEVEL_NAME,
+	SWAP_IN_NAME,
+	SWAP_OUT_NAME,
+	COMPRESSED_NAME,
+	PAGE_SIZE_NAME,
+	PRESSURE_NAME,
+]
 const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 
 // `memory_pressured` says why `available_mb` read none, so a claim that waits can name the pressure.
@@ -75,11 +88,13 @@ interface MachineReading {
 }
 
 // The memory half of a reading. `swapped_mb` is a counter — every page swapped in or out since boot —
-// so a rate is the difference between two readings. `pressure_level` is read on macOS only.
+// so a rate is the difference between two readings, and so is `compressed_mb`, every byte compressed
+// since boot. `pressure_level` and `compressed_mb` are read on macOS only.
 interface MemoryReading {
 	available_mb: number | undefined
 	swapped_mb: number | undefined
 	pressure_level: number | undefined
+	compressed_mb?: number | undefined
 }
 
 // What the ledger's admitted reservations declare — the part of the machine's load already accounted for.
@@ -149,10 +164,10 @@ function swapped_pages(
 	return pages_in === undefined || pages_out === undefined ? undefined : pages_in + pages_out
 }
 
-function swapped_mb(pages: number | undefined, page_bytes: number | undefined): number | undefined {
-	if (pages === undefined || page_bytes === undefined) return undefined
+function mb_of(units: number | undefined, unit_bytes: number | undefined): number | undefined {
+	if (units === undefined || unit_bytes === undefined) return undefined
 
-	return (pages * page_bytes) / BYTES_PER_MB
+	return (units * unit_bytes) / BYTES_PER_MB
 }
 
 // What was swapped between two readings of the counter. A counter that went back — a reboot between
@@ -171,11 +186,12 @@ function parse_darwin_memory(output: string, total_bytes: number): MemoryReading
 	return {
 		available_mb:
 			level === undefined ? undefined : (level / PERCENT) * (total_bytes / BYTES_PER_MB),
-		swapped_mb: swapped_mb(
+		swapped_mb: mb_of(
 			swapped_pages(values.get(SWAP_IN_NAME), values.get(SWAP_OUT_NAME)),
 			values.get(PAGE_SIZE_NAME),
 		),
 		pressure_level: values.get(PRESSURE_NAME),
+		compressed_mb: mb_of(values.get(COMPRESSED_NAME), 1),
 	}
 }
 
@@ -195,7 +211,7 @@ function pages_of(pattern: RegExp, vmstat: string): number | undefined {
 function parse_linux_swapped(vmstat: string, page_bytes: number): number | undefined {
 	const pages = swapped_pages(pages_of(LINUX_SWAP_IN, vmstat), pages_of(LINUX_SWAP_OUT, vmstat))
 
-	return swapped_mb(pages, page_bytes)
+	return mb_of(pages, page_bytes)
 }
 
 async function settled<T>(read: () => Promise<T>): Promise<T | undefined> {
@@ -264,17 +280,25 @@ async function default_sleep(ms: number): Promise<void> {
 	})
 }
 
-function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
-	if ((after.pressure_level ?? 0) >= PRESSURE_WARNING) return true
+// Whether a counter gained more than `limit` MB across the window; an unread counter gained nothing.
+function moved_over(from: number | undefined, to: number | undefined, limit: number): boolean {
+	return (swapped_between(from, to) ?? 0) > limit
+}
 
-	return (swapped_between(before.swapped_mb, after.swapped_mb) ?? 0) > SWAP_PRESSURE_MB
+function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
+	return (
+		(after.pressure_level ?? 0) >= PRESSURE_WARNING ||
+		moved_over(before.swapped_mb, after.swapped_mb, SWAP_PRESSURE_MB) ||
+		moved_over(before.compressed_mb, after.compressed_mb, COMPRESSION_PRESSURE_MB)
+	)
 }
 
 // **Memory under compression and swap pressure has nothing free to admit against.** The level counts
 // compressible pages as available, so on 2026-10-16 it read 5.4 GB free while the compressor held
-// 5.9 GB and swap moved 3.3 GB every three seconds, and 5.2 GB of reservations were admitted on top.
-// A reading the kernel calls pressured, or one with swap traffic across the window, answers no free
-// memory: what the ledger holds keeps running and a heavy claim waits for the pressure to pass.
+// 5.9 GB and compressed and decompressed about 3.3 GB every three seconds, and 5.2 GB of reservations
+// were admitted on top. A reading the kernel calls pressured, or one with swap or compressor traffic
+// across the window, answers no free memory: what the ledger holds keeps running and a heavy claim waits
+// for the pressure to pass.
 function pressured_available(before: MemoryReading, after: MemoryReading): number | undefined {
 	if (after.available_mb === undefined) return undefined
 
@@ -330,6 +354,7 @@ const machine_capacity = {
 	BASELINE_CORES,
 	busy_cores_between,
 	busy_share_between,
+	COMPRESSION_PRESSURE_MB,
 	external_cores,
 	machine_budget,
 	parse_darwin_memory,

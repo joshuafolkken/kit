@@ -26,12 +26,13 @@ const AVAILABLE_MB = 4000
 const LEDGER_MEMORY_MB = 2400
 const LEDGER_CORES = 4
 const PAGE_BYTES = 4096
-// 256 + 512 pages of 4 KB: 3 MB swapped since boot.
+// 256 + 512 pages of 4 KB: 3 MB swapped since boot; 5 MB compressed since boot.
 const DARWIN_LEVEL = 'kern.memorystatus_level: 58'
 const DARWIN_SYSCTL = [
 	DARWIN_LEVEL,
 	'vm.compressor.swapper.swapins_total: 256',
 	'vm.compressor.swapper.swapouts_total: 512',
+	'vm.compressor_input_bytes: 5242880',
 	`hw.pagesize: ${String(PAGE_BYTES)}`,
 ].join('\n')
 
@@ -109,6 +110,7 @@ describe('machine_capacity memory readers', () => {
 
 		expect(reading.available_mb).toBeCloseTo((total_mb * level) / 100)
 		expect(reading.swapped_mb).toBe(3)
+		expect(reading.compressed_mb).toBe(5)
 	})
 
 	it('leaves a figure unread when its sysctl name is missing', () => {
@@ -120,6 +122,7 @@ describe('machine_capacity memory readers', () => {
 			available_mb: undefined,
 			swapped_mb: undefined,
 			pressure_level: undefined,
+			compressed_mb: undefined,
 		})
 	})
 
@@ -158,14 +161,16 @@ describe('machine_capacity.swapped_between', () => {
 })
 
 // joshuafolkken/kit#3943: the level counted compressible pages as free, so 5.2 GB of reservations
-// were admitted while the compressor held 5.9 GB and swap moved 3.3 GB every three seconds.
+// were admitted while the compressor held 5.9 GB and churned 3.3 GB every three seconds.
 const NORMAL = 1
 const WARNING = 2
 const SWAPPED_MB = 100
+const COMPRESSED_MB = 300
 const CALM: MemoryReading = {
 	available_mb: AVAILABLE_MB,
 	swapped_mb: SWAPPED_MB,
 	pressure_level: NORMAL,
+	compressed_mb: COMPRESSED_MB,
 }
 const HEAVY_MB = 2000
 
@@ -203,6 +208,22 @@ describe('machine_capacity.pressured_available — memory under compression and 
 		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB }
 
 		expect(machine_capacity.pressured_available(CALM, after)).toBe(AVAILABLE_MB)
+	})
+
+	// Round 2 of #3943: the incident's thrash was compressor traffic with the kernel's verdict normal
+	// and the swap counters quiet, so the swap threshold alone admitted it.
+	it('answers no free memory when compressor traffic alone passes the threshold, swap quiet', () => {
+		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB + 1
+
+		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(0)
+	})
+
+	it('answers the available memory under compressor traffic at the threshold', () => {
+		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB
+
+		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(
+			AVAILABLE_MB,
+		)
 	})
 
 	it('leaves memory that could not be read unread, so it sets no limit', () => {

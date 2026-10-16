@@ -40,6 +40,7 @@ describe('machine_capacity.read_sample against a probe that never answers', () =
 			available_mb: undefined,
 			swapped_mb: undefined,
 			pressure_level: undefined,
+			compressed_mb: undefined,
 		})
 		expect(hanging_execa.timeouts()).toStrictEqual([PROBE_TIMEOUT_MS])
 	})
