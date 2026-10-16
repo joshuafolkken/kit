@@ -1,7 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
-import { ESLINT_CACHE_FILE, ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_CACHE_FILE,
+	ESLINT_CACHE_FLAGS,
+	PRETTIER_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import {
 	buffered_process,
@@ -11,7 +15,6 @@ import {
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
 
-const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
 // cache flags come from the same constant the ignore rules are asserted against.
 // A copy here would keep writing the old location the day that constant
@@ -22,6 +25,10 @@ const WHOLE_TREE_RECHECK: CrossFileRecheckOptions = {
 	cache_file: ESLINT_CACHE_FILE,
 	patterns: [WHOLE_TREE],
 }
+
+// Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
+// its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
+const PRETTIER_ARGS = ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CACHE_FLAGS] as const
 
 // What one eslint run is made of: the child's arguments, and what re-reading a cached cross-file report
 // (`cross-file-recheck.ts`) needs to ask the same question again — the cache file and the targets.
@@ -132,4 +139,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const lint_parallel = { run_lint_checks, run_lint_parallel_checks }
 
-export { ESLINT_ARGS, lint_parallel }
+export { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS }

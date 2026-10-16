@@ -19,6 +19,12 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Git hooks',
 		reference: ['[paths...]', 'automation', ['none']],
 	},
+	'pre-commit-lint': {
+		script: 'scripts/hooks/pre-commit-lint.ts',
+		description: 'Git hook: run cspell, prettier or eslint over staged files from a content cache',
+		category: 'Git hooks',
+		reference: ['<cspell|prettier|eslint> [paths...]', 'automation', ['files']],
+	},
 	'pre-push-unit': {
 		script: 'scripts/hooks/pre-push-unit.ts',
 		description: 'Git hook: run unit tests, reusing a green gate recorded on the pushed tree',

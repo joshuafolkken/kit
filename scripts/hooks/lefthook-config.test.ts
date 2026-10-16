@@ -27,6 +27,8 @@ const BASE_LEFTHOOK = path.join('lefthook', 'base.yml')
 const VANILLA_LEFTHOOK = path.join('lefthook', 'vanilla.yml')
 const PRE_COMMIT = 'pre-commit'
 const PRE_PUSH = 'pre-push'
+// lefthook's own placeholder, not a template interpolation.
+const LEFTHOOK_STAGED_FILES = '{staged_files}'
 const CSPELL = 'cspell'
 const SECRETLINT = 'secretlint'
 const TYPE_CHECK = 'type-check'
@@ -74,6 +76,16 @@ describe('lefthook/base.yml pre-commit cspell glob', () => {
 	})
 })
 
+// joshuafolkken/kit#3948: the staged-file checks go through the wrapper that picks their cache
+// files, so a hook run neither prunes nor loses the gate's caches.
+describe('lefthook/base.yml pre-commit cached checks', () => {
+	it.each([CSPELL, 'prettier', 'eslint'])('runs %s through josh pre-commit-lint', (tool) => {
+		expect(load_pre_commit_command(BASE_LEFTHOOK, tool)?.run).toBe(
+			['pnpm josh pre-commit-lint', tool, LEFTHOOK_STAGED_FILES].join(' '),
+		)
+	})
+})
+
 describe('lefthook/base.yml pre-commit secretlint command', () => {
 	const secretlint = load_pre_commit_command(BASE_LEFTHOOK, SECRETLINT)
 	const run = secretlint?.run ?? ''
@@ -85,7 +97,7 @@ describe('lefthook/base.yml pre-commit secretlint command', () => {
 	// Scanning the whole tree on every commit would be slow enough that contributors
 	// disable the hook, which is the failure mode this check exists to prevent.
 	it('scans only the staged files', () => {
-		expect(run).toContain('{staged_files}')
+		expect(run).toContain(LEFTHOOK_STAGED_FILES)
 	})
 
 	// secretlint resolves from the consumer project, so a kit upgrade activates this hook

@@ -5,9 +5,11 @@ pre-commit:
       skip: git diff --cached --quiet
       run: pnpm josh prevent-main-commit
 
+    # cspell, prettier and eslint go through `josh pre-commit-lint`, which owns their flags so each
+    # cache location comes from the constant its ignore rules are asserted against (kit#3948).
     cspell:
       glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json,properties}'
-      run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
+      run: pnpm josh pre-commit-lint cspell {staged_files}
 
     # Scans only staged files, so a secret is caught before it ever enters history —
     # GitHub push protection and the CodeRabbit gitleaks pass both fire after the fact,
@@ -22,11 +24,11 @@ pre-commit:
 
     prettier:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs,html,css,scss,md,mdx,json,jsonc,yaml,yml}'
-      run: pnpm exec prettier --check --ignore-unknown {staged_files}
+      run: pnpm josh pre-commit-lint prettier {staged_files}
 
     eslint:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
-      run: pnpm exec eslint --quiet --cache --cache-strategy content {staged_files}
+      run: pnpm josh pre-commit-lint eslint {staged_files}
 
     # Routed through `josh pre-commit-type-check` rather than a bare `pnpm exec tsc --noEmit` so the
     # hook can read the record `pnpm josh gate` leaves behind (kit#1381) — the same reader the

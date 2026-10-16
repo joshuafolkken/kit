@@ -783,6 +783,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "pre-commit-lint": [
+      "<cspell|prettier|eslint> [paths...]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
     "pre-commit-type-check": [
       "",
       "automation",
