@@ -73,8 +73,8 @@ one this run still owes.
 body. A thread longer than the Issue is the pre-implementation reading `delegation.md` describes: brief
 a unit to return **the agreements in force plus the comment URLs that carry them**, never the text.
 
-**Under Claude Code the hook prepends the comments to a body-only `gh api` read and refuses a body-only
-`gh issue view`; the Codex adapter refuses both** (`prompts/collaboration-workflow/rule-delivery.md`).
+**Under Claude Code the hook prepends the comments to a line that opens with a body-only `gh api` read
+and refuses every other body-only read; the Codex adapter refuses them all** (`prompts/collaboration-workflow/rule-delivery.md`).
 **This file is the rule, not the hook** — a session without hooks still owes the read.
 
 ## A person's update mid-run

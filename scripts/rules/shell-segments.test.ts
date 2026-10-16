@@ -27,6 +27,20 @@ describe('segments_of', () => {
 
 		expect(shell_segments.segments_of(command)).toStrictEqual([command])
 	})
+})
+
+describe('first_of', () => {
+	it.each([
+		[LONE_COMMAND, LONE_COMMAND],
+		[`${FIRST} && ${SECOND}`, FIRST],
+		[`echo 'x && y' && ${SECOND}`, "echo 'x && y'"],
+	])('takes the first command of %j, a quoted separator left uncut', (command, expected) => {
+		expect(shell_segments.first_of(command)).toBe(expected)
+	})
+
+	it('answers nothing for a heredoc line', () => {
+		expect(shell_segments.first_of("cat > f <<'EOF'\na && b\nEOF")).toBeUndefined()
+	})
 
 	it('trims each segment so a caller may anchor at the command position', () => {
 		expect(shell_segments.segments_of(`  ${FIRST}  &&   ${SECOND} `)).toStrictEqual(BOTH)

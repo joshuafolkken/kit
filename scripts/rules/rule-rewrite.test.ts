@@ -76,6 +76,29 @@ describe('issue_comments.comments_input', () => {
 	})
 })
 
+describe('issue_comments.comments_input — where the line opens', () => {
+	// A prepended read would run in another cwd than the body read, or run text that was only quoted.
+	it.each([
+		[`cd ../other && ${BODY_READ}`],
+		[`(${BODY_READ})`],
+		[`cat > f <<'EOF'\n${BODY_READ}\nEOF`],
+		[`echo '${BODY_READ}'`],
+	])('rewrites nothing for %j, which does not open with the body read', (command) => {
+		expect(
+			issue_comments.comments_input({ name: BASH, input: { command } }, no_tail),
+		).toBeUndefined()
+	})
+
+	it('rewrites a line that opens with the body read and chains on', () => {
+		const command = `${BODY_READ} && echo done`
+		const rewritten = issue_comments.comments_input({ name: BASH, input: { command } }, no_tail)
+
+		expect(String(rewritten?.['command'])).toMatch(
+			new RegExp(String.raw`\n${BODY_READ} && echo done$`, 'u'),
+		)
+	})
+})
+
 describe('rule_rewrite.rewrite', () => {
 	it('carries the rewritten input in the payload it returns', () => {
 		const rewrite = rule_rewrite.rewrite(bash_payload(BODY_READ))
@@ -85,7 +108,7 @@ describe('rule_rewrite.rewrite', () => {
 	})
 
 	it('folds every rewriting row over one line, joining their notes in row order', () => {
-		const rewrite = rule_rewrite.rewrite(bash_payload(`${PIPED_LINT} && ${BODY_READ}`))
+		const rewrite = rule_rewrite.rewrite(bash_payload(`${BODY_READ} && ${PIPED_LINT}`))
 
 		expect(String(rewrite?.input['command'])).toContain(`(set -o pipefail; ${PIPED_LINT})`)
 		expect(String(rewrite?.input['command'])).toContain(COMMENTS_READ)
@@ -123,7 +146,7 @@ function context_line(content: string): string {
 
 describe('rule_value.measure — a folded note', () => {
 	it.each(['issue-comments', 'piped-verification'])('credits %s with its rewrite', (id) => {
-		const note = rule_rewrite.rewrite(bash_payload(`${PIPED_LINT} && ${BODY_READ}`))?.note ?? ''
+		const note = rule_rewrite.rewrite(bash_payload(`${BODY_READ} && ${PIPED_LINT}`))?.note ?? ''
 		const text = `${rule_value_fixture.session('ls')}\n${context_line(note)}`
 
 		expect(rule_value_fixture.reading_for(id, [[text]]).rewrites).toBe(1)

@@ -112,21 +112,27 @@ const COMMENTS_NOTE =
 	"↻ issue comments: this read returned only the Issue's body, so the Issue's comments were fetched " +
 	`on the same line — a later comment supersedes the body it contradicts (${RULE_DOC}).`
 
-function body_paths(segments: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
-	const reads = segments.filter((segment) => is_body_read_segment(segment))
+// **Only a line that opens with the body read is rewritten.** Prepended ahead of a `cd` or a
+// subshell, the comments read would resolve `{owner}/{repo}` in another directory and print another
+// repository's comments; and the line is cut on its quote-blanked reading, so a body-read spelling
+// quoted in a string or a heredoc body is never prepended as a real call. Every other line keeps the
+// refusal.
+function rewritable_path(command: string): string | undefined {
+	const read = shell_segments.first_of(command)
 
-	if (reads.some((segment) => ISSUE_VIEW_COMMAND.test(segment))) return undefined
+	if (read === undefined || ISSUE_VIEW_COMMAND.test(read)) return undefined
 
-	return [...new Set(reads.map((segment) => ISSUE_BODY_PATH.exec(segment)?.[0] ?? ''))]
+	return is_body_read_segment(read) ? ISSUE_BODY_PATH.exec(read)?.[0] : undefined
 }
 
 function comments_command(command: string): string | undefined {
 	if (!is_body_only_issue_read(command)) return undefined
 
-	const paths = body_paths(shell_segments.segments_of(command))
-	const reads = paths?.map((path) => `gh api --paginate ${path}/comments --jq ${COMMENTS_JQ}`)
+	const path = rewritable_path(command)
 
-	return reads === undefined ? undefined : [...reads, command].join('\n')
+	if (path === undefined) return undefined
+
+	return `gh api --paginate ${path}/comments --jq ${COMMENTS_JQ}\n${command}`
 }
 
 // The call's input with the comments read prepended, or `undefined` where the comments are already on

@@ -1,9 +1,9 @@
 {
-	"reason": "Review round-1 fixes for #3920: fail-open tail read, per-note rule:value credit, comments read prepended so the typed line keeps its exit status, newline as a chain separator in time_shell.discarded_commands, and the skill line naming the Codex adapter's refusal",
+	"reason": "Round-2 review fix: shell_segments.first_of and the opening-segment gate keep the issue-comments rewrite off cd-prefixed, subshell, quoted and heredoc lines",
 	"date": "2026-10-16",
 	"growth": {
-		"scripts.code_lines": 149,
-		"ai_cost.on_demand_bytes": 205,
+		"scripts.code_lines": 155,
+		"ai_cost.on_demand_bytes": 231,
 		"prose.long_paragraphs": 1
 	}
 }
