@@ -43,6 +43,25 @@ type CommandReference = readonly [
 	side_effects: ReadonlyArray<CommandSideEffect>,
 ]
 
+// One `pnpm josh <command> <arguments>` line of a usage block, with the comment printed after it.
+interface CommandExample {
+	arguments: string
+	note?: string
+}
+
+// Spellings of one option — `-y` and `--yes` — rendered side by side.
+interface CommandFlag {
+	names: ReadonlyArray<string>
+	description: string
+}
+
+// What `josh help <command>` prints and what the reference pages render between their usage
+// markers — one source for both, so the page and the terminal cannot disagree (#3932).
+interface CommandUsage {
+	examples: ReadonlyArray<CommandExample>
+	flags?: ReadonlyArray<CommandFlag>
+}
+
 interface CommandEntry {
 	script?: string
 	shell?: ReadonlyArray<string>
@@ -205,7 +224,7 @@ const ESLINT_RELATED_CACHE_FLAGS = content_cache_flags(ESLINT_RELATED_CACHE_FILE
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
 const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
 
-export type { CommandCategory, CommandEntry, GateCacheSpec }
+export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target: the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache

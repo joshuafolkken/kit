@@ -83,6 +83,32 @@ describe('josh.ts — help command', () => {
 
 	// `--all` in the command slot is a help request too (joshuafolkken/kit#1928): it prints the
 	// listing, maintenance commands included, rather than resolving a command named `--all`.
+	it('prints one command usage for help followed by an alias', async () => {
+		process.argv = [...ARGV_BASE, 'help', 'ga']
+
+		await import('./josh')
+
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			expect.stringMatching(/^josh gate[\s\S]*pnpm josh gate --force/u),
+		)
+	})
+
+	it('exits 1 on stderr for help followed by an unknown command', async () => {
+		process.argv = [...ARGV_BASE, 'help', UNKNOWN_CMD]
+
+		await expect(import('./josh')).rejects.toThrow(PROCESS_EXIT_CALLED)
+		expect(vi.mocked(console.info)).not.toHaveBeenCalled()
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining(UNKNOWN_CMD))
+	})
+
+	it('prints the listing when the help topic is a flag', async () => {
+		process.argv = [...ARGV_BASE, '--help', '--all']
+
+		await import('./josh')
+
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(HELP_OUTPUT)
+	})
+
 	it('prints help to stdout for a bare --all', async () => {
 		process.argv = [...ARGV_BASE, '--all']
 

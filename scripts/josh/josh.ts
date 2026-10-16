@@ -1,4 +1,5 @@
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
+import { command_usage } from './command-usage'
 import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
 
 const ARGV_OFFSET = 2
@@ -12,16 +13,24 @@ const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
 // A bare `--all` in the command slot is a help request, not a command.
 const ALL_FLAG = '--all'
 
-function print_help(is_all: boolean, is_consumer: boolean): void {
-	console.info(josh_logic.format_help(is_all, is_consumer))
-}
-
 // Both halves go to stderr. The help listing is a diagnosis here, not the answer, and a shell
 // wiring `--port $(josh port dev)` reads stdout alone, so a command name this kit cannot resolve
 // has to leave that stream empty rather than substitute the whole toolkit index (#825).
 function handle_unknown(cmd: string): never {
 	console.error(josh_logic.format_unknown_command(cmd))
 	process.exit(1)
+}
+
+// `josh help <command>` prints that one command's usage — the text its reference page renders
+// (#3932); a flag in the topic slot is still a listing request (`josh --help --all`).
+function print_help(is_all: boolean, is_consumer: boolean, topic: string | undefined): void {
+	if (topic === undefined || topic.startsWith('-')) {
+		console.info(josh_logic.format_help(is_all, is_consumer))
+
+		return
+	}
+
+	console.info(command_usage.format_command_help(topic) ?? handle_unknown(topic))
 }
 
 // `process.exit` truncates a piped stdout at its buffer size, and the output at risk is the script's
@@ -44,7 +53,7 @@ async function main(): Promise<void> {
 	const is_consumer = doctor_consumer.is_kit_consumer(find_package_directory(process.cwd()))
 
 	if (!cmd || cmd === ALL_FLAG || HELP_COMMANDS.has(cmd)) {
-		print_help(is_all, is_consumer)
+		print_help(is_all, is_consumer, process.argv[ARGV_OFFSET + 1])
 
 		return
 	}
