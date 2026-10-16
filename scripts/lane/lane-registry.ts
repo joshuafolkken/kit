@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
@@ -38,6 +38,9 @@ interface LaneInfo {
 	// instead of waiting for the pool to drain before it can be cut.
 	output: string | undefined
 	profile?: AgentProfile | undefined
+	// When the lane last took a child: `lane:open` writes its `.env`, and every dispatch records its
+	// unit there (`lane-output.ts`). `undefined` where the `.env` cannot be read.
+	dispatched_ms?: number | undefined
 	is_stranded: boolean
 }
 
@@ -106,6 +109,10 @@ function read_environment(directory: string): string | undefined {
 	return file_reader.read_if_readable(path.join(directory, ENV_FILE_NAME))
 }
 
+function dispatched_at(directory: string): number | undefined {
+	return statSync(path.join(directory, ENV_FILE_NAME), { throwIfNoEntry: false })?.mtimeMs
+}
+
 // A lane is identified by its branch rather than by where it sits, so nothing here compares two
 // spellings of one path — git prints the resolved one, and a lane root reached through a symlink
 // would otherwise read as no lane at all.
@@ -151,6 +158,7 @@ function build_lane(
 		preview_port: held.preview_port,
 		output,
 		profile,
+		dispatched_ms: is_stranded ? undefined : dispatched_at(directory),
 		is_stranded,
 	}
 }

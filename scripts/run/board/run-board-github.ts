@@ -73,12 +73,20 @@ function fold_plan(state: BoardState): BoardState {
 	}
 }
 
+// joshuafolkken/kit#3969: the planned issues whose open lane may be this run's though the stream never
+// saw it launched. An earlier run's lane is not, so its issue waits until this run launches it.
+function lanes_in_run(plan: BoardPlan, local: LocalRead): ReadonlySet<number> {
+	const earlier = new Set(local.earlier_lanes?.map(Number))
+
+	return new Set([...run_board_layout.numbers_of(plan)].filter((issue) => !earlier.has(issue)))
+}
+
 function statuses_for(
 	state: BoardState,
 	plan: BoardPlan,
 	local: LocalRead,
 ): ReadonlyMap<number, ItemStatus> {
-	const in_run = run_board_layout.numbers_of(plan)
+	const in_run = lanes_in_run(plan, local)
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
 
 	return run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)

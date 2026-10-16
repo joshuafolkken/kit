@@ -5,6 +5,9 @@ words:
   # macOS's process-policy command, named where lanes deliberately avoid efficiency-core confinement
   # (#3947).
   - taskpolicy
+  # macOS's process-start scanners, named where hook launches cut their process count (#3946).
+  - Xprotect
+  - syspolicyd
   # The gh apt repository's paths and bash's flags for a shell that reads no rc file, in the
   # fresh-machine image and probes (#3714).
   - keyrings
