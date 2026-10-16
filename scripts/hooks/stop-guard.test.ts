@@ -32,6 +32,7 @@ const UNREAD_TRANSCRIPT = 'transcript-not-read'
 afterEach(() => {
 	Reflect.deleteProperty(process.env, SWITCH_KEY)
 	Reflect.deleteProperty(process.env, LANG_KEY)
+	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 })
 
@@ -207,9 +208,12 @@ const HELD: HoldRead = {
 	hold: { issue: '2962', taken_at: '2026-10-03T00:00:00.000Z', pid: process.pid },
 }
 
-// A quiet world on a tree held as `read`, whose transcript tail reads `tail`.
+// A quiet world on a tree held as `read`, whose transcript tail reads `tail`. The session is `en`
+// and not headless, so the English decision reply passes the language rule whatever launched the suite.
 function held_world(is_handed_off: boolean, tail: string, read: HoldRead): void {
 	quiet_world()
+	process.env[LANG_KEY] = 'en'
+	vi.stubEnv(agent_headless.KEY, undefined)
 	vi.mocked(time_density_hook.read_tail).mockReturnValue(tail)
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(process.cwd())
 	vi.spyOn(run_hold, 'read_hold').mockReturnValue(read)
