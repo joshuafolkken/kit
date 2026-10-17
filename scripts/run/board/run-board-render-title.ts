@@ -4,13 +4,22 @@ import type { BoardRow } from './run-board-layout'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
 // that says why it waits keeps saying it on a narrow pane, its title giving up the columns the line
-// runs over, where every other row wraps.
+// runs over down to a floor and its reason the rest, where every other row wraps.
 
 // The columns a terminal row gives its title: a longer one is cut to an ellipsis.
 const TITLE_LIMIT = 48
 // The least a title is cut to where a narrow pane keeps the row's reason: enough to tell rows apart.
 const TITLE_FLOOR = 8
 const ELLIPSIS = '…'
+
+// What a row gives up to stay on one line: the columns its title is cut to, and the columns cut off
+// its reason's end.
+interface RowCut {
+	title_limit: number
+	reason_cut: number
+}
+
+const WHOLE: RowCut = { title_limit: TITLE_LIMIT, reason_cut: 0 }
 
 // A title cut to the title column, so every time after it starts in one column.
 function title_of(title = '', limit = TITLE_LIMIT): string {
@@ -19,12 +28,36 @@ function title_of(title = '', limit = TITLE_LIMIT): string {
 
 // Why a waiting row waits, after its blockers, or why a parked or withdrawn row ended; a lane's stage
 // with how long the lane has stood at it.
-function reason_text(row: BoardRow, now_ms: number): string | undefined {
+function whole_reason(row: BoardRow, now_ms: number): string | undefined {
 	const { reason } = row
 
 	if (reason?.since_ms === undefined) return reason?.text
 
 	return `${reason.text} ${run_board_labels.span_of(now_ms - reason.since_ms)}`
+}
+
+const GRAPHEMES = new Intl.Segmenter()
+
+// The text cut to `columns` terminal columns — a wide character takes two — ending on an ellipsis.
+function columns_cut(text: string, columns: number): string {
+	let kept = ''
+
+	for (const { segment } of GRAPHEMES.segment(text)) {
+		if (run_board_fit.width_of(`${kept}${segment}${ELLIPSIS}`) > columns) break
+		kept += segment
+	}
+
+	return `${kept}${ELLIPSIS}`
+}
+
+// The row's reason with `cut` columns given up at its end, which then ends on an ellipsis; at least
+// the ellipsis is left.
+function reason_text(row: BoardRow, now_ms: number, cut = 0): string | undefined {
+	const text = whole_reason(row, now_ms)
+
+	if (text === undefined || cut === 0) return text
+
+	return columns_cut(text, Math.max(1, run_board_fit.width_of(text) - cut))
 }
 
 // The columns a line runs past the pane, for a row whose end it keeps; none for any other row, and none
@@ -46,21 +79,35 @@ function narrowed_limit(row: BoardRow, overrun: number): number {
 	return Math.max(TITLE_FLOOR, drawn_width(row) - overrun)
 }
 
-// A row's line as `draw` draws it at a title limit: at the title column's, or at a narrower one where
-// that line would run past the pane and the row has a reason, or a held check (joshuafolkken/kit#4052),
-// to keep.
+// A row's line at a narrowed title with its whole reason, or with the reason's end cut by the columns
+// that line still runs past the pane.
+function reason_fitted(
+	row: BoardRow,
+	columns: number | undefined,
+	title_limit: number,
+	draw: (cut: RowCut) => string,
+): string {
+	const text = draw({ title_limit, reason_cut: 0 })
+	const reason_cut = overrun_of(text, row.reason !== undefined, columns)
+
+	return reason_cut === 0 ? text : draw({ title_limit, reason_cut })
+}
+
+// A row's line as `draw` draws it: whole, or — where that line would run past the pane and the row has
+// a reason, or a held check (joshuafolkken/kit#4052), to keep — with its title narrowed first and its
+// reason cut after.
 function fitted(
 	row: BoardRow,
 	columns: number | undefined,
-	draw: (title_limit: number) => string,
+	draw: (cut: RowCut) => string,
 	is_held = false,
 ): string {
-	const text = draw(TITLE_LIMIT)
+	const text = draw(WHOLE)
 	const overrun = overrun_of(text, is_held || row.reason !== undefined, columns)
 
-	return overrun === 0 ? text : draw(narrowed_limit(row, overrun))
+	return overrun === 0 ? text : reason_fitted(row, columns, narrowed_limit(row, overrun), draw)
 }
 
-const run_board_render_title = { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of }
+const run_board_render_title = { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of }
 
-export { run_board_render_title }
+export { run_board_render_title, type RowCut }

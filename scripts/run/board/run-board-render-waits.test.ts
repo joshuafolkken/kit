@@ -6,7 +6,7 @@ import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
-import { run_board_render_title } from './run-board-render-title'
+import { run_board_render_title, type RowCut } from './run-board-render-title'
 import { run_board_render_waits } from './run-board-render-waits'
 
 // joshuafolkken/kit#3943: a claim waiting in the core budget was on no board, so a lane held back by
@@ -154,8 +154,8 @@ describe('run_board_render.render — the held check’s legend', () => {
 	})
 })
 
-function draw(limit: number): string {
-	return `${'x'.repeat(limit)} · 🧠 9″ lint`
+function draw({ title_limit }: RowCut): string {
+	return `${'x'.repeat(title_limit)} · 🧠 9″ lint`
 }
 
 describe('run_board_render_title.fitted — a held row on a narrow pane', () => {
@@ -164,6 +164,6 @@ describe('run_board_render_title.fitted — a held row on a narrow pane', () => 
 		const { fitted } = run_board_render_title
 
 		expect(run_board_fit.width_of(fitted(row, NARROW_COLUMNS, draw, true))).toBe(NARROW_COLUMNS)
-		expect(fitted(row, NARROW_COLUMNS, draw)).toBe(draw(run_board_render_title.TITLE_LIMIT))
+		expect(fitted(row, NARROW_COLUMNS, draw)).toBe(draw(run_board_render_title.WHOLE))
 	})
 })
