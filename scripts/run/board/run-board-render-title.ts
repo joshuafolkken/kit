@@ -60,10 +60,10 @@ function reason_text(row: BoardRow, now_ms: number, cut = 0): string | undefined
 	return columns_cut(text, Math.max(1, run_board_fit.width_of(text) - cut))
 }
 
-// The columns a line runs past the pane, for a row that says why it waits; none for any other row, and
-// none for a frame that is not kept within a pane.
-function overrun_of(text: string, row: BoardRow, columns: number | undefined): number {
-	if (columns === undefined || row.reason === undefined) return 0
+// The columns a line runs past the pane, for a row whose end it keeps; none for any other row, and none
+// for a frame that is not kept within a pane.
+function overrun_of(text: string, is_kept: boolean, columns: number | undefined): number {
+	if (columns === undefined || !is_kept) return 0
 
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
@@ -88,16 +88,22 @@ function reason_fitted(
 	draw: (cut: RowCut) => string,
 ): string {
 	const text = draw({ title_limit, reason_cut: 0 })
-	const reason_cut = overrun_of(text, row, columns)
+	const reason_cut = overrun_of(text, row.reason !== undefined, columns)
 
 	return reason_cut === 0 ? text : draw({ title_limit, reason_cut })
 }
 
 // A row's line as `draw` draws it: whole, or — where that line would run past the pane and the row has
-// a reason to keep — with its title narrowed first and its reason cut after.
-function fitted(row: BoardRow, columns: number | undefined, draw: (cut: RowCut) => string): string {
+// a reason, or a held check (joshuafolkken/kit#4052), to keep — with its title narrowed first and its
+// reason cut after.
+function fitted(
+	row: BoardRow,
+	columns: number | undefined,
+	draw: (cut: RowCut) => string,
+	is_held = false,
+): string {
 	const text = draw(WHOLE)
-	const overrun = overrun_of(text, row, columns)
+	const overrun = overrun_of(text, is_held || row.reason !== undefined, columns)
 
 	return overrun === 0 ? text : reason_fitted(row, columns, narrowed_limit(row, overrun), draw)
 }

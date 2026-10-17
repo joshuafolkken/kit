@@ -13,6 +13,7 @@ import type { ItemState } from './run-board-status'
 const { STATE_ICONS } = run_board_labels
 // joshuafolkken/kit#3767: the third line's kind is named among what is in progress.
 const OPERATION = '🔧 operation'
+const CODERABBIT = '🐰 CodeRabbit'
 
 function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -29,7 +30,7 @@ function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 // The legend for `rows`, each leading with its state's icon unless `drawn` names what the frame draws.
 function legend_of(rows: ReadonlyArray<BoardRow>, drawn: Partial<LegendDrawn> = {}): Array<string> {
 	const leads = new Set(rows.map((entry) => STATE_ICONS[entry.state]))
-	const whole = { leads, icons: leads, named: [], checks: [], ...drawn }
+	const whole = { leads, icons: leads, named: [], checks: [], held: [], ...drawn }
 
 	return run_board_render_legend
 		.legend_of(rows, whole, [])
@@ -84,10 +85,21 @@ describe('run_board_render_legend.legend_of order', () => {
 	it('names 🔗 and the checks after the kinds', () => {
 		const rows = [row(1, { kind: 'enhancement', waits: ['2'] })]
 
-		expect(legend_of(rows, { checks: ['🐰 CodeRabbit'] }).at(-1)).toBe(
-			'✨ feature  🔗 waits on  🐰 CodeRabbit',
+		expect(legend_of(rows, { checks: [CODERABBIT] }).at(-1)).toBe(
+			`✨ feature  🔗 waits on  ${CODERABBIT}`,
 		)
 		expect(legend_of([row(1)]).join('\n')).not.toContain('🔗')
+	})
+
+	// joshuafolkken/kit#4052: a held check and its reasons, after 🔗 and before the checks.
+	it('names the held check and its reasons after 🔗, only where the frame draws them', () => {
+		const rows = [row(1, { waits: ['2'] })]
+		const held = ['🚧 held check', '⚡ cores']
+
+		expect(legend_of(rows, { held, checks: [CODERABBIT] }).at(-1)).toBe(
+			`🔗 waits on  🚧 held check  ⚡ cores  ${CODERABBIT}`,
+		)
+		expect(legend_of(rows).join('\n')).not.toContain('🚧')
 	})
 
 	it('draws nothing on a screen with no rows, and none of the header’s marks', () => {

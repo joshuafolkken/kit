@@ -54,6 +54,10 @@ const WORDS = {
 	waiting: 'waiting',
 	decision: 'decision',
 	waits: 'waits on',
+	// A check held back by the machine-wide core budget, and why.
+	held_check: 'held check',
+	memory: 'memory',
+	cores: 'cores',
 	investigate: 'investigate',
 	implement: 'implement',
 	ship: 'ship',

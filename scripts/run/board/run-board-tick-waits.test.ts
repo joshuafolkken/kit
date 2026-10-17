@@ -4,7 +4,7 @@ import { run_board_fixture } from './run-board-fixture'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#3943: the claims waiting in the core budget are read on the machine's second and
-// drawn under the header.
+// drawn — one no running row owns right before the legend (joshuafolkken/kit#4052).
 
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
@@ -21,7 +21,7 @@ describe('run_board_tick.tick budget waits', () => {
 
 		expect(read_waits).toHaveBeenCalledOnce()
 		expect(state.budget_waits).toStrictEqual(WAITS)
-		expect(frames.join('\n')).toContain('🚧 gate lint  3943  5s  memory under pressure')
+		expect(frames.join('\n')).toContain('  🚧 🧠 5″ lint 3943')
 	})
 
 	it('reads no waiting claim where the board is given no reader', async () => {

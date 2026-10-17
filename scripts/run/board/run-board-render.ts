@@ -144,10 +144,17 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 
 // A running row leads with the icon of the phase it is in now — the last its track reached — and
 // with 🔄 while it has reached none yet.
-function state_icon(row: BoardRow): string {
+function phase_lead(row: BoardRow): string {
 	const current = row.state === 'running' ? row.status?.track?.at(-1) : undefined
 
 	return current === undefined ? STATE_ICONS[row.state] : PHASE_ICONS[current]
+}
+
+// 🚧 while the row's lane is held (joshuafolkken/kit#4052), its end keeping the phase's icon.
+function state_icon(row: BoardRow, header: BoardHeader): string {
+	const { BUDGET_ICON, held_of } = run_board_render_waits
+
+	return held_of(row, header) === undefined ? phase_lead(row) : BUDGET_ICON
 }
 
 // A running row turns the spinner in the first column of its indent where the header has one, so its
@@ -186,7 +193,7 @@ function joined(parts: ReadonlyArray<string | undefined>): string {
 // ends at its icon, so what follows keeps its usual gap.
 function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
-	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
+	const icon = running_fresh(row, state_icon(row, header), row.status?.phase_ms, header)
 	const lead = `${icon} ${header.link(String(row.number))} ${kind}`
 
 	return title === '' ? lead : `${lead} ${title}`
@@ -220,6 +227,7 @@ function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
 		row,
 		frame.columns,
 		(cut) => `${indent}${row_text(row, { ...frame, ...cut })}`,
+		run_board_render_waits.held_of(row, frame.header) !== undefined,
 	)
 
 	return { text, row: run_board_row_yield.yield_of(row) }
@@ -346,17 +354,23 @@ function resume_lines(resume: string | undefined): Array<string> {
 }
 
 // No legend is drawn before a plan is read, nor where the frame draws nothing it would name.
-function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
+function legend_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
 	const { layout } = header
 
 	if (layout === undefined) return []
 
 	const rows = run_board_layout.rows_of(layout)
-	const leads = new Set(rows.map((row) => state_icon(row)))
+	const leads = new Set(rows.map((row) => state_icon(row, header)))
 	const drawn = run_board_render_drawn.drawn_of(header, rows, leads)
-	const legend = run_board_render_legend.legend_of(rows, drawn, notes)
 
-	return legend.length === 0 ? [] : ['', ...legend]
+	return run_board_render_legend.legend_of(rows, drawn, notes)
+}
+
+// The waits no lane row owns, right before the legend (joshuafolkken/kit#4052), and the legend.
+function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
+	const lines = [...run_board_render_waits.stray_lines(header), ...legend_of(header, notes)]
+
+	return lines.length === 0 ? [] : ['', ...lines]
 }
 
 // Names with no link where no terminal opens one: a frame with no `link` draws them plain.
@@ -375,11 +389,7 @@ function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const above = [
-		...run_board_header.header_lines(header),
-		...run_board_render_waits.wait_lines(header.budget_waits, header.link),
-		...resume_lines(view.resume),
-	]
+	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
 		plan: plan_sections(header, view.size),
