@@ -82,7 +82,9 @@ async function read_issue(issue_number: string): Promise<NumberResult> {
 
 	if (fields === undefined) return { kind: 'unreadable' }
 
-	return { kind: 'issue', content: { fields, comments: issue_read.parse_comments(comments_json) } }
+	const comments = await issue_read.parse_comments(comments_json)
+
+	return { kind: 'issue', content: { fields, comments } }
 }
 
 // One issue's block for a caller that wants the text rather than the printing — `run:prep` composes it

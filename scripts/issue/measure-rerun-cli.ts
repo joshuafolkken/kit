@@ -24,7 +24,7 @@ import { session_cite } from './session-cite'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_FIELDS = 'body,author_association'
+const ISSUE_FIELDS = 'body,author_association,user'
 const UNKNOWN_ASSOCIATION = 'unknown'
 const USAGE = 'Usage: josh measure:rerun <issue-number>'
 const NO_BASELINE = 'no `command → value` baseline found in ## ベースライン — nothing to re-run'
@@ -36,6 +36,7 @@ const MEASURE_TIMEOUT_MS = 60_000
 const issue_schema = z.object({
 	body: z.string().nullish(),
 	author_association: z.string().nullish(),
+	user: z.looseObject({ login: z.string() }).nullish(),
 })
 
 type IssueFields = z.infer<typeof issue_schema>
@@ -88,6 +89,15 @@ async function read_issue(issue_number: string): Promise<IssueFields | undefined
 	return json === undefined ? undefined : parse_json_object_or_undefined(json, issue_schema)
 }
 
+function untrusted(issue_number: string, issue: IssueFields): BodyRead {
+	const association = issue.author_association ?? UNKNOWN_ASSOCIATION
+
+	return {
+		kind: 'refused',
+		reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author (${association}) is not ${gh_author_association.TRUSTED_LIST}`,
+	}
+}
+
 // The body, only when its author can write to the repository. A read that fails is refused as well:
 // an unknown author is not a trusted one.
 async function read_trusted_body(issue_number: string): Promise<BodyRead> {
@@ -97,14 +107,9 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 		return { kind: 'refused', reason: `could not read issue ${session_cite.issue(issue_number)}` }
 	}
 
-	const association = issue.author_association ?? UNKNOWN_ASSOCIATION
+	const author = { login: issue.user?.login, association: issue.author_association }
 
-	if (!gh_author_association.is_trusted(association)) {
-		return {
-			kind: 'refused',
-			reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author is ${association}, not ${gh_author_association.TRUSTED_LIST}`,
-		}
-	}
+	if (!(await gh_author_association.is_trusted(author))) return untrusted(issue_number, issue)
 
 	return { kind: 'trusted', body: issue.body ?? '' }
 }

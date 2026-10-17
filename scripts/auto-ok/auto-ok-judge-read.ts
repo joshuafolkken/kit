@@ -27,6 +27,7 @@ const row_schema = z.looseObject({
 	labels: z.array(issue_label_schema),
 	updatedAt: z.string(),
 	author_association: z.string().nullish(),
+	user: z.looseObject({ login: z.string() }).nullish(),
 })
 
 interface JudgeRow extends JudgeIssue {
@@ -37,14 +38,17 @@ interface JudgeRow extends JudgeIssue {
 // An issue's number to the `updatedAt` it was last seen judged at.
 type JudgedCache = Map<number, string>
 
-function to_row(raw: z.infer<typeof row_schema>): JudgeRow {
+async function to_row(raw: z.infer<typeof row_schema>): Promise<JudgeRow> {
 	return {
 		number: raw.number,
 		title: raw.title,
 		body: raw.body ?? '',
 		labels: raw.labels.map((label) => label.name),
 		updated_at: raw.updatedAt,
-		is_trusted: gh_author_association.is_trusted(raw.author_association),
+		is_trusted: await gh_author_association.is_trusted({
+			login: raw.user?.login,
+			association: raw.author_association,
+		}),
 	}
 }
 
@@ -58,7 +62,9 @@ async function read_candidates(): Promise<ReadonlyArray<JudgeRow> | undefined> {
 
 	if (listing.kind !== 'read') return undefined
 
-	return listing.rows.map((raw) => to_row(raw)).filter((row) => auto_ok_judge.is_candidate(row))
+	const rows = await Promise.all(listing.rows.map(async (raw) => await to_row(raw)))
+
+	return rows.filter((row) => auto_ok_judge.is_candidate(row))
 }
 
 // `true` only for an issue known to owe a judgement: a failed comment read learns nothing, so it is
@@ -66,7 +72,7 @@ async function read_candidates(): Promise<ReadonlyArray<JudgeRow> | undefined> {
 async function owes_judgement(row: JudgeRow, cache: JudgedCache): Promise<boolean> {
 	if (cache.get(row.number) === row.updated_at) return false
 
-	const comments = issue_watch_diff.parse_comments(
+	const comments = await issue_watch_diff.parse_comments(
 		await git_gh_command.issue_list_comments(String(row.number)),
 	)
 

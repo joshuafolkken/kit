@@ -228,13 +228,17 @@ async function read_order_comments(
 	pairs: ReadonlyArray<OrderPair>,
 ): Promise<Map<string, ReadonlyArray<string>>> {
 	const ends = epic_audit_rationale.pair_ends(pairs)
-	const listings = await Promise.all(
-		ends.map(async (child) => await git_gh_command.issue_list_comments(String(child.number))),
+	const parsed = await Promise.all(
+		ends.map(async (child) => {
+			const listing = await git_gh_command.issue_list_comments(String(child.number))
+
+			return await issue_read.parse_comments(listing)
+		}),
 	)
 
 	return new Map(
 		ends.flatMap((child, index) => {
-			const comments = issue_read.parse_comments(listings[index])
+			const comments = parsed[index]
 
 			return comments === undefined
 				? []

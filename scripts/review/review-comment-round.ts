@@ -33,12 +33,14 @@ const PER_PAGE = '100'
 const UNNAMED_REPOSITORY = 'Could not name this repository from `git remote`.'
 const UNREAD_SEARCH = 'Could not read the search for closed issues with a comment round.'
 const UNREAD_COMMENTS = 'Could not read the comments of'
+const UNREAD_PERMISSION = 'Could not read the write permission of'
 
 const search_item_schema = z.object({ number: z.number() })
 const search_schema = z.object({ items: z.array(search_item_schema) })
 const comment_schema = z.object({
 	body: z.string().nullish(),
 	author_association: z.string().nullish(),
+	user: z.looseObject({ login: z.string() }).nullish(),
 })
 
 type IssueComment = z.infer<typeof comment_schema>
@@ -50,13 +52,29 @@ function body_of(lines: ReadonlyArray<string>): string {
 // The ledger lines of every comment round among one issue's comments, oldest first; any other
 // comment, one that only quotes the heading among them, carries none — nor does one whose author
 // cannot write to the repository: anyone can comment on a public issue, and the carried lines ride
-// the run's commit unreviewed.
-function lines_of(comments: ReadonlyArray<IssueComment>): Array<string> {
-	return comments
-		.filter((comment) => gh_author_association.is_trusted(comment.author_association))
-		.map((comment) => comment.body ?? '')
-		.filter((body) => body.startsWith(COMMENT_HEADING))
-		.flatMap((body) => body.split('\n'))
+// the run's commit unreviewed. A permission lookup that failed throws instead: the carried file is
+// written once, so a round dropped on a transient failure would never be carried.
+async function is_trusted_comment(comment: IssueComment): Promise<boolean> {
+	const login = comment.user?.login
+	const is_trusted = await gh_author_association.trust_of({
+		login,
+		association: comment.author_association,
+	})
+
+	if (is_trusted === undefined) throw new Error(`${UNREAD_PERMISSION} ${login ?? ''}`)
+
+	return is_trusted
+}
+
+async function lines_of(comments: ReadonlyArray<IssueComment>): Promise<Array<string>> {
+	const rounds = comments.filter((comment) => (comment.body ?? '').startsWith(COMMENT_HEADING))
+	const trusted = await Promise.all(
+		rounds.map(async (comment) => await is_trusted_comment(comment)),
+	)
+
+	return rounds
+		.filter((_comment, index) => trusted[index] === true)
+		.flatMap((comment) => (comment.body ?? '').split('\n'))
 		.filter((line) => review_finding_ledger.is_finding_line(line))
 }
 
@@ -93,7 +111,7 @@ async function carry_issue(issue: number, root: string): Promise<number> {
 
 	if (raw === undefined) throw new Error(`${UNREAD_COMMENTS} ${session_cite.issue(issue)}`)
 
-	const lines = lines_of(parse_json_array_safe(raw, comment_schema))
+	const lines = await lines_of(parse_json_array_safe(raw, comment_schema))
 
 	await observation_ledger_home.append(carried_path(issue, root), lines)
 

@@ -76,8 +76,9 @@ async function read_snapshot(
 	body: string,
 	etag: string | undefined,
 ): Promise<Fetched> {
-	const comments = issue_watch_diff.parse_comments(
+	const comments = await issue_watch_diff.parse_comments(
 		await git_gh_issue_read.issue_list_comments(request.issue, request.timeout_ms),
+		request.timeout_ms,
 	)
 
 	return comments === undefined ? UNREADABLE : { kind: 'read', snapshot: { body, comments }, etag }
