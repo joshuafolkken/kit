@@ -1,6 +1,8 @@
 # @joshuafolkken/kit
 
-**AI assistant setup, plus an optional GitHub workflow.**
+**Hand it off. Walk away. Come back to done.**
+
+Not "almost done" — tested, checked, finished.
 
 kit gives Claude Code or Codex your project's rules and checks.
 
