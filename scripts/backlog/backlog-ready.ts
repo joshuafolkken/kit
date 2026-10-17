@@ -4,6 +4,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_vacant } from '#scripts/lane/lane-vacant'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
@@ -27,6 +28,17 @@ interface LaneUse {
 	seated: number
 }
 
+// The lanes that hold a place under the limit, read once for every count drawn from them.
+interface LaneRoom {
+	occupied: ReadonlyArray<LaneInfo>
+	use: LaneUse
+}
+
+interface LaneCount {
+	limit: number
+	free: number
+}
+
 interface ReadyPorts {
 	free_lane_count: () => Promise<number>
 	ready_issues: () => Promise<ReadonlyArray<string>>
@@ -40,6 +52,7 @@ async function occupied_read(): Promise<OccupiedRead> {
 		invocation: carry?.invocation,
 		events: carry === undefined ? [] : await run_event_stream_emit.scoped_current_events(),
 		idle: lane_spent.idle_lanes,
+		vacant: lane_vacant.vacant_issues,
 	}
 }
 
@@ -47,30 +60,43 @@ async function occupied_read(): Promise<OccupiedRead> {
 async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<LaneInfo>> {
 	const open = lanes ?? (await lane_registry.list_lanes())
 
-	return backlog_occupied.occupied_lanes(open, await occupied_read())
+	return await backlog_occupied.occupied_lanes(open, await occupied_read())
 }
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
 // open one, since an uncounted lane still holds its port seat.
-async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {
+async function lane_room(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneRoom> {
 	const open = lanes ?? (await lane_registry.list_lanes())
 	const occupied = await occupied_lanes(open)
+	const seated = open.filter((lane) => !lane.is_stranded).length
 
-	return { occupied: occupied.length, seated: open.filter((lane) => !lane.is_stranded).length }
+	return { occupied, use: { occupied: occupied.length, seated } }
+}
+
+async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {
+	const room = await lane_room(lanes)
+
+	return room.use
 }
 
 function free_of(limit: number, use: LaneUse): number {
 	return lane_capacity.free_lanes(limit, use.occupied, use.seated)
 }
 
-// Free lanes beside `lanes`, `undefined` where the limit could not be read: the count `lane:limit`
-// prints, and the one `run:board` draws, so the two never answer apart.
-async function free_lanes_beside(lanes: ReadonlyArray<LaneInfo>): Promise<number | undefined> {
+// The limit and the free lanes in `room`, `undefined` where the limit could not be read: the count
+// `lane:limit` prints, and the one `run:board` draws, so the two never answer apart.
+async function count_in(room: LaneRoom): Promise<LaneCount | undefined> {
 	const limit = await lane_capacity.lane_limit()
 
 	if (limit.kind !== 'limit') return undefined
 
-	return free_of(limit.limit, await lane_use(lanes))
+	return { limit: limit.limit, free: free_of(limit.limit, room.use) }
+}
+
+async function free_lanes_beside(lanes: ReadonlyArray<LaneInfo>): Promise<number | undefined> {
+	const count = await count_in(await lane_room(lanes))
+
+	return count?.free
 }
 
 async function free_under(limit: number): Promise<number> {
@@ -208,8 +234,9 @@ const backlog_ready = {
 	print_offer_hint,
 	free_lane_count,
 	free_lanes_beside,
+	count_in,
+	lane_room,
 	lane_use,
-	occupied_lanes,
 	drive_free_lane_count,
 	drains_pool,
 	print_ready_line,
@@ -219,4 +246,4 @@ const backlog_ready = {
 }
 
 export { backlog_ready }
-export type { LaneUse, ReadyPorts, ReadyReading }
+export type { LaneCount, LaneRoom, LaneUse, ReadyPorts, ReadyReading }

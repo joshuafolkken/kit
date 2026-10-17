@@ -43,6 +43,8 @@ interface LocalRead {
 	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
 	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
+	// The lane limit those free lanes are counted under; `undefined` where it could not be read.
+	lane_limit?: number | undefined
 	// The issues whose lanes hold a place under the limit (`backlog-occupied.ts`), named beside a row
 	// that waits for a free lane.
 	occupied_lanes?: ReadonlyArray<string> | undefined
@@ -94,6 +96,20 @@ function earlier_lanes(lanes: ReadonlyArray<LaneInfo>, started_ms: number): Arra
 		.map((lane) => lane.issue)
 }
 
+type LaneRoomRead = Pick<LocalRead, 'free_lanes' | 'lane_limit' | 'occupied_lanes'>
+
+// The lanes against the limit, read once so the free count and the lanes it names agree.
+async function lane_room_of(lanes: ReadonlyArray<LaneInfo>): Promise<LaneRoomRead> {
+	const room = await backlog_ready.lane_room(lanes)
+	const count = await backlog_ready.count_in(room)
+
+	return {
+		free_lanes: count?.free,
+		lane_limit: count?.limit,
+		occupied_lanes: room.occupied.map((lane) => lane.issue),
+	}
+}
+
 // `undefined` when no run has started here.
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
@@ -103,7 +119,6 @@ async function read_local(): Promise<LocalRead | undefined> {
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes()
-	const occupied = await backlog_ready.occupied_lanes(lanes)
 
 	return {
 		started_ms: span.started_ms,
@@ -116,8 +131,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		idle_lanes: lane_spent.idle_lanes(lanes),
 		earlier_lanes: earlier_lanes(lanes, span.started_ms),
-		free_lanes: await backlog_ready.free_lanes_beside(lanes),
-		occupied_lanes: occupied.map((lane) => lane.issue),
+		...(await lane_room_of(lanes)),
 		usual: run_board_usual.read(repository),
 	}
 }

@@ -29,6 +29,11 @@ const WORDS = {
 	not_before: 'not before',
 } as const
 
+type LaneState = 'running' | 'parked' | 'idle'
+
+const LANE_STATES: ReadonlyArray<LaneState> = ['running', 'parked', 'idle']
+const LANE_SEPARATOR = ' · '
+
 // A lane's stage as its row says it: the event's own words, cut to what fits beside a title.
 const STAGE_WORDS: ReadonlyArray<readonly [stage: string, word: string]> = [
 	[LANE_STAGE.OPENING, 'opening lane'],
@@ -44,6 +49,10 @@ interface ReasonRead extends Overlay {
 	// The issues whose lanes fill the limit, named after `no free lane` so a lane an earlier run left
 	// behind shows on the row it holds back.
 	occupied_lanes?: ReadonlyArray<string> | undefined
+	// The limit those lanes fill; `undefined` where it could not be read.
+	lane_limit?: number | undefined
+	// The open lanes no child is working in (`lane-spent.ts`).
+	idle_lanes?: ReadonlyArray<string> | undefined
 	// A stopped run opens no lane, so a stage its stream ends on is not one any lane is at.
 	is_stopped: boolean
 }
@@ -100,10 +109,32 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 		: `${WORDS.overlaps} ${String(clash.holder)} (${clash.path})`
 }
 
-function no_lane_of(occupied: ReadonlyArray<string> = []): string {
-	if (occupied.length === 0) return WORDS.no_lane
+// What an occupying lane is doing: a child works in it, its child parked, or it stands with no child.
+function lane_state(issue: string, read: ReasonRead): LaneState {
+	if (!(read.idle_lanes ?? []).includes(issue)) return 'running'
 
-	return `${WORDS.no_lane} — ${occupied.join(' ')}`
+	return read.statuses.get(Number(issue))?.state === 'parked' ? 'parked' : 'idle'
+}
+
+// The occupying lanes grouped by state, `4023 running · 3988 parked · 4002 4005 idle`.
+function lanes_by_state(occupied: ReadonlyArray<string>, read: ReasonRead): string {
+	const groups = LANE_STATES.map(function group_of(state: LaneState): string {
+		const issues = occupied.filter((issue) => lane_state(issue, read) === state)
+
+		return issues.length === 0 ? '' : `${issues.join(' ')} ${state}`
+	})
+
+	return groups.filter((group) => group !== '').join(LANE_SEPARATOR)
+}
+
+// `no free lane 4/4 — …`: how many lanes hold a place against the limit, and what each is doing (#4028).
+function no_lane_of(read: ReasonRead): string {
+	const { occupied_lanes: occupied = [], lane_limit } = read
+	const count = lane_limit === undefined ? '' : ` ${String(occupied.length)}/${String(lane_limit)}`
+
+	if (occupied.length === 0) return `${WORDS.no_lane}${count}`
+
+	return `${WORDS.no_lane}${count} — ${lanes_by_state(occupied, read)}`
 }
 
 // A candidate nothing blocks, in the order `backlog:next` answers: the pool held for a judgment, then
@@ -115,7 +146,7 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 
 	if (overlap !== undefined) return overlap
 
-	return read.free_lanes === NO_FREE_LANES ? no_lane_of(read.occupied_lanes) : undefined
+	return read.free_lanes === NO_FREE_LANES ? no_lane_of(read) : undefined
 }
 
 // The start time the body declares and the clock has not reached, in the board's local time.

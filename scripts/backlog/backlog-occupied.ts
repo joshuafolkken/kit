@@ -11,6 +11,11 @@ import { backlog_drive_restore } from './backlog-drive-restore'
 // whole run, and the run's own issues would wait on it for good (joshuafolkken/kit#3967). Under a `--only`
 // run such a lane is not counted; its tree and branch stay, for the next run that names its issue.
 //
+// **A vacant lane holds no place under any run** (joshuafolkken/kit#4028): a lane with no commit, a
+// clean tree and no child (`lane-vacant.ts`) is what a child that ended doing nothing leaves, and it
+// filled the limit while a drain run's issues waited. It keeps its port seat, and `lane:launch` closes
+// and reopens it when its issue is offered again.
+//
 // **Everything else keeps its place, so the count errs toward fewer free lanes.** A run that drains
 // the pool may offer any open lane's issue again, a lane whose child still works is busy whoever owns
 // it, and with no run there is nobody to judge ownership for. The read stays local — no issue label is
@@ -24,6 +29,8 @@ interface OccupiedRead {
 	events: ReadonlyArray<RunEvent> | undefined
 	// The issues whose lane has no child working in it; read only for a `--only` run.
 	idle: (lanes: ReadonlyArray<LaneInfo>) => ReadonlyArray<string>
+	// The issues whose lane holds nothing worth keeping (`lane_vacant.vacant_issues`).
+	vacant: (lanes: ReadonlyArray<LaneInfo>) => Promise<ReadonlyArray<string>>
 }
 
 // The issues a `--only` run owns — those it names and those it launched or settled — or `undefined`
@@ -39,15 +46,28 @@ function owned_issues(read: OccupiedRead): ReadonlySet<string> | undefined {
 	return new Set([...named, ...backlog_drive_restore.mentioned_issues(events)])
 }
 
-function occupied_lanes(lanes: ReadonlyArray<LaneInfo>, read: OccupiedRead): Array<LaneInfo> {
+async function held_lanes(
+	lanes: ReadonlyArray<LaneInfo>,
+	read: OccupiedRead,
+): Promise<Array<LaneInfo>> {
 	const live = lanes.filter((lane) => !lane.is_stranded)
+	const vacant = new Set(await read.vacant(live))
+
+	return live.filter((lane) => !vacant.has(lane.issue))
+}
+
+async function occupied_lanes(
+	lanes: ReadonlyArray<LaneInfo>,
+	read: OccupiedRead,
+): Promise<Array<LaneInfo>> {
+	const held = await held_lanes(lanes, read)
 	const owned = owned_issues(read)
 
-	if (owned === undefined) return live
+	if (owned === undefined) return held
 
-	const idle = new Set(read.idle(live))
+	const idle = new Set(read.idle(held))
 
-	return live.filter((lane) => owned.has(lane.issue) || !idle.has(lane.issue))
+	return held.filter((lane) => owned.has(lane.issue) || !idle.has(lane.issue))
 }
 
 const backlog_occupied = { occupied_lanes }

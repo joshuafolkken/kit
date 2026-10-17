@@ -2,6 +2,7 @@ import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -80,11 +81,16 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
 	// Each lane's child is probed with `pgrep`: never a real process from a test.
 	vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
+	// Each lane's branch and tree are read with git: never a real lane from a test.
+	vi.spyOn(lane_vacant, 'vacant_issues').mockResolvedValue([])
 }
 
 afterEach(() => {
 	vi.restoreAllMocks()
 })
+
+// The one lane against the limit, as `lane:limit` counts it.
+const LANE_ROOM = { free_lanes: FREE_LANES, lane_limit: LANE_LIMIT, occupied_lanes: ['3432'] }
 
 describe('run_board_read.read_local', () => {
 	it('reads the ended run with its end, its scope and only the events inside it', async () => {
@@ -101,8 +107,7 @@ describe('run_board_read.read_local', () => {
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			idle_lanes: [],
 			earlier_lanes: [],
-			free_lanes: FREE_LANES,
-			occupied_lanes: ['3432'],
+			...LANE_ROOM,
 			usual: new Map(),
 		})
 	})

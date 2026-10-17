@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // is — left on, it outlived the `needs-decision` a person lifted and held the backlog.
 
 const read_issue_mock = vi.hoisted(() => vi.fn())
-const unmark_mock = vi.hoisted(() => vi.fn())
+const release_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
@@ -37,6 +37,7 @@ vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
 		ask_next: vi.fn().mockResolvedValue('2039'),
 		do_failed: do_failed_mock,
+		release_child: release_mock,
 		do_merged: vi.fn().mockResolvedValue(undefined),
 		has_resumable_cut: vi.fn().mockResolvedValue(false),
 		is_over_budget: vi.fn().mockResolvedValue(false),
@@ -44,7 +45,6 @@ vi.mock('./run-merge-steps', () => ({
 		resume_cut: vi.fn().mockResolvedValue(false),
 	},
 }))
-vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: unmark_mock } }))
 
 const { run_merge_cli } = await import('./run-merge-cli')
 
@@ -67,7 +67,7 @@ function open_with(labels: ReadonlyArray<string>): unknown {
 
 beforeEach(() => {
 	read_issue_mock.mockReset()
-	unmark_mock.mockReset().mockResolvedValue(true)
+	release_mock.mockReset().mockResolvedValue(true)
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
 	do_failed_mock.mockReset()
 	emit_mock.mockReset().mockResolvedValue(undefined)
@@ -127,7 +127,7 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 			const result = await run_merge_cli.merge_child(context())
 
 			expect(result.outcome).toBe('parked')
-			expect(unmark_mock).toHaveBeenCalledWith(CHILD)
+			expect(release_mock).toHaveBeenCalledWith(CHILD)
 		},
 	)
 
@@ -137,7 +137,7 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 		const result = await run_merge_cli.merge_child(context())
 
 		expect(result.outcome).toBe('merged')
-		expect(unmark_mock).not.toHaveBeenCalled()
+		expect(release_mock).not.toHaveBeenCalled()
 	})
 
 	// joshuafolkken/kit#3355: the lane-limit measurement counts merges from the ledger.
