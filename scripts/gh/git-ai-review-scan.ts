@@ -20,8 +20,10 @@ interface ClassifiedFindings {
 	infos: ReadonlyArray<ClassifiedFinding>
 }
 
-const CLAUDE_AUTHORS: ReadonlySet<string> = new Set(['claude', 'claude[bot]'])
-const CODERABBIT_AUTHORS: ReadonlySet<string> = new Set(['coderabbitai', 'coderabbitai[bot]'])
+// Only the app accounts (`type: Bot`): a bare `claude` / `coderabbitai` is an ordinary user login
+// anyone could register, and its comment is not an AI review.
+const CLAUDE_AUTHORS: ReadonlySet<string> = new Set(['claude[bot]'])
+const CODERABBIT_AUTHORS: ReadonlySet<string> = new Set(['coderabbitai[bot]'])
 
 const CLAUDE_BLOCKER_HEADINGS: ReadonlyArray<RegExp> = [
 	/^#{2,4}\s+Issues\b/mu,
