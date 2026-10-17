@@ -6,7 +6,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 
 // joshuafolkken/kit#3430: the board as a person reads it. joshuafolkken/kit#3444: a row carries its
-// number, title, elapsed `MM:SS`; sections are rules, symbols a legend.
+// number, title, elapsed span; sections are rules, symbols a legend.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of, note, rule } =
 	run_board_render_fixture
@@ -44,7 +44,7 @@ describe('run_board_render.render rows', () => {
 	it('draws a running row with its number, title and elapsed time, and no lane', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, STARTED + 40 * MINUTE, 'implement')] }
 		const lines = lines_of(header({ layout }))
-		const row_line = `  🔨 1    ${padded('Issue 1')}  90:00`
+		const row_line = `  🔨 1    ${padded('Issue 1')}  1°30′00″`
 
 		expect(lines).toContain(row_line)
 		expect(row_line).not.toContain('■')
@@ -52,11 +52,11 @@ describe('run_board_render.render rows', () => {
 		expect(lines.join('\n')).not.toContain('lane')
 	})
 
-	it('ends a three-digit elapsed time and a two-digit one in the same column', () => {
+	it('ends an elapsed time of hours and one of seconds in the same column', () => {
 		const long = running(1, NOW - 125 * MINUTE - 30 * SECOND, 'review')
 		const short = running(2, NOW - 42 * SECOND, 'investigate')
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [long, short] } }))
-		const ends = ['125:30', '00:42'].map((time) => {
+		const ends = ['2°05′30″', '42″'].map((time) => {
 			const line = lines.find((text) => text.includes(time)) ?? ''
 
 			return line.indexOf(time) + time.length
@@ -73,7 +73,7 @@ describe('run_board_render.render rows', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [row(2, { state: 'merged', status })] }
 
-		expect(lines_of(header({ layout }))).toContain(`  ✅ 2    ${padded('Issue 2')}  30:00`)
+		expect(lines_of(header({ layout }))).toContain(`  ✅ 2    ${padded('Issue 2')}  30′00″`)
 	})
 
 	it('draws no time for a child settled without a recorded end', () => {
@@ -97,10 +97,10 @@ describe('run_board_render.render release kinds', () => {
 		]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: kinds } }))
 
-		expect(lines).toContain(`  ✅ 1 🧨 ${padded('Issue 1')}  01:00`)
-		expect(lines).toContain(`  ✅ 2 ✨ ${padded('Issue 2')}  01:00`)
-		expect(lines).toContain(`  ✅ 3 🐛 ${padded('Issue 3')}  01:00`)
-		expect(lines).toContain(`  ✅ 4    ${padded('Issue 4')}  01:00`)
+		expect(lines).toContain(`  ✅ 1 🧨 ${padded('Issue 1')}  1′00″`)
+		expect(lines).toContain(`  ✅ 2 ✨ ${padded('Issue 2')}  1′00″`)
+		expect(lines).toContain(`  ✅ 3 🐛 ${padded('Issue 3')}  1′00″`)
+		expect(lines).toContain(`  ✅ 4    ${padded('Issue 4')}  1′00″`)
 	})
 
 	// joshuafolkken/kit#3769: every row's title is padded, so what a row waits on starts in one column.
@@ -274,8 +274,8 @@ describe('run_board_render.render links', () => {
 		const linked = lines_of(header({ layout, link: bracketed }))
 		const plain = lines_of(header({ layout }))
 
-		expect(linked).toContain(`  ✅ [2]    ${padded('Issue 2')}  01:00  🔗 [other/repo#7]`)
-		expect(plain).toContain(`  ✅ 2    ${padded('Issue 2')}  01:00  🔗 other/repo#7`)
+		expect(linked).toContain(`  ✅ [2]    ${padded('Issue 2')}  1′00″  🔗 [other/repo#7]`)
+		expect(plain).toContain(`  ✅ 2    ${padded('Issue 2')}  1′00″  🔗 other/repo#7`)
 	})
 })
 

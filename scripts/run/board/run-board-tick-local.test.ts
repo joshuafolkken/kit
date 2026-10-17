@@ -65,7 +65,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 
 		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
-		expect(lines[2]?.trimStart()).toMatch(/^\S {11}🔄 1 running$/u)
+		expect(lines[2]?.trimStart()).toMatch(/^\S {6}🔄 1 running$/u)
 		expect(lines[3]).toBe('')
 		expect(lines[4]).toMatch(new RegExp(`^. 🔍 ${String(CHILD)}    …`, 'u'))
 	})
@@ -82,9 +82,9 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
 		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
-		expect(lines[0]).toMatch(/^⏸ backlogrun {2}⏰ \d+:\d{2}:\d{2} {2}✅/u)
-		expect(lines[1]).toMatch(/^ +💓 \d+:\d{2}:\d{2} {2}🧠/u)
-		expect(lines[2]).toMatch(/^ +\d+:\d{2}:\d{2} {2}🔭 watching/u)
+		expect(lines[0]).toMatch(/^⏸ backlogrun {2}⏰ (?:\d+′)?\d+″ {2}✅/u)
+		expect(lines[1]).toMatch(/^ +💓 (?:\d+′)?\d+″ {2}🧠/u)
+		expect(lines[2]).toMatch(/^ +(?:\d+′)?\d+″ {2}🔭 watching/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 
@@ -113,7 +113,7 @@ describe('run_board_tick.tick with a session’s operation', () => {
 		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
 
 		expect(lines_of(frames[0])[2]?.trimStart().slice(1)).toBe(
-			`  0:00:00  🔧 #${String(CHILD)} · Bash pnpm josh gate`,
+			`  0″  🔧 #${String(CHILD)} · Bash pnpm josh gate`,
 		)
 	})
 })

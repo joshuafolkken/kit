@@ -68,7 +68,7 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 	])('draws it %s and leaves it out of the parked count', async (_label, closed, icon) => {
 		const lines = await frame_after(answer_of(closed))
 
-		expect(row_of(lines)).toMatch(new RegExp(`${icon} ${String(ISSUE)} +${TITLE} +57:00$`, 'u'))
+		expect(row_of(lines)).toMatch(new RegExp(`${icon} ${String(ISSUE)} +${TITLE} +57′00″$`, 'u'))
 		expect(lines[0]).toContain('💤 0')
 	})
 

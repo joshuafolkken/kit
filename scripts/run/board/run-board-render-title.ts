@@ -23,7 +23,7 @@ function reason_text(row: BoardRow, now_ms: number): string | undefined {
 
 	if (reason?.since_ms === undefined) return reason?.text
 
-	return `${reason.text} ${run_board_labels.stage_span_of(now_ms - reason.since_ms)}`
+	return `${reason.text} ${run_board_labels.span_of(now_ms - reason.since_ms)}`
 }
 
 // The columns a line runs past the pane, for a row that says why it waits; none for any other row, and

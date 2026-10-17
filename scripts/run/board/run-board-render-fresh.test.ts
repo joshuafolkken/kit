@@ -14,7 +14,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // header's are, and nothing else on the row is.
 
 const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
-const { PHASE_ICONS, STATE_ICONS, elapsed_of } = run_board_labels
+const { PHASE_ICONS, STATE_ICONS, span_of } = run_board_labels
 const { paint } = run_board_fresh
 const SECOND = 1000
 const GB = 1024 * 1024 * 1024
@@ -64,7 +64,7 @@ describe('run_board_render.render fresh rows', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const running = row_of(raw_lines(), 'Issue 1')
 
-		expect(running).toContain(paint('00:00', 'inverse'))
+		expect(running).toContain(paint('0″', 'inverse'))
 		expect(running).toContain(paint(PHASE_ICONS.implement, 'bold-color'))
 	})
 
@@ -75,7 +75,7 @@ describe('run_board_render.render fresh rows', () => {
 
 		expect(merged).toContain(paint(finish, 'bold'))
 		expect(merged).toContain(`${STATE_ICONS.merged} 2`)
-		expect(merged).not.toContain(paint(elapsed_of(ENDED - SETTLED_START), 'bold'))
+		expect(merged).not.toContain(paint(span_of(ENDED - SETTLED_START), 'bold'))
 	})
 
 	it('draws no emphasis in a chat, and the same columns as a live screen', () => {
@@ -83,7 +83,7 @@ describe('run_board_render.render fresh rows', () => {
 		const chat = raw_lines({ form: 'chat' })
 		const plain = chat.map((line) => stripVTControlCharacters(line))
 
-		expect(row_of(chat, 'Issue 1')).not.toContain(paint('00:00', 'inverse'))
+		expect(row_of(chat, 'Issue 1')).not.toContain(paint('0″', 'inverse'))
 		expect(raw_lines().map((line) => stripVTControlCharacters(line))).toStrictEqual(plain)
 	})
 })

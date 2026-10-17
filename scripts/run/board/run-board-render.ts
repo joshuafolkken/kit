@@ -38,7 +38,7 @@ import type { Thanks } from './run-board-thanks-csv'
 const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, NOW_ICONS, PHASE_ICONS, STATE_ICONS } =
 	run_board_labels
 const { WAITS_ICON, WORDS } = run_board_labels
-const { clock_of, elapsed_of } = run_board_labels
+const { clock_of, span_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
 const { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of } = run_board_render_title
@@ -68,8 +68,8 @@ interface BoardView extends FrameBounds {
 	link?: Link | undefined
 }
 
-// What every row of one frame is drawn with: the header, how wide the time column is, so a three-digit
-// `125:30` and a `00:42` end in the same column, and each lane's usage where its column is drawn, with
+// What every row of one frame is drawn with: the header, how wide the time column is, so a
+// `2°05′30″` and a `42″` end in the same column, and each lane's usage where its column is drawn, with
 // the column's width.
 interface RowFrame {
 	header: BoardHeader
@@ -108,7 +108,7 @@ function elapsed_ms(row: BoardRow, now_ms: number): number | undefined {
 function time_of(row: BoardRow, now_ms: number): string | undefined {
 	const elapsed = elapsed_ms(row, now_ms)
 
-	return elapsed === undefined ? undefined : elapsed_of(elapsed)
+	return elapsed === undefined ? undefined : span_of(elapsed)
 }
 
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {

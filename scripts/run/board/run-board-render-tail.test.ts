@@ -14,7 +14,7 @@ import type { UsualTimes } from './run-board-usual'
 // every row; a waiting row's blockers start in that column too.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
-const PHASE_TIME = '10:00'
+const PHASE_TIME = '10′00″'
 const SECOND = MINUTE / 60
 const SECONDS_40 = 40 * SECOND
 const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
@@ -77,7 +77,7 @@ afterEach(() => {
 })
 
 describe('run_board_render_tail.tail_of phase time', () => {
-	it('draws how long the child has stood at its phase as MM:SS, plain without a usual time', () => {
+	it('draws how long the child has stood at its phase as a span, plain without a usual time', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
 		expect(tail(running(1))[0]).toBe(PHASE_TIME)
@@ -101,39 +101,39 @@ describe('run_board_render_tail.tail_of phase time', () => {
 			return tail({ ...row, status }, { usual: usual(0) })[0]
 		}
 
-		expect(at(3)).toBe('03:00')
-		expect(at(5)).toBe(styleText('yellow', '05:00'))
-		expect(at(7)).toBe(styleText('red', '07:00'))
+		expect(at(3)).toBe('3′00″')
+		expect(at(5)).toBe(styleText('yellow', '5′00″'))
+		expect(at(7)).toBe(styleText('red', '7′00″'))
 	})
 
 	it('draws blanks where no event said when the child got to its phase', () => {
 		const row = running(1)
 		const status = { ...row.status, state: 'running' as const, phase_ms: undefined }
 
-		expect(tail({ ...row, status }, { usual: usual(1) })[0]).toBe(' '.repeat(PHASE_TIME.length))
+		expect(tail({ ...row, status }, { usual: usual(1) })[0]).toBe(' '.repeat('0″'.length))
 	})
 
-	it('draws seconds as MM:SS and never carries the minutes into hours', () => {
-		expect(phase_time(SECONDS_40)).toBe('00:40')
-		expect(phase_time(MINUTES_61_SECONDS_5)).toBe('61:05')
+	it('draws seconds alone and carries the minutes into hours', () => {
+		expect(phase_time(SECONDS_40)).toBe('40″')
+		expect(phase_time(MINUTES_61_SECONDS_5)).toBe('1°01′05″')
 	})
 })
 
 describe('run_board_render_tail.tail_of activity', () => {
 	it('draws the newest event’s phase icon and its age', () => {
-		expect(tail(running(1))[1]).toBe('👀 03:00')
+		expect(tail(running(1))[1]).toBe('👀 3′00″')
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {
-		expect(tail(running(1), { operations: operations(1, NOW - MINUTE) })[1]).toBe('🔧 01:00')
+		expect(tail(running(1), { operations: operations(1, NOW - MINUTE) })[1]).toBe('🔧 1′00″')
 	})
 
 	it('ages the activity as the 💓 is: plain, yellow past 15 minutes, red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(operated_activity(10)).toBe('🔧 10:00')
-		expect(operated_activity(20)).toBe(styleText('yellow', '🔧 20:00'))
-		expect(operated_activity(40)).toBe(styleText('red', '🔧 40:00'))
+		expect(operated_activity(10)).toBe('🔧 10′00″')
+		expect(operated_activity(20)).toBe(styleText('yellow', '🔧 20′00″'))
+		expect(operated_activity(40)).toBe(styleText('red', '🔧 40′00″'))
 	})
 
 	it('draws nothing after a settled or a waiting row', () => {
@@ -182,7 +182,7 @@ describe('run_board_render.render tail column', () => {
 		expect(column_of(lines, 'Short', PHASE_TIME)).toBe(column_of(lines, 'A much', PHASE_TIME))
 	})
 
-	it('starts every running row’s activity in one column where one phase time has three digits of minutes', () => {
+	it('starts every running row’s activity in one column where one phase time runs past an hour', () => {
 		const long = phased(running(2, 'Long'), LONG_PHASE)
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, 'Short'), long] }
 		const lane_events = new Map([
@@ -192,7 +192,7 @@ describe('run_board_render.render tail column', () => {
 		const lines = lines_of(board({ layout, activity: { ...board().activity, lane_events } }))
 
 		expect(column_of(lines, 'Long', '👀')).toBe(column_of(lines, 'Short', '👀'))
-		expect(column_of(lines, 'Long', '125:00')).toBe(column_of(lines, 'Short', PHASE_TIME) - 1)
+		expect(column_of(lines, 'Long', '2°05′00″')).toBe(column_of(lines, 'Short', PHASE_TIME) - 2)
 	})
 
 	it('starts a waiting row’s 🔗 in the tail’s column', () => {
