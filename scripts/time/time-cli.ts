@@ -16,14 +16,18 @@ import { time_run_state_collect } from './time-run-state-collect'
 // **The only scope is the run tree**. The additional report scopes
 // (`--epic` / `--last` / `--period` / `--session` / `--issue`) and the `--instructions` / `--top`
 // modifiers they carried were retired with no rule or decision reading them; `--run` names the same
-// default tree explicitly, while `--json` shapes it and `--path` redirects the read.
+// default tree explicitly, while `--json` shapes it, `--path` redirects the read and `--split-at`
+// compares it by role before and after one instant.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh time [--run] [--json] [--path <dir>]'
+const USAGE = 'Usage: josh time [--run] [--json] [--path <dir>] [--split-at <ISO time>]'
 
 interface Options {
 	is_json: boolean
+	// The instant to split the tree at for a before/after comparison by role (e.g. a merge time), or
+	// `undefined` for the tree alone.
+	split_at_ms: number | undefined
 	// The target project whose transcripts to read, or `undefined` for this process's own working
 	// directory. From the kit checkout, `--path <dir>` points the read at
 	// another project's transcripts, history and config.
@@ -34,14 +38,23 @@ const PARSE_ARGS_OPTIONS = {
 	json: { type: 'boolean', default: false },
 	run: { type: 'boolean', default: false },
 	path: { type: 'string' },
+	'split-at': { type: 'string' },
 } as const
 
-// An unknown flag is a refusal rather than a default: a misspelled or retired flag must not quietly
-// report the run tree as though the mistake had been understood.
+// `NaN` is an unparseable instant, kept apart from `undefined` (none named) so it can be refused.
+function parse_instant(text: string | undefined): number | undefined {
+	return text === undefined ? undefined : Date.parse(text)
+}
+
+// An unknown flag is a refusal rather than a default: a misspelled or retired flag, or an instant that
+// does not parse, must not quietly report the run tree as though the mistake had been understood.
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	const values = cli_flags.values_of(argv, PARSE_ARGS_OPTIONS)
+	const split_at_ms = parse_instant(values?.['split-at'])
 
-	return values === undefined ? undefined : { is_json: values.json, path: values.path }
+	if (values === undefined || Number.isNaN(split_at_ms)) return undefined
+
+	return { is_json: values.json, path: values.path, split_at_ms }
 }
 
 // The run-state lead the run-tree path prepends: the run this checkout is carrying, read from the
@@ -59,10 +72,13 @@ async function run_state_lead(cwd: string, is_json: boolean): Promise<Array<stri
 // The run tree, led by the run-state block when the run has not finished. The tree report is
 // `cost-run-report.ts`'s, kept for `josh time` after `josh cost`'s readerless run-tree scopes were
 // retired (#2016).
-async function run_tree(cwd: string, is_json: boolean): Promise<number> {
-	const lead = await run_state_lead(cwd, is_json)
+async function run_tree(cwd: string, options: Options): Promise<number> {
+	const lead = await run_state_lead(cwd, options.is_json)
 
-	return cost_run_report.run(cwd, undefined, is_json, lead)
+	return cost_run_report.run(cwd, undefined, options.is_json, {
+		lead,
+		split_at_ms: options.split_at_ms,
+	})
 }
 
 // **The default is this process's own working directory.** A dispatched lane child writes its
@@ -76,7 +92,7 @@ async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Pr
 		return FAILURE_EXIT_CODE
 	}
 
-	return await run_tree(transcript_cwd.resolve(options.path, cwd), options.is_json)
+	return await run_tree(transcript_cwd.resolve(options.path, cwd), options)
 }
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and

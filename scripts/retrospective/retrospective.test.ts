@@ -60,6 +60,7 @@ function cost_report(roles: ReadonlyArray<RoleTotals>): RunCostReport {
 		roles,
 		sessions: [],
 		issues: [],
+		split: undefined,
 	}
 }
 

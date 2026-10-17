@@ -4,6 +4,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cost_run_issues, type IssueTotals } from './cost-run-issues'
 import type { RunNode } from './cost-run-nodes'
 import { cost_run_roles, type RoleTotals, type SessionRow } from './cost-run-roles'
+import { cost_run_split, type RunSplit } from './cost-run-split'
 import { cost_run_tree } from './cost-run-tree'
 
 // The `--run` scope's report: a run tree summed by role, in dollars.
@@ -42,12 +43,23 @@ interface RunCostReport {
 	// The sessions summed per Issue, with whether the implementation cut ended any of them — the
 	// comparison a batch is judged by. Carried in `--json` only.
 	issues: ReadonlyArray<IssueTotals>
+	// The tree split at `--split-at`, by role on each side, or `undefined` when no instant was named.
+	split: RunSplit | undefined
 }
+
+// What a caller layers over the tree report: the lines it leads with, and the instant to split it at.
+interface ReportView {
+	lead: ReadonlyArray<string>
+	split_at_ms: number | undefined
+}
+
+const DEFAULT_VIEW: ReportView = { lead: [], split_at_ms: undefined }
 
 function build(
 	run_count: number,
 	unattributed_count: number,
 	nodes: ReadonlyArray<RunNode>,
+	split_at_ms?: number,
 ): RunCostReport {
 	const roles = cost_run_roles.build(nodes)
 
@@ -63,6 +75,7 @@ function build(
 		roles: roles.roles,
 		sessions: roles.sessions,
 		issues: cost_run_issues.build(roles.sessions),
+		split: split_at_ms === undefined ? undefined : cost_run_split.build(nodes, split_at_ms),
 	}
 }
 
@@ -121,7 +134,8 @@ function session_lines(report: RunCostReport): Array<string> {
 // is a caller's concern — `josh cost --run` passes none — so this report stays a cost report and only
 // the lines it is handed sit above it.
 function format_report(report: RunCostReport, lead: ReadonlyArray<string> = []): string {
-	const body = [...header_lines(report), ...role_lines(report), ...session_lines(report)]
+	const split = report.split === undefined ? [] : cost_run_split.format_lines(report.split)
+	const body = [...header_lines(report), ...role_lines(report), ...split, ...session_lines(report)]
 
 	return (lead.length === 0 ? body : [...lead, '', ...body]).join('\n')
 }
@@ -148,18 +162,20 @@ function run(
 	cwd: string,
 	run_id: string | undefined,
 	is_json: boolean,
-	lead: ReadonlyArray<string> = [],
+	view: ReportView = DEFAULT_VIEW,
 ): number {
 	const tree = cost_run_tree.load(cwd, run_id)
 
 	if (tree === undefined) return report_empty(cwd)
 
-	print_report(build(tree.run_count, tree.unattributed_count, tree.nodes), is_json, lead)
+	const report = build(tree.run_count, tree.unattributed_count, tree.nodes, view.split_at_ms)
+
+	print_report(report, is_json, view.lead)
 
 	return OK_EXIT_CODE
 }
 
 const cost_run_report = { NOT_MEASURED, build, format_report, run }
 
-export type { RunCostReport }
+export type { ReportView, RunCostReport }
 export { cost_run_report }
