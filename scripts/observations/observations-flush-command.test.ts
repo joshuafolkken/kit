@@ -47,6 +47,7 @@ vi.mock('#scripts/git/git-command', () => ({
 		fast_forward_local: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
+		head_commit: vi.fn(),
 		merge_fast_forward: vi.fn(),
 		push: vi.fn(),
 		status: vi.fn(),
@@ -118,6 +119,7 @@ function on_default_branch(): void {
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
 	vi.mocked(git_command.commit_count_beyond).mockResolvedValue(NO_COMMITS)
 	vi.mocked(git_command.checkout_b).mockResolvedValue('')
+	vi.mocked(git_command.head_commit).mockResolvedValue('c0ffee1')
 	vi.mocked(git_command.checkout).mockResolvedValue('')
 	on_github()
 }

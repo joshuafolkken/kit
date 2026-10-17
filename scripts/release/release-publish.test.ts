@@ -30,7 +30,12 @@ const PUBLISH_PLAN: ReleasePlan = {
 	current_version: '1.1.0',
 	next_version: '1.2.0',
 }
-const PR_SNAPSHOT = { rollup: [], merge_state_status: undefined, review_decision: undefined }
+const PR_SNAPSHOT = {
+	rollup: [],
+	merge_state_status: undefined,
+	review_decision: undefined,
+	head_sha: 'c0ffee1',
+}
 
 function given(is_local: boolean, remote_answer: RemoteAnswer): void {
 	vi.spyOn(git_command, 'branch_exists').mockResolvedValue(is_local)
