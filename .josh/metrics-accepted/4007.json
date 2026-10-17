@@ -1,0 +1,10 @@
+{
+	"reason": "#4007 adds the start-time declaration: a new parse/lint module, its backlog:next note, the epic-child hold in epic_classify, one template row and the auto-ok:next doc sentence",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 62,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 149,
+		"prose.long_paragraphs": 1
+	}
+}
