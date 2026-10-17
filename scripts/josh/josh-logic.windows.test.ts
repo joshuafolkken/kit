@@ -54,45 +54,23 @@ describe('resolve_tsx_executable on non-win32', () => {
 	})
 })
 
+// The shell would hand the arguments to cmd.exe unescaped; execa runs a `.cmd` shim itself and
+// escapes them, so no platform or executable turns the shell on.
 describe('josh_logic.spawn_script shell option', () => {
-	it('passes shell: true to execaSync on win32', () => {
+	it.each([
+		['win32', 'tsx.cmd'],
+		['win32', process.execPath],
+		['darwin', 'tsx'],
+	])('never passes a shell to execaSync on %s spawning %s', (platform, executable) => {
 		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
-		Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+		Object.defineProperty(process, 'platform', { value: platform, configurable: true })
 
-		josh_logic.spawn_script('tsx.cmd', SCRIPT_FILE_ARGS)
+		josh_logic.spawn_script(executable, SCRIPT_FILE_ARGS)
 
 		expect(execa_sync_mock).toHaveBeenCalledWith(
-			'tsx.cmd',
+			executable,
 			SCRIPT_FILE_ARGS,
-			expect.objectContaining({ shell: true }),
-		)
-	})
-
-	// The node binary is executable without the shell, and a typical Windows install path
-	// contains spaces that shell invocation would split.
-	it('passes shell: false to execaSync on win32 when spawning the node binary', () => {
-		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
-		Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-
-		josh_logic.spawn_script(process.execPath, SCRIPT_FILE_ARGS)
-
-		expect(execa_sync_mock).toHaveBeenCalledWith(
-			process.execPath,
-			SCRIPT_FILE_ARGS,
-			expect.objectContaining({ shell: false }),
-		)
-	})
-
-	it('passes shell: false to execaSync on darwin', () => {
-		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
-		Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-
-		josh_logic.spawn_script('tsx', SCRIPT_FILE_ARGS)
-
-		expect(execa_sync_mock).toHaveBeenCalledWith(
-			'tsx',
-			SCRIPT_FILE_ARGS,
-			expect.objectContaining({ shell: false }),
+			expect.not.objectContaining({ shell: true }),
 		)
 	})
 })

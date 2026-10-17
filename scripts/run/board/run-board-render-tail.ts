@@ -15,7 +15,7 @@ import { run_board_render_checks } from './run-board-render-checks'
 // starts in one column whichever row it is on — where the phase track before them grew with every
 // round. A settled or a waiting row draws neither.
 
-const { NOW_ICONS, span_of } = run_board_labels
+const { span_of } = run_board_labels
 // A phase past twice its usual time is drawn as long, past three times as alarming.
 const LONG_FACTOR = 2
 const ALARM_FACTOR = 3
@@ -111,18 +111,16 @@ function tail_of(row: BoardRow, header: BoardHeader): Array<string | undefined> 
 	return [phase_part(row, header), last]
 }
 
-// Whether a row draws its pull request's checks, so the legend names them.
-function is_checks_drawn(row: BoardRow, header: BoardHeader): boolean {
-	return checks_of(row, header) !== undefined
+// The icon a row's end draws for its newest activity, so the legend names it — none where the row
+// draws its checks in its place.
+function activity_icon(row: BoardRow, header: BoardHeader): string | undefined {
+	if (row.state !== 'running' || checks_of(row, header) !== undefined) return undefined
+
+	const newest = newest_of(row, header)
+
+	return newest?.since_ms === undefined ? undefined : newest.icon
 }
 
-// Whether a row draws the operation's icon, so the legend names it.
-function is_operation_drawn(row: BoardRow, header: BoardHeader): boolean {
-	if (row.state !== 'running' || is_checks_drawn(row, header)) return false
-
-	return newest_of(row, header)?.icon === NOW_ICONS.operation
-}
-
-const run_board_render_tail = { is_checks_drawn, is_operation_drawn, tail_of }
+const run_board_render_tail = { activity_icon, checks_of, tail_of }
 
 export { run_board_render_tail }

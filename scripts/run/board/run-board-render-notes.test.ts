@@ -106,7 +106,10 @@ describe('run_board_render.render findings legend', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [parked] }
 
-		expect(lines_of(header({ layout }), [park]).at(-1)).toBe(`💤 parked  ${NOTES_LEGEND}`)
+		expect(lines_of(header({ layout }), [park]).slice(-2)).toStrictEqual([
+			'💤 parked',
+			NOTES_LEGEND,
+		])
 	})
 
 	it('does not name a kind whose findings are past the limit and not drawn', () => {
@@ -160,7 +163,7 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row] }
 
 		expect(lines_of(header({ layout }), [bug, enhancement]).at(-1)).toBe(
-			`⏳ waiting  🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
+			`🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
 		)
 	})
 
@@ -252,10 +255,7 @@ describe('run_board_render.render filed this run', () => {
 	it('leads the line with no 📌, which only the heading and the legend carry', () => {
 		const lines = lines_of(listing(LISTED), listed)
 
-		expect(lines.filter((line) => line.includes('📌'))).toStrictEqual([
-			rule('📌'),
-			`⏳ waiting  ${NOTES_LEGEND}`,
-		])
+		expect(lines.filter((line) => line.includes('📌'))).toStrictEqual([rule('📌'), NOTES_LEGEND])
 	})
 
 	it('keeps a filed Issue with no row and every note on a line of its own', () => {
@@ -275,7 +275,7 @@ describe('run_board_render.render filed this run', () => {
 
 		expect(lines).toContain(FILED_RUN)
 		expect(lines).toContain('  more 1')
-		expect(lines.at(-1)).toBe(`⏳ waiting  ${NOTES_LEGEND}  💬 note`)
+		expect(lines.at(-1)).toBe(`${NOTES_LEGEND}  💬 note`)
 	})
 })
 

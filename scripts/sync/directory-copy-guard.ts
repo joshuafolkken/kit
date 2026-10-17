@@ -1,4 +1,4 @@
-import { cpSync, lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { error_text } from '#scripts/lib/error-message'
@@ -79,7 +79,7 @@ function is_transformable(candidate_path: string): boolean {
 function transform_copied_file(file_path: string): void {
 	const content = readFileSync(file_path, 'utf8')
 	const transformed = transform_copied_content(file_path, content)
-	if (transformed !== content) writeFileSync(file_path, transformed)
+	if (transformed !== content) file_content.write_contained(file_path, transformed)
 }
 
 // The walk reads the SOURCE listing and rewrites the matching destination paths, never the

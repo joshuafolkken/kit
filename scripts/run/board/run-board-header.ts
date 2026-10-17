@@ -397,7 +397,12 @@ function now_legend(header: BoardHeader): string | undefined {
 	return now?.legend === undefined ? undefined : `${now.icon} ${now.legend}`
 }
 
-const run_board_header = { aged, counts_of, header_lines, is_plan_read, now_legend }
+// The third line's icon, so the legend names the phase it draws.
+function now_icon(header: BoardHeader): string | undefined {
+	return now_line(counts_of(layout_of(header)), header)?.icon
+}
+
+const run_board_header = { aged, counts_of, header_lines, is_plan_read, now_icon, now_legend }
 
 export { run_board_header }
 export type { BoardCounts, BoardForm, BoardHeader }

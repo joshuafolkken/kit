@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dependabot_cooldown } from '#scripts/dependabot/dependabot-cooldown'
@@ -30,7 +30,7 @@ function did_migrate_prettierrc(destination_path: string): boolean {
 
 	const existing = readFileSync(legacy_path, 'utf8')
 
-	writeFileSync(
+	file_content.write_contained(
 		destination_path,
 		init_logic.merge_prettier_config(existing, path.dirname(destination_path)),
 	)
@@ -49,7 +49,7 @@ function write_merged_prettier_config(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, merged)
+	file_content.write_contained(destination_path, merged)
 	console.info('  ✔ synced    prettier.config.js')
 }
 
@@ -91,7 +91,7 @@ function sync_playwright_config(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, template)
+	file_content.write_contained(destination_path, template)
 	console.info('  ✔ synced    playwright.config.ts')
 }
 
@@ -107,7 +107,7 @@ function sync_deploy_vps(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, patched)
+	file_content.write_contained(destination_path, patched)
 	console.info('  ✔ synced    deploy-vps.yml')
 }
 
@@ -157,7 +157,7 @@ function sync_package_json_with(
 		return
 	}
 
-	writeFileSync(destination_path, transformed)
+	file_content.write_contained(destination_path, transformed)
 	console.info(synced_message)
 }
 

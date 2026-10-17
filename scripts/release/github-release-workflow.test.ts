@@ -102,6 +102,14 @@ describe('release tag selection', () => {
 	it('waits for the Publish run of an announced tag when publish.yml exists', () => {
 		expect(select_outputs(dispatch, true)).toBe(`tag=${TAG}\nworkflow=publish.yml\nawait=true\n`)
 	})
+
+	// The payload is written into `$GITHUB_OUTPUT`, where a newline would add an output of its own.
+	it.each(['', 'main', `${TAG}\nworkflow=evil.yml`, `${TAG};id`])(
+		'refuses a payload that is not a release tag: %j',
+		(tag) => {
+			expect(() => select_outputs({ DISPATCH_TAG: tag }, false)).toThrow()
+		},
+	)
 })
 
 it("keeps kit's own release on its start tag and publish jobs", () => {

@@ -17,6 +17,10 @@ vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_view_json: vi.fn() },
 }))
 
+const api_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+
 vi.mock('node:child_process', async (original) => {
 	const actual = await original<{ execSync: typeof execSync }>()
 
@@ -34,8 +38,19 @@ const TIMEOUT_MESSAGE = 'spawnSync /bin/sh ETIMEDOUT'
 const mocked_exec_sync = vi.mocked(execSync)
 const mocked_issue_view = vi.mocked(git_gh_issue_read.issue_view_json)
 
-function issue_json(body: string, author_association: string): string {
-	return JSON.stringify({ body, author_association })
+function issue_json(body: string, author_association: string, login = 'author'): string {
+	return JSON.stringify({ body, author_association, user: { login } })
+}
+
+// An issue by `login`, a `MEMBER` / `COLLABORATOR` whose permission lookup answers `role_name`.
+function use_asked_author(
+	body: string,
+	association: string,
+	login: string,
+	role_name: string,
+): void {
+	mocked_issue_view.mockResolvedValue(issue_json(body, association, login))
+	api_mock.mockResolvedValue(JSON.stringify({ permission: role_name, role_name }))
 }
 
 function silence_console(): MockInstance<typeof console.info> {
@@ -56,6 +71,7 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	mocked_exec_sync.mockClear()
 	mocked_issue_view.mockReset()
+	api_mock.mockReset()
 })
 
 afterAll(() => {
@@ -108,12 +124,37 @@ describe('measure_rerun_cli.run — author trust', () => {
 	})
 })
 
+// joshuafolkken/kit#4037: `author_association` alone does not say "can write" — `COLLABORATOR`
+// includes a read-only outside collaborator.
+describe('measure_rerun_cli.run — write access', () => {
+	it('refuses a body written by a collaborator with read access only', async () => {
+		silence_console()
+		use_asked_author(BODY, 'COLLABORATOR', 'reader', 'read')
+		const code = await measure_rerun_cli.run(ISSUE, NOW)
+
+		expect(code).toBe(1)
+		expect(mocked_exec_sync).not.toHaveBeenCalled()
+		expect(api_mock).toHaveBeenCalledWith({
+			path: 'repos/{owner}/{repo}/collaborators/reader/permission',
+		})
+	})
+
+	it('runs an OWNER body without asking for its author’s permission', async () => {
+		silence_console()
+		use_ledger('owner.md')
+		mocked_issue_view.mockResolvedValue(issue_json(BODY, 'OWNER'))
+
+		expect(await measure_rerun_cli.run(ISSUE, NOW)).toBe(0)
+		expect(api_mock).not.toHaveBeenCalled()
+	})
+})
+
 describe('measure_rerun_cli.run — command timeout', () => {
 	it('prints a timed-out command as a failure and still runs the remaining baselines', async () => {
 		const info = silence_console()
 
 		use_ledger('timeout.md')
-		mocked_issue_view.mockResolvedValue(issue_json(TWO_BASELINES, 'MEMBER'))
+		use_asked_author(TWO_BASELINES, 'MEMBER', 'writer', 'write')
 		mocked_exec_sync.mockImplementationOnce(() => {
 			throw new Error(TIMEOUT_MESSAGE)
 		})

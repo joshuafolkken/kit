@@ -16,7 +16,10 @@ const TASK_LIST_LINE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'u')
 // `owner/repo#101` on its own. The row patterns below are built from this source, so what counts as
 // a cross-repository reference has one definition — a second copy would let a form the task list
 // accepts be refused where a person types it, or the reverse.
-const EXTERNAL_REFERENCE_SOURCE = String.raw`([\w.-]+)\/([\w.-]+)#(\d+)`
+// A segment starts with a word character, so `.`, `..` and a leading `-` never become an owner or a
+// repository — `../..#1` would otherwise be read as one and walk the API path out of `repos/`.
+const REPOSITORY_SEGMENT_SOURCE = String.raw`\w[\w.-]*`
+const EXTERNAL_REFERENCE_SOURCE = String.raw`(${REPOSITORY_SEGMENT_SOURCE})\/(${REPOSITORY_SEGMENT_SOURCE})#(\d+)`
 const EXTERNAL_REFERENCE_PATTERN = new RegExp(`^${EXTERNAL_REFERENCE_SOURCE}$`, 'u')
 const TASK_LIST_ROW_SOURCE = String.raw`^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+`
 const EXTERNAL_TASK_LIST_PATTERN = new RegExp(
@@ -29,8 +32,10 @@ const EXTERNAL_SHORTHAND_PATTERN = new RegExp(
 	'gmu',
 )
 // `- [ ] https://github.com/owner/repo/issues/101`
-const EXTERNAL_URL_PATTERN =
-	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/issues\/(\d+)\b/gmu
+const EXTERNAL_URL_PATTERN = new RegExp(
+	String.raw`${TASK_LIST_ROW_SOURCE}https?:\/\/github\.com\/(${REPOSITORY_SEGMENT_SOURCE})\/(${REPOSITORY_SEGMENT_SOURCE})\/issues\/(\d+)\b`,
+	'gmu',
+)
 
 // Fenced blocks are stripped before matching. An epic body may quote the body template itself, and
 // its sample rows (`- [ ] #101 <title>`) are illustrations, not tracked children — counting them
@@ -345,4 +350,5 @@ export {
 	is_state_closed,
 	UNORDERED_DEPENDENCIES,
 	DECLARED_CHAIN_LINE,
+	REPOSITORY_SEGMENT_SOURCE,
 }

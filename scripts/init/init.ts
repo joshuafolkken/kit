@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
@@ -10,6 +10,7 @@ import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
 import { security_updates } from '#scripts/security/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
+import { file_content } from '#scripts/sync/file-content'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
@@ -151,7 +152,7 @@ function merge_project_package_json(shape: ProjectShape): void {
 		return
 	}
 
-	writeFileSync(package_json_path, merged)
+	file_content.write_contained(package_json_path, merged)
 	console.info(`  ✔ ${is_existing ? 'updated' : 'created'}   package.json`)
 }
 
