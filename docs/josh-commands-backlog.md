@@ -484,6 +484,7 @@ pnpm josh epic:check 700
 ### `josh auto-ok:next`
 
 Print the next opted-in standalone issue an unattended run may pick up outside an epic. Read-only; ranks `priority:high` first, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on, then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open.
+A candidate whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived is skipped too; `backlog:next` prints `#N not before <time>`.
 
 <!-- usage: auto-ok:next -->
 

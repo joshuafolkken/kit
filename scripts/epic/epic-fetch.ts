@@ -21,6 +21,7 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 		state: epic_issue.normalize_state(parsed.state),
 		labels: epic_issue.label_names(parsed),
 		blocked_by: epic_issue.blocker_references_of(parsed, repo),
+		body: parsed.body,
 	}
 }
 

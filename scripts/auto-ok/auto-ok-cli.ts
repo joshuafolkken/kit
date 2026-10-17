@@ -10,6 +10,7 @@ import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-c
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
@@ -331,10 +332,15 @@ function is_runnable(
 	issue: OpenIssueData,
 	tracked: ReadonlyMap<number, number>,
 	exclude: ReadonlyArray<number>,
+	now: number = Date.now(),
 ): boolean {
 	if (tracked.has(issue.number)) return false
 
-	return is_unblocked(issue) && !exclude.includes(issue.number)
+	return (
+		is_unblocked(issue) &&
+		!exclude.includes(issue.number) &&
+		issue_not_before.is_due(issue.body, now)
+	)
 }
 
 function pick_next(
@@ -351,7 +357,7 @@ function pick_next(
 function none_reason(count: number): string {
 	if (count === 0) return NONE_OPTED_IN_MESSAGE
 
-	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, blocked by an open issue, or the one just merged.`
+	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, blocked by an open issue, not due until its start time, or the one just merged.`
 }
 
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run

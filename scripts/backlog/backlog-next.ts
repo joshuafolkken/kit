@@ -13,6 +13,8 @@ import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { epic_triage, type TriageVerdict } from '#scripts/epic/epic-triage'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { session_cite } from '#scripts/issue/session-cite'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_overlap } from './backlog-overlap'
@@ -130,6 +132,18 @@ function warn_gaps(context: PoolContext, has_answer: boolean): void {
 	warn_epic_gap(context)
 }
 
+// Why a row on the time side is not offered yet, when the reason is a declared start time — the one
+// wait a reader cannot see from the labels or the blockers.
+function warn_not_before(context: PoolContext): void {
+	for (const issue of context.opted_in.issues) {
+		const reason = issue_not_before.waiting_reason(issue.body)
+
+		if (reason !== undefined) {
+			console.error(`${session_cite.issue(issue.number, undefined, context.repo)} ${reason}`)
+		}
+	}
+}
+
 function report(result: EpicNextResult, context: PoolContext): number {
 	warn_gaps(context, result.verdict === 'run')
 	// The explanation names epics and children as `#N` (`tracked by epic #N`); linkified so the text a
@@ -139,6 +153,7 @@ function report(result: EpicNextResult, context: PoolContext): number {
 	const explanation = epic_report.format_result(result, context.repo)
 
 	console.error(issue_citation.linkify(explanation, context.repo))
+	warn_not_before(context)
 
 	for (const token of tokens_of(result, context.repo)) console.info(token)
 

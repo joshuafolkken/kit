@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/run/ship/run-ship-cli.ts:202 | 2026-10-17 | #3998
+- rf:tests | low | scripts/run/ship/run-ship-resume.test.ts:122 | 2026-10-17 | #3998
