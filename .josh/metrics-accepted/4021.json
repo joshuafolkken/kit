@@ -1,7 +1,7 @@
 {
-	"reason": "Trust gate on author_association across auto-ok judge, issue:read, issue-watch-diff and epic-audit rationale #4021",
+	"reason": "Round-2 review asked for a test of read_order_comments, exported for that test",
 	"date": "2026-10-17",
 	"growth": {
-		"scripts.code_lines": 49
+		"scripts.code_lines": 50
 	}
 }

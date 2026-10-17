@@ -361,6 +361,7 @@ const epic_audit_cli = {
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
+	read_order_comments,
 	audit,
 	run,
 }
