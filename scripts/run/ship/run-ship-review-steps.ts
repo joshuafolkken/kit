@@ -4,8 +4,10 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_record } from '#scripts/review/review-record'
+import { review_round2 } from '#scripts/review/review-round2'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_scoped, type Phase } from './run-ship-scoped'
@@ -41,9 +43,9 @@ const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
 const RUN_REVIEW = 'run:review'
 const ATTEST_CHECK = ['review:attest', '--check']
-const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed']
+const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed', '--json']
 const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
-const ROUND_TWO_REQUIRED = 'required'
+const UNREADABLE_DECISION_NOTE = 'review:round2 printed no decision josh ship can read:'
 const ROUND_ONE = '1'
 const ROUND_TWO = '2'
 const COMMENT_FLAG = '--comment'
@@ -262,13 +264,29 @@ async function review_stage(issue: string): Promise<StepResult> {
 
 // The round-2 verification pass, after the commit so it runs beside CI: due only when the round-1 fix
 // delta says so, then scoped pair → brief → fresh reviewer → attest → record.
+//
+// **The decision is read as JSON and recorded in the lane ledger before it is acted on**, so
+// `josh lane:stats` can count the period's round-2 runs and skips by their reason code
+// (joshuafolkken/kit#4064). Output it cannot parse stops the ship rather than guessing a verdict.
 async function round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(ROUND_TWO_DECISION)
-	const answer = decision.out.trim()
 
 	if (decision.code !== SUCCESS_EXIT_CODE) return decision
 
-	if (answer !== ROUND_TWO_REQUIRED) return skipped(`${answer}\n${ROUND_TWO_SKIPPED_NOTE}`)
+	const answer = review_round2.parse_json(decision.out)
+
+	if (answer === undefined) return failure(`${UNREADABLE_DECISION_NOTE}\n${decision.out}`)
+
+	note(answer.reason)
+	await lane_ledger.record_round_two({
+		issue: Number(issue),
+		verdict: answer.verdict,
+		code: answer.code,
+	})
+
+	if (answer.verdict !== review_round2.REQUIRED_VERDICT) {
+		return skipped(`${answer.verdict}\n${ROUND_TWO_SKIPPED_NOTE}`)
+	}
 
 	return await run_phases([
 		scoped_pair,

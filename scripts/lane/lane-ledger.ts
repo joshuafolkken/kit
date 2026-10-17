@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage and per stopped `josh ship`, read back by `josh lane:stats`.
+// `josh ship` stage, per stopped `josh ship` and per round-2 decision, read back by `josh lane:stats`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -39,6 +39,7 @@ const KIND = {
 	OVERLAP: 'overlap',
 	HELD: 'held',
 	RELEASED: 'released',
+	ROUND_TWO: 'round-two',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -131,6 +132,15 @@ const held_schema = z.object({ kind: z.literal(KIND.HELD), at: z.string(), reaso
 // The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
 // the run finished, so no free lane is owed a child any more.
 const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
+// One `review:round2` decision a `josh ship` acted on for `issue`: `verdict` and the stable reason
+// `code` it fell under, so the period's skips and runs are counted by why (joshuafolkken/kit#4064).
+const round_two_schema = z.object({
+	kind: z.literal(KIND.ROUND_TWO),
+	at: z.string(),
+	issue: z.number(),
+	verdict: z.string(),
+	code: z.string(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -141,6 +151,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	overlap_schema,
 	held_schema,
 	released_schema,
+	round_two_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -152,6 +163,8 @@ type StageEntry = z.infer<typeof stage_schema>
 type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
 type HeldEntry = z.infer<typeof held_schema>
+type RoundTwoEntry = z.infer<typeof round_two_schema>
+type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
 type GateCheckRecord = z.infer<typeof check_schema>
@@ -246,6 +259,10 @@ async function record_released(path?: string): Promise<void> {
 	await record({ kind: KIND.RELEASED, at: now_iso() }, path)
 }
 
+async function record_round_two(round_two: RoundTwoRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.ROUND_TWO, at: now_iso(), ...round_two }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -279,6 +296,7 @@ const lane_ledger = {
 	record_released,
 	record_merge,
 	record_overlap,
+	record_round_two,
 	record_stage,
 	record_stop,
 	target,
@@ -295,6 +313,7 @@ export type {
 	MergeEntry,
 	OverlapEntry,
 	OverlapRecord,
+	RoundTwoEntry,
 	StageEntry,
 	StopEntry,
 }

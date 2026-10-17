@@ -182,6 +182,19 @@ lane whose open pull request changes a path its own change does (`run-ship-overl
 The entry names the lanes, the shared paths, `waited_ms` and whether the wait cleared. Read it against
 the `conflict` row of the same period.
 
+## Why round 2 ran or was skipped
+
+Under the stop table, `lane:stats` prints one row per round-2 verdict and reason code, most frequent
+first, with how many decisions fell there. A period with no decision prints a `none` row.
+
+`josh ship` reads `review:round2 --round-1-closed --json` and records the verdict and its `code` as a
+`round-two` entry before acting on it. The codes are one per branch of `review-round2.ts`: `open-finding`,
+`no-snapshot`, `base-moved`, `empty`, `inert` and `live`.
+
+**The decision the table is for**: what to change next. A frequent `live` shows how often round 1's
+fixes reach code that runs. A frequent `open-finding`, `no-snapshot` or `base-moved` means the procedure
+is not giving the decision what it needs.
+
 ## Why a free lane stayed empty
 
 Under the stop table, `lane:stats` prints one row per reason `backlog:drive` left a free lane empty. Each
