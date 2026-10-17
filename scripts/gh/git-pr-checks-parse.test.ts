@@ -4,6 +4,7 @@ import {
 	CHECK_STATUS_MISSING,
 	CHECK_STATUS_PASS,
 	CHECK_STATUS_PENDING,
+	parse_pr_state_snapshot,
 	parse_rollup_checks,
 	read_string,
 } from './git-pr-checks-parse'
@@ -13,6 +14,7 @@ const SONAR_QUBE = 'SonarQube'
 const AUTO_MERGE = 'auto-merge'
 const NON_STRING_VALUE = 'not a string'
 const RATE_LIMITED = 'Review rate limited'
+const CHECKED_SHA = 'c0ffee1'
 
 describe('read_string', () => {
 	it('returns the trimmed string for a non-empty value', () => {
@@ -206,6 +208,19 @@ describe('parse_rollup_checks — edge cases', () => {
 		expect(checks).toHaveLength(2)
 		expect(checks[0]?.name).toBe(CODE_RABBIT)
 		expect(checks[1]?.name).toBe(SONAR_QUBE)
+	})
+})
+
+// #4036: the merge names the head these checks were read from, so the parse must carry it through.
+describe('parse_pr_state_snapshot — head_sha', () => {
+	it('carries headRefOid through as head_sha', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [], headRefOid: CHECKED_SHA })
+
+		expect(parse_pr_state_snapshot(raw).head_sha).toBe(CHECKED_SHA)
+	})
+
+	it('omits head_sha when the read carried no headRefOid', () => {
+		expect(parse_pr_state_snapshot('{}')).not.toHaveProperty('head_sha')
 	})
 })
 

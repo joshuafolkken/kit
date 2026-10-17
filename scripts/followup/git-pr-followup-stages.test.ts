@@ -95,6 +95,7 @@ const { epic_close } = await import('#scripts/epic/epic-close')
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
+const CHECKED_SHA = 'c0ffee1'
 // The pull request body every case here answers with, so the `closes #N` keyword and the issue number
 // in `BASE_INPUT` cannot drift apart.
 const CLOSES_BODY = 'closes #42'
@@ -124,6 +125,7 @@ function answer_every_call(): void {
 		rollup: [],
 		merge_state_status: undefined,
 		review_decision: undefined,
+		head_sha: CHECKED_SHA,
 	})
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
 	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
@@ -240,7 +242,10 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(
+			BASE_INPUT.branch_name,
+			CHECKED_SHA,
+		)
 	})
 })
 
@@ -272,7 +277,10 @@ describe('git_pr_followup.run — a notification that reached nobody', () => {
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(
+			BASE_INPUT.branch_name,
+			CHECKED_SHA,
+		)
 	})
 })
 
