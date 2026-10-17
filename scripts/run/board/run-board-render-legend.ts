@@ -71,7 +71,11 @@ function legend_of(
 ): Array<string> {
 	const kinds = kinds_of(rows)
 	const kind_icons = kinds.map((kind) => FILED_KIND_ICONS[kind])
-	const notes_named = run_board_render_notes.notes_legend(notes, new Set([...drawn, ...kind_icons]))
+	const notes_named = run_board_render_notes.notes_legend(
+		notes,
+		new Set([...drawn, ...kind_icons]),
+		rows,
+	)
 	const kind_named = kinds.map((kind) => `${FILED_KIND_ICONS[kind]} ${WORDS[KIND_WORDS[kind]]}`)
 	const shown = [
 		...new Set(named),
