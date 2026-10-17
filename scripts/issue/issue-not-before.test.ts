@@ -34,6 +34,20 @@ describe('issue_not_before.is_due', () => {
 	})
 })
 
+describe('issue_not_before.waiting_ms', () => {
+	it('is the declared time while it is ahead', () => {
+		expect(issue_not_before.waiting_ms(DATED_BODY, NOW_BEFORE)).toBe(Date.parse(DATE))
+	})
+
+	it('is undefined once due, with no declaration, or with a malformed one', () => {
+		expect(issue_not_before.waiting_ms(DATED_BODY, NOW_AFTER)).toBeUndefined()
+		expect(issue_not_before.waiting_ms(body_with(''), NOW_BEFORE)).toBeUndefined()
+		expect(
+			issue_not_before.waiting_ms(body_with('- 実施可能日: 2026-02-30T09:30Z'), 0),
+		).toBeUndefined()
+	})
+})
+
 describe('issue_not_before.waiting_reason', () => {
 	it('names the time before it is due', () => {
 		expect(issue_not_before.waiting_reason(DATED_BODY, NOW_BEFORE)).toBe(`not before ${DATE}`)
