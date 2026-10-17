@@ -29,6 +29,8 @@ interface EpicChild {
 	state: 'OPEN' | 'CLOSED'
 	labels: ReadonlyArray<string>
 	blocked_by: ReadonlyArray<IssueReference>
+	// Read only to hold a child until its declared start time; absent on rows built without a read.
+	body?: string | undefined
 }
 
 // What is wrong with the graph. Both stop the run — neither is something to pick a winner for.

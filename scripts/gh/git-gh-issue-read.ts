@@ -281,7 +281,11 @@ async function issue_view_json(
 // `repo` reads a child in another repository. Cross-repository children are read this way rather
 // than from a local checkout: their state is a GitHub fact, and requiring a clone to learn it is
 // what kept the auto-close from ever running on such an epic.
-const STATE_AND_RELATIONS_FIELDS = 'number,state,labels,blockedBy'
+//
+// `body` rides along because `epic:next` holds a child until its declared start time
+// (joshuafolkken/kit#4007); the REST issue endpoint answers it in the same response, so it costs no
+// request.
+const STATE_AND_RELATIONS_FIELDS = 'number,state,labels,blockedBy,body'
 
 async function issue_get_state_and_relations(
 	issue_number: string,
