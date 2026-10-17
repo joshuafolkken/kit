@@ -83,7 +83,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.coderabbit.yaml',
 	'.gitattributes',
 	'.mcp.json',
-	'.ncurc.json',
 	'.prettierignore',
 	'SECURITY.md',
 	'pnpm-workspace.yaml',

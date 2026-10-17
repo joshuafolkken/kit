@@ -1,0 +1,7 @@
+{
+	"reason": "Dependabot cooldown sync keeps a comment indented below the key column inside its entry (review round 2), which needs comment-aware block bounds",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 165
+	}
+}

@@ -155,7 +155,8 @@ describe('get_ai_copy_files - dotfiles and config', () => {
 		expect(result).toContain('.gitattributes')
 		expect(result).not.toContain(GITIGNORE_DEST)
 		expect(result).toContain('.mcp.json')
-		expect(result).toContain('.ncurc.json')
+		// Retired with kit #4023: no kit command read it, and `minimumReleaseAge` is the one window.
+		expect(result).not.toContain('.ncurc.json')
 		expect(result).toContain('.prettierignore')
 		expect(result).toContain('SECURITY.md')
 	})

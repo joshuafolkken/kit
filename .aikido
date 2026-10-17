@@ -2,4 +2,4 @@ safe-chain:
   npm:
     minimumPackageAgeExclusions:
       - vite
-  minimumPackageAgeHours: 24
+  minimumPackageAgeHours: 72
