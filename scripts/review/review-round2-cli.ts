@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_code_tree } from './review-code-tree'
-import { review_round2 } from './review-round2'
+import { review_round2, type RoundTwoAnswer } from './review-round2'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -17,7 +17,6 @@ import { review_tree } from './review-tree'
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:round2 [--round-1-closed] [--json]'
-const JSON_KEY = 'round2'
 const FAILURE_EXIT_CODE = 1
 
 // The one input no command can read for itself, so the caller states it: every round-1 High/Medium
@@ -53,6 +52,17 @@ async function read_comment_only(base: string | undefined): Promise<ReadonlyArra
 	return review_code_tree.comment_only(snapshot, tree, base)
 }
 
+// `--json` carries the reason code as well, the field `josh ship` records in the lane ledger.
+function print(answer: RoundTwoAnswer, is_json: boolean): void {
+	if (is_json) {
+		console.info(review_round2.to_json(answer))
+
+		return
+	}
+
+	path_decision.print_decision(review_round2.JSON_KEY, answer.verdict, answer.reason, is_json)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const options = parse_options(argv)
 
@@ -66,7 +76,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	// against a different one — and the resolved commit rather than `git_command.change_base`, whose
 	// fallback is a ref name that moves and would compare equal to itself.
 	const base = await change_base.resolved()
-	const { verdict, reason } = review_round2.decide({
+	const decision = review_round2.decide({
 		base,
 		comment_only: await read_comment_only(base),
 		is_round_one_closed: options.is_round_one_closed,
@@ -78,7 +88,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		tree: await review_tree.read_changed_tree(),
 	})
 
-	path_decision.print_decision(JSON_KEY, verdict, reason, options.is_json)
+	print(decision, options.is_json)
 
 	return 0
 }
@@ -87,7 +97,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const review_round2_cli = { CLOSED_FLAG, parse_options, read_comment_only, run }
+const review_round2_cli = { CLOSED_FLAG, parse_options, print, read_comment_only, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

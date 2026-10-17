@@ -155,3 +155,26 @@ describe('lane_measure_cli.run — stats holds', () => {
 		expect(printed).toContain('| offer:wait | not measured | not measured | not measured | 1 | 1 |')
 	})
 })
+
+// joshuafolkken/kit#4064: and why round 2 ran or was skipped.
+describe('lane_measure_cli.run — stats round 2', () => {
+	it('prints the per-verdict-and-code table', async () => {
+		const context = fresh_context()
+		const decision = {
+			kind: 'round-two',
+			at: AT,
+			issue: 1,
+			verdict: 'skip',
+			code: 'inert',
+		} as const
+
+		lane_ledger.append(context.ledger_path, decision)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| round 2 | code | decisions |')
+		expect(printed).toContain('| skip | inert | 1 |')
+	})
+})

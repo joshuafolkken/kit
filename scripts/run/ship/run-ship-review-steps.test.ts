@@ -1,3 +1,4 @@
+import type { RoundTwoAnswer, RoundTwoVerdict } from '#scripts/review/review-round2'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -7,6 +8,7 @@ const missing_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 // Unrecorded by default; a test that needs another answer sets it once.
 const record_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: 'missing' })))
+const record_round_two_mock = vi.hoisted(() => vi.fn())
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -26,9 +28,13 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
+vi.mock('#scripts/lane/lane-ledger', () => ({
+	lane_ledger: { record_round_two: record_round_two_mock },
+}))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const { run_ship_review } = await import('./run-ship-review')
+const { review_round2 } = await import('#scripts/review/review-round2')
 
 // joshuafolkken/kit#2427: the supervised round-1 review — open, launch, join, attest, record — and each
 // branch that hands control back to the agent.
@@ -48,7 +54,7 @@ const HIGH = 'bug-risks:high:a.ts:4'
 const MEDIUM = 'bug-risks:medium:a.ts:7'
 const MEDIUM_UNFIXED = 'tests:medium:b.ts'
 const LOW = 'tests:low:a.ts'
-const DECIDE = 'review:round2 --round-1-closed'
+const DECIDE = 'review:round2 --round-1-closed --json'
 const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
@@ -94,6 +100,7 @@ beforeEach(() => {
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
 	stamps.write_text_stamp.mockClear()
 	stamps.remove_stamp.mockClear()
+	record_round_two_mock.mockClear()
 })
 
 // joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
@@ -295,14 +302,22 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 	})
 })
 
+// An empty delta skips and a live one runs: one code per verdict is enough here, since the stage
+// records the code as read rather than interpreting it.
+function decision_of(verdict: RoundTwoVerdict): RoundTwoAnswer {
+	const code = verdict === 'skip' ? review_round2.CODE.EMPTY : review_round2.CODE.LIVE
+
+	return { verdict, code, reason: `${code} reason` }
+}
+
 // What each command prints in a round-2 stage: the decision, the brief, and nothing for the rest.
-function round_two_output(command: string, decision: string): string {
-	if (command === DECIDE) return `${decision}\n`
+function round_two_output(command: string, decision: RoundTwoVerdict): string {
+	if (command === DECIDE) return `${review_round2.to_json(decision_of(decision))}\n`
 
 	return command === BRIEF_TWO ? BRIEF : ''
 }
 
-function answer_round_two(decision: string, failing?: string): void {
+function answer_round_two(decision: RoundTwoVerdict, failing?: string): void {
 	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
 		const command = argv.join(' ')
 
@@ -316,6 +331,34 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 
 		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toMatchObject(SKIPPED)
 		expect(commands()).toStrictEqual([DECIDE])
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4064: the skip's output stays the bare verdict and the note, as before.
+	it('keeps the skipped output to the verdict and the note', async () => {
+		answer_round_two('skip')
+
+		const result = await run_ship_review_steps.round_two_stage(ISSUE)
+
+		expect(result.out).toBe('skip\nround 2 not due — nothing left to verify; shipping on.')
+	})
+
+	it.each([
+		['skip', 'empty'],
+		['required', 'live'],
+	] as const)('records a %s decision with its code in the lane ledger', async (verdict, code) => {
+		answer_round_two(verdict)
+
+		await run_ship_review_steps.round_two_stage(ISSUE)
+
+		expect(record_round_two_mock).toHaveBeenCalledWith({ issue: Number(ISSUE), verdict, code })
+	})
+
+	it('stops on a decision it cannot parse, recording nothing and launching no reviewer', async () => {
+		josh_run_mock.mockResolvedValue({ code: OK, out: 'skip\n' })
+
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('code', FAILED)
+		expect(record_round_two_mock).not.toHaveBeenCalled()
 		expect(launch).not.toHaveBeenCalled()
 	})
 
