@@ -95,7 +95,20 @@ describe('run_board_status.statuses_of withdrawn', () => {
 		expect(run_board_status.statuses_of(events, [], NONE).get(3409)).toMatchObject({
 			state: 'withdrawn',
 			ended_ms: Date.parse(T1),
+			reason: 'superseded',
 		})
+	})
+
+	// joshuafolkken/kit#4045: the park that ended a child keeps its reason; a bare one keeps none.
+	it('keeps the reason of the park that ended a child, and none for a bare park', () => {
+		const events = [
+			event_at(1, T0, KIND.PARK, DECISION_PARK),
+			event_at(2, T1, KIND.PARK, PARK_3409),
+		]
+		const statuses = run_board_status.statuses_of(events, [], NONE)
+
+		expect(statuses.get(3433)?.reason).toBe('needs-decision')
+		expect(statuses.get(3409)).not.toHaveProperty('reason')
 	})
 })
 

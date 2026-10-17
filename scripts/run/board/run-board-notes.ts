@@ -2,6 +2,7 @@ import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_filed, type FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_ending_reason } from './run-board-ending-reason'
 
 // The board's findings section: what a run filed, what it parked and the
 // one-line observations it left, read off the event stream alone. A run started from the command line
@@ -25,10 +26,6 @@ interface BoardNote {
 }
 
 const KIND = run_event_stream.EVENT_KIND
-// `#<N> parked`, `#<N> parked (<reason>)` and `#<N> waiting on #<M>` lose their leading number, so a
-// waiting park does not name its issue twice.
-const PARK_PREFIX = /^#\d+ (?:parked\s*)?/u
-const PARENTHESES = /^\((?<inner>.*)\)$/u
 
 function filed_note(event: RunEvent): BoardNote | undefined {
 	const filed = run_event_filed.parse(event.text)
@@ -49,13 +46,6 @@ function filed_note(event: RunEvent): BoardNote | undefined {
 // The board's titles by issue number: the plan's listing with its closed children's.
 type Titles = ReadonlyMap<number, string>
 
-// `#<N> parked (needs-decision)` reads as the reason `needs-decision`; a bare park has none.
-function reason_of(event: RunEvent): string {
-	const rest = event.text.replace(PARK_PREFIX, '')
-
-	return PARENTHESES.exec(rest)?.groups?.['inner'] ?? rest
-}
-
 // The parked issue's title with its reason after it; before the plan is read there is no title, and
 // the reason alone is drawn.
 function park_text(title: string | undefined, reason: string): string {
@@ -65,7 +55,7 @@ function park_text(title: string | undefined, reason: string): string {
 }
 
 function park_note(event: RunEvent, titles: Titles): BoardNote {
-	const reason = reason_of(event)
+	const reason = run_board_ending_reason.park_reason(event)
 	const issue = run_event_scope.issue_named(event)
 	const title = issue === undefined ? undefined : titles.get(Number(issue))
 	const is_decision = reason.includes(NEEDS_DECISION_LABEL)
@@ -92,9 +82,22 @@ function note_of(event: RunEvent, titles: Titles): BoardNote | undefined {
 	return event.kind === KIND.NOTE ? plain_note(event) : undefined
 }
 
-// Newest first: the line a person glancing at the board needs is the latest one.
-function notes_of(events: ReadonlyArray<RunEvent>, titles: Titles): ReadonlyArray<BoardNote> {
-	return events.flatMap((event) => note_of(event, titles) ?? []).toReversed()
+// A park its row already says the reason of is not said twice; one waiting on a decision stays.
+function is_on_row(note: BoardNote, drawn: ReadonlySet<number>): boolean {
+	return note.kind === 'park' && !note.is_decision && drawn.has(Number(note.issue))
+}
+
+// Newest first: the line a person glancing at the board needs is the latest one. `drawn` holds the
+// parked children whose rows draw their park reason (`run_board_layout.drawn_parks`).
+function notes_of(
+	events: ReadonlyArray<RunEvent>,
+	titles: Titles,
+	drawn: ReadonlySet<number> = new Set(),
+): ReadonlyArray<BoardNote> {
+	return events
+		.flatMap((event) => note_of(event, titles) ?? [])
+		.filter((note) => !is_on_row(note, drawn))
+		.toReversed()
 }
 
 const run_board_notes = { notes_of }

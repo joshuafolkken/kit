@@ -51,7 +51,8 @@ interface BoardRow {
 	status: ItemStatus | undefined
 	// The standing blockers this row still waits on, as the plan names them.
 	waits: ReadonlyArray<string>
-	// Why the row waits beyond its blockers (`run-board-reason.ts`); a row the run has touched has none.
+	// Why the row waits beyond its blockers (`run-board-reason.ts`), or why a parked or withdrawn row
+	// ended; any other row the run has touched has none.
 	reason?: RowReason | undefined
 }
 
@@ -156,10 +157,16 @@ function active_order(left: BoardRow, right: BoardRow): number {
 	return compared(rank_of(left), rank_of(right)) || compared(key_of(left), key_of(right))
 }
 
+// The reason a parked or withdrawn row draws where ⏳ draws why it waits — its ending event's own.
+function ending_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
+	return status.reason === undefined ? {} : { reason: { text: status.reason } }
+}
+
 // Every child the run has touched: the running ones and then the parked ones in the order each
 // started, then the finished ones from the newest end.
 function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): Array<BoardRow> {
 	const rows = [...statuses].map(([number, status]) => ({
+		...ending_reason(status),
 		number,
 		title: read.titles.get(number),
 		kind: run_board_kind.kind_of(read.labels.get(number)),
@@ -283,8 +290,16 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 	return [...layout.active, ...waves, ...layout.people, ...layout.unreached]
 }
 
+// The parked children whose rows draw their park reason, so the findings section does not repeat it.
+function drawn_parks(layout: BoardLayout): ReadonlySet<number> {
+	const parks = layout.active.filter((row) => row.state === 'parked' && row.reason !== undefined)
+
+	return new Set(parks.map((row) => row.number))
+}
+
 const run_board_layout = {
 	EMPTY_LAYOUT,
+	drawn_parks,
 	is_blocked,
 	is_finished,
 	is_settled,
