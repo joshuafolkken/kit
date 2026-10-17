@@ -81,12 +81,17 @@ function parse_issue_fields(json: string): IssueFields | undefined {
 	}
 }
 
-function to_comment(raw: z.infer<typeof comment_schema>): IssueComment {
+async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueComment> {
+	const login = raw.user?.login
+
 	return {
-		author: raw.user?.login ?? UNKNOWN_AUTHOR,
+		author: login ?? UNKNOWN_AUTHOR,
 		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',
-		is_trusted: gh_author_association.is_trusted(raw.author_association),
+		is_trusted: await gh_author_association.is_trusted({
+			login,
+			association: raw.author_association,
+		}),
 	}
 }
 
@@ -99,12 +104,16 @@ function to_comment(raw: z.infer<typeof comment_schema>): IssueComment {
 // outcomes it already tells apart; a `JSON.parse` plus `safeParse` pair here would be the clone
 // `CLAUDE.md` prohibits, on the one endpoint two modules would then parse two ways. All three collapse
 // to `undefined` here, because the block above draws only one distinction: read, or not read.
-function parse_comments(json: string | undefined): ReadonlyArray<IssueComment> | undefined {
+async function parse_comments(
+	json: string | undefined,
+): Promise<ReadonlyArray<IssueComment> | undefined> {
 	if (json === undefined) return undefined
 
 	const listing = read_json_listing(json, comment_schema)
 
-	return listing.kind === 'read' ? listing.rows.map((row) => to_comment(row)) : undefined
+	if (listing.kind !== 'read') return undefined
+
+	return await Promise.all(listing.rows.map(async (row) => await to_comment(row)))
 }
 
 // The bodies a caller may act on — the comments of authors with write access, in order.

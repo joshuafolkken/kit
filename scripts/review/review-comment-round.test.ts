@@ -55,30 +55,50 @@ function root_of(name: string): string {
 }
 
 describe('review_comment_round.lines_of', () => {
-	it('reads the ledger lines of a comment round and none of any other comment', () => {
+	it('reads the ledger lines of a comment round and none of any other comment', async () => {
 		const comments = [
 			{ body: 'plan', author_association: OWNER },
 			{ body: review_comment_round.body_of(ROUND), author_association: OWNER },
 			{ author_association: OWNER },
 		]
 
-		expect(review_comment_round.lines_of(comments)).toStrictEqual(ROUND)
+		expect(await review_comment_round.lines_of(comments)).toStrictEqual(ROUND)
 	})
 
-	it('reads nothing from a comment that only quotes a round', () => {
+	it('reads nothing from a comment that only quotes a round', async () => {
 		expect(
-			review_comment_round.lines_of([{ body: QUOTING, author_association: OWNER }]),
+			await review_comment_round.lines_of([{ body: QUOTING, author_association: OWNER }]),
 		).toStrictEqual([])
 	})
 
 	it.each(['NONE', 'CONTRIBUTOR', undefined])(
 		'reads nothing from a round posted by an author without write access (%s)',
-		(author_association) => {
+		async (author_association) => {
 			const comment = { body: review_comment_round.body_of(ROUND), author_association }
 
-			expect(review_comment_round.lines_of([comment])).toStrictEqual([])
+			expect(await review_comment_round.lines_of([comment])).toStrictEqual([])
 		},
 	)
+})
+
+describe('review_comment_round.lines_of — MEMBER / COLLABORATOR', () => {
+	it('reads nothing from a round posted by a read-only COLLABORATOR', async () => {
+		api_mock.mockResolvedValue(JSON.stringify({ permission: 'read', role_name: 'triage' }))
+		const comment = {
+			body: review_comment_round.body_of(ROUND),
+			author_association: 'COLLABORATOR',
+			user: { login: 'read-only-collaborator' },
+		}
+
+		expect(await review_comment_round.lines_of([comment])).toStrictEqual([])
+	})
+
+	it('asks no permission for a comment that is not a round', async () => {
+		const comment = { body: 'plan', author_association: 'MEMBER', user: { login: 'not-asked' } }
+
+		expect(await review_comment_round.lines_of([comment])).toStrictEqual([])
+		expect(api_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('review_comment_round.carry', () => {
@@ -126,6 +146,25 @@ describe('review_comment_round.carry — what it leaves', () => {
 		comments_mock.mockResolvedValue(undefined)
 
 		await expect(review_comment_round.carry(root)).rejects.toThrow(`#${String(ISSUE)}`)
+		expect(existsSync(review_comment_round.carried_path(ISSUE, root))).toBe(false)
+	})
+})
+
+describe('review_comment_round.carry — what it throws on', () => {
+	it('writes no file where a round author’s permission could not be read', async () => {
+		const root = root_of('unanswered')
+		const round = review_comment_round.body_of(ROUND)
+
+		comments_mock.mockResolvedValue(
+			JSON.stringify([
+				{ body: round, author_association: 'MEMBER', user: { login: 'unanswered' } },
+			]),
+		)
+		api_mock
+			.mockResolvedValueOnce(JSON.stringify({ items: [{ number: ISSUE }] }))
+			.mockRejectedValue(new Error('HTTP 502'))
+
+		await expect(review_comment_round.carry(root)).rejects.toThrow('unanswered')
 		expect(existsSync(review_comment_round.carried_path(ISSUE, root))).toBe(false)
 	})
 

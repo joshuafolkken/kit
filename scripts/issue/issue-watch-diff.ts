@@ -2,9 +2,10 @@ import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
-// What a person changed on an issue since a run last read it, as the one pure answer the hook, the
-// review attestation, `josh issue:ack` and `josh followup` all print. Kept free of I/O so the four
-// callers cannot each draw the line between "a person's update" and "noise" differently.
+// What a person changed on an issue since a run last read it, as the one answer the hook, the review
+// attestation, `josh issue:ack` and `josh followup` all print. Kept in one place so the four callers
+// cannot each draw the line between "a person's update" and "noise" differently; its only I/O is the
+// write-access lookup `gh_author_association` makes for a `MEMBER` / `COLLABORATOR`.
 //
 // **A person's update is a body edit or a comment nobody automated.** A bot's comment (`type: Bot`,
 // or a `[bot]` login) is not one. A run's own comment is posted under the person's own `gh` login,
@@ -71,29 +72,41 @@ function is_automated(raw: z.infer<typeof comment_schema>, is_trusted: boolean):
 	return is_bot(raw.user) || (is_trusted && (raw.body?.includes(RUN_MARKER) ?? false))
 }
 
-function to_comment(raw: z.infer<typeof comment_schema>): WatchComment {
-	const author = raw.user?.login ?? UNKNOWN_AUTHOR
-	const created_at = raw.created_at ?? UNKNOWN_TIME
-	const is_trusted = gh_author_association.is_trusted(raw.author_association)
+async function to_comment(
+	raw: z.infer<typeof comment_schema>,
+	timeout_ms?: number,
+): Promise<WatchComment> {
+	const login = raw.user?.login
+	const is_trusted = await gh_author_association.is_trusted({
+		login,
+		association: raw.author_association,
+		timeout_ms,
+	})
 
 	return {
 		id: raw.id,
-		author,
+		author: login ?? UNKNOWN_AUTHOR,
 		is_trusted,
 		is_automated: is_automated(raw, is_trusted),
-		created_at,
+		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',
 	}
 }
 
 // `undefined` — never `[]` — for a listing that could not be read, so a failed read is never taken
-// for "nobody commented".
-function parse_comments(json: string | undefined): ReadonlyArray<WatchComment> | undefined {
+// for "nobody commented". `timeout_ms` bounds each write-access lookup, which run concurrently, so a
+// hook's read stays inside its own timeout.
+async function parse_comments(
+	json: string | undefined,
+	timeout_ms?: number,
+): Promise<ReadonlyArray<WatchComment> | undefined> {
 	if (json === undefined) return undefined
 
 	const listing = read_json_listing(json, comment_schema)
 
-	return listing.kind === 'read' ? listing.rows.map((row) => to_comment(row)) : undefined
+	if (listing.kind !== 'read') return undefined
+
+	return await Promise.all(listing.rows.map(async (row) => await to_comment(row, timeout_ms)))
 }
 
 function last_comment_id(comments: ReadonlyArray<WatchComment>): number {

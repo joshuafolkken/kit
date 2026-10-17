@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
 	issue_watch_diff,
 	type WatchBaseline,
@@ -10,7 +10,12 @@ import {
 // marked comment, a bot's comment and a comment the baseline already read must never stop a run; a
 // body edit and a person's new comment always must.
 
+const api_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+
 const BASELINE_COMMENT_ID = 10
+const LOOKUP_TIMEOUT_MS = 5000
 const NEWER_COMMENT_ID = 11
 const PERSON = 'joshuafolkken'
 const STRANGER = 'stranger'
@@ -44,8 +49,8 @@ function raw_comment(login: string, author_association: string, body: string): u
 	return { id: NEWER_COMMENT_ID, user: { login }, author_association, body }
 }
 
-function parsed(raw: unknown): ReadonlyArray<WatchComment> | undefined {
-	return issue_watch_diff.parse_comments(JSON.stringify(raw))
+async function parsed(raw: unknown): Promise<ReadonlyArray<WatchComment> | undefined> {
+	return await issue_watch_diff.parse_comments(JSON.stringify(raw))
 }
 
 describe('issue_watch_diff.unread_diff', () => {
@@ -99,11 +104,22 @@ describe('issue_watch_diff — an author without write access', () => {
 		expect(issue_watch_diff.unread_diff(baseline(), snapshot({ comments }))).toBeUndefined()
 	})
 
-	it('does not take their run marker as josh', () => {
+	it('does not take their run marker as josh', async () => {
 		const body = `${issue_watch_diff.RUN_MARKER}\nplan`
-		const comments = parsed([raw_comment(STRANGER, UNTRUSTED, body)])
+		const comments = await parsed([raw_comment(STRANGER, UNTRUSTED, body)])
 
 		expect(comments?.[0]).toMatchObject({ is_trusted: false, is_automated: false })
+	})
+
+	it('does not trust a read-only COLLABORATOR, asking within the caller’s timeout', async () => {
+		api_mock.mockResolvedValue(JSON.stringify({ permission: 'read', role_name: 'triage' }))
+		const raw = [raw_comment('read-only', 'COLLABORATOR', 'plan')]
+		const comments = await issue_watch_diff.parse_comments(JSON.stringify(raw), LOOKUP_TIMEOUT_MS)
+
+		expect(comments?.[0]).toMatchObject({ is_trusted: false })
+		expect(api_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ timeout_ms: LOOKUP_TIMEOUT_MS }),
+		)
 	})
 })
 
@@ -126,15 +142,15 @@ describe('issue_watch_diff.unread_diff — line endings', () => {
 })
 
 describe('issue_watch_diff.parse_comments', () => {
-	it('marks a comment carrying the run marker as automated', () => {
+	it('marks a comment carrying the run marker as automated', async () => {
 		const body = `${issue_watch_diff.RUN_MARKER}\nplan`
-		const comments = parsed([raw_comment(PERSON, TRUSTED, body)])
+		const comments = await parsed([raw_comment(PERSON, TRUSTED, body)])
 
 		expect(comments?.[0]?.is_automated).toBe(true)
 	})
 
-	it('marks a Bot-typed user and a [bot] login as automated', () => {
-		const comments = parsed([
+	it('marks a Bot-typed user and a [bot] login as automated', async () => {
+		const comments = await parsed([
 			{ id: NEWER_COMMENT_ID, user: { login: 'helper', type: 'Bot' }, body: 'x' },
 			{ id: NEWER_COMMENT_ID, user: { login: 'coderabbitai[bot]' }, body: 'x' },
 		])
@@ -142,8 +158,8 @@ describe('issue_watch_diff.parse_comments', () => {
 		expect(comments?.map((row) => row.is_automated)).toStrictEqual([true, true])
 	})
 
-	it('keeps an unmarked person comment as a person update', () => {
-		const comments = parsed([
+	it('keeps an unmarked person comment as a person update', async () => {
+		const comments = await parsed([
 			{
 				id: NEWER_COMMENT_ID,
 				user: { login: PERSON, type: 'User' },
@@ -156,9 +172,9 @@ describe('issue_watch_diff.parse_comments', () => {
 		expect(comments).toStrictEqual([comment({ body: 'x' })])
 	})
 
-	it('returns undefined for an unread listing, never an empty one', () => {
-		expect(issue_watch_diff.parse_comments(undefined)).toBeUndefined()
-		expect(issue_watch_diff.parse_comments('not json')).toBeUndefined()
+	it('returns undefined for an unread listing, never an empty one', async () => {
+		expect(await issue_watch_diff.parse_comments(undefined)).toBeUndefined()
+		expect(await issue_watch_diff.parse_comments('not json')).toBeUndefined()
 	})
 })
 
