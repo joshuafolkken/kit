@@ -11,8 +11,8 @@ import { shell_segments } from './shell-segments'
 // **The deny list matches globs; this reads the program.** `Bash(gh pr merge*)` and
 // `Bash(gh api *pulls/*/merge*)` miss `curl -X PUT …/pulls/5/merge`, a GraphQL body read from a file
 // (`gh api graphql -F query=@merge.graphql`), and `enablePullRequestAutoMerge`, which merges once
-// the checks pass. A body kept in a file cannot be read here, so a file-sourced GraphQL call is
-// refused whatever it holds — kit's own GitHub calls are REST (`gh-rest.md`).
+// the checks pass. A body kept in a file or computed by the shell cannot be read here, so such a
+// GraphQL call is refused whatever it holds — kit's own GitHub calls are REST (`gh-rest.md`).
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does.
 
@@ -30,6 +30,10 @@ const GRAPHQL_URL = /\/graphql\b/u
 // short flag with the value attached (`-d@file`), and the flags that upload a whole file.
 const FILE_BODY_VALUE = /^(?:-[A-Za-z]|[^=\s]*=)?['"]?@/u
 const FILE_BODY_FLAGS: ReadonlySet<string> = new Set(['--input', '-T', '--upload-file'])
+// A body the shell computes (`query="$(cat merge.graphql)"`, backticks) is no more readable here.
+const SUBSTITUTED_BODY = /\$\(|`/u
+
+type ApiCall = NonNullable<ReturnType<typeof git_argv.program_of>>
 
 // The words that are neither a flag nor a flag's value, with `gh api`'s value-taking flags, so
 // `gh api -X POST graphql` reaches `graphql` as the endpoint.
@@ -57,27 +61,39 @@ function is_graphql_call(name: string, args: ReadonlyArray<string>): boolean {
 	return name === GH_COMMAND && positional_words(args)[1] === GRAPHQL_ENDPOINT
 }
 
-function reads_body_from_file(args: ReadonlyArray<string>): boolean {
-	return args.some((argument) => FILE_BODY_FLAGS.has(argument) || FILE_BODY_VALUE.test(argument))
+function is_unreadable_body(argument: string): boolean {
+	if (FILE_BODY_FLAGS.has(argument)) return true
+
+	return FILE_BODY_VALUE.test(argument) || SUBSTITUTED_BODY.test(argument)
 }
 
-function is_api_merge(segment: string, name: string, args: ReadonlyArray<string>): boolean {
+// The segment cut ignores quotes, so a multi-line `-f query='mutation {⏎ mergePullRequest…'` leaves
+// the mutation name in a later segment: a GraphQL call's mutation is looked for in the whole line.
+function is_graphql_merge(command: string, name: string, args: ReadonlyArray<string>): boolean {
+	if (!is_graphql_call(name, args)) return false
+
+	return MERGE_MUTATIONS.test(command) || args.some((argument) => is_unreadable_body(argument))
+}
+
+function is_api_merge(command: string, segment: string, call: ApiCall): boolean {
 	if (MERGE_PATH.test(segment) || MERGE_MUTATIONS.test(segment)) return true
 
-	return is_graphql_call(name, args) && reads_body_from_file(args)
+	return is_graphql_merge(command, call.name, call.args)
 }
 
-function is_pr_merge_segment(segment: string): boolean {
+function is_pr_merge_segment(command: string, segment: string): boolean {
 	const call = git_argv.program_of(segment)
 
 	if (call === undefined) return false
 	if (call.name === GH_COMMAND && is_pr_merge_cli_call(call.args)) return true
 
-	return is_github_api_call(call.name, call.args) && is_api_merge(segment, call.name, call.args)
+	return is_github_api_call(call.name, call.args) && is_api_merge(command, segment, call)
 }
 
 function is_pr_merge(command: string): boolean {
-	return shell_segments.commands_of(command).some((segment) => is_pr_merge_segment(segment))
+	return shell_segments
+		.commands_of(command)
+		.some((segment) => is_pr_merge_segment(command, segment))
 }
 
 const PR_MERGE_REASON =

@@ -1,7 +1,7 @@
 {
-	"reason": "New pr-merge guard row and the pipe/background command cut that close the merge, git-force and secret-read bypasses (#4038)",
+	"reason": "pr-merge: judge GraphQL mutations against the whole line and refuse shell-computed bodies (round-2 review)",
 	"date": "2026-10-17",
 	"growth": {
-		"scripts.code_lines": 118
+		"scripts.code_lines": 127
 	}
 }
