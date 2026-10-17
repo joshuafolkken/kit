@@ -47,6 +47,7 @@ const PULLS_PATH = `${REPO_PATH}/pulls`
 const PR_COMMENTS_PATH = `${REPO_PATH}/issues/${String(PR_NUMBER)}/comments`
 const PR_PATH = `${PULLS_PATH}/${String(PR_NUMBER)}`
 const PR_MERGE_PATH = `${PR_PATH}/merge`
+const CHECKED_HEAD_SHA = 'c0ffee1'
 const HTML_URL_FILTER = '.html_url'
 const DEFAULT_BRANCH = 'main'
 const CREATED_URL = 'https://github.com/joshuafolkken/kit/pull/1045'
@@ -278,11 +279,16 @@ describe('pr_update_body', () => {
 describe('pr_merge', () => {
 	// `--merge` produced a merge commit and this repository allows nothing else, so the method is
 	// named rather than left to the endpoint's default.
-	it('puts the merge endpoint with an explicit merge_method', async () => {
-		await git_gh_pr.pr_merge(PR_BRANCH)
+	//
+	// #4036: `sha` binds the merge to the head the checks passed on, so a later push is not merged.
+	it('puts the merge endpoint with an explicit merge_method and the checked head sha', async () => {
+		await git_gh_pr.pr_merge(PR_BRANCH, CHECKED_HEAD_SHA)
 
 		expect(request_to(PR_MERGE_PATH).method).toBe('PUT')
-		expect(parsed_body(PR_MERGE_PATH)).toStrictEqual({ merge_method: 'merge' })
+		expect(parsed_body(PR_MERGE_PATH)).toStrictEqual({
+			merge_method: 'merge',
+			sha: CHECKED_HEAD_SHA,
+		})
 	})
 })
 
@@ -304,7 +310,7 @@ describe.each([
 	{
 		name: 'pr_merge',
 		write: async (): Promise<void> => {
-			await git_gh_pr.pr_merge(PR_BRANCH)
+			await git_gh_pr.pr_merge(PR_BRANCH, CHECKED_HEAD_SHA)
 		},
 	},
 ])('$name when the branch resolves to no number', ({ write }) => {

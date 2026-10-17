@@ -1,5 +1,6 @@
 import { epic_close } from '#scripts/epic/epic-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks'
 import { deferred_answer, type DeferredAnswer } from '#scripts/git/deferred-answer-fixture'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +41,13 @@ vi.mock('#scripts/notify/git-notify', () => ({
 
 const NOTIFY_CONFIG: GitNotifyConfig = { target: 'issue', message: 'done', mentions: [] }
 const GATEWAY_ERROR = '502 Bad Gateway'
+const CHECKED_HEAD_SHA = 'c0ffee1'
+const CHECKED: PrStateSnapshot = {
+	rollup: [],
+	merge_state_status: 'CLEAN',
+	review_decision: undefined,
+	head_sha: CHECKED_HEAD_SHA,
+}
 
 const BASE_INPUT: WrapupInput = {
 	branch_name: 'feature-branch',
@@ -49,6 +57,8 @@ const BASE_INPUT: WrapupInput = {
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
 	managed_notes: [],
+	checked: CHECKED,
+	wait_for_green: vi.fn(),
 }
 
 const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
@@ -83,6 +93,18 @@ beforeEach(() => {
 	mocked_strip_label.mockResolvedValue()
 	mocked_ensure_closed.mockResolvedValue()
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+})
+
+// #4036: the merge names the head the merge gate passed, never whatever the branch points at by then.
+describe('run_wrapup — the merge', () => {
+	it('merges the head the merge gate checked', async () => {
+		await run_wrapup({ should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(
+			BASE_INPUT.branch_name,
+			CHECKED_HEAD_SHA,
+		)
+	})
 })
 
 // joshuafolkken/kit#2770: GitHub stopped applying `closes #N` on some merges, so a merged run confirms

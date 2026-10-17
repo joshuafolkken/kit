@@ -17,8 +17,10 @@ import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 const GRAPHQL_PATH = 'graphql'
 const OPEN_PULLS_QUERY = `${git_gh_api_path.FULL_PAGE_QUERY}&state=open`
 const MISSING_NODE_ID_MESSAGE = 'gh api answered a pull request without a node_id'
+// **`expectedHeadOid` binds the auto-merge to the commit the caller pushed** (#4036): GitHub then
+// refuses it if the head has moved, rather than landing a commit nobody here pushed or checked.
 const ENABLE_AUTO_MERGE_MUTATION =
-	'mutation($id: ID!) { enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: MERGE }) { clientMutationId } }'
+	'mutation($id: ID!, $head: GitObjectID!) { enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: MERGE, expectedHeadOid: $head }) { clientMutationId } }'
 
 interface OpenPull {
 	number: number
@@ -26,13 +28,16 @@ interface OpenPull {
 	has_auto_merge: boolean
 }
 
-async function pr_enable_auto_merge(branch_name: string): Promise<void> {
+async function pr_enable_auto_merge(branch_name: string, head_sha: string): Promise<void> {
 	const pull = await read_pull(await require_pr_number(branch_name))
 	if (pull.node_id === undefined) throw new Error(MISSING_NODE_ID_MESSAGE)
 
 	await git_gh_exec.exec_gh_api({
 		path: GRAPHQL_PATH,
-		body: JSON.stringify({ query: ENABLE_AUTO_MERGE_MUTATION, variables: { id: pull.node_id } }),
+		body: JSON.stringify({
+			query: ENABLE_AUTO_MERGE_MUTATION,
+			variables: { id: pull.node_id, head: head_sha },
+		}),
 	})
 }
 

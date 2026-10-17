@@ -7,6 +7,7 @@ import {
 	gh_api_routes,
 	gh_failure,
 	PR_BRANCH,
+	PR_HEAD_SHA,
 	pr_lookup_path,
 	pr_reviews_path,
 	pr_routes,
@@ -182,6 +183,14 @@ describe('the snapshot split into its checks half and its review half', () => {
 		const checks = await pr_get_checks_snapshot(PR_BRANCH)
 
 		await expect(pr_get_review_decision(checks.pr_number)).resolves.toBe('')
+	})
+
+	// #4036: the merge names this head, so a checks half without it leaves no commit to bind to.
+	it('carries the head commit the rollup was read from', async () => {
+		mocked_api.mockImplementation(gh_api_routes(routes({})))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		expect(parse_pr_state_snapshot(checks.snapshot_json).head_sha).toBe(PR_HEAD_SHA)
 	})
 
 	it('folds the review history when the review half is read', async () => {

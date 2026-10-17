@@ -69,10 +69,16 @@ async function pr_get_review_decision(pr_number: number): Promise<string> {
 // `git-pr-checks-eval.ts` compares strictly against: `MERGE_STATE_CLEAN` never matches a lower-case
 // `clean`, which would also take every pull request out of the CodeRabbit non-blocking exemption
 // keyed on `UNSTABLE`. The rule is shared with `to_pr_info` rather than written twice.
+//
+// **`headRefOid` is the commit the rollup was read from**, in `gh`'s spelling, so a merge can be bound
+// to the head whose checks passed rather than to whatever the branch points at by then (#4036).
 async function build_checks_fields(pull: RestPull): Promise<Record<string, unknown>> {
+	const head_sha = read_head_sha(pull)
+
 	return {
-		statusCheckRollup: await read_status_check_rollup(read_head_sha(pull)),
+		statusCheckRollup: await read_status_check_rollup(head_sha),
 		mergeStateStatus: to_gh_state(pull.mergeable_state),
+		headRefOid: head_sha,
 	}
 }
 

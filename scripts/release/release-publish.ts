@@ -1,5 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { git_pr_checks } from '#scripts/gh/git-pr-checks'
+import { git_pr_merge_checked } from '#scripts/gh/git-pr-merge-checked'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
@@ -136,8 +136,7 @@ async function merge_and_tag(
 	branch_name: string,
 	pr_url: string,
 ): Promise<number> {
-	await git_pr_checks.wait_for_pr_success(branch_name)
-	await git_gh_command.pr_merge(branch_name)
+	await git_pr_merge_checked.merge_when_green(branch_name)
 	console.info(release_progress.pr_merged_line(pr_url))
 
 	const is_tagged = await release_tag.wait_for_tag(plan.next_version)
