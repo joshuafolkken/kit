@@ -7,7 +7,8 @@ import { run_board_layout, type BoardRow } from './run-board-layout'
 // by memory pressure otherwise reads the same as one that is stuck. A lane's wait is drawn on its own
 // row — 🚧 in place of its phase icon, and why, how long and which check in place of its newest
 // activity — so a wait coming and going moves no line. A wait no running row owns — the main
-// checkout's, another repository's — is one line under the header, which a short pane never cuts.
+// checkout's, another repository's — is one line right before the legend, which gives way with it,
+// so nothing is added under the header.
 
 const { HEADER_ICONS, WORDS, span_of } = run_board_labels
 // 🚧 rather than ⏳, which a waiting row already draws, or 🚦, the gate stage's; an emoji a terminal
@@ -44,9 +45,12 @@ function is_lane_row(row: BoardRow, wait: BudgetWait): boolean {
 	return row.state === 'running' && String(row.number) === wait.lane
 }
 
-// The wait a running row's lane is held in, if any.
+// The longest wait a running row's lane is held in, if any: a row draws one, the others of its lane
+// none.
 function held_of(row: BoardRow, header: BoardHeader): BudgetWait | undefined {
-	return header.budget_waits?.find((wait) => is_lane_row(row, wait))
+	const waits = (header.budget_waits ?? []).filter((wait) => is_lane_row(row, wait))
+
+	return waits.toSorted((left, right) => right.waited_ms - left.waited_ms).at(0)
 }
 
 function place_text(wait: BudgetWait, link: (reference: string) => string): string {
@@ -55,11 +59,22 @@ function place_text(wait: BudgetWait, link: (reference: string) => string): stri
 	return wait.lane === undefined ? MAIN_CHECKOUT : link(wait.lane)
 }
 
-// The waits no running row draws.
+function rows_of(header: BoardHeader): Array<BoardRow> {
+	return header.layout === undefined ? [] : run_board_layout.rows_of(header.layout)
+}
+
+// The waits no running row owns.
 function stray_of(header: BoardHeader): Array<BudgetWait> {
-	const rows = header.layout === undefined ? [] : run_board_layout.rows_of(header.layout)
+	const rows = rows_of(header)
 
 	return (header.budget_waits ?? []).filter((wait) => rows.every((row) => !is_lane_row(row, wait)))
+}
+
+// The waits the frame draws: each held row's and every one no row owns.
+function drawn_of(header: BoardHeader): Array<BudgetWait> {
+	const held = rows_of(header).flatMap((row) => held_of(row, header) ?? [])
+
+	return [...held, ...stray_of(header)]
 }
 
 // One line for each wait no running row draws, nothing while none waits.
@@ -69,10 +84,9 @@ function stray_lines(header: BoardHeader): Array<string> {
 	)
 }
 
-// 🚧 and the reasons the frame draws, nothing while none waits; every wait is drawn, on its row or
-// under the header.
+// 🚧 and the reasons the frame draws, nothing while it draws no wait.
 function legend_of(header: BoardHeader): Array<string> {
-	const waits = header.budget_waits ?? []
+	const waits = drawn_of(header)
 
 	if (waits.length === 0) return []
 

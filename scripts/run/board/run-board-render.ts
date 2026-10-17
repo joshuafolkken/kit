@@ -362,7 +362,7 @@ function resume_lines(resume: string | undefined): Array<string> {
 }
 
 // No legend is drawn before a plan is read, nor where the frame draws nothing it would name.
-function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
+function legend_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
 	const { layout } = header
 
 	if (layout === undefined) return []
@@ -371,9 +371,14 @@ function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Arr
 	const leads = new Set(rows.map((row) => state_icon(row, header)))
 	const drawn = run_board_render_drawn.drawn_of(header, rows, leads)
 
-	const legend = run_board_render_legend.legend_of(rows, drawn, notes)
+	return run_board_render_legend.legend_of(rows, drawn, notes)
+}
 
-	return legend.length === 0 ? [] : ['', ...legend]
+// The waits no lane row owns, right before the legend (joshuafolkken/kit#4052), and the legend.
+function legend_lines(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<string> {
+	const lines = [...run_board_render_waits.stray_lines(header), ...legend_of(header, notes)]
+
+	return lines.length === 0 ? [] : ['', ...lines]
 }
 
 // Names with no link where no terminal opens one: a frame with no `link` draws them plain.
@@ -392,11 +397,7 @@ function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const above = [
-		...run_board_header.header_lines(header),
-		...run_board_render_waits.stray_lines(header),
-		...resume_lines(view.resume),
-	]
+	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
 		plan: plan_sections(header, view.size),

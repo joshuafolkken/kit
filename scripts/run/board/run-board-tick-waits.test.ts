@@ -4,7 +4,7 @@ import { run_board_fixture } from './run-board-fixture'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#3943: the claims waiting in the core budget are read on the machine's second and
-// drawn — one no running row owns before the legend (joshuafolkken/kit#4052).
+// drawn — one no running row owns right before the legend (joshuafolkken/kit#4052).
 
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick

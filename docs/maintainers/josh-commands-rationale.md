@@ -23,7 +23,7 @@ A leaked place is swept on read by the same pid-and-start-time liveness the unit
 
 A waiting claim is visible ([#3943](https://github.com/joshuafolkken/kit/issues/3943)): its marker records the command, the checkout and the reason — cores, memory or memory pressure — the command prints one `⏳ <command> waits for the core budget — <reason>` line when its wait starts.
 
-`josh run:board` draws a lane's waiting claim on that lane's row — `🚧` leading it, the reason's header icon, the wait and the check in place of its newest activity — and any other waiting claim as one `🚧` line under the header ([#4052](https://github.com/joshuafolkken/kit/issues/4052)).
+`josh run:board` draws a lane's waiting claim on that lane's row — `🚧` leading it, the reason's header icon, the wait and the check in place of its newest activity — and any other waiting claim as one `🚧` line right before the legend, so nothing is added under the header ([#4052](https://github.com/joshuafolkken/kit/issues/4052)).
 
 ## `josh metrics`' totals
 
