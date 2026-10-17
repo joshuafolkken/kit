@@ -195,10 +195,11 @@ describe('run_board_render.render tail column', () => {
 		expect(column_of(lines, 'Long', '2°05′00″')).toBe(column_of(lines, 'Short', PHASE_TIME) - 2)
 	})
 
-	it('starts a waiting row’s 🔗 in the tail’s column', () => {
-		const lines = tail_lines()
+	// joshuafolkken/kit#4026: a waiting row lines nothing up, so its 🔗 follows its title.
+	it('starts a waiting row’s 🔗 two blanks after its title', () => {
+		const line = tail_lines().find((text) => text.includes('Waiting'))
 
-		expect(column_of(lines, 'Waiting', '🔗')).toBe(column_of(lines, 'Short', PHASE_TIME))
+		expect(line).toMatch(/Waiting {2}🔗 /u)
 	})
 
 	// The header's third line says the run has ended, so only the row's tail draws 🔧.

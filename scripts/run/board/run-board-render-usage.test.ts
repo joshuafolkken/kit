@@ -184,8 +184,8 @@ describe('run_board_render.render usage column on every row', () => {
 	})
 })
 
-// joshuafolkken/kit#3769: a plan row the run has not touched draws blanks in the column, so what it
-// waits on starts where a running row's tail does.
+// joshuafolkken/kit#4026: a plan row the run has not touched draws no blanks in the column, so what it
+// waits on follows its title rather than starting where a running row's tail does.
 function planned_lines(): Array<string> {
 	const planned: BoardRow = { ...waiting, number: 9, title: 'Planned', waits: ['3554'] }
 	const waves = [[{ kind: 'row' as const, row: planned }]]
@@ -201,12 +201,9 @@ function planned_lines(): Array<string> {
 }
 
 describe('run_board_render.render usage column on a plan row', () => {
-	it('starts what an untouched row waits on in the tail’s column', () => {
+	it('starts what an untouched row waits on two blanks after its title', () => {
 		const lines = planned_lines()
 
-		expect(row_line(lines, 'Planned')).toMatch(/Planned +🔗 3554$/u)
-		expect(column_of(row_line(lines, 'Planned'), '🔗')).toBe(
-			column_of(row_line(lines, 'Issue 1'), PHASE_TIME),
-		)
+		expect(row_line(lines, 'Planned')).toMatch(/Planned {2}🔗 3554$/u)
 	})
 })
