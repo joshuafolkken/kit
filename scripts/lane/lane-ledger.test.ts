@@ -173,6 +173,26 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 	})
 })
 
+// joshuafolkken/kit#3995: a free lane the driver left empty is recorded with why.
+describe('lane_ledger.record_held', () => {
+	it('records a dispatch hold naming its reason', async () => {
+		const target = ledger('held')
+		const reason = 'offer:wait:blocked'
+
+		await lane_ledger.record_held(reason, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'held', reason }])
+	})
+
+	it('records the release that ends a hold without a dispatch', async () => {
+		const target = ledger('released')
+
+		await lane_ledger.record_released(target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'released' }])
+	})
+})
+
 describe('lane_ledger.target', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()

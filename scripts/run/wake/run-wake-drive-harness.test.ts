@@ -59,6 +59,7 @@ function drive_ports(world: World): DrivePorts {
 		free_lanes: async () => FREE_LANES,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
+		hold: async () => undefined,
 		now: () => NOW,
 		sleep: async () => undefined,
 		on_state: () => undefined,

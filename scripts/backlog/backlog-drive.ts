@@ -20,6 +20,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
+import { backlog_drive_hold } from './backlog-drive-hold'
 import { backlog_drive_seats } from './backlog-drive-seats'
 
 const { MERGE_TOKEN } = run_merge_token
@@ -131,6 +132,9 @@ interface DrivePorts {
 	// How many open issues lacking `auto-ok` still owe a judgement — `auto_ok_judge_read.owed` in
 	// production, `0` when the read failed.
 	judgement_owed: () => Promise<number>
+	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
+	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
+	hold: (reason: string | undefined) => Promise<void>
 	now: () => Date
 }
 
@@ -351,7 +355,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	if (read.verdict === RUN_VERDICT) return await launch_all(read.issues, next, ports)
 	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	return on_verdict(read, next)
+	return await backlog_drive_hold.held(on_verdict(read, next), read, ports)
 }
 
 // One pass: collect every child that ended, then — unless a `stop` has been read — ask what to start.

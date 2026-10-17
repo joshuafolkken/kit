@@ -37,6 +37,8 @@ const KIND = {
 	STAGE: 'stage',
 	STOP: 'stop',
 	OVERLAP: 'overlap',
+	HELD: 'held',
+	RELEASED: 'released',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -120,6 +122,13 @@ const overlap_schema = z.object({
 	waited_ms: z.number(),
 	is_cleared: z.boolean(),
 })
+// A `backlog:drive` pass that left a free lane empty: `reason` is why — the offer verdict that started
+// nothing, or the hand-back that stopped the driver. How long the lane stayed empty is derived from the
+// next `held`, `released` or `dispatch` entry, the way a stop's wait is (joshuafolkken/kit#3995).
+const held_schema = z.object({ kind: z.literal(KIND.HELD), at: z.string(), reason: z.string() })
+// The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
+// the run finished, so no free lane is owed a child any more.
+const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -128,6 +137,8 @@ const entry_schema = z.discriminatedUnion('kind', [
 	stage_schema,
 	stop_schema,
 	overlap_schema,
+	held_schema,
+	released_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -138,6 +149,7 @@ type DispatchEntry = z.infer<typeof dispatch_schema>
 type StageEntry = z.infer<typeof stage_schema>
 type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
+type HeldEntry = z.infer<typeof held_schema>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
 type GateCheckRecord = z.infer<typeof check_schema>
@@ -224,6 +236,14 @@ async function record_overlap(overlap: OverlapRecord, path?: string): Promise<vo
 	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
 }
 
+async function record_held(reason: string, path?: string): Promise<void> {
+	await record({ kind: KIND.HELD, at: now_iso(), reason }, path)
+}
+
+async function record_released(path?: string): Promise<void> {
+	await record({ kind: KIND.RELEASED, at: now_iso() }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -253,6 +273,8 @@ const lane_ledger = {
 	record,
 	record_dispatch,
 	record_gate,
+	record_held,
+	record_released,
 	record_merge,
 	record_overlap,
 	record_stage,
@@ -265,6 +287,7 @@ export type {
 	DispatchEntry,
 	GateCheckRecord,
 	GateEntry,
+	HeldEntry,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,

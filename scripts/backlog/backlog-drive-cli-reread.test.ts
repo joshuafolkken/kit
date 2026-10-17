@@ -39,6 +39,7 @@ function ports_with(launch: DrivePorts['launch']): DrivePorts {
 		free_lanes: async () => ROOMY_POOL,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
+		hold: async () => undefined,
 		now: () => new Date(),
 	}
 }

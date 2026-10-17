@@ -26,6 +26,7 @@ import {
 import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_carried } from './backlog-drive-carried'
 import { backlog_drive_finish } from './backlog-drive-finish'
+import { backlog_drive_hold, type HoldRecorder } from './backlog-drive-hold'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
@@ -185,6 +186,7 @@ function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
 	last: { state: DriveState },
+	holds: HoldRecorder,
 ): LoopPorts {
 	return {
 		is_finished: finished_checker(seeded),
@@ -194,6 +196,7 @@ function ports_of(
 		free_lanes: backlog_ready.drive_free_lane_count,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		judgement_owed: judgement_reader(),
+		hold: holds.hold,
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
 			await sleep(milliseconds)
@@ -226,6 +229,18 @@ function loop_config(window_ms: number | undefined): LoopConfig {
 	return { poll_ms: POLL_MS, offer_ms: backlog_budget.OFFER_INTERVAL_MS, window_ms }
 }
 
+// The hand-back, the ledger's hold included — the lanes now wait on a session — and the resume line.
+async function report_end(
+	end: DriveEnd,
+	state: DriveState,
+	context: DriveContext,
+	holds: HoldRecorder,
+): Promise<void> {
+	await holds.end(end)
+	console.info(end_line(end))
+	console.info(backlog_drive_args.resume_line(state, context))
+}
+
 async function drive(context: DriveContext): Promise<number> {
 	const seeded = await seeded_lanes(context)
 
@@ -234,11 +249,11 @@ async function drive(context: DriveContext): Promise<number> {
 	const initial =
 		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 	const last = { state: { ...initial, exclude: [...context.exclude] } }
-	const config = loop_config(context.window_ms)
-	const end = await backlog_drive.run_loop(last.state, config, ports_of(context, seeded, last))
+	const holds = backlog_drive_hold.recorder()
+	const ports = ports_of(context, seeded, last, holds)
+	const end = await backlog_drive.run_loop(last.state, loop_config(context.window_ms), ports)
 
-	console.info(end_line(end))
-	console.info(backlog_drive_args.resume_line(last.state, context))
+	await report_end(end, last.state, context, holds)
 
 	return SUCCESS_EXIT_CODE
 }
