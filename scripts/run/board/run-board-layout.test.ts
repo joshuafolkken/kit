@@ -161,6 +161,33 @@ describe('run_board_layout.layout_of waiting reasons', () => {
 	})
 })
 
+// joshuafolkken/kit#4045: a parked or withdrawn row says why it ended where ⏳ says why it waits.
+describe('run_board_layout.layout_of ending reasons', () => {
+	const CAP = 'ship-stop cap'
+	const statuses = new Map<number, ItemStatus>([
+		[1, { state: 'parked', started_ms: 100, reason: CAP }],
+		[2, { state: 'withdrawn', started_ms: 200, ended_ms: 300, reason: 'superseded' }],
+		[3, { state: 'withdrawn', started_ms: 250, ended_ms: 400 }],
+		[4, { state: 'parked', started_ms: 150 }],
+	])
+	const layout = run_board_layout.layout_of(plan_of([]), statuses)
+
+	it('draws the ending reason on a parked or withdrawn row, and none where it gave none', () => {
+		const reasons = layout.active.map((row) => [row.number, row.reason])
+
+		expect(reasons).toStrictEqual([
+			[1, { text: CAP }],
+			[4, undefined],
+			[3, undefined],
+			[2, { text: 'superseded' }],
+		])
+	})
+
+	it('answers the parked rows that draw their reason', () => {
+		expect([...run_board_layout.drawn_parks(layout)]).toStrictEqual([1])
+	})
+})
+
 describe('run_board_layout.waiting_children', () => {
 	it('answers the children the run has not touched and no person is asked about', () => {
 		const statuses = new Map<number, ItemStatus>([[1, { state: 'merged' }]])

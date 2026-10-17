@@ -14,6 +14,8 @@ const FOUND_DURING = '3415'
 const NO_TITLES = new Map<number, string>()
 const PARKED_TITLE = 'Read the lanes'
 const BARE_PARK = '#13 parked'
+const DECISION_PARK_13 = '#13 parked (needs-decision)'
+const WAITING_PARK_13 = '#13 waiting on #7'
 
 function event(kind: string, text: string, pos = 1): RunEvent {
 	return { pos, at: AT, kind, text }
@@ -36,9 +38,22 @@ describe('run_board_notes.notes_of park titles', () => {
 	})
 
 	it('puts the reason after the title, a decision still told apart', () => {
-		expect(park_texts(['#13 parked (needs-decision)', '#13 waiting on #7'])).toStrictEqual([
+		expect(park_texts([DECISION_PARK_13, WAITING_PARK_13])).toStrictEqual([
 			[`${PARKED_TITLE} (needs-decision)`, true],
 			[`${PARKED_TITLE} (waiting on #7)`, false],
+		])
+	})
+
+	// joshuafolkken/kit#4045: a park its row already says the reason of is not repeated here.
+	it('leaves out a park its row draws the reason of, and keeps a decision park', () => {
+		const events = [WAITING_PARK_13, DECISION_PARK_13, '#14 parked (cap)'].map((text) =>
+			event(KIND.PARK, text),
+		)
+		const notes = run_board_notes.notes_of(events, NO_TITLES, new Set([13]))
+
+		expect(notes.map((note) => [note.issue, note.is_decision])).toStrictEqual([
+			['14', false],
+			['13', true],
 		])
 	})
 

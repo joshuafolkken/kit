@@ -1,0 +1,7 @@
+{
+	"reason": "#4045: parked and withdrawn board rows draw their ending reason — a new ending-reason reader, the status field, the layout row reason and the findings filter",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 47
+	}
+}

@@ -215,7 +215,11 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 	const bounds = bounds_of(redraw.ports)
 	const lines = run_board_render.render({
 		header: header_of(state, local, layout, redraw),
-		notes: run_board_notes.notes_of(local.events, titles_of(state)),
+		notes: run_board_notes.notes_of(
+			local.events,
+			titles_of(state),
+			run_board_layout.drawn_parks(layout),
+		),
 		resume: local.resume,
 		thanks: state.thanks,
 		link: redraw.ports.link,

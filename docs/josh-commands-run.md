@@ -634,7 +634,6 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 - `no free lane <used>/<limit> — <N…> <state> · …` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read. Each lane in use is named `running`, `parked` or `idle` (no child, but a commit or change keeps it): `no free lane 4/4 — 4023 running · 3988 parked · 4002 idle`. A vacant lane is never named.
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows that lane's stage, such as `opening lane 5″`.
-
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.
 
 On a terminal it draws on the alternate screen, as `top` and `less` do, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and the cursor that were there before. `--once`, or a stdout that is not a terminal (a pipe or a redirect), writes one frame with no screen control and exits — no color either when it is not a terminal.

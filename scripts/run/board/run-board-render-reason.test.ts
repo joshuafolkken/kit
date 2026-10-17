@@ -136,3 +136,28 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 		expect(line_of(running(), NARROW * 2)).toBe(line_of({ ...running(), reason: undefined }))
 	})
 })
+
+// joshuafolkken/kit#4045: a parked row says why it ended where a waiting row says why it waits; its
+// title is padded to the title column, so it gives up just the columns the line runs over.
+describe('run_board_render.render — why a parked row ended', () => {
+	const status = { state: 'parked' as const, started_ms: STARTED + MINUTE }
+	const parked: BoardRow = { ...waiting({ title: MIDDLE_TITLE }), state: 'parked', status }
+	// The columns the pane is narrowed by, fewer than the title column pads a short title with.
+	const OVERRUN = 5
+
+	it('draws the reason after the row’s padded columns, which stay as they were', () => {
+		const line = line_of({ ...parked, reason: UNTRIAGED })
+
+		expect(line.startsWith(line_of(parked))).toBe(true)
+		expect(line).toMatch(/ {2}untriaged$/u)
+	})
+
+	it('cuts the padded title by just the columns the line runs over', () => {
+		const reasoned = { ...parked, reason: UNTRIAGED }
+		const columns = run_board_fit.width_of(line_of(reasoned)) - OVERRUN
+		const line = line_of(reasoned, columns)
+
+		expect(line).toMatch(/ {2}untriaged$/u)
+		expect(run_board_fit.width_of(line)).toBe(columns)
+	})
+})
