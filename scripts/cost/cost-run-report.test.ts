@@ -74,6 +74,8 @@ describe('cost_run_report.build', () => {
 	})
 })
 
+const SPLIT_HEADING = 'Before → after'
+
 describe('cost_run_report.format_report', () => {
 	const text = cost_run_report.format_report(cost_run_report.build(1, 0, NODES))
 
@@ -89,6 +91,17 @@ describe('cost_run_report.format_report', () => {
 		expect(text).toContain('#1913')
 		expect(text).toContain('d1')
 		expect(text).toContain('output 100')
+	})
+
+	it('omits the before → after block unless a split instant was named', () => {
+		expect(text).not.toContain(SPLIT_HEADING)
+	})
+
+	it('adds the before → after block, and carries it in the record, when split', () => {
+		const report = cost_run_report.build(1, 0, NODES, 0)
+
+		expect(report.split?.after.session_count).toBe(2)
+		expect(cost_run_report.format_report(report)).toContain(SPLIT_HEADING)
 	})
 })
 

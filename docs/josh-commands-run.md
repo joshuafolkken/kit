@@ -1018,17 +1018,19 @@ Report where a run's wall clock went, read from the same transcripts `josh cost`
 <!-- usage: time -->
 
 ```bash
-pnpm josh time                # the last run tree, wall clock and cost by role
-pnpm josh time --run          # the same run-tree scope, named explicitly
-pnpm josh time --json         # the same figures, machine-readable
-pnpm josh time --path <dir>   # read another project's transcripts from this checkout
+pnpm josh time                                   # the last run tree, wall clock and cost by role
+pnpm josh time --run                             # the same run-tree scope, named explicitly
+pnpm josh time --json                            # the same figures, machine-readable
+pnpm josh time --path <dir>                      # read another project's transcripts from this checkout
+pnpm josh time --split-at 2026-10-16T21:33:19Z   # the same tree compared by role before and after a merge
 ```
 
 **Options:**
 
-- `--run` — (default) the whole run tree, wall clock led beside dollars. It is the only scope; any other flag is a usage error (exit 1). History: `docs/maintainers/josh-commands-run-rationale.md` → "`josh cost` and `josh time` lost their report scopes".
+- `--run` — (default) the whole run tree, wall clock led beside dollars. It is the only scope; any flag not listed here is a usage error (exit 1). History: `docs/maintainers/josh-commands-run-rationale.md` → "`josh cost` and `josh time` lost their report scopes".
 - `--path <dir>` — aim the read at another project (absolute path); keeps the `cwd` behavior when absent.
 - `--json` — the run tree, machine-readable.
+- `--split-at <ISO time>` — add a before → after block by role (time share, cost share, req/session), each session on the side of its first request; an unparseable time is a usage error (exit 1).
 
 <!-- /usage -->
 
