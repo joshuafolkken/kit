@@ -90,6 +90,8 @@
 		"!scripts/test/pure-files.ts",
 		"!scripts/test/test-machine-guard.ts",
 		"!scripts/test/test-network-guard.ts",
+		"!scripts/test/test-read-capture.ts",
+		"!scripts/test/test-read-recorder.ts",
 		"!scripts/test/test-repository-guard.ts",
 		"!scripts/test/test-state-guard.ts",
 		"!scripts/test/test-stdout-guard.ts",

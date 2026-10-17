@@ -70,7 +70,7 @@ describe('the static-checks job runs the verification gate', () => {
 // which checks it runs, so the coverage claim is read from the code rather than from a comment: a
 // check removed from `GATE_TARGETS` fails here rather than quietly leaving CI.
 describe('the gate still covers every check the job used to run', () => {
-	it.each(['lint', 'check', 'cspell:dot', 'test:unit'])('fans out to %j', (target) => {
+	it.each(['lint', 'check', 'cspell:dot', 'test:related'])('fans out to %j', (target) => {
 		expect(GATE_TARGETS).toContain(target)
 	})
 })

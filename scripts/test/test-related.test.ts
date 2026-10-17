@@ -4,11 +4,14 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
-vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
+vi.mock('#scripts/git/changed-paths', () => ({
+	changed_paths: { read_changed_paths: vi.fn(), read_changed_since: vi.fn() },
+}))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: {
 		is_running: vi.fn(),
@@ -28,17 +31,30 @@ const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_running = vi.mocked(test_unit_guard.is_running)
+const mocked_since = vi.mocked(changed_paths.read_changed_since)
 
 // Real paths in this repository, because the CLI drops a path the tree does not hold — a fixture
 // name would be filtered out before the assertion could see it.
 const REPOSITORY_ROOT = process.cwd()
 const CHANGED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const ABSOLUTE_SOURCE = path.join(REPOSITORY_ROOT, CHANGED_SOURCE)
+const ADDED_TEST = path.join('scripts', 'test', 'test-related.test.ts')
 const MISSING_FILE = 'no-such-file.ts'
 const GIT_FAILURE = 'not a git repository'
 
 // The reading taken before vitest starts, which the recorder compares against the tree afterwards.
 const BEFORE_TREE = { files: { [CHANGED_SOURCE]: 'digest' }, base: 'a22b3479' }
+
+// A map recorded on `MAP_COMMIT`, under which the README is read by the changed source.
+const MAP_COMMIT = 'f00dcafe'
+const DOCUMENT = 'README.md'
+const DIRTY_DOCUMENT = 'CHANGELOG.md'
+const MAP: ReadMap = {
+	version: test_read_map.MAP_VERSION,
+	commit: MAP_COMMIT,
+	dirty: [DIRTY_DOCUMENT],
+	readers: { [DOCUMENT]: [CHANGED_SOURCE], [DIRTY_DOCUMENT]: [CHANGED_SOURCE] },
+}
 
 function written_output(): string {
 	return vi
@@ -65,6 +81,8 @@ beforeEach(() => {
 	mocked_run.mockResolvedValue(0)
 	mocked_before.mockResolvedValue(BEFORE_TREE)
 	mocked_running.mockReturnValue(true)
+	mocked_since.mockResolvedValue([])
+	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
 })
 
 describe('test_related.run_related_tests — the green record', () => {
@@ -166,5 +184,79 @@ describe('test_related.run_related_tests — what it is told to narrow by', () =
 		mocked_run.mockResolvedValue(1)
 
 		await expect(test_related.run_related_tests([])).resolves.toBe(1)
+	})
+
+	it('resolves an explicit document argument through the map', async () => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
+
+		await test_related.run_related_tests([DOCUMENT])
+
+		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+		expect(written_output()).not.toContain(DOCUMENT)
+	})
+})
+
+// A test added since the map was recorded is in no map entry, so explicit arguments still read the
+// change the map answers for.
+describe('test_related.run_related_tests — explicit arguments against a map', () => {
+	beforeEach(() => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
+	})
+
+	it('joins the change since the map to the arguments, so a test added since it runs', async () => {
+		mocked_since.mockResolvedValue([ADDED_TEST])
+
+		await test_related.run_related_tests([DOCUMENT])
+
+		expect(mocked_since).toHaveBeenCalledWith(MAP_COMMIT)
+		expect(vitest_arguments()).toEqual([
+			'related',
+			path.join(REPOSITORY_ROOT, ADDED_TEST),
+			ABSOLUTE_SOURCE,
+			'--run',
+		])
+	})
+
+	it('drops a map whose commit cannot be resolved', async () => {
+		mocked_since.mockRejectedValue(new Error(GIT_FAILURE))
+
+		await test_related.run_related_tests([DOCUMENT])
+
+		expect(mocked_changed).not.toHaveBeenCalled()
+		expect(vitest_arguments()).toEqual(['run'])
+	})
+})
+
+// joshuafolkken/kit#4065: a map answers for the change since the tree it was recorded on.
+describe('test_related.run_related_tests — the change a map answers for', () => {
+	beforeEach(() => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
+	})
+
+	it('reads the change since the map’s commit rather than the branch change', async () => {
+		mocked_since.mockResolvedValue([DOCUMENT])
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_since).toHaveBeenCalledWith(MAP_COMMIT)
+		expect(mocked_changed).not.toHaveBeenCalled()
+		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+
+	it('counts what already differed from the map’s tree as changed', async () => {
+		await test_related.run_related_tests([])
+
+		expect(announcement()).toContain(CHANGED_SOURCE)
+		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+
+	it('drops the map and reads the branch change when its commit cannot be resolved', async () => {
+		mocked_since.mockRejectedValue(new Error(GIT_FAILURE))
+		mocked_changed.mockResolvedValue([DOCUMENT])
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_changed).toHaveBeenCalledOnce()
+		expect(vitest_arguments()).toEqual(['run'])
 	})
 })

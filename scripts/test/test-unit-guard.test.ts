@@ -3,14 +3,30 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
 import { free_cores } from '#scripts/gate/free-cores'
+import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { test_read_recording } from './test-read-recording'
 import { test_unit_guard } from './test-unit-guard'
 import { unit_worker_share } from './unit-worker-share'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/git/changed-file-scope', () => ({
+	changed_file_scope: { repository_root_or_cwd: vi.fn() },
+}))
+// **Mocked because the real one writes this checkout's test-read map** on a green whole-suite run.
+// What it records and when is `test-read-recording.test.ts`; here it hands the run its variables.
+vi.mock('./test-read-recording', () => ({ test_read_recording: { with_read_recording: vi.fn() } }))
 
 const mocked_execa = vi.mocked(execa)
+const mocked_recording = vi.mocked(test_read_recording.with_read_recording)
+const ROOT = path.resolve('/repo')
+const RECORDING = { JOSH_TEST_READS_ROOT: ROOT }
+
+beforeEach(() => {
+	vi.mocked(changed_file_scope.repository_root_or_cwd).mockResolvedValue(ROOT)
+	mocked_recording.mockImplementation(async (_root, _arguments, run) => await run(RECORDING))
+})
 
 type ExecaResult = Awaited<ReturnType<typeof execa>>
 
@@ -379,5 +395,15 @@ describe('test_unit_guard.run_guarded_unit — spawn environment', () => {
 
 		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 		expect_isolated_environment(last_spawn_options())
+	})
+
+	// joshuafolkken/kit#4065: the recorder decides from the arguments vitest is actually given.
+	it('hands the recorder the full vitest arguments and Vitest the recording variables', async () => {
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [CALLER_WORKERS])
+
+		expect(mocked_recording.mock.calls.at(-1)?.slice(0, 2)).toEqual([ROOT, ['run', CALLER_WORKERS]])
+		expect(last_spawn_options()['env']).toMatchObject(RECORDING)
 	})
 })

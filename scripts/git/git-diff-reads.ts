@@ -151,16 +151,22 @@ async function change_base_commit(): Promise<string> {
 	return await git_spawn.read(['rev-parse', await change_base()])
 }
 
-async function diff_main_names(): Promise<string> {
+// The working tree against any commit, with the same flags as the branch diff. `josh test:related`
+// reads the change since the commit its test-read map was recorded on, which is not the merge base.
+async function diff_names_since(commit: string): Promise<string> {
 	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		NAME_ONLY_FLAG,
 		NO_RELATIVE_PATHS,
 		NO_RENAME_DETECTION,
-		await change_base(),
+		commit,
 		'--',
 	])
+}
+
+async function diff_main_names(): Promise<string> {
+	return await diff_names_since(await change_base())
 }
 
 async function diff_cached_names(): Promise<string> {
@@ -224,6 +230,7 @@ const git_diff_reads = {
 	diff_main,
 	diff_main_names,
 	diff_main_numstat,
+	diff_names_since,
 	get_default_branch,
 	untracked_names,
 }

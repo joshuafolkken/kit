@@ -1,0 +1,7 @@
+{
+	"reason": "Review round-1 fixes: fs-read map readers for changed modules, explicit-argument map validity, recorder split into a testable capture module with its tests",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 458
+	}
+}

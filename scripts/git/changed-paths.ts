@@ -24,6 +24,15 @@ async function read_changed_paths(is_staged: boolean): Promise<Array<string>> {
 	return [...tracked, ...untracked]
 }
 
-const changed_paths = { read_changed_paths, to_paths }
+// The same reading against any commit rather than the change base — the change since the tree a
+// test-read map was recorded on.
+async function read_changed_since(commit: string): Promise<Array<string>> {
+	const tracked = to_paths(await git_command.diff_names_since(commit))
+	const untracked = to_paths(await git_command.untracked_names())
+
+	return [...new Set([...tracked, ...untracked])]
+}
+
+const changed_paths = { read_changed_paths, read_changed_since, to_paths }
 
 export { changed_paths }

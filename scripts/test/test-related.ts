@@ -1,11 +1,14 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { related_scope } from './test-related-scope'
+import { test_read_map, type ReadMap } from './test-read-map'
+import { related_scope, type ScopeRequest } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
@@ -30,16 +33,82 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 	return test_unit_guard.is_running(process.cwd()) ? before : undefined
 }
 
+// The change a narrowing reads, and the map it reads it against.
+type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'>
+
+// A failure answers `undefined` rather than an empty list: the two are opposite inputs to
+// `resolve_scope`, and only one of them means "could not tell".
+async function read_or_undefined(
+	read: () => Promise<ReadonlyArray<string>>,
+): Promise<ReadonlyArray<string> | undefined> {
+	try {
+		return await read()
+	} catch {
+		return undefined
+	}
+}
+
+async function branch_change(): Promise<ReadonlyArray<string> | undefined> {
+	return await read_or_undefined(async () => await changed_paths.read_changed_paths(false))
+}
+
+// **The change a map answers for is the change since the tree it was recorded on**, plus what
+// already differed from that tree then. A commit git can no longer resolve — a pruned or foreign
+// map — leaves the branch change with no map, which runs the whole suite on any non-code file.
+async function change_since(map: ReadMap): Promise<ReadonlyArray<string> | undefined> {
+	const since = await read_or_undefined(
+		async () => await changed_paths.read_changed_since(map.commit),
+	)
+
+	return since === undefined ? undefined : [...new Set([...since, ...map.dirty])]
+}
+
+async function map_change(map: ReadMap): Promise<ChangeReading> {
+	const changed = await change_since(map)
+
+	if (changed === undefined) return { changed: await branch_change(), map: undefined }
+
+	return { changed, map }
+}
+
+// Explicit file arguments win over the git reading, which is what makes the narrowing testable by
+// hand and usable from a hook that already knows which file it just wrote. **The map still answers
+// only for the change since its tree**, so that change joins the arguments: a test added since the
+// map was recorded is in no entry, and only its own appearance in the change runs it.
+async function explicit_change(
+	explicit: ReadonlyArray<string>,
+	map: ReadMap | undefined,
+): Promise<ChangeReading> {
+	const since = map === undefined ? undefined : await change_since(map)
+
+	if (since === undefined) return { changed: explicit, map: undefined }
+
+	return { changed: [...new Set([...explicit, ...since])], map }
+}
+
+async function read_change(
+	root: string,
+	command_arguments: ReadonlyArray<string>,
+): Promise<ChangeReading> {
+	const map = test_read_map.read_map(root)
+	const explicit = command_arguments
+		.filter((argument) => !changed_file_scope.is_flag(argument))
+		.map((file) => path.relative(root, path.resolve(file)))
+
+	if (explicit.length > 0) return await explicit_change(explicit, map)
+
+	return map === undefined ? { changed: await branch_change(), map } : await map_change(map)
+}
+
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const scope = await changed_file_scope.resolve_command_scope({
-		command_arguments,
-		root,
-		inputs: related_scope.scope_inputs(existsSync),
-	})
+	const change = await read_change(root, command_arguments)
+	const scope = related_scope.resolve_scope({ root, ...change, is_present: existsSync })
 
+	// A non-code argument is resolved through the map rather than handed to vitest, so only the
+	// code arguments can be ones vitest was not given.
 	changed_file_scope.report_unusable_arguments(
-		command_arguments,
+		command_arguments.filter((argument) => related_scope.is_relatable(argument)),
 		scope,
 		related_scope.COMMAND_LABEL,
 	)

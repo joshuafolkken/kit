@@ -31,7 +31,7 @@ pnpm josh gate --no-unit   # the static checks only (CI only)
 
 <!-- /usage -->
 
-- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`, `pnpm josh metrics` (in kit only); the unit leg is `pnpm josh test:unit`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
+- Static checks: `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh behavior`, `pnpm josh exports:unused`, `pnpm josh metrics` (in kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved.
 - Otherwise `lint`, `check` and `exports` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`); the header reads `reused — inputs unchanged since it passed at <time>`.
 - The other checks always run; `--force` and `--no-unit` reuse nothing.
@@ -39,7 +39,7 @@ pnpm josh gate --no-unit   # the static checks only (CI only)
 - **On failure, a line per failed check with the command to re-run is printed at the tail**, just above the verdict, so a `tail` of the output keeps every failure and its next action rather than one at a time.
 - **The last line is the verdict, counting what ran apart from what was skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
 - Exit `1` if any check failed. Refuses any argument other than the three flags.
-- The unit leg is the long pole; [`josh test:unit`](#josh-testunit) runs it as a two-project split — same files, less wall clock, not fewer tests.
+- The unit leg is the long pole; [`josh test:related`](#josh-testrelated) narrows it to the tests the change can reach and runs the whole suite when it cannot tell. CI runs the whole sharded suite regardless.
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`), so overlapping gates share the machine. How it is weighted: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".
@@ -223,7 +223,7 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:unit` in d
 
 ### `josh test:related`
 
-Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits. Added in front of the whole `josh test:unit`, never in place of it.
+Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits. `josh gate` runs it as its unit leg.
 
 <!-- usage: test:related -->
 
@@ -235,7 +235,8 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 <!-- /usage -->
 
-- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when no changed file is importable; a narrowed run matching nothing prints `No test files found` and exits 0.
+- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader, or a changed file is one every test depends on; a narrowed run matching nothing prints `No test files found` and exits 0.
+- A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.json`); with no map the changed set is the branch diff.
 
 ### `josh test:declared`
 

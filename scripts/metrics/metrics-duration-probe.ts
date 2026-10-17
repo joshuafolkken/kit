@@ -15,7 +15,7 @@ import { metrics_durations, type Durations } from './metrics-durations'
 // *previous* gates': `josh metrics` runs inside the gate whose own duration is not known yet.
 //
 // **A startup is the fastest of several runs**, the reading least disturbed by whatever else the
-// machine is doing — the gate runs this beside the whole unit suite.
+// machine is doing — the gate runs this beside its unit check.
 
 const SAMPLES = 5
 const BASELINE_FILE = 'josh-metrics-durations.json'

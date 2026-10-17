@@ -6,9 +6,11 @@ import { fileURLToPath } from 'node:url'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
 import { free_cores } from '#scripts/gate/free-cores'
 import { project_checks } from '#scripts/gate/project-checks'
+import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
+import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
 import { unit_worker_share } from './unit-worker-share'
 
 const PNPM = 'pnpm'
@@ -190,20 +192,34 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 	return unit_worker_share.current_share(available_cores, unit_worker_share.live_run_count(), free)
 }
 
+async function execute_vitest(
+	vitest_arguments: ReadonlyArray<string>,
+	recording: RecordingEnvironment,
+): Promise<number> {
+	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
+		env: { ...isolated_unit_environment(), ...recording },
+		extendEnv: false,
+		stdio: 'inherit',
+		reject: false,
+	})
+
+	return result.exitCode ?? FAIL_EXIT_CODE
+}
+
+// A whole-suite run also records the test-read map `josh test:related` narrows by.
 async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<number> {
 	return await unit_worker_share.with_run_marker(async () => {
-		const sized = unit_worker_share.worker_arguments(
-			vitest_arguments,
-			await vitest_share(vitest_arguments),
-		)
-		const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments, ...sized], {
-			env: isolated_unit_environment(),
-			extendEnv: false,
-			stdio: 'inherit',
-			reject: false,
-		})
+		const sized = [
+			...vitest_arguments,
+			...unit_worker_share.worker_arguments(vitest_arguments, await vitest_share(vitest_arguments)),
+		]
+		const root = await changed_file_scope.repository_root_or_cwd()
 
-		return result.exitCode ?? FAIL_EXIT_CODE
+		return await test_read_recording.with_read_recording(
+			root,
+			sized,
+			async (recording) => await execute_vitest(sized, recording),
+		)
 	})
 }
 

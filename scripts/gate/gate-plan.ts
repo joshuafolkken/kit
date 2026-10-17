@@ -49,6 +49,7 @@ interface GateCheck {
 const LINT_LABEL = 'lint'
 const TYPE_CHECK_LABEL = 'check'
 const UNIT_LABEL = 'test:unit'
+const UNIT_TARGET = 'test:related'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
 const EXPORTS_LABEL = 'exports'
@@ -124,9 +125,15 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 
 // The checks, in the order their output is printed — the static set, then the unit suite last (the
 // one check that fans out across every core, and the one the `--no-unit` split drops).
+//
+// **The unit check runs the tests the change can reach, not the whole suite**
+// (joshuafolkken/kit#4065): `josh test:related` narrows through the module graph and the test-read
+// map, and runs the whole suite — refreshing that map — whenever it cannot tell. The label stays
+// `test:unit`, the name every ledger, reservation and record knows the check by. CI runs the whole
+// sharded suite regardless.
 const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 	...STATIC_CHECKS,
-	{ label: UNIT_LABEL, target: UNIT_LABEL, reserved_cores: 0 },
+	{ label: UNIT_LABEL, target: UNIT_TARGET, reserved_cores: 0 },
 ]
 
 // **Selecting is not skipping, and the difference is where the unit suite runs rather than whether
@@ -469,6 +476,7 @@ const gate_plan = {
 	STATIC_CHECKS,
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
+	UNIT_TARGET,
 	WARNING_CHECKER_LABELS,
 	bound_by_free,
 	check_memory,
