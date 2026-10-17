@@ -12,6 +12,7 @@ const {
 	MACHINE_GUARD,
 	MAIN_EXCLUDE,
 	PURE_PROJECT,
+	READ_RECORDER,
 	STATE_GUARD,
 	STDOUT_GUARD,
 	TELEGRAM_GUARD,
@@ -123,9 +124,15 @@ describe('the state guard is scoped to the pure project', () => {
 // joshuafolkken/kit#2296: the stdout guard must run inside every worker of both projects, so a
 // fixture's direct stream write never leaks into `pnpm josh test:unit`'s output. joshuafolkken/kit#2494
 // puts the Telegram guard beside it, since it wraps each worker's own `fetch`, and joshuafolkken/kit#3415
-// the machine guard, since it replaces each worker's own machine reading.
+// the machine guard, since it replaces each worker's own machine reading. joshuafolkken/kit#4065
+// adds the test-read recorder after them, since a whole-suite run records from every worker.
 describe('the per-worker guards run on both projects', () => {
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('sets up every worker guard on %s', (name) => {
-		expect(project(name).setupFiles).toEqual([...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD])
+		expect(project(name).setupFiles).toEqual([
+			...STDOUT_GUARD,
+			...TELEGRAM_GUARD,
+			...MACHINE_GUARD,
+			...READ_RECORDER,
+		])
 	})
 })

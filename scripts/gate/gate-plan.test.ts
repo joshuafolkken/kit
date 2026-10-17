@@ -322,7 +322,7 @@ describe('gate_plan the checks a gate runs', () => {
 			['behavior', 'behavior'],
 			['exports', 'exports:unused'],
 			['metrics', 'metrics'],
-			['test:unit', 'test:unit'],
+			['test:unit', 'test:related'],
 		])
 	})
 })

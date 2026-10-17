@@ -87,14 +87,14 @@ describe('josh gate --no-unit', () => {
 		await run_gate(NO_UNIT)
 
 		expect(spawned_checks()).toHaveLength(gate_plan.STATIC_CHECKS.length)
-		expect(spawned_checks().join('\n')).not.toContain(gate_plan.UNIT_LABEL)
+		expect(spawned_checks().join('\n')).not.toContain(gate_plan.UNIT_TARGET)
 	})
 
 	it('still runs all four when the flag is absent', async () => {
 		await run_gate([])
 
 		expect(spawned_checks()).toHaveLength(gate_plan.GATE_CHECKS.length)
-		expect(spawned_checks().join('\n')).toContain(gate_plan.UNIT_LABEL)
+		expect(spawned_checks().join('\n')).toContain(gate_plan.UNIT_TARGET)
 	})
 })
 

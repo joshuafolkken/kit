@@ -72,7 +72,10 @@ describe('vitest configs — every config arms the same guards', () => {
 		(name) => {
 			const project = unit_projects.UNIT_PROJECTS.find((one) => one.test.name === name)
 
-			expect(project?.test.setupFiles).toEqual(unit_projects.WORKER_GUARDS)
+			expect(project?.test.setupFiles).toEqual([
+				...unit_projects.WORKER_GUARDS,
+				...unit_projects.READ_RECORDER,
+			])
 		},
 	)
 })

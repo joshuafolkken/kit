@@ -1,5 +1,6 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PURE_FILES } from '#scripts/test/pure-files'
+import { unit_setup_files } from '#scripts/test/unit-setup-files'
 import { VITEST_INCLUDE_GLOBS } from '#scripts/test/vitest-include-globs'
 
 // The unit suite runs as two Vitest projects so the isolation-safe files can skip per-file worker
@@ -66,32 +67,7 @@ const ENV: Record<string, string> = {
 const PURE_PROJECT = 'pure'
 const ISOLATED_PROJECT = 'isolated'
 
-// The state guard runs on the pure project alone. isolate:false is what lets one file see the git
-// branch, working tree or GIT_* variables a sibling left changed, so that is the only run where a leak
-// is a correctness problem rather than a latent one — and the isolated project keeps exactly the guards
-// the single-project suite had. The network guard is armed once at the root instead, since it arms
-// `PATH` before any worker of either project forks.
-const STATE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-state-guard.ts']
-
-// Runs in every worker of both projects, before each test, and silences the real streams for the test
-// body so a fixture's direct `process.stdout` write cannot leak into `pnpm josh test:unit`'s output.
-// `setupFiles` rather than `globalSetup` because it must run inside the
-// worker where the test's writes happen, not once in the main process.
-const STDOUT_GUARD: ReadonlyArray<string> = ['./scripts/test/test-stdout-guard.ts']
-
-// Runs in every worker for the same reason: it wraps that worker's own `fetch`, refusing a real
-// Telegram send and recording which test tried.
-const TELEGRAM_GUARD: ReadonlyArray<string> = ['./scripts/test/test-telegram-guard.ts']
-
-// Runs in every worker too: it replaces that worker's machine reading, so a suite that drives the gate
-// admits the same way on every platform and every load.
-const MACHINE_GUARD: ReadonlyArray<string> = ['./scripts/test/test-machine-guard.ts']
-
-// The guards every run of the suite arms, whichever config starts it: the network guard once in the
-// main process, the stdout, Telegram and machine guards in every worker. Named here so `vitest.config.ts` and
-// `vitest.harness.config.ts` read one definition — the harness once ran with none of them.
-const NETWORK_GUARD: ReadonlyArray<string> = ['./scripts/test/test-network-guard.ts']
-const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD, ...MACHINE_GUARD]
+const { STATE_GUARD, WORKER_GUARDS, READ_RECORDER } = unit_setup_files
 
 interface UnitProjectTest {
 	name: string
@@ -126,7 +102,7 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 			isolate: spec.isolate,
 			testTimeout: TEST_TIMEOUT_MS,
 			globalSetup: [...(spec.globalSetup ?? [])],
-			setupFiles: [...WORKER_GUARDS],
+			setupFiles: [...WORKER_GUARDS, ...READ_RECORDER],
 		},
 	}
 }
@@ -147,17 +123,12 @@ const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
 ]
 
 const unit_projects = {
+	...unit_setup_files,
 	ENV,
 	ISOLATED_PROJECT,
-	MACHINE_GUARD,
 	MAIN_EXCLUDE,
-	NETWORK_GUARD,
 	PURE_PROJECT,
-	STATE_GUARD,
-	STDOUT_GUARD,
-	TELEGRAM_GUARD,
 	UNIT_PROJECTS,
-	WORKER_GUARDS,
 }
 
 export type { UnitProject, UnitProjectTest }

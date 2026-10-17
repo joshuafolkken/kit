@@ -211,7 +211,7 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 			'behavior',
 			'exports:unused',
 			'metrics',
-			'test:unit',
+			'test:related',
 		])
 	})
 

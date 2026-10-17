@@ -418,7 +418,7 @@ describe('the gate follows the plan', () => {
 
 		expect(unit_step_args(steps)).toEqual([
 			JOSH,
-			gate_plan.UNIT_LABEL,
+			gate_plan.UNIT_TARGET,
 			`${verification_gate.UNIT_WORKER_FLAG}=${String(UNIT_CAP)}`,
 		])
 	})
@@ -437,7 +437,7 @@ describe('the gate follows the plan', () => {
 	it('leaves the unit command bare when the plan caps nothing', async () => {
 		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, UNCAPPED_PLAN)
 
-		expect(unit_step_args(steps)).toEqual([JOSH, gate_plan.UNIT_LABEL])
+		expect(unit_step_args(steps)).toEqual([JOSH, gate_plan.UNIT_TARGET])
 	})
 
 	// The whole point of the gate is that one failure never hides the other three. Narrowing the
