@@ -95,7 +95,7 @@ function others_line(
 		...kind_named,
 		...waits_legend(rows),
 		...drawn.checks,
-		...run_board_render_notes.notes_legend(notes, named),
+		...run_board_render_notes.notes_legend(notes, named, rows),
 	]
 }
 

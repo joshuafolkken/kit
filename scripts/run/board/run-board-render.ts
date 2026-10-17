@@ -340,11 +340,10 @@ function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Arr
 // The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
 // many more there are, so the section never pushes the plan off the screen.
 function notes_part(notes: ReadonlyArray<BoardNote>, header: BoardHeader): NotesPart {
-	const has_legend = header.layout !== undefined
-	const lines = run_board_render_notes.note_lines(notes, has_legend, header.link)
-	const label = has_legend ? NOTES_ICON : WORDS.notes
+	const body = run_board_render_notes.note_lines(notes, header)
+	const label = header.layout === undefined ? WORDS.notes : NOTES_ICON
 
-	return { head: heading_lines(label), lines, hidden: notes.length - lines.length }
+	return { head: heading_lines(label), ...body }
 }
 
 // The command that resumes a stopped run's session, under the header where the person looks first.
