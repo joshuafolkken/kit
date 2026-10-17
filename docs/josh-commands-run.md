@@ -626,6 +626,7 @@ A child whose open lane has had no child process for `lane:await`'s 15-second re
 A waiting row (`⏳`) ends with why it waits, in English whatever the session language, after its `🔗` blockers — which are drawn as before, so a row with both shows both:
 
 - `untriaged` — the issue carries neither `run:lane` nor `run:solo`, so nobody has judged it. It is the one reason drawn beside a `🔗`, since judging it is what a person can do meanwhile.
+- `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue until then. It comes before every reason below.
 - `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
 - `overlaps <N> (<file>)` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
 - `no free lane` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read.
