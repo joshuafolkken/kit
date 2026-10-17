@@ -63,8 +63,17 @@ function trim_trailing_blanks(lines: ReadonlyArray<string>): Array<string> {
 	return trimmed
 }
 
-// The first line at or after `from` that is not blank and sits left of `width`, or `limit`.
-function block_end(
+function is_comment(line: string | undefined): boolean {
+	return line?.trimStart().startsWith('#') === true
+}
+
+// A blank line, or a comment left of `width`: it may sit inside a block or head the next one.
+function is_detached(line: string | undefined, width: number): boolean {
+	return is_blank(line) || (is_comment(line) && indent_width(line ?? '') < width)
+}
+
+// The first key line at or after `from` that sits left of `width`, or `limit`.
+function block_stop(
 	lines: ReadonlyArray<string>,
 	from: number,
 	width: number,
@@ -72,9 +81,27 @@ function block_end(
 ): number {
 	const relative = lines
 		.slice(from, limit)
-		.findIndex((line) => !is_blank(line) && indent_width(line) < width)
+		.findIndex((line) => !is_blank(line) && !is_comment(line) && indent_width(line) < width)
 
 	return relative === -1 ? limit : from + relative
+}
+
+// The block runs to the next key line left of `width`. A comment left of `width` in the middle stays
+// inside, while the run of such comments right before that key belongs to what follows.
+function block_end(
+	lines: ReadonlyArray<string>,
+	from: number,
+	width: number,
+	limit: number,
+): number {
+	const stop = block_stop(lines, from, width, limit)
+	let end = stop
+
+	for (let index = stop - 1; index >= from && is_detached(lines[index], width); index -= 1) {
+		if (!is_blank(lines[index])) end = index
+	}
+
+	return end
 }
 
 // The next top-level key. A list written flush with `updates:` and a comment at column 0 both still

@@ -139,6 +139,17 @@ describe('dependabot_cooldown.merge_cooldown with a leading cooldown', () => {
 	})
 })
 
+describe('dependabot_cooldown.merge_cooldown with a shallow comment', () => {
+	it('keeps a comment indented left of the keys inside its entry', () => {
+		const entry = [UPDATES_LINE, `  - ${NPM_KEY}`, '  # weekly', "    schedule: 'weekly'"]
+		const window: ReleaseWindow = { minutes: DEFAULT_RELEASE_AGE_MINUTES, exclusions: [] }
+
+		expect(dependabot_cooldown.merge_cooldown(entry.join('\n'), window)).toBe(
+			[...entry, ...COOLDOWN].join('\n'),
+		)
+	})
+})
+
 describe('dependabot_cooldown.sync_dependabot_cooldown', () => {
 	it('writes the three-day default when the repository has no pnpm-workspace.yaml', () => {
 		with_root((root) => {
