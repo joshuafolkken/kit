@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_fixture } from '#scripts/run/event/run-event-stream-fixture'
 import { run_ship_stage, type Stage } from '#scripts/run/ship/run-ship-stage'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_board_status, type ItemStatus } from './run-board-status'
@@ -40,9 +41,12 @@ function saturated(): string {
 	run_event_stream.append(target, KIND.CHILD_LAUNCH, `${CITE} launched`, AT)
 	run_event_stream.append(target, KIND.LANE_PHASE, `${CITE} implement`, AT)
 
-	for (let index = 0; index < run_event_stream.EVENT_CAP - OWN_POSITIONS - 1; index += 1) {
-		run_event_stream.append(target, KIND.LANE_PHASE, '#1 implement', AT)
-	}
+	run_event_stream_fixture.fill(
+		target,
+		KIND.LANE_PHASE,
+		run_event_stream.EVENT_CAP - OWN_POSITIONS - 1,
+		() => '#1 implement',
+	)
 
 	return target
 }

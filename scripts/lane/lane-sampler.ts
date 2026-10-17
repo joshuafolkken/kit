@@ -14,6 +14,8 @@ const SAMPLE_INTERVAL_MS = 60_000
 // Where the ledger is and what "now" is, overridable so a test reads a fixed ledger at a fixed instant.
 interface MeasureContext {
 	ledger_path?: string
+	// The run's event stream `lane:stats` reads parks from; absent, the repository's own.
+	events_path?: string
 	now_ms?: number
 }
 
