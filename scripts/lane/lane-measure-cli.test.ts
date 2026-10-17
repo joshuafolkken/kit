@@ -139,3 +139,19 @@ describe('lane_measure_cli.run — stats reads the event stream', () => {
 		expect(printed).toContain('| gate | 1.0 | 1.0 | 1.0 | 1 | 0 |')
 	})
 })
+
+// joshuafolkken/kit#3995: and how long a free lane stayed empty, by why.
+describe('lane_measure_cli.run — stats holds', () => {
+	it('prints the per-hold-reason table', async () => {
+		const context = fresh_context()
+
+		lane_ledger.append(context.ledger_path, { kind: 'held', at: AT, reason: 'offer:wait' })
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| held by | total (min) | median (min) | max (min) | holds |')
+		expect(printed).toContain('| offer:wait | not measured | not measured | not measured | 1 | 1 |')
+	})
+})

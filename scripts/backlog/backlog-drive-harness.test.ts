@@ -89,6 +89,7 @@ function ports(world_state: World): LoopPorts {
 		free_lanes: async () => FREE_LANES,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
+		hold: async () => undefined,
 		now: () => new Date(world_state.clock),
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds

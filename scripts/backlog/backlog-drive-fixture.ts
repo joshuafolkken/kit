@@ -25,6 +25,7 @@ interface Harness {
 	calls: Array<string>
 	offers: Array<DriveState>
 	states: Array<DriveState>
+	holds: Array<string | undefined>
 }
 
 interface Script {
@@ -141,15 +142,20 @@ function harness(script: Script): Harness {
 	const calls: Array<string> = []
 	const offers: Array<DriveState> = []
 	const states: Array<DriveState> = []
+	const holds: Array<string | undefined> = []
 
 	return {
 		calls,
 		offers,
 		states,
+		holds,
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
 			...loop_ports(calls, states),
+			hold: async (reason) => {
+				holds.push(reason)
+			},
 		},
 	}
 }

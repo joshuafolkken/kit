@@ -175,6 +175,34 @@ lane whose open pull request changes a path its own change does (`run-ship-overl
 The entry names the lanes, the shared paths, `waited_ms` and whether the wait cleared. Read it against
 the `conflict` row of the same period.
 
+## Why a free lane stayed empty
+
+Under the stop table, `lane:stats` prints one row per reason `backlog:drive` left a free lane empty. Each
+row shows the total, median and maximum minutes, how many holds were recorded (`holds`), and how many
+had no end (`not ended`). A period with no hold prints a `none` row.
+
+The driver records the hold only while a lane is free. A pass that collects a child asks for the
+next offer in that same pass, so a freed lane is offered at once. Two passes record a `held` entry:
+
+- An offered pass that started nothing. The entry is `offer:<verdict>[:<answer>]`, for example
+  `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing.
+- A driver end that hands control back to a session. The entry is `hand-back:<reason>`, for example
+  `hand-back:merge` or `hand-back:window`. A finished run (`stop`, or the drain's `watch` or
+  `retrospective`) is not a hold.
+
+Every lane taken is the limit, not idle capacity, and a finished run owes no lane a child. Either one
+records a `released` entry instead, once per hold. This ends a hold that a lane opened outside the
+driver filled, such as an epic run or a person's `lane:open`.
+
+The time is derived, not recorded. A hold runs until the next `held`, `released` or `dispatch` entry.
+The driver offers once a minute while it waits, so consecutive entries cover the wait and the last one
+ends at the dispatch or the release. A hold past an hour is a driver nobody restarted, and it reads as
+ended at the hour.
+
+**The decision the table is for**: what `backlog:stalled`'s "ready, free lane, no dispatch" time is
+made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
+own answer. Compare the rows from one period to the next to show the idle time shrinking.
+
 ## What the load is made of
 
 A `load` sample's `processes` is the machine's process list at that minute, grouped by the kind of

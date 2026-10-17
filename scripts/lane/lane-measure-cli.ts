@@ -6,6 +6,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
+import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
@@ -130,6 +131,7 @@ async function stats_command(
 			`${lane_stats.header()}\n${row}`,
 			lane_stage_stats.table(entries, window),
 			lane_stop_stats.table(entries, window, await read_events(context)),
+			lane_held_stats.table(entries, window),
 			lane_process_stats.table(entries, window),
 			lane_check_stats.table(entries, window),
 		].join('\n\n'),
