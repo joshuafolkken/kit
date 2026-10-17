@@ -20,6 +20,7 @@ import type { BoardNote } from './run-board-notes'
 import { run_board_render_drawn } from './run-board-render-drawn'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
+import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_thanks } from './run-board-render-thanks'
@@ -46,9 +47,7 @@ const GAP = '  '
 const INDENT = '  '
 const BRANCH = '     ├ '
 const LAST_BRANCH = '     └ '
-const RULE = '─'
-const RULE_LEAD = `${RULE}${RULE}`
-const RULE_WIDTH = 50
+const { done_section, heading_lines, plan_section } = run_board_render_section
 
 // The live terminal a frame is kept within, and the footer the frame ends on and gives way first;
 // neither for a frame that is not redrawn in place.
@@ -245,23 +244,6 @@ function entry_lines(entry: WaveEntry, frame: RowFrame): Array<PlanLine> {
 	return epic_lines(entry, frame)
 }
 
-function rule_of(label: string): string {
-	return `${RULE_LEAD} ${label} `.padEnd(RULE_WIDTH, RULE)
-}
-
-function heading_lines(heading: string | undefined): Array<string> {
-	return heading === undefined ? [''] : ['', rule_of(heading)]
-}
-
-function plan_section(
-	heading: string | undefined,
-	lines: ReadonlyArray<PlanLine>,
-): Array<PlanSection> {
-	if (lines.length === 0) return []
-
-	return [{ head: heading_lines(heading), lines }]
-}
-
 function rows_section(
 	heading: string | undefined,
 	rows: ReadonlyArray<BoardRow>,
@@ -329,11 +311,18 @@ function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Arr
 		),
 	)
 
+	const done = layout.active.filter((row) => run_board_layout.is_finished(row.state))
+
 	return [
-		...rows_section(undefined, layout.active, frame),
+		...rows_section(
+			undefined,
+			layout.active.filter((row) => !done.includes(row)),
+			frame,
+		),
 		...waves,
 		...rows_section(STATE_ICONS.human, layout.people, frame),
-		...rows_section(WAITS_ICON, layout.unreached, frame),
+		...rows_section(`${WAITS_ICON} ${WORDS.waiting}`, layout.unreached, frame),
+		...done_section(done, (row) => row_line(INDENT, row, frame)),
 	]
 }
 

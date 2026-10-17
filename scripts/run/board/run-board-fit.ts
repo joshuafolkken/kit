@@ -8,7 +8,8 @@ import { run_board_labels } from './run-board-labels'
 // the footer, the legend, the oldest notes until three are left, the finished rows, the rest of the
 // notes, the reviewers thanked above the legend, the rows not yet started, the parked rows and, last,
 // the running rows — what a person keeps the board open to see. Each stage stops once the
-// frame fits, a cut row is counted on its section's `more N` line, and the order a row is drawn in
+// frame fits, a cut row is counted on the plan's `more N` line — or on its folding section's own last
+// line while that section keeps a row (joshuafolkken/kit#4042) — and the order a row is drawn in
 // never changes. A line wider than the pane wraps, so every line is counted by the rows it takes on
 // screen, not as one.
 
@@ -37,10 +38,12 @@ interface PlanLine {
 	row: RowYield | undefined
 }
 
-// A plan section drops its heading once none of its rows is left.
+// A plan section drops its heading once none of its rows is left — unless it folds: then its cut rows
+// are counted on its own last line, drawn by `fold`, rather than on the plan's `more N`.
 interface PlanSection {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<PlanLine>
+	fold?: ((cut: ReadonlyArray<PlanLine>) => string) | undefined
 }
 
 // The newest notes shown, and how many older ones are already past the section's limit.
@@ -92,21 +95,51 @@ function more_lines(hidden: number): Array<string> {
 }
 
 // A section that ends on an epic whose children were all cut ends on its last row instead.
-function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<string> {
+function kept_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<string> {
 	const kept = section.lines.filter((line) => !cut.has(line))
 	const last = kept.findLastIndex((line) => line.row !== undefined)
 
-	if (last === -1) return []
+	return kept.slice(0, last + 1).map((line) => line.text)
+}
 
-	return [...section.head, ...kept.slice(0, last + 1).map((line) => line.text)]
+// A folding section counts its own cut rows while any of its rows is left; with none left it goes,
+// and the plan's `more N` counts them.
+function is_folding(section: PlanSection, cut: ReadonlySet<PlanLine>): boolean {
+	return section.fold !== undefined && kept_lines(section, cut).length > 0
+}
+
+// The fold line a folding section ends on while any of its rows is cut.
+function fold_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<string> {
+	const gone = section.lines.filter((line) => cut.has(line))
+
+	if (!is_folding(section, cut) || gone.length === 0) return []
+
+	return [section.fold?.(gone) ?? '']
+}
+
+function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<string> {
+	const kept = kept_lines(section, cut)
+
+	if (kept.length === 0) return []
+
+	return [...section.head, ...kept, ...fold_lines(section, cut)]
+}
+
+// The cut rows no folding section counts.
+function unfolded(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>): number {
+	const folding = plan.filter((section) => is_folding(section, cut))
+	const folded = new Set(folding.flatMap((section) => section.lines))
+
+	return [...cut].filter((line) => !folded.has(line)).length
 }
 
 // The plan's cut rows are counted on one line at its end, under a blank when no section is left.
 function plan_lines(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>): Array<string> {
 	const drawn = plan.flatMap((section) => section_lines(section, cut))
-	const lead = drawn.length === 0 && cut.size > 0 ? [''] : []
+	const hidden = unfolded(plan, cut)
+	const lead = drawn.length === 0 && hidden > 0 ? [''] : []
 
-	return [...lead, ...drawn, ...more_lines(cut.size)]
+	return [...lead, ...drawn, ...more_lines(hidden)]
 }
 
 // The notes give way from the oldest shown; with none left the section goes, heading and all.
