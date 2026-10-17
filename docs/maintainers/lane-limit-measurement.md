@@ -166,6 +166,13 @@ stop late in the period whose end falls after it reads as `not resumed` as well.
 keeps about a week of a run's events, so a park older than that is gone and its stop reads as
 `not resumed`.
 
+The `causes` column counts each reason's stops by cause, most frequent first (`infra 2, check 1`):
+`finding`, `conflict`, `infra` (a rate limit, missing checks, a network failure) or `check`.
+
+Only `sync`, `commit`, `followup` and `report` can read as `infra`. `josh ship` re-runs such a
+stage up to twice, a minute apart, before it stops (`run-ship-infra-retry.ts`). A stop recorded
+before causes existed reads as `unrecorded`.
+
 **The decision the table is for**: which stop reason to remove next — the reason with the largest
 `wait total (min)` costs the lanes the most time.
 

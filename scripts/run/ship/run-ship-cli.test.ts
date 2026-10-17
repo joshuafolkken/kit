@@ -373,24 +373,19 @@ describe('run_ship_cli.run — --review carries round 2 between the commit and t
 
 // joshuafolkken/kit#3643: every stage that ran leaves its duration in the lane ledger, so
 // `lane:stats` can say where a lane's time went — the stage that stopped the ship included.
-it('records each stage a ship ran, never a skipped one, up to the one that failed', async () => {
+// joshuafolkken/kit#3789: the stop goes to the ledger too, so `lane:stats` can time the wait it began;
+// joshuafolkken/kit#3998: with its cause — a red gate is a check whatever it prints, never retried.
+it('records each stage a ship ran, never a skipped one, and the stop with its cause', async () => {
 	const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+	const record_stop = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+	const stop = { issue: Number(NUMBER), reason: 'gate', cause: 'check' }
 
 	review_mock.mockResolvedValue({ code: OK, out: 'round 1 already recorded', is_skipped: true })
-	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red' })
+	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red: rate limit test' })
 	await run_ship_cli.run([TITLE, '--review'])
 
 	expect(
 		record.mock.calls.map(([stage]) => `${stage.stage} #${String(stage.issue)}`),
 	).toStrictEqual(['preflight', 'sync', 'gate'].map((stage) => `${stage} #${NUMBER}`))
-})
-
-// joshuafolkken/kit#3789: the stop goes to the ledger too, so `lane:stats` can time the wait it began.
-it('records the stop of a ship with the stage it stopped at', async () => {
-	const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
-
-	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red' })
-	await run_ship_cli.run([TITLE, '--review'])
-
-	expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'gate' }]])
+	expect(record_stop.mock.calls).toStrictEqual([[stop]])
 })

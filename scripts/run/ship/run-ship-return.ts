@@ -10,6 +10,7 @@ import type { ShipSection } from './run-ship'
 import { run_ship_next, type ShipResume } from './run-ship-next'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
+import { run_ship_stop_cause } from './run-ship-stop-cause'
 import { run_ship_stop_context } from './run-ship-stop-context'
 import { run_ship_stop_text } from './run-ship-stop-text'
 
@@ -33,8 +34,11 @@ const OPENAI_PROVIDER = 'openai'
 
 type ReturnOutcome = 'relaunched' | 'recorded'
 
-function stop_text(issue: string, stage: Stage, resume: ShipResume): string {
-	return run_ship_stop_text.format(issue, run_ship_stage.stop_reason(stage, resume.conflicts))
+function stop_text(issue: string, stage: Stage, resume: ShipResume, output: string): string {
+	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+	const cause = run_ship_stop_cause.cause_of(stage, output, resume.conflicts)
+
+	return run_ship_stop_text.format(issue, reason, cause)
 }
 
 function can_relaunch(lane: LaneInfo | undefined): lane is LaneInfo {
@@ -92,7 +96,7 @@ async function return_control(
 ): Promise<ReturnOutcome> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.SHIP_STOP,
-		stop_text(issue, stage, resume),
+		stop_text(issue, stage, resume, output),
 	)
 
 	const lane = await lane_to_relaunch(issue)

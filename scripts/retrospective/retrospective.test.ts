@@ -201,7 +201,7 @@ describe('retrospective.compose — the invocation scope of the friction count',
 // joshuafolkken/kit#3245: where the run's ship supervisors stopped, by stage, read back from the very
 // text the supervisor writes.
 function ship_stop(reason: string, at: string = RUN_START): RunEvent {
-	return { pos: 1, at, kind: 'ship-stop', text: run_ship_stop_text.format('3245', reason) }
+	return { pos: 1, at, kind: 'ship-stop', text: run_ship_stop_text.format('3245', reason, 'check') }
 }
 
 describe('retrospective.compose — ship stops by stage', () => {

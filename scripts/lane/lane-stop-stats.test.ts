@@ -45,8 +45,8 @@ function park(text: string, minutes_before: number): RunEvent {
 	return { pos: 1, at: minutes_before_now(minutes_before), kind: 'park', text }
 }
 
-// The cells of one reason's row, without the reason.
-function row_of(
+// Every cell of one reason's row, the reason included.
+function cells_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	reason: string,
 	events: ReadonlyArray<RunEvent> = [],
@@ -56,7 +56,20 @@ function row_of(
 		.split('\n')
 		.map((line) => line.slice(2, -2).split(' | '))
 
-	return rows.find(([first]) => first === reason)?.slice(1)
+	return rows.find(([first]) => first === reason)
+}
+
+// The wait cells of one reason's row, without the reason and the causes.
+function row_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	reason: string,
+	events: ReadonlyArray<RunEvent> = [],
+): Array<string> | undefined {
+	return cells_of(entries, reason, events)?.slice(1, -1)
+}
+
+function causes_of(entries: ReadonlyArray<LedgerEntry>, reason: string): string | undefined {
+	return cells_of(entries, reason)?.at(-1)
 }
 
 describe('lane_stop_stats.table — the rows', () => {
@@ -75,7 +88,7 @@ describe('lane_stop_stats.table — the rows', () => {
 		const [header] = lane_stop_stats.table([], WINDOW).split('\n', 1)
 
 		expect(header).toBe(
-			'| stop | wait median (min) | wait max (min) | wait total (min) | runs | not resumed |',
+			'| stop | wait median (min) | wait max (min) | wait total (min) | runs | not resumed | causes |',
 		)
 	})
 
@@ -154,5 +167,27 @@ describe('lane_stop_stats.table — a stop nothing ended', () => {
 		const day_and_a_half = 36 * 60
 
 		expect(row_of([stop(GATE, day_and_a_half)], GATE)).toStrictEqual([...UNENDED, '0'])
+	})
+})
+
+// joshuafolkken/kit#3998: each row counts its stops by cause, so the share the infrastructure took is a
+// number rather than a guess.
+describe('lane_stop_stats.table — the causes', () => {
+	it('counts a reason’s stops by cause, the most frequent first', () => {
+		const entries = [
+			{ ...stop(GATE, 30), cause: 'check' },
+			{ ...stop(GATE, 20), cause: 'infra' },
+			{ ...stop(GATE, 10), cause: 'infra' },
+		]
+
+		expect(causes_of(entries, GATE)).toBe('infra 2, check 1')
+	})
+
+	it('counts a stop recorded before it carried a cause as unrecorded', () => {
+		expect(causes_of([stop(REVIEW, 10)], REVIEW)).toBe('unrecorded 1')
+	})
+
+	it('prints a dash for a reason nothing stopped at', () => {
+		expect(causes_of([], GATE)).toBe('-')
 	})
 })

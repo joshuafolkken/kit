@@ -77,6 +77,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 
 const { run_ship_cli } = await import('./run-ship-cli')
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2428: the CLI side of the detached supervisor — `--detach` hands the region over and
 // runs nothing itself, `--log <N>` prints what a stopped supervisor left, `--cite` carries follow-ups so
@@ -201,7 +202,21 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
 		await run_ship_cli.run([TITLE])
 
-		expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'preflight' }]])
+		expect(record.mock.calls).toStrictEqual([
+			[{ issue: Number(NUMBER), reason: 'preflight', cause: 'check' }],
+		])
+	})
+})
+
+// joshuafolkken/kit#3998: every stage runs through the retry that re-runs an infrastructure stop.
+describe('run_ship_cli.run — the infrastructure retry', () => {
+	it('runs a stage through the infrastructure retry', async () => {
+		const retried = vi.spyOn(run_ship_infra_retry, 'retried')
+
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		await run_ship_cli.run([TITLE])
+
+		expect(retried).toHaveBeenCalledWith('preflight', expect.any(Function))
 	})
 })
 
