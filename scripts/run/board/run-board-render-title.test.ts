@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import type { BoardRow, RowReason } from './run-board-layout'
-import { run_board_render_title } from './run-board-render-title'
+import { run_board_render_title, type RowCut } from './run-board-render-title'
 
-const { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of } = run_board_render_title
+const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of } = run_board_render_title
 
 const SECOND = 1000
 const NOW = 1_000_000
@@ -15,6 +15,11 @@ const INSTALLING: RowReason = { text: 'installing', since_ms: NOW - STAGE_SECOND
 const TITLE_FLOOR = 8
 const OVERRUN = 8
 const TINY_PANE = 10
+// A pane the floored title leaves room in for only part of the reason.
+const FLOOR_PANE = 14
+const REASON_CUT = 4
+// Six characters taking two columns each.
+const WIDE_REASON = '理由を書いた'
 
 function row_of(extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -28,10 +33,10 @@ function row_of(extra: Partial<BoardRow> = {}): BoardRow {
 	}
 }
 
-// A row's line as a renderer would draw it: its title at the limit, then its reason.
-function draw_of(row: BoardRow): (title_limit: number) => string {
-	return function draw(title_limit: number): string {
-		return `${title_of(row.title, title_limit)} ${row.reason?.text ?? ''}`
+// A row's line as a renderer would draw it: its title at the limit, then its reason with its cut.
+function draw_of(row: BoardRow): (cut: RowCut) => string {
+	return function draw({ title_limit, reason_cut }: RowCut): string {
+		return `${title_of(row.title, title_limit)} ${reason_text(row, NOW, reason_cut) ?? ''}`
 	}
 }
 
@@ -41,7 +46,7 @@ function fitted_in(row: BoardRow, columns: number | undefined): string {
 
 // The pane the row's full-title line runs `OVERRUN` columns past.
 function pane_of(row: BoardRow): number {
-	return run_board_fit.width_of(draw_of(row)(TITLE_LIMIT)) - OVERRUN
+	return run_board_fit.width_of(draw_of(row)(WHOLE)) - OVERRUN
 }
 
 describe('run_board_render_title.title_of', () => {
@@ -73,6 +78,27 @@ describe('run_board_render_title.reason_text', () => {
 	it('says a stage with how long the lane has stood at it', () => {
 		expect(reason_text(row_of({ reason: INSTALLING }), NOW)).toBe('installing 42″')
 	})
+
+	it('gives up the cut columns at the reason end, ending on an ellipsis', () => {
+		// The ellipsis takes one of the columns left.
+		const kept = UNTRIAGED.text.slice(0, UNTRIAGED.text.length - REASON_CUT - ELLIPSIS.length)
+
+		expect(reason_text(row_of({ reason: UNTRIAGED }), NOW, REASON_CUT)).toBe(`${kept}${ELLIPSIS}`)
+	})
+
+	it('cuts a wide-character reason by the columns it takes, not its characters', () => {
+		const row = row_of({ reason: { text: WIDE_REASON } })
+		const cut = reason_text(row, NOW, REASON_CUT) ?? ''
+
+		expect(cut).toBe(`理由を${ELLIPSIS}`)
+		expect(run_board_fit.width_of(cut)).toBeLessThanOrEqual(
+			run_board_fit.width_of(WIDE_REASON) - REASON_CUT,
+		)
+	})
+
+	it('leaves only the ellipsis for a cut at or past the reason length', () => {
+		expect(reason_text(row_of({ reason: UNTRIAGED }), NOW, UNTRIAGED.text.length)).toBe(ELLIPSIS)
+	})
 })
 
 describe('run_board_render_title.fitted', () => {
@@ -83,21 +109,24 @@ describe('run_board_render_title.fitted', () => {
 		expect(run_board_fit.width_of(fitted_in(row, columns))).toBe(columns)
 	})
 
-	it('never cuts the title under the floor', () => {
+	it('never cuts the title under the floor, and cuts the reason for the rest', () => {
 		const row = row_of({ reason: UNTRIAGED })
+		const line = fitted_in(row, FLOOR_PANE)
 
-		expect(fitted_in(row, TINY_PANE)).toBe(draw_of(row)(TITLE_FLOOR))
+		expect(line.startsWith(`${title_of(LONG_TITLE, TITLE_FLOOR)} `)).toBe(true)
+		expect(line.endsWith(ELLIPSIS)).toBe(true)
+		expect(run_board_fit.width_of(line)).toBe(FLOOR_PANE)
 	})
 
 	it('leaves a row with no reason at the title column', () => {
 		const row = row_of()
 
-		expect(fitted_in(row, TINY_PANE)).toBe(draw_of(row)(TITLE_LIMIT))
+		expect(fitted_in(row, TINY_PANE)).toBe(draw_of(row)(WHOLE))
 	})
 
 	it('leaves a line that is not kept within a pane at the title column', () => {
 		const row = row_of({ reason: UNTRIAGED })
 
-		expect(fitted_in(row, undefined)).toBe(draw_of(row)(TITLE_LIMIT))
+		expect(fitted_in(row, undefined)).toBe(draw_of(row)(WHOLE))
 	})
 })

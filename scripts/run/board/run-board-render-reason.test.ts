@@ -4,6 +4,7 @@ import { run_board_fit } from './run-board-fit'
 import type { BoardRow, RowReason } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import type { LaneUsages } from './run-board-usage'
 
 // joshuafolkken/kit#3750: a waiting row says why it waits after its blockers, a lane being opened says
 // its stage and how long it has stood there, and a narrow pane cuts the title rather than the reason.
@@ -159,5 +160,60 @@ describe('run_board_render.render — why a parked row ended', () => {
 
 		expect(line).toMatch(/ {2}untriaged$/u)
 		expect(run_board_fit.width_of(line)).toBe(columns)
+	})
+})
+
+// joshuafolkken/kit#4060: a parked row draws no usage and no finish time, so its reason follows its
+// time; a reason the floored title still runs past the pane with is cut to an ellipsis.
+const ENDED = { started_ms: STARTED + MINUTE, ended_ms: NOW - MINUTE }
+const WORDY: RowReason = {
+	text: `the sandbox approach breaks pnpm store access; ${'x'.repeat(NARROW)}`,
+}
+const NO_USAGE: LaneUsages = new Map()
+const parked: BoardRow = {
+	...waiting({ reason: UNTRIAGED }),
+	state: 'parked',
+	status: { state: 'parked', ...ENDED },
+}
+const withdrawn: BoardRow = {
+	...waiting({ number: ISSUE + 1, title: LONG_TITLE, reason: WORDY }),
+	state: 'withdrawn',
+	status: { state: 'withdrawn', ...ENDED },
+}
+
+// The parked row's line on a board whose usage column a withdrawn row's finish time draws.
+function parked_line(): string {
+	const layout = { ...EMPTY_LAYOUT, unreached: [parked, withdrawn] }
+	const lines = run_board_render.render({ header: header({ layout, usages: NO_USAGE }), notes: [] })
+	const line = lines.find((drawn) => drawn.includes(` ${String(ISSUE)} `)) ?? ''
+
+	return stripVTControlCharacters(line)
+}
+
+describe('run_board_render.render — a parked row’s reason, and a reason cut to the pane', () => {
+	it('draws a parked row’s reason two columns after its time', () => {
+		expect(parked_line()).toMatch(/\d″ {2}untriaged$/u)
+	})
+
+	it('cuts a withdrawn row’s reason to an ellipsis once its title is at the floor', () => {
+		const line = line_of({ ...withdrawn, number: ISSUE }, NARROW * 2)
+
+		expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
+		expect(line.endsWith('…')).toBe(true)
+		expect(run_board_fit.width_of(line)).toBe(NARROW * 2)
+	})
+
+	it('cuts a waiting row’s reason by the same rule', () => {
+		const line = line_of(waiting({ title: LONG_TITLE, reason: WORDY }), NARROW)
+
+		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  the sandbox`)
+		expect(line.endsWith('…')).toBe(true)
+		expect(run_board_fit.width_of(line)).toBe(NARROW)
+	})
+
+	it('draws the whole reason where no pane width is known', () => {
+		expect(line_of({ ...withdrawn, number: ISSUE })).toMatch(
+			new RegExp(`${'x'.repeat(NARROW)}$`, 'u'),
+		)
 	})
 })

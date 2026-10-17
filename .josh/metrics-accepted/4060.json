@@ -1,0 +1,7 @@
+{
+	"reason": "#4060 adds the reason-cut step to the board row fit (RowCut, reason_fitted, a cut-aware reason_text); the ellipsis cut of an overrunning reason measures terminal columns grapheme by grapheme, so a wide-character reason is cut to the columns it overruns by",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 26
+	}
+}

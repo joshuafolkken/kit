@@ -41,7 +41,7 @@ const { WAITS_ICON, WORDS } = run_board_labels
 const { clock_of, span_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
-const { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of } = run_board_render_title
+const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of } = run_board_render_title
 const { padded } = run_board_fresh
 const GAP = '  '
 const INDENT = '  '
@@ -76,6 +76,8 @@ interface RowFrame {
 	slot_width: number
 	// The columns a row's title is cut to: the title column's, or fewer where a row gives some up.
 	title_limit: number
+	// The columns cut off the end of a row's reason, where its title alone could not give up enough.
+	reason_cut: number
 	// The pane's width where the frame is kept within one.
 	columns: number | undefined
 }
@@ -165,11 +167,12 @@ function slot_text(row: BoardRow, usage: UsageSlot, header: BoardHeader): string
 }
 
 // A row's usage column where the frame draws one, padded to one width on every row so every tail
-// starts in one column. A plan row the run has not touched draws blanks in its place.
+// starts in one column. A plan row the run has not touched draws blanks in its place; a parked row has
+// no usage and no finish time, so draws none and its reason follows its time.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	const { usage, slot_width } = frame
 
-	if (usage === undefined || slot_width === 0) return undefined
+	if (usage === undefined || slot_width === 0 || row.state === 'parked') return undefined
 	if (row.status === undefined) return ' '.repeat(slot_width)
 
 	return cell_of(slot_text(row, usage, frame.header), slot_width)
@@ -205,7 +208,7 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 function row_text(row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
 	const tail = run_board_render_tail.tail_of(row, header)
-	const notes = [waits_of(row, header), reason_text(row, header.now_ms)]
+	const notes = [waits_of(row, header), reason_text(row, header.now_ms, frame.reason_cut)]
 
 	return joined([head_text(row, frame), ...tail, ...notes]).trimEnd()
 }
@@ -216,7 +219,7 @@ function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
 	const text = fitted(
 		row,
 		frame.columns,
-		(title_limit) => `${indent}${row_text(row, { ...frame, title_limit })}`,
+		(cut) => `${indent}${row_text(row, { ...frame, ...cut })}`,
 	)
 
 	return { text, row: run_board_row_yield.yield_of(row) }
@@ -291,7 +294,7 @@ function frame_of(
 		time_width: time_width(header),
 		usage,
 		slot_width: usage === undefined ? 0 : column_width(rows, usage, header.now_ms),
-		title_limit: TITLE_LIMIT,
+		...WHOLE,
 		columns: size?.columns,
 	}
 
