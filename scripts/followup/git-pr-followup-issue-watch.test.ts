@@ -50,6 +50,13 @@ const BASE_INPUT: WrapupInput = {
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
 	managed_notes: [],
+	checked: {
+		rollup: [],
+		merge_state_status: 'CLEAN',
+		review_decision: undefined,
+		head_sha: 'c0ffee1',
+	},
+	wait_for_green: vi.fn(),
 }
 
 const mocked_merge = vi.mocked(git_gh_command.pr_merge)

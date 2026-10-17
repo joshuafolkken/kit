@@ -17,6 +17,7 @@ const pr_raw_schema = z.object({
 	statusCheckRollup: z.array(rollup_item_schema).optional(),
 	mergeStateStatus: z.string().optional(),
 	reviewDecision: z.string().optional(),
+	headRefOid: z.string().optional(),
 })
 
 const pull_comment_schema = z.object({

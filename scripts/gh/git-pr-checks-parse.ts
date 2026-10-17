@@ -45,6 +45,9 @@ interface PrStateSnapshot {
 	rollup: Array<RollupCheck>
 	merge_state_status: string | undefined
 	review_decision: string | undefined
+	// The commit `rollup` was read from — the head a merge has to name so that it lands what passed and
+	// nothing pushed since (#4036). Absent where the snapshot carried none.
+	head_sha?: string
 }
 
 function read_string(value: unknown): string | undefined {
@@ -118,16 +121,21 @@ function parse_rollup_checks(raw_json: string): Array<RollupCheck> {
 	return checks
 }
 
+function with_head_sha(snapshot: PrStateSnapshot, head_sha: string | undefined): PrStateSnapshot {
+	return head_sha === undefined ? snapshot : { ...snapshot, head_sha }
+}
+
 function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
 	const parsed = json_value.parse_or_undefined(raw_json)
 	const result = pr_raw_schema.safeParse(parsed)
 	const data = result.success ? result.data : undefined
-
-	return {
+	const snapshot = {
 		rollup: parse_rollup_checks(raw_json),
 		merge_state_status: read_string(data?.mergeStateStatus),
 		review_decision: read_string(data?.reviewDecision),
 	}
+
+	return with_head_sha(snapshot, read_string(data?.headRefOid))
 }
 
 export {

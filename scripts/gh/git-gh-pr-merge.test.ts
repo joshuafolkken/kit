@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
+import { gh_failure as git_gh_failure } from './git-gh-failure'
 import { git_gh_pr, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE } from './git-gh-pr'
 import {
 	find_request,
@@ -44,6 +45,9 @@ const ALREADY_MERGED = 'gh: Pull Request is not mergeable (HTTP 405)'
 // Both have to settle the question, so both are exercised.
 const MERGED_AT = '2026-09-07T01:23:45Z'
 const DETAIL_READ_FAILURE = 'detail read exploded'
+const HEAD_SHA = 'c0ffee1'
+const HEAD_MOVED_STATUS = 409
+const UNPROCESSABLE_STATUS = 422
 
 function fails_with(error: Error): GhApiAnswer {
 	async function answer(): Promise<string> {
@@ -51,6 +55,11 @@ function fails_with(error: Error): GhApiAnswer {
 	}
 
 	return answer
+}
+
+// A failure carrying the status GitHub's error document reported, as `exec_gh_api` throws it.
+function status_failure(status: number): Error {
+	return git_gh_failure.attach(new Error(`gh: HTTP ${String(status)}`), { status })
 }
 
 // A path that fails its first read and answers from then on — the dropped connection the read-back
@@ -94,15 +103,34 @@ describe('pr_merge', () => {
 	it('sends the merge with a budget of its own rather than the shared request timeout', async () => {
 		arrange(MERGED_RESPONSE, rest_pull())
 
-		await git_gh_pr.pr_merge(PR_BRANCH)
+		await git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)
 
 		expect(merge_request().timeout_ms).toBe(MERGE_REQUEST_TIMEOUT_MS)
+	})
+
+	// #4036: a 409 must reach the caller unchanged, since that caller re-waits on the new head.
+	it('rethrows the 409 a moved head answers, since the merge did not land', async () => {
+		const moved = status_failure(HEAD_MOVED_STATUS)
+
+		arrange(fails_with(moved), rest_pull())
+
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toBe(moved)
 	})
 
 	it('rethrows the original failure when the merge did not land', async () => {
 		arrange(fails_with(gh_failure()), rest_pull())
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).rejects.toThrow(gh_failure().message)
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toThrow(gh_failure().message)
+	})
+})
+
+describe('is_head_moved', () => {
+	it.each([
+		{ error: status_failure(HEAD_MOVED_STATUS), expected: true },
+		{ error: status_failure(UNPROCESSABLE_STATUS), expected: false },
+		{ error: gh_failure(), expected: false },
+	])('answers $expected for $error.message', ({ error, expected }) => {
+		expect(git_gh_pr.is_head_moved(error)).toBe(expected)
 	})
 })
 
@@ -116,7 +144,7 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 	it('returns normally when the request failed but the merge had already landed', async () => {
 		arrange(fails_with(gh_failure()), rest_pull({ merged: true }))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).resolves.toBeUndefined()
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
 	})
 
 	it('recovers from the 405 a re-run gets on a pull request that is already merged', async () => {
@@ -124,7 +152,7 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 
 		arrange(fails_with(new Error(ALREADY_MERGED)), merged)
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).resolves.toBeUndefined()
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
 	})
 
 	// The outage that killed the merge request is the one most likely to kill the read that follows it,
@@ -132,7 +160,7 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 	it('retries the read-back rather than giving up on its first failure', async () => {
 		arrange(fails_with(gh_failure()), fails_once_then(rest_pull({ merged: true })))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).resolves.toBeUndefined()
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
 	})
 
 	// What could not be read is not an answer: reporting "not merged" here would send a run back to a
@@ -140,13 +168,13 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 	it('reports an unconfirmed merge when the pull request could not be read back', async () => {
 		arrange(fails_with(gh_failure()), fails_with(new Error(DETAIL_READ_FAILURE)))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).rejects.toThrow(MERGE_UNCONFIRMED_MESSAGE)
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toThrow(MERGE_UNCONFIRMED_MESSAGE)
 	})
 
 	it('carries the merge failure as the cause of an unconfirmed merge', async () => {
 		arrange(fails_with(gh_failure()), fails_with(new Error(DETAIL_READ_FAILURE)))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).rejects.toHaveProperty(
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toHaveProperty(
 			'cause.message',
 			gh_failure().message,
 		)
