@@ -59,6 +59,7 @@ beforeEach(() => {
 	reap_mock.mockReset().mockReturnValue([])
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 })
 
 // joshuafolkken/kit#2421: the branches that judge a child finished are where its lingering process is

@@ -2,6 +2,7 @@ import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-thresho
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -62,6 +63,7 @@ beforeEach(() => {
 	ship_cause_mock.mockReset().mockReturnValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	serve_labels(IN_PROGRESS)
 })
 
