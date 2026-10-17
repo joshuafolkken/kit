@@ -100,7 +100,7 @@ describe('run_board_render.render running rows', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2    ${title}  5′00″  ⚡  8% 🧠0.5G  2′00″  🚦 1′00″`,
+			`  🚦 2    ${title}  5′00″  ⚡  8% 🧠0.5G  🚦 2′00″ · 🚦 1′00″`,
 		)
 	})
 })
