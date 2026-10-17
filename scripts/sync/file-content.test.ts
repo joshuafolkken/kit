@@ -101,6 +101,31 @@ describe('file_content.write_contained — a relative link behind a directory li
 		}).toThrow(/outside the project/u)
 		expect(existsSync(path.join(OUTSIDE, target_name))).toBe(false)
 	})
+
+	// `deep/..` folds to the project lexically, but the kernel climbs out of where `deep` points.
+	it('refuses a dangling symlink whose text climbs out of a directory link', () => {
+		const target_name = 'created-through-deep'
+
+		mkdirSync(path.join(OUTSIDE, 'sub'))
+		symlinkSync(path.join(OUTSIDE, 'sub'), path.join(ROOT, 'deep'))
+		// Written by hand: `path.join` would fold the `..` this test is about.
+		symlinkSync(`deep${path.sep}..${path.sep}${target_name}`, path.join(ROOT, 'climb.md'))
+
+		expect(() => {
+			file_content.write_contained(path.join(ROOT, 'climb.md'), NEW_CONTENT)
+		}).toThrow(/outside the project/u)
+		expect(existsSync(path.join(OUTSIDE, target_name))).toBe(false)
+	})
+
+	it('refuses a link cycle instead of following it forever', () => {
+		const link_path = path.join(ROOT, 'cycle.md')
+
+		symlinkSync('cycle.md', link_path)
+
+		expect(() => {
+			file_content.write_contained(link_path, NEW_CONTENT)
+		}).toThrow(/too many links/u)
+	})
 })
 
 describe('file_content.write_contained — a directory link to outside', () => {

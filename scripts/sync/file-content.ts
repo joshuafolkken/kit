@@ -1,13 +1,9 @@
-import {
-	lstatSync,
-	mkdirSync,
-	readFileSync,
-	readlinkSync,
-	realpathSync,
-	writeFileSync,
-} from 'node:fs'
+import { lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+
+const PATH_SEPARATORS = path.sep === '\\' ? /[/\\]/u : /\//u
+const MAX_RESOLVE_STEPS = 4096
 
 function is_absent_error(error: unknown): boolean {
 	return error instanceof Error && 'code' in error && error.code === 'ENOENT'
@@ -51,39 +47,41 @@ function read_symlink(target: string): string | undefined {
 	return readlinkSync(target)
 }
 
-function try_realpath(target: string): string | undefined {
-	try {
-		return realpathSync(target)
-	} catch (error) {
-		if (is_absent_error(error)) return undefined
-		throw error
-	}
+function split_components(target: string): Array<string> {
+	return target.split(PATH_SEPARATORS).filter((part) => part !== '' && part !== '.')
 }
 
-// A dangling symlink is followed by hand: the write would create the file it names, not the link.
-// A relative link is read from its directory's real path, as the kernel reads it — the lexical
-// parent may itself be a link, and `..` from it lands somewhere else.
-function follow_dangling_links(target: string): string {
-	let current = target
+// One component, as the kernel takes it: `..` steps up from the real directory reached so far, and
+// a link — dangling or not — splices its own text in, from the root when it is absolute.
+function enter_component(current: string, name: string, pending: Array<string>): string {
+	if (name === '..') return path.dirname(current)
 
-	for (let link = read_symlink(current); link !== undefined; link = read_symlink(current)) {
-		current = path.resolve(realpathSync(path.dirname(current)), link)
-	}
+	const next = path.join(current, name)
+	const link = read_symlink(next)
+	if (link === undefined) return next
+	const root = path.isAbsolute(link) ? path.parse(link).root : ''
 
-	return current
+	pending.unshift(...split_components(link.slice(root.length)))
+
+	return root === '' ? current : root
 }
 
-// Where a write to `target` lands. `realpathSync` refuses a path that does not exist yet, so the
-// not-yet-created tail is appended to the real path of its nearest existing ancestor.
+// Where a write to `target` lands. The path is walked component by component rather than through
+// `path.resolve` or `realpathSync`: the first folds `link/..` lexically while the kernel climbs
+// out of where `link` points, and the second refuses the not-yet-created file a dangling link
+// names. A link cycle the walk would never leave is cut off rather than spun on.
 function resolve_write_path(target: string): string {
-	const real = try_realpath(target)
-	if (real !== undefined) return real
+	const absolute = path.isAbsolute(target) ? target : `${process.cwd()}${path.sep}${target}`
+	let current = path.parse(absolute).root
+	const pending = split_components(absolute.slice(current.length))
 
-	const unlinked = follow_dangling_links(target)
-	const parent = path.dirname(unlinked)
-	if (parent === unlinked) return unlinked
+	for (let steps = 0; steps <= MAX_RESOLVE_STEPS; steps += 1) {
+		const name = pending.shift()
+		if (name === undefined) return current
+		current = enter_component(current, name, pending)
+	}
 
-	return path.join(resolve_write_path(parent), path.basename(unlinked))
+	throw new Error(`Refusing to write ${target}: too many links`)
 }
 
 function is_within(root: string, target: string): boolean {

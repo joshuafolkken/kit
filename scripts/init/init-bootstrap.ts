@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
+import { file_content } from '#scripts/sync/file-content'
 import { z } from 'zod'
 import { init_basic } from './init-basic'
 import { init_install, type InstallStep } from './init-install'
@@ -79,7 +80,9 @@ function handoff_step(args: ReadonlyArray<string>): InstallStep {
 function ensure_project_manifest(project_root: string): void {
 	const manifest_path = path.join(project_root, PACKAGE_JSON)
 
-	if (!existsSync(manifest_path)) writeFileSync(manifest_path, init_basic.initial_manifest())
+	if (existsSync(manifest_path)) return
+
+	file_content.write_contained(manifest_path, init_basic.initial_manifest())
 }
 
 function is_handed_off(): boolean {
