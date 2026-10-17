@@ -8,6 +8,7 @@ import { piped_verification } from '#scripts/rules/piped-verification'
 import { rule_rewrite } from '#scripts/rules/rule-rewrite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
+import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
 
 // The watcher guard is the one composed rule that reads off disk, so it is mocked here to pin the
@@ -76,10 +77,12 @@ function fresh_transcript(): string {
 	return transcript_path
 }
 
-function payload_with_transcript(command: string): string {
-	const transcript_path = fresh_transcript()
-
+function bash_call(command: string, transcript_path: string): string {
 	return JSON.stringify({ tool_name: 'Bash', tool_input: { command }, transcript_path })
+}
+
+function payload_with_transcript(command: string): string {
+	return bash_call(command, fresh_transcript())
 }
 
 // The same fresh transcript, carried by an `Edit` of a runtime file instead of a shell call.
@@ -187,10 +190,10 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		expect(pretool_outcome(edit_payload_with_transcript()).notice).toBe(step_zero_notice.NOTICE)
 	})
 
-	it('says nothing on a shell call', async () => {
+	it('gives a shell call the shell rules rather than Step 0', async () => {
 		const result = await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
 
-		expect(result.notice).toBeUndefined()
+		expect(result.notice).toBe(shell_rules_notice.NOTICE)
 	})
 
 	// joshuafolkken/kit#3444: the reminder's edit is the lane child's move from plan to code.
@@ -211,6 +214,20 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		const result = await pretool_outcome_async(edit_payload_with_transcript())
 
 		expect(result).toEqual(outcome(WATCHER_STALE_REASON, undefined, undefined))
+	})
+})
+
+// joshuafolkken/kit#3996: the shell rules reach the first Bash call, and a refusal keeps their stamp.
+describe('pretool_outcome — the shell rules at the first Bash call', () => {
+	it('lets a refusal win and keeps the notice for the next clear call', () => {
+		const transcript_path = fresh_transcript()
+		const refused = pretool_outcome(bash_call(SHELL_BODY_COMMAND, transcript_path))
+		const first = pretool_outcome(bash_call(BENIGN_COMMAND, transcript_path))
+		const second = pretool_outcome(bash_call(BENIGN_COMMAND, transcript_path))
+
+		expect(refused.notice).toBeUndefined()
+		expect(first.notice).toBe(shell_rules_notice.NOTICE)
+		expect(second.notice).toBeUndefined()
 	})
 })
 

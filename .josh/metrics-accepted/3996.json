@@ -1,0 +1,7 @@
+{
+	"reason": "New once-per-session shell rules notice module (#3996): +18 code lines for a new delivery the guards lacked",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}
