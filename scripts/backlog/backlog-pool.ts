@@ -140,6 +140,9 @@ function settle_standalone(
 // `epic_issue.blocker_references_of` is the epic side's own resolution —
 // `repository_url` when the node names one, this repository only as the fallback an unqualified
 // relation has always meant — and it is reused rather than repeated.
+//
+// The body rides along as an epic child's does, so a declared start time (`issue-not-before.ts`)
+// reaches the classification and the board's waiting row for a standalone row too (#4014).
 function to_child(issue: OpenIssueData, repo: string): EpicChild {
 	return {
 		number: issue.number,
@@ -147,6 +150,7 @@ function to_child(issue: OpenIssueData, repo: string): EpicChild {
 		state: 'OPEN',
 		labels: (issue.labels ?? []).map((label) => label.name),
 		blocked_by: epic_issue.blocker_references_of(issue, repo),
+		body: issue.body,
 	}
 }
 

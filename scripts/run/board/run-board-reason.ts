@@ -1,6 +1,7 @@
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_triage } from '#scripts/epic/epic-triage'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
@@ -10,8 +11,10 @@ import type { ItemStatus } from './run-board-status'
 // Why each waiting row waits — pure, so the words are tested apart from the screen. A row whose lane is
 // being opened says the stage that lane is at; any other says what `backlog:next` would answer for it,
 // read off the same rules: `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
-// running issue holds, the lane limit for a full pool. A blocker stays the row's `🔗`; only a row that
-// nobody has judged says so beside it, since judging it is what a person can do meanwhile.
+// running issue holds, the lane limit for a full pool. A start time the body declares and the clock has
+// not reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers
+// the row until then. A blocker stays the row's `🔗`; only a row that nobody has judged says so beside
+// it, since judging it is what a person can do meanwhile.
 // Every word is English whatever the session language, as every other word on the board is.
 
 const { LANE_STAGE } = run_event_setup
@@ -117,7 +120,7 @@ function wait_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | un
 	if (!epic_triage.is_triaged(child)) return { text: WORDS.untriaged }
 	if (run_board_layout.is_blocked(child, read)) return undefined
 
-	const text = offer_wait(child, read, pool)
+	const text = issue_not_before.waiting_reason(child.body) ?? offer_wait(child, read, pool)
 
 	return text === undefined ? undefined : { text }
 }

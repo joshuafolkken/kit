@@ -236,3 +236,34 @@ describe('run_board_reason.reader names the lanes that fill the limit', () => {
 		expect(reasons([child(HELD)], full)).toStrictEqual([NO_LANE_WORD])
 	})
 })
+
+// joshuafolkken/kit#4014: a row whose body declared a start time still ahead stood at `⏳` with no
+// word of why, while `backlog:next` withheld it for exactly that.
+const FUTURE = '2999-01-01T00:00Z'
+const PAST = '2000-01-01T00:00Z'
+
+function not_before(date: string, blocked_by: Array<number> = []): EpicChild {
+	return { ...child(HELD, blocked_by), body: `## 背景\n\n- 実施可能日: ${date}\n` }
+}
+
+describe('run_board_reason.reader — a row whose declared start time is ahead', () => {
+	it('says the time a row may not start before', () => {
+		expect(reasons([not_before(FUTURE)])).toStrictEqual([`not before ${FUTURE}`])
+	})
+
+	it('says the start time before the lanes a full pool would name', () => {
+		const pool = [not_before(FUTURE)]
+
+		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([`not before ${FUTURE}`])
+	})
+
+	it('goes on to the pool’s reasons once the declared time has passed', () => {
+		const pool = [not_before(PAST)]
+
+		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([NO_LANE_WORD])
+	})
+
+	it('leaves a blocked row to its 🔗 whatever start time it declares', () => {
+		expect(reasons([not_before(FUTURE, [BLOCKER])])).toStrictEqual([undefined])
+	})
+})

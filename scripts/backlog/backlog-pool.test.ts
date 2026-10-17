@@ -56,6 +56,14 @@ describe('backlog_pool.to_child', () => {
 	it('stamps the row itself with the reading repository', () => {
 		expect(backlog_pool.to_child(row([]), READING_REPO).repo).toBe(READING_REPO)
 	})
+
+	// joshuafolkken/kit#4014: the body was dropped here, so a standalone row's declared start time
+	// never reached the board's waiting row.
+	it('carries the row’s body, where a declared start time is read from', () => {
+		const body = '## 背景\n\n- 実施可能日: 2999-01-01T00:00Z\n'
+
+		expect(backlog_pool.to_child({ ...row([]), body }, READING_REPO).body).toBe(body)
+	})
 })
 
 // joshuafolkken/kit#1679: `already-done` names work that is already merged, and the close that is
