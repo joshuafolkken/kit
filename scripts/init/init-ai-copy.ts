@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { is_workflow_destination } from '#scripts/claude/workflow-destination'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
@@ -9,6 +9,7 @@ import {
 	copy_directory_failure,
 	directory_copy_blocker,
 } from '#scripts/sync/directory-copy-guard'
+import { file_content } from '#scripts/sync/file-content'
 import { basic_path_migration } from './basic-path-migration'
 import { distributed_paths } from './distributed-paths'
 import { transform_copied_content } from './init-copy-content'
@@ -76,8 +77,7 @@ function copied_content(source_path: string, destination_path: string): string {
 }
 
 function copy_ai_file(source_path: string, destination_path: string): void {
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, copied_content(source_path, destination_path))
+	file_content.write_contained(destination_path, copied_content(source_path, destination_path))
 }
 
 // `init` declines to modify a file that already exists, and that includes not stamping it: the
@@ -139,7 +139,7 @@ function merge_existing_workspace_yaml(source_path: string, destination_path: st
 		return
 	}
 
-	writeFileSync(destination_path, merged)
+	file_content.write_contained(destination_path, merged)
 	console.info(`  ✔ updated   ${WORKSPACE_YAML}`)
 }
 
@@ -158,7 +158,7 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 		return false
 	}
 
-	writeFileSync(destination_path, workspace_content(source_path, destination_path))
+	file_content.write_contained(destination_path, workspace_content(source_path, destination_path))
 	console.info(`  ✔ created   ${WORKSPACE_YAML}`)
 
 	return false
@@ -286,7 +286,7 @@ function report_existing_claude_md(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, migrated)
+	file_content.write_contained(destination_path, migrated)
 	console.info(`  ✔ updated   ${CLAUDE_MD_FILENAME} (rules import moved to the basic path)`)
 }
 
@@ -320,7 +320,7 @@ function did_skip_claude_md_import(shape?: ProjectShape): boolean {
 	const content =
 		shape?.profile === 'basic' ? basic_claude_md() : init_logic.ensure_claude_md_import(undefined)
 
-	writeFileSync(destination_path, content)
+	file_content.write_contained(destination_path, content)
 	console.info(`  ✔ created   ${CLAUDE_MD_FILENAME}`)
 
 	return false

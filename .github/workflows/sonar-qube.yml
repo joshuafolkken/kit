@@ -40,6 +40,7 @@ jobs:
         if: env.SONAR_TOKEN != ''
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+          persist-credentials: false
       # The dependencies are installed before the scan, on a push as well as on a pull request:
       # `tsconfig.sonar.json` extends `@joshuafolkken/kit/tsconfig/base`, which a consumer resolves
       # only from node_modules, so a scan ahead of the install read a config it could not load

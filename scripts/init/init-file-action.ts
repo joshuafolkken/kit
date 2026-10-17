@@ -1,13 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_content } from '#scripts/sync/file-content'
 import type { FileAction } from './init-actions'
 
 const SAMPLE_INDENT_WIDTH = 4
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 
 function write_new_file(action: FileAction, destination_path: string): void {
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, action.create())
+	file_content.write_contained(destination_path, action.create())
 	console.info(`  ✔ created   ${action.dest}`)
 }
 
@@ -38,7 +38,7 @@ function merge_existing_file(action: FileAction, destination_path: string): void
 		return
 	}
 
-	writeFileSync(destination_path, merged)
+	file_content.write_contained(destination_path, merged)
 	console.info(`  ✔ updated   ${action.dest}`)
 }
 

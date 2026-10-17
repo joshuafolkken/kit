@@ -1,0 +1,7 @@
+{
+	"reason": "Symlink containment for sync/init writes and tag validation (#4039 security hardening); no existing helper resolves a write path through dangling links",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 54
+	}
+}
