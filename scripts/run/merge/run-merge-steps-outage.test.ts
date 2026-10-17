@@ -1,3 +1,4 @@
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
@@ -44,6 +45,7 @@ beforeEach(() => {
 	vi.restoreAllMocks()
 	unmark_mock.mockReset().mockResolvedValue(true)
 	reap_mock.mockReset().mockReturnValue([])
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 })
 
 describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
