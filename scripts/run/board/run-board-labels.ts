@@ -232,6 +232,15 @@ function minute_of(ms: number): string {
 	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
+// The local `YYYY-MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
+// start.
+function date_minute_of(ms: number): string {
+	const date = new Date(ms)
+	const day = [date.getMonth() + 1, date.getDate()].map((value) => two_digits(value))
+
+	return `${[String(date.getFullYear()), ...day].join('-')} ${minute_of(ms)}`
+}
+
 // How long a row's child has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so every
 // row reads one short column; a negative span reads as zero.
 function elapsed_of(ms: number): string {
@@ -333,6 +342,7 @@ const run_board_labels = {
 	WORDS,
 	bar_of,
 	clock_of,
+	date_minute_of,
 	elapsed_of,
 	minute_of,
 	painted,

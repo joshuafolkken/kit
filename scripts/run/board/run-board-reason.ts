@@ -4,6 +4,7 @@ import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_setup } from './run-board-setup'
 import type { ItemStatus } from './run-board-status'
@@ -13,7 +14,7 @@ import type { ItemStatus } from './run-board-status'
 // read off the same rules: `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
 // running issue holds, the lane limit for a full pool. A start time the body declares and the clock has
 // not reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers
-// the row until then. A blocker stays the row's `🔗`; only a row that nobody has judged says so beside
+// the row until then; it reads in the local time every other time on the board does (#4017). A blocker stays the row's `🔗`; only a row that nobody has judged says so beside
 // it, since judging it is what a person can do meanwhile.
 // Every word is English whatever the session language, as every other word on the board is.
 
@@ -25,6 +26,7 @@ const WORDS = {
 	held: 'held by triage',
 	no_lane: 'no free lane',
 	overlaps: 'overlaps',
+	not_before: 'not before',
 } as const
 
 // A lane's stage as its row says it: the event's own words, cut to what fits beside a title.
@@ -116,11 +118,18 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 	return read.free_lanes === NO_FREE_LANES ? no_lane_of(read.occupied_lanes) : undefined
 }
 
+// The start time the body declares and the clock has not reached, in the board's local time.
+function not_before_of(child: EpicChild): string | undefined {
+	const ms = issue_not_before.waiting_ms(child.body)
+
+	return ms === undefined ? undefined : `${WORDS.not_before} ${run_board_labels.date_minute_of(ms)}`
+}
+
 function wait_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return { text: WORDS.untriaged }
 	if (run_board_layout.is_blocked(child, read)) return undefined
 
-	const text = issue_not_before.waiting_reason(child.body) ?? offer_wait(child, read, pool)
+	const text = not_before_of(child) ?? offer_wait(child, read, pool)
 
 	return text === undefined ? undefined : { text }
 }

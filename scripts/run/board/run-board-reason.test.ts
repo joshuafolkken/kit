@@ -3,6 +3,7 @@ import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
+import { run_board_labels } from './run-board-labels'
 import type { BoardPlan, RowReason } from './run-board-layout'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import type { ItemStatus } from './run-board-status'
@@ -241,20 +242,22 @@ describe('run_board_reason.reader names the lanes that fill the limit', () => {
 // word of why, while `backlog:next` withheld it for exactly that.
 const FUTURE = '2999-01-01T00:00Z'
 const PAST = '2000-01-01T00:00Z'
+const FUTURE_WORDS = `not before ${run_board_labels.date_minute_of(Date.parse(FUTURE))}`
 
 function not_before(date: string, blocked_by: Array<number> = []): EpicChild {
 	return { ...child(HELD, blocked_by), body: `## 背景\n\n- 実施可能日: ${date}\n` }
 }
 
 describe('run_board_reason.reader — a row whose declared start time is ahead', () => {
-	it('says the time a row may not start before', () => {
-		expect(reasons([not_before(FUTURE)])).toStrictEqual([`not before ${FUTURE}`])
+	// joshuafolkken/kit#4017: in the local time every other time on the board reads in, not UTC.
+	it('says the local time a row may not start before', () => {
+		expect(reasons([not_before(FUTURE)])).toStrictEqual([FUTURE_WORDS])
 	})
 
 	it('says the start time before the lanes a full pool would name', () => {
 		const pool = [not_before(FUTURE)]
 
-		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([`not before ${FUTURE}`])
+		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([FUTURE_WORDS])
 	})
 
 	it('goes on to the pool’s reasons once the declared time has passed', () => {
