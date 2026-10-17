@@ -1,0 +1,7 @@
+{
+	"reason": "#4052 draws a held check on its lane row: wait-to-row matching, the stray-wait line, the held legend and held-row title fitting are new board behavior",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}

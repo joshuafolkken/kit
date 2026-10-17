@@ -13,7 +13,8 @@ const WAIT_REASONS = ['cores', 'memory', 'pressure'] as const
 
 type WaitReason = (typeof WAIT_REASONS)[number]
 
-// The one wording of each reason, shared by the waiting command's line and the board's.
+// The one wording of each reason, on the waiting command's own line; the board draws the reason as the
+// header's icon instead (joshuafolkken/kit#4052).
 const REASON_TEXT: Record<WaitReason, string> = {
 	cores: 'not enough free cores',
 	memory: 'not enough free memory',
@@ -118,7 +119,6 @@ function waits_of(
 }
 
 const core_wait = {
-	REASON_TEXT,
 	WAIT_REASONS,
 	wait_line,
 	wait_reason,

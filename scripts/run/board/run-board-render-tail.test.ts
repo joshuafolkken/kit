@@ -169,6 +169,39 @@ describe('run_board_render_tail.tail_of activity', () => {
 	})
 })
 
+// joshuafolkken/kit#4052: a lane held in the core budget draws why, how long and which check in its
+// newest activity's place, the time in the activity's right-aligned column.
+describe('run_board_render_tail.tail_of held check', () => {
+	const held = {
+		command: 'lint:related',
+		lane: '2',
+		elsewhere: undefined,
+		waited_ms: 9 * SECOND,
+		reason: 'memory' as const,
+	}
+	const layout = { ...EMPTY_LAYOUT, active: [running(1), running(2)] }
+
+	it('draws the wait in the activity’s place, right-aligned to the widest age', () => {
+		const extra = { layout, budget_waits: [held] }
+
+		expect(quiet_tail(running(2), extra)).toBe(`${PHASE_PART} · 🧠    9″ lint`)
+		expect(quiet_tail(running(1), extra)).toBe(`${PHASE_PART} · 👀 3′00″`)
+	})
+
+	it('draws the newest activity again once the wait is gone', () => {
+		const extra = { layout, operations: operations(2, NOW - MINUTE) }
+
+		expect(quiet_tail(running(2), extra)).toBe(`${PHASE_PART} · 🔧 1′00″`)
+	})
+
+	it('names the phase but no activity icon for the legend while held', () => {
+		const extra = board({ layout, budget_waits: [held], operations: operations(2, NOW - MINUTE) })
+
+		expect(run_board_render_tail.activity_icon(running(2), extra)).toBeUndefined()
+		expect(run_board_render_tail.phase_icon(running(2))).toBe('👀')
+	})
+})
+
 describe('run_board_render_tail.activity_icon', () => {
 	it('is the newest activity’s icon, only for a running row', () => {
 		const operated = board({ operations: operations(1, NOW - MINUTE) })

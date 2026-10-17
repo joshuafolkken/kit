@@ -4,6 +4,7 @@ import type { BoardRow } from './run-board-layout'
 import { run_board_render_checks } from './run-board-render-checks'
 import type { LegendDrawn } from './run-board-render-legend'
 import { run_board_render_tail } from './run-board-render-tail'
+import { run_board_render_waits } from './run-board-render-waits'
 
 // What a `run:board` frame draws, read for its legend (joshuafolkken/kit#4047): every icon a phase may be
 // drawn with — the rows' leads, the header's third line and the rows' ends — the activity kinds their
@@ -21,7 +22,10 @@ function drawn_of(
 	rows: ReadonlyArray<BoardRow>,
 	leads: ReadonlySet<string>,
 ): LegendDrawn {
-	const ends = rows.map((row) => run_board_render_tail.activity_icon(row, header))
+	const ends = rows.flatMap((row) => [
+		run_board_render_tail.phase_icon(row),
+		run_board_render_tail.activity_icon(row, header),
+	])
 	const icons = present([...leads, run_board_header.now_icon(header), ...ends])
 	const now = run_board_header.now_legend(header)
 	const is_operation = icons.has(NOW_ICONS.operation)
@@ -33,6 +37,7 @@ function drawn_of(
 		icons,
 		named: [...(now === undefined ? [] : [now]), ...operation],
 		checks: run_board_render_checks.legend_of(checks),
+		held: run_board_render_waits.legend_of(header),
 	}
 }
 

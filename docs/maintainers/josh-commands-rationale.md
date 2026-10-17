@@ -21,7 +21,9 @@ Each check claims a place in a machine-wide weighted core budget before it start
 
 A leaked place is swept on read by the same pid-and-start-time liveness the unit-run marker uses, and a reservation that never fits is admitted at minimum width after a wait cap — and the gate's summary then prints a `⚠ <check> — started past the core budget …` line above the verdict, so an over-subscribed run does not look like one that fitted. A gate nested inside another gate's unit suite (this repository's own gate tests) takes no place, so it never waits on cores the outer gate is holding. The pre-push `pnpm install` and `pnpm josh audit` join the same budget through [`josh reserved-run`](../josh-commands-automation.md#josh-reserved-run), and the pre-push unit suite reserves the gate's unit-suite weight and memory whenever it runs rather than reusing a passed gate's result ([#3874](https://github.com/joshuafolkken/kit/issues/3874)).
 
-A waiting claim is visible ([#3943](https://github.com/joshuafolkken/kit/issues/3943)): its marker records the command, the checkout and the reason — cores, memory or memory pressure — the command prints one `⏳ <command> waits for the core budget — <reason>` line when its wait starts, and `josh run:board` draws each waiting claim as a `🚧` line under its header.
+A waiting claim is visible ([#3943](https://github.com/joshuafolkken/kit/issues/3943)): its marker records the command, the checkout and the reason — cores, memory or memory pressure — the command prints one `⏳ <command> waits for the core budget — <reason>` line when its wait starts.
+
+`josh run:board` draws a lane's waiting claim on that lane's row — `🚧` leading it, the reason's header icon, the wait and the check in place of its newest activity — and any other waiting claim as one `🚧` line under the header ([#4052](https://github.com/joshuafolkken/kit/issues/4052)).
 
 ## `josh metrics`' totals
 
