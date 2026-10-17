@@ -134,25 +134,35 @@ describe('run_board_tick.tick in a short terminal', () => {
 	})
 })
 
-// joshuafolkken/kit#3531: the findings name a parked child by the plan's title once the plan is read.
+// joshuafolkken/kit#4045: the lines that say the park's reason — the parked row's alone, the findings
+// section not repeating it.
+function park_reason_lines(lines: ReadonlyArray<string>): Array<string> {
+	return lines.filter((line) => line.includes('waiting on #7'))
+}
+
+// joshuafolkken/kit#3531: a parked child is named by the plan's title once the plan is read.
 describe('run_board_tick.tick park titles', () => {
 	const PARK = { pos: 1, at: LAUNCH.at, kind: 'park', text: '#1 waiting on #7' }
 
-	it('draws the reason alone before the plan is read', async () => {
+	it('draws the reason on the parked row alone before the plan is read', async () => {
 		const lines = await loading([PARK])
 
-		expect(lines).toContainEqual(expect.stringMatching(/ 1 {2}waiting on #7$/u))
+		expect(park_reason_lines(lines)).toStrictEqual([
+			expect.stringMatching(/💤 1 .* {2}waiting on #7$/u),
+		])
 	})
 
-	it('names the parked child by the plan’s title once the plan is read', async () => {
+	it('draws the reason after the plan’s title once the plan is read, and only there', async () => {
 		const { ports, frames } = harness({ ...LOCAL, events: [PARK] }, [
 			run_board_fixture.plan_titled('Lead the lanes'),
 		])
 
 		await tick(FRESH_STATE, ports)
 
-		expect(lines_of(frames.at(-1))).toContainEqual(
-			expect.stringMatching(/ 1 {2}Lead the lanes \(waiting on #7\)$/u),
-		)
+		const lines = lines_of(frames.at(-1))
+
+		expect(park_reason_lines(lines)).toStrictEqual([
+			expect.stringMatching(/💤 1 {4}Lead the lanes {2,}waiting on #7$/u),
+		])
 	})
 })

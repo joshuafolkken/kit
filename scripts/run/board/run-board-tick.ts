@@ -168,7 +168,7 @@ interface Redraw {
 // What the header reads off the local read.
 type LocalHeader = Pick<
 	BoardHeader,
-	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual'
+	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual' | 'lane_limit'
 >
 
 function local_header(local: LocalRead): LocalHeader {
@@ -178,6 +178,7 @@ function local_header(local: LocalRead): LocalHeader {
 		activity: activity_here(local),
 		operations: local.operations,
 		usual: local.usual,
+		lane_limit: local.lane_limit,
 	}
 }
 
@@ -215,7 +216,11 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 	const bounds = bounds_of(redraw.ports)
 	const lines = run_board_render.render({
 		header: header_of(state, local, layout, redraw),
-		notes: run_board_notes.notes_of(local.events, titles_of(state)),
+		notes: run_board_notes.notes_of(
+			local.events,
+			titles_of(state),
+			run_board_layout.drawn_parks(layout),
+		),
 		resume: local.resume,
 		thanks: state.thanks,
 		link: redraw.ports.link,

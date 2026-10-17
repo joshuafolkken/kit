@@ -17,7 +17,8 @@ function title_of(title = '', limit = TITLE_LIMIT): string {
 	return title.length > limit ? `${title.slice(0, limit - 1)}${ELLIPSIS}` : title
 }
 
-// Why a waiting row waits, after its blockers; a lane's stage with how long the lane has stood at it.
+// Why a waiting row waits, after its blockers, or why a parked or withdrawn row ended; a lane's stage
+// with how long the lane has stood at it.
 function reason_text(row: BoardRow, now_ms: number): string | undefined {
 	const { reason } = row
 
@@ -34,13 +35,15 @@ function overrun_of(text: string, is_kept: boolean, columns: number | undefined)
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
 
-// The row's title once it has given up `overrun` columns, never under the floor. A waiting row's title
-// is not padded, so the columns come off the title as drawn; any other's off the title column.
-function narrowed_limit(row: BoardRow, overrun: number): number {
-	const drawn =
-		row.state === 'waiting' ? Math.min(TITLE_LIMIT, row.title?.length ?? 0) : TITLE_LIMIT
+// The columns the row's title takes as drawn: a waiting row's title is not padded, every other row's
+// is padded to the title column.
+function drawn_width(row: BoardRow): number {
+	return row.state === 'waiting' ? Math.min(TITLE_LIMIT, row.title?.length ?? 0) : TITLE_LIMIT
+}
 
-	return Math.max(TITLE_FLOOR, drawn - overrun)
+// The row's title once it has given up `overrun` columns, never under the floor.
+function narrowed_limit(row: BoardRow, overrun: number): number {
+	return Math.max(TITLE_FLOOR, drawn_width(row) - overrun)
 }
 
 // A row's line as `draw` draws it at a title limit: at the title column's, or at a narrower one where

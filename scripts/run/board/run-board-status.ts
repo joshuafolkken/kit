@@ -8,6 +8,7 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_checks } from './run-board-checks'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_setup, type SetupRead } from './run-board-setup'
@@ -36,6 +37,8 @@ interface ItemStatus {
 	track?: ReadonlyArray<Phase> | undefined
 	// When a running child entered the phase its track ends on — the event that moved it there.
 	phase_ms?: number | undefined
+	// Why the park or withdraw that ended the child ended it, where its event gives a reason.
+	reason?: string | undefined
 }
 
 interface LatestEvent {
@@ -128,7 +131,13 @@ function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemSta
 }
 
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
-	return { ...settled_as(previous, state), ended_ms: moment(event) }
+	const reason = run_board_ending_reason.reason_of(event)
+
+	return {
+		...settled_as(previous, state),
+		ended_ms: moment(event),
+		...(reason !== undefined && { reason }),
+	}
 }
 
 function continued(previous: ItemStatus | undefined): ItemStatus {

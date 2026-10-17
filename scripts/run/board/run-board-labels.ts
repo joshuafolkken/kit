@@ -19,6 +19,9 @@ const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 // A length's units — hours, minutes and seconds — so a length never shares the clock's `:`.
 const SPAN_UNITS = { hours: '°', minutes: '′', seconds: '″' } as const
+const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
+// The seconds a length rounded to its minute draws, which `minute_span_of` leaves off.
+const ZERO_SECONDS = `00${SPAN_UNITS.seconds}`
 // Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
@@ -82,6 +85,7 @@ const WORDS = {
 	on_person: 'waiting on a person',
 	operation: 'operation',
 	ended: 'ended',
+	estimate: 'estimated finish',
 	// The session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
 	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
@@ -195,6 +199,8 @@ const HEADER_ICONS = {
 	loading: '⏳',
 	elapsed: '⏰',
 	heartbeat: '💓',
+	// The estimated finish: a done row's own mark, as the run's end is what it estimates.
+	estimate: STATE_ICONS.done,
 } as const
 
 // The kind of what the header's third line says, under the `⚡` (joshuafolkken/kit#3767): a call a
@@ -280,6 +286,14 @@ function span_of(ms: number): string {
 	return head + rest.map((field) => `${two_digits(field.value)}${field.unit}`).join('')
 }
 
+// A length rounded up to its minute, in `span_of`'s style without the seconds (`25′`, `1°05′`), never
+// under a minute: an estimate drawn to the second would claim a precision it does not have.
+function minute_span_of(ms: number): string {
+	const minutes = Math.max(1, Math.ceil(ms / MS_PER_MINUTE))
+
+	return span_of(minutes * MS_PER_MINUTE).slice(0, -ZERO_SECONDS.length)
+}
+
 function is_shade(color: Paint): color is Shade {
 	return typeof color === 'object' && 'rgb' in color
 }
@@ -348,6 +362,7 @@ const run_board_labels = {
 	clock_of,
 	date_minute_of,
 	minute_of,
+	minute_span_of,
 	painted,
 	span_of,
 	spinner_of,

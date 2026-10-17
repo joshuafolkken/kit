@@ -213,6 +213,33 @@ describe('run_board_fit.fit order of the notes', () => {
 	})
 })
 
+// joshuafolkken/kit#4042: a folding section counts its own cut rows on its last line, not on the plan's
+// `more N`, until its last row is cut and it goes.
+const DONE_HEAD = ['', '── done ──']
+const DONE = {
+	...section(
+		[issue(2, 'finished', 30), issue(3, 'finished', 20), issue(4, 'finished', 10)],
+		DONE_HEAD,
+	),
+	fold: (cut: ReadonlyArray<PlanLine>): string => `  folded ${String(cut.length)}`,
+}
+const FOLDING = parts_of([section([issue(1, 'running', 5)]), DONE])
+const RUNNING = [...HEADER, '', '  1']
+
+describe('run_board_fit.fit folding section', () => {
+	it('draws every row and no fold line while the pane holds them', () => {
+		expect(fit_wide(FOLDING, 9)).toStrictEqual([...RUNNING, ...DONE_HEAD, '  2', '  3', '  4'])
+	})
+
+	it('folds the oldest rows into its own count, keeping its heading', () => {
+		expect(fit_wide(FOLDING, 8)).toStrictEqual([...RUNNING, ...DONE_HEAD, '  2', '  folded 2'])
+	})
+
+	it('goes with its last row, the plan’s more counting every row it held', () => {
+		expect(fit_wide(FOLDING, 7)).toStrictEqual([...RUNNING, '  more 3'])
+	})
+})
+
 describe('run_board_fit.whole', () => {
 	it('draws every part in its order, the notes counting the ones past their limit', () => {
 		const notes = { head: ['', 'notes'], lines: ['  a'], hidden: 2 }

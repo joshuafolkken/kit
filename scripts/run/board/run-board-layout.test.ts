@@ -117,7 +117,10 @@ describe('run_board_layout.layout_of release kinds', () => {
 		const plan = { ...plan_of([]), labels: new Map([[1, [BREAKING]]]) }
 		const layout = run_board_layout.layout_of(plan, statuses)
 
-		expect(layout.active.map((row) => row.kind)).toStrictEqual([BREAKING, undefined])
+		expect(layout.active.map((row) => [row.number, row.kind])).toStrictEqual([
+			[2, undefined],
+			[1, BREAKING],
+		])
 		expect(run_board_layout.local_layout_of(statuses).active[0]?.kind).toBeUndefined()
 	})
 })
@@ -158,6 +161,33 @@ describe('run_board_layout.layout_of waiting reasons', () => {
 	})
 })
 
+// joshuafolkken/kit#4045: a parked or withdrawn row says why it ended where ⏳ says why it waits.
+describe('run_board_layout.layout_of ending reasons', () => {
+	const CAP = 'ship-stop cap'
+	const statuses = new Map<number, ItemStatus>([
+		[1, { state: 'parked', started_ms: 100, reason: CAP }],
+		[2, { state: 'withdrawn', started_ms: 200, ended_ms: 300, reason: 'superseded' }],
+		[3, { state: 'withdrawn', started_ms: 250, ended_ms: 400 }],
+		[4, { state: 'parked', started_ms: 150 }],
+	])
+	const layout = run_board_layout.layout_of(plan_of([]), statuses)
+
+	it('draws the ending reason on a parked or withdrawn row, and none where it gave none', () => {
+		const reasons = layout.active.map((row) => [row.number, row.reason])
+
+		expect(reasons).toStrictEqual([
+			[1, { text: CAP }],
+			[4, undefined],
+			[3, undefined],
+			[2, { text: 'superseded' }],
+		])
+	})
+
+	it('answers the parked rows that draw their reason', () => {
+		expect([...run_board_layout.drawn_parks(layout)]).toStrictEqual([1])
+	})
+})
+
 describe('run_board_layout.waiting_children', () => {
 	it('answers the children the run has not touched and no person is asked about', () => {
 		const statuses = new Map<number, ItemStatus>([[1, { state: 'merged' }]])
@@ -187,16 +217,44 @@ describe('run_board_layout.layout_of outside the waves', () => {
 		expect(layout.unreached.map((row) => row.number)).toStrictEqual([31])
 	})
 
-	it('lists a touched child only in the active section, in the order each started', () => {
+	it('lists a touched child only in the active section, a running one before a finished one', () => {
 		const statuses = new Map<number, ItemStatus>([
 			[2, { state: 'running', started_ms: 200 }],
 			[1, { state: 'merged', started_ms: 100, ended_ms: 150 }],
 		])
 		const layout = run_board_layout.layout_of(plan_of([[child(1), child(2)], [child(3)]]), statuses)
 
-		expect(layout.active.map((row) => row.number)).toStrictEqual([1, 2])
+		expect(layout.active.map((row) => row.number)).toStrictEqual([2, 1])
 		expect(wave_numbers(layout)).toStrictEqual([[3]])
 		expect(run_board_layout.is_settled('merged')).toBe(true)
 		expect(run_board_layout.is_settled('running')).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4042: the running rows first, then the parked and stopped ones, each in the order
+// it started; then the finished ones from the newest end, one with no recorded end last.
+describe('run_board_layout.layout_of active order', () => {
+	it('orders the running, then the parked and stopped, then the finished rows', () => {
+		const statuses = new Map<number, ItemStatus>([
+			[1, { state: 'merged', started_ms: 100, ended_ms: 500 }],
+			[2, { state: 'parked', started_ms: 300 }],
+			[3, { state: 'running', started_ms: 400 }],
+			[4, { state: 'withdrawn', started_ms: 150, ended_ms: 900 }],
+			[5, { state: 'stopped', started_ms: 200 }],
+			[6, { state: 'running', started_ms: 250 }],
+			[7, { state: 'done', started_ms: 50 }],
+			[8, { state: 'done', started_ms: 60, ended_ms: 700 }],
+		])
+		const layout = run_board_layout.layout_of(plan_of([]), statuses)
+
+		expect(layout.active.map((row) => row.number)).toStrictEqual([6, 3, 5, 2, 4, 8, 1, 7])
+	})
+
+	it('names merged, done and withdrawn as finished, and parked, stopped and running not', () => {
+		const finished = (['merged', 'done', 'withdrawn', 'parked', 'stopped', 'running'] as const).map(
+			(state) => run_board_layout.is_finished(state),
+		)
+
+		expect(finished).toStrictEqual([true, true, true, false, false, false])
 	})
 })
