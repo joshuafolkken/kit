@@ -2,7 +2,11 @@ import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import type { RunNode } from '#scripts/cost/cost-run-nodes'
-import type { TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
+import { delivered_rules } from '#scripts/rules/delivered-rules'
+import {
+	time_transcript_line,
+	type TranscriptLine,
+} from '#scripts/time-runtime/time-transcript-line'
 
 // Guard refusals and Stop re-entries counted per guard, and what their round trips cost.
 //
@@ -10,7 +14,8 @@ import type { TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
 // to answer the reason. That request — the session's first at or after the hit, shared among every
 // hit it answered — is what the round trip is priced at, so a refusal late in a long session costs what it really did rather than an
 // average. The guard is the one `time-transcript-line.ts` already reads off the reason's opening, so
-// this tally and every other reader of a refusal name a guard the same way.
+// this tally and every other reader of a refusal name a guard the same way — save a renamed guard,
+// which is tallied under its current name (`RENAMED_GUARDS`).
 
 type HitKind = 'refusal' | 'stop'
 
@@ -40,8 +45,26 @@ interface GuardRow {
 	usd: number
 }
 
+function renamed_pairs(
+	reason: string,
+	former_reasons: ReadonlyArray<string>,
+): Array<[string, string]> {
+	const current = time_transcript_line.guard_from_refusal(reason)
+
+	return former_reasons.map((former) => [time_transcript_line.guard_from_refusal(former), current])
+}
+
+// **A reworded reason can rename its guard** — `issue comments` opened as `an Issue's comments are
+// part of the Issue` before #3570 — so a refusal under a `former_reasons` opening is tallied under the
+// guard's current name, and a rename alone never reads as one guard vanishing and another regressing.
+const RENAMED_GUARDS = new Map(
+	delivered_rules.MEASURED_RULES.flatMap((rule) =>
+		renamed_pairs(rule.reason, rule.former_reasons ?? []),
+	).filter(([former, current]) => former !== current),
+)
+
 function hit(guard: string, kind: HitKind, at_ms: number): GuardHit {
-	return { guard, kind, at_ms }
+	return { guard: RENAMED_GUARDS.get(guard) ?? guard, kind, at_ms }
 }
 
 function line_hits(line: TranscriptLine): Array<GuardHit> {
