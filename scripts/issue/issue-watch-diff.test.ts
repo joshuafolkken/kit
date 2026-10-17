@@ -13,6 +13,9 @@ import {
 const BASELINE_COMMENT_ID = 10
 const NEWER_COMMENT_ID = 11
 const PERSON = 'joshuafolkken'
+const STRANGER = 'stranger'
+const TRUSTED = 'OWNER'
+const UNTRUSTED = 'NONE'
 const CREATED_AT = '2026-10-14T00:00:00Z'
 const BODY = 'first line\nsecond line'
 const ONE_LINE_EDIT = 'Body edited:\n- second line\n+ changed line'
@@ -21,6 +24,7 @@ function comment(overrides: Partial<WatchComment>): WatchComment {
 	return {
 		id: NEWER_COMMENT_ID,
 		author: PERSON,
+		is_trusted: true,
 		is_automated: false,
 		created_at: CREATED_AT,
 		body: 'please also cover X',
@@ -34,6 +38,10 @@ function baseline(): WatchBaseline {
 
 function snapshot(overrides: Partial<WatchSnapshot> = {}): WatchSnapshot {
 	return { body: BODY, comments: [], ...overrides }
+}
+
+function raw_comment(login: string, author_association: string, body: string): unknown {
+	return { id: NEWER_COMMENT_ID, user: { login }, author_association, body }
 }
 
 function parsed(raw: unknown): ReadonlyArray<WatchComment> | undefined {
@@ -82,6 +90,23 @@ describe('issue_watch_diff.unread_diff', () => {
 	})
 })
 
+// joshuafolkken/kit#4021: on a public repository anyone can comment, so only an author with write
+// access is a person whose comment reaches a run, and only theirs carries josh's run marker.
+describe('issue_watch_diff — an author without write access', () => {
+	it('ignores their comment in the unread update', () => {
+		const comments = [comment({ is_trusted: false })]
+
+		expect(issue_watch_diff.unread_diff(baseline(), snapshot({ comments }))).toBeUndefined()
+	})
+
+	it('does not take their run marker as josh', () => {
+		const body = `${issue_watch_diff.RUN_MARKER}\nplan`
+		const comments = parsed([raw_comment(STRANGER, UNTRUSTED, body)])
+
+		expect(comments?.[0]).toMatchObject({ is_trusted: false, is_automated: false })
+	})
+})
+
 // A body josh wrote over the API has LF endings; one saved in GitHub's web editor comes back CRLF.
 describe('issue_watch_diff.unread_diff — line endings', () => {
 	it('lists only the edited line when the web editor rewrote the body with CRLF endings', () => {
@@ -103,7 +128,7 @@ describe('issue_watch_diff.unread_diff — line endings', () => {
 describe('issue_watch_diff.parse_comments', () => {
 	it('marks a comment carrying the run marker as automated', () => {
 		const body = `${issue_watch_diff.RUN_MARKER}\nplan`
-		const comments = parsed([{ id: NEWER_COMMENT_ID, user: { login: PERSON }, body }])
+		const comments = parsed([raw_comment(PERSON, TRUSTED, body)])
 
 		expect(comments?.[0]?.is_automated).toBe(true)
 	})
@@ -122,6 +147,7 @@ describe('issue_watch_diff.parse_comments', () => {
 			{
 				id: NEWER_COMMENT_ID,
 				user: { login: PERSON, type: 'User' },
+				author_association: TRUSTED,
 				created_at: CREATED_AT,
 				body: 'x',
 			},

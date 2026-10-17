@@ -1,3 +1,4 @@
+import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
@@ -25,6 +26,7 @@ const row_schema = z.looseObject({
 	body: z.string().nullish(),
 	labels: z.array(issue_label_schema),
 	updatedAt: z.string(),
+	author_association: z.string().nullish(),
 })
 
 interface JudgeRow extends JudgeIssue {
@@ -42,6 +44,7 @@ function to_row(raw: z.infer<typeof row_schema>): JudgeRow {
 		body: raw.body ?? '',
 		labels: raw.labels.map((label) => label.name),
 		updated_at: raw.updatedAt,
+		is_trusted: gh_author_association.is_trusted(raw.author_association),
 	}
 }
 

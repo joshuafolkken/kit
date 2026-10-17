@@ -222,7 +222,8 @@ function fetch_anomalies(
 //
 // A listing that could not be read is left out of the map rather than entered as `[]`, so a
 // transport failure reads as "not asked" instead of "nobody recorded anything" — the finding it
-// would otherwise manufacture is an `error`, which stops the epic.
+// would otherwise manufacture is an `error`, which stops the epic. Only a comment from an author with
+// write access records a rationale.
 async function read_order_comments(
 	pairs: ReadonlyArray<OrderPair>,
 ): Promise<Map<string, ReadonlyArray<string>>> {
@@ -237,7 +238,7 @@ async function read_order_comments(
 
 			return comments === undefined
 				? []
-				: [[epic_graph.key_of(child), comments.map((comment) => comment.body)] as const]
+				: [[epic_graph.key_of(child), issue_read.trusted_bodies(comments)] as const]
 		}),
 	)
 }
@@ -360,6 +361,7 @@ const epic_audit_cli = {
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
+	read_order_comments,
 	audit,
 	run,
 }
