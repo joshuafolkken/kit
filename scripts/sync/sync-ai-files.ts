@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_ai_copy } from '#scripts/init/init-ai-copy'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
@@ -191,8 +191,7 @@ function sync_claude_md(destination_path: string, shape?: ProjectShape): void {
 		return
 	}
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, ensured)
+	file_content.write_contained(destination_path, ensured)
 	console.info(`  ✔ synced    ${CLAUDE_MD_FILENAME}`)
 }
 

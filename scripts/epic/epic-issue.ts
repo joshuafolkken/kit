@@ -2,6 +2,7 @@ import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
 import { blocked_by_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
+import { REPOSITORY_SEGMENT_SOURCE } from './epic-parse'
 import type { IssueReference } from './epic-reference'
 
 // The shapes one issue is read as, and the argument every epic command takes.
@@ -116,7 +117,10 @@ interface EpicReference {
 	number: number
 }
 
-const QUALIFIED_REFERENCE = /^([\w.-]+\/[\w.-]+)#(\d+)$/u
+const QUALIFIED_REFERENCE = new RegExp(
+	String.raw`^(${REPOSITORY_SEGMENT_SOURCE}\/${REPOSITORY_SEGMENT_SOURCE})#(\d+)$`,
+	'u',
+)
 const QUALIFIED_REPO_GROUP = 1
 const QUALIFIED_NUMBER_GROUP = 2
 

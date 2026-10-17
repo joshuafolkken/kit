@@ -82,6 +82,13 @@ describe('epic_issue.parse_epic_reference', () => {
 	it('refuses a half-written qualification', () => {
 		expect(epic_issue.parse_epic_reference(REPO)).toBeUndefined()
 	})
+
+	it.each(['../..#858', 'owner/..#858', '-owner/repo#858'])(
+		'refuses a dot or dash segment that would walk the API path: %j',
+		(raw) => {
+			expect(epic_issue.parse_epic_reference(raw)).toBeUndefined()
+		},
+	)
 })
 
 describe('epic_next.parse_options — a qualified epic', () => {

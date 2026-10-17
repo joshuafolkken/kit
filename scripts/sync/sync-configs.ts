@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { vscode_tasks } from '#scripts/init/vscode-tasks'
 import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
+import { file_content } from './file-content'
 
 type MergeFunction = (existing: string) => string
 
@@ -26,7 +27,7 @@ function sync_with_merge(
 		return
 	}
 
-	writeFileSync(destination_path, merged)
+	file_content.write_contained(destination_path, merged)
 	console.info(`  ✔ synced    ${destination_name}`)
 }
 
@@ -107,7 +108,7 @@ function sync_secretlint_config(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, init_logic.generate_secretlint_config())
+	file_content.write_contained(destination_path, init_logic.generate_secretlint_config())
 	console.info('  ✔ created   .secretlintrc.json')
 }
 
@@ -163,8 +164,7 @@ function sync_vscode_tasks_json(destination_path: string): void {
 		return
 	}
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, kit_content)
+	file_content.write_contained(destination_path, kit_content)
 	console.info('  ✔ created   .vscode/tasks.json')
 }
 

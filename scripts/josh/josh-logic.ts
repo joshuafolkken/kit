@@ -165,16 +165,11 @@ function format_unknown_command(cmd: string): string {
 	return `Unknown command: ${cmd}.${hint} Run 'josh --help' for common commands or 'josh --all' for the full list.`
 }
 
-// A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and
-// running it through the shell would break on the spaces in a typical Windows install path.
-function should_use_shell(executable: string): boolean {
-	return process.platform === 'win32' && executable !== process.execPath
-}
-
+// No `shell` option on purpose: execa runs a Windows `.cmd` shim itself and escapes the arguments
+// for cmd.exe, which the shell would receive unescaped.
 function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
 	const result = execaSync(tsx_executable, script_arguments, {
 		stdio: 'inherit',
-		shell: should_use_shell(tsx_executable),
 		reject: false,
 	})
 

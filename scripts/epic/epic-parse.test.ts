@@ -263,4 +263,11 @@ describe('epic_parse.parse_external_task_list_children — what it ignores', () 
 	it('returns nothing for a missing body', () => {
 		expect(parse_external_task_list_children(undefined)).toEqual([])
 	})
+
+	it.each(['- [ ] ../..#1', '- [ ] https://github.com/../../issues/1'])(
+		'does not read a dot-segment reference as a child: %j',
+		(row) => {
+			expect(parse_external_task_list_children(row)).toEqual([])
+		},
+	)
 })
