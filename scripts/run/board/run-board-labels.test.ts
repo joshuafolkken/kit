@@ -8,7 +8,7 @@ import { run_board_phase } from './run-board-phase'
 
 const { WORDS, bar_of, clock_of, minute_of, span_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_INTERVAL_MS, painted } = run_board_labels
-const { date_minute_of } = run_board_labels
+const { date_minute_of, minute_span_of } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -49,6 +49,23 @@ describe('run_board_labels.span_of', () => {
 
 	it('reads a negative span as zero', () => {
 		expect(span_of(-MINUTE)).toBe('0″')
+	})
+})
+
+// joshuafolkken/kit#4044: the estimated finish, drawn to the minute.
+describe('run_board_labels.minute_span_of', () => {
+	it('rounds a length up to its minute and drops the seconds', () => {
+		expect(minute_span_of(25 * MINUTE)).toBe('25′')
+		expect(minute_span_of(24 * MINUTE + SECOND)).toBe('25′')
+	})
+
+	it('draws an hour and more with its minutes in two digits', () => {
+		expect(minute_span_of(HOUR + 5 * MINUTE)).toBe('1°05′')
+	})
+
+	it('never draws less than a minute', () => {
+		expect(minute_span_of(0)).toBe('1′')
+		expect(minute_span_of(-MINUTE)).toBe('1′')
 	})
 })
 
