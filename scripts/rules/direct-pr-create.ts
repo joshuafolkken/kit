@@ -89,7 +89,7 @@ function is_pr_create_segment(segment: string): boolean {
 }
 
 function is_direct_pr_create(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_pr_create_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_pr_create_segment(segment))
 }
 
 const DIRECT_PR_CREATE_REASON =
@@ -105,6 +105,12 @@ const ROW = {
 	decide: (): boolean => true,
 }
 
-const direct_pr_create = { DIRECT_PR_CREATE_REASON, ROW, is_direct_pr_create }
+const direct_pr_create = {
+	API_VALUE_TAKING_FLAGS,
+	DIRECT_PR_CREATE_REASON,
+	ROW,
+	is_direct_pr_create,
+	positional_words,
+}
 
 export { direct_pr_create }

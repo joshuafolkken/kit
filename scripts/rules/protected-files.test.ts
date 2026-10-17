@@ -80,6 +80,34 @@ describe('protected_files.is_protected_file_call — .env through Bash', () => {
 	})
 })
 
+// joshuafolkken/kit#4038: the readers the set lacked, a path-spelled reader, and a pipe or `&` in front.
+describe('protected_files.is_protected_file_call — the wider readers', () => {
+	it.each([
+		'base64 .env',
+		'jq . .env',
+		'diff .env .env.example',
+		'cmp .env .env.example',
+		'hexdump -C .env',
+		'perl -pe 1 .env',
+		'/bin/cat .env',
+		'true | cat .env',
+		'x & cat .env',
+	])('refuses the read in %j', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+	})
+
+	it.each(['cp .env.example .env', 'mv .env.local.bak .env.local'])(
+		'leaves the write in %j alone',
+		(command) => {
+			const call = { name: 'Bash', input: { command } }
+
+			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+		},
+	)
+})
+
 describe('protected_files.is_protected_file_call — .claude/settings.json', () => {
 	it.each(['Edit', 'Write'])('refuses a consumer %s', (name) => {
 		const call = { name, input: { file_path: SETTINGS_PATH } }

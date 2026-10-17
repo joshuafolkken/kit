@@ -394,6 +394,10 @@ test file pins:
 - `scripts/rules/direct-pr-create.test.ts` — pins the predicate that stops a direct PR creation which
   never generates `closes #N` (`gh pr create`, a `gh api` write to pulls, joshuafolkken/kit#3183). It is delivered as the
   fourth row of `permission-guards.ts`
+- `scripts/rules/pr-merge.test.ts` — pins the predicate that stops a PR merge by the agent's own
+  `Bash` call in the spellings the `gh pr merge*` glob misses (`curl … /pulls/<N>/merge`, a GraphQL
+  merge mutation or a file-sourced GraphQL body, joshuafolkken/kit#4038). It is delivered as the
+  fifth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
   for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
   a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),

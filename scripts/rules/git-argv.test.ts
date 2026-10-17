@@ -29,6 +29,14 @@ describe('git_argv.parse', () => {
 		expect(git_argv.parse('env GIT_EDITOR=true git commit -m x')?.subcommand).toBe('commit')
 	})
 
+	it('reads a git named by its path', () => {
+		expect(git_argv.parse('/usr/bin/git push -f')?.subcommand).toBe('push')
+	})
+
+	it('skips a wrapper named by its path', () => {
+		expect(git_argv.parse('/usr/bin/env git stash')?.subcommand).toBe('stash')
+	})
+
 	it('is not a git command when josh stands between the wrapper and git', () => {
 		expect(git_argv.parse('pnpm josh git -y "title #1"')).toBeUndefined()
 	})

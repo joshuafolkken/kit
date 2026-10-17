@@ -60,8 +60,17 @@ function words_of(segment: string): Array<string> {
 	return segment.split(WHITESPACE).filter((word) => word !== '')
 }
 
+const PATH_SEPARATOR = '/'
+
+// The program a word launches, read off the path's last component, so `/usr/bin/git` is `git`.
+function program_name(word: string): string {
+	return word.slice(word.lastIndexOf(PATH_SEPARATOR) + NEXT)
+}
+
 function is_wrapper_token(word: string): boolean {
-	return word === SUBSHELL_OPEN || ENV_ASSIGNMENT.test(word) || WRAPPER_WORDS.has(word)
+	return (
+		word === SUBSHELL_OPEN || ENV_ASSIGNMENT.test(word) || WRAPPER_WORDS.has(program_name(word))
+	)
 }
 
 // Skip the wrapper: environment assignments, a launcher word, and a leading subshell parenthesis. The
@@ -94,14 +103,30 @@ function after_globals(words: ReadonlyArray<string>, start: number): number {
 	return index
 }
 
+interface ProgramCall {
+	name: string
+	args: Array<string>
+}
+
+// The program the segment launches once the wrapper is skipped, with the words after it, or
+// `undefined` for a segment with no program word.
+function program_of(segment: string): ProgramCall | undefined {
+	const words = words_of(segment)
+	const command_index = after_wrapper(words)
+	const word = words[command_index]
+
+	if (word === undefined) return undefined
+
+	return { name: program_name(word), args: words.slice(command_index + NEXT) }
+}
+
 // The words after `command` once the wrapper is skipped, or `undefined` when the segment does not
 // invoke it. `gh` and `rm` are judged by the same wrapper cut as `git`, so
 // `env gh pr close` and `sudo rm -rf` are read as the calls they are.
 function arguments_of(segment: string, command: string): Array<string> | undefined {
-	const words = words_of(segment)
-	const command_index = after_wrapper(words)
+	const call = program_of(segment)
 
-	return words[command_index] === command ? words.slice(command_index + NEXT) : undefined
+	return call?.name === command ? call.args : undefined
 }
 
 // The subcommand and the arguments after it, or `undefined` when the segment is not a git invocation.
@@ -135,6 +160,6 @@ function short_cluster_has(token: string, letters: string): boolean {
 	return false
 }
 
-const git_argv = { arguments_of, parse, short_cluster_has }
+const git_argv = { arguments_of, parse, program_of, short_cluster_has }
 
 export { git_argv }

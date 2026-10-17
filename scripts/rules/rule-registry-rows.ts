@@ -257,6 +257,16 @@ const GUARD_ROWS: ReadonlyArray<RegisteredRule> = [
 		quiet: '`pnpm josh pr`, or reading a PR — the path that writes `closes #N`',
 	},
 	{
+		id: 'pr-merge',
+		title: 'Direct PR merge',
+		topic: GIT_RULES,
+		entry: RULE_GUARD,
+		fires:
+			'`gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a `mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file. Every occurrence',
+		quiet:
+			'`pnpm josh followup` and `pnpm josh observations:flush`, which merge in their own process',
+	},
+	{
 		id: 'poll-loop',
 		title: 'Output poll loop',
 		topic: BACKGROUND_COMMANDS,

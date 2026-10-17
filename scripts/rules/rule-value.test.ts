@@ -265,6 +265,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'destructive-command',
 	'protected-file',
 	'direct-pr-create',
+	'pr-merge',
 	'poll-loop',
 	INVESTIGATION,
 ]

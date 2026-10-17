@@ -3,6 +3,7 @@ import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
+import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
 // The trigger and the delivered text behind the `protected-file` row of `delivered-rules.ts`:
@@ -31,25 +32,44 @@ const SETTINGS_FILE = path.join('.claude', 'settings.json')
 const WHITESPACE = /\s+/u
 const TOKEN_QUOTES = /["']/gu
 const INPUT_REDIRECT = '<'
+// Programs that print a named file's bytes, or run them. `cp` and `mv` are deliberately absent: they
+// write rather than print, and `cp .env.example .env` is how a checkout's `.env` is made.
 const SHELL_READERS: ReadonlySet<string> = new Set([
 	'.',
 	'awk',
+	'base64',
 	'bat',
 	'cat',
+	'cmp',
+	'column',
+	'comm',
 	'cut',
+	'diff',
+	'fold',
 	'grep',
 	'head',
+	'hexdump',
+	'jq',
 	'less',
 	'more',
 	'nl',
 	'od',
+	'paste',
+	'perl',
+	'python',
+	'python3',
+	'rev',
 	'rg',
+	'ruby',
 	'sed',
 	'sort',
 	'source',
 	'strings',
+	'tac',
 	'tail',
+	'uniq',
 	'xxd',
+	'yq',
 ])
 
 function file_path_of(call: GuardedCall): string {
@@ -80,15 +100,15 @@ function is_environment_read_segment(segment: string): boolean {
 	const is_redirected = words.some(
 		(word, index) => word === INPUT_REDIRECT && is_environment_path(words[index + 1] ?? ''),
 	)
-	const [command = '', ...rest] = words
+	const call = git_argv.program_of(segment)
 
-	return (
-		is_redirected || (SHELL_READERS.has(command) && rest.some((word) => is_environment_path(word)))
-	)
+	if (is_redirected || call === undefined) return is_redirected
+
+	return SHELL_READERS.has(call.name) && call.args.some((word) => is_environment_path(word))
 }
 
 function is_environment_shell_read(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_environment_read_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_environment_read_segment(segment))
 }
 
 function is_environment_read(call: GuardedCall): boolean {

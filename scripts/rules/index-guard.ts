@@ -46,7 +46,7 @@ function is_index_segment(segment: string): boolean {
 }
 
 function is_index_mutation(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_index_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_index_segment(segment))
 }
 
 const INDEX_MUTATION_REASON =
