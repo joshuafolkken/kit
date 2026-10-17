@@ -65,6 +65,14 @@ describe('is_trusted — MEMBER / COLLABORATOR', () => {
 		expect(await gh_author_association.is_trusted({ login, association: 'MEMBER' })).toBe(true)
 		expect(api_mock).toHaveBeenCalledWith({ path: `${COLLABORATORS_PATH}${login}/permission` })
 	})
+
+	it('asks for an Enterprise Managed User login carrying an underscore', async () => {
+		api_mock.mockResolvedValue(permission('write'))
+		const login = 'jane_acme'
+
+		expect(await gh_author_association.is_trusted({ login, association: 'MEMBER' })).toBe(true)
+		expect(api_mock).toHaveBeenCalledWith({ path: `${COLLABORATORS_PATH}${login}/permission` })
+	})
 })
 
 describe('is_trusted — MEMBER / COLLABORATOR refused', () => {

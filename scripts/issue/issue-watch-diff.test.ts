@@ -123,6 +123,26 @@ describe('issue_watch_diff — an author without write access', () => {
 	})
 })
 
+// A failed lookup must neither hide a write-access member's correction nor hand an unchecked body to a run.
+describe('issue_watch_diff — an author whose write access could not be checked', () => {
+	it('announces their comment with its body withheld', () => {
+		const comments = [comment({ is_trusted: undefined, body: 'injected' })]
+		const diff = issue_watch_diff.unread_diff(baseline(), snapshot({ comments }))
+
+		expect(diff).toContain(`New comment by ${PERSON}`)
+		expect(diff).toContain('body withheld')
+		expect(diff).not.toContain('injected')
+	})
+
+	it('does not take the run marker of an unchecked author as josh', async () => {
+		api_mock.mockRejectedValue(new Error('timed out'))
+		const body = `${issue_watch_diff.RUN_MARKER}\nplan`
+		const comments = await parsed([raw_comment('member', 'MEMBER', body)])
+
+		expect(comments?.[0]).toMatchObject({ is_trusted: undefined, is_automated: false })
+	})
+})
+
 // A body josh wrote over the API has LF endings; one saved in GitHub's web editor comes back CRLF.
 describe('issue_watch_diff.unread_diff — line endings', () => {
 	it('lists only the edited line when the web editor rewrote the body with CRLF endings', () => {

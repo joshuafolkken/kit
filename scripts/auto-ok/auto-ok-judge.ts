@@ -53,7 +53,7 @@ function digest_of(comment: WatchComment): string | undefined {
 }
 
 function is_person_comment(comment: WatchComment): boolean {
-	return comment.is_trusted && !comment.is_automated
+	return comment.is_trusted === true && !comment.is_automated
 }
 
 // Judged when the newest judgement comment covers the body as it stands and no person has commented

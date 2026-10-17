@@ -16,9 +16,9 @@ import { z } from 'zod'
 const OWNER = 'OWNER'
 const ASKED_ASSOCIATIONS: ReadonlySet<string> = new Set(['MEMBER', 'COLLABORATOR'])
 const WRITE_ROLES: ReadonlySet<string> = new Set(['admin', 'maintain', 'write'])
-// A GitHub user login — it is placed in a REST path, so anything else (a `[bot]` login, a slash) is
-// refused before a request is made.
-const LOGIN_PATTERN = /^[\da-z](?:[\da-z-]*[\da-z])?$/iu
+// A GitHub user login, an Enterprise Managed User's `name_shortcode` included — it is placed in a REST
+// path, so anything else (a `[bot]` login, a slash) is refused before a request is made.
+const LOGIN_PATTERN = /^[\da-z](?:[\w-]*[\da-z])?$/iu
 const TRUSTED_LIST = 'OWNER, or MEMBER / COLLABORATOR with write access'
 
 const permission_schema = z.looseObject({

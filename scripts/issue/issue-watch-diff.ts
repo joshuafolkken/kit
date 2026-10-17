@@ -16,7 +16,10 @@ import { z } from 'zod'
 //
 // **Only an author with write access is a person here** (`gh_author_association`). On a public
 // repository anyone can comment, so a comment from anyone else is never handed to a run as an update,
-// and its `RUN_MARKER` is not taken as josh's own.
+// and its `RUN_MARKER` is not taken as josh's own. A `MEMBER` / `COLLABORATOR` whose lookup failed
+// (`is_trusted: undefined` — the hook's timeout fired) is neither: their comment is announced with its
+// body withheld, costing one `josh issue:ack` rather than a missed correction, and its marker is not
+// trusted.
 //
 // **Comment edits are out of scope.** A new comment carries an id above the baseline's; an edited
 // one keeps its id and is not seen. The body is compared whole, so its edits are.
@@ -27,6 +30,8 @@ const BOT_SUFFIX = '[bot]'
 const NO_COMMENT_ID = 0
 const UNKNOWN_AUTHOR = '(unknown)'
 const UNKNOWN_TIME = '(undated)'
+const UNVERIFIED_BODY =
+	"(body withheld — the author's write access could not be checked; read it with `josh issue:read`)"
 
 const BODY_HEADING = 'Body edited:'
 const REMOVED_PREFIX = '- '
@@ -48,7 +53,8 @@ const comment_schema = z.looseObject({
 interface WatchComment {
 	id: number
 	author: string
-	is_trusted: boolean
+	// `undefined` when the write-access lookup failed.
+	is_trusted: boolean | undefined
 	is_automated: boolean
 	created_at: string
 	body: string
@@ -68,8 +74,11 @@ function is_bot(user: z.infer<typeof comment_schema>['user']): boolean {
 	return user?.type === BOT_TYPE || (user?.login.endsWith(BOT_SUFFIX) ?? false)
 }
 
-function is_automated(raw: z.infer<typeof comment_schema>, is_trusted: boolean): boolean {
-	return is_bot(raw.user) || (is_trusted && (raw.body?.includes(RUN_MARKER) ?? false))
+function is_automated(
+	raw: z.infer<typeof comment_schema>,
+	is_trusted: boolean | undefined,
+): boolean {
+	return is_bot(raw.user) || (is_trusted === true && (raw.body?.includes(RUN_MARKER) ?? false))
 }
 
 async function to_comment(
@@ -77,7 +86,7 @@ async function to_comment(
 	timeout_ms?: number,
 ): Promise<WatchComment> {
 	const login = raw.user?.login
-	const is_trusted = await gh_author_association.is_trusted({
+	const is_trusted = await gh_author_association.trust_of({
 		login,
 		association: raw.author_association,
 		timeout_ms,
@@ -145,7 +154,9 @@ function body_section(previous_raw: string, current_raw: string): string | undef
 }
 
 function comment_section(comment: WatchComment): string {
-	return `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at}${LINE_SEPARATOR}${comment.body}`
+	const body = comment.is_trusted === true ? comment.body : UNVERIFIED_BODY
+
+	return `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at}${LINE_SEPARATOR}${body}`
 }
 
 function new_person_comments(
@@ -154,7 +165,9 @@ function new_person_comments(
 ): ReadonlyArray<WatchComment> {
 	return snapshot.comments.filter(
 		(comment) =>
-			comment.id > baseline.last_comment_id && comment.is_trusted && !comment.is_automated,
+			comment.id > baseline.last_comment_id &&
+			comment.is_trusted !== false &&
+			!comment.is_automated,
 	)
 }
 
