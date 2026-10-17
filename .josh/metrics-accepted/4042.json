@@ -1,0 +1,7 @@
+{
+	"reason": "#4042 adds the done section, its fold line and the running/parked/finished order to run:board — new behavior, not duplication",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 69
+	}
+}
