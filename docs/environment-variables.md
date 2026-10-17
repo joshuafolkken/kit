@@ -4,7 +4,7 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 
 Only these load `.env` themselves, and only when it exists:
 
-- **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
+- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
 - **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:sample`, `josh lane:stats`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.

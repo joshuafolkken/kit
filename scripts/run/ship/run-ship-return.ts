@@ -8,6 +8,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { ShipSection } from './run-ship'
 import { run_ship_next, type ShipResume } from './run-ship-next'
+import { run_ship_relaunch_cap } from './run-ship-relaunch-cap'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -26,13 +27,14 @@ import { run_ship_stop_text } from './run-ship-stop-text'
 //    effort because a fix is judgement. It is started before the supervisor exits, so the parent's
 //    liveness poll never sees the lane empty. An OpenAI lane is left to its own supervisor, which starts
 //    no successor without a cut, so its parent books the stop exactly as it books any ended child.
+//    The relaunches are capped: past the cap the issue is parked and a person told instead.
 //
 // A ship run in an agent's own turn is not supervised and hands nothing back: its report is already in
 // front of the agent that ran it.
 
 const OPENAI_PROVIDER = 'openai'
 
-type ReturnOutcome = 'relaunched' | 'recorded'
+type ReturnOutcome = 'relaunched' | 'recorded' | 'parked'
 
 function stop_text(issue: string, stage: Stage, resume: ShipResume, output: string): string {
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
@@ -87,6 +89,18 @@ async function brokered(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> 
 	return 'recorded'
 }
 
+// A child that stopped more often than the cap allows is parked instead of relaunched
+// (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
+async function parked(issue: string, stage: Stage, resume: ShipResume): Promise<ReturnOutcome> {
+	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+
+	if (await run_ship_relaunch_cap.park(issue, reason)) return 'parked'
+
+	note('the lane child was not relaunched past the ship-stop cap, and the park label was refused')
+
+	return 'recorded'
+}
+
 // `output` is the failed stage's own output: the relaunched child's prompt carries its tail.
 async function return_control(
 	issue: string,
@@ -102,6 +116,8 @@ async function return_control(
 	const lane = await lane_to_relaunch(issue)
 
 	if (lane === undefined) return 'recorded'
+
+	if (await run_ship_relaunch_cap.is_over(issue)) return await parked(issue, stage, resume)
 
 	const stop = { stage, ...resume, context: await run_ship_stop_context.build(issue, output) }
 

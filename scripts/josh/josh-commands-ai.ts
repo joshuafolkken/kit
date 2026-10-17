@@ -196,6 +196,9 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	// failed step and names it, so the run reads only the step to fix.
 	ship: {
 		script: 'scripts/run/ship/run-ship-cli.ts',
+		// `.env` rather than the ambient environment: parking a lane child past the relaunch cap
+		// sends a Telegram warning, which needs the credentials.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
 		category: 'AI tools',

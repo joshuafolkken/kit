@@ -6,6 +6,8 @@ const find_lane_mock = vi.hoisted(() => vi.fn())
 const relaunch_mock = vi.hoisted(() => vi.fn())
 const serving_mock = vi.hoisted(() => vi.fn())
 const request_mock = vi.hoisted(() => vi.fn())
+const is_over_mock = vi.hoisted(() => vi.fn())
+const park_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
@@ -23,6 +25,10 @@ vi.mock('#scripts/lane/lane-session-broker', () => ({
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
+}))
+
+vi.mock('./run-ship-relaunch-cap', () => ({
+	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
 }))
 
 const { run_ship_return } = await import('./run-ship-return')
@@ -45,6 +51,8 @@ beforeEach(() => {
 	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
 	serving_mock.mockReset().mockReturnValue(false)
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
+	is_over_mock.mockReset().mockResolvedValue(false)
+	park_mock.mockReset().mockResolvedValue(true)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
@@ -123,6 +131,33 @@ describe('run_ship_return.return_control on a served lane', () => {
 		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
 
 		expect(write).toHaveBeenCalledWith(expect.stringContaining('— the issue is parked'))
+	})
+})
+
+// joshuafolkken/kit#3999: a child that keeps stopping is parked past the cap rather than relaunched forever.
+describe('run_ship_return.return_control past the ship-stop cap', () => {
+	it('parks the issue for the stopped stage and relaunches nothing', async () => {
+		is_over_mock.mockResolvedValue(true)
+
+		expect(await run_ship_return.return_control(ISSUE, 'round-2', RESUME, OUTPUT)).toBe('parked')
+		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
+		expect(relaunch_mock).not.toHaveBeenCalled()
+		expect(request_mock).not.toHaveBeenCalled()
+	})
+
+	it('records the stop when the park label was refused', async () => {
+		is_over_mock.mockResolvedValue(true)
+		park_mock.mockResolvedValue(false)
+
+		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('recorded')
+		expect(relaunch_mock).not.toHaveBeenCalled()
+	})
+
+	it('asks the cap only inside a dispatched lane child', async () => {
+		is_child_mock.mockReturnValue(false)
+		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
+
+		expect(is_over_mock).not.toHaveBeenCalled()
 	})
 })
 
