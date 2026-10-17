@@ -1,0 +1,7 @@
+{
+	"reason": "lane:stats measures the stop wait to its earliest end (resume, re-dispatch, park read off the event stream) with a total column, and the bound tests share a fill fixture (#3997)",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 63
+	}
+}

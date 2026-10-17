@@ -150,22 +150,24 @@ above the core count.
 
 Under the per-stage table, `lane:stats` prints a third: one row per reason a `josh ship` stopped —
 each stage, plus `conflict` for a merge git could not finish, the reasons the retrospective counts —
-with the median and the maximum of the wait from the stop to the resumed ship, how many stops were
-resumed (`runs`) and how many never were (`not resumed`). The stage rows above time the work; this
-table times the time between the work, which none of them holds.
+with the median (`wait median (min)`), the maximum (`wait max (min)`) and the sum (`wait total (min)`)
+of the wait from the stop to its end, how many waits ended (`runs`) and how many never did
+(`not resumed`). The stage rows above time the work; this table times the time between the work,
+which none of them holds.
 
 **The wait is derived, not recorded.** Every stopped ship writes a `stop` entry naming its issue and its
-reason; the wait runs from it to the start of the same issue's next `stage` entry, the way `implement`
-is read.
+reason; the wait runs from it to whichever comes first of the same issue's next `stage` entry (the
+lane resumed), its next dispatch (a fresh lane took it over) and its `park` on the run's event stream
+(the run gave up on it) — the time the stop held the issue.
 
-**A stop nothing resumed is `not resumed`, never a wait.** A lane parked or left stopped has no end to
-its wait, so it is counted beside the row and kept out of the median and the maximum. A dispatch of
-the same issue after the stop ends the search too: the new child's ship is a fresh lane's work, not
-the resumption of the old stop. A stop late in the period whose resumption falls after it reads as
-`not resumed` as well.
+**A stop none of the three followed is `not resumed`, never a wait.** A lane left stopped has no end to
+its wait, so it is counted beside the row and kept out of the median, the maximum and the total. A
+stop late in the period whose end falls after it reads as `not resumed` as well. The event stream
+keeps about a week of a run's events, so a park older than that is gone and its stop reads as
+`not resumed`.
 
-**The decision the table is for**: which stop reason to remove next — the reason whose runs times
-median is largest costs the lanes the most time.
+**The decision the table is for**: which stop reason to remove next — the reason with the largest
+`wait total (min)` costs the lanes the most time.
 
 An `overlap` entry is the wait that targets the `conflict` row. Before its sync, a ship waits for every
 lane whose open pull request changes a path its own change does (`run-ship-overlap.ts`).

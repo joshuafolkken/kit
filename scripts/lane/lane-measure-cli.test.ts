@@ -14,6 +14,7 @@ vi.mock('./lane-load', () => ({ lane_load: { sample: sample_mock } }))
 const { lane_ledger } = await import('./lane-ledger')
 const { lane_measure_cli } = await import('./lane-measure-cli')
 const { lane_stats } = await import('./lane-stats')
+const { run_event_stream } = await import('#scripts/run/event/run-event-stream')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-test-'))
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
@@ -24,8 +25,12 @@ afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
 })
 
-function fresh_context(): { ledger_path: string; now_ms: number } {
-	return { ledger_path: path.join(scratch, `${randomUUID()}.jsonl`), now_ms: NOW }
+function fresh_context(): { ledger_path: string; events_path: string; now_ms: number } {
+	return {
+		ledger_path: path.join(scratch, `${randomUUID()}.jsonl`),
+		events_path: path.join(scratch, `${randomUUID()}-events.jsonl`),
+		now_ms: NOW,
+	}
 }
 
 beforeEach(() => {
@@ -113,7 +118,24 @@ describe('lane_measure_cli.run — stats', () => {
 
 		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
 
-		expect(printed).toContain('| stop | median (min) | max (min) | runs | not resumed |')
-		expect(printed).toContain('| gate | not measured | not measured | 0 | 1 |')
+		expect(printed).toContain('| stop | wait median (min) | wait max (min) | wait total (min) |')
+		expect(printed).toContain('| gate | not measured | not measured | not measured | 0 | 1 |')
+	})
+})
+
+// joshuafolkken/kit#3997: a park on the run's event stream ends a stop's wait.
+describe('lane_measure_cli.run — stats reads the event stream', () => {
+	it('reads the parks off the event stream the context names', async () => {
+		const context = fresh_context()
+		const parked_at = new Date(Date.parse(AT) + 60_000).toISOString()
+
+		lane_ledger.append(context.ledger_path, { kind: 'stop', at: AT, issue: 1, reason: 'gate' })
+		run_event_stream.append(context.events_path, 'park', '#1 parked', parked_at)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| gate | 1.0 | 1.0 | 1.0 | 1 | 0 |')
 	})
 })

@@ -29,10 +29,11 @@ const EVENT_PREFIX = 'josh-run-events-'
 // every reader — a person, an editor — that it is a line stream rather than a single document, the same
 // distinction the ambient `.log` draws.
 const EVENT_SUFFIX = '.jsonl'
-// A run's session-facing events over one unattended night: a plan, a launch/PR/review-round/merge
-// per child across a few dozen children, plus parks, cuts and stops. Five hundred keeps the whole of a
-// large `backlogrun` and still bounds an unattended run — past it the oldest events roll off.
-const EVENT_CAP = 500
+// A week of a busy run's events, so `josh lane:stats --period 7` reads the parks that end a stop's wait
+// and `run:board` keeps every ship stage (joshuafolkken/kit#3997). A four-lane `backlogrun` wrote about
+// 75 events an hour (1,877 in 25 hours), so fifteen thousand holds about eight days at that rate and
+// still bounds the file to a few megabytes — past it the oldest events roll off.
+const EVENT_CAP = 15_000
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
 const LINE_SEPARATOR = '\n'
