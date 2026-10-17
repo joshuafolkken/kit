@@ -26,6 +26,7 @@ interface Harness {
 	offers: Array<DriveState>
 	states: Array<DriveState>
 	holds: Array<string | undefined>
+	idles: Array<DriveState>
 }
 
 interface Script {
@@ -143,18 +144,23 @@ function harness(script: Script): Harness {
 	const offers: Array<DriveState> = []
 	const states: Array<DriveState> = []
 	const holds: Array<string | undefined> = []
+	const idles: Array<DriveState> = []
 
 	return {
 		calls,
 		offers,
 		states,
 		holds,
+		idles,
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
 			...loop_ports(calls, states),
 			hold: async (reason) => {
 				holds.push(reason)
+			},
+			idle: async (idle_state) => {
+				idles.push(idle_state)
 			},
 		},
 	}

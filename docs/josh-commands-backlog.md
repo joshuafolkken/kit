@@ -598,7 +598,7 @@ pnpm josh backlog:stalled
 
 <!-- /usage -->
 
-stdout is one verdict word, always exit 0: `stalled`, `unreadable` or `ok`. A stall leaves one marker on the event stream and sends one `⏳` Telegram; the Stop hook runs it.
+stdout is one verdict word, always exit 0: `stalled`, `unreadable` or `ok`. A stall leaves one marker on the event stream and sends no Telegram — the idle notification of `backlog:drive` is the one that reaches a person; the Stop hook runs it.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:stalled` in detail".
 
@@ -664,6 +664,8 @@ pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 <!-- /usage -->
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags.
+
+A watch with no child running sends one `💤` Telegram per idle episode, listing the merged count, the `needs-decision` issues and the issues waiting on a not-before date; the next dispatch ends the episode.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are described, with their creation commands, in [Labels and run states](./labels-and-run-states.md).
 

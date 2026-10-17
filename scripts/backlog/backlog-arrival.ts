@@ -11,7 +11,7 @@ import { backlog_stalled } from './backlog-stalled'
 // The arrival probe a `backlogrun` parent's `--wait` watcher runs while children are in flight.
 // Without it, an issue opted in with `auto-ok` mid-run is picked up only when the parent
 // next wakes — a child's merge, or the progress interval — so in practice the ten-minute stall detector
-// becomes the pick-up, and the person gets a ⏳ notification for the wait.
+// becomes the pick-up, ten minutes late.
 //
 // **The watcher's exit is the only thing that wakes a live parent**, so the probe rides it: once a
 // minute it reads the backlog the pick-up line reads (`backlog_ready.read_ready`, cheap first — a full
