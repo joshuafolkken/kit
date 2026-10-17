@@ -75,7 +75,8 @@ describe('run_board_tick.tick thanks', () => {
 })
 
 describe('run_board_cli.run thanks', () => {
-	it('waits for the roster in one plain frame, drawing the names right above the legend', async () => {
+	// joshuafolkken/kit#4047: a plan with no rows draws no legend under the names.
+	it('waits for the roster in one plain frame, drawing the names apart from what is around them', async () => {
 		const board = harness(LOCAL, plans(1))
 		const read_thanks = vi.fn(async () => THANKS)
 
@@ -87,7 +88,6 @@ describe('run_board_cli.run thanks', () => {
 		expect(at).toBeGreaterThan(0)
 		expect(lines[at - 1]).toBe('')
 		expect(lines[at + 1]).toBe('')
-		expect(lines.slice(at + 2).join('\n')).not.toBe('')
 	})
 
 	it('neither reads nor draws the roster in the chat frame', async () => {

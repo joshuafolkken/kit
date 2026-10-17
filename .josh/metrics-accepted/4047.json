@@ -1,0 +1,7 @@
+{
+	"reason": "The legend now reads what the frame draws (new run-board-render-drawn.ts) and filters the check marks drawn, in place of fixed phase and checks lines (#4047)",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 65
+	}
+}
