@@ -204,22 +204,30 @@ function kept_lane_comment(directory: string): string {
 	return `The split left this issue's lane open: it still holds a commit, an uncommitted change or a live process — ${directory}`
 }
 
-// A child promoted to an epic by a split leaves its lane holding a seat: the epic root is never
-// dispatched again, so nothing else would ever close it. The lane is closed only when it holds
-// nothing — no commit, no change, no live process (`lane_vacant`); any other lane is kept, and why is
-// stated on the issue.
-async function close_split_lane(child: string): Promise<void> {
+// A child that ended without a merge closes its lane only when the lane holds nothing — no commit, no
+// change, no live process (`lane_vacant`); any other lane is kept for whoever resumes the issue.
+// Returns the kept lane, `undefined` where there was none or it was closed. joshuafolkken/kit#4028:
+// three children that ended doing nothing left lanes that filled the limit.
+async function close_vacant_lane(child: string): Promise<LaneInfo | undefined> {
 	const lane = await lane_registry.find_open_lane(child)
 
-	if (lane === undefined) return
+	if (lane === undefined) return undefined
 
-	if (await lane_vacant.is_vacant(lane)) {
-		await close_lane(child)
+	if (!(await lane_vacant.is_vacant(lane))) return lane
 
-		return
+	await close_lane(child)
+
+	return undefined
+}
+
+// A child promoted to an epic by a split leaves its lane holding a seat: the epic root is never
+// dispatched again, so nothing else would ever close it. A lane it keeps is stated on the issue.
+async function close_split_lane(child: string): Promise<void> {
+	const kept = await close_vacant_lane(child)
+
+	if (kept !== undefined) {
+		await git_gh_issue_write.issue_try_comment(child, kept_lane_comment(kept.directory))
 	}
-
-	await git_gh_issue_write.issue_try_comment(child, kept_lane_comment(lane.directory))
 }
 
 // The progress comment is a human-readable mirror of the carry record, so it is best-effort and only
@@ -272,6 +280,15 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	return undefined
 }
 
+// A child that ended without a merge: end whatever of its process still runs, drop its stale
+// `in-progress`, and close its lane if the child left nothing in it. The reap comes first, so the lane
+// reads with no live process.
+async function release_child(child: string): Promise<void> {
+	lane_reap.reap_child(child)
+	await run_label.unmark(child)
+	await close_vacant_lane(child)
+}
+
 function refused_result(carry: RunCarry): FailedResult {
 	return { carry, is_parked: false, is_refused: true, blockers: NO_BLOCKERS }
 }
@@ -303,8 +320,7 @@ async function do_waiting(
 
 	if (refused !== undefined) return refused_result(refused)
 
-	lane_reap.reap_child(ctx.child)
-	await run_label.unmark(ctx.child)
+	await release_child(ctx.child)
 	await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.waiting_comment(blockers))
 
 	return { carry: undefined, is_parked: false, is_refused: false, blockers }
@@ -324,8 +340,7 @@ async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResu
 
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
-	lane_reap.reap_child(ctx.child)
-	await run_label.unmark(ctx.child)
+	await release_child(ctx.child)
 	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
 
 	if (is_parked) {
@@ -374,8 +389,7 @@ async function do_outage(ctx: MergeContext): Promise<OutageResult> {
 
 	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
 
-	lane_reap.reap_child(ctx.child)
-	await run_label.unmark(ctx.child)
+	await release_child(ctx.child)
 
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
 }
@@ -455,6 +469,7 @@ const run_merge_steps = {
 	CUT_RELAUNCH_CAUSE,
 	ask_next,
 	close_split_lane,
+	release_child,
 	do_failed,
 	do_merged,
 	do_outage,

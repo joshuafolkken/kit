@@ -10,7 +10,6 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_label } from '#scripts/run/run-label'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
@@ -315,9 +314,9 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 // A child that parked itself: nothing is counted, but the park is written to the stream as a failed
 // child's is, so a reader restoring the run from its events sees the child settled. Its `in-progress`
 // is dropped as a failed child's is: left on, it would outlive the `needs-decision` a person later
-// lifts, and a `run:solo` child would then hold the whole backlog.
+// lifts, and a `run:solo` child would then hold the whole backlog. A lane it left empty is closed.
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
-	await run_label.unmark(ctx.child)
+	await run_merge_steps.release_child(ctx.child)
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
 		`${issue_cite.plain(ctx.child)} parked`,

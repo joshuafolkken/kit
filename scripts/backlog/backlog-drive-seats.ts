@@ -1,4 +1,5 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_vacant } from '#scripts/lane/lane-vacant'
 import type { DrivePorts } from './backlog-drive'
 
 type SeatPorts = Pick<DrivePorts, 'free_lanes' | 'has_lane'>
@@ -16,10 +17,14 @@ async function seated(issues: ReadonlyArray<string>, ports: SeatPorts): Promise<
 }
 
 // A kept lane is one a child was dispatched into — `lane:launch` reuses it rather than opening one.
+// A vacant one holds no place under the limit (`backlog-occupied.ts`), so reusing it takes a free lane
+// like any fresh launch (joshuafolkken/kit#4028).
 async function has_kept_lane(issue: string): Promise<boolean> {
 	const lane = await lane_registry.find_open_lane(issue)
 
-	return lane?.output !== undefined
+	if (lane?.output === undefined) return false
+
+	return !(await lane_vacant.is_vacant(lane))
 }
 
 const backlog_drive_seats = { has_kept_lane, seated }

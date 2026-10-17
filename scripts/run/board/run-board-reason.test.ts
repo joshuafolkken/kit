@@ -228,13 +228,48 @@ describe('run_board_reason.reader names the lanes that fill the limit', () => {
 	it('lists the occupying issues after no free lane', () => {
 		const full = { free_lanes: NO_LANE_LEFT, occupied_lanes: ['3943', '3948'] }
 
-		expect(reasons([child(HELD)], full)).toStrictEqual(['no free lane — 3943 3948'])
+		expect(reasons([child(HELD)], full)).toStrictEqual(['no free lane — 3943 3948 running'])
 	})
 
 	it('keeps the bare words when no occupying lane is known', () => {
 		const full = { free_lanes: NO_LANE_LEFT, occupied_lanes: [] }
 
 		expect(reasons([child(HELD)], full)).toStrictEqual([NO_LANE_WORD])
+	})
+})
+
+// joshuafolkken/kit#4028: `no free lane — 3988 4002 4005 4023` did not say that only #4023 was working;
+// #3988 had parked and #4002 / #4005 had ended doing nothing.
+const LANE_LIMIT = 4
+const PARKED_LANE = 3988
+
+describe('run_board_reason.reader says what each occupying lane is doing', () => {
+	const full = {
+		free_lanes: NO_LANE_LEFT,
+		lane_limit: LANE_LIMIT,
+		occupied_lanes: ['3988', '4002', '4005', '4023'],
+		idle_lanes: ['3988', '4002', '4005'],
+		statuses: new Map<number, ItemStatus>([[PARKED_LANE, { state: 'parked' }]]),
+	}
+
+	it('counts the lanes against the limit and groups them by state', () => {
+		expect(reasons([child(HELD)], full)).toStrictEqual([
+			'no free lane 4/4 — 4023 running · 3988 parked · 4002 4005 idle',
+		])
+	})
+
+	it('reads every lane running where no idle lane is known', () => {
+		const unread = { ...full, idle_lanes: undefined }
+
+		expect(reasons([child(HELD)], unread)).toStrictEqual([
+			'no free lane 4/4 — 3988 4002 4005 4023 running',
+		])
+	})
+
+	it('says the count alone when no occupying lane is known', () => {
+		expect(reasons([child(HELD)], { ...full, occupied_lanes: [] })).toStrictEqual([
+			'no free lane 0/4',
+		])
 	})
 })
 

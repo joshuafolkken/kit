@@ -386,7 +386,7 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
 child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
 `lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
-or `already-done`) is left alone; an **outage** child (OPEN, unparked, exit record shows it could not
+or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API) has its stale `in-progress` dropped but is **not** parked and
 **not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
 stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
@@ -397,6 +397,8 @@ A **cut** child (OPEN, unparked, its lane holding a declared cut with its handof
 adopted) is neither parked nor counted: its successor is relaunched in the same
 lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
 unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
+A parked, failed, waiting or outage child's lane is closed when vacant (no commit past the default
+branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
@@ -629,7 +631,7 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 - `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue until then. The board shows it as the local `YYYY-MM-DD HH:MM`, as it does every other time; `backlog:next` keeps the UTC spelling. It comes before every reason below.
 - `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
 - `overlaps <N> (<file>)` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
-- `no free lane` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read.
+- `no free lane <used>/<limit> — <N…> <state> · …` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read. Each lane in use is named `running`, `parked` or `idle` (no child, but a commit or change keeps it): `no free lane 4/4 — 4023 running · 3988 parked · 4002 idle`. A vacant lane is never named.
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows that lane's stage, such as `opening lane 5″`.
 
