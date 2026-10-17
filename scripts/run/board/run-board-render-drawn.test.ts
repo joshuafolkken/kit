@@ -81,3 +81,19 @@ describe('run_board_render_drawn.drawn_of', () => {
 		).toContain('🚢')
 	})
 })
+
+// joshuafolkken/kit#4052: a held row leads with 🚧, so its end alone draws the phase's icon, and its
+// wait takes the place of its checks.
+describe('run_board_render_drawn.drawn_of a held row', () => {
+	it('reads the phase from the row’s end and names the held check in place of its checks', () => {
+		const row = running('followup')
+		const frame = board(row, { pr_checks: new Map([[1, CHECKS]]) })
+		const wait = { command: 'lint', lane: '1', elsewhere: undefined, waited_ms: 0 }
+		const budget_waits = [{ ...wait, reason: 'cores' as const }]
+		const drawn = run_board_render_drawn.drawn_of({ ...frame, budget_waits }, [row], LEADS)
+
+		expect(drawn.icons).toContain('⚓')
+		expect(drawn.checks).toStrictEqual([])
+		expect(drawn.held).toStrictEqual(['🚧 held check', '⚡ cores'])
+	})
+})

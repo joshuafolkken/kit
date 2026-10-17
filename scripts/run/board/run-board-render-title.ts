@@ -27,10 +27,10 @@ function reason_text(row: BoardRow, now_ms: number): string | undefined {
 	return `${reason.text} ${run_board_labels.span_of(now_ms - reason.since_ms)}`
 }
 
-// The columns a line runs past the pane, for a row that says why it waits; none for any other row, and
-// none for a frame that is not kept within a pane.
-function overrun_of(text: string, row: BoardRow, columns: number | undefined): number {
-	if (columns === undefined || row.reason === undefined) return 0
+// The columns a line runs past the pane, for a row whose end it keeps; none for any other row, and none
+// for a frame that is not kept within a pane.
+function overrun_of(text: string, is_kept: boolean, columns: number | undefined): number {
+	if (columns === undefined || !is_kept) return 0
 
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
@@ -47,14 +47,16 @@ function narrowed_limit(row: BoardRow, overrun: number): number {
 }
 
 // A row's line as `draw` draws it at a title limit: at the title column's, or at a narrower one where
-// that line would run past the pane and the row has a reason to keep.
+// that line would run past the pane and the row has a reason, or a held check (joshuafolkken/kit#4052),
+// to keep.
 function fitted(
 	row: BoardRow,
 	columns: number | undefined,
 	draw: (title_limit: number) => string,
+	is_held = false,
 ): string {
 	const text = draw(TITLE_LIMIT)
-	const overrun = overrun_of(text, row, columns)
+	const overrun = overrun_of(text, is_held || row.reason !== undefined, columns)
 
 	return overrun === 0 ? text : draw(narrowed_limit(row, overrun))
 }

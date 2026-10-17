@@ -29,6 +29,8 @@ interface LegendDrawn {
 	named: ReadonlyArray<string>
 	// What a followup row's checks draw (joshuafolkken/kit#3770).
 	checks: ReadonlyArray<string>
+	// 🚧 and the reasons a held check is drawn with (joshuafolkken/kit#4052).
+	held: ReadonlyArray<string>
 }
 
 type StateWords = ReadonlyArray<readonly [ItemState, keyof Words]>
@@ -94,6 +96,7 @@ function others_line(
 	return [
 		...kind_named,
 		...waits_legend(rows),
+		...drawn.held,
 		...drawn.checks,
 		...run_board_render_notes.notes_legend(notes, named, rows),
 	]

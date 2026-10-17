@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 fix: a lane row draws its longest wait, the legend names only drawn waits, and waits no row owns move right before the legend per the Issue's acceptance criteria",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}
