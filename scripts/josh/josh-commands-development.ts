@@ -129,7 +129,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'stop:guard': {
 		script: 'scripts/hooks/stop-guard.ts',
 		description:
-			'Claude Code Stop hook: deliver the three stop-time rules — hold notify/release and issue citation (reads the Stop payload on stdin)',
+			'Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		// **No `tsx_arguments`, deliberately**, the same as `pretool:guard` above: this runs at every

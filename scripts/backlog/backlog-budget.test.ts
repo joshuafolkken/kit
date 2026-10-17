@@ -76,7 +76,7 @@ describe('backlog_budget — the ask interval a watch names', () => {
 	it('names no second poll while children are still running', () => {
 		const reason = backlog_budget.running_watch_reason('exhausted', 1, LAST_MINUTE_MS)
 
-		expect(reason).toContain('poll at the polling interval')
+		expect(reason).toContain('wait on `pnpm josh lane:await` until they merge')
 		expect(reason).not.toContain('idle poll')
 	})
 })

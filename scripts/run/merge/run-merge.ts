@@ -24,10 +24,11 @@ const CLOSED_STATE = 'CLOSED'
 // failing every child it is handed rather than on failures scattered across a long run.
 const CONSECUTIVE_FAILURE_LIMIT = 3
 // Three outages in a row stop the run too — the same shape as the failure
-// guard, over its own streak. An outage is a child its environment ended — it could not reach the API,
-// its session was killed inside a turn, or its ship stopped with no relaunch — so a run of them is
-// the environment being down; stopping is what keeps the run from re-dispatching into a dead API
-// forever. A merge or a genuine child failure resets it (`run-carry.ts` → `next_outages`).
+// guard, over its own streak. An outage is a child its environment ended — it could not reach the API
+// or its session was killed inside a turn — so a run of them is the environment being down; stopping is
+// what keeps the run from re-dispatching into a dead API forever. A ship that stopped with no relaunch
+// is re-dispatched too but not counted: its child reached the API (joshuafolkken/kit#3974). A merge or
+// a genuine child failure resets it (`run-carry.ts` → `next_outages`).
 const CONSECUTIVE_OUTAGE_LIMIT = 3
 const ONE = 1
 
@@ -45,9 +46,12 @@ const ONE = 1
 //                   the child ended its session on purpose, so it is resumed rather than parked and
 //                   counts nothing.
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
+// - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
+//                   GitHub state: closed as not planned, or about to be, it is neither merged nor failed.
 // - `unresolved`  — the state could not be read; re-read before deciding.
 type ChildOutcome =
 	| 'merged'
+	| 'withdrawn'
 	| 'human-review'
 	| 'parked'
 	| 'split'
@@ -65,6 +69,10 @@ interface EndingSignals {
 	// The merged pull request whose `closes #N` names the child, when GitHub left the child OPEN after
 	// merging it.
 	merged_pr?: string | undefined
+	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`).
+	is_withdrawn?: boolean | undefined
+	// The outage is a ship stop no relaunch answered, not an API the child could not reach.
+	is_unanswered?: boolean | undefined
 }
 
 const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }
@@ -107,12 +115,16 @@ function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 	return unfinished_outcome(signals)
 }
 
-// The signals are read by the CLI and matter only for an OPEN child — a CLOSED child is merged
-// regardless of how the process exited.
+// The signals are read by the CLI and, but for a withdrawal, matter only for an OPEN child — a CLOSED
+// child is merged regardless of how the process exited. **A withdrawal is read first**: `lane:withdraw`
+// records it before stopping the child, so the parent may collect it while the issue is still OPEN, and
+// once it is CLOSED as not planned the closed state would otherwise read as a merge.
 function classify_child(
 	state: IssueState | undefined,
 	signals: EndingSignals = NO_SIGNALS,
 ): ChildOutcome {
+	if (signals.is_withdrawn === true) return 'withdrawn'
+
 	if (state === undefined) return 'unresolved'
 
 	if (is_closed(state)) return 'merged'
@@ -121,9 +133,9 @@ function classify_child(
 }
 
 // The counter change a child's outcome implies. A merge counts a merge (which resets the failure
-// streak); a failure counts a failure; a split, parked or human-review child counts nothing — a decision
-// waiting on a person is not the environment failing — and `undefined` says the carry record is left
-// untouched.
+// streak); a failure counts a failure; a split, parked, withdrawn or human-review child counts nothing —
+// a decision a person made or still owes is not the environment failing — and `undefined` says the
+// carry record is left untouched.
 function change_of(outcome: ChildOutcome): CarryChange | undefined {
 	if (outcome === 'merged') return { merged: ONE }
 

@@ -1,7 +1,6 @@
 # The working-tree hold — one run per tree
 
-**The single source of the hold**, read at its point of use — the moment a run is about to claim or
-release the tree. History: `docs/maintainers/working-tree-hold-rationale.md` → "Where each rule came from".
+Read the moment a run is about to claim or release the tree.
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers** — the first call of
 `fullrun` and `halfrun`, before the title, before `pnpm josh ms`, and **before a `new` entry files its
@@ -23,8 +22,7 @@ pnpm josh run:release --force # a record left behind by a run that has ended
 
 **The unit is the working tree** — one branch, one index and one uncommitted diff, and a linked work
 tree has its own three. **`backlogrun`'s per-repository guard (`epic-busy.ts`) is a separate layer.** **`kickoff`
-does not claim it** (`docs/maintainers/working-tree-hold-rationale.md` → "Why the unit is the working
-tree").
+does not claim it.**
 
 **Claim it in the checkout the run will edit** — a cross-repository `fullrun owner/repo#N` resolves
 that checkout from `pnpm josh doctor` **first** (a read) and claims there.

@@ -43,7 +43,7 @@ was delivered.
   `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
   `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
   entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
-  `Bash|Edit|Read|Write|AskUserQuestion`. A
+  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task`. A
   batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
   still honors its own environment switch.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
@@ -70,15 +70,25 @@ read come from `hook-decision.ts`; whether a message is a stop notice comes from
 `lane-park.ts`; whether a hold is in place comes from the `run:hold` record — **no second verdict
 mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
 repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
-payload carries no tool call, and all four rows answer with `{"decision":"block","reason":…}`. That
-is the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
+payload carries no tool call. A row that needs the model answers with `{"decision":"block","reason":…}`,
+the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
+
+**A row whose answer is fixed acts instead of refusing** (joshuafolkken/kit#3919). The stop
+notification, the hold release and the citation lines are each one operation whose arguments the hook
+already holds, so `stop-actions.ts` runs them in process — the same `send_values`, `run_hold_cli.run`
+and `issue_cite_cli.cite` the commands call, since three `pnpm` launches would spend most of the
+20-second budget — and reports them as a `systemMessage`. A refusal there cost a whole model turn to
+run a command the hook already knew. Only an action that fails falls back to its old refusal, and
+never past `stop_hook_active`. The actions run only on a stop that goes through, so a refused stop
+never notifies a pause its continuation cancels; the stdout of the reused calls is sent to stderr,
+since the hook's stdout is the decision envelope.
 
 **Two entry points, one foundation.** "One route, never a new one" forbids a second copy of the
 shared part, not an entry point per event. The four `stop:guard` rows are triggered by **the run
 stopping**, not by a shell call, so they live in `stop-rules.ts` rather than in `DELIVERED_RULES` in
-`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): each
-of the four blocking rows resolves itself (send the notice, release the hold, file the Issue, fix the
-citation and reissue the reply), and `stop_hook_active` stops an endless loop.
+`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): the
+hook runs the fixed rows itself, each blocking row resolves itself (file the Issue, rewrite the reply),
+and `stop_hook_active` stops an endless loop.
 
 `backlogrun`'s ordinary parent loop and the fetch of the next Issue are handled by the supervisor
 process, so the Stop verdict that made a run fetch the next Issue was removed. On the route that hands
@@ -282,11 +292,11 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
 
 `lane-guard-policy.ts` gives each mode a one-sentence `because`; the measurements behind it:
 
-- `investigation` → `notice`. A refusal ends a child turn (joshuafolkken/kit#2138), so it was `off`
-  until joshuafolkken/kit#2382 re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372
-  #2374 #2375):
-  every one read 4–17 files it never edited, over the threshold of 3. The notice names the concrete
-  files (the #2276 precedent), since a generic "delegate" did not move the number (#2164 → #2178).
+- `investigation` → `refuse`. It was `off` (joshuafolkken/kit#2138) until joshuafolkken/kit#2382
+  re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372 #2374 #2375): every one read
+  4–17 files it never edited, over the threshold of 3, so it became a notice naming those files.
+  joshuafolkken/kit#3927 measured the notice not moving the reading (52% of lane cost in main-line
+  exploration), so it refuses at the same threshold, once per accumulation.
 - `batching` → `off`. A notice (joshuafolkken/kit#2164), taken off (joshuafolkken/kit#2178), restored
   (joshuafolkken/kit#2276) and re-measured (joshuafolkken/kit#2405) at 1.13 calls per round trip
   against a 1.40 target, as every advisory attempt before it (joshuafolkken/kit#1304, #1329, #1337,
@@ -394,8 +404,8 @@ test file pins:
   notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
   and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
   `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
-  silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
-  `stop_hook_active` is silent; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
-  repository or an unknown owner is silent; a bare `#N` blocks, while one in link form, a code fence,
+  silence (hold × no notice sends the notify; clean × hold releases it; dirty or notified is silent;
+  `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
+  repository or an unknown owner is silent; a bare `#N` prints the citation lines, while one in link form, a code fence,
   inline code, a quoted line or a PR reference is silent), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

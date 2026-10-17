@@ -1,5 +1,5 @@
 {
-	"version": "1.1471.0",
+	"version": "1.1514.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
 	"keywords": [
@@ -19,7 +19,7 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.12.1+sha512.b7f98934c0b1f29a65f5da52f2d7f994e7faad573ffdddea1497fb4dcb5aec051590ee7c7d95a38172b4bfae103a5b83edf2ee866e11731c2cafa96063610ac5",
+	"packageManager": "pnpm@12.13.0+sha512.1e55719bf26e809dce5c5084fdebaa64efb3da9038ae5d68a9f8a68311f1a45841c8c3b76a37298c3b66f6bcc80409a9b7f33c78a7168a3e90fb65a5d8235ae4",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
@@ -80,6 +80,7 @@
 		"!scripts/eval",
 		"!scripts/time",
 		"!scripts/cost",
+		"!scripts/cost-audit",
 		"!scripts/retrospective",
 		"!scripts/dogfood",
 		"!scripts/metrics",
@@ -105,6 +106,7 @@
 		"!scripts/exports/namespace-members.ts",
 		"!scripts/exports/unused-members.ts",
 		"!scripts/document/generate-catalog.ts",
+		"!scripts/document/generate-command-usage.ts",
 		"!scripts/document/issue-citation-budget.ts",
 		"!scripts/document/retired-phrases.ts",
 		"!scripts/document/review-agent-type.ts",
@@ -255,12 +257,12 @@
 		"@eslint/compat": "^2.1.1",
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
-		"@playwright/test": "^1.64.0",
+		"@playwright/test": "^1.64.1",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.7",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/node": "^26.6.5",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.3.6",
+		"cspell": "^10.4.0",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.12.0",
 		"eslint-config-prettier": "^10.1.8",
@@ -271,21 +273,21 @@
 		"eslint-plugin-unicorn": "^78.0.0",
 		"eslint_d": "^15.0.3",
 		"globals": "^17.13.0",
-		"lefthook": "^2.2.1",
+		"lefthook": "^2.2.2",
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.64.5",
+		"rollup": "^4.64.7",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.7",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.71.1",
-		"vitest": "^5.0.3"
+		"typescript-eslint": "^8.71.2",
+		"vitest": "^5.0.4"
 	},
 	"dependencies": {
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
-		"execa": "^10.1.0",
+		"execa": "^10.1.1",
 		"js-yaml": "^5.4.3",
 		"jsonc-parser": "^3.3.1",
 		"ora": "^9.4.1",
@@ -293,12 +295,12 @@
 		"string-width": "^8.3.0",
 		"terminal-link": "^5.0.0",
 		"tsx": "^4.23.15",
-		"zod": "^4.6.6"
+		"zod": "^4.6.7"
 	},
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.12.1+sha512.b7f98934c0b1f29a65f5da52f2d7f994e7faad573ffdddea1497fb4dcb5aec051590ee7c7d95a38172b4bfae103a5b83edf2ee866e11731c2cafa96063610ac5",
+			"version": "12.13.0+sha512.1e55719bf26e809dce5c5084fdebaa64efb3da9038ae5d68a9f8a68311f1a45841c8c3b76a37298c3b66f6bcc80409a9b7f33c78a7168a3e90fb65a5d8235ae4",
 			"onFail": "download"
 		}
 	}

@@ -1,5 +1,6 @@
 import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import type { BudgetWait } from '#scripts/gate/core-wait'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_labels } from './run-board-labels'
@@ -65,6 +66,8 @@ interface BoardHeader {
 	machine: MachineGauges | undefined
 	// Each running lane's CPU and memory, `undefined` where none could be read.
 	usages?: LaneUsages | undefined
+	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
+	budget_waits?: ReadonlyArray<BudgetWait> | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
@@ -107,7 +110,7 @@ function count_state(rows: ReadonlyArray<BoardRow>, state: BoardRow['state']): n
 function counts_of(layout: BoardLayout): BoardCounts {
 	const total = run_board_layout.rows_of(layout).length
 	const parked = count_state(layout.active, 'parked')
-	const settled = count_state(layout.active, 'merged') + parked + count_state(layout.active, 'done')
+	const settled = layout.active.filter((row) => run_board_layout.is_settled(row.state)).length
 	const running = count_state(layout.active, 'running')
 
 	return { total, settled, parked, running, remaining: total - settled - running }

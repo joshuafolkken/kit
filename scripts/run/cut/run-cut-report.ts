@@ -148,6 +148,20 @@ function report_held_cut(issue: string): number {
 	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
 }
 
+// **A cut that relaunched its successor says so on this session's own transcript** (joshuafolkken/kit#3936).
+// The successor's `run:cut --resume` can clear the record before this session's turn ends, so the
+// `Stop` hook cannot tell a cut stop by the record alone; it reads this line off the turn instead, a
+// fact no other process can remove. The held cut never prints it — a person resumes that one. **A bare
+// token line**, so it is read off the `run:cut` call's own result (`cost-run-cut.ts`), and a turn that
+// merely quotes it is not read as a relaunch.
+const RELAUNCHED_CUT_MARKER = 'cut-relaunched'
+
+function report_relaunched_cut(): number {
+	console.error(RELAUNCHED_CUT_MARKER)
+
+	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)
+}
+
 // **An implementation cut is never resumed by a session over the threshold**.
 // The cut outside a lane leaves the session that took it open, so a person retyping `fullrun #N` there
 // would be answered `resume-impl`, keep implementing over the threshold, and be cut again on the next
@@ -174,6 +188,7 @@ const run_cut_report = {
 	INCOMPLETE_VERDICT,
 	NOT_A_LANE_VERDICT,
 	OVER_VERDICT,
+	RELAUNCHED_CUT_MARKER,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
 	STALE_VERDICT,
@@ -191,6 +206,7 @@ const run_cut_report = {
 	report_held_cut,
 	report_incomplete,
 	report_over,
+	report_relaunched_cut,
 	report_reviewer,
 	report_stale,
 	report_under_threshold,

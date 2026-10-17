@@ -101,16 +101,26 @@ async function local_slug_for(targets: ReadonlyArray<CiteTarget>): Promise<strin
 	return has_bare_target ? await git_gh_command.repo_get_name_with_owner() : undefined
 }
 
+// The citation lines and the failure lines of one invocation, apart.
+interface CiteReport {
+	lines: ReadonlyArray<string>
+	failures: ReadonlyArray<string>
+}
+
+function split_results(results: ReadonlyArray<LineResult>): CiteReport {
+	return {
+		lines: results.filter((result) => result.kind === 'ok').map((result) => result.line),
+		failures: results.filter((result) => result.kind === 'fail').map((result) => result.line),
+	}
+}
+
 // Citations to stdout so the block stays paste-ready; failures to stderr so each unanswered number is
 // named without landing in what gets pasted. A failure sets a non-zero exit.
-function report(results: ReadonlyArray<LineResult>): number {
-	const lines = results.filter((result) => result.kind === 'ok').map((result) => result.line)
-	const failures = results.filter((result) => result.kind === 'fail').map((result) => result.line)
+function report(cited: CiteReport): number {
+	if (cited.lines.length > 0) console.info(cited.lines.join(LINE_SEPARATOR))
+	for (const failure of cited.failures) console.error(failure)
 
-	if (lines.length > 0) console.info(lines.join(LINE_SEPARATOR))
-	for (const failure of failures) console.error(failure)
-
-	return failures.length === 0 ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return cited.failures.length === 0 ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
 // The targets the command line names, or `undefined` for a line nobody can read — an unknown flag and
@@ -122,14 +132,11 @@ function read_targets(args: ReadonlyArray<string>): ReadonlyArray<CiteTarget> | 
 	return parse_targets(parsed.positionals, parsed.values.repo)
 }
 
-async function run(args: ReadonlyArray<string>): Promise<number> {
+// The lines `issue:cite` prints for `args`, without printing them — the `Stop` hook shows them itself
+// (`stop-actions.ts`). `undefined` for a line nobody can read.
+async function cite(args: ReadonlyArray<string>): Promise<CiteReport | undefined> {
 	const targets = read_targets(args)
-
-	if (targets === undefined) {
-		console.error(USAGE)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (targets === undefined) return undefined
 
 	const local_slug = await local_slug_for(targets)
 	const results = await bounded_pool.bounded_map(
@@ -138,7 +145,19 @@ async function run(args: ReadonlyArray<string>): Promise<number> {
 		async (target) => await cite_target(target, local_slug),
 	)
 
-	return report(results)
+	return split_results(results)
+}
+
+async function run(args: ReadonlyArray<string>): Promise<number> {
+	const cited = await cite(args)
+
+	if (cited === undefined) {
+		console.error(USAGE)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return report(cited)
 }
 
 async function main(args: ReadonlyArray<string>): Promise<void> {
@@ -147,6 +166,7 @@ async function main(args: ReadonlyArray<string>): Promise<void> {
 
 const issue_cite_cli = {
 	USAGE,
+	cite,
 	parse_targets,
 	run,
 }

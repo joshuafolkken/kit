@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { issue_comments } from '#scripts/rules/issue-comments'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
@@ -106,6 +107,24 @@ describe('Codex pre-tool adaptation', () => {
 
 		expect(emit).toHaveBeenCalledWith(outcome)
 		expect(mark).toHaveBeenCalledWith(outcome)
+	})
+})
+
+// joshuafolkken/kit#3920: the rewrite is Claude Code's `updatedInput`, so Codex keeps the refusal.
+describe('Codex pre-tool rewrites', () => {
+	it('still refuses a body-only Issue read rather than rewriting it', () => {
+		const transcript_path = path.join(TEST_DIRECTORY, 'body-read.jsonl')
+
+		writeFileSync(transcript_path, '{"type":"user"}\n')
+		const raw_payload = JSON.stringify({
+			tool_name: 'Bash',
+			tool_input: { command: 'gh api repos/o/r/issues/7 --jq .body' },
+			transcript_path,
+		})
+
+		expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toBe(
+			issue_comments.ISSUE_COMMENTS_REASON,
+		)
 	})
 })
 

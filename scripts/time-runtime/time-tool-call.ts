@@ -55,6 +55,9 @@ interface ToolCall {
 	// A chained `pnpm josh lint:related && pnpm josh test:related` carries both; the count tables expand
 	// it so the ones `josh_command` drops are still counted.
 	josh_commands: ReadonlyArray<string>
+	// Each of those with the operands it named, flags dropped — what tells `lane:output 1` from
+	// `lane:output 2` once the span has kept no command string. `run-poll-hook.ts` reads it.
+	josh_signatures: ReadonlyArray<string>
 	check_key: string
 	marker: PhaseMarker
 	is_bundleable: boolean
@@ -83,6 +86,7 @@ const NO_CALL: ToolCall = {
 	label: '',
 	josh_command: '',
 	josh_commands: [],
+	josh_signatures: [],
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
@@ -95,6 +99,7 @@ const UNKNOWN_CALL: ToolCall = {
 	label: UNKNOWN_TOOL,
 	josh_command: '',
 	josh_commands: [],
+	josh_signatures: [],
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
@@ -111,6 +116,7 @@ function non_bash_call(name: string, input: unknown, message_id: string): ToolCa
 		label: name,
 		josh_command: '',
 		josh_commands: [],
+		josh_signatures: [],
 		check_key: time_single_check.NO_CHECK,
 		marker: time_markers.tool_marker(name, input),
 		message_id,
@@ -132,6 +138,7 @@ function bash_call(input: unknown, message_id: string): ToolCall {
 		label: time_shell.bash_label(command),
 		josh_command,
 		josh_commands: time_shell.josh_commands_of(command),
+		josh_signatures: time_shell.josh_signatures_of(command),
 		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
 		message_id,

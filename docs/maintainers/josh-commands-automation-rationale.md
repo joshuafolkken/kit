@@ -19,13 +19,14 @@ reach the turn it would pack.
 In the main line the guard once fired once per run and fell silent for the rest of a run that ignored
 it; it now re-fires, the notice on a tighter interval than the refusal (joshuafolkken/kit#2276).
 
-## The investigation guard is a notice in a lane child
+## The investigation guard refuses in a lane child
 
 It was `off` from joshuafolkken/kit#2138 to joshuafolkken/kit#2382, on the reason that a child cannot
 dispatch a sub-unit to read its own edit targets. joshuafolkken/kit#2382 re-measured six lane
 children each reading 4–17 unedited files, so the reading was there to send out, and the guard became
-a notice naming those files. It is re-measured on the next backlogrun and redesigned rather than kept
-if it misses the target.
+a notice naming those files. joshuafolkken/kit#3927 measured the notice not moving the reading — 52%
+of lane cost stayed in main-line exploration — so the child is refused at the unchanged threshold. A
+hook denial returns to the model as guidance, and the refusal fires once per accumulation.
 
 ## Where each command came from
 
@@ -37,7 +38,7 @@ the behavior.
 | --------------------------- | ---------------------------------------------------------------- |
 | `josh batch:guard`          | #2138, #2164, #2178, #2276, #2405, #2984 (the hook launch shape) |
 | `josh time:density`         | #2405                                                            |
-| `josh investigation:guard`  | #2138, #2382                                                     |
+| `josh investigation:guard`  | #2138, #2382, #3927                                              |
 | `josh duplicate-read:guard` | #2298                                                            |
 | `josh rule:guard`           | #2297, #2385, #2807                                              |
 | `josh pretool:guard`        | #2138, #2164, #2178, #2276, #2298, #2382, #2405                  |
@@ -61,7 +62,8 @@ Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 descri
 
 Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is **not wired standalone**: it is one of the three `PreToolUse` guards consolidated into `josh pretool:guard` (with `investigation:guard` and the rule guard), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
 
-- The launcher (`scripts/hooks/run-hook.sh <name> [arguments]`) holds everything the hooks share, once: it clears the git location variables for the hook itself when the root resolves without them, hands the hook to the ready gate, which runs `dist/hooks/<name>.js` once it passes and otherwise runs the live source through `pnpm josh <command>` — the name with its first `-` turned into `:` (`pretool-guard` → `pretool:guard`).
+- The launcher (`scripts/hooks/run-hook.sh <name> [arguments]`) holds everything the hooks share, once: it hands the hook to the ready gate, which runs `dist/hooks/<name>.js` once it passes and otherwise runs the live source through `pnpm josh <command>` — the name with its first `-` turned into `:` (`pretool-guard` → `pretool:guard`).
+- The root prefix in front of it (`scripts/init/hook-launch.ts`) clears the git location variables with the shell's own `unset` when the root resolves without them, so a hook call starts `git` once and no `env` or `dirname` process (joshuafolkken/kit#3946): a hook runs on every tool call across every lane, and on macOS each process start is also scanned by `XprotectService` / `syspolicyd`.
 - The ready gate (`scripts/hooks/hook-bundle-ready.ts`, run by plain `node`) compares a content digest of the bundle inputs recorded at build time (`dist/hooks/inputs.json`) with the source on disk. Fresh → the bundle runs in the gate's own process, so a hook call starts node once. Stale → it rebuilds `dist/hooks/` in-process (a fraction of a second) and says so on stderr, so an edited guard is never shadowed by its old bundle. A checkout that cannot build drops to the `pnpm josh` fallback with a stderr warning — that path is slow and a hook exceeding its timeout lets the call through unguarded.
 - Silent in a dispatched lane child (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, and a `PreToolUse` hook cannot see the turn it is in, so the notice is `off`; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`. Why: "The batching guard is off in a lane child" above.
 - Fires more than once per run (main line). The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the refusal every `REFIRE_EVERY` further turns (the initial limit), the notice every `NOTICE_REFIRE_EVERY` (tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence.
@@ -72,7 +74,7 @@ Report tool calls per round trip across the recent lane sessions — the density
 
 ## `josh investigation:guard` in detail
 
-- **A notice, not a refusal, in a dispatched lane child** (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, so the guard delivers the same guidance as a non-blocking notice — the read proceeds with the guidance attached, and the notice names the concrete unedited files the run read. Why: "The investigation guard is a notice in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
+- **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`), at the same threshold. Why: "The investigation guard refuses in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 
 ## `josh rule:guard` in detail
 
@@ -82,11 +84,11 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deli
 
 ## `josh pretool:guard` in detail
 
-**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `notice` (it names the concrete unedited files rather than refusing), `batching` is `off` (a notice is structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `refuse` (its notice was measured not to move the reading), `batching` is `off` (a notice is structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ## `josh stop:guard` in detail
 
-The `Stop` hook: one process delivering the four stop-time rules — stop-notification, hold-release, filing-offer and issue-citation all **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. In an unattended run (a headless session kit launched, a lane child, or the `backlogrun` parent), a reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to file it with `pnpm josh issue:file`, because a first-party filing is Tier A (`observation-filing.md`); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted, and in an interactive session, where asking before filing is correct. A bare `#N` in the reply's prose is fed back so the model reissues the reply with a number-link; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
+The `Stop` hook: one process delivering the stop-time rules. Stop-notification, hold-release and issue-citation have a fixed answer, so the hook runs it itself and shows what it did as a `systemMessage`, blocking only when that fails (joshuafolkken/kit#3919); filing-offer, the session language and the lane / headless waits **block** the stop, since `{"decision":"block"}` is a `Stop` hook's one channel to the model. In an unattended run (a headless session kit launched, a lane child, or the `backlogrun` parent), a reply whose prose offers to file an Issue ("起票してよければ", "Shall I file …") on a turn whose transcript tail holds no filing that a guard let through is sent back to file it with `pnpm josh issue:file`, because a first-party filing is Tier A (`observation-filing.md`); it stays silent when the reply names a third-party `owner/repo` or the session owner cannot be read, since a Tier C filing is never prompted, and in an interactive session, where asking before filing is correct. A bare `#N` in the reply's prose gets its number-link citation lines printed by the hook; the detection skips a `#N` inside a fenced code block, inline code, a quote line, or right after `PR` / `pull request`. Built on `hook-decision.ts`, `lane-park.ts`, `filing-cap.ts`, `repo-party.ts` and `run:hold`; fails open, and `stop_hook_active` breaks a block loop. The rows are in `prompts/collaboration-workflow/rule-delivery.md`.
 
 ## `josh fresh:run` in detail
 

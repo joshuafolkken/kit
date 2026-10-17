@@ -1,8 +1,7 @@
 # Execution waves — parallel, then one alone, then the rest
 
 Read this when an epic's children need an order between groups — a wave boundary, or one child that
-must run alone. It builds on `SKILL.md` → "`josh epic:next <E…>` — what is runnable". Reasons:
-`docs/maintainers/epic-commands-rationale.md` → "Execution waves — why a wave is not a mechanism".
+must run alone. It builds on `SKILL.md` → "`josh epic:next <E…>` — what is runnable".
 
 **A wave is not a mechanism, and there is nothing to add for one** — the dependency declaration
 already expresses it.

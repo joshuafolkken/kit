@@ -112,6 +112,14 @@ async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 	return { repo_name, issue_title }
 }
 
+// The send behind the command line, for a caller that already holds the values — the `Stop` hook's
+// own confirmation (`stop-actions.ts`). It throws as `telegram_notify.send` does.
+async function send_values(values: CliValues): Promise<void> {
+	const context = await resolve_context(values)
+
+	await telegram_notify.send(telegram_test_logic.build_input({ values, context }))
+}
+
 async function main(): Promise<void> {
 	josh_environment_file.load_environment_file()
 	const values = parse_cli_arguments()
@@ -122,10 +130,7 @@ async function main(): Promise<void> {
 		return
 	}
 
-	const context = await resolve_context(values)
-	const input = telegram_test_logic.build_input({ values, context })
-
-	await telegram_notify.send(input)
+	await send_values(values)
 }
 
 // **A notification nobody received must not read as success**. This command
@@ -148,6 +153,6 @@ async function run_cli(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await run_cli()
 
-const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context, run_cli }
+const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context, run_cli, send_values }
 
 export { telegram_test }

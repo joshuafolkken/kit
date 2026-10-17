@@ -1,8 +1,7 @@
 # A prerequisite discovered mid-run — a dependency, not a park
 
 **The single source of the prerequisite branch**, read at its point of use — the moment a run
-discovers that another Issue in this repository has to land first. History:
-`docs/maintainers/prerequisite-rationale.md` → "Where each rule came from".
+discovers that another Issue in this repository has to land first.
 
 **A prerequisite discovered mid-run is a dependency, not a park** — the Issue in hand is still one
 deliverable, it just needs another one before it.

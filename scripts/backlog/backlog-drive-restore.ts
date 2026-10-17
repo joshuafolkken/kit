@@ -5,12 +5,14 @@ const SETTLED_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,
 	run_event_stream.EVENT_KIND.PARK,
 	run_event_stream.EVENT_KIND.SPLIT,
+	run_event_stream.EVENT_KIND.WITHDRAW,
 	run_event_stream.EVENT_KIND.OUTAGE,
 ])
 const DONE_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,
 	run_event_stream.EVENT_KIND.PARK,
 	run_event_stream.EVENT_KIND.SPLIT,
+	run_event_stream.EVENT_KIND.WITHDRAW,
 ])
 
 function issue_of(event: RunEvent): string | undefined {
@@ -82,4 +84,10 @@ function restore(
 	)
 }
 
-export const backlog_drive_restore = { active_issues, restore, settled_issues, parked_issues }
+export const backlog_drive_restore = {
+	active_issues,
+	mentioned_issues,
+	restore,
+	settled_issues,
+	parked_issues,
+}

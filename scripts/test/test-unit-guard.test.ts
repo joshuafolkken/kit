@@ -2,8 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
+import { free_cores } from '#scripts/gate/free-cores'
 import { execa } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { test_unit_guard } from './test-unit-guard'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -20,6 +21,8 @@ const UNIT_FILE = path.join('src', UNIT_TEST_BASENAME)
 const OUTER_SEED = '7'
 const OUTER_SEAT = '3'
 const SPAWN_OPTIONS_POSITION = 2
+const FREE_CORES = 3
+const CALLER_WORKERS = '--maxWorkers=4'
 
 function fake_result(exit_code: number | undefined): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
@@ -65,9 +68,15 @@ function stub_share(share: number | undefined): void {
 	vi.spyOn(unit_worker_share, 'current_share').mockReturnValue(share)
 }
 
+// The free cores are the machine's too, so they are pinned for the share's reason.
+function stub_free(free: number | undefined): MockInstance<typeof free_cores.read> {
+	return vi.spyOn(free_cores, 'read').mockResolvedValue(free)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	stub_share(undefined)
+	stub_free(undefined)
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-'))
 })
 
@@ -302,6 +311,44 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(
 			'pnpm',
 			['exec', 'vitest', 'run', '--maxWorkers=2'],
+			expect.objectContaining({ reject: false }),
+		)
+	})
+})
+
+describe('test_unit_guard.run_guarded_unit — the free cores', () => {
+	beforeEach(() => {
+		add_vitest_package()
+		add_unit_file(UNIT_FILE)
+	})
+
+	// joshuafolkken/kit#3945: the share is bounded by the cores free of load outside the ledger.
+	it('hands the free cores to the share', async () => {
+		stub_free(FREE_CORES)
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
+
+		expect(unit_worker_share.current_share).toHaveBeenCalledWith(
+			expect.any(Number),
+			expect.any(Number),
+			FREE_CORES,
+		)
+	})
+
+	// A typed count wins whatever the machine says, so the sample window is not waited out for it.
+	it('neither reads the machine nor overrides a caller-supplied --maxWorkers', async () => {
+		const read = stub_free(FREE_CORES)
+
+		stub_share(FREE_CORES)
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [CALLER_WORKERS])
+
+		expect(read).not.toHaveBeenCalled()
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'pnpm',
+			['exec', 'vitest', 'run', CALLER_WORKERS],
 			expect.objectContaining({ reject: false }),
 		)
 	})

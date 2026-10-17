@@ -176,8 +176,8 @@ function is_candidate(call: GuardedCall): boolean {
 }
 
 // A refusable call is refused only where the mode is `refuse`. A lane child is `notice`, so it reaches
-// here and is withheld the refusal — the notice branch carries the guidance instead, because a refusal
-// ends a headless child's turn.
+// here and is withheld the refusal — the notice branch carries the guidance instead, for the reason its
+// `because` in `lane-guard-policy.ts` records.
 function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
 	if (duplicate_mode() !== 'refuse') return false
 

@@ -6,7 +6,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
+						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
 						"timeout": 180
 					}
 				]
@@ -17,7 +17,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
+						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
 						"timeout": 10
 					}
 				]
@@ -25,11 +25,11 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|apply_patch",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|apply_patch",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter pretool",
+						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter pretool",
 						"timeout": 20
 					}
 				]
@@ -41,7 +41,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter posttool",
+						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter posttool",
 						"timeout": 90
 					}
 				]
@@ -53,7 +53,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"$(env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR -u GIT_DIR -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_OBJECT_DIRECTORY -u GIT_WORK_TREE git rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
+						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
 						"timeout": 20
 					}
 				]

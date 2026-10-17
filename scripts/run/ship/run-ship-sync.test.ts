@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_overlap } from './run-ship-overlap'
 
 const merge_mock = vi.hoisted(() => vi.fn())
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const merge_state_mock = vi.hoisted(() => vi.fn())
 const scoped_mock = vi.hoisted(() => vi.fn())
+const overlap_mock = vi.spyOn(run_ship_overlap, 'await_overlap')
 
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
@@ -23,6 +25,9 @@ const { run_ship_sync } = await import('./run-ship-sync')
 const OK = 0
 const FAILED = 1
 const TITLE = 'Re-merge main #3221'
+const ISSUE = '3221'
+const SHARED = 'scripts/shared.ts'
+const WAITED = { issue: 3221, lanes: [3870], paths: [SHARED], waited_ms: 1, is_cleared: true }
 const NOTIFY = ['--notify-message-file', 'body.txt']
 const CONFLICTED = ['scripts/a.ts', 'scripts/b.ts']
 const CURRENT = { kind: 'current', branch: 'main' }
@@ -50,11 +55,40 @@ beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	merge_state_mock.mockReset().mockResolvedValue(DIRTY)
 	scoped_mock.mockReset().mockResolvedValue(SCOPED_GREEN)
+	overlap_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#3901: the sync waits out an overlapping open pull request first, so the merge that
+// follows brings that pull request in before the gate.
+describe('run_ship_sync.sync_stage — the wait for an overlapping lane', () => {
+	it('waits for the overlapping lane before merging, and says so', async () => {
+		overlap_mock.mockImplementation(async () => {
+			expect(merge_mock).not.toHaveBeenCalled()
+
+			return WAITED
+		})
+		merge_mock.mockResolvedValue(MERGED)
+
+		expect(await run_ship_sync.sync_stage(ISSUE)).toStrictEqual({
+			code: OK,
+			out: `${run_ship_overlap.note(WAITED)}\nmerged main`,
+		})
+		expect(overlap_mock).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('still names the wait when the merge after it stops on a conflict', async () => {
+		overlap_mock.mockResolvedValue(WAITED)
+		merge_mock.mockResolvedValue(CONFLICT)
+
+		const result = await run_ship_sync.sync_stage(ISSUE)
+
+		expect(result.out.startsWith(run_ship_overlap.note(WAITED))).toBe(true)
+	})
 })
 
 describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('goes on when the default branch brings nothing in', async () => {
-		expect(await run_ship_sync.sync_stage()).toStrictEqual({
+		expect(await run_ship_sync.sync_stage(ISSUE)).toStrictEqual({
 			code: OK,
 			out: 'main brings nothing in',
 		})
@@ -66,7 +100,7 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('leaves the merged tree to the gate stage that follows, and goes on without stopping', async () => {
 		merge_mock.mockResolvedValue(MERGED)
 
-		expect(await run_ship_sync.sync_stage()).toStrictEqual({ code: OK, out: 'merged main' })
+		expect(await run_ship_sync.sync_stage(ISSUE)).toStrictEqual({ code: OK, out: 'merged main' })
 		expect(scoped_mock).not.toHaveBeenCalled()
 		expect(josh_run_mock).not.toHaveBeenCalled()
 	})
@@ -74,7 +108,7 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('stops on a conflict, naming the unmerged paths', async () => {
 		merge_mock.mockResolvedValue(CONFLICT)
 
-		const result = await run_ship_sync.sync_stage()
+		const result = await run_ship_sync.sync_stage(ISSUE)
 
 		expect(result.code).toBe(FAILED)
 		expect(result.conflicts).toStrictEqual(CONFLICTED)
@@ -84,13 +118,13 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('defers a refused merge to the followup rather than stopping the commit', async () => {
 		merge_mock.mockResolvedValue({ kind: 'refused', message: 'uncommitted overlap' })
 
-		expect(await run_ship_sync.sync_stage()).toMatchObject({ code: OK })
+		expect(await run_ship_sync.sync_stage(ISSUE)).toMatchObject({ code: OK })
 	})
 
 	it('defers a merge that could not be attempted rather than throwing', async () => {
 		merge_mock.mockRejectedValue(new Error('fetch failed'))
 
-		expect(await run_ship_sync.sync_stage()).toMatchObject({ code: OK })
+		expect(await run_ship_sync.sync_stage(ISSUE)).toMatchObject({ code: OK })
 	})
 })
 

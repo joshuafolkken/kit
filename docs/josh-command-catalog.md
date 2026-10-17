@@ -211,7 +211,7 @@ Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context,
 
 _No arguments._
 
-Claude Code Stop hook: deliver the three stop-time rules — hold notify/release and issue citation (reads the Stop payload on stdin)
+Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin)
 
 ---
 
@@ -715,6 +715,16 @@ Git hook: validate commit message
 
 ---
 
+### `josh pre-commit-lint`
+
+> **Audience:** automation · **Side effects:** files
+
+`<cspell|prettier|eslint> [paths...]`
+
+Git hook: run cspell, prettier or eslint over staged files from a content cache
+
+---
+
 ### `josh pre-commit-type-check`
 
 > **Audience:** automation · **Side effects:** processes
@@ -882,6 +892,16 @@ Count code duplication across files and first-party repositories, printing each 
 `(--cut | --over <tokens-per-request>) [--path <dir>]`
 
 Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over)
+
+---
+
+### `josh cost:audit` · `josh ca`
+
+> **Audience:** maintainer · **Side effects:** none · **kit only**
+
+`[--period <days>]`
+
+Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before
 
 ---
 
@@ -1271,7 +1291,17 @@ Record the machine load (load average, swap, free memory, working lanes) to the 
 
 `--period <days> [--limit <lane-limit>]`
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, and the wait after each ship stop reason under those
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, and the duration and reuse count of each gate check last
+
+---
+
+### `josh lane:withdraw` · `josh lwd`
+
+> **Audience:** developer · **Side effects:** files, git, processes, network
+
+`<issue> --reason <text>`
+
+Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure
 
 ---
 

@@ -1,3 +1,4 @@
+import { core_budget } from '#scripts/gate/core-budget'
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 import { BACKLOG_COMMANDS } from './josh-commands-backlog'
 import { DOCUMENT_COMMANDS } from './josh-commands-document'
@@ -80,6 +81,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['(--cut | --over <tokens-per-request>) [--path <dir>]', 'automation', ['none']],
 	},
+	'cost:audit': {
+		script: 'scripts/cost-audit/cost-audit-cli.ts',
+		description:
+			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
+		category: 'AI tools',
+		reference: ['[--period <days>]', 'maintainer', ['none']],
+		// Kit-only: it reads kit's own transcript store, like `josh retrospective`, which carries its
+		// summary line.
+		is_kit_only: true,
+	},
 	...DOCUMENT_COMMANDS,
 	time: {
 		script: 'scripts/time/time-cli.ts',
@@ -108,6 +119,8 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			"Aggregate a finished run's cost, review findings, observation ledger and events into one digest",
 		category: 'AI tools',
 		reference: ['', 'maintainer', ['none']],
+		core_weight: core_budget.CORE_WEIGHTS.retrospective,
+		memory_mb: core_budget.MEMORY_MB.retrospective,
 		// Kit-only: it reads kit's own development run — the transcript store, the review ledger and the
 		// run event stream — so it means nothing in a consumer project and is dropped from a consumer's
 		// help, through the same declaration `josh time` uses for the same reason.

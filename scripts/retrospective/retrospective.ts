@@ -48,6 +48,9 @@ interface RetrospectiveInputs {
 	scope: EventScope
 	// The selected run's sessions with their parsed transcripts.
 	sessions: ReadonlyArray<SessionTranscript>
+	// `josh cost:audit`'s summary line — the trend across runs this run sits in — and, on a
+	// regression, the filing line `retrospective.md` acts on.
+	audit_summary: string
 }
 
 const CLOSING =
@@ -145,6 +148,7 @@ function ship_stop_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Ar
 function compose(inputs: RetrospectiveInputs): string {
 	return [
 		...cost_lines(inputs.cost),
+		inputs.audit_summary,
 		'',
 		...findings_lines(inputs.findings, inputs.zero_rounds),
 		'',

@@ -6,6 +6,7 @@ import {
 	type AgentProfile,
 	type AgentRole,
 } from './agent-role-profile'
+import { lane_instructions } from './lane-instructions'
 
 const AGENT_COMMAND = 'claude'
 // **The permission mode is passed, not left to the checkout's `.claude/settings.json`.** Claude Code
@@ -63,6 +64,7 @@ const PROJECT_MCP_FILE = '.mcp.json'
 interface ClaudeArgv {
 	command: string
 	args: ReadonlyArray<string>
+	ends_with_prompt: true
 }
 
 type ClaudeArgvResult =
@@ -87,6 +89,14 @@ function tool_flags(cwd: string = process.cwd()): ReadonlyArray<string> {
 	return [TOOLS_FLAG, LAUNCHED_TOOLS.join(','), ...mcp_flags]
 }
 
+// **A lane child and a review session start from the lane instruction set** (`lane-instructions.ts`);
+// the scheduler keeps `CLAUDE.md`, because it is the one that stops and asks a person.
+function instruction_flags(profile: AgentProfile, cwd?: string): ReadonlyArray<string> {
+	if (profile.role === agent_role_profile.SCHEDULER) return []
+
+	return lane_instructions.flags(cwd)
+}
+
 function build(
 	invocation: string,
 	profile: AgentProfile,
@@ -98,6 +108,7 @@ function build(
 		args: [
 			...AGENT_FLAGS,
 			...tool_flags(cwd),
+			...instruction_flags(profile, cwd),
 			...session_id_flags(session_id),
 			MODEL_FLAG,
 			profile.model,
@@ -105,6 +116,7 @@ function build(
 			profile.effort,
 			invocation,
 		],
+		ends_with_prompt: true,
 	}
 }
 
@@ -121,6 +133,7 @@ function build_resume(
 		args: [
 			...AGENT_FLAGS,
 			...tool_flags(cwd),
+			...instruction_flags(profile, cwd),
 			RESUME_FLAG,
 			session_id,
 			MODEL_FLAG,
@@ -129,6 +142,7 @@ function build_resume(
 			profile.effort,
 			invocation,
 		],
+		ends_with_prompt: true,
 	}
 }
 

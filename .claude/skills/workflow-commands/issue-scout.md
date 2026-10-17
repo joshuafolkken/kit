@@ -28,8 +28,9 @@ pnpm josh issue:file "<title>" --body-file <complete-draft.md> --depth <n> --dis
   `add_to_epic` / `create_epic` Tier A and `ask` a stop, in exactly the reading `into-target.md`'s
   `into <target>` suffix would have given by hand. Where the user typed `into <target>`, that naming wins.
 - **`Epic: not asked` is not `Epic: none`.** The epic half decides from the issue numbers the body
-  names. **Cite `#N` in the body whenever the work follows an existing Issue** — one line is enough,
-  and naming the epic itself (`part of epic #<E>`) is answered with that epic.
+  names in its acceptance criteria or its `parent: #N` line; a background mention does not count.
+  **Cite `#N` there whenever the work follows an existing Issue** — one line is enough, and naming
+  the epic itself (`parent: #<E>`) is answered with that epic.
 - **`epic:bundle` then runs on the new Issue, in the same call.** Act on its printed answer; a `⚠`
   means rerun `pnpm josh epic:bundle <N>` — the Issue exists, so never refile; a placing answer
   reads the `epic-commands` skill.

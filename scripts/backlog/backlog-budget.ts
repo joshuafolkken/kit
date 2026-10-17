@@ -42,7 +42,7 @@ const WATCH_VERDICT = 'watch'
 const STOP_VERDICT = 'stop'
 const TRIAGE_VERDICT = 'triage'
 
-// `run` — start what `backlog:next` offered. `watch` — sleep the polling interval and ask again,
+// `run` — start what `backlog:next` offered. `watch` — sleep the re-ask floor and ask again,
 // except while something of the run's own is in flight, where the wake is the progress watcher's exit
 // and the interval is only a floor (`docs/maintainers/backlogrun-driver.md` → "Waiting while
 // something is in flight").
@@ -87,7 +87,7 @@ interface BudgetDecision {
 }
 
 const BLOCKED_REASON =
-	'Everything opted in is blocked or already running, so waiting can still change the answer. Poll again at the polling interval.'
+	'Everything opted in is blocked or already running, so waiting can still change the answer. Ask again at the re-ask floor (60 s).'
 
 const TRIAGE_REASON =
 	'An opted-in candidate carries neither `run:solo` nor `run:lane`, so nothing starts until it is judged. Read each issue named above, record its order and one of the two labels with a comment, then ask again.'
@@ -121,7 +121,7 @@ function max_reached_reason(merged: number, max_issues: number): string {
 }
 
 function draining_reason(running: number, reason: string): string {
-	return `Start nothing more and poll until the running children merge (running: ${String(running)}). Then report and finish — ${reason}`
+	return `Start nothing more and wait on \`pnpm josh lane:await\` until the running children merge (running: ${String(running)}). Then report and finish — ${reason}`
 }
 
 function idle_expired_reason(answer: BacklogAnswer, idle_budget_ms: number): string {
@@ -140,7 +140,7 @@ function idle_watch_reason(answer: BacklogAnswer, left_ms: number): string {
 // **The watch runs down while they drain, and restarts at each one collected.** A collected child is
 // work, so it moves `active_at`; an ask that offered nothing never does.
 function running_watch_reason(answer: BacklogAnswer, running: number, left_ms: number): string {
-	return `${waiting_on(answer)} and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree until they merge and poll at the polling interval — the watch is running down meanwhile.`
+	return `${waiting_on(answer)} and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree and wait on \`pnpm josh lane:await\` until they merge — the watch is running down meanwhile.`
 }
 
 function watching_reason(input: BudgetInput, left_ms: number): string {

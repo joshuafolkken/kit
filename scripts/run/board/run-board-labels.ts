@@ -43,6 +43,7 @@ const WORDS = {
 	merged: 'merged',
 	parked: 'parked',
 	done: 'done',
+	withdrawn: 'withdrawn',
 	in_progress: 'running',
 	stopped: 'stopped',
 	waiting: 'waiting',
@@ -104,6 +105,7 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	waiting: '⏳',
 	human: '🙋',
 	stopped: '🛑',
+	withdrawn: '🚫',
 }
 
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.

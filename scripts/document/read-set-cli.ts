@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { lane_instructions } from '#scripts/agent/lane-instructions'
 import { backlogrun_parent_read_set } from './backlogrun-parent-read-set'
 import { entry_read_set, type ReadSetCost, type SectionCost } from './entry-read-set'
 import { lane_child_read_set } from './lane-child-read-set'
@@ -192,7 +193,9 @@ function total_lines(report: ReadSetCost, width: number): Array<string> {
 }
 
 function note_lines(report: ReadSetCost): Array<string> {
-	if (report.entry === lane_child_read_set.LANE_CHILD) return [...LANE_CHILD_NOTE, '']
+	if (report.entry === lane_child_read_set.LANE_CHILD) {
+		return [...LANE_CHILD_NOTE, lane_instructions.resident_line(), '']
+	}
 
 	if (report.entry === BACKLOGRUN) return [...BACKLOGRUN_PARENT_NOTE, '']
 

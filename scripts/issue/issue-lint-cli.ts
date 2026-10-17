@@ -2,6 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { behavior_change_lint } from './behavior-change-lint'
+import { expected_effect_lint } from './expected-effect-lint'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 
@@ -9,7 +10,7 @@ import { issue_lint } from './issue-lint'
 // one per line, exiting non-zero. It reads a path rather than stdin so it can
 // lint a body written to a file before the `gh api … issues` call that files it. A body that declares
 // itself a behavior-change Issue is additionally held to the firing-point, baseline and reproduction
-// rules.
+// rules, and one that declares a run-time-shortening aim to the expected-effect estimate.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -17,14 +18,15 @@ const OK_MESSAGE = 'ok'
 const NO_LABELS = 'none'
 const USAGE = 'Usage: josh issue:lint <path-to-issue-body>'
 
-// Every problem a body has: the four base template headings it lacks, then the behavior-change
-// problems (empty for an Issue that does not declare itself one).
+// Every problem a body has: the four base template headings it lacks, then the behavior-change and
+// expected-effect problems (each empty for an Issue that does not declare itself one).
 function problems(body: string): ReadonlyArray<string> {
 	const missing = issue_lint.missing_headings(body).map((heading) => `missing heading: ${heading}`)
 
 	return [
 		...missing,
 		...behavior_change_lint.problems(body),
+		...expected_effect_lint.problems(body),
 		...issue_classification.problems(body),
 	]
 }

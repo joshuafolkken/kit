@@ -71,6 +71,7 @@ const REST_FIELD_NAMES = new Map<string, string>([
 	['url', 'html_url'],
 	['createdAt', 'created_at'],
 	['closedAt', 'closed_at'],
+	['stateReason', 'state_reason'],
 	['updatedAt', 'updated_at'],
 ])
 

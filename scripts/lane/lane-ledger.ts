@@ -36,9 +36,16 @@ const KIND = {
 	DISPATCH: 'dispatch',
 	STAGE: 'stage',
 	STOP: 'stop',
+	OVERLAP: 'overlap',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
+const check_schema = z.object({
+	label: z.string(),
+	elapsed_ms: z.number(),
+	is_passed: z.boolean(),
+	is_reused: z.boolean().optional(),
+})
 const gate_schema = z.object({
 	kind: z.literal(KIND.GATE),
 	at: z.string(),
@@ -50,6 +57,9 @@ const gate_schema = z.object({
 	// The whole cores busy outside this gate, beyond the machine's baseline, at its start or its end —
 	// whichever was higher. Absent when the machine could not be read.
 	external_cores: z.number().optional(),
+	// Each check's own duration and verdict, so `josh lane:stats` can name the check a slow gate waited
+	// on. A reused check started no process: its row says so, and its zero is no timing.
+	checks: z.array(check_schema).optional(),
 })
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
@@ -98,6 +108,18 @@ const stop_schema = z.object({
 	issue: z.number(),
 	reason: z.string(),
 })
+// A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
+// before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the
+// wait ran out first (joshuafolkken/kit#3901).
+const overlap_schema = z.object({
+	kind: z.literal(KIND.OVERLAP),
+	at: z.string(),
+	issue: z.number(),
+	lanes: z.array(z.number()),
+	paths: z.array(z.string()),
+	waited_ms: z.number(),
+	is_cleared: z.boolean(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -105,6 +127,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	dispatch_schema,
 	stage_schema,
 	stop_schema,
+	overlap_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -114,10 +137,13 @@ type LoadEntry = z.infer<typeof load_schema>
 type DispatchEntry = z.infer<typeof dispatch_schema>
 type StageEntry = z.infer<typeof stage_schema>
 type StopEntry = z.infer<typeof stop_schema>
+type OverlapEntry = z.infer<typeof overlap_schema>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
+type GateCheckRecord = z.infer<typeof check_schema>
 type StageRecord = Omit<StageEntry, 'kind' | 'at'>
 type StopRecord = Omit<StopEntry, 'kind' | 'at'>
+type OverlapRecord = Omit<OverlapEntry, 'kind' | 'at'>
 
 function target_of(repository: string): string {
 	return stamp_file.stamp_path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -194,6 +220,10 @@ async function record_stop(stop: StopRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.STOP, at: now_iso(), ...stop }, path)
 }
 
+async function record_overlap(overlap: OverlapRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -224,11 +254,23 @@ const lane_ledger = {
 	record_dispatch,
 	record_gate,
 	record_merge,
+	record_overlap,
 	record_stage,
 	record_stop,
 	target,
 	target_of,
 }
 
-export type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry, StageEntry, StopEntry }
+export type {
+	DispatchEntry,
+	GateCheckRecord,
+	GateEntry,
+	LedgerEntry,
+	LoadEntry,
+	MergeEntry,
+	OverlapEntry,
+	OverlapRecord,
+	StageEntry,
+	StopEntry,
+}
 export { lane_ledger }

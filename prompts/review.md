@@ -48,8 +48,7 @@ review, its severity tests and the round cap are unchanged.
 Run `pnpm josh review:brief --level-only` and use what it prints — `low` or `medium`, from the changed
 paths only, never "this one is small". `--staged` classifies the staged diff, `--json` adds the reason;
 inside a workflow `pnpm josh review:brief` prints the level on its first line. `low` gets 1 round,
-`medium` up to 2. Derivation (inert paths, documentation at `medium`):
-`docs/maintainers/review-history.md` → "The level is decided from the changed paths".
+`medium` up to 2. A diff that touches documentation is not inert: it stays at `medium`.
 
 ```bash
 pnpm josh review:brief --level-only            # the branch diff
@@ -94,8 +93,7 @@ deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot i
   as code).
 
 One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
-code line, or a source file whose comment-free text cannot be read. Why: `docs/maintainers/review-history.md`
-→ "The two skip arms".
+code line, or a source file whose comment-free text cannot be read.
 
 Record a skipped round on the Issue:
 
@@ -129,7 +127,8 @@ Findings that reduce to one root judgement are filed as one Issue with a section
 
 Branch 2 only:
 
-- File a follow-up Issue referencing the current one; the current Issue completes.
+- File a follow-up Issue whose `parent: #N` line names the current one — a mention in its background
+  is not read by `epic:bundle`; the current Issue completes.
 - An Issue in no epic is never offered by `epic:next`, so filing continues to the epic. Run these steps
   inside the CI wait: in `fullrun` / `backlogrun` after `pnpm josh git -y` and before
   `pnpm josh followup`; in `halfrun` or a standalone pre-commit self-review as soon as the disposition

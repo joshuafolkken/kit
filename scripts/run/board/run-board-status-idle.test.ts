@@ -60,7 +60,13 @@ describe('run_board_status.settle_closed a stopped lane', () => {
 
 	it('draws it merged once GitHub says its issue merged after the launch', () => {
 		const statuses = run_board_status.statuses_of([LAUNCH], [LANE], NONE, [LANE])
-		const merged = { title: '', labels: [], is_merged: true, closed_ms: Date.parse(T1) }
+		const merged = {
+			title: '',
+			labels: [],
+			is_merged: true,
+			is_not_planned: false,
+			closed_ms: Date.parse(T1),
+		}
 		const closed = new Map([[ISSUE, merged]])
 		const read = { ...OPEN, open_numbers: NONE, closed }
 

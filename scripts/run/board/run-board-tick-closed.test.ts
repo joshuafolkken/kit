@@ -37,7 +37,13 @@ function merged_closed(
 	const closed = new Map(
 		issues.map((issue) => [
 			issue,
-			{ title: `Child ${String(issue)}`, labels, closed_ms: CLOSED_MS, is_merged: true },
+			{
+				title: `Child ${String(issue)}`,
+				labels,
+				closed_ms: CLOSED_MS,
+				is_merged: true,
+				is_not_planned: false,
+			},
 		]),
 	)
 

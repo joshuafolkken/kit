@@ -57,4 +57,20 @@ describe('markdown_section.unfenced_lines', () => {
 
 		expect(lines).toEqual(['a', '', '', '', 'c'])
 	})
+
+	it('splits a CRLF body without keeping the carriage return', () => {
+		expect(markdown_section.unfenced_lines('a\r\nb')).toEqual(['a', 'b'])
+	})
+
+	it('blanks an indented code line', () => {
+		expect(markdown_section.unfenced_lines('a\n    code')).toEqual(['a', ''])
+	})
+})
+
+describe('markdown_section.fence_free_lines', () => {
+	it('blanks the fenced lines and keeps an indented line', () => {
+		const lines = markdown_section.fence_free_lines(['    kept', FENCE, 'b', FENCE].join('\n'))
+
+		expect(lines).toEqual(['    kept', '', '', ''])
+	})
 })

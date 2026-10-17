@@ -85,14 +85,15 @@ kept, or a stranded one, has no child running and adds no load.
 Under the lane-limit row, `lane:stats` prints a second table: one row per stage of a lane, in the
 order a lane passes them, each with its median, its maximum and how many runs the period holds.
 
-| Row                             | Source                                                                     | Read for                                                    |
-| ------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `implement`                     | a `dispatch` entry to the start of the same issue's first `stage` after it | how much of a lane neither decision below can move          |
-| `review`                        | `stage` entries of `josh ship`'s round-one review                          | whether to overlap the round-one review with CI             |
-| `ci-wait`                       | `stage` entries `josh followup` writes for its wait on the checks          | whether to overlap the round-one review with CI             |
-| `gate`                          | `stage` entries of `josh ship`'s gate                                      | whether to lower `JOSH_LANE_LIMIT`, beside the load columns |
-| `preflight`, `sync`, `commit`   | `stage` entries of `josh ship`                                             | the rest of the time from dispatch to the pull request      |
-| `round-2`, `followup`, `report` | `stage` entries of `josh ship`                                             | the rest of the time from the pull request to the merge     |
+| Row                           | Source                                                                     | Read for                                                    |
+| ----------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `implement`                   | a `dispatch` entry to the start of the same issue's first `stage` after it | how much of a lane neither decision below can move          |
+| `review`                      | `stage` entries of `josh ship`'s round-one review                          | whether to overlap the round-one review with CI             |
+| `ci-wait`                     | `stage` entries `josh followup` writes for its wait on the checks          | whether to overlap the round-one review with CI             |
+| `gate`                        | `stage` entries of `josh ship`'s gate                                      | whether to lower `JOSH_LANE_LIMIT`, beside the load columns |
+| `preflight`, `sync`, `commit` | `stage` entries of `josh ship`                                             | the rest of the time from dispatch to the pull request      |
+| `round-2`                     | `stage` entries of `josh ship`'s round-two review                          | its `runs` against `review`'s: the overlap's clean rate     |
+| `followup`, `report`          | `stage` entries of `josh ship`                                             | the rest of the time from the pull request to the merge     |
 
 **A stage nothing recorded prints `not measured`, never `0`** — a period that ran no second review
 round has no `round-2` duration, which is not a round that took no time. A stage that found nothing
@@ -111,10 +112,39 @@ replacement's ship is not counted against it.
 `followup` that waited for the checks. Only a wait that ran to its end is recorded — one that was
 interrupted leaves no entry.
 
-**The two decisions the table is for.** Overlapping the round-one review with CI saves one CI wait when
-`review`'s median is at least `ci-wait`'s, and almost nothing when `review` is under a minute. Lowering
-`JOSH_LANE_LIMIT` is worth it when `gate` grows with the effective lanes while the load peak is above
-the core count.
+**The two decisions the table is for.** Overlapping the round-one review with CI pays only when round
+one finds nothing to fix: CI then runs once, on the head the review passed. When round one fixes
+something, the CI run on the pre-review head is wasted and runs again on the fixed head. So overlap only
+when the gain outweighs the loss:
+
+- Gain: the clean rate × the shorter of `review`'s and `ci-wait`'s medians, the time the two would
+  share — next to nothing when `review` is under a minute.
+- Loss: the fix rate × the cost of one extra CI run — another CI concurrency slot and another
+  CodeRabbit review against its rate limit, on top of the CI time itself.
+
+The clean rate is approximated from the table's `runs`: 1 − `round-2`'s runs ÷ `review`'s runs. A
+round 2 that was not due writes no entry, so the ratio counts the round-one reviews that led to a
+second round. It is an approximation, biased both ways:
+
+- Too high: a round 2 is skipped when every path round 1 fixed is inert — documentation, a prompt,
+  or a comment-only edit. Such a fix still moves the head and wastes the CI run on the pre-review head,
+  but adds no `round-2` entry.
+- Too low: a round 2 runs with no fix when round 1 recorded no snapshot or the base moved since,
+  and runs again when new work is pushed after it, while round 1 records once — one lane can add two
+  `round-2` runs against one `review` run, and the ratio can fall below zero.
+
+Read it as a direction, not a figure: a ratio far from the break-even point decides the question, one
+near it does not.
+
+A worked example, from the ledger in October 2026: 79 of the 97 round-one reviews from 2026-10-07 ran a
+round 2, a clean rate of about 19% — four of five overlapped CI runs would be thrown away, for a saving
+on one lane in five.
+
+The too-high bias only strengthens that reading, and the too-low one would have to
+account for most of the 79 runs to turn it, so the answer was not to overlap ([#3902](https://github.com/joshuafolkken/kit/issues/3902) was decided on this reading).
+
+Lowering `JOSH_LANE_LIMIT` is worth it when `gate` grows with the effective lanes while the load peak is
+above the core count.
 
 ## How long a stopped ship waits
 
@@ -137,6 +167,12 @@ the resumption of the old stop. A stop late in the period whose resumption falls
 **The decision the table is for**: which stop reason to remove next — the reason whose runs times
 median is largest costs the lanes the most time.
 
+An `overlap` entry is the wait that targets the `conflict` row. Before its sync, a ship waits for every
+lane whose open pull request changes a path its own change does (`run-ship-overlap.ts`).
+
+The entry names the lanes, the shared paths, `waited_ms` and whether the wait cleared. Read it against
+the `conflict` row of the same period.
+
 ## What the load is made of
 
 A `load` sample's `processes` is the machine's process list at that minute, grouped by the kind of
@@ -152,3 +188,14 @@ period whose samples carried no breakdown prints the header alone.
 **The decision the table is for**: what is loading the machine beyond the core budget's ledger
 ([#3874](https://github.com/joshuafolkken/kit/issues/3874)) — a kind with a high mean that nothing
 reserves is the next thing to put on the budget.
+
+## Which check a gate waited on
+
+A `gate` entry's `checks` is one row per check it ran — its label, duration, verdict and whether it was
+reused from its own green record (`scripts/gate/check-reuse.ts`). Under the process table, `lane:stats`
+prints a fifth: one row per check, in the order they first appear, with the median and maximum duration
+in seconds, how many runs and how many of them were reused.
+
+**A reused check is counted, never timed** — it started no process, so its zero would pull the median
+toward a check that never ran. A check that was only ever reused prints `not measured`. A gate recorded
+before the field existed contributes no row.

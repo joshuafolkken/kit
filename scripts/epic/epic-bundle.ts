@@ -1,6 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, RELEASE_LABEL } from '#scripts/issue/issue-labels'
-import { epic_audit_logic } from './epic-audit'
+import { epic_audit_logic, type SignalSection } from './epic-audit'
 import { epic_graph } from './epic-graph'
 import type { DependencyLink } from './epic-parse'
 import type { IssueReference } from './epic-reference'
@@ -11,9 +11,9 @@ import type { IssueReference } from './epic-reference'
 // not reach the other way in: two issues filed days apart that turn out to be the front and back of
 // one job are executed separately, in whatever order, with the reasoning recorded nowhere.
 //
-// The candidate search reads issue references out of prose — the same reading `epic:audit` does
-// inside one epic. That analysis is imported rather than written a second time; the only
-// difference is what it is pointed at.
+// The candidate search reads issue references out of the acceptance criteria and the `parent: #N`
+// line — the same reading `epic:audit` does inside one epic. That analysis is imported rather than
+// written a second time; the only difference is what it is pointed at.
 
 // An open issue as the search sees it.
 interface BacklogIssue {
@@ -59,11 +59,19 @@ interface BundleDecision {
 	reason: string
 }
 
-// Whether `from`'s body names `to`. One direction of the citation test, because which direction it
-// was is what `epic-bundle-evidence.ts` reports — and the read is single-sourced here rather than
-// written a second time there, so the candidate search and the evidence beside it cannot drift apart.
+// Where `from`'s body names `to` in a place that counts as a relation — its acceptance criteria or
+// its `parent: #N` line — or nothing. One direction of the citation test, because which direction
+// and which section it was is what `epic-bundle-evidence.ts` reports — and the read is single-sourced
+// here rather than written a second time there, so the candidate search and the evidence beside it
+// cannot drift apart. A number written only as the background of a filing is not a relation.
+function reference_section(from: BacklogIssue, to: BacklogIssue): SignalSection | undefined {
+	return epic_audit_logic
+		.signal_references(from.body, from.repo)
+		.find((reference) => reference.number === to.number)?.section
+}
+
 function names_in_body(from: BacklogIssue, to: BacklogIssue): boolean {
-	return epic_audit_logic.parse_references(from.body, from.repo).includes(to.number)
+	return reference_section(from, to) !== undefined
 }
 
 // Whether two issues cite each other, in either direction. A one-way citation is enough: the point
@@ -324,7 +332,7 @@ function bundle_children(
 
 const epic_bundle = {
 	names_as_blocker,
-	names_in_body,
+	reference_section,
 	NO_SIGNAL_REASON,
 	already_tracked_reason,
 	has_recorded_dependency,

@@ -1,9 +1,9 @@
 import { process_identity } from '#scripts/josh/process-identity'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger, type GateCheckRecord } from '#scripts/lane/lane-ledger'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
 import { gate_plan } from './gate-plan'
-import type { GateStepResult } from './gate-report'
+import { gate_report, type GateStepResult } from './gate-report'
 import { machine_capacity } from './machine-capacity'
 
 // A finished gate's line in the lane ledger: its duration, its verdict, its
@@ -88,6 +88,15 @@ async function start(ledger_path: string | undefined): Promise<GateLedgerStart> 
 	return { ledger_path, readings, sampler: start_sampler(readings) }
 }
 
+function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckRecord> {
+	return results.map((result) => ({
+		label: result.label,
+		elapsed_ms: result.elapsed_ms,
+		is_passed: !gate_report.is_gate_step_failed(result),
+		is_reused: result.reused_at !== undefined,
+	}))
+}
+
 // The caller measures the elapsed time before this, so the end's reading is never part of it.
 async function record(
 	begun: GateLedgerStart,
@@ -101,7 +110,12 @@ async function record(
 	const unit_ms = results.find((result) => result.label === gate_plan.UNIT_LABEL)?.elapsed_ms
 	const external_cores = peak([...begun.readings, await read_external_cores()])
 
-	await lane_ledger.record_gate(begun.ledger_path, { ...outcome, unit_ms, external_cores })
+	await lane_ledger.record_gate(begun.ledger_path, {
+		...outcome,
+		unit_ms,
+		external_cores,
+		checks: check_records(results),
+	})
 }
 
 const gate_ledger = {

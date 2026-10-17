@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { delivered_rules } from './delivered-rules'
+import { guard_remedy } from './guard-remedy'
 import { rule_registry, type RegisteredRule } from './rule-registry'
 
 // `josh rule:list` — the list of trigger-delivered rules, rendered from the guard rows themselves.
@@ -12,6 +13,7 @@ import { rule_registry, type RegisteredRule } from './rule-registry'
 const HEADER =
 	'# Trigger-delivered rules — rendered by `pnpm josh rule:list` from `scripts/rules/delivered-rules.ts`'
 const MISSING = '(no entry in `scripts/rules/rule-registry.ts`)'
+const MISSING_WHY = '(no `why` in `scripts/rules/guard-remedy.ts`)'
 
 function item(id: string, rule: RegisteredRule | undefined): string {
 	if (rule === undefined) return `- \`${id}\` ${MISSING}`
@@ -20,6 +22,7 @@ function item(id: string, rule: RegisteredRule | undefined): string {
 		`- **${rule.title}** (\`${id}\`, ${rule.topic})`,
 		`  - fires: \`${rule.entry}\` — ${rule.fires}`,
 		`  - silent: ${rule.quiet}`,
+		`  - not automated: ${guard_remedy.why_of(id) ?? MISSING_WHY}`,
 	].join('\n')
 }
 
@@ -46,6 +49,6 @@ function orphans(): ReadonlyArray<string> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.stdout.write(`${render()}\n`)
 
-const rule_list = { MISSING, orphans, render }
+const rule_list = { MISSING, MISSING_WHY, orphans, render }
 
 export { rule_list }

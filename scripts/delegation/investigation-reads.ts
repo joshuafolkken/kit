@@ -362,7 +362,6 @@ const investigation_reads = {
 	is_session_artifact,
 	is_subject_file,
 	projected_count,
-	repository_relative,
 	resolved,
 	should_block,
 	tally_of,

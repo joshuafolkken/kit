@@ -2,6 +2,7 @@ import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { direct_filing } from './direct-filing'
 import { early_heartbeat } from './early-heartbeat'
@@ -46,6 +47,9 @@ type CallTest = (
 	run: ReadonlyArray<GuardedCall>,
 ) => boolean
 
+// The tail is read lazily: most calls no rewrite applies to never need it.
+type CallRewrite = (call: GuardedCall, tail: () => string) => Record<string, unknown> | undefined
+
 // `id` keys the rule's own refusal record, so one rule firing never spends another's budget.
 interface DeliveredRule {
 	id: string
@@ -63,6 +67,9 @@ interface DeliveredRule {
 	// The occasion the rule governs, for a row whose trigger is the violation itself (else `is_trigger`
 	// would only count runs that broke it).
 	reaches?: CallTest
+	// The call made right, for a row `guard-remedy.ts` classes as a rewrite: `rule-rewrite.ts` runs it
+	// in place of the refusal. `undefined` where this call has no mechanical fix, so it is refused.
+	rewrite?: CallRewrite
 	// The note a hook attaches where it rewrites a violating call instead of refusing it, so
 	// `rule-value.ts` counts the rewrite as this row's delivery.
 	rewrite_note?: string
@@ -107,7 +114,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: piped_verification.PIPED_VERIFICATION_REASON,
 		keeps: on_bash_command(piped_verification.keeps_verdict_intact),
 		reaches: on_bash_command(piped_verification.runs_verification),
-		// A `| tail` / `| grep` masking is rewritten under `pipefail` by `pretool-guard.ts`, never refused.
+		// A masking whose filter reads to the end is rewritten under `pipefail`, never refused.
+		rewrite: piped_verification.pipefail_input,
 		rewrite_note: piped_verification.PIPEFAIL_NOTE,
 	},
 	{
@@ -146,6 +154,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	lane_split_park.ROW,
 	lane_park.ROW,
 	lane_interactive_ask.ROW,
+	agent_model.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.
@@ -304,5 +313,5 @@ const delivered_rules = {
 	is_issue_filing,
 }
 
-export type { DeliveredRule, MeasuredRule }
+export type { CallRewrite, DeliveredRule, MeasuredRule }
 export { delivered_rules }

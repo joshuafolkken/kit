@@ -1,0 +1,30 @@
+{
+	"name": "verification-fix-two-findings",
+	"rule": "prompts/review.md — the round-2 verification pass passes a delta whose every round-1 finding is closed",
+	"prompt": "Run the round-2 verification pass over the round-1 fixes in this checkout. Round 1 reported the findings in round-1-findings.txt and the fixes are already in place in src/. Read only: do not edit any source file, and do not commit. Check that each round-1 finding is fixed and that the fix introduced no new defect. Then write every finding with the Write tool to findings.txt, one per line as <category>:<severity>:<file>[:<line>] — <one sentence: what is wrong and why> (category one of bug-risks, security, performance, project-conventions, i18n, tests, comments, assumptions, confidence; severity high, medium or low), and write an empty file when there is none.",
+	"fixture_files": {
+		"round-1-findings.txt": "bug-risks:medium:src/retry.ts:6 — the loop retries a non-retryable error until the attempts run out instead of rethrowing it at once.\ntests:medium:src/retry.test.ts — no test pins that a non-retryable error is rethrown on the first attempt.\n",
+		"src/retry.ts": "export class RetryableError extends Error {}\n\nexport async function with_retry<T>(task: () => Promise<T>, attempts: number): Promise<T> {\n\tlet last: unknown\n\n\tfor (let attempt = 0; attempt < attempts; attempt += 1) {\n\t\ttry {\n\t\t\treturn await task()\n\t\t} catch (error) {\n\t\t\tif (!(error instanceof RetryableError)) throw error\n\t\t\tlast = error\n\t\t}\n\t}\n\n\tthrow last\n}\n",
+		"src/retry.test.ts": "import { expect, it, vi } from 'vitest'\nimport { RetryableError, with_retry } from './retry'\n\nit('retries a retryable error until the task succeeds', async () => {\n\tconst task = vi.fn().mockRejectedValueOnce(new RetryableError()).mockResolvedValue('done')\n\n\tawait expect(with_retry(task, 3)).resolves.toBe('done')\n\texpect(task).toHaveBeenCalledTimes(2)\n})\n\nit('rethrows a non-retryable error on the first attempt', async () => {\n\tconst task = vi.fn().mockRejectedValue(new TypeError('bad input'))\n\n\tawait expect(with_retry(task, 3)).rejects.toThrow('bad input')\n\texpect(task).toHaveBeenCalledOnce()\n})\n"
+	},
+	"max_turns": 10,
+	"should_call": [
+		{
+			"tool": "Write",
+			"input_matches": "findings\\.txt",
+			"because": "The verification pass reports through the findings file the supervisor reads; a pass that never writes it reads as unfinished."
+		}
+	],
+	"should_not_call": [
+		{
+			"tool": "Write",
+			"input_matches": "^(?=.*findings\\.txt)(?=.*\"content\":\"(?:[^\"\\\\]|\\\\.)*:(?:high|medium):)",
+			"because": "Both round-1 findings are closed — the non-retryable error is rethrown and a test pins it — so a High or Medium blocks a correct delta; the reference verdict passes."
+		},
+		{
+			"tool": "Edit",
+			"input_matches": "src/",
+			"because": "Round 2 only reads; an edit changes the tree after the commit it verifies."
+		}
+	]
+}

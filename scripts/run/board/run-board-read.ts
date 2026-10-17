@@ -37,9 +37,15 @@ interface LocalRead {
 	// The open lanes no child is working in at this read (`lane-spent.ts`); one is drawn stopped once it
 	// has stayed so (`run-board-idle.ts`).
 	idle_lanes?: ReadonlyArray<string> | undefined
+	// The open lanes that last took a child before the run started — an earlier run's, until this run
+	// dispatches into one again.
+	earlier_lanes?: ReadonlyArray<string> | undefined
 	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
 	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
+	// The issues whose lanes hold a place under the limit (`backlog-occupied.ts`), named beside a row
+	// that waits for a free lane.
+	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
 }
@@ -81,6 +87,13 @@ function sources_of(
 	}
 }
 
+// joshuafolkken/kit#3969: a lane whose last dispatch is unknown is not called earlier.
+function earlier_lanes(lanes: ReadonlyArray<LaneInfo>, started_ms: number): Array<string> {
+	return lanes
+		.filter((lane) => lane.dispatched_ms !== undefined && lane.dispatched_ms < started_ms)
+		.map((lane) => lane.issue)
+}
+
 // `undefined` when no run has started here.
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
@@ -90,6 +103,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes()
+	const occupied = await backlog_ready.occupied_lanes(lanes)
 
 	return {
 		started_ms: span.started_ms,
@@ -101,7 +115,9 @@ async function read_local(): Promise<LocalRead | undefined> {
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		idle_lanes: lane_spent.idle_lanes(lanes),
+		earlier_lanes: earlier_lanes(lanes, span.started_ms),
 		free_lanes: await backlog_ready.free_lanes_beside(lanes),
+		occupied_lanes: occupied.map((lane) => lane.issue),
 		usual: run_board_usual.read(repository),
 	}
 }

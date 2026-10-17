@@ -1,13 +1,17 @@
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_ship_next, type ShipResume } from '#scripts/run/ship/run-ship-next'
 import type { Stage } from '#scripts/run/ship/run-ship-stage'
+import { run_ship_stop_context, type StopContext } from '#scripts/run/ship/run-ship-stop-context'
 
 interface ShipStop extends ShipResume {
 	stage: Stage
+	context?: StopContext
 }
 
 const CHILD_INVOCATION = 'fullrun'
+const LINE_BREAK = '\n'
 // What a brokered reviewer's prompt ends with, so the one pattern below finds it too.
 const REVIEW_INVOCATION = 'the reviewer of lane'
 const RESUME_GUIDE = '.claude/skills/workflow-commands/pre-gate-cut.md'
@@ -79,14 +83,41 @@ function outage_resume_invocation(issue: string): string {
 // **A known stage puts the next command in the prompt**, so the relaunched
 // session runs it rather than re-deriving it from `chain-rule.md`. An OpenAI lane's supervisor sees only
 // that the ship failed, not where, so without a stage the prompt points at `run:step` as before.
+//
+// **A stop that carries its context puts it in the prompt too** — the failed output's
+// tail and the changed files (`run-ship-stop-context.ts`), so the session starts at the fix rather than
+// at `josh ship --log` and `git diff` (joshuafolkken/kit#3923).
+//
+// The context gets what the rest of the prompt leaves of the one argv element's cap, so the whole
+// prompt still launches (joshuafolkken/kit#3964).
+function known_stop_lines(
+	issue: string,
+	stop: ShipStop,
+	frame: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	const { context } = stop
+	const is_excerpted = run_ship_stop_context.has_excerpt(context)
+	const next = run_ship_next.next_step(issue, stop.stage, stop, is_excerpted)
+
+	if (context === undefined) return [next]
+
+	const fixed = [...frame, next].join(LINE_BREAK).length + LINE_BREAK.length
+	const budget = agent_role_profile.MAX_VALUE_LENGTH - fixed
+
+	return [next, run_ship_stop_context.describe(issue, context, budget)]
+}
+
 function ship_stop_invocation(issue: string, stop?: ShipStop): string {
 	const opening = `Resuming the lane child for issue ${issue_cite.plain(issue)} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
-	const next =
+	const closing = `Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`
+	const middle =
 		stop === undefined
-			? `Run \`pnpm josh run:step ${issue}\` and read the stopped report it names, fix what stopped the ship, then hand the region back per chain-rule.md.`
-			: run_ship_next.next_step(issue, stop.stage, stop)
+			? [
+					`Run \`pnpm josh run:step ${issue}\` and read the stopped report it names, fix what stopped the ship, then hand the region back per chain-rule.md.`,
+				]
+			: known_stop_lines(issue, stop, [opening, closing])
 
-	return `${opening} ${next} Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`
+	return [opening, ...middle, closing].join(LINE_BREAK)
 }
 
 const lane_child_invocation = {

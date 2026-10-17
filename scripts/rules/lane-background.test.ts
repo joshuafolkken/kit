@@ -34,7 +34,9 @@ const TIMESTAMP = '2026-09-29T03:00:00.000Z'
 const TASK_ID = 'bxj18z032'
 const AGENT_ID = 'a6b97a47275a1a193'
 const DROPS_FINISHED_AGENT = 'drops a subagent whose finish notice is on the tail'
-const { context } = stop_rules_fixture
+const { action_kinds, context } = stop_rules_fixture
+// A held stop whose reply names its decision — the one a notify is sent for (joshuafolkken/kit#3961).
+const HELD_DECISION = { hold_issue: '7', message: stop_rules_fixture.DECISION_MESSAGE }
 
 function background_call(command: string): { name: string; input: Record<string, unknown> } {
 	return { name: BASH, input: { command, run_in_background: true } }
@@ -253,9 +255,12 @@ describe('lane_background.pending_agent_ids', () => {
 
 describe('stop_rules.stop_outcome — lane background wait', () => {
 	it('sends a lane child with a running task back to wait instead of to notify', () => {
-		const held = context({ lane_child: true, background_pending: true, hold_present: true })
+		const held = context({ lane_child: true, background_pending: true, hold_issue: '7' })
 
-		expect(stop_rules.stop_outcome(held).reason).toBe(lane_background.LANE_BACKGROUND_STOP_REASON)
+		expect(stop_rules.stop_outcome(held)).toEqual({
+			...stop_rules.NO_OUTCOME,
+			reason: lane_background.LANE_BACKGROUND_STOP_REASON,
+		})
 	})
 
 	it('stays silent outside a lane child', () => {
@@ -269,26 +274,23 @@ describe('stop_rules.stop_outcome — lane background wait', () => {
 		'asks no notify or release of a held run waiting on a subagent (tree clean: %s)',
 		(tree_clean) => {
 			const pending = { background_pending: true, agent_pending: true }
-			const held = context({ ...pending, hold_present: true, tree_clean })
+			const held = context({ ...pending, hold_issue: '7', tree_clean })
 
-			expect(stop_rules.stop_outcome(held).reason).toBeUndefined()
+			expect(stop_rules.stop_outcome(held)).toEqual(stop_rules.NO_OUTCOME)
 		},
 	)
 
 	it.each([
 		['nothing running', {}],
 		['only a command running, which may never end', { background_pending: true }],
-	])('still asks the notify of a held run with %s', (_label, pending) => {
-		const held = context({ ...pending, hold_present: true })
-
-		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	])('still sends the notify of a held run with %s', (_label, pending) => {
+		expect(action_kinds({ ...pending, ...HELD_DECISION })).toEqual(['notify'])
 	})
 
-	it('still refuses a bare issue number while a subagent runs', () => {
+	it('still cites a bare issue number while a subagent runs', () => {
 		const pending = { background_pending: true, agent_pending: true }
-		const stop = context({ ...pending, hold_present: true, message: 'See #2774.' })
 
-		expect(stop_rules.stop_outcome(stop).reason).toContain('issue citation')
+		expect(action_kinds({ ...pending, hold_issue: '7', message: 'See #2774.' })).toEqual(['cite'])
 	})
 
 	it('honours the loop-breaker', () => {

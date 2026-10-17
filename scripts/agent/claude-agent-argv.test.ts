@@ -175,3 +175,40 @@ describe('Claude launched-tool argv construction', () => {
 		expect(argv.args).toContain(path.join(directory, MCP_CONFIG_FILE))
 	})
 })
+
+// **A lane child and a review session start from the lane instruction set instead of `CLAUDE.md`**
+// (joshuafolkken/kit#3929); the scheduler, which asks a person, keeps `CLAUDE.md`.
+describe('Claude lane-instruction argv construction', () => {
+	const PROMPT_FILE_FLAG = '--append-system-prompt-file'
+	const SETTINGS_FLAG = '--settings'
+	const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..')
+
+	it.each(['worker', 'reviewer'] as const)('gives a %s the lane set ahead of the model', (role) => {
+		const argv = claude_agent_argv.build(
+			INVOCATION,
+			agent_role_profile.DEFAULT_PROFILES[role],
+			undefined,
+			REPO_ROOT,
+		)
+		const settings = argv.args[argv.args.indexOf(SETTINGS_FLAG) + 1] ?? ''
+
+		expect(argv.args.indexOf(PROMPT_FILE_FLAG)).toBeLessThan(argv.args.indexOf('--model'))
+		expect(settings).toContain('claudeMdExcludes')
+		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+
+	it('keeps CLAUDE.md for the scheduler', () => {
+		const { scheduler } = agent_role_profile.DEFAULT_PROFILES
+		const argv = claude_agent_argv.build(INVOCATION, scheduler, undefined, REPO_ROOT)
+
+		expect(argv.args).not.toContain(PROMPT_FILE_FLAG)
+	})
+
+	it('carries the lane set into a resumed session', () => {
+		const { worker } = agent_role_profile.DEFAULT_PROFILES
+		const argv = claude_agent_argv.build_resume(INVOCATION, worker, 'session', REPO_ROOT)
+
+		expect(argv.args).toContain(PROMPT_FILE_FLAG)
+		expect(argv.args.at(-1)).toBe(INVOCATION)
+	})
+})

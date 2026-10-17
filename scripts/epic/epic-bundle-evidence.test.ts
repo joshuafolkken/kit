@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
 import { epic_bundle_evidence } from './epic-bundle-evidence'
+import { epic_bundle_fixture } from './epic-bundle-fixture'
 
 // The facts behind the order `epic:bundle` prints (joshuafolkken/kit#1737).
 //
@@ -13,11 +14,11 @@ import { epic_bundle_evidence } from './epic-bundle-evidence'
 const REPO = 'joshuafolkken/kit'
 const SUBJECT_NUMBER = 3
 const OTHER_NUMBER = 2
-// The prose reference that makes the two a candidate pair, written on each side in turn.
-const SUBJECT_BODY = 'follows #2'
-const OTHER_BODY = 'blocks #3'
-const SUBJECT_NAMES_OTHER = '#3 names #2 in its body — that points to #2 first'
-const OTHER_NAMES_SUBJECT = '#2 names #3 in its body — that points to #3 first'
+// The acceptance-criteria reference that makes the two a candidate pair, written on each side in turn.
+const SUBJECT_BODY = epic_bundle_fixture.in_acceptance('follows #2')
+const OTHER_BODY = epic_bundle_fixture.in_acceptance('blocks #3')
+const SUBJECT_NAMES_OTHER = '#3 names #2 in its acceptance criteria — that points to #2 first'
+const OTHER_NAMES_SUBJECT = '#2 names #3 in its acceptance criteria — that points to #3 first'
 const CREATE_DECISION = {
 	action: 'create_epic' as const,
 	epics: [],
@@ -85,6 +86,18 @@ describe('epic_bundle_evidence.format_evidence — a body naming the other issue
 
 		expect(lines).toContain(SUBJECT_NAMES_OTHER)
 		expect(lines).toContain(OTHER_NAMES_SUBJECT)
+	})
+
+	it('names the parent line when that is where the reference was read', () => {
+		const lines = rendered(issue(SUBJECT_NUMBER, { body: 'parent: #2' }), issue(OTHER_NUMBER))
+
+		expect(lines).toContain('#3 names #2 in its parent line — that points to #2 first')
+	})
+
+	it('shows nothing for a reference made only in the background', () => {
+		const subject = issue(SUBJECT_NUMBER, { body: '## Background\n\n- found while filing #2' })
+
+		expect(epic_bundle_evidence.format_evidence(subject, [issue(OTHER_NUMBER)])).toEqual([])
 	})
 })
 

@@ -3,7 +3,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
-import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
@@ -18,6 +17,7 @@ import {
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
+import { find_package_directory } from './package-directory'
 import { run_github_prerequisite } from './run-github-prerequisite'
 
 const COLUMN_WIDTH = 26
@@ -33,17 +33,6 @@ const UNKNOWN_COMMAND_EXIT_CODE = -1
 interface TsxRunner {
 	executable: string
 	leading_arguments: ReadonlyArray<string>
-}
-
-// Resolve the kit package root by ascending to the nearest package.json. This works both
-// from the bundled dist/josh.js (one level under the root) and from the tsx source at
-// scripts/josh/ (two levels), so this file's depth no longer has to be hard-coded.
-function find_package_directory(start_directory: string): string {
-	return (
-		ancestor_directories.nearest(start_directory, (directory) =>
-			existsSync(path.join(directory, PACKAGE_JSON)),
-		) ?? start_directory
-	)
 }
 
 const PACKAGE_DIR = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
@@ -287,6 +276,7 @@ function declared(value: number | (() => number) | undefined): number | undefine
 // without claiming a place. A command under a parent that already holds its cores claims nothing:
 // `core_budget.with_command_reservation` reads the mark that parent set.
 async function dispatch_entry(
+	command: string,
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
@@ -297,7 +287,7 @@ async function dispatch_entry(
 	return await core_budget.with_command_reservation(
 		weight,
 		async () => await run_entry(entry, subcommand_arguments),
-		{ memory_mb: declared(entry.memory_mb) },
+		{ memory_mb: declared(entry.memory_mb), command },
 	)
 }
 
@@ -314,7 +304,7 @@ async function run_command(
 	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
 	if (early_exit !== undefined) return early_exit
 
-	return await dispatch_entry(entry, subcommand_arguments)
+	return await dispatch_entry(resolved, entry, subcommand_arguments)
 }
 
 const josh_logic = {
@@ -330,10 +320,11 @@ export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {
-	find_package_directory,
 	josh_logic,
 	resolve_alias,
 	resolve_tsx_executable,
 	resolve_tsx_runner,
 	UNKNOWN_COMMAND_EXIT_CODE,
 }
+
+export { find_package_directory } from './package-directory'

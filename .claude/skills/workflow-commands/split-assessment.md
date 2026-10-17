@@ -1,9 +1,7 @@
 # The split assessment — one definition, every entry point
 
 Before any entry point starts work on an Issue, decide whether the request is **one** deliverable or
-several. This file is the single definition; every command applies it identically. Reasons:
-`docs/maintainers/split-assessment-rationale.md` → "Why the default is not to split" and
-`docs/maintainers/split-assessment-rationale.md` → "Why diff size is not a reason to split".
+several. Every command applies it identically.
 
 ## The question
 

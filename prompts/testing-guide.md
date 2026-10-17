@@ -50,7 +50,7 @@ Req N: ...
 | Component / browser | `*.svelte.test.ts`       | browser/component vitest project |
 | E2E                 | `src/routes/**/*.e2e.ts` | Playwright                       |
 
-- **Never `*.spec.ts`** — lint-enforced by `eslint/rules/test-filename.js` (wired into `eslint/base.js`) for every JS/TS extension; rationale: `docs/maintainers/testing-guide-history.md` → "Why the `*.spec.*` ban is a lint rule".
+- **Never `*.spec.ts`** — lint-enforced by `eslint/rules/test-filename.js` (wired into `eslint/base.js`) for every JS/TS extension.
 - **Keep the `.svelte.` infix** on component/browser tests: `*.svelte.test.ts` matches the browser project (`include: src/**/*.svelte.{test,spec}.{js,ts}`), plain `*.test.ts` the node project (`include: src/**/*.{test,spec}.{js,ts}`); dropping it silently moves the file to the wrong project.
 - **Colocate** each test beside its code (`foo.test.ts` next to `foo.ts`); no top-level `tests/` (lint-enforced by the same rule). E2E specs go under `src/routes/**` — enforced by review only, since `playwright.config.ts` `testMatch: '**/*.e2e.{ts,js}'` runs them anywhere.
 
@@ -148,7 +148,7 @@ Reset module state at the start of each test (`reset_praise_audio_index()` in `s
 
 ## 6. Closing the E2E gate without a human run
 
-No human E2E run closes the gate, and nothing a red local run stopped is let through (`docs/maintainers/testing-guide-history.md`).
+No human E2E run closes the gate, and nothing a red local run stopped is let through.
 
 ### Which result closes the gate
 

@@ -112,6 +112,11 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// A script rather than an `sh -c` chain, because the strategy has to be named rather than left to
 	// the caller's git configuration: a bare `git pull` aborts with `Need to specify how to reconcile
 	// divergent branches` on exactly the diverged branch the command exists for.
+	//
+	// **It declares no core weight, by measurement** (joshuafolkken/kit#3944): its own work is git, and
+	// the catalog it may regenerate took 0.6s of CPU. The heavy processes seen beside it are commit
+	// hooks — its regenerated catalog's commit runs them — which reserve themselves, and a weight here
+	// would set the held mark they inherit, folding the parallel hook tools into this one place.
 	'main:merge': {
 		script: 'scripts/git/main-merge.ts',
 		description: 'Merge origin default branch into the current branch',

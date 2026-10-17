@@ -14,10 +14,11 @@ vi.mock('#scripts/issue/issue-merged', () => ({ issue_merged: { read_merge_state
 const CLOSED_AT = '2026-10-08T08:45:48Z'
 const TITLE = 'Show closed children'
 
-function view(state: string): string {
+function view(state: string, state_reason?: string): string {
 	return JSON.stringify({
 		title: TITLE,
 		state,
+		stateReason: state_reason,
 		closedAt: state === 'CLOSED' ? CLOSED_AT : undefined,
 		labels: [{ name: 'bug' }, { name: 'auto-ok' }],
 	})
@@ -38,13 +39,30 @@ describe('run_board_closed.read_closed', () => {
 			labels: ['bug', 'auto-ok'],
 			closed_ms: Date.parse(CLOSED_AT),
 			is_merged,
+			is_not_planned: false,
 		})
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith(
 			'3439',
-			'title,state,closedAt,labels',
+			'title,state,stateReason,closedAt,labels',
 		)
 	})
+})
 
+// joshuafolkken/kit#3958: a child a person closed as not planned is drawn withdrawn.
+describe('run_board_closed.read_closed — the close reason', () => {
+	it.each<[string, boolean]>([
+		['not_planned', true],
+		['completed', false],
+		['duplicate', false],
+	])('reads a close as %s as not planned %s', async (reason, is_not_planned) => {
+		vi.mocked(git_gh_issue_read.issue_view_json).mockResolvedValue(view('CLOSED', reason))
+		vi.mocked(issue_merged.read_merge_state).mockResolvedValue(false)
+
+		await expect(run_board_closed.read_closed(3439)).resolves.toMatchObject({ is_not_planned })
+	})
+})
+
+describe('run_board_closed.read_closed — an issue not read closed', () => {
 	it('answers still open for an open issue, without asking whether it merged', async () => {
 		vi.mocked(git_gh_issue_read.issue_view_json).mockResolvedValue(view('OPEN'))
 
@@ -67,7 +85,13 @@ describe('run_board_closed.read_closed', () => {
 })
 
 describe('run_board_closed.read_all', () => {
-	const closed = { title: TITLE, labels: [], closed_ms: undefined, is_merged: false }
+	const closed = {
+		title: TITLE,
+		labels: [],
+		closed_ms: undefined,
+		is_merged: false,
+		is_not_planned: false,
+	}
 
 	it('keeps only the issues that answered closed, whole when the rest answered open', async () => {
 		const read = vi.fn(async (issue: number) =>

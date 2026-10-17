@@ -84,6 +84,24 @@ describe('gate_ledger — the external load a gate ran beside', () => {
 		await expect(recorded('unread')).resolves.toBeUndefined()
 	})
 
+	// joshuafolkken/kit#3903: a reused check is marked so `josh lane:stats` never times its zero.
+	it('records every check, its verdict and whether it was reused', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'checks.jsonl')
+		const lint = { label: 'lint', command: 'josh lint', exit_code: 1, output: '', elapsed_ms: 5 }
+		const check = { ...lint, label: 'check', exit_code: 0, elapsed_ms: 0, reused_at: 'then' }
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [lint, check], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry?.kind === 'gate' ? entry.checks : undefined).toStrictEqual([
+			{ label: 'lint', elapsed_ms: 5, is_passed: false, is_reused: false },
+			{ label: 'check', elapsed_ms: 0, is_passed: true, is_reused: true },
+		])
+	})
+
 	it('reads nothing when no ledger was resolved', async () => {
 		await gate_ledger.record(await gate_ledger.start(undefined), [], OUTCOME)
 

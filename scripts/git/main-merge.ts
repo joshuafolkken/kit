@@ -6,6 +6,7 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-c
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
+import { main_merge_regenerate } from './main-merge-regenerate'
 
 // `josh main:merge` (`josh mm`) — bring the default branch into the branch this checkout is on.
 //
@@ -62,18 +63,26 @@ interface MergeTarget {
 }
 
 // A failure that left no unmerged path — a remote that cannot be reached, a hook that refused — is not
-// a conflict, so it is rethrown rather than reported as one with nothing to resolve.
+// a conflict, so it is rethrown rather than reported as one with nothing to resolve. A conflict only on
+// generated files is regenerated and committed (`main-merge-regenerate.ts`), so it answers `undefined`
+// and the merge reads as finished.
+async function unresolved_conflict(error: unknown): Promise<MergeOutcome | undefined> {
+	const files = main_merge_guard.unmerged_paths(await git_command.status())
+
+	if (files.length === 0) throw error
+
+	return (await main_merge_regenerate.resolve(files)) ? undefined : { kind: 'conflict', files }
+}
+
 async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
 	const { default_branch, current_branch } = target
 
 	try {
 		await git_command.merge_branch(default_branch, merge_message(default_branch, current_branch))
 	} catch (error) {
-		const files = main_merge_guard.unmerged_paths(await git_command.status())
+		const conflict = await unresolved_conflict(error)
 
-		if (files.length === 0) throw error
-
-		return { kind: 'conflict', files }
+		if (conflict !== undefined) return conflict
 	}
 
 	return { kind: target.is_current ? 'current' : 'merged', branch: default_branch }

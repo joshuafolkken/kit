@@ -1,8 +1,6 @@
 # The entry sequence and the stop branches — shared by `fullrun`, `halfrun` and `prrun`
 
-`fullrun.md`, `halfrun.md` and `prrun.md` name only how their own run differs from this shared
-procedure; `pnpm josh run:step <N>` prints the run's next single action. History:
-`docs/maintainers/entry-sequence-rationale.md` → "Where each rule came from".
+`pnpm josh run:step <N>` prints the run's next single action.
 
 ## The ordered entry sequence
 

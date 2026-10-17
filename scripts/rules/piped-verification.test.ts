@@ -143,6 +143,13 @@ const REWRITES: Array<[string, string]> = [
 	['pnpm josh gate | grep "#x"', `${WRAP}pnpm josh gate | grep "#x")`],
 	// A quoted parenthesis is text, not a group.
 	['pnpm josh gate | grep "a(b"', `${WRAP}pnpm josh gate | grep "a(b")`],
+	// joshuafolkken/kit#3920: `cut`, `sort`, `uniq` and `wc` read their input to the end too.
+	[
+		"pnpm josh test:related 2>&1 | grep -E 'FAIL' | cut -c1-250",
+		`${WRAP}pnpm josh test:related 2>&1 | grep -E 'FAIL' | cut -c1-250)`,
+	],
+	['pnpm josh lint | sort | uniq', `${WRAP}pnpm josh lint | sort | uniq)`],
+	['pnpm josh cspell:dot | wc -l', `${WRAP}pnpm josh cspell:dot | wc -l)`],
 ]
 
 describe('pipefail_input', () => {

@@ -51,6 +51,7 @@ const TYPE_CHECK_LABEL = 'check'
 const UNIT_LABEL = 'test:unit'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
+const EXPORTS_LABEL = 'exports'
 
 // The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
 // (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
@@ -106,7 +107,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// program and walks it for about 5s, and it is over well before lint and the type check. A
 	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
 	// unit suite for the whole gate.
-	{ label: 'exports', target: 'exports:unused', reserved_cores: 0 },
+	{ label: EXPORTS_LABEL, target: 'exports:unused', reserved_cores: 0 },
 	// **The metrics ratchet is kit's own**: it holds kit's repository-wide
 	// totals to the merge-base's. It is one in-process eslint pass with only `max-lines` enabled, over
 	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
@@ -397,6 +398,25 @@ function resolve_gate_plan(
 	}
 }
 
+// The unit cap bounded by the cores free of load from outside the core budget's ledger
+// (`free-cores.ts`), so the run count's share is never wider than what is free. A plan with no unit
+// step carries no cap, and an unread machine leaves the cap as resolved (`unit_worker_share.cap_to_free`).
+function bound_by_free(
+	plan: GatePlan,
+	available_cores: number,
+	free_cores: number | undefined,
+): GatePlan {
+	if (!has_unit_check(plan.checks)) return plan
+
+	const unit_worker_cap = unit_worker_share.cap_to_free(
+		plan.unit_worker_cap,
+		free_cores,
+		available_cores,
+	)
+
+	return { ...plan, unit_worker_cap }
+}
+
 // Printed once per run, so a gate that was slow on someone else's machine can be read without
 // re-deriving the plan from their core count.
 //
@@ -440,6 +460,7 @@ function format_gate_plan(
 }
 
 const gate_plan = {
+	EXPORTS_LABEL,
 	GATE_CHECKS,
 	LINT_LABEL,
 	MEASURED_CORES,
@@ -449,6 +470,7 @@ const gate_plan = {
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
 	WARNING_CHECKER_LABELS,
+	bound_by_free,
 	check_memory,
 	check_weight,
 	direct_unit_memory,

@@ -22,6 +22,7 @@ import {
 } from '#scripts/run/run-stage'
 import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_stop } from './run-entry-stop'
 
@@ -259,7 +260,13 @@ async function proceed(issue_number: string, hold: string, cost: string): Promis
 	// update is measured against (`issue-watch.ts`).
 	await issue_watch.record_baseline_here(issue_number)
 
-	return emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
+	const code = emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
+
+	// The entry's own read — the split assessment every run answers before its work — printed here so
+	// the reader does not spend a turn fetching it.
+	if (code !== SUCCESS_EXIT_CODE) return code
+
+	return run_step_section.print_section(run_step_section.ENTRY)
 }
 
 async function claim_run(

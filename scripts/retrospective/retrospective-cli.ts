@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { cost_audit_cli } from '#scripts/cost-audit/cost-audit-cli'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { cost_run_report, type RunCostReport } from '#scripts/cost/cost-run-report'
 import { cost_run_tree, type RunTree } from '#scripts/cost/cost-run-tree'
@@ -89,8 +90,10 @@ async function gather(cwd: string): Promise<RetrospectiveInputs> {
 	const ledger = await read_ledger(cwd)
 	const run_read = await read_run()
 	const tree = read_tree(cwd)
+	const audit_summary = await cost_audit_cli.summary(cwd)
 
 	return {
+		audit_summary,
 		cost: tree.cost,
 		sessions: tree.sessions,
 		findings: review_finding_ledger.category_counts(ledger),

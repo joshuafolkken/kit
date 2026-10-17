@@ -1,0 +1,8 @@
+{
+	"reason": "#3936: the relaunched-cut marker and the Stop hook's turn read that fix the cut/resume race — the call/answer pairing moved from kit-only cost-run-cut.ts to the shipped tail-commands.ts so the hook can share it — plus one sentence in pre-gate-cut.md naming where the hook reads it",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 15,
+		"ai_cost.on_demand_bytes": 113
+	}
+}

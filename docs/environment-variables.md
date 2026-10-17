@@ -6,7 +6,7 @@ Only these load `.env` themselves, and only when it exists:
 
 - **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
 - **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
-- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:sample`, `josh lane:stats`.
+- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:sample`, `josh lane:stats`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.
 - **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
 - `playwright.config.ts`.
@@ -61,16 +61,18 @@ A missing `.env` file is not itself an error: both commands also read the two va
 
 Each role's model and effort for a `backlogrun`. The invoking CLI picks the provider. Model overrides apply to Claude Code only — Codex always runs `gpt-6.1-sol`; effort accepts `low`, `medium`, `high`, `xhigh` or `max` for either provider.
 
-| Variable                | Required | Default                                            | Used when                                                   |
-| ----------------------- | -------- | -------------------------------------------------- | ----------------------------------------------------------- |
-| `JOSH_SCHEDULER_MODEL`  | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.              |
-| `JOSH_SCHEDULER_EFFORT` | No       | `medium`                                           | The effort of the run that schedules the batch.             |
-| `JOSH_WORKER_MODEL`     | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.            |
-| `JOSH_WORKER_EFFORT`    | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.           |
-| `JOSH_REVIEWER_MODEL`   | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.               |
-| `JOSH_REVIEWER_EFFORT`  | No       | `high`                                             | The effort of the review a lane's change gets.              |
-| `JOSH_LANE_MODEL`       | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.  |
-| `JOSH_LANE_EFFORT`      | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead. |
+| Variable                            | Required | Default                                            | Used when                                                                  |
+| ----------------------------------- | -------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
+| `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                             |
+| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                            |
+| `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.                           |
+| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                          |
+| `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                              |
+| `JOSH_REVIEWER_EFFORT`              | No       | `high`                                             | The effort of the review a lane's change gets.                             |
+| `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.  |
+| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`. |
+| `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                 |
+| `JOSH_LANE_EFFORT`                  | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead.                |
 
 ### Runs
 
@@ -83,6 +85,7 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_DEBUG`                     | No       | off                                                              | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged.                                                       |
 | `JOSH_TEMP_ROOT`                 | No       | `/tmp` (`os.tmpdir()` on Windows or when `/tmp` is not writable) | The directory every host-wide record goes to, the run's state among them. Point it at a fresh `mktemp -d` to take live evidence of `run:carry` without touching the running run (it does not isolate `run:merge`). |
 | `JOSH_CORE_RESERVED`             | No       | unset                                                            | Set by josh, never by hand: `1` marks a child whose parent already holds its share of the machine-wide core budget, so it does not reserve a second time.                                                          |
+| `JOSH_CORE_RESERVATION`          | No       | unset                                                            | Set by josh, never by hand: the ledger key of the claim a command holds for its children, so a unit suite reading the machine's free cores leaves its own not-yet-busy claim out of the ledger.                    |
 
 ### Merge, release and dependency updates
 
@@ -117,6 +120,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 | `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                   |
 | `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-run.md#josh-runwatcherguard) — a run whose progress watcher stopped.           |
 | `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                            |
+| `JOSH_POLL_GUARD`           | No       | on      | A `backlogrun` parent or wake session repeating a state read with nothing decided in between.                             |
 | `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).          |
 
 ### Rule evaluation

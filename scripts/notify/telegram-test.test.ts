@@ -75,6 +75,32 @@ describe('telegram_test.run_cli — a send that reached nobody', () => {
 	})
 })
 
+// joshuafolkken/kit#3919: the `Stop` hook sends its confirmation through this, values in hand.
+describe('telegram_test.send_values', () => {
+	it('sends without reading the command line', async () => {
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
+		vi.mocked(parseArgs).mockClear()
+
+		await telegram_test.send_values({
+			'task-type': 'confirmation',
+			body: 'paused',
+			recommended: 'answer it',
+		})
+
+		expect(telegram_send_mock).toHaveBeenCalledOnce()
+		expect(vi.mocked(parseArgs)).not.toHaveBeenCalled()
+	})
+
+	it('throws a send that reached nobody back to the caller', async () => {
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
+		const failure = new Error('not configured')
+
+		telegram_send_mock.mockRejectedValue(failure)
+
+		await expect(telegram_test.send_values({ body: 'paused' })).rejects.toBe(failure)
+	})
+})
+
 // A notification body is usually a Markdown list, so a split `--body -x` has to reach `parseArgs`
 // joined to its flag; handed over as two tokens, `parseArgs` refuses it as ambiguous.
 describe('telegram_test.run_cli — a dash-led free-text value', () => {

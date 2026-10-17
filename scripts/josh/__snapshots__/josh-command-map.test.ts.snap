@@ -11,6 +11,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "bp": "bump",
     "by": "bytes",
     "c": "check",
+    "ca": "cost:audit",
     "dr": "doctor",
     "eu": "exports:unused",
     "ev": "eval",
@@ -29,6 +30,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
+    "lwd": "lane:withdraw",
     "mm": "main:merge",
     "ms": "main:sync",
     "mt": "metrics",
@@ -226,6 +228,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "cost": [
       "(--cut | --over <tokens-per-request>) [--path <dir>]",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "cost:audit": [
+      "[--period <days>]",
+      "maintainer",
       [
         "none",
       ],
@@ -608,6 +617,16 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "lane:withdraw": [
+      "<issue> --reason <text>",
+      "developer",
+      [
+        "files",
+        "git",
+        "processes",
+        "network",
+      ],
+    ],
     "latest": [
       "",
       "developer",
@@ -762,6 +781,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "pre-commit-lint": [
+      "<cspell|prettier|eslint> [paths...]",
+      "automation",
+      [
+        "files",
       ],
     ],
     "pre-commit-type-check": [

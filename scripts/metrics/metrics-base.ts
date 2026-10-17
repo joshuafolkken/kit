@@ -93,6 +93,10 @@ async function is_at(commit: string): Promise<boolean> {
 	return head === commit && status.trim().length === 0
 }
 
+// **The child runs inside its caller's claim, so it claims none of its own** (joshuafolkken/kit#3944).
+// `josh metrics` holds its weight while it waits on this child, and inside the gate the metrics
+// step's claim — its memory, and the zero cores `gate-plan.ts` gives it — stands for it. The held mark
+// both set reaches the child through the environment.
 async function measure_in(tree: string): Promise<Metrics> {
 	const runner = resolve_tsx_runner()
 	const { stdout } = await execa(

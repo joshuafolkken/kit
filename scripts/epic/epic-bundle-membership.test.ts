@@ -3,6 +3,7 @@ import { capped_listing_outcome, listing_outcome } from '#scripts/gh/git-gh-issu
 import { describe, expect, it, vi } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleAction } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
+import { epic_bundle_fixture } from './epic-bundle-fixture'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
 
 // Whether the related issues' epic membership was actually read, and what the command says when it
@@ -26,7 +27,7 @@ const ADD_TO_EPIC: BundleAction = 'add_to_epic'
 const CREATE_EPIC_LINE = epic_bundle_cli.ACTION_LINES[CREATE_EPIC] ?? ''
 const ADD_TO_EPIC_LINE = epic_bundle_cli.ACTION_LINES[ADD_TO_EPIC] ?? ''
 // The prose reference that makes the two a candidate pair — one of the only two strong signals.
-const SUBJECT_BODY = 'follows #1662'
+const SUBJECT_BODY = epic_bundle_fixture.in_acceptance('follows #1662')
 
 function issue(number: number, overrides: Partial<BacklogIssue> = {}): BacklogIssue {
 	return { number, repo: REPO, body: '', blocked_by: [], ...overrides }
@@ -54,7 +55,8 @@ describe('epic_bundle_gaps.is_membership_established', () => {
 // The subject and one candidate, neither of which the index places in an epic — the input that
 // produces `create_epic`.
 const SUBJECT = issue(1696, { body: SUBJECT_BODY })
-const CANDIDATE = issue(1662, { body: 'the parent' })
+const CANDIDATE_BODY = 'the parent'
+const CANDIDATE = issue(1662, { body: CANDIDATE_BODY })
 
 function rendered(is_membership_established: boolean): string {
 	const decision = epic_bundle.decide_bundle(SUBJECT, [CANDIDATE])
@@ -140,8 +142,10 @@ describe('epic_bundle.decide_bundle — a related issue an epic already tracks',
 })
 
 const EPIC_LISTING = '[{"number":1262,"body":"- [ ] #1"}]'
-const BACKLOG_LISTING =
-	'[{"number":1696,"title":"a","body":"follows #1662"},{"number":1662,"title":"b","body":"the parent"}]'
+const BACKLOG_LISTING = JSON.stringify([
+	{ number: 1696, title: 'a', body: SUBJECT_BODY },
+	{ number: 1662, title: 'b', body: CANDIDATE_BODY },
+])
 
 // The whole command, so the cutoff is proved to reach the verdict rather than only the predicate.
 async function report_with_capped_epics(): Promise<string> {

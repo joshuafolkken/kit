@@ -1,8 +1,7 @@
 # `fullrun` — the step lists and the branches
 
-**The detailed procedure behind `fullrun.md`'s manifest**, read on demand — `pnpm josh run:next <N>`
-names which step the run is at, and the sections below carry that step in full. History:
-`docs/maintainers/fullrun-steps-rationale.md` → "Where each rule came from".
+`pnpm josh run:next <N>` names which step the run is at, and the sections below carry that step in
+full.
 
 ## The `fullrun #N` step list
 
@@ -31,8 +30,7 @@ fit**: open the PR between the rounds with `pnpm josh git -y "<title> #<N>"`, ru
 default `ja`). Before implementing, run `pnpm josh ms`, then `pnpm josh latest:scope`
 and update dependencies only on `required` — `latest-gate.md` is its single source, and on `required`
 load the `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it
-refuses in a lane, and `pnpm josh main:merge` brings the latest default in during the gate
-(`docs/maintainers/fullrun-steps-rationale.md` → "Why a lane child skips `josh ms`"). The parent runs
+refuses in a lane, and `pnpm josh main:merge` brings the latest default in during the gate. The parent runs
 `pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
 `backlogrun-child.md` are the single sources. When running `pnpm josh followup`, pass an
 implementation summary via `--notify-message` in the session language, leading with the three

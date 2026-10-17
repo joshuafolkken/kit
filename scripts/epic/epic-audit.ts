@@ -180,6 +180,55 @@ function acceptance_section(body: string | undefined): string {
 	return markdown_section.section_lines_matching(body, is_acceptance_heading).join('\n')
 }
 
+// Where a body reference that counts as a relation was written. Only these two places state what the
+// issue delivers or where it belongs; a number in the background, symptom or origin section is the
+// example that prompted the filing, and reading it as a relation bundled issues whose work never
+// overlaps.
+type SignalSection = 'acceptance criteria' | 'parent line'
+
+interface SignalReference {
+	number: number
+	section: SignalSection
+}
+
+// What marks a line as naming the issue's parent, in both spellings for the same reason as
+// `ACCEPTANCE_HEADINGS`. `epic:audit`'s orphan search matches it anywhere in the line, then asks
+// whether the same line names the epic.
+const PARENT_MARKERS: ReadonlyArray<string> = ['親:', '親：', 'Parent:', 'parent:']
+
+function has_parent_marker(line: string): boolean {
+	return PARENT_MARKERS.some((marker) => line.includes(marker))
+}
+
+// The reference written directly after a parent marker, bold markup allowed (`- **Parent:** #N`).
+// Only that reference is the parent: a background sentence that mentions `parent:` and names an
+// issue elsewhere on the line is not a parent line.
+const PARENT_REFERENCE = /(?:親|Parent|parent)\**[:：]\**\s*(?:[\w.-]+\/[\w.-]+)?#\d+/gu
+
+function parent_references(body: string): string {
+	return markdown_section
+		.unfenced_lines(body)
+		.flatMap((line) => [...line.matchAll(PARENT_REFERENCE)].map((match) => match[0]))
+		.join('\n')
+}
+
+function references_in(text: string, repo: string, section: SignalSection): Array<SignalReference> {
+	return parse_references(text, repo).map((number) => ({ number, section }))
+}
+
+// The same-repository references a body makes in the places that count as a relation, each with the
+// section it was read from. A number both places name is reported once, at the first.
+function signal_references(body: string, repo = ''): Array<SignalReference> {
+	const read = [
+		...references_in(acceptance_section(body), repo, 'acceptance criteria'),
+		...references_in(parent_references(body), repo, 'parent line'),
+	]
+
+	return read.filter((reference, index) => {
+		return read.findIndex((other) => other.number === reference.number) === index
+	})
+}
+
 // Everything `node` depends on, directly or through a chain. Walked iteratively so a graph that
 // still contains a cycle terminates — `epic:next` rejects one first, but an auditor must not hang on
 // the input it exists to examine.
@@ -223,8 +272,10 @@ const epic_audit_logic = {
 	parse_issue_references,
 	parse_references,
 	acceptance_section,
+	signal_references,
+	has_parent_marker,
 	depends_on,
 }
 
-export type { AuditFinding, FindingLevel, ReferenceState }
+export type { AuditFinding, FindingLevel, ReferenceState, SignalReference, SignalSection }
 export { epic_audit_logic }

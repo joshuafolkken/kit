@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/rules/rule-list.ts:25 | 2026-10-16 | #3931

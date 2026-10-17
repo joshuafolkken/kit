@@ -26,11 +26,17 @@ ignorePaths:
   # joshuafolkken/kit#1347: `josh lint:related` has its own for the same reason — an implementation
   # loop calls it while the gate lints the whole tree, and two eslint runs on one cache file discard
   # each other's entries.
+  # joshuafolkken/kit#3948: prettier's gate and scoped caches, and the pre-commit hook's own cspell and
+  # eslint caches — a staged-files run on the gate's file would prune or narrow it.
   - '**/.eslintcache'
   - '**/.eslintcache.edit'
   - '**/.eslintcache.related'
+  - '**/.eslintcache.commit'
   - '**/.tsbuildinfo'
   - '**/.cspellcache'
+  - '**/.cspellcache.commit'
+  - '**/.prettiercache'
+  - '**/.prettiercache.related'
   - '**/.gitignore'
   - '**/pnpm-lock.yaml'
   - '**/.vscode/**'
@@ -110,6 +116,7 @@ words:
   - domcontentloaded
   - esbuild
   - eslintcache
+  - prettiercache
   - fetchpriority
   - fullrun
   - halfrun

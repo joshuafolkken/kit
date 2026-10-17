@@ -2,22 +2,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
-import {
-	investigation_notice_path,
-	NOTICE,
-	refusal_path,
-	SWITCH_ENV_KEY,
-} from '#scripts/delegation/investigation-guard'
-import { hook_decision } from '#scripts/josh/hook-decision'
+import { refusal_path, SWITCH_ENV_KEY } from '#scripts/delegation/investigation-guard'
+import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-// joshuafolkken/kit#3877: in a lane child the investigation guard answers with a notice rather than a
-// refusal, and `pretool:guard` used to keep only the refusal half — the notice spent its stamp and was
-// never delivered. Pinned end to end through the one hook process, on a real transcript. A separate
+// joshuafolkken/kit#3927: in a lane child the investigation guard refuses at the threshold, as it does
+// in the main line. Pinned end to end through the one hook process, on a real transcript. A separate
 // suite from `pretool-guard.test.ts`, which is at its length limit.
 
 vi.mock('#scripts/run/run-watcher-hook', () => ({
@@ -36,7 +30,7 @@ const { pretool_guard } = await import('./pretool-guard')
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'pretool-guard-investigation-'))
 const ENTRY_DIRECTORY = process.cwd()
-const LANE_ISSUE = '3877'
+const LANE_ISSUE = '3927'
 const LANE_DIRECTORY = path.join(WORK_DIRECTORY, '.kit-lanes', LANE_ISSUE)
 const WRITTEN_TRANSCRIPTS: Array<string> = []
 const UNSET = ''
@@ -80,11 +74,14 @@ async function written(raw_payload: string): Promise<string> {
 }
 
 const envelope_schema = z.object({
-	hookSpecificOutput: z.object({ additionalContext: z.string() }),
+	hookSpecificOutput: z.object({
+		permissionDecision: z.string(),
+		permissionDecisionReason: z.string(),
+	}),
 })
 
-function additional_context(text: string): string | undefined {
-	return json_value.parse_with(text, envelope_schema)?.hookSpecificOutput.additionalContext
+function decision(text: string): z.infer<typeof envelope_schema>['hookSpecificOutput'] | undefined {
+	return json_value.parse_with(text, envelope_schema)?.hookSpecificOutput
 }
 
 // The mark and the checkout are set up exactly as `investigation-guard.test.ts` sets up its lane case.
@@ -103,28 +100,18 @@ afterEach(() => {
 afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(refusal_path(transcript), { force: true })
-		rmSync(investigation_notice_path(transcript), { force: true, recursive: true })
 	}
 
 	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('pretool:guard — the investigation guard in a lane child', () => {
-	it('delivers the notice as additional context, with no refusal', async () => {
-		const text = await written(read_payload(write_transcript('notice')))
+	it('refuses the threshold read with the investigation reason', async () => {
+		const text = await written(read_payload(write_transcript('refusal')))
 
-		expect(text).not.toContain('permissionDecision')
-		expect(additional_context(text)).toContain(NOTICE)
-	})
-
-	// A notice stamp that cannot be written withholds the notice and reports the fault instead.
-	it('delivers the fault when the notice stamp cannot be written', async () => {
-		const transcript = write_transcript('fault')
-
-		mkdirSync(investigation_notice_path(transcript), { recursive: true })
-
-		const text = await written(read_payload(transcript))
-
-		expect(additional_context(text)).toBe(hook_decision.stamp_fault(SWITCH_ENV_KEY))
+		expect(decision(text)).toEqual({
+			permissionDecision: 'deny',
+			permissionDecisionReason: investigation_reads.REASON,
+		})
 	})
 })

@@ -28,8 +28,9 @@ const FORMAT_HOOK_COMMAND = hook_launch.hook_launch_command('format-edited')
 // launches on every consumer's Bash call became one. Launched from its own bundle with a `pnpm josh`
 // fallback (joshuafolkken/kit#2023).
 const PRETOOL_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command('pretool-guard')
-// The Stop hook (joshuafolkken/kit#2121): one process delivering the three stop-time rules — the two
-// hold-based refusals and the issue-citation notice. It is the stop-time counterpart of the PreToolUse
+// The Stop hook (joshuafolkken/kit#2121): one process delivering the stop-time rules — the hold notify
+// and release and the issue citation it runs itself (joshuafolkken/kit#3919), and the refusals that need
+// the model. It is the stop-time counterpart of the PreToolUse
 // guard, launched from its own bundle with a `pnpm josh` fallback.
 const STOP_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command('stop-guard')
 // Derived from the script's own per-spawn bound rather than written as a number: raising that bound
@@ -69,10 +70,10 @@ const FORMAT_TOOLS = ['Edit', 'Write']
 // (joshuafolkken/kit#1798); `Write` earns the batching guard's non-blocking notice
 // (joshuafolkken/kit#1848); `AskUserQuestion` is where the lane-child interactive-ask rule binds
 // (joshuafolkken/kit#2201) — without it in the matcher the hook never sees the ask a headless child
-// must be routed away from. Each composed guard self-gates on the tool name inside its own candidate
-// test, so naming the union is safe — a guard the call does not concern returns "allow" without ever
-// reading the transcript.
-const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion']
+// must be routed away from; `Agent` / `Task` is where the `agent-model` row binds (joshuafolkken/kit#3927).
+// Each composed guard self-gates on the tool name inside its own candidate test, so naming the union is
+// safe — a guard the call does not concern returns "allow" without ever reading the transcript.
+const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion', 'Agent', 'Task']
 // The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
 // rather than a push that dies after the unit suite has already run. It goes through the shared

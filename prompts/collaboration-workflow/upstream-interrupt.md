@@ -4,7 +4,7 @@
 
 ### 無条件ルール: 起票は確認なし、停止は必ず
 
-**「今の作業をブロックするか」は判定しない。** 上流の欠陥は、発見した時点で例外なく同じ手順を通る（`docs/maintainers/upstream-interrupt-rationale.md` → "Why there is no blocking test"）。
+**「今の作業をブロックするか」は判定しない。** 上流の欠陥は、発見した時点で例外なく同じ手順を通る。
 
 - 起票は Tier A — 起票するか・どこへ起票するかをユーザーに確認しない。対象は first-party に限る（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
 - **停止は無条件**。Issue を作ってから停止し、待つか先送りするかはユーザーが決める
@@ -33,7 +33,7 @@
 「起票は確認なし」は first-party だけに成り立つ。
 
 - **判定は `pnpm josh repo:party [<owner/repo>]` が答える**: `first-party` / `third-party` / `unknown`（unknown は third-party 扱いしない）。fork や contribute しているだけの org リポジトリも third-party
-- **third-party への書き込みは種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビュー、既存 Issue のクローズ・編集も、その turn のユーザーの明示指示なしに行わない。正しい診断も許可ではない（`docs/maintainers/upstream-interrupt-rationale.md` → "Why third-party writes are Tier C"、`docs/maintainers/upstream-interrupt-rationale.md` → "Why a correct diagnosis is not authorization"）
+- **third-party への書き込みは種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビュー、既存 Issue のクローズ・編集も、その turn のユーザーの明示指示なしに行わない。正しい診断も許可ではない
 - third-party と判明したら: (1) 自分たちの側の Issue に証拠込みで所見を `## Upstream candidate` 見出しで記録する（`## Upstream issues` は使わない）。(2) 報告本文の下書きをその Issue 内に用意する。(3) 対象プロジェクト名と報告内容を書いた `confirmation` Telegram を送って停止する
 - 下書きの前に揃える証拠: 自プロジェクトの外で成立する最小再現（無ければ「プロジェクト組み込みの再現しかない」と明記）、全主張の検証、既存 Issue の検索
 

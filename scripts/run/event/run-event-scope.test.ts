@@ -269,3 +269,30 @@ describe('run_event_scope.is_merge_owed', () => {
 		).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#3908: `lane:withdraw` records a withdrawal before stopping the child, and `run:merge`
+// reads it ahead of GitHub — only while it is the issue's newest launch or withdrawal.
+describe('run_event_scope.is_withdrawn', () => {
+	const launch = named(1, KIND.CHILD_LAUNCH, `#${ISSUE} launched`)
+	const withdraw = named(2, KIND.WITHDRAW, `#${ISSUE} withdrawn by a person: superseded`)
+
+	it('reads a withdrawal after the launch as withdrawn', () => {
+		expect(run_event_scope.is_withdrawn([launch, withdraw], ISSUE)).toBe(true)
+	})
+
+	it('does not carry an old withdrawal over a later launch', () => {
+		const relaunch = named(3, KIND.CHILD_LAUNCH, `#${ISSUE} launched`)
+
+		expect(run_event_scope.is_withdrawn([launch, withdraw, relaunch], ISSUE)).toBe(false)
+	})
+
+	it('does not read another issue’s withdrawal as this child’s', () => {
+		const foreign = named(2, KIND.WITHDRAW, '#2994 withdrawn by a person: superseded')
+
+		expect(run_event_scope.is_withdrawn([launch, foreign], ISSUE)).toBe(false)
+	})
+
+	it('counts the withdrawal toward settling the launch, so no merge is owed', () => {
+		expect(run_event_scope.is_merge_owed([launch, withdraw], since(START), ISSUE)).toBe(false)
+	})
+})

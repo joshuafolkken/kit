@@ -1,14 +1,6 @@
 # `backlogrun` — the detailed procedure behind the manifest
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table"; how the driver runs the loop on its own is `docs/maintainers/backlogrun-driver.md`. Reasons:
-
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the authorization boundary is shaped this way"
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Why a session cut does not end the run"
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the plan and the decision pass come first"
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the loop's contract is shaped this way"
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free"
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Why the cost check skips a watch"
-- `docs/maintainers/backlogrun-steps-rationale.md` → "Where each rule came from"
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow".
 
 ## What one invocation approves
 
@@ -135,7 +127,7 @@ section the row names:
 | `window` | Hand the loop back as is | — |
 
 **A candidate only in another repository is never a token** — report it with its checkout. The budgets,
-verdicts and stops are the driver's own: `docs/maintainers/backlogrun-driver.md`.
+verdicts and stops are the driver's own.
 
 ## What runs once per session, not once per issue
 

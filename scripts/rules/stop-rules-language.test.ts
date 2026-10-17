@@ -38,10 +38,14 @@ describe('stop_rules.stop_outcome — session language (joshuafolkken/kit#2470)'
 		expect(stop_rules.stop_outcome(looped).reason).toBeUndefined()
 	})
 
-	it('reports a bare Issue citation ahead of the language', () => {
+	// joshuafolkken/kit#3919: the citation lines are the hook's to print, so the language refuses alone.
+	it('sends a drifted reply back even when it also names a bare Issue', () => {
 		const both = context({ session_lang: 'ja', message: `${ENGLISH_REPLY} Filed #7.` })
 
-		expect(stop_rules.stop_outcome(both).reason).toContain('issue citation')
+		expect(stop_rules.stop_outcome(both)).toEqual({
+			...stop_rules.NO_OUTCOME,
+			reason: stop_rules.build_language_reason('ja'),
+		})
 	})
 })
 

@@ -5,10 +5,7 @@ description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlo
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
-package's collaboration workflow is built on. **This file is their manifest — triggers and pointers,
-never a procedure**: each rule is stated once, in the file its row names. History:
-`docs/maintainers/workflow-commands-rationale.md` → "Where each rule came from".
+Each rule is stated once, in the file its row names.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
@@ -19,8 +16,9 @@ alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 ## 1. Which file to read
 
 Read this file, then the files the typed command's row names. A command file is a **manifest** of
-terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action, computed
-from the event stream, the carry record and the issue state, never the conversation.
+terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action and the
+section that governs it, computed from the event stream, the carry record and the issue state, never
+the conversation; a section it prints is not fetched again.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -31,8 +29,8 @@ from the event stream, the carry record and the issue state, never the conversat
 | `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` — its dispatched child reads `fullrun.md` + `split-assessment.md` in its own unit, not the parent at entry |
 
 `entry-sequence.md` holds the entry sequence and stop branches `fullrun`, `halfrun` and `prrun` share;
-each manifest carries only its difference. `split-assessment.md` → "The question" is read at the
-entry as a section, its split-handling detail only when a split is found.
+each manifest carries only its difference. `split-assessment.md` → "The question" is printed by
+`pnpm josh run:entry` at the entry, its split-handling detail read only when a split is found.
 
 ### The fetch is one `Read` call per file
 
@@ -100,7 +98,7 @@ from — read at that trigger, never restated here.
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
 | `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | `retrospective.md` |
 | Any artifact prose (Issue bodies, comments, Telegram) | Session language (`JOSH_SESSION_LANG`, default `ja`); Issue/PR titles stay English | `prompts/collaboration-workflow/overview.md` |
-| Any mid-workflow stop | Send a `confirmation` Telegram first, so the user is alerted off-screen | `CLAUDE.md` → "Mid-workflow stop notification" |
+| Any mid-workflow stop | `stop:guard` sends the `confirmation` Telegram; on its refusal, send it | `CLAUDE.md` → "Mid-workflow stop notification" |
 
 ## 3. What stays resident, and what is read from here
 

@@ -330,7 +330,7 @@ async function run_review(round: number, reading: ChangeReading): Promise<number
 	const refusal = scoped_green.refusal_for(tree, commit)
 
 	if (refusal !== undefined) return report_error(refusal)
-	const resolved = agent_role_profile.resolve(agent_role_profile.REVIEWER)
+	const resolved = agent_role_profile.resolve_review(round)
 
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
 	agent_role_profile.warn_of_default()

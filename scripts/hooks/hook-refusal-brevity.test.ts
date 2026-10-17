@@ -1,11 +1,12 @@
 import { duplicate_reads } from '#scripts/delegation/duplicate-read-guard'
-import { NOTICE as INVESTIGATION_NOTICE } from '#scripts/delegation/investigation-guard'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { issue_comments } from '#scripts/rules/issue-comments'
 import { lane_background } from '#scripts/rules/lane-background'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
+import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { describe, expect, it } from 'vitest'
 
 // Every `PreToolUse` and `Stop` refusal or notice is read by the model, and stays in its context once
@@ -29,10 +30,11 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['stop: lane background', lane_background.LANE_BACKGROUND_STOP_REASON],
 	['notice: lane background foreground', lane_background.FOREGROUND_NOTE],
 	['notice: pipefail rewrite', piped_verification.PIPEFAIL_NOTE],
-	['notice: investigation', INVESTIGATION_NOTICE],
+	['notice: issue-comments rewrite', issue_comments.COMMENTS_NOTE],
 	['duplicate read refusal', duplicate_reads.REASON],
 	['notice: duplicate read', duplicate_reads.NOTICE],
 	['parent cut', run_parent_cut_hook.PARENT_CUT_REASON],
+	['poll', run_poll_hook.POLL_REASON],
 ]
 
 const MODE_REASONS: ReadonlyArray<[string, string]> = lane_guard_policy.LANE_GUARD_POLICY.map(

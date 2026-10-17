@@ -3,9 +3,12 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { backlog_occupied, type OccupiedRead } from './backlog-occupied'
 import { backlog_stalled } from './backlog-stalled'
 
 // The ready line reports runnable work to the driving backlogrun parent on a watcher wake.
@@ -18,14 +21,46 @@ interface ReadyReading {
 	free_lanes: number
 }
 
+// How many open lanes hold a place under the limit, and how many hold a port seat.
+interface LaneUse {
+	occupied: number
+	seated: number
+}
+
 interface ReadyPorts {
 	free_lane_count: () => Promise<number>
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-// The lanes in use: the open worktrees an interruption has not stranded. `josh lane:limit` prints it.
-async function live_lane_count(): Promise<number> {
-	return lane_registry.live_count(await lane_registry.list_lanes())
+// What decides which open lanes hold a place, read from this checkout's live run.
+async function occupied_read(): Promise<OccupiedRead> {
+	const carry = await run_headless.current_carry()
+
+	return {
+		invocation: carry?.invocation,
+		events: carry === undefined ? [] : await run_event_stream_emit.scoped_current_events(),
+		idle: lane_spent.idle_lanes,
+	}
+}
+
+// The lanes that hold a place under the limit (`backlog-occupied.ts`).
+async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<LaneInfo>> {
+	const open = lanes ?? (await lane_registry.list_lanes())
+
+	return backlog_occupied.occupied_lanes(open, await occupied_read())
+}
+
+// The open lanes as the free count reads them: those that hold a place under the limit, and every
+// open one, since an uncounted lane still holds its port seat.
+async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {
+	const open = lanes ?? (await lane_registry.list_lanes())
+	const occupied = await occupied_lanes(open)
+
+	return { occupied: occupied.length, seated: open.filter((lane) => !lane.is_stranded).length }
+}
+
+function free_of(limit: number, use: LaneUse): number {
+	return lane_capacity.free_lanes(limit, use.occupied, use.seated)
 }
 
 // Free lanes beside `lanes`, `undefined` where the limit could not be read: the count `lane:limit`
@@ -35,11 +70,11 @@ async function free_lanes_beside(lanes: ReadonlyArray<LaneInfo>): Promise<number
 
 	if (limit.kind !== 'limit') return undefined
 
-	return lane_capacity.free_lanes(limit.limit, lane_registry.live_count(lanes))
+	return free_of(limit.limit, await lane_use(lanes))
 }
 
 async function free_under(limit: number): Promise<number> {
-	return lane_capacity.free_lanes(limit, await live_lane_count())
+	return free_of(limit, await lane_use())
 }
 
 // Free lanes right now: the limit less the live lanes. An unreadable limit reads as no free lane — the
@@ -48,9 +83,10 @@ async function free_under(limit: number): Promise<number> {
 //
 // **Occupancy is the local worktree count, not the dispatch budget's busy read.** `epic-lane-offer`
 // measures occupancy with `epic_busy.occupied_lanes`, a network read of in-progress issue labels; this
-// counts live worktrees instead, deliberately — it runs on the cheap-first path where the costly read
-// (`backlog:next`) is gated behind a free lane, so a network read here would defeat that design. The
-// two can diverge, but only toward over-counting live lanes → fewer free lanes, the safe direction.
+// counts the worktrees that hold a place instead (`backlog-occupied.ts`), deliberately — it runs on the
+// cheap-first path where the costly read (`backlog:next`) is gated behind a free lane, so a network
+// read here would defeat that design. The two can diverge, but only toward over-counting live lanes →
+// fewer free lanes, the safe direction.
 async function free_lane_count(): Promise<number> {
 	return (await free_lanes_beside(await lane_registry.list_lanes())) ?? NO_FREE
 }
@@ -172,7 +208,8 @@ const backlog_ready = {
 	print_offer_hint,
 	free_lane_count,
 	free_lanes_beside,
-	live_lane_count,
+	lane_use,
+	occupied_lanes,
 	drive_free_lane_count,
 	drains_pool,
 	print_ready_line,
@@ -182,4 +219,4 @@ const backlog_ready = {
 }
 
 export { backlog_ready }
-export type { ReadyPorts, ReadyReading }
+export type { LaneUse, ReadyPorts, ReadyReading }

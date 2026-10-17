@@ -8,9 +8,6 @@ mark the step done. Read this file in full, in the same turn, before filing.
 drained, *before* the idle watch, so the watch picks up what it files; a run that stops without
 draining — the failure guard, `--idle 0` — still prints it at the stop position. Kit-only.
 
-Rationale: `docs/maintainers/retrospective-rationale.md` → "Why the retrospective is read at its step";
-provenance: `docs/maintainers/retrospective-rationale.md` → "Where each rule came from".
-
 ## The digest is read, not skimmed
 
 The command `run:step` prints folds four existing measurements into one digest — it adds none:
@@ -30,9 +27,12 @@ and anything the run surfaced that lives outside it).
 **The filing condition is the existing depth test, unchanged** (`observation-filing.md` → "The depth
 test"). What cannot pass it is not filed — not a shortfall, just not yet a finding.
 
+**A cost regression is filed.** The digest's `File a cost regression: …` line passes the depth test as
+printed — measured, with the command it names as the reproduction — and ranks first: one Issue names
+every regressed row, and the scout keeps a repeat sighting from filing twice.
+
 **Order what passes by effect, and file the top two.** **The third onward is stacked in the observation
 ledger** (drained by `pnpm josh observations:flush`). **File nothing when nothing passes.**
-`docs/maintainers/retrospective-rationale.md` → "Why the top two are a selection, not a ration".
 
 **Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`): file
 with `pnpm josh issue:file`, which scouts first — an **open** candidate covering it means do not file, a

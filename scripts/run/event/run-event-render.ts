@@ -29,6 +29,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	cut: { ja: 'セッション交代', en: 'session cut' },
 	resume: { ja: '実装を再開', en: 'implementation resumed' },
 	restart: { ja: '止めて出し直し', en: 'restarted' },
+	withdraw: { ja: '取り下げ', en: 'withdrawn' },
 	drain: { ja: 'バックログが空', en: 'backlog drained' },
 	stop: { ja: '停止', en: 'stopped' },
 	'pr-opened': { ja: 'PR 作成', en: 'PR opened' },

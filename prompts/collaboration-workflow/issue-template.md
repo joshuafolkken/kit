@@ -43,6 +43,15 @@
 <実際の出力>
 ```
 
+## 期待効果
+
+<`- 目的: 時間短縮` のみ。出典はコマンドと値>
+
+- 効く率: <値>
+- 1 回あたりの得: <値>
+- 外れたときの損: <値>
+- 出典: <`pnpm josh lane:stats` → 値>
+
 ## Origin
 
 <別リポジトリのセッションから起票した場合のみ。起票元 Issue を `owner/repo#N` 形式で書く。自リポジトリ発の Issue では節ごと省略する>
@@ -57,6 +66,7 @@
 | `- 種別: 不具合`       | `bug`                             | 報告された症状を直す（無ければ `- 種別: 非不具合`）        |
 | `- 目的: 機能追加`     | `enhancement`                     | 新しい機能。修正・文書・依存更新・保守には書かない         |
 | `- 目的: 機能改善`     | `enhancement`                     | 既存機能の改善。目的が曖昧なら受け入れ条件を具体化してから |
+| `- 目的: 時間短縮`     | `enhancement`                     | 所要時間を短くする。`## 期待効果` の 4 行が必須            |
 | `- 互換性: 破壊的変更` | `breaking-change`                 | 契約を変える。移行措置があっても書き、廃止対象と影響を書く |
 | `- 種別: 振る舞い変更` | なし                              | AI の振る舞いを変える。下の 3 見出しが必須                 |
 | `- 人の判断: 不要`     | `auto-ok`（除外ラベルが無ければ） | 方針の判断・外部アカウント・目視確認のどれも要らない       |
@@ -114,5 +124,3 @@
    ```
 
 4. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`
-
-各手順の理由は kit の `docs/maintainers/epic-commands-rationale.md` →「Creating an epic by hand」。

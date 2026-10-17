@@ -104,13 +104,21 @@ function conflict_step(conflicts: ReadonlyArray<string>): string {
 	return `Resolve the conflict with origin/main in ${conflicts.join(', ')} (the merge is left in progress: remove the conflict markers in those files), then`
 }
 
+// A prompt that already carries the failed output points at it; only one without has the
+// session read the stopped report first.
+function fix_step(issue: string, stage: Stage, is_excerpted: boolean): string {
+	if (is_excerpted) return `Fix the ${stage} failure shown in the output below`
+
+	return `Read the stopped report with \`${COMMAND.LOG} ${issue}\`, fix the ${stage} failure`
+}
+
 // Two lines' worth: read the stopped report, then the one command that resumes after the fix.
-function next_step(issue: string, stage: Stage, resume: ShipResume): string {
+function next_step(issue: string, stage: Stage, resume: ShipResume, is_excerpted = false): string {
 	const conflicts = resume.conflicts ?? []
 
 	if (conflicts.length > 0) return `${conflict_step(conflicts)} ${AFTER_FIX[stage](resume)}`
 
-	return `Read the stopped report with \`${COMMAND.LOG} ${issue}\`, fix the ${stage} failure, then ${AFTER_FIX[stage](resume)}`
+	return `${fix_step(issue, stage, is_excerpted)}, then ${AFTER_FIX[stage](resume)}`
 }
 
 const run_ship_next = { COMMAND, next_step, quoted, resume_of }

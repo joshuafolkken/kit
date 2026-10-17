@@ -6,8 +6,11 @@ import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import type { ShipResume } from './run-ship-next'
+import type { ShipSection } from './run-ship'
+import { run_ship_next, type ShipResume } from './run-ship-next'
 import { run_ship_stage, type Stage } from './run-ship-stage'
+import type { ShipArguments } from './run-ship-steps'
+import { run_ship_stop_context } from './run-ship-stop-context'
 import { run_ship_stop_text } from './run-ship-stop-text'
 
 // How a detached `josh ship` supervisor hands a stopped stage back. The agent
@@ -66,19 +69,26 @@ function relaunched(lane: LaneInfo, stop: ShipStop): ReturnOutcome {
 // child's Bash tool, which Claude Code starts without the token, so a child started here could not sign
 // in where the token is the only credential (joshuafolkken/kit#3817).
 async function brokered(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
-	if (await lane_session_broker.request(lane.directory, lane.issue, { kind: 'relaunch', stop })) {
-		return 'relaunched'
-	}
+	const answer = await lane_session_broker.request(lane.directory, lane.issue, {
+		kind: 'relaunch',
+		stop,
+	})
 
-	note('the lane child could not be relaunched: the lane broker did not start it')
+	if (answer.is_success) return 'relaunched'
+
+	note(
+		`the lane child could not be relaunched: the lane broker did not start it — ${answer.reason}`,
+	)
 
 	return 'recorded'
 }
 
+// `output` is the failed stage's own output: the relaunched child's prompt carries its tail.
 async function return_control(
 	issue: string,
 	stage: Stage,
 	resume: ShipResume,
+	output: string,
 ): Promise<ReturnOutcome> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.SHIP_STOP,
@@ -89,14 +99,28 @@ async function return_control(
 
 	if (lane === undefined) return 'recorded'
 
-	const stop = { stage, ...resume }
+	const stop = { stage, ...resume, context: await run_ship_stop_context.build(issue, output) }
 
 	return lane_session_broker.is_serving(lane.directory, issue)
 		? await brokered(lane, stop)
 		: relaunched(lane, stop)
 }
 
-const run_ship_return = { return_control }
+// The stopped ship's arguments and its failed section, as `return_control` takes them: the section's
+// conflicts ride on the resume, its body is the output the prompt carries.
+async function hand_back(
+	args: ShipArguments,
+	stage: Stage,
+	failed: Pick<ShipSection, 'body' | 'conflicts'> | undefined,
+): Promise<ReturnOutcome> {
+	const resume = run_ship_next.resume_of(args)
+	const conflicts = failed?.conflicts
+	const stopped = conflicts === undefined ? resume : { ...resume, conflicts }
+
+	return await return_control(args.number, stage, stopped, failed?.body ?? '')
+}
+
+const run_ship_return = { hand_back, return_control }
 
 export type { ReturnOutcome }
 export { run_ship_return }

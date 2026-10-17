@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execa } from 'execa'
+import { core_budget } from './core-budget'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
 import { hook_gate_reuse } from './hook-gate-reuse'
@@ -143,6 +144,18 @@ async function run_type_check(): Promise<number> {
 	return resolve_spawn_exit(PNPM, result)
 }
 
+// **The type check claims the place `josh check` claims** (joshuafolkken/kit#3944), so lefthook's
+// parallel commit hooks stop reaching other lanes' admission as foreign load. Only a miss reserves:
+// a reused record runs nothing, and a claim there could make a commit wait out a full ledger for a
+// check it then skips.
+async function run_reserved_type_check(): Promise<number> {
+	return await core_budget.with_command_reservation(
+		core_budget.CORE_WEIGHTS.type_check,
+		run_type_check,
+		{ memory_mb: core_budget.MEMORY_MB.type_check, command: 'pre-commit type check' },
+	)
+}
+
 function unexpected_arguments(extra_arguments: ReadonlyArray<string>): ReadonlyArray<string> {
 	return extra_arguments.filter((argument) => argument !== gate_skip.FORCE_FLAG)
 }
@@ -161,7 +174,7 @@ async function run_pre_commit_type_check(
 
 	const reusable = await reusable_green_commit(await read_commit_tree(), extra_arguments, source)
 
-	if (reusable === undefined) return await run_type_check()
+	if (reusable === undefined) return await run_reserved_type_check()
 
 	process.stdout.write(`${format_skip(reusable.taken_at)}\n`)
 

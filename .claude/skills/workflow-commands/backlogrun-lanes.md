@@ -1,15 +1,6 @@
 # `backlogrun` — lanes and concurrency
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table". Reasons:
-
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane ceiling is shaped the way it is"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why CI concurrency is capped by the lane limit"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why a lane's review needs a brief and an attestation"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why the lane branch is `<N>-lane` and never switched"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why lanes cost as well as buy throughput"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why `lane:launch` folds the lane steps into one"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Why a committed child's lane is kept"
-- `docs/maintainers/backlogrun-lanes-rationale.md` → "Where each rule came from"
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow".
 
 ## Concurrency: as many children per repository as it has free lanes
 
@@ -29,7 +20,6 @@ answer wrongly (a false green or a false red)? All three, and the issue carries 
 missing, and it carries `run:lane`. `backlog:next` and `epic:next --lanes` answer `triage` for an
 issue with neither, so a filed issue carries one of the two from its filing. **It stops the other
 lanes for one reason only: a batch run on broken verification leaves nobody's result trustworthy.**
-This section is the rule's single source; why: `docs/maintainers/wip-cap-rationale.md` → "Why a solo run".
 
 ## Lanes — running more than one child at a time
 
@@ -77,7 +67,7 @@ pid=$(pnpm josh lane:launch "$n") || exit 1   # the child's pid on stdout, nothi
 
 | It answers | What the run does |
 | --- | --- |
-| a pid | The child runs; poll it |
+| a pid | The child runs; wait on it with `lane:await` |
 | empty, non-zero, `full` | No free lane; wait for one |
 | empty, non-zero, `already-open` or a failed install | **Park that child and name `pnpm josh lane:close <N>`** — a lock the lane cannot build is a person's to fix |
 | `lane:open` reports a reused `<N>-lane` on stderr | The way back to a child parked after it pushed — **a reused branch is not a fresh lane** |
@@ -96,14 +86,15 @@ Everything else is unchanged; `pnpm josh followup` releases the lane's hold at t
 - **It records where the child writes** — `<temp>/josh-lane-dispatch-<N>.log`.
 - **A refusal is an empty capture beside a non-zero exit**, with a `warning` Telegram. **Park that
   child and name the log the message carries**; never re-dispatch into the same lane without reading it.
-- **A child that started with nowhere to write exits zero and warns** — **poll that lane on the
-  process trace alone**.
+- **A child that started with nowhere to write exits zero and warns** — **wait on that lane with
+  `lane:await`, which reads the process trace alone**.
 - **The child is started as `fullrun #<N>` with the lane as its working directory**; the typed
   `backlogrun` covers it.
 - **It passes `--permission-mode bypassPermissions`, never `--dangerously-skip-permissions`.**
   `.claude/settings.json`'s `deny` list still refuses what it names; report what stopped, never loosen it.
 
-**Start each child without blocking on it, and poll them all** — a silent one is
+**Start each child without blocking on it, then wait on `backlog:drive` or `lane:await`**
+(`scripts/run/run-poll-hook.ts`) — a silent one is
 `backlogrun-recovery.md` → "A delegated unit that stopped without reporting", read in that child's lane.
 
 **`pnpm josh ms` is the parent's now, not the child's** — run it in the primary checkout **before

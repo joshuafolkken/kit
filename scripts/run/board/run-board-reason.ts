@@ -36,6 +36,9 @@ interface ReasonRead extends Overlay {
 	events: ReadonlyArray<RunEvent>
 	// How many more lanes the limit allows; `undefined` where it could not be read.
 	free_lanes: number | undefined
+	// The issues whose lanes fill the limit, named after `no free lane` so a lane an earlier run left
+	// behind shows on the row it holds back.
+	occupied_lanes?: ReadonlyArray<string> | undefined
 	// A stopped run opens no lane, so a stage its stream ends on is not one any lane is at.
 	is_stopped: boolean
 }
@@ -92,6 +95,12 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 		: `${WORDS.overlaps} ${String(clash.holder)} (${clash.path})`
 }
 
+function no_lane_of(occupied: ReadonlyArray<string> = []): string {
+	if (occupied.length === 0) return WORDS.no_lane
+
+	return `${WORDS.no_lane} — ${occupied.join(' ')}`
+}
+
 // A candidate nothing blocks, in the order `backlog:next` answers: the pool held for a judgment, then
 // a path a running issue declares, then a pool with no lane left.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
@@ -101,7 +110,7 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 
 	if (overlap !== undefined) return overlap
 
-	return read.free_lanes === NO_FREE_LANES ? WORDS.no_lane : undefined
+	return read.free_lanes === NO_FREE_LANES ? no_lane_of(read.occupied_lanes) : undefined
 }
 
 function wait_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {

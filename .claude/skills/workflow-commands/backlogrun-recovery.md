@@ -4,7 +4,8 @@ Point-of-use, read one section at the failure that reaches it; the single source
 
 ## A delegated unit that stopped without reporting
 
-**A stop from outside leaves no notification behind, so the parent polls rather than waits.** Record
+**A stop from outside leaves no notification behind, so the parent waits on `lane:await`, whose exit
+covers it.** Record
 where a lane child writes with `pnpm josh lane:output <N> <path>` in the dispatch turn, and once its
 output has been unchanged for the silent-unit window (`backlogrun-progress.md` → "Waiting, and never
 waiting forever") **ask the command rather than combining the traces yourself**, in the checkout the
@@ -18,13 +19,10 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 
 | Answer | What the parent does |
 | --- | --- |
-| `alive` | Keep polling; touch nothing |
+| `alive` | Wait on `lane:await` again; touch nothing |
 | `settled` | Re-read with `pnpm josh run:status <N>` and take the branch its state section says |
 | `undetermined` | Read the trace that failed and ask again. **A second in a row on the same child is a fault in the check**: send a `confirmation` naming the trace and stop — never escalate it to `stopped` |
 | `stopped` | The recovery below |
-
-Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why liveness needs silence and no
-process together".
 
 **On `stopped`, re-read with `pnpm josh run:status <N>`.** **A re-read carrying `needs-decision`** — the
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
@@ -39,7 +37,10 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
    the stale `in-progress` itself.
 3. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
 
-Rationale: `docs/maintainers/backlogrun-recovery-rationale.md` → "Why the poll routes through `run:merge`".
+## A person withdraws a running child
+
+On a person's instruction to drop a running child's issue, run `pnpm josh lane:withdraw <N>
+--reason "<their reason>"` — `docs/josh-commands.md` → "`josh lane:withdraw`".
 
 ## Conflicts are not predicted
 
@@ -51,8 +52,7 @@ followup` ends that child with a named conflict in about ten seconds.
 
 **That child does not stop: it resolves the conflict in its own lane**, uncounted by the
 consecutive-failure guard. **The merge direction is `origin/main` into the lane's branch, never a
-rebase**; no step rewrites a pushed commit (`docs/maintainers/backlogrun-recovery-rationale.md` → "Why a
-conflict is resolved in the lane rather than handed to a person").
+rebase**; no step rewrites a pushed commit.
 
 1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, resolve
    in place. Do not close the lane, open another, or switch its branch.

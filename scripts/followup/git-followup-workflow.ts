@@ -7,6 +7,7 @@ import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { cli_body } from '#scripts/josh/cli-body'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
+import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_record } from '#scripts/review/review-record'
@@ -143,7 +144,7 @@ function is_merge_permitted(status: string): boolean {
 	return status === 'ok' || status === 'not-required'
 }
 
-function is_valid_issue(issue_number: string | undefined): boolean {
+function is_valid_issue(issue_number: string | undefined): issue_number is string {
 	return issue_number !== undefined && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
 }
 
@@ -194,6 +195,21 @@ async function assert_live_evidence(should_merge: boolean, branch_name: string):
 	throw new Error(live_evidence.refusal_message())
 }
 
+// Every acceptance criterion the Issue carries at the merge maps to a row in the pull request body —
+// `acceptance_map` carries the why. Re-read here rather than at the commit, so a criterion added
+// during the review is refused too. A run whose issue it cannot identify has no criteria to read.
+async function assert_acceptance_mapped(
+	should_merge: boolean,
+	issue_number: string | undefined,
+	branch_name: string,
+): Promise<void> {
+	if (!should_merge || !is_valid_issue(issue_number)) return
+
+	const refusal = await acceptance_map_check.refusal(issue_number, branch_name)
+
+	if (refusal !== undefined) throw new Error(refusal)
+}
+
 // Every pre-merge refusal, in order — each one throws, so nothing merges past the first that fails.
 async function assert_merge_gates(
 	should_merge: boolean,
@@ -203,6 +219,7 @@ async function assert_merge_gates(
 	await assert_review_attested(should_merge)
 	await assert_review_recorded(should_merge, issue_number)
 	await assert_live_evidence(should_merge, branch_name)
+	await assert_acceptance_mapped(should_merge, issue_number, branch_name)
 }
 
 // After the gates, before the CI wait: a line appended since the run's commit rides the pull request
@@ -261,6 +278,7 @@ try {
 }
 
 const git_followup_workflow = {
+	assert_acceptance_mapped,
 	assert_live_evidence,
 	assert_review_attested,
 	assert_review_recorded,

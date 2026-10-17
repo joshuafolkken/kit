@@ -103,7 +103,7 @@ const REASONS: Record<LivenessVerdict, string> = {
 		'A trace could not be read, so this says nothing about the unit. A trace that could not be read answers `undetermined`, never `stopped`.',
 }
 
-const ALIVE_ADVICE = 'Keep polling; do not touch the child.'
+const ALIVE_ADVICE = 'Keep waiting on `pnpm josh lane:await`; do not touch the child.'
 const SETTLED_ADVICE =
 	'Read the child with `pnpm josh issue:state <N>` and take the branch its state says.'
 // The unit stopped, but *why* it stopped — abandoned mid-implementation, or dead because it could not

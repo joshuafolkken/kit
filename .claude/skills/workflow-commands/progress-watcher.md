@@ -40,7 +40,6 @@ silence clock (`docs/josh-commands-run.md` → "`josh run:progress`").
 `JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides; `josh` → `progress_interval_minutes` in
 `package.json` sits one step below it. **`--interval` moves the watcher alone** — quieter, never the
 guard stricter.
-Rationale: `docs/maintainers/progress-watcher-rationale.md` → "Why the heartbeat reads as it does".
 
 ### What a report says
 
@@ -61,8 +60,7 @@ off-screen, start `pnpm josh run:board --every <minutes>` in the background (`do
 
 **A stop is the only interrupt**: a `backlogrun` that has stopped ends with
 `pnpm josh run:carry --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
-its own (`backlogrun-park.md`). Rationale: `docs/maintainers/progress-watcher-rationale.md` → "Why the
-signal tiers are split this way".
+its own (`backlogrun-park.md`).
 
 ### Who starts it, and what counts as a report
 
@@ -85,7 +83,4 @@ tool result only you read is not one.** `--output` is omitted there, and `record
 **A run that merges needs no teardown; a run that stops has to end the reporting itself** — **no
 further `--wait` is started** after the stop notification, and the running one is stopped in the same
 turn: `halfrun`'s stop before commit, a `needs-human-review`, split or prerequisite stop, a
-`backlogrun` named issue's failure stop. Rationale: `docs/maintainers/progress-watcher-rationale.md` →
-"Why the watcher runs where it does".
-
-Provenance of each rule: `docs/maintainers/progress-watcher-rationale.md` → "Where each rule came from".
+`backlogrun` named issue's failure stop.

@@ -7,7 +7,7 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
-import { detached_launch } from '#scripts/run/detached-launch'
+import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
@@ -197,7 +197,7 @@ function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
 	return dispatched_of(request, active.pid, [])
 }
 
-function launch_argv(request: StartRequest, nonce: string | undefined): AgentArgv {
+function launch_argv(request: StartRequest, nonce: string | undefined): LaunchArgv {
 	if (request.profile.provider !== 'openai') return request.argv
 	if (nonce === undefined) throw new Error('OpenAI supervisor nonce is missing')
 
@@ -404,7 +404,7 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`
 	}
 
-	return ` It writes to ${outcome.log_path}. To poll it, ${poll}.`
+	return ` It writes to ${outcome.log_path}. Wait on it with \`pnpm josh lane:await ${issue} --owner "$PPID"\` in the background and end the turn; once that output falls silent, ${poll}.`
 }
 
 // Whether this dispatch resumed the disconnected child's session or started fresh — the report the

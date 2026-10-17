@@ -12,6 +12,10 @@ import { oracle_firing } from './oracle-firing'
 const ARGV_OFFSET = 2
 const INDENT = '  '
 const FIELD_WIDTH = 10
+// The rule-prose guard sends a rule author here first, so the list closes on the placement order a new
+// rule is weighed against before it becomes a guard or a document line.
+const AUTOMATION_ORDER =
+	'automate first: a command > a hook that runs it > a refusal guard > a document — a lower rung states why the higher cannot hold (`principles.md` → "automate-first"; a guard\'s `why` is `scripts/rules/guard-remedy.ts`)'
 
 function pad_field(label: string): string {
 	return label.padEnd(FIELD_WIDTH)
@@ -51,6 +55,8 @@ function print_list(): void {
 	for (const oracle of decision_oracle.DECISION_ORACLES) {
 		console.info(format_oracle(oracle))
 	}
+
+	console.info(AUTOMATION_ORDER)
 }
 
 function run(argv: ReadonlyArray<string>): number {
@@ -70,6 +76,7 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const oracle_list_cli = {
+	AUTOMATION_ORDER,
 	print_list,
 }
 

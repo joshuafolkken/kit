@@ -1,0 +1,7 @@
+{
+	"reason": "#3964: a prompt-only line-break check in the launch argv gate, the ends_with_prompt mark on the agent argv builders, and fitting the ship-stop excerpt to the argv cap",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 77
+	}
+}

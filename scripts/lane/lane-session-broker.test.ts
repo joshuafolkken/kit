@@ -5,7 +5,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
-import { lane_session_broker } from './lane-session-broker'
+import { lane_session_broker, type BrokerAction, type BrokerAnswer } from './lane-session-broker'
 
 const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
@@ -44,11 +44,12 @@ const LANE: LaneInfo = {
 }
 const CLAUDE_LANE: LaneInfo = { ...LANE, profile: undefined }
 const REJECTED = { kind: 'rejected', note: 'no profile' } as const
+const SUCCESS = { is_success: true }
 
 vi.mock('#scripts/git/git-common-directory', () => ({
 	git_common_directory: { resolve: resolve_mock },
 }))
-vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: argv_mock } }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: argv_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
@@ -95,11 +96,22 @@ async function extra_field_request(field: string): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 250))
 }
 
-async function request_relaunch(lane: LaneInfo): Promise<boolean> {
+async function request_relaunch(lane: LaneInfo): Promise<BrokerAnswer> {
 	return await lane_session_broker.with_server(
 		lane,
 		async () => await lane_session_broker.request(LANE.directory, ISSUE, RELAUNCH),
 	)
+}
+
+async function request_review(lane: LaneInfo, round: BrokerAction): Promise<BrokerAnswer> {
+	return await lane_session_broker.with_server(
+		lane,
+		async () => await lane_session_broker.request(LANE.directory, ISSUE, round),
+	)
+}
+
+function reason_of(answer: BrokerAnswer): string {
+	return answer.is_success ? '' : answer.reason
 }
 
 function claude_reviewer(): void {
@@ -111,29 +123,20 @@ function claude_reviewer(): void {
 }
 
 it('derives the reviewer command and checkout from the registered lane', async () => {
-	const result = await lane_session_broker.with_server(LANE, async () =>
-		(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)) ? 0 : 1,
-	)
-
-	expect(result).toBe(0)
+	expect(await request_review(LANE, ROUND_ONE)).toStrictEqual(SUCCESS)
 	expect(argv_mock).toHaveBeenCalledWith(
 		expect.stringContaining('review:attest'),
-		'reviewer',
+		Number(ROUND_ONE.round),
 		LANE.directory,
 	)
 	expect(launch_mock.mock.calls[0]?.[0]).toMatchObject({ cwd: LANE.directory })
 })
 
 it('keeps the second review round read-only', async () => {
-	const is_success = await lane_session_broker.with_server(
-		LANE,
-		async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_TWO),
-	)
-
-	expect(is_success).toBe(true)
+	expect(await request_review(LANE, ROUND_TWO)).toStrictEqual(SUCCESS)
 	expect(argv_mock).toHaveBeenCalledWith(
 		expect.stringContaining('Do not edit any file.'),
-		'reviewer',
+		Number(ROUND_TWO.round),
 		LANE.directory,
 	)
 })
@@ -143,13 +146,13 @@ it('does not overwrite a symlink target when publishing a request', async () => 
 	const original = 'original content'
 
 	writeFileSync(victim, original)
-	const is_success = await lane_session_broker.with_server(LANE, async () => {
+	const answer = await lane_session_broker.with_server(LANE, async () => {
 		symlinkSync(victim, lane_session_broker.request_path(LANE.directory, ISSUE))
 
 		return await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)
 	})
 
-	expect(is_success).toBe(true)
+	expect(answer).toStrictEqual(SUCCESS)
 	expect(readFileSync(victim, 'utf8')).toBe(original)
 })
 
@@ -170,38 +173,30 @@ it.each(['command', 'args', 'cwd', 'model', 'write_directory'])(
 )
 
 it('fails closed when the isolated reviewer is unavailable', async () => {
-	expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
+	expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toStrictEqual({
+		is_success: false,
+		reason: 'no broker serves this lane',
+	})
 })
 
 it("refuses a reviewer on a provider other than the lane's own", async () => {
 	claude_reviewer()
-	const is_result = await lane_session_broker.with_server(
-		LANE,
-		async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_TWO),
-	)
 
-	expect(is_result).toBe(false)
+	expect(await request_review(LANE, ROUND_TWO)).toMatchObject({ is_success: false })
 	expect(launch_mock).not.toHaveBeenCalled()
 })
 
 // joshuafolkken/kit#3817: a Claude lane's reviewer is started by the supervisor's broker, on Claude.
 it('starts a Claude reviewer for a Claude lane', async () => {
 	claude_reviewer()
-	const is_result = await lane_session_broker.with_server(
-		CLAUDE_LANE,
-		async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
-	)
 
-	expect(is_result).toBe(true)
+	expect(await request_review(CLAUDE_LANE, ROUND_ONE)).toStrictEqual(SUCCESS)
 	expect(launch_mock).toHaveBeenCalledOnce()
 })
 
 it("marks the reviewer as the lane's child rather than inheriting the server's environment", async () => {
 	claude_reviewer()
-	await lane_session_broker.with_server(
-		CLAUDE_LANE,
-		async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
-	)
+	await request_review(CLAUDE_LANE, ROUND_ONE)
 
 	expect(launch_mock.mock.calls[0]?.[0]).toMatchObject({ env: { JOSH_LANE_CHILD: ISSUE } })
 })
@@ -212,7 +207,7 @@ describe('lane_session_broker — the relaunch action', () => {
 			.spyOn(lane_relaunch, 'relaunch')
 			.mockReturnValue({ kind: 'launched', pid: 1 })
 
-		expect(await request_relaunch(CLAUDE_LANE)).toBe(true)
+		expect(await request_relaunch(CLAUDE_LANE)).toStrictEqual(SUCCESS)
 		expect(relaunch).toHaveBeenCalledWith(
 			CLAUDE_LANE,
 			expect.stringContaining('detached ship supervisor stopped'),
@@ -225,28 +220,68 @@ describe('lane_session_broker — the relaunch action', () => {
 	it('refuses to relaunch an OpenAI lane child', async () => {
 		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
 
-		expect(await request_relaunch(LANE)).toBe(false)
+		expect(await request_relaunch(LANE)).toMatchObject({ is_success: false })
 		expect(relaunch).not.toHaveBeenCalled()
 	})
 
 	it('answers a failure when the relaunch is rejected', async () => {
 		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
 
-		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
+		expect(await request_relaunch(CLAUDE_LANE)).toMatchObject({ is_success: false })
+	})
+})
+
+// joshuafolkken/kit#3974: a refused relaunch reached the ship log as a bare failure, so a stale
+// supervisor refusing a multi-line prompt could not be told from a dead broker.
+describe('lane_session_broker — a failed action names its reason', () => {
+	it('names the rejected relaunch', async () => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
+
+		expect(await request_relaunch(CLAUDE_LANE)).toStrictEqual({
+			is_success: false,
+			reason: 'the broker answered a failure: the relaunch did not start: no profile',
+		})
+	})
+
+	it('answers an action that threw as a failure rather than a dead server', async () => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+			throw new Error('spawn EACCES')
+		})
+
+		expect(reason_of(await request_relaunch(CLAUDE_LANE))).toContain(
+			'the broker answered a failure: the broker failed',
+		)
+	})
+})
+
+describe('lane_session_broker — the relaunch carries the stop context', () => {
+	// joshuafolkken/kit#3923: the stop's context crosses the request file and reaches the prompt.
+	it('carries the stop context through to the relaunched prompt', async () => {
+		const relaunch = vi
+			.spyOn(lane_relaunch, 'relaunch')
+			.mockReturnValue({ kind: 'launched', pid: 1 })
+		const excerpt = ['FAIL gate', 'expected 1 to be 2']
+		const context = { excerpt, changed: ['scripts/a.ts'], more_changed: 0 }
+		const action = { kind: 'relaunch', stop: { ...RELAUNCH.stop, context } } as const
+
+		expect(await request_review(CLAUDE_LANE, action)).toStrictEqual(SUCCESS)
+		expect(relaunch).toHaveBeenCalledWith(
+			CLAUDE_LANE,
+			expect.stringContaining('\nFAIL gate\nexpected 1 to be 2\n'),
+			'implementation',
+			expect.any(Function),
+		)
 	})
 })
 
 // joshuafolkken/kit#3878: a parked lane got a reviewer and then a relaunch from requests read late.
 describe('lane_session_broker — a parked issue and a finished request', () => {
 	it('ends the reviewer prompt with the review invocation the liveness pattern matches', async () => {
-		await lane_session_broker.with_server(
-			LANE,
-			async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
-		)
+		await request_review(LANE, ROUND_ONE)
 
 		expect(argv_mock).toHaveBeenCalledWith(
 			expect.stringMatching(/the reviewer of lane #2654$/u),
-			'reviewer',
+			Number(ROUND_ONE.round),
 			LANE.directory,
 		)
 	})
@@ -254,13 +289,9 @@ describe('lane_session_broker — a parked issue and a finished request', () => 
 	it('starts neither a reviewer nor a relaunch for a parked issue', async () => {
 		parked_mock.mockResolvedValue(true)
 		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
-		const is_review = await lane_session_broker.with_server(
-			LANE,
-			async () => await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
-		)
 
-		expect(is_review).toBe(false)
-		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
+		expect(await request_review(LANE, ROUND_ONE)).toMatchObject({ is_success: false })
+		expect(await request_relaunch(CLAUDE_LANE)).toMatchObject({ is_success: false })
 		expect(parked_mock).toHaveBeenCalledWith(ISSUE)
 		expect(launch_mock).not.toHaveBeenCalled()
 		expect(relaunch).not.toHaveBeenCalled()
@@ -269,7 +300,7 @@ describe('lane_session_broker — a parked issue and a finished request', () => 
 	it('withdraws its request once answered, so no server acts on it later', async () => {
 		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue(REJECTED)
 
-		expect(await request_relaunch(CLAUDE_LANE)).toBe(false)
+		expect(await request_relaunch(CLAUDE_LANE)).toMatchObject({ is_success: false })
 		expect(existsSync(lane_session_broker.request_path(LANE.directory, ISSUE))).toBe(false)
 	})
 })

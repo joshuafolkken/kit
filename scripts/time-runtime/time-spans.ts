@@ -334,6 +334,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): A
 		label: event.label,
 		josh_command: event.josh_command,
 		josh_commands: event.josh_commands,
+		josh_signatures: event.josh_signatures,
 		check_key: event.check_key,
 		marker: event.marker,
 		is_bundleable: event.is_bundleable,
