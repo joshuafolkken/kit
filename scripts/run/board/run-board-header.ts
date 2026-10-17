@@ -415,12 +415,18 @@ function estimate_legend(header: BoardHeader): string | undefined {
 	return estimate_part(header) === undefined ? undefined : run_board_estimate.LEGEND
 }
 
+// The third line's icon, so the legend names the phase it draws.
+function now_icon(header: BoardHeader): string | undefined {
+	return now_line(counts_of(layout_of(header)), header)?.icon
+}
+
 const run_board_header = {
 	aged,
 	counts_of,
 	estimate_legend,
 	header_lines,
 	is_plan_read,
+	now_icon,
 	now_legend,
 }
 

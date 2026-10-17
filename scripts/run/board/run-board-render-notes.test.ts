@@ -1,8 +1,10 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_notes, type BoardNote } from './run-board-notes'
-import { run_board_render } from './run-board-render'
+import { run_board_render, type BoardView } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#3430: what the board says below its plan — the findings, the resume command and a
@@ -104,7 +106,10 @@ describe('run_board_render.render findings legend', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [parked] }
 
-		expect(lines_of(header({ layout }), [park]).at(-1)).toBe(`💤 parked  ${NOTES_LEGEND}`)
+		expect(lines_of(header({ layout }), [park]).slice(-2)).toStrictEqual([
+			'💤 parked',
+			NOTES_LEGEND,
+		])
 	})
 
 	it('does not name a kind whose findings are past the limit and not drawn', () => {
@@ -158,7 +163,7 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row] }
 
 		expect(lines_of(header({ layout }), [bug, enhancement]).at(-1)).toBe(
-			`⏳ waiting  🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
+			`🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
 		)
 	})
 
@@ -207,6 +212,100 @@ describe('run_board_render.render findings with no legend', () => {
 
 		expect(lines).toContain(rule(WORDS.notes))
 		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+	})
+})
+
+function filed_as(issue: number, minutes_ago: number): BoardNote {
+	const reference = String(issue)
+
+	return {
+		...filed,
+		issue: reference,
+		at_ms: NOW - minutes_ago * MINUTE,
+		text: `Title ${reference}`,
+	}
+}
+
+function waiting(number: number): BoardRow {
+	const title = `Row ${String(number)}`
+
+	return { number, title, kind: undefined, state: 'waiting', status: undefined, waits: [] }
+}
+
+function listing(numbers: ReadonlyArray<number>): BoardHeader {
+	return header({ layout: { ...EMPTY_LAYOUT, active: numbers.map((number) => waiting(number)) } })
+}
+
+const LISTED = [4022, 4033, 4036, 4037, 4038, 4039]
+const FILED_RUN = '  filed this run  4036–4039  4033  4022'
+const WIDE = 500
+
+// joshuafolkken/kit#4046: the Issues a run filed that the plan draws a row for share one line of
+// numbers, so a title is not drawn twice.
+describe('run_board_render.render filed this run', () => {
+	const listed = [4039, 4038, 4022, 4037, 4036, 4033].map((issue, index) => filed_as(issue, index))
+
+	it('collapses the filed Issues with a row into one line of numbers, newest first, ranges joined', () => {
+		const lines = lines_of(listing(LISTED), listed)
+
+		expect(lines).toContain(FILED_RUN)
+		expect(lines.join('\n')).not.toContain('Title 40')
+	})
+
+	it('leads the line with no 📌, which only the heading and the legend carry', () => {
+		const lines = lines_of(listing(LISTED), listed)
+
+		expect(lines.filter((line) => line.includes('📌'))).toStrictEqual([rule('📌'), NOTES_LEGEND])
+	})
+
+	it('keeps a filed Issue with no row and every note on a line of its own', () => {
+		const notes = [filed_as(4039, 0), filed_as(4040, 1), note(NOW, 'seen')]
+		const lines = lines_of(listing([4039, 3415]), notes)
+
+		expect(lines).toContain('  filed this run  4039')
+		expect(lines).toContain(`  🆕 ${minute_of(NOW - MINUTE)} 4040  Title 4040`)
+		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415  seen`)
+	})
+
+	it('counts the line as one finding toward the limit, and names no 🆕 for it in the legend', () => {
+		const notes = Array.from({ length: run_board_render.NOTE_LIMIT - 1 }, (_, index) =>
+			note(NOW - index * MINUTE, `observation ${String(index)}`),
+		)
+		const lines = lines_of(listing(LISTED), [...listed, ...notes, filed_as(4040, 9)])
+
+		expect(lines).toContain(FILED_RUN)
+		expect(lines).toContain('  more 1')
+		expect(lines.at(-1)).toBe(`${NOTES_LEGEND}  💬 note`)
+	})
+})
+
+// Every frame a pane shorter than the whole board draws, tallest last.
+function frames_of(view: BoardView): Array<Array<string>> {
+	const heights = Array.from({ length: run_board_render.render(view).length }, (_, rows) => rows)
+
+	return heights.map((rows) =>
+		run_board_render
+			.render({ ...view, size: { rows, columns: WIDE } })
+			.map((line) => stripVTControlCharacters(line)),
+	)
+}
+
+function seen_count(frame: ReadonlyArray<string>): number {
+	return frame.filter((line) => line.includes('seen')).length
+}
+
+describe('run_board_render.render filed this run in a short pane', () => {
+	it('gives the line way as one finding, after the older ones', () => {
+		const listed = LISTED.map((issue, index) => filed_as(issue, index))
+		const seen = [1, 2, 3].map((minutes) => note(NOW - minutes * MINUTE, `seen ${String(minutes)}`))
+		const frames = frames_of({ header: listing(LISTED), notes: [...listed, ...seen] })
+
+		expect(
+			frames.filter((frame) => seen_count(frame) > 0 && !frame.includes(FILED_RUN)),
+		).toHaveLength(0)
+		expect(
+			frames.some((frame) => frame.includes(FILED_RUN) && seen_count(frame) < seen.length),
+		).toBe(true)
 	})
 })
 

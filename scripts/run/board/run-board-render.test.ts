@@ -119,7 +119,7 @@ describe('run_board_render.render release kinds', () => {
 	it('names the drawn kinds in the legend', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(1, { kind: 'bug' }), row(2)] }
 
-		expect(lines_of(header({ layout })).at(-1)).toBe('⏳ waiting  🐛 fix')
+		expect(lines_of(header({ layout })).slice(-2)).toStrictEqual(['⏳ waiting', '🐛 fix'])
 	})
 })
 
@@ -133,7 +133,7 @@ describe('run_board_render.render sections', () => {
 		const lines = lines_of(header({ layout }))
 		const wave_rule = rule('1')
 
-		expect(lines.slice(lines.indexOf(wave_rule), -4)).toStrictEqual([
+		expect(lines.slice(lines.indexOf(wave_rule), -3)).toStrictEqual([
 			wave_rule,
 			'  📁 10  Epic ten',
 			'     ├ ⏳ 11    Issue 11',

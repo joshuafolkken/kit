@@ -66,7 +66,7 @@ describe('run_board_render.render usage column', () => {
 	it('draws a running row’s usage before its tail, and both before what it waits on', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}0″ {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}🔨 0″ {2}🔗 3$/u)
 		expect(row_line(lines, 'Issue 2')).not.toContain('⚡')
 	})
 
