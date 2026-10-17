@@ -14,11 +14,16 @@ import type { WatchComment } from '#scripts/issue/issue-watch-diff'
 // **The record is the judgement comment itself.** It carries a digest of the body it judged, so an
 // issue is judged again only when its body changed or a person commented after it — the same line
 // `issue_watch_diff` draws between a person's update and an automated one.
+//
+// **Only an author with write access is read** (`gh_author_association`, joshuafolkken/kit#4021): an
+// issue anyone else filed is never a candidate, and a judgement comment or a later comment from anyone
+// else is not counted, so a third party can neither opt an issue in nor mark one judged.
 
 interface JudgeIssue {
 	number: number
 	labels: ReadonlyArray<string>
 	body: string
+	is_trusted: boolean
 }
 
 const MARKER_PREFIX = '<!-- josh:auto-ok-judged body='
@@ -29,7 +34,7 @@ const CRLF = '\r\n'
 const LF = '\n'
 
 function is_candidate(issue: JudgeIssue): boolean {
-	if (has_label_name(issue.labels, AUTO_OK_LABEL)) return false
+	if (!issue.is_trusted || has_label_name(issue.labels, AUTO_OK_LABEL)) return false
 
 	return issue_auto_ok.exclusion_of(issue.labels) === undefined
 }
@@ -42,7 +47,13 @@ function body_digest(body: string): string {
 }
 
 function digest_of(comment: WatchComment): string | undefined {
+	if (!comment.is_trusted) return undefined
+
 	return MARKER_PATTERN.exec(comment.body)?.groups?.['digest']
+}
+
+function is_person_comment(comment: WatchComment): boolean {
+	return comment.is_trusted && !comment.is_automated
 }
 
 // Judged when the newest judgement comment covers the body as it stands and no person has commented
@@ -52,7 +63,7 @@ function is_judged(body: string, comments: ReadonlyArray<WatchComment>): boolean
 
 	if (judgement === undefined || digest_of(judgement) !== body_digest(body)) return false
 
-	return comments.every((comment) => comment.id <= judgement.id || comment.is_automated)
+	return comments.every((comment) => comment.id <= judgement.id || !is_person_comment(comment))
 }
 
 function comment_of(decision: AutoOkDecision, body: string): string {

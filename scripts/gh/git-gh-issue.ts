@@ -151,8 +151,9 @@ async function issue_list_by_label_in_repo(
 }
 
 // Every open issue with what `josh auto-ok:judge` judges it by — its labels and body — and `updatedAt`,
-// so the backlog driver's resident check reads an issue's comments again only once it has moved.
-const JUDGEMENT_FIELDS = 'number,title,body,labels,updatedAt'
+// so the backlog driver's resident check reads an issue's comments again only once it has moved; and
+// `author_association`, so an issue a third party filed is never judged.
+const JUDGEMENT_FIELDS = 'number,title,body,labels,updatedAt,author_association'
 
 async function issue_list_open_for_judgement(limit: number): Promise<IssueListOutcome> {
 	return await issue_list({ json_fields: JUDGEMENT_FIELDS, limit })

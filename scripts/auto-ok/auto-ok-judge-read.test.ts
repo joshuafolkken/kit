@@ -6,6 +6,7 @@ import {
 	JUDGED_NUMBER,
 	OPTED_IN_NUMBER,
 	OWED_NUMBER,
+	UNTRUSTED,
 } from './auto-ok-judge-fixture'
 import { auto_ok_judge_read } from './auto-ok-judge-read'
 
@@ -50,5 +51,22 @@ describe('auto_ok_judge_read.owed', () => {
 		await auto_ok_judge_read.owed(cache)
 
 		expect(list_comments).toHaveBeenCalledTimes(1)
+	})
+
+	// joshuafolkken/kit#4021: on a public repository a third party can file an issue, and an issue
+	// judged `auto-ok` is implemented and released unattended.
+	it('never offers an issue filed by an author without write access', async () => {
+		list_open.mockResolvedValueOnce(listing_of([row(OWED_NUMBER, [], UNTRUSTED)]))
+
+		expect(await auto_ok_judge_read.owed()).toStrictEqual([])
+		expect(list_comments).not.toHaveBeenCalled()
+	})
+
+	it('treats an issue with no author association as untrusted', async () => {
+		list_open.mockResolvedValueOnce(
+			listing_of([{ ...row(OWED_NUMBER), author_association: undefined }]),
+		)
+
+		expect(await auto_ok_judge_read.owed()).toStrictEqual([])
 	})
 })

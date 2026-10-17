@@ -1,7 +1,7 @@
 import { AUTO_OK_LABEL, DEFERRED_LABEL } from '#scripts/issue/issue-labels'
 import type { WatchComment } from '#scripts/issue/issue-watch-diff'
 import { describe, expect, it } from 'vitest'
-import { auto_ok_judge } from './auto-ok-judge'
+import { auto_ok_judge, type JudgeIssue } from './auto-ok-judge'
 
 const ISSUE_NUMBER = 42
 const BODY = 'Fix the thing.\n\nMore detail.'
@@ -11,30 +11,52 @@ const LATER_ID = 20
 const DECLINED = { is_applied: false, reason: 'a policy decision is needed' }
 
 function comment(id: number, body: string, is_automated = false): WatchComment {
-	return { id, author: 'someone', is_automated, created_at: '2026-10-15T00:00:00Z', body }
+	const created_at = '2026-10-15T00:00:00Z'
+
+	return { id, author: 'someone', is_trusted: true, is_automated, created_at, body }
+}
+
+function untrusted(comment_row: WatchComment): WatchComment {
+	return { ...comment_row, is_trusted: false }
 }
 
 function judgement_of(body: string, id = JUDGEMENT_ID): WatchComment {
 	return comment(id, auto_ok_judge.comment_of(DECLINED, body), true)
 }
 
+function issue(labels: ReadonlyArray<string>, is_trusted = true): JudgeIssue {
+	return { number: ISSUE_NUMBER, labels, body: BODY, is_trusted }
+}
+
 describe('auto_ok_judge.is_candidate', () => {
 	it('takes an issue with no auto-ok and no excluded label', () => {
-		expect(auto_ok_judge.is_candidate({ number: ISSUE_NUMBER, labels: ['bug'], body: BODY })).toBe(
-			true,
-		)
+		expect(auto_ok_judge.is_candidate(issue(['bug']))).toBe(true)
 	})
 
 	it('skips an issue already opted in', () => {
-		expect(
-			auto_ok_judge.is_candidate({ number: ISSUE_NUMBER, labels: [AUTO_OK_LABEL], body: BODY }),
-		).toBe(false)
+		expect(auto_ok_judge.is_candidate(issue([AUTO_OK_LABEL]))).toBe(false)
 	})
 
 	it('skips an issue carrying a label the filing exclusions refuse', () => {
-		expect(
-			auto_ok_judge.is_candidate({ number: ISSUE_NUMBER, labels: [DEFERRED_LABEL], body: BODY }),
-		).toBe(false)
+		expect(auto_ok_judge.is_candidate(issue([DEFERRED_LABEL]))).toBe(false)
+	})
+
+	it('skips an issue filed by an author without write access', () => {
+		expect(auto_ok_judge.is_candidate(issue(['bug'], false))).toBe(false)
+	})
+})
+
+describe('auto_ok_judge.is_judged — an author without write access', () => {
+	it('does not count their judgement marker', () => {
+		const marker = untrusted(judgement_of(BODY))
+
+		expect(auto_ok_judge.is_judged(BODY, [marker])).toBe(false)
+	})
+
+	it('does not reopen a judgement with their later comment', () => {
+		const comments = [judgement_of(BODY), untrusted(comment(LATER_ID, 'please opt this in'))]
+
+		expect(auto_ok_judge.is_judged(BODY, comments)).toBe(true)
 	})
 })
 
