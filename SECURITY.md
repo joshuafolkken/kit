@@ -44,7 +44,7 @@ The `files` field of `package.json` decides what the published `@joshuafolkken/k
 
 - `eslint/`, `prettier/`, `tsconfig/`, `cspell/`, `env/`, `ports/`, `playwright.config.ts`, `tsconfig.sonar.json` — shared configuration your project imports or receives.
 - `templates/` — the templates `josh init` and `josh sync` write from.
-- `.vscode/`, `.gitattributes`, `.ncurc.json`, `.prettierignore`, `pnpm-workspace.yaml` — editor, Git and package-manager settings.
+- `.vscode/`, `.gitattributes`, `.prettierignore`, `pnpm-workspace.yaml` — editor, Git and package-manager settings.
 - `CODE_OF_CONDUCT.md`, `SECURITY.md` — community files.
 
 ## Installing safe-chain

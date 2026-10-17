@@ -267,8 +267,8 @@ The `basic` profile copies short AI pointers and a `pnpm-workspace.yaml` that ap
 CLAUDE.md           AGENTS.md           GEMINI.md
 CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
-.mcp.json           .ncurc.json         .prettierignore
-SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
+.mcp.json           .prettierignore     SECURITY.md
+pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml

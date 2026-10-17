@@ -8,6 +8,8 @@ updates:
       - '/.github/actions/*'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 3
   # Version updates are disabled: `josh latest` runs at the start of every fullrun / halfrun /
   # queue and already bumps npm dependencies to latest, so Dependabot's weekly PRs only duplicate
   # it and were being closed unmerged after consuming a full CI run. `open-pull-requests-limit: 0`
@@ -21,3 +23,7 @@ updates:
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 0
+    cooldown:
+      default-days: 3
+      exclude:
+        - 'vite'

@@ -84,7 +84,6 @@ const AI_COPY_ROOT_FILES = [
 	'.coderabbit.yaml',
 	'.gitattributes',
 	'.mcp.json',
-	'.ncurc.json',
 	PRETTIER_IGNORE,
 	WORKSPACE_CONFIG,
 	'tsconfig.sonar.json',

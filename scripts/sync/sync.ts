@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dependabot_cooldown } from '#scripts/dependabot/dependabot-cooldown'
 import { project_checks } from '#scripts/gate/project-checks'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { basic_path_migration } from '#scripts/init/basic-path-migration'
@@ -255,6 +256,13 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 	repository_labels.ensure_labels(name_with_owner)
 }
 
+// Every file that restates the workspace's `minimumReleaseAge`: Safe Chain's `.aikido` and
+// Dependabot's `cooldown`.
+function sync_release_window_mirrors(root: string): void {
+	project_config.sync_project_config(root)
+	dependabot_cooldown.sync_dependabot_cooldown(root)
+}
+
 function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_files.sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
@@ -267,9 +275,9 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
-	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window `.aikido`'s age is
-	// derived from.
-	project_config.sync_project_config(PROJECT_ROOT)
+	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window both mirrors are derived
+	// from, and which rewrites `.github/dependabot.yml` itself.
+	sync_release_window_mirrors(PROJECT_ROOT)
 	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
 }
@@ -318,6 +326,7 @@ const sync = {
 	sync_prepare_lefthook_warning,
 	sync_safe_chain_preinstall,
 	sync_package_json_migrations,
+	sync_release_window_mirrors,
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 

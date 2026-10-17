@@ -1,0 +1,7 @@
+{
+	"reason": "kit #4023 adds the Dependabot cooldown mirror the Issue asks for: a line-based cooldown rewriter (including an entry that opens with its cooldown key) and the shared release-window reader .aikido now also uses",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 146
+	}
+}

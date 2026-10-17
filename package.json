@@ -65,7 +65,6 @@
 		".coderabbit.yaml",
 		".gitattributes",
 		".mcp.json",
-		".ncurc.json",
 		".prettierignore",
 		"pnpm-workspace.yaml",
 		".pnpmfile.mjs",
