@@ -7,6 +7,7 @@ import { destructive_command } from './destructive-command'
 import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { josh_git_bare } from './josh-git-bare'
+import { pr_merge } from './pr-merge'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2120: the three Bash-string rows fire through the real delivery path, and stay
@@ -164,6 +165,23 @@ describe('direct-pr-create — the PR opened outside pnpm josh pr', () => {
 
 	it.each(['pnpm josh pr', 'gh pr view 12'])(SILENT_TITLE, (command) => {
 		expect(delivered_for(`pr-silent-${command}`, command)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4038: the merge outside `pnpm josh followup`, delivered through the real path and
+// claimed by one row.
+describe('pr-merge — the PR merged outside pnpm josh followup', () => {
+	it.each([
+		['cli', 'gh pr merge 5 --squash'],
+		['curl', 'curl -X PUT https://api.github.com/repos/joshuafolkken/kit/pulls/5/merge'],
+		['graphql', 'gh api graphql -F query=@merge.graphql'],
+	])(DELIVERS_TITLE, (name, command) => {
+		expect(delivered_for(`merge-${name}`, command)).toBe(pr_merge.PR_MERGE_REASON)
+		expect(rules_claiming(command)).toBe(ONE_RULE)
+	})
+
+	it.each(['pnpm josh followup', 'pnpm josh observations:flush'])(SILENT_TITLE, (command) => {
+		expect(delivered_for(`merge-silent-${command}`, command)).toBeUndefined()
 	})
 })
 

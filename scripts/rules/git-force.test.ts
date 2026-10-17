@@ -35,6 +35,26 @@ describe('git_force.is_force_or_delete — refuses the spellings the deny glob m
 	})
 })
 
+// joshuafolkken/kit#4038: a path-spelled git, a pipe or `&` in front, and the ref-deleting pushes.
+describe('git_force.is_force_or_delete — the program word, the pipe and the ref-deleting pushes', () => {
+	it.each([
+		'/usr/bin/git push -f',
+		'true | git push -f',
+		'x & git push -f',
+		'git push --mirror origin',
+		'git push --prune origin',
+	])('refuses the spelling %j', (command) => {
+		expect(git_force.is_force_or_delete(command)).toBe(true)
+	})
+
+	it.each(['git fetch --prune', 'git remote prune origin', 'git push origin main 2>&1 | tail -5'])(
+		'leaves %j alone',
+		(command) => {
+			expect(git_force.is_force_or_delete(command)).toBe(false)
+		},
+	)
+})
+
 describe('git_force.GIT_FORCE_REASON', () => {
 	it.each([
 		'force push or branch delete',

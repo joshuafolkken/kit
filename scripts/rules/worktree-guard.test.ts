@@ -18,6 +18,7 @@ describe('worktree_guard.is_unauthorized_worktree_change — refuses', () => {
 		'git -C /repo stash',
 		'git clean -fdx',
 		'git -C . clean --force',
+		'true | git stash',
 	])('refuses %j', (command) => {
 		expect(worktree_guard.is_unauthorized_worktree_change(command)).toBe(true)
 	})

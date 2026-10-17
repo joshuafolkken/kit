@@ -117,7 +117,7 @@ function is_unauthorized_segment(segment: string): boolean {
 }
 
 function is_unauthorized_worktree_change(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_unauthorized_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_unauthorized_segment(segment))
 }
 
 // The instruction in the shape a refusal can carry: what the command touches, the authorized route,

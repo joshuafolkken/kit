@@ -53,6 +53,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'rule-body': judgment('a trigger-plus-pointer line is written, not derived'),
 	'direct-filing': judgment(ANOTHER_COMMAND),
 	'direct-pr-create': judgment(ANOTHER_COMMAND),
+	'pr-merge': judgment(ANOTHER_COMMAND),
 	'josh-git-bare': judgment(ANOTHER_COMMAND),
 	'run-tail': judgment(ANOTHER_COMMAND),
 	'pre-gate-cut': judgment(ANOTHER_COMMAND),

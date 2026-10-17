@@ -46,3 +46,19 @@ describe('first_of', () => {
 		expect(shell_segments.segments_of(`  ${FIRST}  &&   ${SECOND} `)).toStrictEqual(BOTH)
 	})
 })
+
+// joshuafolkken/kit#4038: the argv-reading rows cut at the pipe and the background `&` too, and never
+// at a `&` that belongs to a redirection.
+describe('commands_of', () => {
+	it.each([
+		[`${FIRST} && ${SECOND}`, BOTH],
+		[`${FIRST} | ${SECOND}`, BOTH],
+		[`${FIRST} |& ${SECOND}`, BOTH],
+		[`${FIRST} & ${SECOND}`, BOTH],
+		[`${FIRST} 2>&1 | ${SECOND}`, [`${FIRST} 2>&1`, SECOND]],
+		[`${FIRST} &> log`, [`${FIRST} &> log`]],
+		[`${FIRST} >&2`, [`${FIRST} >&2`]],
+	])('cuts %j', (command, expected) => {
+		expect(shell_segments.commands_of(command)).toStrictEqual(expected)
+	})
+})

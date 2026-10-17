@@ -238,6 +238,8 @@ words:
   - pushd
   - popd
   - subshell
+  # A shell reader `protected-files.ts` refuses on `.env` (joshuafolkken/kit#4038).
+  - hexdump
   # How a session that never calls `Edit` or `Write` rewrites a file — the mode the density hook's
   # matcher was widened to reach (joshuafolkken/kit#1337). Named in `docs/` and in a test file,
   # neither of which `josh sync` copies, so it stays in this local list.
