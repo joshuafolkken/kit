@@ -1,4 +1,5 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
+import { issue_comments } from '#scripts/rules/issue-comments'
 import { describe, expect, it } from 'vitest'
 import { guard_friction } from './guard-friction'
 import { guard_friction_fixture } from './guard-friction-fixture'
@@ -51,6 +52,20 @@ describe('guard_friction.guard_rows', () => {
 		])
 
 		expect(guard_friction.guard_rows([ended])[0]?.usd).toBe(0)
+	})
+})
+
+describe('guard_friction.guard_rows on a renamed guard', () => {
+	it('tallies a refusal under a former reason under the guard it was renamed to', () => {
+		const former = issue_comments.ROW.former_reasons[0] ?? ''
+		const renamed = session(node('renamed', { records: [record(0, CONTEXT), ANSWER] }), [
+			refusal_line(1, 'a', former),
+			refusal_line(1, 'b', issue_comments.ROW.reason),
+		])
+
+		expect(guard_friction.guard_rows([renamed]).map((row) => [row.guard, row.refusals])).toEqual([
+			['issue comments', 2],
+		])
 	})
 })
 
