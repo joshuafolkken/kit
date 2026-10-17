@@ -1,10 +1,10 @@
 # @joshuafolkken/kit
 
+The hand-off kit for Claude Code and Codex.
+
 **Hand it off. Walk away. Come back to done.**
 
 Not "almost done" — tested, checked, finished.
-
-kit gives Claude Code or Codex your project's rules and checks.
 
 ## The workflow
 

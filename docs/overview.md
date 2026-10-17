@@ -1,6 +1,6 @@
 # @joshuafolkken/kit — Overview
 
-For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. kit gives Claude Code or Codex your project's rules and checks. With the workflow, the agent takes each change from Issue to merged PR. That workflow is optional: what kit sets up underneath is AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
+For anyone deciding whether kit fits their project: what it sets up for each profile, and how it works. kit is the hand-off kit for Claude Code and Codex: it gives the agent your project's rules and checks. With the workflow, the agent takes each change from Issue to merged PR. That workflow is optional: what kit sets up underneath is AI assistant rules, formatting and Git settings for any project, plus the full lint, type-check, test and hook toolchain for Node projects. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
 
 ## What it provides
 
