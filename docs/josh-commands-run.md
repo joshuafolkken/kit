@@ -601,23 +601,23 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 The header is three lines — the first two in three columns, the third a spinner and time under the second column, then the kind's icon and words under the third:
 
 ```
-▶ backlogrun  ⏰ 7:18:07  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0
-  kit         💓 0:00:20  ⚡  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
-              ⠦  0:00:04  🔧 #<N> · Bash pnpm josh test:related
+▶ backlogrun  ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0
+  kit         💓      20″  ⚡  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
+              ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first line is how far the run is: its state mark and name, `⏰` elapsed, a progress bar and per-state counts.
+The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board is written so; a colon is a time of day), a progress bar and per-state counts.
 
 The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned, and both lines' first bars start in one.
 
 The third line is what the run is doing now: a spinner, how long ago it happened, then the kind's icon and words.
 
-- **At a stage** — the stage's words then why: `⠸  0:02:31  🤔 waiting on judgment — 4 waiting`.
-- **At a stage a session works on** — that session's newest operation: `⠼  0:00:03  📝 planning · Bash pnpm josh backlog:plan`.
-- **Children running, no stage** — the newest child operation or event: `⠙  0:00:04  🔧 #<N> · Bash pnpm josh test:related`.
+- **At a stage** — the stage's words then why: `⠸  2′31″  🤔 waiting on judgment — 4 waiting`.
+- **At a stage a session works on** — that session's newest operation: `⠼  3″  📝 planning · Bash pnpm josh backlog:plan`.
+- **Children running, no stage** — the newest child operation or event: `⠙  4″  🔧 #<N> · Bash pnpm josh test:related`.
 - **No operation readable** — a log that is missing, unreadable or holds no call falls back to what the line said before: the stage with its time and reason, or how many children run (`🔄 2 running`), with no time.
-- **Watching** — nothing running and no stage: `0:24:10  🔭 watching — pool empty`, the time counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at — so a judgment session's minutes are not counted as watching).
-- **Ended** — the newest thing the run did, in that event's words, timed up to the end: `0:00:42  🔚 backlog drained`.
+- **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, the time counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at — so a judgment session's minutes are not counted as watching).
+- **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
 Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), the wave order, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
@@ -631,7 +631,7 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 - `overlaps <N> (<file>)` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
 - `no free lane` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read.
 
-A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows that lane's stage, such as `opening lane 0:05`.
+A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows that lane's stage, such as `opening lane 5″`.
 
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.
 

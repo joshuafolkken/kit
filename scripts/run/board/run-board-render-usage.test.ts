@@ -66,7 +66,7 @@ describe('run_board_render.render usage column', () => {
 	it('draws a running row’s usage before its tail, and both before what it waits on', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}00:00 {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}0″ {2}🔗 3$/u)
 		expect(row_line(lines, 'Issue 2')).not.toContain('⚡')
 	})
 
@@ -99,7 +99,7 @@ describe('run_board_render.render usage column', () => {
 // so every running row's tail starts in one column.
 const TRACK: Array<Phase> = ['investigate', 'plan', 'ship']
 const FINISH = /🔚 (?:\d+\/\d+ )?\d{2}:\d{2}/u
-const PHASE_TIME = '00:30'
+const PHASE_TIME = '30″'
 
 function tracked(number: number, state: BoardRow['state'], ended_ms?: number): BoardRow {
 	const status = {
@@ -173,7 +173,7 @@ describe('run_board_render.render usage column on every row', () => {
 		const lines = mixed_lines({}, NARROW)
 
 		expect(lines.join('\n')).not.toMatch(/[🔚⚡]/u)
-		expect(row_line(lines, 'Issue 3')).toMatch(/\d{2}:\d{2}$/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/\d″$/u)
 	})
 
 	it('draws both in a chat as on a screen', () => {

@@ -68,7 +68,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 	})
 
 	it('draws a lane’s stage with how long the lane has stood at it', () => {
-		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/ {2}installing 0:42$/u)
+		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/ {2}installing 42″$/u)
 	})
 
 	it('draws no Japanese in what it adds to the row', () => {

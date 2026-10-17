@@ -8,15 +8,17 @@ import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
 // The words and the clock `run:board` draws with. A moment on the board is a local clock, `HH:MM`
-// where a person reads it to the minute; how long a row or the heartbeat has run is a short `MM:SS`,
-// and how long the run has run or its wait has left is `H:MM:SS` — two separators are a length and one
-// is a time of day, so the header's time column never reads a length as a moment.
+// where a person reads it to the minute; every length — how long the run, a row, a phase or the
+// heartbeat has run — is degree-minute-second style (`1°15′57″`), so `:` is a time of day alone and
+// the board never reads a length as a moment.
 
 const CLOCK_WIDTH = 2
 const CLOCK_PAD = '0'
 const MS_PER_SECOND = 1000
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
+// A length's units — hours, minutes and seconds — so a length never shares the clock's `:`.
+const SPAN_UNITS = { hours: '°', minutes: '′', seconds: '″' } as const
 // Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
@@ -93,6 +95,12 @@ interface Shade {
 }
 
 type Paint = TextColor | Shade
+
+// One unit of a length: its count and the mark it is drawn with.
+interface SpanField {
+	value: number
+	unit: string
+}
 
 // Every row icon is an emoji a terminal draws two columns wide by default (Emoji_Presentation), so the
 // number after it lines up whichever state a row is in: 🅿 and ☑ are text symbols a terminal such as
@@ -241,39 +249,30 @@ function date_minute_of(ms: number): string {
 	return `${[String(date.getFullYear()), ...day].join('-')} ${minute_of(ms)}`
 }
 
-// How long a row's child has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so every
-// row reads one short column; a negative span reads as zero.
-function elapsed_of(ms: number): string {
-	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
-	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
-
-	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
-}
-
-// A length as its hours, and its minutes and seconds within the hour; a negative span reads as zero.
-function span_fields(ms: number): [hours: number, minutes: number, seconds: number] {
+// A length as its hours, and its minutes and seconds within the hour, each with its unit; a negative
+// span reads as zero.
+function span_fields(ms: number): Array<SpanField> {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
 	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
 	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
 
-	return [hours, minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
+	return [
+		{ value: hours, unit: SPAN_UNITS.hours },
+		{ value: minutes % MINUTES_PER_HOUR, unit: SPAN_UNITS.minutes },
+		{ value: seconds % SECONDS_PER_MINUTE, unit: SPAN_UNITS.seconds },
+	]
 }
 
-// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
-// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
+// **Every length the board draws**, in degree-minute-second style (`26″`, `3′27″`, `1°15′57″`): the
+// leading unit not padded and a zero one dropped down to the seconds, the units after it two digits;
+// a negative span reads as zero.
 function span_of(ms: number): string {
-	const [hours, ...tail] = span_fields(ms)
+	const fields = span_fields(ms)
+	const lead = fields.findIndex((field, index) => field.value > 0 || index === fields.length - 1)
+	const [first, ...rest] = fields.slice(lead)
+	const head = first === undefined ? '' : `${String(first.value)}${first.unit}`
 
-	return [String(hours), ...tail.map((value) => two_digits(value))].join(':')
-}
-
-// How long the run has stood at its stage, as `M:SS` with the minutes not padded, and as `span_of`'s
-// `H:MM:SS` from an hour on. It stands beside the stage's words, never in the header's time column, so
-// its one separator is not read there as a time of day.
-function stage_span_of(ms: number): string {
-	const [hours, minutes, seconds] = span_fields(ms)
-
-	return hours === 0 ? `${String(minutes)}:${two_digits(seconds)}` : span_of(ms)
+	return head + rest.map((field) => `${two_digits(field.value)}${field.unit}`).join('')
 }
 
 function is_shade(color: Paint): color is Shade {
@@ -343,12 +342,10 @@ const run_board_labels = {
 	bar_of,
 	clock_of,
 	date_minute_of,
-	elapsed_of,
 	minute_of,
 	painted,
 	span_of,
 	spinner_of,
-	stage_span_of,
 }
 
 export { run_board_labels }

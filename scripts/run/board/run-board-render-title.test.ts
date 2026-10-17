@@ -71,7 +71,7 @@ describe('run_board_render_title.reason_text', () => {
 	})
 
 	it('says a stage with how long the lane has stood at it', () => {
-		expect(reason_text(row_of({ reason: INSTALLING }), NOW)).toBe('installing 0:42')
+		expect(reason_text(row_of({ reason: INSTALLING }), NOW)).toBe('installing 42″')
 	})
 })
 

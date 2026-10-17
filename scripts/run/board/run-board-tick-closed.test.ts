@@ -77,7 +77,7 @@ describe('run_board_tick.tick — children that closed', () => {
 
 		for (const issue of CHILDREN) {
 			expect(row_of(frames.at(-1), issue)).toMatch(
-				new RegExp(`✅ ${String(issue)} +Child ${String(issue)} +45:48`, 'u'),
+				new RegExp(`✅ ${String(issue)} +Child ${String(issue)} +45′48″`, 'u'),
 			)
 		}
 	})

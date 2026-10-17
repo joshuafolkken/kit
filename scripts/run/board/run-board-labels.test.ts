@@ -3,12 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import { run_board_phase } from './run-board-phase'
 
-// joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a short span.
+// joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a span.
 // joshuafolkken/kit#3486: its words are English whatever the session language.
 
-const { WORDS, bar_of, clock_of, elapsed_of, minute_of, span_of, spinner_of } = run_board_labels
+const { WORDS, bar_of, clock_of, minute_of, span_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_INTERVAL_MS, painted } = run_board_labels
-const { date_minute_of, stage_span_of } = run_board_labels
+const { date_minute_of } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -24,53 +24,31 @@ describe('run_board_labels.WORDS', () => {
 	})
 })
 
-// joshuafolkken/kit#3444: elapsed times are a short `MM:SS`, and the one bar the
-// board draws fills in proportion.
-describe('run_board_labels.elapsed_of', () => {
-	it('draws minutes and seconds whose minutes never carry into hours', () => {
-		expect(elapsed_of(42 * SECOND + 999)).toBe('00:42')
-		expect(elapsed_of(HOUR + MINUTE + 5 * SECOND)).toBe('61:05')
-		expect(elapsed_of(2 * HOUR + 5 * MINUTE + 30 * SECOND)).toBe('125:30')
-	})
-
-	it('reads a negative elapsed time as zero', () => {
-		expect(elapsed_of(-MINUTE)).toBe('00:00')
-	})
-})
-
-// joshuafolkken/kit#3687: an ended run's `⏱ 03:25` read as a time of day beside `🔚 03:33`. A span is
-// always three fields, so two separators are a length and one is a moment.
+// joshuafolkken/kit#4020: `15:11  🔚 21:46` did not say which was a length. Every length is
+// degree-minute-second style, so `:` is a time of day alone.
 describe('run_board_labels.span_of', () => {
-	it('draws a span under an hour with its zero hour, so it never reads as a time', () => {
-		expect(span_of(3 * MINUTE + 25 * SECOND + 999)).toBe('0:03:25')
-		expect(span_of(0)).toBe('0:00:00')
+	it('draws zero and a span of seconds as seconds alone', () => {
+		expect(span_of(0)).toBe('0″')
+		expect(span_of(26 * SECOND + 999)).toBe('26″')
 	})
 
-	it('carries minutes into hours it does not pad', () => {
-		expect(span_of(7 * HOUR + 42 * MINUTE + 18 * SECOND)).toBe('7:42:18')
-		expect(span_of(12 * HOUR + 5 * SECOND)).toBe('12:00:05')
+	it('drops a zero hour and pads the seconds after the minutes', () => {
+		expect(span_of(3 * MINUTE + 27 * SECOND)).toBe('3′27″')
+		expect(span_of(MINUTE + 2 * SECOND)).toBe('1′02″')
+	})
+
+	it('pads the minutes and seconds after the hours', () => {
+		expect(span_of(HOUR + 15 * MINUTE + 57 * SECOND)).toBe('1°15′57″')
+		expect(span_of(HOUR + 5 * SECOND)).toBe('1°00′05″')
+	})
+
+	it('carries sixty minutes and more into hours', () => {
+		expect(span_of(HOUR + MINUTE + 5 * SECOND)).toBe('1°01′05″')
+		expect(span_of(12 * HOUR)).toBe('12°00′00″')
 	})
 
 	it('reads a negative span as zero', () => {
-		expect(span_of(-MINUTE)).toBe('0:00:00')
-	})
-})
-
-// joshuafolkken/kit#3738: the time beside a stage is short while the stage is, and a span from an hour on.
-describe('run_board_labels.stage_span_of', () => {
-	it('draws minutes it does not pad and seconds it does, under an hour', () => {
-		expect(stage_span_of(2 * MINUTE + 31 * SECOND + 999)).toBe('2:31')
-		expect(stage_span_of(0)).toBe('0:00')
-		expect(stage_span_of(HOUR - SECOND)).toBe('59:59')
-	})
-
-	it('draws the span’s three fields from an hour on', () => {
-		expect(stage_span_of(HOUR)).toBe('1:00:00')
-		expect(stage_span_of(HOUR + 2 * MINUTE + 3 * SECOND)).toBe('1:02:03')
-	})
-
-	it('reads a stage entered after now as just entered', () => {
-		expect(stage_span_of(-MINUTE)).toBe('0:00')
+		expect(span_of(-MINUTE)).toBe('0″')
 	})
 })
 

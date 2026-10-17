@@ -71,7 +71,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const opening = { ...LOCAL, events: [OPENING_EVENT] }
 		const plan = plan_of([child(OPENING)])
 
-		expect(await row_of(OPENING, opening, plan)).toMatch(/ {2}opening lane \d+:\d{2}$/u)
+		expect(await row_of(OPENING, opening, plan)).toMatch(/ {2}opening lane (?:\d+′)?\d+″$/u)
 		expect(await row_of(OPENING, { ...opening, is_stranded: true }, plan)).not.toMatch(/opening/u)
 	})
 })

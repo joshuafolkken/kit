@@ -16,13 +16,13 @@ const { WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
 // The second line's first two columns where nothing is drawn in them: no repository, no heartbeat.
 const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
-const TIME_BLANK = ' '.repeat('⏰ 0:30:00'.length + 1)
+const TIME_BLANK = ' '.repeat('⏰ 30′00″'.length + 1)
 const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
 // joshuafolkken/kit#3749: the third line — blank where the stream holds no event, else what the run is
 // doing now: its time under the second column, its icon and words under the third.
 const NOW_BLANK = ''
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
-const STALE_BEAT = '💓 0:40:00'
+const STALE_BEAT = '💓 40′00″'
 const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = backlog_budget.MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
@@ -101,8 +101,8 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ backlogrun  ⏰ 1:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}    ${MACHINE_UNKNOWN}`,
+			`■ backlogrun  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}`,
 			NOW_BLANK,
 		])
 	})
@@ -118,8 +118,8 @@ describe('run_board_header.header_lines shape', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ backlogrun  ⏰ 0:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${NAME_BLANK}  💓 0:01:00  ${MACHINE_UNKNOWN}`,
+			`⏸ backlogrun  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${NAME_BLANK}  💓  1′00″  ${MACHINE_UNKNOWN}`,
 			NOW_BLANK,
 		])
 	})
@@ -129,7 +129,7 @@ describe('run_board_header.header_lines shape', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
-			`▶ backlogrun  ⏰ 0:30:00  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
+			`▶ backlogrun  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -170,7 +170,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
 
 		expect(lines_of(board)).toStrictEqual([
-			`▶ backlogrun  ⏰ 0:30:00  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
+			`▶ backlogrun  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -229,8 +229,8 @@ describe('run_board_header.header_lines heartbeat color', () => {
 	it('leaves a fresh heartbeat plain, then yellow past 15 minutes and red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(aged_beat(MINUTE)).toContain(' 💓 0:01:00')
-		expect(aged_beat(20 * MINUTE)).toContain(styleText('yellow', '💓 0:20:00'))
+		expect(aged_beat(MINUTE)).toContain(' 💓  1′00″')
+		expect(aged_beat(20 * MINUTE)).toContain(styleText('yellow', '💓 20′00″'))
 		expect(aged_beat(40 * MINUTE)).toContain(alarmed())
 	})
 

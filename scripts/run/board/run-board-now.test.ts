@@ -7,7 +7,7 @@ import type { RunActivity } from './run-board-status'
 
 // joshuafolkken/kit#3749: the header's third line — what the run is doing now, in English words with
 // no label, and never blank while the stream holds an event. joshuafolkken/kit#3767: its kind as an
-// icon, and how long ago apart from its words, as the header's own `H:MM:SS`.
+// icon, and how long ago apart from its words, as the header's own `1°15′57″`.
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
@@ -16,7 +16,7 @@ const { STAGE } = run_event_setup
 const JAPANESE = /[぀-ヿ一-鿿]/u
 const LABEL = /^now\b/iu
 const WATCHED_MS = 24 * MINUTE + 10 * SECOND
-const DRAINED_LINE = '0:24:10 🔚 backlog drained'
+const DRAINED_LINE = '24′10″ 🔚 backlog drained'
 
 // The run at no stage, the newest thing it did `text`, `age_ms` ago.
 function after(text: string, age_ms: number): RunActivity {
@@ -50,16 +50,14 @@ describe('run_board_now.line_of at a stage', () => {
 	it('writes the stage under its icon, how long the run has stood there, then what is left', () => {
 		const activity = standing(STAGE.SESSION, 72 * SECOND)
 
-		expect(line_of({ activity, waiting: 2 })).toBe(
-			'0:01:12 💭 judgment session running — 2 waiting',
-		)
+		expect(line_of({ activity, waiting: 2 })).toBe('1′12″ 💭 judgment session running — 2 waiting')
 	})
 
 	it('writes the running children as the reason while any run', () => {
 		const activity = standing(STAGE.JUDGING, SECOND)
 
 		expect(line_of({ activity, running: 2, waiting: 3 })).toBe(
-			'0:00:01 🤔 waiting on judgment — 2 running',
+			'1″ 🤔 waiting on judgment — 2 running',
 		)
 	})
 
@@ -95,7 +93,7 @@ describe('run_board_now.line_of with no stage', () => {
 	})
 
 	it('writes how long the run has watched since the newest thing it did, and an empty pool', () => {
-		expect(line_of()).toBe('0:24:10 🔭 watching — pool empty')
+		expect(line_of()).toBe('24′10″ 🔭 watching — pool empty')
 	})
 
 	// A judgment session's minutes are the run's own: the watch is counted from the stage's end, not
@@ -103,19 +101,19 @@ describe('run_board_now.line_of with no stage', () => {
 	it('counts the watch from the run’s own newest moment, not from its newest position', () => {
 		const activity = { ...after('#5 merged', 22 * MINUTE), idle_ms: NOW - 2 * MINUTE }
 
-		expect(line_of({ activity })).toBe('0:02:00 🔭 watching — pool empty')
+		expect(line_of({ activity })).toBe('2′00″ 🔭 watching — pool empty')
 	})
 
 	it('writes what the pool holds that the run cannot take', () => {
-		expect(line_of({ waiting: 3, people: 1 })).toBe('0:24:10 🔭 watching — 3 waiting')
+		expect(line_of({ waiting: 3, people: 1 })).toBe('24′10″ 🔭 watching — 3 waiting')
 	})
 
 	it('writes a pool left only to people as waiting on a person', () => {
-		expect(line_of({ waiting: 2, people: 2 })).toBe('0:24:10 🔭 watching — 2 waiting on a person')
+		expect(line_of({ waiting: 2, people: 2 })).toBe('24′10″ 🔭 watching — 2 waiting on a person')
 	})
 
 	it('writes the watch alone before the plan is read', () => {
-		expect(line_of({ waiting: undefined })).toBe('0:24:10 🔭 watching')
+		expect(line_of({ waiting: undefined })).toBe('24′10″ 🔭 watching')
 	})
 
 	it('is blank only where the stream holds no event', () => {
@@ -134,7 +132,7 @@ describe('run_board_now.line_of once the run has stopped', () => {
 
 	it('stops the age at the run’s end', () => {
 		expect(line_of({ activity: STOPPED, ended_ms: NOW - WATCHED_MS + MINUTE })).toBe(
-			'0:01:00 🔚 backlog drained',
+			'1′00″ 🔚 backlog drained',
 		)
 	})
 
