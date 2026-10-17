@@ -4,6 +4,7 @@ import { poll } from '#scripts/lib/poll'
 import { z } from 'zod'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
+import { gh_failure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_issue_write } from './git-gh-issue-write'
 import { forget_pr_numbers, git_gh_pr_read, read_pull, require_pr_number } from './git-gh-pr-read'
@@ -49,6 +50,8 @@ const MERGE_UNCONFIRMED_MESSAGE =
 	'gh api could not read the pull request back after the merge request failed'
 const MERGE_READ_BACK_ATTEMPTS = 3
 const MERGE_READ_BACK_INTERVAL_MS = 1000
+// `PUT pulls/{N}/merge` with a `sha` that is no longer the branch head.
+const HEAD_MOVED_STATUS = 409
 const PR_NUMBER_PATTERN = /\/pull\/([1-9]\d*)$/u
 const LABELS_SEGMENT = '/labels'
 const PR_LABELS = z.array(z.object({ name: z.string() }))
@@ -166,14 +169,23 @@ async function pr_update_body(branch_name: string, body: string): Promise<void> 
 }
 
 // A merge moves the remembered detail read's state, so it is cleared first.
-async function put_merge(pr_number: number): Promise<void> {
+//
+// **`sha` binds the merge to the head the checks passed on** (#4036): without it GitHub merges
+// whatever the branch points at, so a commit pushed after the gate went green would land unverified.
+// A head that moved is answered 409 (`is_head_moved`).
+async function put_merge(pr_number: number, head_sha: string): Promise<void> {
 	forget_pr_numbers()
 	await git_gh_exec.exec_gh_api({
 		path: git_gh_api_path.pull_merge_api_path(String(pr_number)),
 		method: PUT_METHOD,
-		body: JSON.stringify({ merge_method: MERGE_COMMIT_METHOD }),
+		body: JSON.stringify({ merge_method: MERGE_COMMIT_METHOD, sha: head_sha }),
 		timeout_ms: MERGE_REQUEST_TIMEOUT_MS,
 	})
+}
+
+// GitHub's answer to a merge whose `sha` is no longer the branch head.
+function is_head_moved(error: unknown): boolean {
+	return gh_failure.failure_of(error)?.status === HEAD_MOVED_STATUS
 }
 
 // `undefined` is "nobody read it", kept apart from the `false` that means "the pull request is not
@@ -240,11 +252,11 @@ async function has_merge_landed(pr_number: number, merge_error: unknown): Promis
 // made by hand between the failure and the read leaves `followup` with exactly the same work to
 // finish. REST offers nothing that would tell the two apart without keeping the merge commit's SHA
 // across a request that never answered.
-async function pr_merge(branch_name: string): Promise<void> {
+async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
 	const pr_number = await require_pr_number(branch_name)
 
 	try {
-		await put_merge(pr_number)
+		await put_merge(pr_number, head_sha)
 	} catch (error) {
 		if (!(await has_merge_landed(pr_number, error))) throw error
 	}
@@ -259,6 +271,7 @@ const git_gh_pr = {
 	pr_comment,
 	pr_merge,
 	pr_update_body,
+	is_head_moved,
 }
 
 export { git_gh_pr, MERGE_COMMIT_METHOD, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE }

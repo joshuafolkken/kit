@@ -1,6 +1,8 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenPull } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_pr_checks } from '#scripts/gh/git-pr-checks'
+import { git_pr_merge_checked } from '#scripts/gh/git-pr-merge-checked'
+import { git_command } from '#scripts/git/git-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
 
@@ -21,9 +23,10 @@ const MERGE_FAILED_REASON =
 // **Best-effort, and the answer says which wait to use.** GraphQL — the only way to enable auto-merge
 // — can be refused in a cloud session, and that loses the safety net rather
 // than the flush: the in-process wait-and-merge still runs, exactly as before auto-merge existed.
+// The checkout's head is the commit this flush just pushed, so that is the one auto-merge may land.
 async function request_auto_merge(branch_name: string): Promise<boolean> {
 	try {
-		await git_gh_command.pr_enable_auto_merge(branch_name)
+		await git_gh_command.pr_enable_auto_merge(branch_name, await git_command.head_commit())
 
 		return true
 	} catch (error) {
@@ -37,8 +40,7 @@ async function request_auto_merge(branch_name: string): Promise<boolean> {
 // the merge gate's wait would run out its budget on a pull request that is already merged.
 async function wait_for_landing(branch_name: string, is_auto_merge: boolean): Promise<void> {
 	if (!is_auto_merge) {
-		await git_pr_checks.wait_for_pr_success(branch_name)
-		await git_gh_command.pr_merge(branch_name)
+		await git_pr_merge_checked.merge_when_green(branch_name)
 
 		return
 	}

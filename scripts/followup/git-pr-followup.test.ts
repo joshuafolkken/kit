@@ -96,6 +96,7 @@ const { git_pr_ai_review } = await import('#scripts/gh/git-pr-ai-review')
 const { telegram_notify } = await import('#scripts/notify/telegram-notify')
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
+const CHECKED_SHA = 'c0ffee1'
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',
@@ -127,6 +128,7 @@ function setup_run_mocks(): void {
 		rollup: [],
 		merge_state_status: undefined,
 		review_decision: undefined,
+		head_sha: CHECKED_SHA,
 	})
 	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
@@ -241,7 +243,7 @@ describe('git_pr_followup.run — --merge flag', () => {
 	it('calls pr_merge with the branch name when should_merge is true', async () => {
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(BASE_INPUT.branch_name, CHECKED_SHA)
 	})
 
 	it('does not call pr_merge when should_merge is false', async () => {
@@ -270,7 +272,7 @@ describe('git_pr_followup.run — temporary CodeRabbit skip (kit#753)', () => {
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(BASE_INPUT.branch_name, CHECKED_SHA)
 		expect(vi.mocked(git_gh_command.pr_comment)).not.toHaveBeenCalled()
 	})
 
@@ -297,6 +299,7 @@ describe('git_pr_followup.run — CodeRabbit skip audit trail (kit#753)', () => 
 			],
 			merge_state_status: 'UNSTABLE',
 			review_decision: undefined,
+			head_sha: CHECKED_SHA,
 		})
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
@@ -346,7 +349,7 @@ describe('git_pr_followup.run — CodeRabbit comments that could not be read (ki
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(BASE_INPUT.branch_name, CHECKED_SHA)
 	})
 
 	// The audit trail an ignore reason leaves on the two branches around this one.

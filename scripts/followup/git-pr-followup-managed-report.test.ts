@@ -90,6 +90,7 @@ const { telegram_notify } = await import('#scripts/notify/telegram-notify')
 const { epic_close } = await import('#scripts/epic/epic-close')
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
+const CHECKED_SHA = 'c0ffee1'
 const UNDISTRIBUTED_FILE = 'scripts/followup/git-pr-followup.ts'
 const PATHS_HEADING = 'Distributed paths in this diff:'
 // What `format_hit` actually writes: the path, then the list that claimed it, in brackets. Asserted
@@ -136,6 +137,7 @@ function setup_run_mocks(): void {
 		rollup: [],
 		merge_state_status: undefined,
 		review_decision: undefined,
+		head_sha: CHECKED_SHA,
 	})
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
 	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
@@ -158,7 +160,10 @@ describe('followup — a diff that changes a distributed file', () => {
 	it('merges instead of stopping', async () => {
 		await git_pr_followup.run(BASE_INPUT)
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(
+			BASE_INPUT.branch_name,
+			CHECKED_SHA,
+		)
 	})
 
 	it('names the path and the list that claimed it in the completion notification', async () => {

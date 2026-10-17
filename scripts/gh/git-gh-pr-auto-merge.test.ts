@@ -25,6 +25,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 const GRAPHQL_PATH = 'graphql'
 const NODE_ID = 'PR_kwDOabc123'
+const PUSHED_SHA = 'c0ffee1'
 const OPEN_PULLS_PATH = `${REPO_NAME_PATH}/pulls?per_page=100&state=open`
 const FLUSH_PREFIX = 'observations/'
 const LANDING_NUMBER = 2479
@@ -68,20 +69,27 @@ describe('git_gh_pr_auto_merge.pr_enable_auto_merge', () => {
 			gh_api_routes(pr_routes({ node_id: NODE_ID }, { [GRAPHQL_PATH]: '{}' })),
 		)
 
-		await git_gh_pr_auto_merge.pr_enable_auto_merge(PR_BRANCH)
+		await git_gh_pr_auto_merge.pr_enable_auto_merge(PR_BRANCH, PUSHED_SHA)
 
 		const requests = mocked_api.mock.calls.map(([request]) => request)
 
 		expect(request_body(find_request(requests, GRAPHQL_PATH))).toEqual({
 			query: ENABLE_AUTO_MERGE_MUTATION,
-			variables: { id: NODE_ID },
+			variables: { id: NODE_ID, head: PUSHED_SHA },
 		})
+	})
+
+	// #4036: without `expectedHeadOid`, a commit pushed after the caller's would be the one that lands.
+	it('binds the mutation to the expected head commit', () => {
+		expect(ENABLE_AUTO_MERGE_MUTATION).toContain('expectedHeadOid: $head')
 	})
 
 	it('refuses a pull request that carries no node id rather than sending an empty one', async () => {
 		mocked_api.mockImplementation(gh_api_routes(pr_routes()))
 
-		await expect(git_gh_pr_auto_merge.pr_enable_auto_merge(PR_BRANCH)).rejects.toThrow('node_id')
+		await expect(git_gh_pr_auto_merge.pr_enable_auto_merge(PR_BRANCH, PUSHED_SHA)).rejects.toThrow(
+			'node_id',
+		)
 	})
 })
 
