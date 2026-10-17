@@ -34,10 +34,10 @@ function overrun_of(text: string, row: BoardRow, columns: number | undefined): n
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
 
-// The title column once it has given up `overrun` columns, never under the floor: the blanks a short
-// title is padded with go first, so a title that fits keeps whole.
-function narrowed_limit(overrun: number): number {
-	return Math.max(TITLE_FLOOR, TITLE_LIMIT - overrun)
+// The row's title once it has given up `overrun` columns, never under the floor. A row with a reason
+// waits, and a waiting row's title is not padded, so the columns come off the title as drawn.
+function narrowed_limit(row: BoardRow, overrun: number): number {
+	return Math.max(TITLE_FLOOR, Math.min(TITLE_LIMIT, row.title?.length ?? 0) - overrun)
 }
 
 // A row's line as `draw` draws it at a title limit: at the title column's, or at a narrower one where
@@ -50,7 +50,7 @@ function fitted(
 	const text = draw(TITLE_LIMIT)
 	const overrun = overrun_of(text, row, columns)
 
-	return overrun === 0 ? text : draw(narrowed_limit(overrun))
+	return overrun === 0 ? text : draw(narrowed_limit(row, overrun))
 }
 
 const run_board_render_title = { ELLIPSIS, TITLE_LIMIT, fitted, reason_text, title_of }

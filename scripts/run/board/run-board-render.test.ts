@@ -103,8 +103,8 @@ describe('run_board_render.render release kinds', () => {
 		expect(lines).toContain(`  ✅ 4    ${padded('Issue 4')}  1′00″`)
 	})
 
-	// joshuafolkken/kit#3769: every row's title is padded, so what a row waits on starts in one column.
-	it('starts the waits of a row with no title in the column a titled row’s start in', () => {
+	// joshuafolkken/kit#4026: a waiting row's title is not padded, so what it waits on follows it.
+	it('starts the waits of a waiting row two blanks after its title, or its kind with no title', () => {
 		const untitled = row(12, { kind: 'enhancement', title: undefined, waits: ['3'] })
 		const titled = row(13, { kind: 'enhancement', waits: ['3'] })
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [untitled, titled] } }))
@@ -112,8 +112,8 @@ describe('run_board_render.render release kinds', () => {
 			(mark) => lines.find((line) => line.includes(mark)) ?? '',
 		)
 
-		expect(columns[0]).toMatch(/^ {2}⏳ 12 ✨ +🔗 3$/u)
-		expect(columns[0]?.indexOf('🔗')).toBe(columns[1]?.indexOf('🔗'))
+		expect(columns[0]).toMatch(/^ {2}⏳ 12 ✨ {2}🔗 3$/u)
+		expect(columns[1]).toMatch(/^ {2}⏳ 13 ✨ \S.* {2}🔗 3$/u)
 	})
 
 	it('names the drawn kinds in the legend', () => {

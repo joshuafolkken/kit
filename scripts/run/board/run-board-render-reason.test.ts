@@ -14,6 +14,7 @@ const ISSUE = 3720
 const BLOCKER = '3409'
 const SHORT_TITLE = 'Short title'
 const LONG_TITLE = 'Verify josh start end-to-end on a fresh machine with nothing installed'
+const MIDDLE_TITLE = 'A title of about thirty chars!'
 const TITLE_START = 'Verify j'
 const UNTRIAGED: RowReason = { text: 'untriaged' }
 const STAGE_SECONDS = 42
@@ -40,24 +41,44 @@ function running(): BoardRow {
 	return { ...waiting({ title: LONG_TITLE }), state: 'running', status }
 }
 
-// The line the board draws for the row, in a pane `columns` wide where one is given.
-function line_of(row: BoardRow, columns?: number): string {
-	const section = row.state === 'running' ? { active: [row] } : { unreached: [row] }
-	const board = header({ layout: { ...EMPTY_LAYOUT, ...section } })
+// The lines the board draws for the rows, in a pane `columns` wide where one is given.
+function lines_of(rows: ReadonlyArray<BoardRow>, columns?: number): Array<string> {
+	const active = rows.filter((row) => row.state === 'running')
+	const unreached = rows.filter((row) => row.state !== 'running')
+	const board = header({ layout: { ...EMPTY_LAYOUT, active, unreached } })
 	const size = columns === undefined ? undefined : { rows: TALL, columns }
 	const lines = run_board_render.render({ header: board, notes: [], size })
-	const drawn = lines.map((line) => stripVTControlCharacters(line))
 
-	return drawn.find((line) => line.includes(String(ISSUE))) ?? ''
+	return lines.map((line) => stripVTControlCharacters(line))
+}
+
+// The line the board draws for the issue's row, in a pane `columns` wide where one is given.
+function line_of(row: BoardRow, columns?: number): string {
+	return lines_of([row], columns).find((line) => line.includes(String(ISSUE))) ?? ''
 }
 
 describe('run_board_render.render — why a waiting row waits', () => {
-	it('draws the reason at the end of the row, past the title column', () => {
+	it('draws the reason two blanks after the title, not past the title column', () => {
 		const line = line_of(waiting({ reason: UNTRIAGED }))
 		const title_column = line.indexOf(SHORT_TITLE)
 
-		expect(line).toMatch(/Short title +untriaged$/u)
-		expect(line.indexOf('untriaged')).toBe(title_column + run_board_render.TITLE_LIMIT + 2)
+		expect(line).toMatch(/Short title {2}untriaged$/u)
+		expect(line.indexOf('untriaged')).toBe(title_column + SHORT_TITLE.length + 2)
+	})
+
+	it('draws the blockers right after the title, and the reason after them', () => {
+		const line = line_of(waiting({ waits: [BLOCKER], reason: UNTRIAGED }))
+
+		expect(line).toMatch(/Short title {2}🔗 3409 {2}untriaged$/u)
+	})
+
+	it('keeps a running row’s columns where they are beside a waiting row', () => {
+		const other = waiting({ number: ISSUE + 1, reason: UNTRIAGED })
+		const [alone, beside] = [[running()], [running(), other]].map((rows) =>
+			lines_of(rows).find((line) => line.includes(` ${String(ISSUE)} `)),
+		)
+
+		expect(beside).toBe(alone)
 	})
 
 	it('draws the reason after the row’s blockers, which stay as they were', () => {
@@ -93,11 +114,18 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  overlaps 3701`)
 	})
 
-	it('leaves a title that already fits the pane whole, giving up the blanks after it first', () => {
+	it('leaves a title that already fits the pane whole', () => {
 		const line = line_of(waiting({ reason: UNTRIAGED }), NARROW)
 
-		expect(line).toMatch(/Short title +untriaged$/u)
+		expect(line).toMatch(/Short title {2}untriaged$/u)
 		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
+	})
+
+	it('cuts a title shorter than the title column by just the columns the line runs over', () => {
+		const line = line_of(waiting({ title: MIDDLE_TITLE, reason: UNTRIAGED }), NARROW)
+
+		expect(line).toMatch(/… {2}untriaged$/u)
+		expect(run_board_fit.width_of(line)).toBe(NARROW)
 	})
 
 	it('draws a row with no reason as it did, in a pane and out of one', () => {
