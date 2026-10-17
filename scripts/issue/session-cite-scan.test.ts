@@ -80,6 +80,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/merge/run-merge-cli.ts', 7],
 	['run/merge/run-merge.ts', 1],
 	['run/ship/run-ship-detach.ts', 1],
+	// The park event and its Telegram warning.
+	['run/ship/run-ship-relaunch-cap.ts', 1],
 	// The reviewer child's prompt, which an agent reads.
 	['run/ship/run-ship-review.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],

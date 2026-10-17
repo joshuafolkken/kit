@@ -4,7 +4,7 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 
 Only these load `.env` themselves, and only when it exists:
 
-- **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
+- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
 - **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:sample`, `josh lane:stats`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.
@@ -13,7 +13,7 @@ Only these load `.env` themselves, and only when it exists:
 
 `scripts/document/environment-file-reference.test.ts` checks this list against the command registry, both ways.
 
-Every other command — `josh gate`, `josh ship`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read (`JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`, the two `*_FORCE` switches) in the shell that runs them.
+Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read (`JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`, the two `*_FORCE` switches) in the shell that runs them.
 
 Set `JOSH_PROGRESS_INTERVAL_MINUTES` in the shell, or commit `josh.progress_interval_minutes` in `package.json`: in `.env` it reaches only the `josh rule:guard` heartbeat, not `josh run:progress`.
 

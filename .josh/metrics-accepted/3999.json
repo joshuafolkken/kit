@@ -1,0 +1,7 @@
+{
+	"reason": "Ship-stop relaunch cap (#3999): a new module counting a lane child's stops since dispatch and parking past the cap, plus ship loading .env for the park warning",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 50
+	}
+}
