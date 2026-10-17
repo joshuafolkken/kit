@@ -55,15 +55,29 @@ describe('josh time registration', () => {
 	})
 })
 
+const SPLIT_FLAG = '--split-at'
+const MERGED_AT = '2026-10-16T21:33:19Z'
 const RETIRED_FLAGS = ['--issue', '--session', '--epic', '--last', '--period', '--top'] as const
 
 describe('time_cli.parse_options', () => {
 	it('defaults to the run tree and the text report', () => {
-		expect(time_cli.parse_options([])).toEqual({ is_json: false, path: undefined })
+		expect(time_cli.parse_options([])).toEqual({
+			is_json: false,
+			path: undefined,
+			split_at_ms: undefined,
+		})
 	})
 
 	it('reads --run and --json as the run-tree scope', () => {
-		expect(time_cli.parse_options(['--run', '--json'])).toEqual({ is_json: true, path: undefined })
+		expect(time_cli.parse_options(['--run', '--json'])).toMatchObject({ is_json: true })
+	})
+
+	it('reads --split-at as the instant to split the tree at', () => {
+		expect(time_cli.parse_options([SPLIT_FLAG, MERGED_AT])?.split_at_ms).toBe(Date.parse(MERGED_AT))
+	})
+
+	it('refuses a --split-at that does not parse as a time', () => {
+		expect(time_cli.parse_options([SPLIT_FLAG, 'yesterday'])).toBeUndefined()
 	})
 
 	// A refusal, not a silent default: a mistyped flag must not report the run tree as though the
@@ -105,6 +119,13 @@ describe('time_cli.run — the run tree', () => {
 	it('reports the empty run tree in words when nothing was found', async () => {
 		expect(await time_cli.run([], CWD)).toBe(1)
 		expect(errors()).toContain('No transcripts found')
+	})
+
+	it('adds the before → after block when --split-at is named', async () => {
+		write_session_under(CWD)
+
+		expect(await time_cli.run([SPLIT_FLAG, at(2)], CWD)).toBe(0)
+		expect(output()).toContain(`Before → after ${new Date(at(2)).toISOString()}`)
 	})
 
 	it('fails on an unknown flag', async () => {

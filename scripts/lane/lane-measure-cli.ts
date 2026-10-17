@@ -2,6 +2,8 @@
 import { setInterval as every } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_held_stats } from './lane-held-stats'
@@ -103,6 +105,13 @@ async function read_ledger(
 	return path === undefined ? [] : lane_ledger.read_entries(path)
 }
 
+// The run's event stream, read for the parks that end a stop's wait.
+async function read_events(context: MeasureContext): Promise<ReadonlyArray<RunEvent>> {
+	if (context.events_path !== undefined) return run_event_stream.read_events(context.events_path)
+
+	return await run_event_stream_emit.all_events()
+}
+
 async function stats_command(
 	rest: ReadonlyArray<string>,
 	context: MeasureContext,
@@ -121,7 +130,7 @@ async function stats_command(
 		[
 			`${lane_stats.header()}\n${row}`,
 			lane_stage_stats.table(entries, window),
-			lane_stop_stats.table(entries, window),
+			lane_stop_stats.table(entries, window, await read_events(context)),
 			lane_held_stats.table(entries, window),
 			lane_process_stats.table(entries, window),
 			lane_check_stats.table(entries, window),

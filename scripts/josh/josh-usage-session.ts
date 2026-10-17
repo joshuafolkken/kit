@@ -188,12 +188,16 @@ const SESSION_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ arguments: '--run', note: 'the same run-tree scope, named explicitly' },
 			{ arguments: '--json', note: 'the same figures, machine-readable' },
 			{ arguments: PATH_DIR, note: "read another project's transcripts from this checkout" },
+			{
+				arguments: '--split-at 2026-10-16T21:33:19Z',
+				note: 'the same tree compared by role before and after a merge',
+			},
 		],
 		flags: [
 			{
 				names: ['--run'],
 				description:
-					'(default) the whole run tree, wall clock led beside dollars. It is the only scope; any other flag is a usage error (exit 1). History: `docs/maintainers/josh-commands-run-rationale.md` → "`josh cost` and `josh time` lost their report scopes".',
+					'(default) the whole run tree, wall clock led beside dollars. It is the only scope; any flag not listed here is a usage error (exit 1). History: `docs/maintainers/josh-commands-run-rationale.md` → "`josh cost` and `josh time` lost their report scopes".',
 			},
 			{
 				names: [PATH_DIR],
@@ -201,6 +205,11 @@ const SESSION_USAGE: Readonly<Record<string, CommandUsage>> = {
 					'aim the read at another project (absolute path); keeps the `cwd` behavior when absent.',
 			},
 			{ names: ['--json'], description: 'the run tree, machine-readable.' },
+			{
+				names: ['--split-at <ISO time>'],
+				description:
+					'add a before → after block by role (time share, cost share, req/session), each session on the side of its first request; an unparseable time is a usage error (exit 1).',
+			},
 		],
 	},
 	'cost:audit': {

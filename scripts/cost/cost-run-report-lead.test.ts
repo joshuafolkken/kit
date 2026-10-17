@@ -19,6 +19,7 @@ const REPORT: RunCostReport = {
 	roles: [],
 	sessions: [],
 	issues: [],
+	split: undefined,
 }
 
 describe('cost_run_report.format_report lead', () => {
