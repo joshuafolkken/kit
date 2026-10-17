@@ -168,7 +168,7 @@ interface Redraw {
 // What the header reads off the local read.
 type LocalHeader = Pick<
 	BoardHeader,
-	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual'
+	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual' | 'lane_limit'
 >
 
 function local_header(local: LocalRead): LocalHeader {
@@ -178,6 +178,7 @@ function local_header(local: LocalRead): LocalHeader {
 		activity: activity_here(local),
 		operations: local.operations,
 		usual: local.usual,
+		lane_limit: local.lane_limit,
 	}
 }
 

@@ -1,6 +1,7 @@
 import { styleText } from 'node:util'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import type { BudgetWait } from '#scripts/gate/core-wait'
+import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_labels } from './run-board-labels'
@@ -15,7 +16,8 @@ import type { UsualTimes } from './run-board-usual'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
 // and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
-// events); nothing here guesses one. Two lines of symbols rather than sentences: the `⏰` that moves
+// events); nothing here guesses one, but the estimated finish after the progress bar, which is drawn `~`
+// as the estimate it is (`run-board-estimate.ts`). Two lines of symbols rather than sentences: the `⏰` that moves
 // every second is the proof the board is live, so no `updated` line is drawn. **Always three lines,
 // the first two in three columns**: the run's mark and name over its repository's, the run's age over
 // the `💓`, then the progress over the machine the run is on — so the first line reads as how far the
@@ -70,6 +72,8 @@ interface BoardHeader {
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
+	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
+	lane_limit?: number | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
@@ -307,11 +311,20 @@ function tally_part(counts: BoardCounts, header: BoardHeader): string {
 	return `${STATE_ICONS.merged} ${tally} ${bar}`
 }
 
-function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string> {
+// The estimated finish after the bar (`run-board-estimate.ts`), once the plan says what is left to run.
+// A stopped run advances nothing, so an estimate would count down to a finish that never comes.
+function estimate_part(header: BoardHeader): string | undefined {
+	const is_moving = is_plan_read(header) && !header.activity.is_stopped
+
+	return is_moving ? run_board_estimate.part_of(header) : undefined
+}
+
+function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string | undefined> {
 	const is_read = is_plan_read(header)
 
 	return [
 		`${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`,
+		estimate_part(header),
 		`${STATE_ICONS.running} ${String(counts.running)}`,
 		`${STATE_ICONS.waiting} ${is_read ? String(counts.remaining) : UNKNOWN}`,
 		`${STATE_ICONS.parked} ${String(counts.parked)}`,
@@ -397,7 +410,19 @@ function now_legend(header: BoardHeader): string | undefined {
 	return now?.legend === undefined ? undefined : `${now.icon} ${now.legend}`
 }
 
-const run_board_header = { aged, counts_of, header_lines, is_plan_read, now_legend }
+// The estimated finish as the legend names it, on a frame that draws it alone.
+function estimate_legend(header: BoardHeader): string | undefined {
+	return estimate_part(header) === undefined ? undefined : run_board_estimate.LEGEND
+}
+
+const run_board_header = {
+	aged,
+	counts_of,
+	estimate_legend,
+	header_lines,
+	is_plan_read,
+	now_legend,
+}
 
 export { run_board_header }
 export type { BoardCounts, BoardForm, BoardHeader }

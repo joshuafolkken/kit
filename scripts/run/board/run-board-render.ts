@@ -355,16 +355,17 @@ function resume_lines(resume: string | undefined): Array<string> {
 	return ['', `${STATE_ICONS.human} ${WORDS.resume}${GAP}claude --resume ${resume}`]
 }
 
-// The activity kinds the legend names: the header's third line's, 🔧 where a row's tail draws it, and
-// a followup row's checks (joshuafolkken/kit#3770).
+// The activity kinds the legend names: the header's estimated finish where it draws one
+// (joshuafolkken/kit#4044) and its third line's, 🔧 where a row's tail draws it, and a followup row's
+// checks (joshuafolkken/kit#3770).
 function activity_named(header: BoardHeader, rows: ReadonlyArray<BoardRow>): Array<string> {
-	const now = run_board_header.now_legend(header)
+	const legends = [run_board_header.estimate_legend(header), run_board_header.now_legend(header)]
 	const is_drawn = rows.some((row) => run_board_render_tail.is_operation_drawn(row, header))
 	const operation = is_drawn ? [`${NOW_ICONS.operation} ${WORDS.operation}`] : []
 	const is_checks = rows.some((row) => run_board_render_tail.is_checks_drawn(row, header))
 	const checks = is_checks ? run_board_render_checks.LEGEND : []
 
-	return [...(now === undefined ? [] : [now]), ...operation, ...checks]
+	return [...legends.filter((legend) => legend !== undefined), ...operation, ...checks]
 }
 
 // No legend is drawn before a plan is read: there are no rows whose symbols it would name.
