@@ -13,8 +13,10 @@ import { run_board_render_tail } from './run-board-render-tail'
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const CHECKS: PrChecks = { pr: 3765, pass: 6, pending: 2, fail: 0, coderabbit: 'running' }
+const LIMITED: PrChecks = { ...CHECKS, coderabbit: 'rate-limited' }
 const DRAWN = 'PR 3765  ✓ 6  ⏳ 2  🐰 ⏳'
-const LEGEND_CODERABBIT = '🐰 CodeRabbit (⛔ rate-limited)'
+const LEGEND_CODERABBIT = '🐰 CodeRabbit'
+const LEGEND_RATE_LIMITED = '🐰 CodeRabbit (⛔ rate-limited)'
 
 function running(phase: Phase): BoardRow {
 	const status = {
@@ -50,7 +52,7 @@ describe('run_board_render_checks.checks_part', () => {
 
 	it('draws a failure red and a rate limit yellow', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
-		const checks: PrChecks = { ...CHECKS, pending: 0, fail: 1, coderabbit: 'rate-limited' }
+		const checks: PrChecks = { ...LIMITED, pending: 0, fail: 1 }
 
 		expect(run_board_render_checks.checks_part(checks)).toBe(
 			`PR 3765  ✓ 6  ${styleText('red', '✗ 1')}  ${styleText('yellow', '🐰 ⛔')}`,
@@ -67,7 +69,31 @@ describe('run_board_render_tail.tail_of in followup', () => {
 		const row = running('review')
 
 		expect(run_board_render_tail.tail_of(row, board())[1]).toBeUndefined()
-		expect(run_board_render_tail.is_checks_drawn(row, board())).toBe(false)
+		expect(run_board_render_tail.checks_of(row, board())).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4047: only the marks some row's checks draw.
+describe('run_board_render_checks.legend_of', () => {
+	it('names only the marks the parts draw, CodeRabbit’s among them', () => {
+		const failing: PrChecks = { ...CHECKS, pass: 0, pending: 0, fail: 1, coderabbit: 'done' }
+
+		expect(run_board_render_checks.legend_of([CHECKS])).toStrictEqual([
+			'✓ ⏳ checks passed · pending',
+			LEGEND_CODERABBIT,
+		])
+		expect(run_board_render_checks.legend_of([failing])).toStrictEqual([
+			'✓ ✗ checks passed · failed',
+			LEGEND_CODERABBIT,
+		])
+	})
+
+	it('names the rate limit only while CodeRabbit draws it, and CodeRabbit only while it has a check', () => {
+		const quiet: PrChecks = { ...CHECKS, pending: 0, coderabbit: 'none' }
+
+		expect(run_board_render_checks.legend_of([LIMITED]).at(-1)).toBe(LEGEND_RATE_LIMITED)
+		expect(run_board_render_checks.legend_of([quiet])).toStrictEqual(['✓ checks passed'])
+		expect(run_board_render_checks.legend_of([])).toStrictEqual([])
 	})
 })
 

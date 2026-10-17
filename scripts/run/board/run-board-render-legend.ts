@@ -8,42 +8,53 @@ import { run_board_phase } from './run-board-phase'
 import { run_board_render_notes } from './run-board-render-notes'
 import type { ItemState } from './run-board-status'
 
-// The legend at the foot of `run:board`: the symbols named once, so a row carries only what differs
-// between rows. Drawn apart from the rows, which tell it the icons they lead with.
+// The legend at the foot of `run:board`: the symbols the frame draws, named once, so a row carries
+// only what differs between rows. Drawn apart from the rows, which tell it the icons they draw.
+// joshuafolkken/kit#4047: what is in progress, waiting and done on one line, the kinds and the rest
+// on the next, each naming only what the frame draws.
 
 const { FILED_KIND_ICONS, KIND_WORDS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON, WORDS } =
 	run_board_labels
 const GAP = '  '
 
-// Every phase a run passes through, in the order a run passes them and whatever is on screen: a row's phase
-// moves between redraws, so fixed lines keep each icon where the eye last found it — six to a line, so
-// the twelve fit a narrow pane.
-const PHASES_PER_LINE = 6
-const PHASE_ENTRIES = run_board_phase.PHASES.map(
-	(phase) => `${PHASE_ICONS[phase]} ${WORDS[PHASE_WORDS[phase]]}`,
-)
-const PHASE_LEGEND = Array.from(
-	{ length: Math.ceil(PHASE_ENTRIES.length / PHASES_PER_LINE) },
-	(_, line) => PHASE_ENTRIES.slice(line * PHASES_PER_LINE, (line + 1) * PHASES_PER_LINE).join(GAP),
-)
+// What the frame draws, as the legend reads it.
+interface LegendDrawn {
+	// The icons the rows lead with — a running row leads with its phase, so 🔄 is named only while a
+	// row draws it.
+	leads: ReadonlySet<string>
+	// Every icon a phase may be drawn with: the rows' leads, the header's third line and the rows' ends.
+	icons: ReadonlySet<string>
+	// The activity kinds the header's third line and the rows' ends draw, where their own words do not
+	// name them (joshuafolkken/kit#3767, joshuafolkken/kit#3769).
+	named: ReadonlyArray<string>
+	// What a followup row's checks draw (joshuafolkken/kit#3770).
+	checks: ReadonlyArray<string>
+}
 
-// The row states the legend can name, in its order, each with its word.
-const STATE_LEGEND: ReadonlyArray<readonly [ItemState, keyof Words]> = [
-	['merged', 'merged'],
+type StateWords = ReadonlyArray<readonly [ItemState, keyof Words]>
+
+// The row states the legend can name, each with its word: in progress first, then waiting, then done.
+const PROGRESS_STATES: StateWords = [['running', 'in_progress']]
+const SETTLED_STATES: StateWords = [
 	['parked', 'parked'],
+	['waiting', 'waiting'],
+	['stopped', 'stopped'],
+	['human', 'decision'],
+	['merged', 'merged'],
 	['done', 'done'],
 	['withdrawn', 'withdrawn'],
-	['running', 'in_progress'],
-	['stopped', 'stopped'],
-	['waiting', 'waiting'],
-	['human', 'decision'],
 ]
 
-// The states some row on screen leads with (`drawn`) — a running row leads with its phase, so 🔄 is
-// named only while a row draws it.
-function state_legend(drawn: ReadonlySet<string>): Array<string> {
-	return STATE_LEGEND.filter(([state]) => drawn.has(STATE_ICONS[state])).map(
-		([state, word]) => `${STATE_ICONS[state]} ${WORDS[word]}`,
+function state_legend(states: StateWords, leads: ReadonlySet<string>): Array<string> {
+	return states
+		.filter(([state]) => leads.has(STATE_ICONS[state]))
+		.map(([state, word]) => `${STATE_ICONS[state]} ${WORDS[word]}`)
+}
+
+// The phases the frame draws, in the order a run passes them.
+function phase_legend(icons: ReadonlySet<string>): Array<string> {
+	return run_board_phase.PHASES.filter((phase) => icons.has(PHASE_ICONS[phase])).map(
+		(phase) => `${PHASE_ICONS[phase]} ${WORDS[PHASE_WORDS[phase]]}`,
 	)
 }
 
@@ -58,31 +69,45 @@ function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
 }
 
-// The phases on their lines and what the screen draws on one more, drawn only when it names something.
-// The header's gauges and marks read by their place, so the legend leaves them.
-// `drawn` is the icons the rows lead with; `named` the activity kinds the header's third line and the
-// rows' tails draw, each named once, where their own words do not name them (joshuafolkken/kit#3767,
-// joshuafolkken/kit#3769).
-function legend_of(
+// What is in progress, waiting and done.
+function states_line(drawn: LegendDrawn): Array<string> {
+	return [
+		...state_legend(PROGRESS_STATES, drawn.leads),
+		...phase_legend(drawn.icons),
+		...new Set(drawn.named),
+		...state_legend(SETTLED_STATES, drawn.leads),
+	]
+}
+
+// The kinds, then the rest. The header's gauges and marks read by their place, so the legend leaves
+// them.
+function others_line(
 	rows: ReadonlyArray<BoardRow>,
-	drawn: ReadonlySet<string>,
+	drawn: LegendDrawn,
 	notes: ReadonlyArray<BoardNote>,
-	named: ReadonlyArray<string> = [],
 ): Array<string> {
 	const kinds = kinds_of(rows)
 	const kind_icons = kinds.map((kind) => FILED_KIND_ICONS[kind])
-	const notes_named = run_board_render_notes.notes_legend(notes, new Set([...drawn, ...kind_icons]))
+	const named = new Set([...drawn.leads, ...kind_icons])
 	const kind_named = kinds.map((kind) => `${FILED_KIND_ICONS[kind]} ${WORDS[KIND_WORDS[kind]]}`)
-	const shown = [
-		...new Set(named),
-		...state_legend(drawn),
+
+	return [
 		...kind_named,
 		...waits_legend(rows),
-		...notes_named,
+		...drawn.checks,
+		...run_board_render_notes.notes_legend(notes, named),
 	]
-	const lines = shown.length === 0 ? PHASE_LEGEND : [...PHASE_LEGEND, shown.join(GAP)]
+}
 
-	return lines.map((line) => styleText('dim', line))
+// Each line drawn only when it names something.
+function legend_of(
+	rows: ReadonlyArray<BoardRow>,
+	drawn: LegendDrawn,
+	notes: ReadonlyArray<BoardNote>,
+): Array<string> {
+	const lines = [states_line(drawn), others_line(rows, drawn, notes)]
+
+	return lines.filter((line) => line.length > 0).map((line) => styleText('dim', line.join(GAP)))
 }
 
 const run_board_render_legend = {
@@ -90,3 +115,4 @@ const run_board_render_legend = {
 }
 
 export { run_board_render_legend }
+export type { LegendDrawn }

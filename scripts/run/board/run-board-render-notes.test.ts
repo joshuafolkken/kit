@@ -104,7 +104,10 @@ describe('run_board_render.render findings legend', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [parked] }
 
-		expect(lines_of(header({ layout }), [park]).at(-1)).toBe(`💤 parked  ${NOTES_LEGEND}`)
+		expect(lines_of(header({ layout }), [park]).slice(-2)).toStrictEqual([
+			'💤 parked',
+			NOTES_LEGEND,
+		])
 	})
 
 	it('does not name a kind whose findings are past the limit and not drawn', () => {
@@ -158,7 +161,7 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row] }
 
 		expect(lines_of(header({ layout }), [bug, enhancement]).at(-1)).toBe(
-			`⏳ waiting  🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
+			`🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
 		)
 	})
 

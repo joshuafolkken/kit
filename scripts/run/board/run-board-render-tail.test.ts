@@ -145,15 +145,15 @@ describe('run_board_render_tail.tail_of activity', () => {
 	})
 })
 
-describe('run_board_render_tail.is_operation_drawn', () => {
-	it('is true only for a running row whose newest activity is an operation', () => {
+describe('run_board_render_tail.activity_icon', () => {
+	it('is the newest activity’s icon, only for a running row', () => {
 		const operated = board({ operations: operations(1, NOW - MINUTE) })
 
-		expect(run_board_render_tail.is_operation_drawn(running(1), operated)).toBe(true)
-		expect(run_board_render_tail.is_operation_drawn(running(1), board())).toBe(false)
+		expect(run_board_render_tail.activity_icon(running(1), operated)).toBe('🔧')
+		expect(run_board_render_tail.activity_icon(running(1), board())).toBe('👀')
 		expect(
-			run_board_render_tail.is_operation_drawn({ ...running(1), state: 'merged' }, operated),
-		).toBe(false)
+			run_board_render_tail.activity_icon({ ...running(1), state: 'merged' }, operated),
+		).toBeUndefined()
 	})
 })
 
@@ -208,7 +208,7 @@ describe('run_board_render.render tail column', () => {
 		const activity = { ...board().activity, is_stopped: true, latest }
 		const lines = tail_lines({ operations: operations(1, NOW - MINUTE), activity })
 
-		expect(stripVTControlCharacters(lines.at(-1) ?? '')).toContain('🔧 operation')
+		expect(stripVTControlCharacters(lines.slice(-2).join('\n'))).toContain('🔧 operation')
 		expect(stripVTControlCharacters(lines.slice(0, 3).join('\n'))).not.toContain('🔧')
 	})
 })
