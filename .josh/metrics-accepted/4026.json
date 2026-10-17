@@ -1,0 +1,7 @@
+{
+	"reason": "#4026: a waiting row skips the padded time and usage columns — one early return in timed_parts and head_text, plus a test helper drawing several rows",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

@@ -129,10 +129,14 @@ function running_fresh(
 }
 
 // The title padded to the title column and the time to the time column — blanks where a row has none —
-// so the times form one column, and what follows them starts in one column on every row.
+// so the times form one column, and what follows them starts in one column on every row but a waiting
+// one, whose title is not padded.
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
-	const time = time_of(row, frame.header.now_ms) ?? ''
 	const title = title_of(row_title(row, frame.header), frame.title_limit)
+
+	if (row.state === 'waiting') return [title]
+
+	const time = time_of(row, frame.header.now_ms) ?? ''
 	const fresh = running_fresh(row, time, row.status?.started_ms, frame.header)
 
 	return [title.padEnd(frame.title_limit), padded(time, frame.time_width, fresh)]
@@ -163,8 +167,7 @@ function slot_text(row: BoardRow, usage: UsageSlot, header: BoardHeader): string
 }
 
 // A row's usage column where the frame draws one, padded to one width on every row so every tail
-// starts in one column. A plan row the run has not touched draws blanks in its place, so what it waits
-// on starts in the tail's column.
+// starts in one column. A plan row the run has not touched draws blanks in its place.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	const { usage, slot_width } = frame
 
@@ -188,11 +191,15 @@ function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 	return title === '' ? lead : `${lead} ${title}`
 }
 
-// A row up to its usage column — the columns that stay where they are on every row.
+// A row up to its usage column — the columns that stay where they are on every row. A waiting row has
+// no time and no usage to line up, so it ends at its title and what it waits on follows two blanks on.
 function head_text(row: BoardRow, frame: RowFrame): string {
 	const [title = '', time] = timed_parts(row, frame)
+	const lead = lead_of(row, frame.header, title)
 
-	return joined([lead_of(row, frame.header, title), time, cell_text(row, frame)])
+	if (row.state === 'waiting') return lead
+
+	return joined([lead, time, cell_text(row, frame)])
 }
 
 // Every row carries its state's icon, a waiting one ⏳ too; a running row ends on its tail
