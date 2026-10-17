@@ -21,6 +21,7 @@ import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_hold } from './backlog-drive-hold'
+import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_seats } from './backlog-drive-seats'
 
 const { MERGE_TOKEN } = run_merge_token
@@ -135,6 +136,9 @@ interface DrivePorts {
 	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
 	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
 	hold: (reason: string | undefined) => Promise<void>
+	// A watch with nothing in flight — the one idle notification (`backlog-drive-idle.ts`), deduplicated
+	// per episode by the port itself.
+	idle: (state: DriveState) => Promise<void>
 	now: () => Date
 }
 
@@ -158,20 +162,12 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 	}
 }
 
-// Only an empty backlog drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a
-// parked or unreadable backlog has no retrospective for `run:step` to fire and stays the driver's.
-function is_drain(read: OfferRead, state: DriveState): boolean {
+// A drain owing the retrospective, read under a `watch` or a `stop` verdict. Only an empty backlog
+// drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a parked or unreadable
+// backlog has no retrospective for `run:step` to fire and stays the driver's.
+function is_drain_owed(read: OfferRead, state: DriveState, verdict: string): boolean {
 	return (
-		read.verdict === WATCH_VERDICT &&
-		read.answer === EXHAUSTED_ANSWER &&
-		state.in_flight.length === 0 &&
-		read.is_retrospective_owed === true
-	)
-}
-
-function needs_retrospective(read: OfferRead, state: DriveState): boolean {
-	return (
-		read.verdict === STOP_VERDICT &&
+		read.verdict === verdict &&
 		read.answer === EXHAUSTED_ANSWER &&
 		state.in_flight.length === 0 &&
 		read.is_retrospective_owed === true
@@ -314,7 +310,10 @@ async function launch_all(
 // parent's. With children still running the watch is only waiting on them.
 function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	if (!KNOWN_VERDICTS.has(read.verdict)) return ended(read.verdict, state, read.verdict)
-	if (needs_retrospective(read, state)) return ended('retrospective', state, 'retrospective')
+
+	if (is_drain_owed(read, state, STOP_VERDICT)) {
+		return ended('retrospective', state, 'retrospective')
+	}
 
 	if (read.verdict === STOP_VERDICT) {
 		return {
@@ -328,7 +327,7 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 		}
 	}
 
-	if (is_drain(read, state)) return ended(WATCH_VERDICT, state, WATCH_VERDICT)
+	if (is_drain_owed(read, state, WATCH_VERDICT)) return ended(WATCH_VERDICT, state, WATCH_VERDICT)
 
 	return { kind: 'continue', state }
 }
@@ -355,7 +354,9 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	if (read.verdict === RUN_VERDICT) return await launch_all(read.issues, next, ports)
 	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	return await backlog_drive_hold.held(on_verdict(read, next), read, ports)
+	const result = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+
+	return await backlog_drive_hold.held(result, read, ports)
 }
 
 // One pass: collect every child that ended, then — unless a `stop` has been read — ask what to start.

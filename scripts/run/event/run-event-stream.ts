@@ -144,6 +144,11 @@ const EVENT_KIND = {
 	// in followup without asking GitHub (joshuafolkken/kit#3770). A trace: it says how the checks stand,
 	// not where the run is.
 	PR_CHECKS: 'pr-checks',
+	// `backlog:drive` reached a watch with no child running and nothing to dispatch — the point a person's
+	// hand is wanted. Emitted once per idle episode (`emit_once_since_with`, reset by `CHILD_LAUNCH`), it
+	// is the dedup marker for the one idle Telegram. A trace: a drain's retrospective is read off the
+	// position beneath it, so the marker must not stand over it.
+	IDLE_NOTICE: 'idle-notice',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -163,6 +168,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.LANE_LIMIT,
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
+	EVENT_KIND.IDLE_NOTICE,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

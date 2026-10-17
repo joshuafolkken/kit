@@ -23,36 +23,36 @@ function ports(overrides: Partial<DetectPorts>): DetectPorts {
 		free_lane_count: async () => FREE,
 		ready_count: async () => READY,
 		emit_stall: async () => true,
-		notify_stalled: async () => true,
 		...overrides,
 	}
 }
 
 describe('backlog_stalled_detect.detect_and_report', () => {
-	it('reports a stall and fires both side effects when idle with a free lane', async () => {
+	it('reports a stall and leaves the marker when idle with a free lane', async () => {
 		const emit_stall = vi.fn(async () => true)
-		const notify_stalled = vi.fn(async () => true)
 
 		const verdict = await backlog_stalled_detect.detect_and_report(
-			ports({ emit_stall, notify_stalled }),
+			ports({ emit_stall }),
 			THRESHOLD_MS,
 		)
 
 		expect(verdict).toBe(backlog_stalled.STALLED)
 		expect(emit_stall).toHaveBeenCalledOnce()
-		expect(notify_stalled).toHaveBeenCalledOnce()
 	})
 
-	it('holds the notification back when the marker was a duplicate', async () => {
-		const notify_stalled = vi.fn(async () => true)
+	// joshuafolkken/kit#4015: a stall resolves at the next dispatch, so it reaches nobody off-screen.
+	// Credentials are stubbed so a send would reach `fetch` rather than fail at the missing config first.
+	it('sends no Telegram on a stall', async () => {
+		vi.stubEnv('TELEGRAM_BOT_TOKEN', 'bot-token')
+		vi.stubEnv('TELEGRAM_CHAT_ID', 'chat-id')
+		vi.stubEnv('JOSH_NOTIFY', undefined)
+		const fetch_spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
 
-		const verdict = await backlog_stalled_detect.detect_and_report(
-			ports({ emit_stall: async () => false, notify_stalled }),
-			THRESHOLD_MS,
-		)
+		await backlog_stalled_detect.detect_and_report(ports({}), THRESHOLD_MS)
 
-		expect(verdict).toBe(backlog_stalled.STALLED)
-		expect(notify_stalled).not.toHaveBeenCalled()
+		expect(fetch_spy).not.toHaveBeenCalled()
+		fetch_spy.mockRestore()
+		vi.unstubAllEnvs()
 	})
 
 	it('is unreadable, with no side effects, when the stream target will not resolve', async () => {

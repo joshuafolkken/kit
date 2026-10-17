@@ -5,7 +5,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 // When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks.
 // This is the mechanical judge of that state: three facts read, never
 // weighed — is there runnable work, is there a free lane, and has nothing been dispatched for a while.
-// The verdict is a report, not a stop: a false positive costs one notification, never a halted run.
+// The verdict is a report, not a stop: a false positive costs one stream marker, never a halted run.
 //
 // **Pure by design.** The clock and the counts are handed in, so the four acceptance cases — work with
 // a free lane, work with no free lane, no work, and an unreadable record — and the elapsed-time

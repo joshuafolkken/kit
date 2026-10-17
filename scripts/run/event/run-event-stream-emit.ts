@@ -85,27 +85,41 @@ function invocation_events(repository: string, target: string): ReadonlyArray<Ru
  * Append one event unless this kind is already on the stream since the newest `reset_kind` — the
  * episode marker for a condition that holds across other events. `emit_once`'s newest-event test would
  * re-fire each time a parallel lane appended a merge or a park; this ends the episode only at
- * `reset_kind`. Returns whether it appended, as `emit_once` does.
+ * `reset_kind`. The text is composed only once the episode is new, so a caller polled every pass whose
+ * text costs a network read pays it once. Returns the appended text, or `undefined` when nothing was.
  */
-async function emit_once_since(kind: string, text: string, reset_kind: string): Promise<boolean> {
+async function emit_once_since_with(
+	kind: string,
+	reset_kind: string,
+	compose: () => Promise<string>,
+): Promise<string | undefined> {
 	try {
 		const repository = await run_carry.repository_directory()
 
-		if (repository === undefined) return false
+		if (repository === undefined) return undefined
 
 		const target = run_event_stream.target_of(repository)
 
 		if (run_event_stream.has_since(invocation_events(repository, target), kind, reset_kind)) {
-			return false
+			return undefined
 		}
 
-		return run_event_stream.append(target, kind, text, now_iso()).appended
+		const text = await compose()
+
+		return run_event_stream.append(target, kind, text, now_iso()).appended ? text : undefined
 	} catch (error) {
 		// Best-effort: a failed append is dropped rather than raised into the caller's work.
 		error_text.trace_swallowed('run_event_stream_emit.emit_once_since', error)
 
-		return false
+		return undefined
 	}
+}
+
+// `emit_once_since_with` for a text already in hand. Returns whether it appended, as `emit_once` does.
+async function emit_once_since(kind: string, text: string, reset_kind: string): Promise<boolean> {
+	const appended = await emit_once_since_with(kind, reset_kind, async () => text)
+
+	return appended !== undefined
 }
 
 // One progress heartbeat line onto the stream, so a relay reaches it across a cut.
@@ -172,6 +186,7 @@ const run_event_stream_emit = {
 	emit_heartbeat,
 	emit_once,
 	emit_once_since,
+	emit_once_since_with,
 	invocation_or_all_events,
 	scoped_current_events,
 	stream_target,

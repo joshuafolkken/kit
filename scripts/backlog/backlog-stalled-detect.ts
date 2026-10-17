@@ -1,12 +1,13 @@
-import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
 import { backlog_stalled, type StallReading, type StallVerdict } from './backlog-stalled'
 
 // The I/O half of the stall detector: it gathers the three counts the pure
-// judge in `backlog-stalled.ts` weighs, then — on a stall — leaves the marker and sends the one
-// notification. `stop-guard.ts` wires it into the Stop hook, so it runs at each loop boundary; the CLI
+// judge in `backlog-stalled.ts` weighs, then — on a stall — leaves the marker `run:step` reads as
+// `backlog:next`. It sends no Telegram (joshuafolkken/kit#4015): a stall resolves itself at the next
+// dispatch, so the person it reached had nothing to do; the idle notification `backlog:drive` sends
+// when nothing is left to dispatch is the one that wants a hand. `stop-guard.ts` wires it into the Stop hook, so it runs at each loop boundary; the CLI
 // exposes the same call for a person to run by hand.
 //
 // **Cheap first.** The costly read is `backlog:next`, a subprocess that hits the network. The two local
@@ -19,12 +20,8 @@ const NO_FREE = 0
 const NO_READY = 0
 const NO_AGE = 0
 
-// The recovery line names the command that resolves the stall — the same one `run:step` points a stalled
-// run at — so the person the notification reaches has the fix in hand.
-const STALL_RECOVERY = 'Dispatch the ready work with `pnpm josh backlog:next`.'
-
-// The seams a test replaces: the stream target and its events, the clock, the two counts, and the two
-// side effects. The defaults are the real readers; a test hands fakes so the gather and report logic run
+// The seams a test replaces: the stream target and its events, the clock, the two counts, and the
+// marker. The defaults are the real readers; a test hands fakes so the gather and report logic run
 // without a git tree, a network or a wall clock.
 interface DetectPorts {
 	resolve_target: () => Promise<string | undefined>
@@ -33,7 +30,6 @@ interface DetectPorts {
 	free_lane_count: () => Promise<number>
 	ready_count: () => Promise<number>
 	emit_stall: (text: string) => Promise<boolean>
-	notify_stalled: (body: string) => Promise<boolean>
 }
 
 // The free-lane and runnable-issue reads are `backlog-ready.ts`'s — the watcher's ready line reads the
@@ -55,10 +51,6 @@ async function real_emit_stall(text: string): Promise<boolean> {
 	return await run_event_stream_emit.emit_once_since(STALL, text, CHILD_LAUNCH)
 }
 
-async function real_notify_stalled(body: string): Promise<boolean> {
-	return await telegram_notify.stalled({ body, recovery: STALL_RECOVERY })
-}
-
 function ports_over(ready: ReadyPorts): DetectPorts {
 	return {
 		resolve_target: run_event_stream_emit.stream_target,
@@ -67,7 +59,6 @@ function ports_over(ready: ReadyPorts): DetectPorts {
 		free_lane_count: ready.free_lane_count,
 		ready_count: ready_count_of(ready),
 		emit_stall: real_emit_stall,
-		notify_stalled: real_notify_stalled,
 	}
 }
 
@@ -104,17 +95,14 @@ async function gather(ports: DetectPorts, threshold_ms: number): Promise<StallRe
 	return await probe_reading(ports, age)
 }
 
-// The marker and the notification, both once per stall episode. `emit_stall` refuses a second until a
-// dispatch has intervened, and its `false` is what holds the notification back too — so a stall
-// polled every stop reaches the person once, not once a turn.
+// The marker, once per stall episode: `emit_stall` refuses a second until a dispatch has intervened, so a
+// stall polled every stop lands on the stream once, not once a turn.
 async function report(ports: DetectPorts, reading: StallReading): Promise<void> {
-	const text = backlog_stalled.describe(reading)
-
-	if (await ports.emit_stall(text)) await ports.notify_stalled(text)
+	await ports.emit_stall(backlog_stalled.describe(reading))
 }
 
-// Read the three conditions, print nothing, and on a stall leave the marker and notify. The verdict is
-// returned for the CLI to print; the side effects are the report's.
+// Read the three conditions, print nothing, and on a stall leave the marker. The verdict is returned for
+// the CLI to print; the side effect is the report's.
 async function detect_and_report(
 	ports: DetectPorts = DEFAULT_PORTS,
 	threshold_ms: number = backlog_stalled.STALL_THRESHOLD_MS,
@@ -127,7 +115,7 @@ async function detect_and_report(
 	return verdict
 }
 
-// Best-effort for the Stop hook: the detector is a report, so a failure to gather or notify is dropped
+// Best-effort for the Stop hook: the detector is a report, so a failure to gather or mark is dropped
 // rather than raised into the stop decision it rides alongside.
 async function run_stall_check(ready: ReadyPorts = backlog_ready.DEFAULT_PORTS): Promise<void> {
 	try {

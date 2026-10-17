@@ -27,6 +27,7 @@ import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_carried } from './backlog-drive-carried'
 import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_hold, type HoldRecorder } from './backlog-drive-hold'
+import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
@@ -182,6 +183,11 @@ function judgement_reader(): () => Promise<number> {
 	}
 }
 
+// The two reports an offered pass leaves: why it started nothing, and the idle notice.
+function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle'> {
+	return { hold: holds.hold, idle: backlog_drive_idle.notify }
+}
+
 function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
@@ -196,7 +202,7 @@ function ports_of(
 		free_lanes: backlog_ready.drive_free_lane_count,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		judgement_owed: judgement_reader(),
-		hold: holds.hold,
+		...reporters(holds),
 		now: () => new Date(),
 		sleep: async (milliseconds) => {
 			await sleep(milliseconds)
