@@ -21,6 +21,7 @@ const COLUMNS = [
 	'wait total (min)',
 	'runs',
 	'not resumed',
+	'causes',
 ] as const
 const { STAGE } = run_ship_stage
 const { is_dispatch, is_number, is_stage } = lane_stage_stats
@@ -38,8 +39,13 @@ const REASONS = [
 // `#<N> parked`, `#<N> parked (<reason>)` and `#<N> waiting on #<M>` name the parked issue first.
 const PARKED_ISSUE = /#([1-9]\d*)\b/u
 
+// A stop recorded before it carried a cause (joshuafolkken/kit#3998) is counted under this one.
+const UNRECORDED_CAUSE = 'unrecorded'
+const NO_CAUSES = '-'
+
 interface StopWait {
 	reason: string
+	cause: string
 	wait_ms: number | undefined
 }
 
@@ -91,13 +97,29 @@ function waits_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	ends: ReadonlyArray<IssueAt>,
 ): Array<StopWait> {
-	return entries
-		.filter(is_stop)
-		.map((stop) => ({ reason: stop.reason, wait_ms: wait_ms(stop, ends) }))
+	return entries.filter(is_stop).map((stop) => ({
+		reason: stop.reason,
+		cause: stop.cause ?? UNRECORDED_CAUSE,
+		wait_ms: wait_ms(stop, ends),
+	}))
 }
 
 function total(values: ReadonlyArray<number>): number | undefined {
 	return values.length === 0 ? undefined : values.reduce((sum, value) => sum + value, 0)
+}
+
+// `infra 2, check 1` — how many of one reason's stops each cause took, the most frequent first.
+function causes_cell(waits: ReadonlyArray<StopWait>): string {
+	const causes = [...new Set(waits.map((wait) => wait.cause))]
+	const counted = causes.map((cause) => ({
+		cause,
+		count: waits.filter((wait) => wait.cause === cause).length,
+	}))
+	const ranked = counted.toSorted((left, right) => right.count - left.count)
+
+	return ranked.length === 0
+		? NO_CAUSES
+		: ranked.map(({ cause, count }) => `${cause} ${String(count)}`).join(', ')
 }
 
 function reason_row(reason: string, waits: ReadonlyArray<StopWait>): string {
@@ -111,6 +133,7 @@ function reason_row(reason: string, waits: ReadonlyArray<StopWait>): string {
 		lane_stage_stats.cell(total(ended)),
 		String(ended.length),
 		String(of_reason.length - ended.length),
+		causes_cell(of_reason),
 	])
 }
 

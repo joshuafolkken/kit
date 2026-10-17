@@ -154,10 +154,10 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 	it('records a stopped ship naming the issue and the stop reason', async () => {
 		const target = ledger('stop')
 
-		await lane_ledger.record_stop({ issue: 7, reason: 'conflict' }, target)
+		await lane_ledger.record_stop({ issue: 7, reason: 'conflict', cause: 'conflict' }, target)
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([
-			{ kind: 'stop', issue: 7, reason: 'conflict' },
+			{ kind: 'stop', issue: 7, reason: 'conflict', cause: 'conflict' },
 		])
 	})
 

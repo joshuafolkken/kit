@@ -8,11 +8,13 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_pre_detach } from './run-ship-pre-detach'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
+import { run_ship_stop_cause } from './run-ship-stop-cause'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
 // It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
@@ -186,7 +188,7 @@ async function record_timed(step: Step, issue: string, elapsed_ms: number): Prom
 	await lane_ledger.record_stage({ stage: step.stage, elapsed_ms, issue: Number(issue) })
 }
 
-async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
+async function run_once(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
 	const started_ms = performance.now()
 	const result = await step.run(args, state)
 	const elapsed_ms = performance.now() - started_ms
@@ -195,6 +197,18 @@ async function run_step(step: Step, args: ShipArguments, state: ShipState): Prom
 	const section = { header: step.header, body: result.out, code: result.code }
 
 	return result.conflicts === undefined ? section : { ...section, conflicts: result.conflicts }
+}
+
+// A stage that stopped on the infrastructure runs again in place before it stops the ship. A retry
+// re-reads the state, as a resumed ship does: a commit whose push failed is not made a second time.
+async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
+	const first = [state]
+
+	return await run_ship_infra_retry.retried(step.stage, async () => {
+		const current = first.pop() ?? (await run_ship_probe.read_state())
+
+		return await run_once(step, args, current)
+	})
 }
 
 async function emit_phase(
@@ -275,14 +289,11 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 
 // Every stop goes to the lane ledger — supervised, in an agent's own turn, or a lane child's preflight
 // before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason.
-async function record_stop(
-	args: ShipArguments,
-	stage: Stage,
-	conflicts?: ReadonlyArray<string>,
-): Promise<void> {
-	const reason = run_ship_stage.stop_reason(stage, conflicts)
+async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
+	const reason = run_ship_stage.stop_reason(stage, failed?.conflicts)
+	const cause = run_ship_stop_cause.cause_of(stage, failed?.body ?? '', failed?.conflicts)
 
-	await lane_ledger.record_stop({ issue: Number(args.number), reason })
+	await lane_ledger.record_stop({ issue: Number(args.number), reason, cause })
 }
 
 // A detached supervisor hands the stopped stage back (`run-ship-return.ts`); a
@@ -296,7 +307,7 @@ async function stopped(
 ): Promise<ReadonlyArray<ShipSection>> {
 	const failed = sections.at(-1)
 
-	await record_stop(args, step.stage, failed?.conflicts)
+	await record_stop(args, step.stage, failed)
 
 	if (run_ship_detach.is_supervised()) {
 		record(context.target, run_ship_stage.end_attempt)
@@ -381,7 +392,7 @@ async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<S
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
 
 	if (preflight.code !== SUCCESS_EXIT_CODE) {
-		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage)
+		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, preflight)
 
 		return [preflight]
 	}

@@ -59,6 +59,7 @@ vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
 const { run_ship_stage } = await import('./run-ship-stage')
+const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2426: a ship re-run after it died resumes rather than restarts. The stage record is
 // the real file module writing to a temp path, so each restart reads what the previous call left; the
@@ -180,6 +181,32 @@ describe('josh ship — a restart with no record', () => {
 
 		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
 		expect(commands()).toStrictEqual(['gate'])
+	})
+})
+
+// joshuafolkken/kit#3998: an infrastructure retry re-reads the state as a resume does, so a commit whose
+// push failed on the network is retried with the commit skipped rather than refused as nothing to commit.
+describe('josh ship — an infrastructure retry of the commit', () => {
+	it('retries a commit whose push failed with the commit skipped', async () => {
+		const { retried } = run_ship_infra_retry
+		const instant = { wait: async (): Promise<void> => undefined, note: (): void => undefined }
+
+		const spy = vi
+			.spyOn(run_ship_infra_retry, 'retried')
+			.mockImplementation(async (stage, attempt) => await retried(stage, attempt, instant))
+
+		josh_run_mock.mockResolvedValueOnce({ code: OK, out: '' }).mockResolvedValueOnce({
+			code: FAILED,
+			out: 'fatal: unable to access: Could not resolve host: github.com',
+		})
+		probe.read_state.mockResolvedValueOnce(NOTHING).mockResolvedValue(COMMITTED)
+
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(commands().slice(1, 3)).toStrictEqual([
+			`git -y ${TITLE}`,
+			`git -y --skip-commit ${TITLE}`,
+		])
+		spy.mockRestore()
 	})
 })
 

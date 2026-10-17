@@ -54,7 +54,7 @@ describe('run_ship_return.return_control', () => {
 
 		expect(emit_mock).toHaveBeenCalledWith(
 			'ship-stop',
-			`#${ISSUE} gate failed — pnpm josh ship --log ${ISSUE}`,
+			`#${ISSUE} gate failed (check) — pnpm josh ship --log ${ISSUE}`,
 		)
 	})
 
@@ -140,7 +140,7 @@ describe('run_ship_return.return_control on a merge conflict', () => {
 
 		expect(emit_mock).toHaveBeenCalledWith(
 			'ship-stop',
-			`#${ISSUE} conflict failed — pnpm josh ship --log ${ISSUE}`,
+			`#${ISSUE} conflict failed (conflict) — pnpm josh ship --log ${ISSUE}`,
 		)
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(conflicted)
 	})

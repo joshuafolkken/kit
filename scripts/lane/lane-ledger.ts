@@ -100,13 +100,15 @@ const stage_schema = z.object({
 	issue: z.number().optional(),
 })
 // A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
-// retrospective's stop reason. How long it stayed stopped is derived from the next ship stage, not
-// recorded, so a resumed ship never has to know the stop it ends.
+// retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded
+// before it had one. How long it stayed stopped is derived from the next ship stage, not recorded, so a
+// resumed ship never has to know the stop it ends.
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),
 	at: z.string(),
 	issue: z.number(),
 	reason: z.string(),
+	cause: z.string().optional(),
 })
 // A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
 // before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the
