@@ -19,11 +19,14 @@ interface ReadMap {
 	// The files that differed from `commit` when the map was recorded, which count as changed for
 	// every narrowing read against it.
 	dirty: Array<string>
+	// The directories `commit` holds, so a directory new since then is told apart from one no test
+	// read — the map's own keys cannot say which, since an unread directory has none.
+	directories: Array<string>
 	readers: ReadRecords
 }
 
 // Bumped whenever the shape changes, so a map an older kit wrote reads as no map at all.
-const MAP_VERSION = 1
+const MAP_VERSION = 3
 
 const MAP_DIRECTORY = 'josh'
 const MAP_FILE = 'test-read-map.json'
@@ -60,13 +63,15 @@ function is_read_records(value: unknown): value is ReadRecords {
 	return is_object(value) && Object.values(value).every(is_string_array)
 }
 
+const PATH_LIST_FIELDS = ['dirty', 'directories'] as const
+
 function is_read_map(value: unknown): value is ReadMap {
 	if (!is_object(value)) return false
 
 	return (
 		Reflect.get(value, 'version') === MAP_VERSION &&
 		typeof Reflect.get(value, 'commit') === 'string' &&
-		is_string_array(Reflect.get(value, 'dirty')) &&
+		PATH_LIST_FIELDS.every((field) => is_string_array(Reflect.get(value, field))) &&
 		is_read_records(Reflect.get(value, 'readers'))
 	)
 }
@@ -91,16 +96,50 @@ function parse_records(text: string): ReadRecords {
 	return is_read_records(value) ? value : {}
 }
 
-// A changed file is read by whoever read it, and by whoever walked a directory above it — which is
-// what covers a file added since the map was recorded.
-function lookup_keys(relative: string): Array<string> {
-	if (relative === test_read_trace.ROOT_ENTRY) return [relative]
+// Innermost first, ending at the root `.`.
+function directories_above(relative: string): Array<string> {
+	const parent = path.dirname(relative)
 
-	return [relative, ...lookup_keys(path.dirname(relative))]
+	if (parent === relative) return []
+
+	return [parent, ...directories_above(parent)]
+}
+
+// The directories on the file's path the recorded commit did not hold, innermost first. The root
+// always existed.
+function created_directories(
+	directories: ReadonlyArray<string>,
+	recorded: ReadonlySet<string>,
+): Array<string> {
+	return directories.filter(
+		(directory) => directory !== test_read_trace.ROOT_ENTRY && !recorded.has(directory),
+	)
+}
+
+// A changed file is read by whoever read it, listed its own directory or walked any directory above
+// it. A directory new since the recording is also a new entry in the listing above it and a probe of
+// it that now answers differently; a directory that already existed reads the same to both, whatever
+// changed deeper down.
+function lookup_keys(relative: string, recorded: ReadonlySet<string>): Array<string> {
+	const directories = directories_above(relative)
+	const created = created_directories(directories, recorded)
+	const listed = [
+		directories[0] ?? test_read_trace.ROOT_ENTRY,
+		...created.map((directory) => path.dirname(directory)),
+	]
+
+	return [
+		relative,
+		...created,
+		...listed.map((directory) => test_read_trace.read_key(directory, 'listing')),
+		...directories.map((directory) => test_read_trace.read_key(directory, 'walk')),
+	]
 }
 
 function readers_of(map: ReadMap, relative: string): Array<string> {
-	return [...new Set(lookup_keys(relative).flatMap((key) => map.readers[key] ?? []))]
+	const keys = lookup_keys(relative, new Set(map.directories))
+
+	return [...new Set(keys.flatMap((key) => map.readers[key] ?? []))]
 }
 
 function map_path(root: string): string | undefined {

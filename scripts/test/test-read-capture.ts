@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { getCallSites } from 'node:util'
 import { threadId } from 'node:worker_threads'
 import { afterAll, expect } from 'vitest'
-import { test_read_trace } from './test-read-trace'
+import { test_read_trace, type ReadKind } from './test-read-trace'
 
 // What the worker setup file `test-read-recorder.ts` arms: recording which repository paths each test
 // reads, for the test-read map (`test-read-map.ts`). Kept apart from the setup file so the recording
@@ -17,9 +17,9 @@ import { test_read_trace } from './test-read-trace'
 // About 220 test files call `readFileSync` / `readFile` directly and about 42 walk a directory, so no
 // static reading can name what a test depends on. Wrapping the reading half of `fs` in the worker
 // sees every read a test makes in its own process, whichever module makes it. A read a test hands to
-// a child process is not seen: a file only such a child reads resolves to whoever walked a directory
-// above it — the repository root among them — rather than to the test that depends on it, so the
-// narrowing can miss that test, and CI's whole-suite run is what catches it.
+// a child process is not seen: a file only such a child reads resolves to whoever listed its
+// directory or walked one above it, rather than to the test that depends on it, so the narrowing can
+// miss that test, and CI's whole-suite run is what catches it.
 
 interface RecorderState {
 	root: string
@@ -39,7 +39,8 @@ const STACK_DEPTH = 64
 
 const RECORDER = fileURLToPath(import.meta.url)
 
-// Every call here takes the path it reads as its first argument.
+// Every call here takes the path it reads as its first argument, and a directory listing takes its
+// options — `recursive` among them — as its second.
 const SYNC_READS = [
 	'readFileSync',
 	'readdirSync',
@@ -76,21 +77,23 @@ function read_path_of(root: string, argument: unknown): string | undefined {
 	return target === undefined ? undefined : test_read_trace.repository_path(root, target)
 }
 
-function record_read(state: RecorderState, argument: unknown): void {
+function record_read(state: RecorderState, argument: unknown, kind: ReadKind = 'path'): void {
 	const read_path = read_path_of(state.root, argument)
 
 	if (read_path === undefined) return
 
+	const key = test_read_trace.read_key(read_path, kind)
+
 	for (const reader of call_readers(state.root)) {
-		test_read_trace.add_reader(state.records, read_path, reader)
+		test_read_trace.add_reader(state.records, key, reader)
 	}
 }
 
 // A recording must never change what a test sees: a failure to record — a cwd a fixture deleted —
 // is dropped, and the read goes ahead.
-function safely_record(state: RecorderState, argument: unknown): void {
+function safely_record(state: RecorderState, name: string, parameters: Array<unknown>): void {
 	try {
-		record_read(state, argument)
+		record_read(state, parameters[0], test_read_trace.read_kind(name, parameters[1]))
 	} catch {
 		// The read is not recorded; nothing the test observes changes.
 	}
@@ -105,7 +108,7 @@ function wrap_read(owner: object, name: string, state: RecorderState): void {
 	const read = original
 
 	function recorded(this: unknown, ...parameters: Array<unknown>): unknown {
-		safely_record(state, parameters[0])
+		safely_record(state, name, parameters)
 
 		return Reflect.apply(read, this, parameters)
 	}
@@ -169,6 +172,7 @@ const test_read_capture = {
 	arm,
 	flush,
 	record_read,
+	wrap_read,
 }
 
 export type { RecorderState }

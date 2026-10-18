@@ -18,15 +18,44 @@ const mocked_common = vi.mocked(git_common_directory.repository)
 const ROOT = path.resolve('/repo')
 const DOCUMENT = path.join('docs', 'a.md')
 const NESTED_DOCUMENT = path.join('docs', 'guide', 'b.md')
+const DEEP_DOCUMENT = path.join('.josh', 'observations', 'c.md')
 const READER = 'reader.ts'
 const WALKER = 'walker.ts'
+const LISTER = 'lister.ts'
 const ROOT_WALKER = 'root-walker.ts'
+const ROOT_LISTER = 'root-lister.ts'
+const ROOT_PROBER = 'root-prober.ts'
+
+const { ROOT_ENTRY } = test_read_trace
 
 const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'abc',
 	dirty: ['notes.md'],
-	readers: { [DOCUMENT]: [READER], docs: [WALKER], [test_read_trace.ROOT_ENTRY]: [ROOT_WALKER] },
+	directories: [
+		'.josh',
+		path.dirname(DEEP_DOCUMENT),
+		'docs',
+		path.join('docs', 'guide'),
+		'prompts',
+	],
+	readers: {
+		[DOCUMENT]: [READER],
+		[test_read_trace.read_key('docs', 'walk')]: [WALKER],
+		[test_read_trace.read_key(path.join('docs', 'guide'), 'listing')]: [LISTER],
+		[test_read_trace.read_key(ROOT_ENTRY, 'walk')]: [ROOT_WALKER],
+	},
+}
+
+// joshuafolkken/kit#4071: what reads the root without walking it — a listing of its own entries,
+// or a probe of the directory itself — and what a change deep in the tree leaves untouched.
+const SHALLOW_ROOT_MAP: ReadMap = {
+	...MAP,
+	readers: {
+		[test_read_trace.read_key(ROOT_ENTRY, 'listing')]: [ROOT_LISTER],
+		[test_read_trace.read_key(ROOT_ENTRY, 'path')]: [ROOT_PROBER],
+		[path.join(path.dirname(DEEP_DOCUMENT), 'other.md')]: [READER],
+	},
 }
 
 // A holder rather than a top-level `let`: `unicorn/no-top-level-assignment-in-function` refuses a
@@ -73,8 +102,35 @@ describe('test_read_map.readers_of', () => {
 		expect(test_read_map.readers_of(MAP, DOCUMENT)).toEqual([READER, WALKER, ROOT_WALKER])
 	})
 
-	it('reaches a file no test read through the directories above it', () => {
-		expect(test_read_map.readers_of(MAP, NESTED_DOCUMENT)).toEqual([WALKER, ROOT_WALKER])
+	it('reaches a file no test read through its directory’s listing and every walk above it', () => {
+		expect(test_read_map.readers_of(MAP, NESTED_DOCUMENT)).toEqual([LISTER, WALKER, ROOT_WALKER])
+	})
+
+	it('leaves out a listing or a probe of the root when the change is deeper down', () => {
+		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, DEEP_DOCUMENT)).toEqual([])
+	})
+
+	it('reaches a file at the top level through the listing of the root', () => {
+		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, 'notes.md')).toEqual([ROOT_LISTER])
+	})
+
+	it('leaves out the listing above a directory that existed though no test read it', () => {
+		const added = path.join('prompts', 'x.md')
+
+		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, added)).toEqual([])
+	})
+
+	it('reaches a file in a directory new since the recording through the listing that gains it', () => {
+		const added = path.join('scratch', 'x.md')
+
+		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, added)).toEqual([ROOT_LISTER])
+	})
+
+	it('reaches a file in a directory new since the recording through a probe of that directory', () => {
+		const created = path.join('prompts', 'new-dir')
+		const map = { ...SHALLOW_ROOT_MAP, readers: { [created]: [ROOT_PROBER] } }
+
+		expect(test_read_map.readers_of(map, path.join(created, 'x.md'))).toEqual([ROOT_PROBER])
 	})
 
 	it('answers nothing when neither the file nor any directory above it was read', () => {

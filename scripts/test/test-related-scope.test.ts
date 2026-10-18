@@ -34,9 +34,10 @@ const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
 	dirty: [],
+	directories: ['docs', 'lib', 'notes', 'scripts'],
 	readers: {
 		[DOCUMENT_FILE]: [READER_FILE],
-		docs: [WALKER_FILE],
+		[path.join('docs', '*')]: [WALKER_FILE],
 		[DATA_SOURCE_FILE]: [DATA_READER_FILE],
 	},
 }
@@ -95,14 +96,14 @@ describe('related_scope.resolve_scope — code files', () => {
 })
 
 describe('related_scope.resolve_scope — non-code files through the map', () => {
-	it('narrows a changed document to the modules recorded reading it and the walks above it', () => {
+	it('narrows a changed document to the modules recorded reading it and listing its directory', () => {
 		const scope = related_scope.resolve_scope(request([DOCUMENT_FILE, SOURCE_FILE]))
 
 		expect(scope.mode).toBe('related')
 		expect(scope.files).toEqual([at(SOURCE_FILE), at(READER_FILE), at(WALKER_FILE)])
 	})
 
-	it('reaches a document added since the map through the directory walk above it', () => {
+	it('reaches a document added since the map through the listing of its directory', () => {
 		const scope = related_scope.resolve_scope(request([NEW_DOCUMENT_FILE]))
 
 		expect(scope.files).toEqual([at(WALKER_FILE)])

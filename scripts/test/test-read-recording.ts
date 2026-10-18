@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { git_spawn } from '#scripts/git/git-spawn'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 
@@ -27,11 +28,19 @@ function is_recordable(vitest_arguments: ReadonlyArray<string>): boolean {
 	return subcommand === RUN_SUBCOMMAND && flags.every((flag) => flag.startsWith(WORKER_FLAG_PREFIX))
 }
 
-// The tree the run read: the commit, and every file that differed from it.
-async function tree_snapshot(): Promise<Pick<ReadMap, 'commit' | 'dirty'>> {
-	const commit = await git_command.head_commit()
+// Every directory the commit holds, NUL-separated so a name git would quote reads as itself.
+async function commit_directories(commit: string): Promise<Array<string>> {
+	const output = await git_spawn.read(['ls-tree', '-r', '-d', '--name-only', '-z', commit])
 
-	return { commit, dirty: await changed_paths.read_changed_since(commit) }
+	return output.split('\0').filter((listed) => listed.length > 0)
+}
+
+// The tree the run read: the commit, every file that differed from it, and the directories it holds.
+async function tree_snapshot(): Promise<Pick<ReadMap, 'commit' | 'dirty' | 'directories'>> {
+	const commit = await git_command.head_commit()
+	const dirty = await changed_paths.read_changed_since(commit)
+
+	return { commit, dirty, directories: await commit_directories(commit) }
 }
 
 // A map that cannot be written — no git, a read-only common directory — leaves the previous map in
