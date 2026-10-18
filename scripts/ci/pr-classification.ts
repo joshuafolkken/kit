@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
+	BUG_LABEL,
 	BUGFIX_LABEL as BUGFIX,
 	RELEASE_CLASSIFICATION_NAMES as CLASSIFICATION_LABELS,
 	ENHANCEMENT_LABEL,
@@ -12,7 +13,6 @@ import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
 const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
-const ISSUE_BUG_LABEL = 'bug'
 // The line an Issue body declares its release classification with. A body written by a script
 // (`josh propagate`'s upgrade issue) builds it with `declaration`, so the writer and this parser share
 // one format.
@@ -70,7 +70,7 @@ function issue_candidates(issue_json: string): ReadonlyArray<ReleaseClassificati
 
 	if (unknown.length > 0) throw new Error(`Unknown release classification: ${unknown.join(', ')}`)
 
-	if (names.includes(ISSUE_BUG_LABEL) && !candidates.includes(BREAKING)) {
+	if (names.includes(BUG_LABEL) && !candidates.includes(BREAKING)) {
 		candidates.push(BUGFIX)
 	}
 
