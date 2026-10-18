@@ -53,10 +53,11 @@ describe('run_board_notes.notes_of park titles', () => {
 		expect(park_texts([WAITING_PARK_13])).toStrictEqual([`${PARKED_TITLE} (waiting on #7)`])
 	})
 
-	// joshuafolkken/kit#4045: a park its row already says the reason of is not repeated here.
-	it('leaves out a park its row draws the reason of', () => {
+	// joshuafolkken/kit#4045, #4127: only the parks of the children the board lists are said — not one
+	// its row draws the reason of, nor one a person released or closed.
+	it('keeps only the parks of the listed children', () => {
 		const events = [WAITING_PARK_13, '#14 parked (cap)'].map((text) => event(KIND.PARK, text))
-		const notes = run_board_notes.notes_of(events, NO_TITLES, new Set([13]))
+		const notes = run_board_notes.notes_of(events, NO_TITLES, new Set([14]))
 
 		expect(notes.map((note) => note.issue)).toStrictEqual(['14'])
 	})

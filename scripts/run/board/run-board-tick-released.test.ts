@@ -22,14 +22,14 @@ function event_of(pos: number, at: string, kind: string, verb: string): RunEvent
 	return { pos, at, kind, text: `#${String(ISSUE)} ${verb}` }
 }
 
+const LAUNCH = event_of(1, '2026-10-07T04:00:00.000Z', 'child-launch', 'launched')
+
 // Parked before the board's clock, so the listing the board reads is read after the park.
-const LOCAL_PARKED = {
-	...LOCAL,
-	events: [
-		event_of(1, '2026-10-07T04:00:00.000Z', 'child-launch', 'launched'),
-		event_of(2, '2026-10-07T04:24:00.000Z', 'park', 'parked (needs-decision)'),
-	],
+function local_parked(verb: string): typeof LOCAL {
+	return { ...LOCAL, events: [LAUNCH, event_of(2, '2026-10-07T04:24:00.000Z', 'park', verb)] }
 }
+
+const LOCAL_PARKED = local_parked('parked (needs-decision)')
 
 function plan_with(labels: ReadonlyArray<string>): BoardPlan {
 	const child: EpicChild = {
@@ -49,8 +49,11 @@ function plan_with(labels: ReadonlyArray<string>): BoardPlan {
 	}
 }
 
-async function frame_with(labels: ReadonlyArray<string>): Promise<Array<string>> {
-	const { ports, frames } = harness(LOCAL_PARKED, [plan_with(labels)])
+async function frame_with(
+	labels: ReadonlyArray<string>,
+	local = LOCAL_PARKED,
+): Promise<Array<string>> {
+	const { ports, frames } = harness(local, [plan_with(labels)])
 
 	await tick(FRESH_STATE, ports)
 
@@ -81,5 +84,13 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
 		expect(lines[0]).toContain('⏳ 1  💤 0')
+	})
+
+	// joshuafolkken/kit#4127: the findings section read the park off the stream and kept saying it.
+	it('leaves its park out of the findings section', async () => {
+		const lines = await frame_with(RELEASED_LABELS, local_parked('waiting on #4065'))
+
+		expect(lines.join('\n')).not.toContain('(waiting on #4065)')
+		expect(lines.filter((line) => line.includes('💤'))).toStrictEqual([lines[0]])
 	})
 })

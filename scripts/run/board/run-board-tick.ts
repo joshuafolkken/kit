@@ -236,7 +236,7 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 		notes: run_board_notes.notes_of(
 			local.events,
 			titles_of(state),
-			run_board_layout.drawn_parks(layout),
+			run_board_layout.listed_parks(layout),
 		),
 		resume: local.resume,
 		thanks: state.thanks,

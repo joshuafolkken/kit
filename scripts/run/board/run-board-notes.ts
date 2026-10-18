@@ -91,21 +91,23 @@ function note_of(event: RunEvent, titles: Titles): BoardNote | undefined {
 	return event.kind === KIND.NOTE ? plain_note(event) : undefined
 }
 
-// A park its row already says the reason of is not said twice.
-function is_on_row(note: BoardNote, drawn: ReadonlySet<number>): boolean {
-	return note.kind === 'park' && drawn.has(Number(note.issue))
+// A park is said only of a child the board still holds parked, so one a person released or closed
+// is not (joshuafolkken/kit#4127).
+function is_listed(note: BoardNote, listed: ReadonlySet<number> | undefined): boolean {
+	return listed === undefined || note.kind !== 'park' || listed.has(Number(note.issue))
 }
 
-// Newest first: the line a person glancing at the board needs is the latest one. `drawn` holds the
-// parked children whose rows draw their park reason (`run_board_layout.drawn_parks`).
+// Newest first: the line a person glancing at the board needs is the latest one. `listed` holds the
+// parked children whose park the section says (`run_board_layout.listed_parks`); without it, every
+// park is said.
 function notes_of(
 	events: ReadonlyArray<RunEvent>,
 	titles: Titles,
-	drawn: ReadonlySet<number> = new Set(),
+	listed?: ReadonlySet<number>,
 ): ReadonlyArray<BoardNote> {
 	return events
 		.flatMap((event) => note_of(event, titles) ?? [])
-		.filter((note) => !is_on_row(note, drawn))
+		.filter((note) => is_listed(note, listed))
 		.toReversed()
 }
 

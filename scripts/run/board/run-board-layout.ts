@@ -327,21 +327,23 @@ function people_of(layout: BoardLayout): Array<BoardRow> {
 	return [...asked, ...layout.people]
 }
 
-// The parked children whose rows draw their park reason, so the findings section does not repeat it.
-function drawn_parks(layout: BoardLayout): ReadonlySet<number> {
-	const parks = layout.active.filter((row) => row.state === 'parked' && row.reason !== undefined)
+// The parked children the findings section says the park of: still parked on the board, their rows
+// drawing no park reason of their own. A child a person released or closed is no row of this
+// (joshuafolkken/kit#4127), and a reason its row draws is not said twice.
+function listed_parks(layout: BoardLayout): ReadonlySet<number> {
+	const parks = layout.active.filter((row) => row.state === 'parked' && row.reason === undefined)
 
 	return new Set(parks.map((row) => row.number))
 }
 
 const run_board_layout = {
 	EMPTY_LAYOUT,
-	drawn_parks,
 	is_blocked,
 	is_decision,
 	is_finished,
 	is_settled,
 	layout_of,
+	listed_parks,
 	local_layout_of,
 	people_of,
 	numbers_of,
