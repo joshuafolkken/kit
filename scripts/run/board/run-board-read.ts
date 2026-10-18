@@ -48,9 +48,9 @@ interface LocalRead {
 	free_lanes?: number | undefined
 	// The lane limit those free lanes are counted under; `undefined` where it could not be read.
 	lane_limit?: number | undefined
-	// The issues whose lanes hold a place under the limit (`backlog-occupied.ts`), named beside a row
-	// that waits for a free lane.
-	occupied_lanes?: ReadonlyArray<string> | undefined
+	// How many lanes hold a place under the limit (`backlog-occupied.ts`), counted beside a row that
+	// waits for a free lane.
+	occupied_count?: number | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
@@ -102,9 +102,9 @@ function earlier_lanes(lanes: ReadonlyArray<LaneInfo>, started_ms: number): Arra
 		.map((lane) => lane.issue)
 }
 
-type LaneRoomRead = Pick<LocalRead, 'free_lanes' | 'lane_limit' | 'occupied_lanes'>
+type LaneRoomRead = Pick<LocalRead, 'free_lanes' | 'lane_limit' | 'occupied_count'>
 
-// The lanes against the limit, read once so the free count and the lanes it names agree.
+// The lanes against the limit, read once so the free count and the lanes it counts agree.
 async function lane_room_of(lanes: ReadonlyArray<LaneInfo>): Promise<LaneRoomRead> {
 	const room = await backlog_ready.lane_room(lanes)
 	const count = await backlog_ready.count_in(room)
@@ -112,7 +112,7 @@ async function lane_room_of(lanes: ReadonlyArray<LaneInfo>): Promise<LaneRoomRea
 	return {
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
-		occupied_lanes: room.occupied.map((lane) => lane.issue),
+		occupied_count: room.occupied.length,
 	}
 }
 

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_event, type AgentEventState } from '#scripts/agent/agent-event'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { has_parked_label } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state } from '#scripts/issue/issue-state'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
@@ -96,7 +96,7 @@ const REASONS: Record<LivenessVerdict, string> = {
 	[ALIVE_VERDICT]:
 		'The unit is still working: its output moved, or a process of the child is alive.',
 	[SETTLED_VERDICT]:
-		'The child is closed, parked with `needs-decision`, or marked `already-done`, so there is nothing here to recover.',
+		'The child is closed, parked with `needs-decision` or `run:stalled`, or marked `already-done`, so there is nothing here to recover.',
 	[STOPPED_VERDICT]:
 		'The output has been frozen past the silent window and no process of the child is alive in that checkout.',
 	[UNDETERMINED_VERDICT]:
@@ -112,11 +112,11 @@ const SETTLED_ADVICE =
 // routed through `run:merge --output`, the same composite a returned child takes: it reads the exit
 // record without waiting for the unit to return, re-dispatches an outage child (counting the outage,
 // and stopping the run on the environment guard once a run of them trips it), and parks an abandoned
-// child with `needs-decision` against the consecutive-failure guard.
+// child with `run:stalled` against the consecutive-failure guard.
 const STOPPED_CLEAN_ADVICE =
-	'The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it reads the child\'s exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard and stops the run), and parks an abandoned child with `needs-decision` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash.'
+	'The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it reads the child\'s exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard and stops the run), and parks an abandoned child with `run:stalled` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash.'
 const STOPPED_DIRTY_ADVICE =
-	'Stash the half-finished work with `git stash push -u -m "backlogrun: stopped unit for #<N>"` and record it on the Issue, then classify how the unit ended with `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `needs-decision` against the consecutive-failure guard, without waiting for the unit to return.'
+	'Stash the half-finished work with `git stash push -u -m "backlogrun: stopped unit for #<N>"` and record it on the Issue, then classify how the unit ended with `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `run:stalled` against the consecutive-failure guard, without waiting for the unit to return.'
 const UNDETERMINED_ADVICE =
 	'Read the trace that failed and ask again. Where the process trace was given as `unknown`, leave `--process` out so the command reads it. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 
@@ -307,19 +307,13 @@ async function read_output_frozen(request: FreshnessRequest): Promise<boolean | 
 	return second.mtime_ms === first.mtime_ms && second.size === first.size
 }
 
-function carries_label(labels: ReadonlyArray<string>, wanted: string): boolean {
-	return labels.some((label) => label.toLowerCase() === wanted)
-}
-
-// The labels that say a unit stopped on purpose. `needs-decision` is the park branch; `already-done`
-// is the exit a child takes when it verifies its Issue's work is already merged
-// — it comments the evidence, applies the label and stops with the checkout
+// The park labels (`PARKED_LABELS`) say a unit stopped on purpose. `needs-decision` and `run:stalled`
+// are the park branches; `already-done` is the exit a child takes when it verifies its Issue's work is
+// already merged — it comments the evidence, applies the label and stops with the checkout
 // clean, which is settled by the same reasoning. Left out, this command reports a child that
 // finished correctly as `stopped` and a supervisor restarts the investigation it just completed.
-const SETTLED_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
-
 function carries_settled_label(labels: ReadonlyArray<string>): boolean {
-	return SETTLED_LABELS.some((label) => carries_label(labels, label))
+	return has_parked_label(labels)
 }
 
 // Settled needs positive evidence that the child is done with: it closed, or the unit parked it and

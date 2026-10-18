@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
@@ -11,6 +12,7 @@ import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/ru
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge, type ChildOutcome } from './run-merge'
+import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
@@ -31,7 +33,7 @@ const FAILURE_EXIT_CODE = 1
 const FIRST = 0
 const MIN_PID = 1
 const { MERGE_TOKEN } = run_merge_token
-const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
+const PARK_FAILURE_NOTE = `The failed child could not be parked with ${RUN_STALLED_LABEL}; stopping.`
 // The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
 const DIGITS = /^\d+$/u
 // A GitHub `owner/repo` slug: an owner and a repository name around a single slash, each starting with
@@ -42,9 +44,10 @@ const DIGITS = /^\d+$/u
 // itself forbids (names cannot start with a hyphen) and which the taint analyzer keeps flagging.
 const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/u
 const USAGE =
-	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>]'
+	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>] [--driver]'
 
 const OPTIONS = {
+	driver: { type: 'boolean' },
 	epic: { type: 'string' },
 	output: { type: 'string' },
 	over: { type: 'string' },
@@ -54,7 +57,9 @@ const OPTIONS = {
 
 interface ParsedArguments {
 	positionals: ReadonlyArray<string>
-	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>>
+	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>> & {
+		driver?: boolean
+	}
 }
 
 // Absent owner is "no owner declared", which the carry guard reads as not provably foreign; a present
@@ -126,6 +131,11 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(child) ? child : undefined
 }
 
+// `backlog:drive` has no context to cut, so its merge is never handed back `over`.
+function threshold_of(values: ParsedArguments['values']): number | undefined {
+	return values.driver === true ? undefined : CONTEXT_CUT_THRESHOLD
+}
+
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
 	if (has_invalid_offer(parsed.values) || has_invalid_legacy_over(parsed.values.over)) {
 		return undefined
@@ -143,7 +153,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 		child,
 		epic: valid_epic(parsed.values.epic),
 		repo: valid_repo(parsed.values.repo),
-		over: CONTEXT_CUT_THRESHOLD,
+		over: threshold_of(parsed.values),
 		owner,
 		output: parsed.values.output,
 	}
@@ -155,8 +165,8 @@ function parse(argv: ReadonlyArray<string>): MergeContext | undefined {
 	return parsed === undefined ? undefined : to_context(parsed)
 }
 
-// One handled return: the stdout token and the exit code. Returned rather than printed, so the
-// in-process caller (`backlog:drive`) reads the same verdict the CLI prints.
+// One handled return: the stdout token and the exit code. Returned rather than printed, so
+// `merge_child` carries the verdict to `run_merge_driver.printed`, which prints it.
 interface ControlVerdict {
 	token: MergeToken
 	code: number
@@ -246,7 +256,7 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} parked (needs-decision)`,
+		`${issue_cite.plain(ctx.child)} parked (${RUN_STALLED_LABEL})`,
 	)
 
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
@@ -310,7 +320,7 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 // A child that parked itself: nothing is counted, but the park is written to the stream as a failed
 // child's is, so a reader restoring the run from its events sees the child settled. Its `in-progress`
-// is dropped as a failed child's is: left on, it would outlive the `needs-decision` a person later
+// is dropped as a failed child's is: left on, it would outlive the park label a person later
 // lifts, and a `run:solo` child would then hold the whole backlog. A lane it left empty is closed.
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.release_child(ctx.child)
@@ -369,8 +379,9 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	withdrawn: on_withdrawn,
 }
 
-// The whole merge event for one returned child, in-process: read its state, classify it, and run the
-// handler. The CLI prints the token; `backlog:drive` branches on the outcome.
+// The whole merge event for one returned child: read its state, classify it, and run the handler.
+// The CLI prints the token and the outcome; `backlog:drive` runs it as a child process
+// (`run-merge-driver.ts`) and branches on the printed outcome.
 async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	if (lane_handoff.is_ship_running(ctx.child, process.cwd())) {
 		return { outcome: 'shipping', ...(await on_shipping()) }
@@ -396,7 +407,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const result = await merge_child(ctx)
 
-	console.info(result.token)
+	console.info(run_merge_driver.printed(argv, result))
 
 	return result.code
 }

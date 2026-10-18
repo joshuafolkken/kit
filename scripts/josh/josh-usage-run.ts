@@ -191,6 +191,11 @@ const RUN_USAGE: Readonly<Record<string, CommandUsage>> = {
 				names: [OUTPUT],
 				description: 'the transcript the outage split reads; absent, it is off.',
 			},
+			{
+				names: ['--driver'],
+				description:
+					'the caller is `backlog:drive`, which has no context to cut, so the merge is never handed back `over`.',
+			},
 		],
 	},
 	'run:review': {

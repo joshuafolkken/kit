@@ -1,10 +1,11 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import {
 	run_board_layout,
 	type BoardLayout,
 	type BoardPlan,
+	type RowReason,
 	type WaveEntry,
 } from './run-board-layout'
 import type { ItemStatus } from './run-board-status'
@@ -244,6 +245,29 @@ describe('run_board_layout.layout_of outside the waves', () => {
 	})
 })
 
+// joshuafolkken/kit#4104: the ⏳ rows keep the plan's order ahead of the 📅 rows, which follow from the
+// earliest start — two on the same day by the time.
+const STARTS: ReadonlyMap<number, number> = new Map([
+	[41, Date.parse('2999-03-01T09:00Z')],
+	[43, Date.parse('2999-01-02T15:00Z')],
+	[44, Date.parse('2999-01-02T08:00Z')],
+])
+
+function start_reason(item: EpicChild): RowReason {
+	const not_before_ms = STARTS.get(item.number)
+
+	return { text: 'waits', ...(not_before_ms !== undefined && { not_before_ms }) }
+}
+
+describe('run_board_layout.layout_of unreached order', () => {
+	it('draws the waiting rows first, then the rows waiting on a start time from the earliest', () => {
+		const unreached = [41, 42, 43, 44, 45].map((number) => child(number))
+		const layout = run_board_layout.layout_of(plan_of([], unreached), NO_STATUSES, start_reason)
+
+		expect(layout.unreached.map((row) => row.number)).toStrictEqual([42, 45, 44, 43, 41])
+	})
+})
+
 // joshuafolkken/kit#4042: the running rows first, then the parked and stopped ones, each in the order
 // it started; then the finished ones from the newest end, one with no recorded end last.
 describe('run_board_layout.layout_of active order', () => {
@@ -269,5 +293,23 @@ describe('run_board_layout.layout_of active order', () => {
 		)
 
 		expect(finished).toStrictEqual([true, true, true, false, false, false])
+	})
+})
+
+// joshuafolkken/kit#4102: a mechanical park asks nobody for a decision, so it stays out of 🙋.
+describe('run_board_layout.layout_of — a run:stalled child', () => {
+	it('draws it as stopped in the unreached section, never with the people', () => {
+		const plan = plan_of([], [child(33, [], [RUN_STALLED_LABEL])])
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
+
+		expect(layout.people).toStrictEqual([])
+		expect(layout.unreached.map((row) => [row.number, row.state])).toStrictEqual([[33, 'stopped']])
+	})
+
+	it('leaves it out of the waiting children', () => {
+		const plan = plan_of([[child(1), child(2, [], [RUN_STALLED_LABEL])]])
+		const waiting = run_board_layout.waiting_children({ plan, statuses: NO_STATUSES })
+
+		expect(waiting.map((item) => item.number)).toStrictEqual([1])
 	})
 })

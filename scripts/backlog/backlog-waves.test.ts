@@ -8,6 +8,7 @@ import {
 	NEEDS_DECISION_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -276,5 +277,15 @@ describe('backlog_waves.format_waves', () => {
 		const input: EpicNextResult = { ...result([]), verdict: 'error' }
 
 		expect(backlog_waves.format_waves(input, CONTEXT)).toContain(backlog_plan.UNUSABLE_HEADING)
+	})
+})
+
+// joshuafolkken/kit#4102: a mechanical park names the fix, not a person's decision.
+describe('backlog_waves.format_waves — a run:stalled issue', () => {
+	it('names an unreached run:stalled issue as stalled mechanically', () => {
+		const stalled = child(PARKED, { labels: [RUN_STALLED_LABEL, RUN_LANE_LABEL] })
+		const text = backlog_waves.format_waves(result([child(FIRST)], [], [stalled]), CONTEXT)
+
+		expect(text).toContain(`${backlog_fixture.cite(PARKED)}  — ${backlog_waves.RUN_STALLED_NOTE}`)
 	})
 })

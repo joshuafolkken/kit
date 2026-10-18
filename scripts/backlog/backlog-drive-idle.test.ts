@@ -12,6 +12,7 @@ const NOW_MS = Date.parse('2026-10-18T00:00Z')
 const PARKED = 4101
 const DATED = 4102
 const READY = 4103
+const STALLED = 4104
 const IDLE_TEXT = 'idle body'
 
 function issue(number: number, extra: Partial<OpenIssueData> = {}): OpenIssueData {
@@ -78,6 +79,23 @@ describe('backlog_drive_idle.describe', () => {
 
 		expect(empty).toContain('Nothing parked or dated is left.')
 		expect(unreadable).toContain('Remaining issues: unreadable')
+	})
+
+	// joshuafolkken/kit#4102: a mechanical park asks for a fix, not a decision, so it has its own heading.
+	it('lists a run:stalled issue under its own heading, apart from the decisions', () => {
+		const stalled = issue(STALLED, { labels: [{ name: 'run:stalled' }] })
+		const body = backlog_drive_idle.describe({
+			merged: 0,
+			issues: [...POOL, stalled],
+			now_ms: NOW_MS,
+		})
+
+		expect(body).toContain(
+			`Waiting on a decision (needs-decision):\n- #${String(PARKED)} Issue ${String(PARKED)}\n`,
+		)
+		expect(body).toContain(
+			`Stalled mechanically (run:stalled):\n- #${String(STALLED)} Issue ${String(STALLED)}\n`,
+		)
 	})
 })
 

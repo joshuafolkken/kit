@@ -4,7 +4,12 @@ import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo } from '#scripts/epic/epic-solo'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { has_label_name, IN_PROGRESS_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import {
+	has_label_name,
+	IN_PROGRESS_LABEL,
+	PARKED_LABELS,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
 import type { OutOfScopeRow } from './backlog-scope'
 
 // The plan a person reads before a `backlogrun` starts.
@@ -30,8 +35,9 @@ const ONLY_NAMED_HEADING =
 const READY_HEADING =
 	'Ready now — each takes a free lane in its repository, so these may run in parallel:'
 const WAITING_HEADING = 'Waiting — each names what it is waiting on:'
-const HUMAN_HEADING =
-	'Waiting on a person (`needs-decision`) — resolve these before the run starts:'
+// Every park label (`PARKED_LABELS`) puts a child here, so the heading names none and each row names
+// its own: a `run:stalled` row read as `needs-decision` sends a person to decide a mechanical failure.
+const HUMAN_HEADING = 'Waiting on a person — resolve these before the run starts:'
 const SCOPE_HEADING = 'Out of scope — open, but the backlog will not run these:'
 // `epic_report`'s own words for the same condition, so the plan and the run name it identically.
 const UNUSABLE_HEADING = 'The dependency graph is unusable, so there is no plan:'
@@ -150,6 +156,14 @@ function child_lines(
 	return children.map((child) => row_of(child, context, note(child)))
 }
 
+// The park labels a child carries, so its row says what the person is asked for.
+function park_note(child: EpicChild): string {
+	return [...PARKED_LABELS]
+		.filter((label) => has_label_name(child.labels, label))
+		.map((label) => `\`${label}\``)
+		.join(', ')
+}
+
 // A section whose rows say nothing beyond naming the issue: being under the heading is the whole
 // statement.
 function no_note(): string {
@@ -239,7 +253,7 @@ function format_plan(
 		'',
 		section(WAITING_HEADING, waiting_lines(result.waiting, context)),
 		'',
-		section(HUMAN_HEADING, child_lines(result.blocked_on_people, context, no_note)),
+		section(HUMAN_HEADING, child_lines(result.blocked_on_people, context, park_note)),
 		'',
 		section(SCOPE_HEADING, scope_lines(out_of_scope, context.repo)),
 	].join('\n')

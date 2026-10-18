@@ -15,7 +15,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 //
 // **The restart is a hand-off inside the parent's re-confirm window, not a recovery.** Killing the child
 // alone would let `lane:await` book it stopped and `run:merge` classify it — an `outage` resumes the old
-// session with the old specification in mind, anything else is parked `needs-decision` and counted as a
+// session with the old specification in mind, anything else is parked `run:stalled` and counted as a
 // failure. `run:cut` already hands a lane to a new process inside `lane:await`'s re-confirm window, so a
 // child that disappears and reappears under the same `fullrun #<N>` pattern is never collected: the
 // restart stops, stashes and re-dispatches within that window, and no failure or outage is counted.

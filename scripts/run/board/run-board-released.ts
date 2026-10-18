@@ -1,8 +1,4 @@
-import {
-	ALREADY_DONE_LABEL,
-	has_label_name,
-	NEEDS_DECISION_LABEL,
-} from '#scripts/issue/issue-labels'
+import { has_parked_label } from '#scripts/issue/issue-labels'
 import type { ItemStatus, OpenRead } from './run-board-status'
 
 // A parked child a person has released by removing `needs-decision` is no longer the run's: the
@@ -11,17 +7,14 @@ import type { ItemStatus, OpenRead } from './run-board-status'
 
 type ReleaseRead = Pick<OpenRead, 'read_ms' | 'labels'>
 
-// The labels a person still owns a parked child by: `already-done` parks it as surely as
-// `needs-decision` does (`run-merge.ts`), and only a person's close settles it.
-const PARK_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
-
 function is_read_after_park(status: ItemStatus, read_ms: number | undefined): boolean {
 	return read_ms !== undefined && (status.ended_ms ?? 0) <= read_ms
 }
 
-// An issue the listing did not hold has no labels to read, and stays parked.
+// A person still owns a parked child while any park label (`PARKED_LABELS`) is on it. An issue the
+// listing did not hold has no labels to read, and stays parked.
 function is_undecided(labels: ReadonlyArray<string> | undefined): boolean {
-	return labels !== undefined && PARK_LABELS.every((label) => !has_label_name(labels, label))
+	return labels !== undefined && !has_parked_label(labels)
 }
 
 function is_released(issue: number, status: ItemStatus, read: ReleaseRead): boolean {

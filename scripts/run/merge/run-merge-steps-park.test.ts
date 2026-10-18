@@ -1,5 +1,6 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -55,6 +56,15 @@ function serve_labels(...names: ReadonlyArray<string>): void {
 	)
 }
 
+function stub_issue_reads(): void {
+	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [IN_PROGRESS], is_human_review: false },
+	})
+}
+
 beforeEach(() => {
 	add_label_mock.mockReset().mockResolvedValue(true)
 	comment_mock.mockReset().mockResolvedValue(undefined)
@@ -62,8 +72,7 @@ beforeEach(() => {
 	ensure_closed_mock.mockReset().mockResolvedValue(undefined)
 	ship_cause_mock.mockReset().mockReturnValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
-	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
-	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	stub_issue_reads()
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	serve_labels(IN_PROGRESS)
 })
@@ -92,7 +101,7 @@ describe('run_merge_steps.do_failed — the stale in-progress goes through the s
 })
 
 describe('run_merge_steps.do_failed — the park is explained on the issue', () => {
-	it('comments the reason when it parks the child with needs-decision', async () => {
+	it('comments the reason when it parks the child with run:stalled', async () => {
 		await run_merge_steps.do_failed(CONTEXT, run_merge_steps.CUT_RELAUNCH_CAUSE)
 
 		expect(comment_mock).toHaveBeenCalledOnce()
@@ -103,7 +112,7 @@ describe('run_merge_steps.do_failed — the park is explained on the issue', () 
 		expect(comment_mock).toHaveBeenCalledWith(CHILD, expect.stringContaining(`fullrun #${CHILD}`))
 	})
 
-	it('comments nothing when the needs-decision label could not be written', async () => {
+	it('comments nothing when the run:stalled label could not be written', async () => {
 		add_label_mock.mockResolvedValue(false)
 
 		await run_merge_steps.do_failed(CONTEXT)
@@ -150,7 +159,9 @@ describe('run_merge_steps.do_failed — a child whose detached ship ended', () =
 // blocker — nothing for a person to decide, so no `needs-decision` and no failure counted.
 const KIT = 'joshuafolkken/kit'
 const BLOCKER = 3501
-const NEEDS_DECISION = 'needs-decision'
+// joshuafolkken/kit#4102: a mechanical park carries `run:stalled`, never a person's `needs-decision`.
+const RUN_STALLED = 'run:stalled'
+const NOT_BEFORE = 'not-before'
 const OWN_CARRY = {
 	invocation: 'backlogrun #3435',
 	started_at: new Date().toISOString(),
@@ -214,7 +225,7 @@ describe('run_merge_steps.do_failed — a child with no open blocker is parked a
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(result.waits).toStrictEqual([])
-		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
 	})
 
 	it('parks the child when its blockers cannot be read', async () => {
@@ -223,7 +234,7 @@ describe('run_merge_steps.do_failed — a child with no open blocker is parked a
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(result.is_parked).toBe(true)
-		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
 	})
 })
 
@@ -267,7 +278,33 @@ describe('run_merge_steps.do_failed — a child waiting on its declared start da
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(result.waits).toStrictEqual([])
-		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
+	})
+})
+
+// joshuafolkken/kit#4102: the `not-before` label stands in for the body only where the body is unreadable.
+describe('run_merge_steps.do_failed — a child carrying the not-before label', () => {
+	beforeEach(() => {
+		vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+			kind: 'state',
+			state: { state: 'OPEN', labels: [IN_PROGRESS, NOT_BEFORE], is_human_review: false },
+		})
+	})
+
+	it('releases the child to wait on its not-before label when the body cannot be read', async () => {
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual(['a start date still ahead (`not-before`)'])
+		expect(add_label_mock).not.toHaveBeenCalled()
+	})
+
+	it('parks the child carrying a stale not-before label when its body declares no date', async () => {
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue('## 背景\n')
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual([])
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
 	})
 })
 

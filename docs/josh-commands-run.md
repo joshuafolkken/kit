@@ -380,17 +380,19 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 - `--epic <E>` / `--repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
 - `--output <path>` — the transcript the outage split reads; absent, it is off.
+- `--driver` — the caller is `backlog:drive`, which has no context to cut, so the merge is never handed back `over`.
 
 <!-- /usage -->
 
 Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
 child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
-`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
-or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
+`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`,
+`run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API) has it dropped, unparked and uncounted, so re-dispatchable;
-a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `needs-decision`,
-and counts against the failure guard — unless it records an open blocker or a `- 実施可能日:` still
-ahead: then it is **waiting**, unparked and uncounted, its comment naming the wait.
+a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` — a
+mechanical failure, not a person's decision — and counts against the failure guard — unless it records
+an open blocker or a `- 実施可能日:` still ahead (or, its body unreadable, carries `not-before`): then it
+is **waiting**, unparked and uncounted, its comment naming the wait.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
 newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`.
 A **cut** child (OPEN, unparked, its lane holding a declared cut no successor adopted) is neither
@@ -630,7 +632,7 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 - `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue until then. The board shows it as the local `YYYY-MM-DD HH:MM`, as it does every other time; `backlog:next` keeps the UTC spelling. It comes before every reason below.
 - `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
 - `overlaps <N> (<file>)` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
-- `no free lane <used>/<limit> — <N…> <state> · …` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read. Each lane in use is named `running`, `parked` or `idle` (no child, but a commit or change keeps it): `no free lane 4/4 — 4023 running · 3988 parked · 4002 idle`. A vacant lane is never named.
+- `no free lane <used>/<limit>` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read: `no free lane 4/4`. The lanes are counted, not named — every lane `lane:limit` counts, even one an earlier run left that no row shows. An unread limit leaves `no free lane` alone.
 - `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads normal and 🧠 is under yellow. The ledger records the hold as `memory`, its own `lane:stats` row. An unread figure is left out.
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows that lane's stage, such as `opening lane 5″`.

@@ -858,7 +858,7 @@ pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies aga
 - The lanes in use are the open lane work trees, less two kinds that are not counted:
   - a vacant lane — no commit beyond the default branch, a clean tree, no child — under any run;
   - under a `--only` run, a lane with no child working in it whose issue the run neither names nor has launched — its tree and branch stay for the next run that names the issue.
-- `run:board` prints `no free lane <used>/<limit>` and names each lane in use with its state (running, parked, idle).
+- `run:board` prints `no free lane <used>/<limit>`; the waiting row counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
 - The limit counts lanes, not memory: under it, the driver still opens no lane while memory is under pressure, and `run:board` prints `no memory headroom`.
 - A limit above the nine port seats is shown and counted at the seats, as `JOSH_LANE_LIMIT` already is. A value that is not a positive integer is refused by the same rule.
 - The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.

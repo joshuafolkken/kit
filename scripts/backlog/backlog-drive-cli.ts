@@ -12,7 +12,8 @@ import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_merge_cli, type MergeResult } from '#scripts/run/merge/run-merge-cli'
+import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
 import { z } from 'zod'
 import { backlog_budget } from './backlog-budget'
 import {
@@ -109,20 +110,21 @@ function merge_token(out: string, code: number): string {
 	return ''
 }
 
+// A `run:merge` that printed no result — a crash before its verdict — answers no token, which the loop
+// never reads as a collection.
+function unprinted(code: number): MergeResult {
+	return { token: '', code, is_offer: true, outcome: 'unresolved' }
+}
+
 // The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
-// failure exactly as it does for the parent that passes `--output` by hand. No hand-off threshold: the
-// supervisor runs this loop, and a process has no context to cut.
+// failure exactly as it does for the parent that passes `--output` by hand. Run as its own process
+// (`run-merge-driver.ts`), so a fix merged since this loop started is the code that decides the child.
 async function merge(issue: string, owner: string): Promise<MergeResult> {
 	await backlog_drive_owner.assert_current(owner)
 	const lane = await lane_registry.find_open_lane(issue)
-	const result = await run_merge_cli.merge_child({
-		child: issue,
-		epic: undefined,
-		repo: undefined,
-		over: undefined,
-		owner: run_carry.owner_of(Number(owner)),
-		output: lane?.output,
-	})
+	const argv = run_merge_driver.argv_of({ child: issue, owner, output: lane?.output })
+	const ran = await josh_command.josh_run(argv, should_forward_stderr)
+	const result = run_merge_driver.read(ran.out) ?? unprinted(ran.code)
 
 	await backlog_drive_named.mark_done(issue, result, owner)
 

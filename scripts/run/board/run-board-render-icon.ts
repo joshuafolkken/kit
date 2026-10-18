@@ -10,7 +10,7 @@ const { NOT_BEFORE_ICON, PHASE_ICONS, STATE_ICONS } = run_board_labels
 
 // A row waiting on the start time its body declares leads with 📅 in place of its state's icon.
 function state_lead(row: BoardRow): string {
-	return row.reason?.is_not_before === true ? NOT_BEFORE_ICON : STATE_ICONS[row.state]
+	return row.reason?.not_before_ms === undefined ? STATE_ICONS[row.state] : NOT_BEFORE_ICON
 }
 
 // A running row leads with the icon of the phase it is in now — the last its track reached — and

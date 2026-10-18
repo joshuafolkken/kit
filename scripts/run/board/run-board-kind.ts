@@ -12,12 +12,9 @@ import type { FiledKind } from '#scripts/run/event/run-event-filed'
 // there. An issue with labels from several takes the first, as the release notes do; one with none is
 // an Other Change and draws no kind.
 
-const SEMVER_MAJOR_LABEL = 'Semver-Major'
-const SEMVER_MINOR_LABEL = 'Semver-Minor'
-
 const RELEASE_KINDS: ReadonlyArray<readonly [FiledKind, ReadonlyArray<string>]> = [
-	['breaking-change', [BREAKING_CHANGE_LABEL, SEMVER_MAJOR_LABEL]],
-	['enhancement', [ENHANCEMENT_LABEL, SEMVER_MINOR_LABEL]],
+	['breaking-change', [BREAKING_CHANGE_LABEL]],
+	['enhancement', [ENHANCEMENT_LABEL]],
 	['bug', [BUGFIX_LABEL, BUG_LABEL]],
 ]
 

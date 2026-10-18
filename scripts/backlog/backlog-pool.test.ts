@@ -5,6 +5,7 @@ import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { backlog_pool } from './backlog-pool'
@@ -100,6 +101,13 @@ describe('backlog_pool.classify_standalone — the rows a person has to resolve'
 	// `backlogrun` would start the very issue it has just been told is already merged.
 	it('does not offer an already-done row', () => {
 		const issues = [opted_in(ROW_NUMBER, [ALREADY_DONE_LABEL])]
+
+		expect(backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable).toEqual([])
+	})
+
+	// joshuafolkken/kit#4102: a mechanical park is withheld like a decision park until its label is removed.
+	it('does not offer a run:stalled row', () => {
+		const issues = [opted_in(ROW_NUMBER, [RUN_STALLED_LABEL])]
 
 		expect(backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable).toEqual([])
 	})

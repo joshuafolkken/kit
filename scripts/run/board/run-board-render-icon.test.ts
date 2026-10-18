@@ -34,7 +34,7 @@ describe('run_board_render_icon.state_icon', () => {
 	})
 
 	it('leads a row waiting on its start time with 📅', () => {
-		const reason = { text: 'not before', is_not_before: true }
+		const reason = { text: 'not before', not_before_ms: 0 }
 
 		expect(state_icon(row('waiting', undefined, reason), header())).toBe('📅')
 	})
