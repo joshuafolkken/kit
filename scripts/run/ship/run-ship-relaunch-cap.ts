@@ -1,6 +1,6 @@
-import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_park } from '#scripts/issue/issue-park'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -48,13 +48,12 @@ function park_comment(issue: string, reason: string): string {
 // The label is what keeps the issue from being re-dispatched; without it the stop stays a plain stop,
 // which `run:merge` books as an unanswered ship stop under its own outage cap.
 async function park(issue: string, reason: string): Promise<boolean> {
-	const is_parked = await git_gh_issue_write.issue_add_label(issue, RUN_STALLED_LABEL)
+	const park_write = await issue_park.apply(issue, RUN_STALLED_LABEL, park_comment(issue, reason))
 
-	if (!is_parked) return false
+	if (!park_write.is_labelled) return false
 
 	const cite = issue_cite.plain(issue)
 
-	await git_gh_issue_write.issue_try_comment(issue, park_comment(issue, reason))
 	await run_event_stream_emit.emit(PARK, `${cite} parked (${PARK_CAUSE})`)
 	await telegram_notify.warn({
 		issue_title: `Ship stop cap reached ${cite}`,

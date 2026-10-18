@@ -295,6 +295,25 @@ async function issue_remove_label(issue_number: string, label: string): Promise<
 	})
 }
 
+// **The removal for a caller that wants the label gone, not removed by this call** — a release that
+// may find the label already off. A failed DELETE is confirmed against the labels the issue carries,
+// the read `issue_apply_label` confirms an addition with, so an absent label answers `true` and a
+// failure that left the label on answers `false`.
+async function issue_clear_label(issue_number: string, label: string): Promise<boolean> {
+	try {
+		await issue_remove_label(issue_number, label)
+
+		return true
+	} catch (error) {
+		const names = await read_label_names(issue_number)
+
+		if (names?.includes(label) === false) return true
+		error_text.trace_swallowed('git_gh_issue_write.issue_clear_label', error)
+
+		return false
+	}
+}
+
 // The blocker's **database id**, which is the only thing the dependencies endpoint accepts — and the
 // reason this resolution exists rather than the issue number being sent straight through.
 //
@@ -364,6 +383,7 @@ const git_gh_issue_write = {
 	issue_apply_label,
 	issue_add_label,
 	issue_remove_label,
+	issue_clear_label,
 	issue_add_blocked_by,
 	issue_remove_blocked_by,
 }

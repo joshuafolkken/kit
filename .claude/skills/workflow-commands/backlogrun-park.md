@@ -42,8 +42,7 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'
-pnpm josh issue:comment <N> --body-file <path>   # what needs deciding, and the options
+pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision
 ```
 
 `in-progress` stays; the parked child does **not** hold the repository (`needs-decision` takes
@@ -60,7 +59,7 @@ still filed at once, and a workaround is still forbidden. `epic:bundle`'s `ask` 
 **Removing the label is Tier A — do it without asking**, once the decision is recorded:
 
 ```bash
-gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/null || true
+pnpm josh run:park <N> --clear   # succeeds when the label is already off
 ```
 
 **The released child goes back to a lane, never into the parent's own context** — `pnpm josh

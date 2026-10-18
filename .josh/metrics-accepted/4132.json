@@ -1,0 +1,9 @@
+{
+	"reason": "Round-2 review fix: lane:dispatch clears a stale run:park record (+2 code lines, test); review-round doc fixes add 3 on-demand bytes",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 161,
+		"ai_cost.on_demand_bytes": 3,
+		"prose.excess_bold": 1
+	}
+}

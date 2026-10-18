@@ -27,7 +27,7 @@ describe('the delivered text — what the refusal states', () => {
 	// `needs-decision` plus the question, and the parent reads the label rather than a log line.
 	it('hands over the park and names the settled-label stops it does not touch', () => {
 		expect(delivered).toContain('needs-decision')
-		expect(delivered).toContain('labels[]=needs-decision')
+		expect(delivered).toContain('pnpm josh run:park <N> --body-file <path>')
 		expect(delivered).toContain('needs-human-review')
 	})
 

@@ -115,6 +115,15 @@ const RUN_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ arguments: '--end', note: 'clear the record' },
 		],
 	},
+	'run:park': {
+		examples: [
+			{
+				arguments: '1839 --body-file .josh/tmp/park-1839.md',
+				note: 'comment, needs-decision and the local record',
+			},
+			{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },
+		],
+	},
 	'run:liveness': {
 		examples: [
 			{ arguments: '1169 --output <path>' },

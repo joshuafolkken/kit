@@ -67,11 +67,16 @@ function parse_request(argv: ReadonlyArray<string>): CommentRequest | undefined 
 // A both-flags refusal and a file-read failure both surface as an `Error` from `resolve`, and its
 // message already names the flags or the resolved path — so it is printed as-is and `USAGE` is
 // withheld. `undefined` is the other refusal: a bad number or an empty body, which `USAGE` explains.
-function resolve_request(argv: ReadonlyArray<string>): CommentRequest | undefined {
+// `usage` is the caller's: `run:park` parks with the same issue number and body, so it reads them here
+// and prints its own usage on a refusal.
+function resolve_request(
+	argv: ReadonlyArray<string>,
+	usage: string = USAGE,
+): CommentRequest | undefined {
 	try {
 		const request = parse_request(argv)
 
-		if (request === undefined) console.error(USAGE)
+		if (request === undefined) console.error(usage)
 
 		return request
 	} catch (error) {
@@ -97,8 +102,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_comment_cli = { USAGE, run }
+const issue_comment_cli = { USAGE, resolve_request, run, single_issue_number }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
+export type { CommentRequest }
 export { issue_comment_cli }

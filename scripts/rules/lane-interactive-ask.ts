@@ -43,8 +43,7 @@ function is_interactive_ask(
 const LANE_INTERACTIVE_ASK_REASON =
 	'⛔ lane child interactive ask: this session is a dispatched lane child and cannot ask a ' +
 	'person, so park instead: ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'`, " +
-	'`pnpm josh issue:comment <N> --body-file <path>`, ' +
+	'`pnpm josh run:park <N> --body-file <path>` (it applies `needs-decision`), ' +
 	'the `confirmation` Telegram, stop. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/pre-gate-cut.md`, `backlogrun-park.md`).'
 

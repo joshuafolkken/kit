@@ -211,6 +211,21 @@ The relaunched child runs at the effort of the phase it resumes into — lowered
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` in detail".
 
+### `josh run:park`
+
+Park a lane child for a person's decision in one call: post the question as a comment, apply `needs-decision`, and write the local park record the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` removes the label (succeeding when it is already off) and the record. `in-progress` and the hold are left alone — a parked ending still owes `pnpm josh run:release <N>`.
+
+<!-- usage: run:park -->
+
+```bash
+pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # comment, needs-decision and the local record
+pnpm josh run:park 1839 --clear                              # remove needs-decision and the record
+```
+
+<!-- /usage -->
+
+**Output / exit codes:** one `park #<N>` line naming what was written; exit `0` once the label and the comment are both on the issue (or, with `--clear`, once the label is off), `1` otherwise. The record is written only on `0`.
+
 ### `josh run:liveness`
 
 Say whether the delegated unit running a child is still working, or stopped without reporting. Two traces decide it: whether the transcript grew, and whether a child process is alive.

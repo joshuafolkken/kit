@@ -60,6 +60,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
 	},
+	'run:park': {
+		script: 'scripts/run/park/run-park-cli.ts',
+		description: 'Park a lane child for a decision, or clear the park',
+		category: 'AI tools',
+		reference: ['<issue> --body-file <path> | <issue> --clear', 'automation', ['files', 'network']],
+	},
 	'run:liveness': {
 		script: 'scripts/run/run-liveness-cli.ts',
 		description: 'Say whether a delegated unit is still working, or stopped without reporting',
