@@ -207,6 +207,24 @@ The relaunched child runs at the effort of the phase it resumes into — lowered
 
 **Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
 
+**The dispatch mark:** `lane:dispatch` starts each child generation with `JOSH_LANE_CHILD` set to
+the lane's issue number (`scripts/lane/lane-child-marker.ts`).
+
+- It means "this session was launched for issue `<N>`, not typed by a person"; it lives as long as the
+  child process — set at launch, never written by the run itself.
+- It is trusted only where its value equals the lane's own issue — a leaked mark naming another issue,
+  or none, is read as a person. An interactive `fullrun` carries no mark.
+- `run:cut` itself looks for an open lane for the issue instead (`not-a-lane` otherwise).
+
+**The gate guard:** `josh rule:guard` refuses `josh gate` in a lane with no cut record carried.
+
+- It fires for a marked child and nowhere else — the working directory is `<lane root>/<issue number>`
+  **and** `JOSH_LANE_CHILD` names that issue (`run:cut`'s open-lane lookup need not agree byte for
+  byte).
+- It fires only when the current context warrants a cut (`cost_cli.session_verdict`, as `run:cut`), and
+  once per run; it is silent once the cut is carried. `--resume`, `--end` and `--json` do not count as
+  taking the cut.
+
 `--setup` is a usage error (`docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` lost its setup-phase cut").
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` in detail".

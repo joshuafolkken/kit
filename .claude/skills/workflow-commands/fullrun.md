@@ -9,8 +9,8 @@ run's next single action. `chain-rule.md`, `followup.md`, `background-commands.m
 
 - **The entry passes no `--to`**: `pnpm josh run:entry <N>` is `fullrun`'s stage. Follow `run:step`
   into `fullrun-steps.md` — the `fullrun #N` list or the `fullrun new` list.
-- **The end merges**: `run:step` names the verification gate, `pnpm josh followup`, `pnpm josh ms` and
-  the release ask in order. Invoking `fullrun` authorizes the merge, through `pnpm josh followup` only.
+- **The end merges**: `run:step` names the verification gate, `pnpm josh followup` and the release ask
+  in order. Invoking `fullrun` authorizes the merge, through `pnpm josh followup` only.
 - **A split or a prerequisite stops the run**: typing `fullrun` approved **one** Issue.
 
 ## The lane-child seam

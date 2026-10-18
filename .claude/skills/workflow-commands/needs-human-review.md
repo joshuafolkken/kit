@@ -34,12 +34,7 @@ pnpm josh issue:state <N> --repo <owner/repo>  # a child in another repository
 
 **Never apply or remove it**: a mark a run can clear for itself is
 not a mark. Everything but typing the command on an explicit instruction in the current turn is a
-proposal, written as an Issue comment and left for the person. The label itself is created once per
-repository, by a person:
-
-```bash
-gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f description="Implement and verify, but stop before committing so a person can look"
-```
+proposal, written as an Issue comment and left for the person. `josh sync` creates the label.
 
 **It is not `needs-decision`**: `needs-decision` withholds a run's *start*; this withholds its *end*.
 So a `needs-human-review` issue is still offered, and a child stopped by it **goes on holding its

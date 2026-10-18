@@ -470,7 +470,31 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 
 With `--repo`, the occupancy line names each `in-progress` holder with its label age read from the issue timeline — `in-progress for <n> min`, marked `stale` past 90 minutes or when the label predates the timeline, `label age unread` when the timeline could not be read.
 
-Several leading epic arguments merge into one candidate pool per repository. A cross-repository dependency resolves only when the blocker is closed **and** its declared version has published. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`.
+Several leading epic arguments merge into one candidate pool per repository. `run`/`wait`/`stop`/`complete` exit `0`; an unusable graph (cycle, or body/relations disagreement) exits `1`, and one reference that does not parse fails the read.
+
+**Priority and duplicates:** priority is the order the epics were named, then each epic's own task-list order (its declared chain still decides what is runnable). A child two epics track enters once, kept by the epic named earlier. Reordering with `josh epic --add … --order-before` / `--order-after` leaves declarations and `blocked-by` relations as they were.
+
+**Lanes:** an `in-progress` issue occupies a lane, not the repository. Free lanes are `JOSH_LANE_LIMIT` (default 4) minus that repository's `in-progress` listing; at zero the answer is `wait`, with the holders on standard error. A parked child releases its lane; a `needs-human-review` stop keeps it.
+
+**Nested epics:** a child that is itself an epic is never offered and waits on a person. The test is
+the child's `epic` label, never how its row is written: a cross-repository `owner/repo#N` row that is
+not an epic stays runnable. A parent epic over another epic never auto-closes (a grandchild's merge
+never reaches it); `epic:audit` reports the row.
+
+**Blockers outside the named epics:** closed, it resolves (cross-repository: after its release); open
+and tracked by an epic named in the same call, the child waits on time (or on a person, if the blocker
+does); open and untracked, the child waits on a person and the blocker is named on standard error; an
+unknown state reads as waiting.
+
+**Cross-repository children:**
+
+- Their state is read through `gh api`. The epic auto-closes only when every cross-repository child's
+  state could be read.
+- A cross-repository dependency resolves only when the blocker is closed **and** the version its default
+  branch declares is in the registry (checked in that order; that exact version) — the target is the
+  release that includes the blocker. The publish check is `josh propagate`'s.
+- A repository that publishes nothing (no `package.json` on its default branch, or `private`) resolves on
+  close, read from its manifest, never the registry; a failed manifest read (not a 404) still waits.
 
 ### `josh epic:bundle`
 
@@ -518,6 +542,11 @@ pnpm josh epic:audit 858
 | Orphan child         | warning   | An issue names this epic as parent but the task list does not track it.                                        |
 | Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
 | Unjustified order    | **error** | The body declares an order between two open children and nothing records why.                                  |
+
+An open-backlog search that stopped before the end (only the newest 500 issues, or 50 bodies, were
+covered) is a warning. Cycle and declaration checks are reused from `epic:next`. A forward reference
+the other child already depends on is not reported, and a pair is demoted to a warning only when the
+closed state is confirmed (any state but `CLOSED` normalizes to `OPEN`).
 
 Only errors change the exit code. Run it at the start of a `backlogrun` epic run and after a child or dependency changes. Fixing what it finds is Tier A; park with `needs-decision` only when the contradiction is an unmade design choice.
 

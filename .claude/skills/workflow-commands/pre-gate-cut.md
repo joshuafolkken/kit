@@ -17,20 +17,12 @@ the fallback.
 ## It applies to a dispatched lane child, and to nothing else
 
 A person's interactive `fullrun` never relaunches itself. A dispatched child is told apart
-**mechanically, by a mark the dispatch sets** — never by reading its own prompt.
+**mechanically, by the `JOSH_LANE_CHILD` mark the dispatch sets** — never by reading its own prompt
+(`docs/josh-commands-run.md` → "`josh run:cut`").
 
-### The dispatch mark
-
-`lane:dispatch` starts each child generation with **`JOSH_LANE_CHILD`** set to the lane's issue number
-(`scripts/lane/lane-child-marker.ts`).
-
-- **Meaning**: "this session was launched for issue `<N>`, not typed by a person."
-- **Lifetime**: the child process — set at launch, never written by the run itself.
-- **Trust**: only where its value equals the lane's own issue; a leaked mark naming another issue, or
-  none, is read as a person. An interactive `fullrun` carries no mark.
-
-The name, meaning and lifetime are documented here and nowhere else. `run:cut` itself looks for an
-**open lane** for the issue instead (`not-a-lane` otherwise), so it is safe to issue unconditionally.
+An interactive `fullrun` carries no mark, and every
+guard in this file holds that boundary: **It fires for a marked child and nowhere else**. `run:cut`
+answers `not-a-lane` outside a lane, so it is safe to issue unconditionally.
 
 ## Taking the cut
 
@@ -55,17 +47,8 @@ pnpm josh run:cut <N>
 ### The gate refuses until the cut has been taken
 
 `pnpm josh rule:guard` **refuses `pnpm josh gate`** in a lane with no cut record carried, handing back
-the command above.
-
-- **It fires for a marked child and nowhere else**: the working directory is `<lane root>/<issue
-  number>` **and** `JOSH_LANE_CHILD` names that issue. `run:cut` uses an open-lane lookup instead, so
-  the guard and the command need not agree byte for byte.
-- **It fires only when the current context warrants a cut** (`cost_cli.session_verdict`, as `run:cut`).
-- **It is silent once the cut is carried**.
-- **It fires once per run.**
-- **`--resume`, `--end` and `--json` do not count as taking the cut.**
-
-Its row: `prompts/collaboration-workflow/rule-delivery.md`.
+the command above — run it. When the guard fires: `docs/josh-commands-run.md` → "`josh run:cut`"; its
+row: `prompts/collaboration-workflow/rule-delivery.md`.
 
 ## Resuming — the fresh process's entry check
 

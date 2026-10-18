@@ -4,9 +4,8 @@ Point-of-use, read one section at a time from `backlogrun.md` → "The manifest 
 
 ## Concurrency: as many children per repository as it has free lanes
 
-**One session per repository**, each running only its own repository's children. The lane ceiling is
-`.claude/skills/epic-commands/SKILL.md` → "An `in-progress` issue occupies a lane"; a dependency that
-crosses a repository is `.claude/skills/epic-commands/SKILL.md` → "Epics that span repositories".
+**One session per repository**, each running only its own repository's children. The lane ceiling and a
+dependency that crosses a repository are `docs/josh-commands-backlog.md` → "`josh epic:next`".
 
 ## A solo run
 
@@ -31,7 +30,7 @@ stay serial.**
 
 **A lane child may cut its own turn before the gate** — `pre-gate-cut.md`, the single source. The
 child is told apart from a person, and handed its resume stage, by `JOSH_LANE_CHILD`
-(`pre-gate-cut.md` → "The dispatch mark" and "The stage is passed to the resumed child").
+(`docs/josh-commands-run.md` → "`josh run:cut`"; `pre-gate-cut.md` → "The stage is passed to the resumed child").
 
 **A lane's review does not inherit the lane, and `pnpm josh review:brief` is what closes that**: it
 prints the lane's root, branch and HEAD, targets written `git -C <root> …`, and a nonce the review

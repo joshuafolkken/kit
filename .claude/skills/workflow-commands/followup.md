@@ -31,8 +31,8 @@ A pre-merge failure stops the run; an unverifiable AI finding or CI failure need
 `confirmation` Telegram. A post-merge cleanup failure is named and does not undo the merge; run the
 named recovery without rerunning `followup`. The printed result is authoritative.
 
-After success, run `pnpm josh ms`; in a lane it refuses and the parent uses `pnpm josh lane:close <N>`.
-Never delete the branch unless requested. The sections below are read when the output needs reading.
+After the merge `run:tail` returns to the default branch — `ship` runs it; after a bare `followup`, run
+`pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested. The sections below are read when the output needs reading.
 
 ## The options
 
@@ -49,8 +49,6 @@ Never delete the branch unless requested. The sections below are read when the o
 
 Invoking `fullrun` is itself the explicit authorization to merge.
 
-- **Always run `pnpm josh ms` after a successful merge**. **In a lane, `pnpm josh lane:close <N>` is the
-  terminal step instead** — `josh ms` refuses there.
 - **Green CI is not authorization to merge while AI review findings are open.** A blocker sends a
   `confirmation` Telegram and exits non-zero — fix and re-run. SonarCloud is carried by the required
   `SonarQube` check.
@@ -78,40 +76,17 @@ re-run once CI has settled. Re-run after every follow-up commit.
 merges on main: <n>`. **Do not report a shipped version** — a child no longer bumps. See "When `pnpm
 josh release` runs" below.
 
-## Reading the stage-timing block
-
-One `followup stage: <name> <seconds>` row per stage, then `followup stages total:`.
-
-- **A failed run prints it too**, up to the stage that threw, named `interrupted`. The `merge` row
-  appears only on a run that merged.
-- **A row named `<a>-and-<b>` is a batch of requests sent together**; `checks-wait` is never
-  overlapped.
-- **The total is the sum of the stages**, not the wall clock — the post-merge tail sits outside it.
-
 A `failure` Telegram is sent **by hand, exactly once**, and only when recovery is given up:
 
 ```bash
 pnpm josh notify --task-type failure --issue-url "<issue-url>" --body-file <reason-file>
 ```
 
-## AI reviewer comment scan
+## What the output means
 
-`followup` scans top-level PR comments from AI reviewers **independently of CI status**.
-
-- **Blockers are structural, not NLP**: a Claude Review body with `### Issues`, `### Problem`,
-  `#### Logic bug` or a numbered `### 1. …` heading; a CodeRabbit `Actionable comments posted: N` with
-  N > 0. Rate-limit notices and sign-offs (`All issues resolved ✓`) match nothing.
-- **A standing blocker without `--ai-review-ignore-reason`** sends a `confirmation` Telegram and exits
-  non-zero; with it, the reason is posted and the run proceeds.
-- **A comment listing that could not be read is a standing blocker**.
-- **Temporary**: CodeRabbit is non-blocking end to end — out of the default required checks
-  (restore via `JOSH_REQUIRED_CHECKS`); its findings are audit notes.
-
-## Config file reporting
-
-`followup` matches every changed path against what `josh sync` distributes (`AI_COPY_FILES`,
-`AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`) and **reports** the claimed paths in the
-notification and the Issue report. **It stops nothing.** `pnpm josh sync:scope` gives the same answer.
+**A standing AI-review blocker** is fixed, or passed with `--ai-review-ignore-reason` once verified
+inapplicable. The stage-timing block, the blocker shapes and the config-claim report:
+`docs/josh-commands-automation.md` → "`josh followup`" and its detail document.
 
 ## When `pnpm josh release` runs
 
