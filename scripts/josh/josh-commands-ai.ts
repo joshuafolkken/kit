@@ -20,6 +20,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
 	},
+	'stash:push': {
+		script: 'scripts/git/stash/stash-push-cli.ts',
+		description: 'Stash the working tree, untracked files included, leaving the observation ledger',
+		category: 'AI tools',
+		reference: ['<message>', 'automation', ['git']],
+	},
 	'stash:pop': {
 		script: 'scripts/git/stash/stash-pop-cli.ts',
 		description: 'Pop the stash matching this message, not whichever a shared stack has on top',

@@ -89,6 +89,18 @@ function is_ledger_path(file_path: string): boolean {
 	)
 }
 
+// The git pathspec of every path but the ledger — the same paths `is_ledger_path` answers, for a git
+// command to leave out. `:/` and `top` anchor it at the repository root, so a command run from a
+// subdirectory still covers the whole tree and still leaves the root's ledger alone.
+const LEDGER_EXCLUSION_PATHSPEC: ReadonlyArray<string> = [
+	':/',
+	...LEDGER_DIRECTORIES.map((directory) => `:(top,exclude)${directory}`),
+	...LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) => `:(top,exclude)${legacy}`),
+	...LEGACY_OBSERVATION_LEDGER_PATHS.map(
+		(legacy) => `:(top,exclude,glob)${legacy}.*${MIGRATION_CLAIM_SUFFIX}`,
+	),
+]
+
 function is_ledger_line(line: string): boolean {
 	return is_ledger_path(status_path(line))
 }
@@ -124,6 +136,7 @@ const observation_ledger = {
 
 export {
 	LEDGER_DIRECTORIES,
+	LEDGER_EXCLUSION_PATHSPEC,
 	LEDGER_FILE_EXTENSION,
 	LEGACY_LEDGER_FILE,
 	LEGACY_OBSERVATION_LEDGER_DIRECTORY,

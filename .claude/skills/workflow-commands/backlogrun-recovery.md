@@ -27,7 +27,7 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 **On `stopped`, re-read with `pnpm josh run:status <N>`.** **A re-read carrying `needs-decision`** — the
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
 
-1. **Stash the half-finished work** — `git stash push -u -m "backlogrun: stopped unit for #<N>"` — and
+1. **Stash the half-finished work** — `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` — and
    record it on the Issue; it is popped by message, `pnpm josh stash:pop "backlogrun: stopped unit for
    #<N>"`, never positionally.
 2. **Classify and act in one call** — `pnpm josh run:merge <N> --output <path>` (`--epic <E> --repo

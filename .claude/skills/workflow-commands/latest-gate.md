@@ -26,10 +26,10 @@ judgement that the dependencies are probably still fresh.
 ## What runs when the answer is `required`
 
 ```bash
-git stash push -u -m "josh latest"    # only if the working tree has staged or modified files
+pnpm josh stash:push "josh latest"    # `clean` when nothing changed
 pnpm josh ms
 pnpm josh latest     # on `required` only
-pnpm josh stash:pop "josh latest"     # only if you stashed above — by message, never a positional pop
+pnpm josh stash:pop "josh latest"     # only after `stashed` above — by message, never a positional pop
 ```
 
 **The pop is by message, never a bare `git stash pop`** — the stash is a repository-wide stack every

@@ -6,6 +6,7 @@ import type { CommandUsage } from './josh-command-types'
 // `josh-usage-backlog.ts`, the review and delegation commands `josh-usage-review.ts`.
 const REPO = '--repo <owner/repo>'
 const BODY_FILE = '--body-file <path>'
+const DIR = '--dir <path>'
 const CONCURRENT = 'several numbers, read concurrently'
 const REPO_FLAG = {
 	names: [REPO],
@@ -214,6 +215,15 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 	},
 	'issue:backlinks': { examples: [{ arguments: '2123' }] },
 	'report:lint': { examples: [{ arguments: '< summary.md' }] },
+	'stash:push': {
+		examples: [{ arguments: '"backlogrun: josh latest before lanes"' }],
+		flags: [
+			{
+				names: [DIR],
+				description: 'stashes that work tree (`git -C <path>`); without it the current checkout.',
+			},
+		],
+	},
 	'stash:pop': {
 		examples: [
 			{ arguments: '"backlogrun: parked #2028"' },
@@ -224,7 +234,7 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 		],
 		flags: [
 			{
-				names: ['--dir <path>'],
+				names: [DIR],
 				description:
 					'applies the pop in that work tree (`git -C <path>`); without it the pop lands in the current checkout. The stack is shared, so it reads the same either way.',
 			},

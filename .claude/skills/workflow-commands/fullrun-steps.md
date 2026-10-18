@@ -47,10 +47,9 @@ with the labels `kickoff.md` → "Words typed after `new`" maps (per
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
 `<N>`. (3) Add `in-progress` (the bare hold named no issue):
 `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Record the agreed plan
-in the session language: `pnpm josh issue:plan <N> --body-file <path>`. (5) If the working tree already has staged or modified files,
-`git stash push -m "fullrun new: pre-existing changes" -- ':!.josh/observations'` first. (6) `pnpm josh ms`. (7)
+in the session language: `pnpm josh issue:plan <N> --body-file <path>`. (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
 `pnpm josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on
-`skip` neither runs (`latest-gate.md` is the single source). If you stashed in (5),
+`skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"` — by message, never a positional `git stash
 pop`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round
 runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether a second round is due**, once

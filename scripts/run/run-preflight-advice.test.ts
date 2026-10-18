@@ -15,7 +15,7 @@ describe('the advice names what the rule requires', () => {
 	it('stashes with -u and records the stash instead of popping it', () => {
 		const { advice } = run_preflight.decide({ ...CLEAN_TREE, is_dirty: true }, NO_WORK, ISSUE)
 
-		expect(advice).toContain(`git stash push -u -m "${run_preflight.STASH_LABEL_PREFIX}${ISSUE}"`)
+		expect(advice).toContain(`pnpm josh stash:push "${run_preflight.STASH_LABEL_PREFIX}${ISSUE}"`)
 		expect(advice).toContain(`Record the stash on ${session_cite.issue(ISSUE)}`)
 		expect(advice).not.toContain('git stash pop')
 	})

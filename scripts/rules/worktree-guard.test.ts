@@ -44,7 +44,7 @@ describe('worktree_guard.WORKTREE_MUTATION_REASON', () => {
 		'unauthorized working-tree change',
 		'pnpm josh stash:pop',
 		// The stash push is the documented flow's, never a substitute for the refused call.
-		'A documented flow stashes with `git stash push -u -m',
+		'A documented flow stashes with `pnpm josh stash:push',
 		'operating-rules.md',
 		'fires on every occurrence',
 		// joshuafolkken/kit#3648: the refusal has to lead to the substitution, not to a park.

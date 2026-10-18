@@ -15,16 +15,16 @@
    - Issue URL を必ず含め、箇条書きの間に改行を入れる
    - `kickoff` はここで**停止**する（実装に進まない）
 
-4. 作業ツリーに変更（ステージ済みを含む）が既にあれば退避する:
+4. 作業ツリーの変更を退避する（変更が無ければ `clean` と答えて何もしない）:
    ```bash
-   git stash push -u -m "plan: pre-existing changes"
+   pnpm josh stash:push "plan: pre-existing changes"
    ```
 5. メインブランチへ切り替えて最新を取得する:
    ```bash
    pnpm josh ms
    ```
 6. `pnpm josh latest:scope` が `required` と答えたときだけ `pnpm josh latest` を実行し、`dependency-update` スキルに従う（`.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
-   ステップ 4 で stash したら、ここでメッセージ指定で復元する（位置指定や引数なしの `git stash pop` は使わない — joshuafolkken/kit#2050）:
+   ステップ 4 が `stashed` と答えたら、ここでメッセージ指定で復元する（位置指定や引数なしの `git stash pop` は使わない — joshuafolkken/kit#2050）:
    ```bash
    pnpm josh stash:pop "plan: pre-existing changes"
    ```

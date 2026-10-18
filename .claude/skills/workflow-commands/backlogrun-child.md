@@ -16,7 +16,7 @@ or a split found mid-run does **not** stop it:
 1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
    confirmation.
 2. **Stash and remove `in-progress`**, as steps 2 and 4 of "A prerequisite discovered mid-run" do:
-   `git stash push -u -m "..."`, a `gh api repos/{owner}/{repo}/issues/<N>/comments` post recording the
+   `pnpm josh stash:push "..."`, a `gh api repos/{owner}/{repo}/issues/<N>/comments` post recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
 
@@ -97,10 +97,10 @@ Ask once, the first time the loop hands back a child number, before implementing
 
 ```bash
 pnpm josh latest:scope   # → required | skip ; the reason on stderr
-git stash push -u -m "backlogrun: josh latest #<N>"        # only if the tree has staged or modified files — never conditional on the answer
+pnpm josh stash:push "backlogrun: josh latest #<N>"        # `clean` when nothing changed — never conditional on the answer
 pnpm josh ms
 pnpm josh latest         # on `required` only
-pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only if you stashed above — by message, not a positional pop
+pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only after `stashed` above — by message, not a positional pop
 ```
 
 On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed

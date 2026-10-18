@@ -112,6 +112,8 @@ words:
   # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
   # review-subagent document rule checks against (joshuafolkken/kit#2297).
   - statusline
+  # `git_stash.has_stashable_changes` — what `josh stash:push` would set aside (joshuafolkken/kit#4131).
+  - stashable
   # `josh fanout` — the command that says whether implementation units are file-disjoint, so their
   # subagents may be launched in one fan-out turn (joshuafolkken/kit#2345).
   - fanout

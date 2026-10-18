@@ -1,8 +1,10 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
@@ -162,13 +164,13 @@ function to_reason(verdict: PreflightVerdict, tree: TreeState, child: ChildState
 // comment is the only thing that can ever bring it back.
 //
 // **The stash lines appear only over a dirty tree.** `reclaim` also answers a clean checkout parked on
-// a feature branch, and printing them there tells the caller to record a stash `git stash push` never
+// a feature branch, and printing them there tells the caller to record a stash `stash:push` never
 // created — an Issue comment naming nothing, under a rule that says the comment is what restores it.
 function reclaim_steps(tree: TreeState, issue: string): Array<string> {
 	if (!tree.is_dirty) return []
 
 	return [
-		`git stash push -u -m "${STASH_LABEL_PREFIX}${issue}"`,
+		`pnpm josh stash:push "${STASH_LABEL_PREFIX}${issue}"`,
 		`Record the stash on ${session_cite.issue(issue)} — the comment is what gets it popped; nothing pops it for you.`,
 	]
 }
@@ -211,9 +213,22 @@ function to_pr_state(raw: string): PrState {
 	return (state === undefined ? undefined : GH_PR_STATES.get(state)) ?? NO_PR
 }
 
+// Dirty means work `stash:push` would set aside: a tree whose only change is the observation ledger
+// would otherwise be told to stash, get `clean`, and be told to stash again. Unreadable is dirty, as
+// in `run_hold.is_tree_dirty`.
+async function has_stashable_work(): Promise<boolean> {
+	try {
+		return await git_stash.has_stashable_changes()
+	} catch (error) {
+		error_text.trace_swallowed('run_preflight.has_stashable_work', error)
+
+		return true
+	}
+}
+
 async function read_tree_state(): Promise<TreeState> {
 	const [is_dirty, current, default_branch] = await Promise.all([
-		run_hold.is_tree_dirty(),
+		has_stashable_work(),
 		git_command.branch(),
 		git_command.get_default_branch(),
 	])

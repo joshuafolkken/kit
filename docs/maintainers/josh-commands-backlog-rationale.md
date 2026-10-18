@@ -22,6 +22,7 @@ the behavior. joshuafolkken/kit#3280 moved these commands out of the automation 
 | `josh issue:lint`         | #2123, #2212, #2353                      |
 | `josh defect:rate`        | #2449, #2455                             |
 | `josh report:lint`        | #2123                                    |
+| `josh stash:push`         | #4131                                    |
 | `josh stash:pop`          | #2050                                    |
 | `josh epic:next`          | #2779                                    |
 | `josh auto-ok:next`       | #2928                                    |
@@ -71,6 +72,12 @@ A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変�
 ## `josh issue:backlinks` in detail
 
 **Verdicts:** `ok` (exit 0) when `## Upstream issues` lists repository-qualified references and each listed upstream cites `## Origin` back — a body with only `## Upstream candidate` (nothing filed yet) also reads `ok`; `missing-upstream` when no backlink heading is present; `missing-origin` when a listed upstream does not point back; `wrong-heading` for a near-miss heading (`## Upstream`), a bare `#N` reference, or a checkbox reference. Anything but `ok` exits 1.
+
+## `josh stash:push` in detail
+
+The skills once pushed in two forms: `-u` with no exclusion, and no `-u` with `.josh/observations` excluded. Each was right about one thing. Without `-u`, a new untracked `*.test.ts` stays behind and the next `pnpm josh ms` refuses it. Without the exclusion, the run's own observation-ledger lines leave the tree before its commit or the batch-end flush can carry them.
+
+`stash:push` does both: `-u` with the ledger excluded. A tree whose only changes are in the ledger is `clean` and pushes nothing, so a procedure can call it unconditionally and pop only after `stashed`.
 
 ## `josh stash:pop` in detail
 

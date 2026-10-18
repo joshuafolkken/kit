@@ -1,13 +1,15 @@
 import { fileURLToPath } from 'node:url'
 import { error_text } from '#scripts/lib/error-message'
 import { git_stash } from './git-stash'
-import { stash_pop_args, type Request } from './stash-pop-args'
+import { stash_args, type Request } from './stash-args'
 
 // `josh stash:pop "<message>"` — pop the stash whose message matches, and no other.
 // The stash stack is shared by every working tree of the repository, so a
 // procedure that pops by position takes whatever another lane last pushed. This resolves the
 // selector from the message and pops that entry alone; no match and more than one match are both
 // refusals rather than a guess at which was meant.
+
+const COMMAND = 'stash:pop'
 
 const POPPED_VERDICT = 'popped'
 const CONFLICTED_VERDICT = 'conflicted'
@@ -26,7 +28,7 @@ function report(verdict: string, detail: string, code: number): number {
 }
 
 function refuse(): number {
-	console.error(stash_pop_args.USAGE)
+	console.error(stash_args.usage(COMMAND))
 
 	return FAILURE_EXIT_CODE
 }
@@ -73,11 +75,11 @@ function report_unknown(error: unknown): number {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const parsed = stash_pop_args.read_arguments(argv)
+	const parsed = stash_args.read_arguments(argv)
 
 	if (parsed === undefined) return refuse()
 
-	const request = stash_pop_args.to_request(parsed)
+	const request = stash_args.to_request(parsed)
 
 	if (request === undefined) return refuse()
 

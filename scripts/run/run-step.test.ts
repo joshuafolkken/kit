@@ -85,7 +85,7 @@ describe('run_step.next_action — carry and state guards', () => {
 
 		expect(action.kind).toBe('decide')
 		expect(action.line).toContain(
-			`git stash push -u -m "${ISSUE}: uncommitted work at already-done"`,
+			`pnpm josh stash:push "${ISSUE}: uncommitted work at already-done"`,
 		)
 		expect(action.line).toMatch(NOT_A_PROCEDURE)
 	})
