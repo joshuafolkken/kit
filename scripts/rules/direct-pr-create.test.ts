@@ -31,6 +31,9 @@ describe('direct_pr_create.is_direct_pr_create — refuses', () => {
 		"sh -ec 'git push; gh pr create --fill'",
 		"bash --norc -c 'git push && gh pr create --fill'",
 		"ssh host 'cd x && gh pr create --fill'",
+		"env ssh host 'cd x && gh pr create --fill'",
+		"eval 'git push && gh pr create --fill'",
+		'echo `git push && gh pr create --fill`',
 		"echo hi # don't\ngh pr create --fill\necho 'ok'",
 	])('refuses %j', (command) => {
 		expect(direct_pr_create.is_direct_pr_create(command)).toBe(true)
@@ -54,6 +57,8 @@ describe('direct_pr_create.is_direct_pr_create — is silent on', () => {
 		'echo "gh pr create"',
 		// joshuafolkken/kit#4091: a quoted mention is not a call, and a help call creates nothing.
 		'grep -iE "x|gh pr create|y" file',
+		'grep -E "ssh|gh pr create|y" file',
+		'grep -E "eval|gh pr create|y" file',
 		'c=\'x; gh pr create --fill\'; echo "$c"',
 		"c='gh pr new --help'; jq -nc --arg c \"$c\" '{c: $c}'",
 		'gh pr create --help',

@@ -99,21 +99,29 @@ function is_pr_create_segment(segment: string): boolean {
 }
 
 // Quoted text the shell still runs: a command substitution, or the string `sh -c` (its `-c` alone or
-// in a cluster such as `-lc`, after any other flags), `ssh` or `eval` executes.
-const RUNS_QUOTED_TEXT = /\$\(|`|\bssh\b|\beval\b/u
+// in a cluster such as `-lc`, after any other flags), `ssh` or `eval` executes. `ssh` and `eval` count
+// only as the segment's program, so `grep -E "ssh|gh pr create"` stays one quoted pattern.
+const RUNS_QUOTED_TEXT = /\$\(|`/u
+const QUOTED_TEXT_RUNNERS: ReadonlySet<string> = new Set(['ssh', 'eval'])
 const SHELL_DASH_C = /\b(?:ba|da|k|z)?sh\s+(?:-\S+\s+)*-[A-Za-z]*c\b/u
 // A `#` comment hides its apostrophe from the shell but not from the quote pairing, so a multi-line
 // segment holding one may be lines the pairing joined (`# don't` … `'`) rather than one quoted span.
 const COMMENT_MARKER = /(?:^|\s)#/mu
 const LINE_BREAK = '\n'
 
-function is_runs_quoted_text(segment: string): boolean {
+function is_run_by_shell(segment: string): boolean {
 	if (RUNS_QUOTED_TEXT.test(segment) || SHELL_DASH_C.test(segment)) return true
+
+	return QUOTED_TEXT_RUNNERS.has(git_argv.program_of(segment)?.name ?? '')
+}
+
+function is_runs_quoted_text(segment: string): boolean {
+	if (is_run_by_shell(segment)) return true
 
 	return segment.includes(LINE_BREAK) && COMMENT_MARKER.test(segment)
 }
 
-// A segment whose quotes still run keeps the plain cut, so `bash -c 'git push && gh pr create'`
+// A segment whose quotes still run keeps the plain cut, so `bash -c 'git push && gh pr create --fill'`
 // is refused as it was before the quote-aware cut.
 function judged_segments(segment: string): Array<string> {
 	return is_runs_quoted_text(segment) ? shell_segments.commands_of(segment) : [segment]
