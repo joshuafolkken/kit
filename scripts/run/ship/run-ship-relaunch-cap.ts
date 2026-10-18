@@ -1,6 +1,6 @@
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -13,7 +13,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 // **The count is the issue's `ship-stop` events since its last fresh dispatch**: a relaunch into the
 // lane emits no `child-launch`, a dispatch does, so a re-dispatched issue starts a new budget. The
 // current stop is emitted before the count is read, so it is part of it. Past the cap the issue is
-// parked with `needs-decision`, which every offer and the lane broker already refuse to start.
+// parked with `run:stalled`, which every offer and the lane broker already refuse to start.
 // The whole stream is read, not the run's carry scope: the count scopes itself by issue and dispatch,
 // and a lane child shipping with no carry record (`lane:dispatch` outside a run, or a run already
 // ended) would otherwise read no events and relaunch without a cap.
@@ -41,14 +41,14 @@ function park_comment(issue: string, reason: string): string {
 	return [
 		`Parked by the \`josh ship\` supervisor: the ship stopped at \`${reason}\` after ${String(MAX_SHIP_STOP_RELAUNCHES)} relaunches of the lane child since its dispatch.`,
 		'',
-		`Read the stop with \`pnpm josh ship --log ${issue}\`, then remove \`needs-decision\` to offer it again.`,
+		`Read the stop with \`pnpm josh ship --log ${issue}\`, then fix the cause and remove \`${RUN_STALLED_LABEL}\` to offer it again.`,
 	].join('\n')
 }
 
 // The label is what keeps the issue from being re-dispatched; without it the stop stays a plain stop,
 // which `run:merge` books as an unanswered ship stop under its own outage cap.
 async function park(issue: string, reason: string): Promise<boolean> {
-	const is_parked = await git_gh_issue_write.issue_add_label(issue, NEEDS_DECISION_LABEL)
+	const is_parked = await git_gh_issue_write.issue_add_label(issue, RUN_STALLED_LABEL)
 
 	if (!is_parked) return false
 
@@ -59,7 +59,7 @@ async function park(issue: string, reason: string): Promise<boolean> {
 	await telegram_notify.warn({
 		issue_title: `Ship stop cap reached ${cite}`,
 		body: `The lane child stopped at ${reason} more than ${String(MAX_SHIP_STOP_RELAUNCHES)} times since its dispatch, so it was not relaunched and the issue is parked.`,
-		recovery: `Read pnpm josh ship --log ${issue}, then remove needs-decision to offer it again.`,
+		recovery: `Read pnpm josh ship --log ${issue}, then fix the cause and remove ${RUN_STALLED_LABEL} to offer it again.`,
 	})
 
 	return true

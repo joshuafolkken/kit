@@ -8,6 +8,7 @@ import {
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
@@ -36,6 +37,7 @@ const HEADING_ASSUMPTION =
 const UNREACHED_HEADING = 'Not reached — each names what it is waiting on:'
 const PARALLEL_NOTE = '(parallel)'
 const NEEDS_DECISION_NOTE = `waiting on a person (\`${NEEDS_DECISION_LABEL}\`)`
+const RUN_STALLED_NOTE = `stalled mechanically — fix the cause, then remove \`${RUN_STALLED_LABEL}\``
 const NOT_REACHED_NOTE = 'not reached by the waves above'
 const WAVE_GAP_WIDTH = 2
 const PARALLEL_GAP_WIDTH = 3
@@ -132,6 +134,7 @@ function build(result: EpicNextResult, repo: string, scope: GateScope = EMPTY_SC
 // as not reached instead.
 function unreached_note(child: EpicChild, context: PlanContext): string {
 	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return NEEDS_DECISION_NOTE
+	if (has_label_name(child.labels, RUN_STALLED_LABEL)) return RUN_STALLED_NOTE
 	const note = backlog_plan.waiting_note(child, context)
 
 	return note === backlog_plan.PAST_OFFER_NOTE ? NOT_REACHED_NOTE : note
@@ -174,6 +177,7 @@ const backlog_waves = {
 	HEADING_ASSUMPTION,
 	NEEDS_DECISION_NOTE,
 	PARALLEL_NOTE,
+	RUN_STALLED_NOTE,
 	UNREACHED_HEADING,
 	build,
 	format_waves,

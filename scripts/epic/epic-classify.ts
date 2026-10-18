@@ -1,9 +1,4 @@
-import {
-	ALREADY_DONE_LABEL,
-	has_label_name,
-	IN_PROGRESS_LABEL,
-	NEEDS_DECISION_LABEL,
-} from '#scripts/issue/issue-labels'
+import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_nested } from './epic-nested'
@@ -49,14 +44,12 @@ function has_label(child: EpicChild, label: string): boolean {
 	return has_label_name(child.labels, label)
 }
 
-// The labels that put a child in `human` on their own. `needs-decision` waits for an answer nobody
-// has given; `already-done` has its answer — the work is merged, and the close that is left is Tier C
-// and so a person's. Neither is resolved by waiting, which is what separates
-// them from `in-progress` below.
-const HUMAN_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
-
+// The park labels (`PARKED_LABELS`) put a child in `human` on their own. `needs-decision` waits for an
+// answer nobody has given; `already-done` has its answer — the work is merged, and the close that is
+// left is Tier C and so a person's; `run:stalled` waits on a person fixing a mechanical cause. None is
+// resolved by waiting, which is what separates them from `in-progress` below.
 function has_human_label(child: EpicChild): boolean {
-	return HUMAN_LABELS.some((label) => has_label(child, label))
+	return has_parked_label(child.labels)
 }
 
 // A child someone else's session is finishing, or one held until its declared start time

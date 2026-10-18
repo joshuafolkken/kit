@@ -1,5 +1,5 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import {
 	run_board_layout,
@@ -280,5 +280,23 @@ describe('run_board_layout.layout_of active order', () => {
 		)
 
 		expect(finished).toStrictEqual([true, true, true, false, false, false])
+	})
+})
+
+// joshuafolkken/kit#4102: a mechanical park asks nobody for a decision, so it stays out of 🙋.
+describe('run_board_layout.layout_of — a run:stalled child', () => {
+	it('draws it as stopped in the unreached section, never with the people', () => {
+		const plan = plan_of([], [child(33, [], [RUN_STALLED_LABEL])])
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
+
+		expect(layout.people).toStrictEqual([])
+		expect(layout.unreached.map((row) => [row.number, row.state])).toStrictEqual([[33, 'stopped']])
+	})
+
+	it('leaves it out of the waiting children', () => {
+		const plan = plan_of([[child(1), child(2, [], [RUN_STALLED_LABEL])]])
+		const waiting = run_board_layout.waiting_children({ plan, statuses: NO_STATUSES })
+
+		expect(waiting.map((item) => item.number)).toStrictEqual([1])
 	})
 })

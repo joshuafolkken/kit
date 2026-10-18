@@ -4,7 +4,11 @@ import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { IssueReference } from '#scripts/epic/epic-reference'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import {
+	has_label_name,
+	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_board_kind } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
@@ -199,13 +203,12 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 	return !overlay.statuses.has(child.number)
 }
 
-function is_human(child: EpicChild): boolean {
-	return has_label_name(child.labels, NEEDS_DECISION_LABEL)
-}
+// A plan row waits, unless it waits on a person's decision — the one wait the board marks — or the run
+// stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
+function plan_state(child: EpicChild): ItemState {
+	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return 'human'
 
-// A wave row waits, unless it waits on a person's decision — the one wait the board marks.
-function wave_state(child: EpicChild): ItemState {
-	return is_human(child) ? 'human' : 'waiting'
+	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
 }
 
 // One wave, its rows in the plan's order, an epic's children gathered under the epic where the first
@@ -214,7 +217,7 @@ function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Drawn): Array<Wav
 	const entries: Array<WaveEntry> = []
 
 	for (const child of wave) {
-		const row = plan_row(child, wave_state(child), overlay)
+		const row = plan_row(child, plan_state(child), overlay)
 		const epic = overlay.plan.tracked.get(child.number)
 
 		if (epic === undefined) entries.push({ kind: 'row', row })
@@ -234,11 +237,10 @@ function start_order(left: BoardRow, right: BoardRow): number {
 }
 
 function unreached_rows(overlay: Drawn, is_people: boolean): Array<BoardRow> {
-	const state: ItemState = is_people ? 'human' : 'waiting'
-
 	return overlay.plan.waves.unreached
-		.filter((child) => is_untouched(child, overlay) && is_human(child) === is_people)
-		.map((child) => plan_row(child, state, overlay))
+		.filter((child) => is_untouched(child, overlay))
+		.map((child) => plan_row(child, plan_state(child), overlay))
+		.filter((row) => (row.state === 'human') === is_people)
 		.toSorted(start_order)
 }
 
@@ -248,10 +250,10 @@ function children_of(plan: BoardPlan): Array<EpicChild> {
 }
 
 // The children whose rows wait on the run rather than on a person: the run has not touched them, and
-// no decision is asked of anyone.
+// it is neither parked for a decision nor stalled.
 function waiting_children(overlay: Overlay): Array<EpicChild> {
 	return children_of(overlay.plan).filter(
-		(child) => is_untouched(child, overlay) && !is_human(child),
+		(child) => is_untouched(child, overlay) && plan_state(child) === 'waiting',
 	)
 }
 

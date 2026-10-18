@@ -380,17 +380,19 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 - `--epic <E>` / `--repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
 - `--output <path>` — the transcript the outage split reads; absent, it is off.
+- `--driver` — the caller is `backlog:drive`, which has no context to cut, so the merge is never handed back `over`.
 
 <!-- /usage -->
 
 Confirms the child from GitHub and, by what it turned out to be, does the post-merge steps: a **merged**
 child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
-`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
-or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
+`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`,
+`run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API) has it dropped, unparked and uncounted, so re-dispatchable;
-a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `needs-decision`,
-and counts against the failure guard — unless it records an open blocker or a `- 実施可能日:` still
-ahead: then it is **waiting**, unparked and uncounted, its comment naming the wait.
+a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` — a
+mechanical failure, not a person's decision — and counts against the failure guard — unless it records
+an open blocker or a `- 実施可能日:` still ahead (or, its body unreadable, carries `not-before`): then it
+is **waiting**, unparked and uncounted, its comment naming the wait.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
 newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`.
 A **cut** child (OPEN, unparked, its lane holding a declared cut no successor adopted) is neither

@@ -1,12 +1,13 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import {
-	ALREADY_DONE_LABEL,
 	EPIC_LABEL,
 	has_label_name,
-	NEEDS_DECISION_LABEL,
+	has_parked_label,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { CarryChange, RunCarry } from '#scripts/run/carry/run-carry'
+import type { ChildOutcome } from './run-merge-outcome'
 
 // The pure core of `run:merge`, the one composite command for a `backlogrun` merge event: the parent —
 // the session whose context is largest and per-turn cost highest — calls `run:merge <N>` once at a
@@ -38,7 +39,7 @@ const ONE = 1
 //                   child a merged pull request's `closes #N` names — GitHub merged it without closing
 //                   the issue.
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (needs-human-review.md).
-// - `parked`      — OPEN and carrying `needs-decision` or `already-done`; a person still owns it.
+// - `parked`      — OPEN and carrying a park label (`PARKED_LABELS`); a person still owns it.
 // - `split`       — OPEN and carrying `epic`; its work was divided into new children.
 // - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API; not
 //                   the child's failure, so it is re-dispatchable and uncounted against the failure guard.
@@ -49,17 +50,7 @@ const ONE = 1
 // - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
 //                   GitHub state: closed as not planned, or about to be, it is neither merged nor failed.
 // - `unresolved`  — the state could not be read; re-read before deciding.
-type ChildOutcome =
-	| 'merged'
-	| 'withdrawn'
-	| 'human-review'
-	| 'parked'
-	| 'split'
-	| 'cut'
-	| 'outage'
-	| 'failed'
-	| 'unresolved'
-	| 'shipping'
+// The names themselves are `run-merge-outcome.ts`'s.
 
 // What the CLI read beside the GitHub state: whether the exit record is an API outage, and whether the
 // lane holds a cut its successor never adopted.
@@ -81,12 +72,10 @@ function is_closed(state: IssueState): boolean {
 	return state.state.toUpperCase() === CLOSED_STATE
 }
 
-// A parked child is one a person still owns: it stopped for a decision (`needs-decision`) or it was
-// found already merged (`already-done`). Either way it is left alone and not counted as a failure.
-const PARK_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
-
+// A parked child is one a person still owns (`PARKED_LABELS`): it is left alone and not counted as a
+// failure again.
 function is_parked(state: IssueState): boolean {
-	return PARK_LABELS.some((label) => has_label_name(state.labels, label))
+	return has_parked_label(state.labels)
 }
 
 // **CLOSED means merged, whatever labels it carries** — a child that finished and merged keeps the
@@ -173,7 +162,7 @@ function counters_comment(carry: RunCarry): string {
 }
 
 // Why the run parked a child it judged failed. A child that stops itself leaves its own comment; one
-// the driver stops leaves none, so this tells a person why it carries `needs-decision`.
+// the driver stops leaves none, so this tells a person why it carries `run:stalled`.
 // Script-emitted, so English.
 interface ParkReason {
 	child: string
@@ -192,11 +181,11 @@ function park_comment(reason: ParkReason): string {
 	const transcript = reason.output === undefined ? '' : ` (\`${reason.output}\`)`
 
 	return [
-		'Parked with `needs-decision` by `pnpm josh run:merge`, the `backlogrun` driver — not by the child itself.',
+		`Parked with \`${RUN_STALLED_LABEL}\` by \`pnpm josh run:merge\`, the \`backlogrun\` driver — a mechanical failure, with no decision to make.`,
 		`- Why: ${reason.cause}`,
-		'- Read: the issue is OPEN, carries none of `needs-decision`, `already-done`, `needs-human-review` or `epic`, and no merged pull request’s `closes #N` names it.',
+		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker or start date still ahead.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun ${issue_cite.plain(reason.child)}\`, or record the decision here and remove \`needs-decision\`.`,
+		`- Next: read the child’s transcript${transcript}, fix the cause, then resume it with \`fullrun ${issue_cite.plain(reason.child)}\` or remove \`${RUN_STALLED_LABEL}\` to offer it again.`,
 	].join('\n')
 }
 
@@ -223,5 +212,7 @@ const run_merge = {
 	is_outage_guard_tripped,
 }
 
-export type { ChildOutcome, EndingSignals, ParkReason }
+export type { EndingSignals, ParkReason }
 export { run_merge }
+
+export { type ChildOutcome } from './run-merge-outcome'

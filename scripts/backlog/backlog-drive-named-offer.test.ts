@@ -47,25 +47,29 @@ test('offers a named epic child from the epic instead of launching the root', as
 	epic.mockRestore()
 })
 
-test('never dispatches a named issue parked with needs-decision, and books it done', async () => {
-	const state = backlog_drive.initial_state([], ACTIVE)
-	const read = vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
-		kind: 'state',
-		state: { state: 'OPEN', labels: ['needs-decision'], is_human_review: false },
-	})
-	const mark_done = vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
+// joshuafolkken/kit#4102: a mechanical park (`run:stalled`) is booked the same as a decision park.
+test.each(['needs-decision', 'run:stalled'])(
+	'never dispatches a named issue parked with %s, and books it done',
+	async (label) => {
+		const state = backlog_drive.initial_state([], ACTIVE)
+		const read = vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+			kind: 'state',
+			state: { state: 'OPEN', labels: [label], is_human_review: false },
+		})
+		const mark_done = vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
 
-	const offer = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+		const offer = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
 
-	expect(offer).toMatchObject({ verdict: 'wait', issues: [] })
-	expect(mark_done).toHaveBeenCalledWith(
-		'1',
-		expect.objectContaining({ outcome: 'parked' }),
-		CONTEXT.owner,
-	)
-	read.mockRestore()
-	mark_done.mockRestore()
-})
+		expect(offer).toMatchObject({ verdict: 'wait', issues: [] })
+		expect(mark_done).toHaveBeenCalledWith(
+			'1',
+			expect.objectContaining({ outcome: 'parked' }),
+			CONTEXT.owner,
+		)
+		read.mockRestore()
+		mark_done.mockRestore()
+	},
+)
 
 test('offers the next named issue after the epic root is recorded done', async () => {
 	const state = backlog_drive.initial_state([], ACTIVE)

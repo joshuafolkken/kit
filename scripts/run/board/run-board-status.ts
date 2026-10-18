@@ -2,6 +2,7 @@ import {
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -284,6 +285,7 @@ function is_closed_running(issue: number, status: ItemStatus, read: OpenRead): b
 function labelled_state(labels: ReadonlyArray<string> | undefined): ItemState | undefined {
 	if (labels === undefined) return undefined
 	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return 'human'
+	if (has_label_name(labels, RUN_STALLED_LABEL)) return 'stopped'
 
 	return has_label_name(labels, IN_PROGRESS_LABEL) ? undefined : 'stopped'
 }

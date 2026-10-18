@@ -1,6 +1,7 @@
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { run_merge_driver } from './run-merge-driver'
 import { run_merge_ship } from './run-merge-ship'
 
 // A child interrupted by its environment — its session killed inside a turn, or its ship stopped with
@@ -106,4 +107,15 @@ it('parks a child that ended on its own', async () => {
 	await merge_child()
 
 	expect(do_failed_mock).toHaveBeenCalledOnce()
+})
+
+// joshuafolkken/kit#4102: `backlog:drive` branches on the outcome `run` prints under `--driver`.
+it('prints the whole result as the line the driver reads back under --driver', async () => {
+	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+	await run_merge_cli.run([CHILD, '--output', OUTPUT, run_merge_driver.DRIVER_FLAG])
+
+	const line: unknown = info.mock.lastCall?.at(0)
+
+	expect(run_merge_driver.read(String(line))).toMatchObject({ outcome: 'failed' })
 })

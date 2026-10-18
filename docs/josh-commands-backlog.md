@@ -582,7 +582,8 @@ Wave 2  #2765 [run:solo]
 Wave 3  #2774 #2766 #2769   (parallel)
 ```
 
-Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`, a row with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on), **Waiting on a person** (`needs-decision` children), **Out of scope** (every open issue the backlog will not run, with the reason).
+Sections: **Ready now** (runnable children, grouped by repository = the parallelism; a `run:solo` row is marked `[run:solo]`, a row with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on),
+**Waiting on a person** (parked children — `needs-decision`, `run:stalled` or `already-done` — each row naming its label), **Out of scope** (every open issue the backlog will not run, with the reason).
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".
 

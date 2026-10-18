@@ -5,8 +5,9 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
@@ -90,6 +91,8 @@ interface FailedResult {
 }
 
 const NO_WAITS: ReadonlyArray<string> = []
+// The wait a `not-before` label alone records: the label carries no date, only that one is ahead.
+const NOT_BEFORE_WAIT = 'a start date still ahead (`not-before`)'
 
 // A captured `pnpm josh` subprocess: its output is read back rather than inherited, and a non-zero
 // exit is a value to branch on rather than a throw. The step's stderr stays piped here — `run:merge`
@@ -308,10 +311,22 @@ async function open_blockers(child: string): Promise<ReadonlyArray<string>> {
 	}
 }
 
-// The child's declared start date while it is still ahead (joshuafolkken/kit#4076). A due date, none,
-// or a body nobody could read answers none, so the child is parked as before.
+// Whether the child carries `not-before` — the body's start date copied to a label. Read only where the
+// body could not be: the body is the source, so a label it no longer backs is never a wait.
+async function has_not_before_label(ctx: MergeContext): Promise<boolean> {
+	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
+
+	return read.kind === 'state' && has_label_name(read.state.labels, NOT_BEFORE_LABEL)
+}
+
+// The child's declared start date while it is still ahead (joshuafolkken/kit#4076), or its `not-before`
+// label when the body could not be read (joshuafolkken/kit#4102). A due date or none answers none, so
+// the child is parked as before.
 async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>> {
 	const body = await git_gh_command.issue_get_body(ctx.child, ctx.repo)
+
+	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : NO_WAITS
+
 	const date = issue_not_before.waiting_date(body)
 
 	return date === undefined ? NO_WAITS : [`start date ${date}`]
@@ -336,9 +351,10 @@ async function do_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Prom
 
 // A failed child: count the failure, end whatever of its process is still running (a child judged
 // abandoned that hung on a wait loop would otherwise answer the pgrep liveness check `alive` for its
-// issue number forever), drop the stale `in-progress`, and park it with `needs-decision` so the next
-// offer does not hand the same child straight back. Returns the record so the caller can read the
-// streak against the guard. Returns `is_refused: true` without touching labels when the carry record
+// issue number forever), drop the stale `in-progress`, and park it with `run:stalled` so the next
+// offer does not hand the same child straight back. Not `needs-decision`: the failure is mechanical,
+// and nothing is asked of a person but to fix its cause (joshuafolkken/kit#4102). Returns the record
+// so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the carry record
 // rejected the count. A park is always explained on the issue — `cause` says what was judged, and the
 // comment what was read and what a person does next.
 async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResult> {
@@ -349,7 +365,7 @@ async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResu
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
 	await release_child(ctx.child)
-	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
+	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, RUN_STALLED_LABEL)
 
 	if (is_parked) {
 		const reason = { child: ctx.child, cause, carry, output: ctx.output }

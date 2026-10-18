@@ -1,4 +1,8 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
@@ -267,6 +271,7 @@ function read_labelled(
 describe('run_board_status.settle_closed with the listing’s labels', () => {
 	it.each<[string, ReadonlyArray<string>, string]>([
 		['needs-decision as waiting on a person', [NEEDS_DECISION_LABEL, IN_PROGRESS_LABEL], 'human'],
+		['run:stalled as stopped, never a person', [RUN_STALLED_LABEL, IN_PROGRESS_LABEL], 'stopped'],
 		['no in-progress as stopped', ['bug'], 'stopped'],
 		['in-progress as still running', ['bug', IN_PROGRESS_LABEL], 'running'],
 	])('draws a running child labelled %s', (_label, labels, state) => {
