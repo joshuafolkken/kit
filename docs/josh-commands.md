@@ -18,7 +18,7 @@ These commands replace the corresponding `package.json` scripts; consumer projec
 
 ### `josh gate`
 
-Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) (kit only) and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
+Run the completion gate's checks — lint, type check, spell check, [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only), and unit tests — **concurrently**, running all to completion and reporting every failure in one pass.
 
 <!-- usage: gate -->
 

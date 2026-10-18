@@ -29,6 +29,14 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Maintenance',
 		reference: ['', 'developer', ['processes']],
 	},
+	'lockfile:policy': {
+		script: 'scripts/security/lockfile-policy.ts',
+		description:
+			"Verify the lockfile against pnpm's supply-chain policy (minimumReleaseAge) when it or the policy moved from the merge-base",
+		category: 'Maintenance',
+		reference: ['', 'automation', ['network']],
+		is_kit_only: true,
+	},
 	'audit:provision': {
 		script: 'scripts/security/security-audit-provision.ts',
 		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',
