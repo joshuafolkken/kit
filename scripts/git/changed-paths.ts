@@ -33,6 +33,14 @@ async function read_changed_since(commit: string): Promise<Array<string>> {
 	return [...new Set([...tracked, ...untracked])]
 }
 
-const changed_paths = { read_changed_paths, read_changed_since, to_paths }
+// The paths among `paths` the tree of `commit` held. An empty list asks git nothing, since
+// `ls-tree` with no path lists the whole tree.
+async function read_held_at(commit: string, paths: ReadonlyArray<string>): Promise<Array<string>> {
+	if (paths.length === 0) return []
+
+	return to_paths(await git_command.tree_names_at(commit, paths))
+}
+
+const changed_paths = { read_changed_paths, read_changed_since, read_held_at, to_paths }
 
 export { changed_paths }

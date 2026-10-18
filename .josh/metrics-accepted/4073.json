@@ -1,0 +1,7 @@
+{
+	"reason": "#4073 adds the no-test scope: a git ls-tree read of the map's tree, the recorded-file filter and the run path that skips vitest",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}

@@ -10,7 +10,11 @@ import { test_unit_guard } from './test-unit-guard'
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({
-	changed_paths: { read_changed_paths: vi.fn(), read_changed_since: vi.fn() },
+	changed_paths: {
+		read_changed_paths: vi.fn(),
+		read_changed_since: vi.fn(),
+		read_held_at: vi.fn(),
+	},
 }))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: {
@@ -32,6 +36,7 @@ const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_running = vi.mocked(test_unit_guard.is_running)
 const mocked_since = vi.mocked(changed_paths.read_changed_since)
+const mocked_held = vi.mocked(changed_paths.read_held_at)
 
 // Real paths in this repository, because the CLI drops a path the tree does not hold — a fixture
 // name would be filtered out before the assertion could see it.
@@ -83,6 +88,7 @@ beforeEach(() => {
 	mocked_before.mockResolvedValue(BEFORE_TREE)
 	mocked_running.mockReturnValue(true)
 	mocked_since.mockResolvedValue([])
+	mocked_held.mockResolvedValue([])
 	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
 })
 
@@ -258,6 +264,43 @@ describe('test_related.run_related_tests — the change a map answers for', () =
 		await test_related.run_related_tests([])
 
 		expect(mocked_changed).toHaveBeenCalledOnce()
+		expect(vitest_arguments()).toEqual(['run'])
+	})
+})
+
+// joshuafolkken/kit#4073: a change made only of files the map's tree held and no test read runs
+// nothing, and says so.
+describe('test_related.run_related_tests — a change no test reads', () => {
+	const UNREAD_DOCUMENT = 'LICENSE'
+
+	beforeEach(() => {
+		vi.mocked(test_read_map.read_map).mockReturnValue({ ...MAP, dirty: [] })
+		mocked_since.mockResolvedValue([UNREAD_DOCUMENT])
+		mocked_held.mockResolvedValue([UNREAD_DOCUMENT])
+	})
+
+	it('succeeds without starting vitest and prints why', async () => {
+		await expect(test_related.run_related_tests([])).resolves.toBe(0)
+
+		expect(mocked_run).not.toHaveBeenCalled()
+		expect(written_output()).toContain('running no tests')
+		expect(written_output()).toContain(UNREAD_DOCUMENT)
+	})
+
+	it('asks the map’s tree only about non-code files that did not already differ from it', async () => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
+		mocked_since.mockResolvedValue([UNREAD_DOCUMENT, CHANGED_SOURCE])
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_held).toHaveBeenCalledWith(MAP_COMMIT, [UNREAD_DOCUMENT])
+	})
+
+	it('runs the whole suite when the map’s tree cannot be read', async () => {
+		mocked_held.mockRejectedValue(new Error(GIT_FAILURE))
+
+		await test_related.run_related_tests([])
+
 		expect(vitest_arguments()).toEqual(['run'])
 	})
 })

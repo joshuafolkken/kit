@@ -177,7 +177,7 @@ async function resolve_command_scope(request: ScopeRequest): Promise<ChangedFile
 // describing a set the caller never handed over.
 function report_unusable_arguments(
 	command_arguments: ReadonlyArray<string>,
-	scope: ChangedFileScope,
+	scope: Pick<ChangedFileScope, 'files'>,
 	label: string,
 ): void {
 	const narrowed = new Set(scope.files)
@@ -196,6 +196,7 @@ const changed_file_scope = {
 	UNREADABLE_REASON,
 	describe_scope,
 	flags_of,
+	format_file_list,
 	is_flag,
 	read_changed_files,
 	report_unusable_arguments,

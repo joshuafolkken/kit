@@ -8,7 +8,7 @@ import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_read_map, type ReadMap } from './test-read-map'
-import { related_scope, type ScopeRequest } from './test-related-scope'
+import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
@@ -100,10 +100,50 @@ async function read_change(
 	return map === undefined ? { changed: await branch_change(), map } : await map_change(map)
 }
 
+// **The changed non-code files the map's tree held and that did not already differ from it** — the
+// ones whose having no reader in the map means no test reads them. A file that was dirty when the
+// map was recorded is left out, since the tree the tests read then was not the commit's. A git
+// failure holds none, which runs the whole suite on any of them.
+async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string>> {
+	const { changed, map } = change
+
+	if (changed === undefined || map === undefined) return new Set()
+
+	const dirty = new Set(map.dirty)
+	const candidates = changed.filter((file) => !related_scope.is_relatable(file) && !dirty.has(file))
+
+	return new Set(
+		await read_or_undefined(async () => await changed_paths.read_held_at(map.commit, candidates)),
+	)
+}
+
+// A change known to reach no test succeeds without starting vitest, and says why.
+async function run_scope(
+	scope: RelatedScope,
+	root: string,
+	command_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	const description = related_scope.describe_scope(scope, root)
+
+	if (scope.mode === 'none') {
+		process.stdout.write(`${description}\n`)
+
+		return 0
+	}
+
+	return await test_unit_guard.run_guarded_vitest(
+		process.cwd(),
+		related_scope.vitest_arguments(scope, changed_file_scope.flags_of(command_arguments)),
+		related_scope.COMMAND_NAME,
+		description,
+	)
+}
+
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const change = await read_change(root, command_arguments)
-	const scope = related_scope.resolve_scope({ root, ...change, is_present: existsSync })
+	const recorded = await recorded_files(change)
+	const scope = related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
 
 	// A non-code argument is resolved through the map rather than handed to vitest, so only the
 	// code arguments can be ones vitest was not given.
@@ -114,12 +154,7 @@ async function run_related_tests(command_arguments: ReadonlyArray<string>): Prom
 	)
 
 	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await test_unit_guard.run_guarded_vitest(
-		process.cwd(),
-		related_scope.vitest_arguments(scope, changed_file_scope.flags_of(command_arguments)),
-		related_scope.COMMAND_NAME,
-		related_scope.describe_scope(scope, root),
-	)
+	const exit_code = await run_scope(scope, root, command_arguments)
 
 	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
 		before: conclusive_tree(before),
