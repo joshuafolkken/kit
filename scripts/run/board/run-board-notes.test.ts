@@ -139,6 +139,17 @@ describe('run_board_notes.notes_of', () => {
 		expect(notes.at(-1)).toMatchObject({ text: 'Count the seats again', found_during: '3415' })
 	})
 
+	// joshuafolkken/kit#4097: the line leads with the number already.
+	it('drops the number a note opens with, and keeps a text that names another', () => {
+		const other = 'saw #4073 again'
+		const notes = run_board_notes.notes_of(
+			[event(KIND.NOTE, '#4073 auto-ok applied', 1), event(KIND.NOTE, other, 2)],
+			NO_TITLES,
+		)
+
+		expect(notes.map((note) => note.text)).toStrictEqual([other, 'auto-ok applied'])
+	})
+
 	it('keeps an Issue filed elsewhere qualified', () => {
 		const [note] = run_board_notes.notes_of(
 			[event(KIND.FILED, 'joshuafolkken/app-kit#12 Fix the port')],

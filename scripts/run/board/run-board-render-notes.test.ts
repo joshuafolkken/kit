@@ -268,14 +268,14 @@ describe('run_board_render.render filed this run', () => {
 	})
 
 	it('counts the line as one finding toward the limit, and names no 🆕 for it in the legend', () => {
-		const notes = Array.from({ length: run_board_render.NOTE_LIMIT - 1 }, (_, index) =>
+		const notes = Array.from({ length: run_board_render.NOTE_LIMIT - 2 }, (_, index) =>
 			note(NOW - index * MINUTE, `observation ${String(index)}`),
 		)
 		const lines = lines_of(listing(LISTED), [...listed, ...notes, filed_as(4040, 9)])
 
 		expect(lines).toContain(FILED_RUN)
-		expect(lines).toContain('  more 1')
-		expect(lines.at(-1)).toBe(`${NOTES_LEGEND}  💬 note`)
+		expect(lines.join('\n')).not.toContain('more')
+		expect(lines.at(-1)).toBe(`${NOTES_LEGEND}  🆕 filed  💬 note`)
 	})
 })
 
@@ -295,17 +295,15 @@ function seen_count(frame: ReadonlyArray<string>): number {
 }
 
 describe('run_board_render.render filed this run in a short pane', () => {
-	it('gives the line way as one finding, after the older ones', () => {
+	it('gives the line way as one finding, before the notes', () => {
 		const listed = LISTED.map((issue, index) => filed_as(issue, index))
 		const seen = [1, 2, 3].map((minutes) => note(NOW - minutes * MINUTE, `seen ${String(minutes)}`))
 		const frames = frames_of({ header: listing(LISTED), notes: [...listed, ...seen] })
 
 		expect(
-			frames.filter((frame) => seen_count(frame) > 0 && !frame.includes(FILED_RUN)),
+			frames.filter((frame) => frame.includes(FILED_RUN) && seen_count(frame) < seen.length),
 		).toHaveLength(0)
-		expect(
-			frames.some((frame) => frame.includes(FILED_RUN) && seen_count(frame) < seen.length),
-		).toBe(true)
+		expect(frames.some((frame) => !frame.includes(FILED_RUN) && seen_count(frame) > 0)).toBe(true)
 	})
 })
 
