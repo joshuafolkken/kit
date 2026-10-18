@@ -136,9 +136,17 @@ describe('issue_plan_cli.run — the title goes first and the label last', () =>
 
 		issue_comment.mockRejectedValue(new Error(refusal))
 
-		await expect(
-			issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE, TITLE_FLAG, TITLE, PLANNED_FLAG]),
-		).rejects.toThrow(refusal)
+		const code = await issue_plan_cli.run([
+			'7',
+			BODY_FILE_FLAG,
+			PLAN_FILE,
+			TITLE_FLAG,
+			TITLE,
+			PLANNED_FLAG,
+		])
+
+		expect(code).toBe(1)
+		expect(errors).toContain(refusal)
 		expect(issue_edit_title).toHaveBeenCalledWith('7', TITLE, undefined)
 		expect(issue_add_label).not.toHaveBeenCalled()
 	})

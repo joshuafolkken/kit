@@ -113,12 +113,23 @@ async function record_plan(request: PlanRequest): Promise<boolean> {
 	return request.is_planned ? await apply_planned_label(issue_number, repo) : true
 }
 
+// A refused write prints as one line, like a file-read failure, rather than escaping as a stack trace.
+async function try_record_plan(request: PlanRequest): Promise<boolean> {
+	try {
+		return await record_plan(request)
+	} catch (error) {
+		console.error(error_text.message_of(error))
+
+		return false
+	}
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const request = resolve_request(argv)
 
 	if (request === undefined) return FAILURE_EXIT_CODE
 
-	return (await record_plan(request)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return (await try_record_plan(request)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

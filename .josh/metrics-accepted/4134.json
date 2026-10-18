@@ -1,8 +1,8 @@
 {
-	"reason": "Review round 1 fixes: issue:plan gains --repo threaded through the issue write helpers, plus tests pinning repo threading and write ordering; kickoff's split path now states the title rename it lost",
+	"reason": "Round-2 review fixes: issue:plan prints a refused write as one line instead of a stack trace, and the --repo paths of issue_edit_body/issue_edit_title/issue_comment gain write-layer tests",
 	"date": "2026-10-18",
 	"growth": {
-		"scripts.code_lines": 162,
+		"scripts.code_lines": 170,
 		"prose.long_paragraphs": 1
 	}
 }
