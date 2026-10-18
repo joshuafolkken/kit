@@ -1,0 +1,2 @@
+- rf:project-conventions | low | scripts/behavior/behavior-rules.ts:94 | 2026-10-18 | #4086
+- rf:comments | low | scripts/behavior/behavior-rules.ts:88 | 2026-10-18 | #4086

@@ -122,7 +122,8 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 
 	return {
 		usual: run_board_usual.usual_of(entries),
-		is_memory_held: lane_held_stats.open_reason(entries) === backlog_drive_memory.HOLD_REASON,
+		is_memory_held:
+			lane_held_stats.open_reason(entries, Date.now()) === backlog_drive_memory.HOLD_REASON,
 	}
 }
 

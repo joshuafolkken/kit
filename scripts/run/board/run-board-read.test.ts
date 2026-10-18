@@ -162,6 +162,8 @@ describe('run_board_read.read_local memory hold', () => {
 	function arrange_ledger(entries: ReadonlyArray<LedgerEntry>): void {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
 		vi.spyOn(lane_ledger, 'read_entries').mockReturnValue(entries)
+		// Inside the hold's cap, so the open hold is not read as a driver killed while held.
+		vi.spyOn(Date, 'now').mockReturnValue(Date.parse(INSIDE.at))
 	}
 
 	it('reads a memory hold the ledger leaves open', async () => {

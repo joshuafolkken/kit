@@ -92,17 +92,21 @@ describe('lane_held_stats.table — a memory hold', () => {
 // joshuafolkken/kit#4084: `run:board` reads the driver's memory hold off the hold still open.
 describe('lane_held_stats.open_reason', () => {
 	it('reads the reason of the last hold nothing ended', () => {
-		expect(lane_held_stats.open_reason([held(BLOCKED, 20), held(MEMORY, 10)])).toBe(MEMORY)
+		expect(lane_held_stats.open_reason([held(BLOCKED, 20), held(MEMORY, 10)], NOW)).toBe(MEMORY)
 	})
 
 	it('reads no reason once a dispatch or a release ended the last hold', () => {
 		const released: LedgerEntry = { kind: 'released', at: minutes_before_now(5) }
 
-		expect(lane_held_stats.open_reason([held(MEMORY, 10), dispatch(5)])).toBeUndefined()
-		expect(lane_held_stats.open_reason([held(MEMORY, 10), released])).toBeUndefined()
+		expect(lane_held_stats.open_reason([held(MEMORY, 10), dispatch(5)], NOW)).toBeUndefined()
+		expect(lane_held_stats.open_reason([held(MEMORY, 10), released], NOW)).toBeUndefined()
+	})
+
+	it('reads no reason from a hold past the cap, a driver killed while held', () => {
+		expect(lane_held_stats.open_reason([held(MEMORY, LONG_AGO_MINUTES)], NOW)).toBeUndefined()
 	})
 
 	it('reads no reason from a ledger without a hold', () => {
-		expect(lane_held_stats.open_reason([])).toBeUndefined()
+		expect(lane_held_stats.open_reason([], NOW)).toBeUndefined()
 	})
 })

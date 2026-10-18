@@ -113,6 +113,19 @@ describe('backlog_drive_memory.gauge — swap', () => {
 
 		await expect(holds_over(swapped)).resolves.toStrictEqual([false, false])
 	})
+
+	it('keeps a swap hold through a reading too close to measure a rate of its own', async () => {
+		const swapped = [
+			{ at_ms: 0, memory: { available_mb: TOTAL_MB, swapped_mb: 0 } },
+			{ at_ms: SECOND_MS, memory: { available_mb: TOTAL_MB, swapped_mb: RED_SWAP_MB } },
+			{
+				at_ms: SECOND_MS + HALF_SECOND_MS,
+				memory: { available_mb: TOTAL_MB, swapped_mb: RED_SWAP_MB },
+			},
+		]
+
+		await expect(holds_over(swapped)).resolves.toStrictEqual([false, true, true])
+	})
 })
 
 describe('backlog_drive.run_loop — a memory hold', () => {

@@ -58,24 +58,35 @@ const PRODUCTION: GaugePorts = { read: machine_capacity.read_sample, now: Date.n
 // What one gauge carries between calls.
 interface GaugeMemo {
 	last: MachineMark | undefined
+	// The last swap rate measured, kept for a reading too close to the last to measure its own.
+	swap_mb_per_s: number | undefined
 	is_held: boolean
 }
 
 // The reading's gauges, the rate measured from the last reading at least `MIN_RATE_MS` old; the last
-// moves on only then, so two close calls keep measuring from the same one.
+// moves on only then, so two close calls keep measuring from the same one. A reading too close to
+// measure keeps the last rate measured, so a held machine still swapping does not read 0 and resume.
+function is_rate_of(last: MachineMark | undefined, mark: MachineMark): last is MachineMark {
+	return last !== undefined && mark.at_ms - last.at_ms >= MIN_RATE_MS
+}
+
 function rated(memo: GaugeMemo, mark: MachineMark): MemoryGauges {
 	const { last } = memo
-	const is_rated = last !== undefined && mark.at_ms - last.at_ms >= MIN_RATE_MS
+	const is_rated = is_rate_of(last, mark)
 
 	if (last === undefined || is_rated) memo.last = mark
 
-	return run_board_machine.gauges_of(is_rated ? last : undefined, mark)
+	const gauges = run_board_machine.gauges_of(is_rated ? last : undefined, mark)
+
+	if (is_rated) memo.swap_mb_per_s = gauges.swap_mb_per_s
+
+	return { ...gauges, swap_mb_per_s: memo.swap_mb_per_s }
 }
 
 // The production `memory_held` port: each call reads the machine once, and the hold is carried
 // between calls — a held machine waits for the resume, a free one for the stop.
 function gauge(ports: GaugePorts = PRODUCTION): () => Promise<boolean> {
-	const memo: GaugeMemo = { last: undefined, is_held: false }
+	const memo: GaugeMemo = { last: undefined, swap_mb_per_s: undefined, is_held: false }
 
 	return async function memory_held(): Promise<boolean> {
 		const gauges = rated(memo, { sample: await ports.read(), at_ms: ports.now() })
