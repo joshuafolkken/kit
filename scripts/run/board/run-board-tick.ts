@@ -126,16 +126,15 @@ function activity_here(local: LocalRead): RunActivity {
 
 type RoomRead = Pick<
 	ReasonRead,
-	'free_lanes' | 'occupied_lanes' | 'lane_limit' | 'idle_lanes' | 'is_memory_held' | 'gauges'
+	'free_lanes' | 'occupied_count' | 'lane_limit' | 'is_memory_held' | 'gauges'
 >
 
 // The room a waiting row is weighed against: the lanes under the limit, and the machine's memory.
 function room_of(state: BoardState, local: LocalRead): RoomRead {
 	return {
 		free_lanes: local.free_lanes,
-		occupied_lanes: local.occupied_lanes,
+		occupied_count: local.occupied_count,
 		lane_limit: local.lane_limit,
-		idle_lanes: local.idle_lanes,
 		is_memory_held: local.is_memory_held,
 		gauges: state.gauges,
 	}

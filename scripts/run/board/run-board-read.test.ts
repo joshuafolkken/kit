@@ -90,7 +90,7 @@ afterEach(() => {
 })
 
 // The one lane against the limit, as `lane:limit` counts it.
-const LANE_ROOM = { free_lanes: FREE_LANES, lane_limit: LANE_LIMIT, occupied_lanes: ['3432'] }
+const LANE_ROOM = { free_lanes: FREE_LANES, lane_limit: LANE_LIMIT, occupied_count: 1 }
 
 describe('run_board_read.read_local', () => {
 	it('reads the ended run with its end, its scope and only the events inside it', async () => {

@@ -5,6 +5,7 @@ import {
 	run_board_layout,
 	type BoardLayout,
 	type BoardPlan,
+	type RowReason,
 	type WaveEntry,
 } from './run-board-layout'
 import type { ItemStatus } from './run-board-status'
@@ -228,6 +229,29 @@ describe('run_board_layout.layout_of outside the waves', () => {
 		expect(wave_numbers(layout)).toStrictEqual([[3]])
 		expect(run_board_layout.is_settled('merged')).toBe(true)
 		expect(run_board_layout.is_settled('running')).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4104: the ⏳ rows keep the plan's order ahead of the 📅 rows, which follow from the
+// earliest start — two on the same day by the time.
+const STARTS: ReadonlyMap<number, number> = new Map([
+	[41, Date.parse('2999-03-01T09:00Z')],
+	[43, Date.parse('2999-01-02T15:00Z')],
+	[44, Date.parse('2999-01-02T08:00Z')],
+])
+
+function start_reason(item: EpicChild): RowReason {
+	const not_before_ms = STARTS.get(item.number)
+
+	return { text: 'waits', ...(not_before_ms !== undefined && { not_before_ms }) }
+}
+
+describe('run_board_layout.layout_of unreached order', () => {
+	it('draws the waiting rows first, then the rows waiting on a start time from the earliest', () => {
+		const unreached = [41, 42, 43, 44, 45].map((number) => child(number))
+		const layout = run_board_layout.layout_of(plan_of([], unreached), NO_STATUSES, start_reason)
+
+		expect(layout.unreached.map((row) => row.number)).toStrictEqual([42, 45, 44, 43, 41])
 	})
 })
 

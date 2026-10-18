@@ -41,8 +41,8 @@ interface RowReason {
 	// When the row entered a stage, where the reason is one — how long it has stood there is counted
 	// from it.
 	since_ms?: number | undefined
-	// The row waits on the start time its body declares, which it leads with 📅 rather than ⏳.
-	is_not_before?: boolean | undefined
+	// The start time its body declares and the row waits on, which it leads with 📅 rather than ⏳.
+	not_before_ms?: number | undefined
 }
 
 // What a waiting child's row says after its blockers; `undefined` says nothing.
@@ -227,11 +227,21 @@ function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Drawn): Array<Wav
 	return entries
 }
 
+// A row waiting on no start time keeps its plan place ahead of every 📅 row, which follow from the
+// earliest start (joshuafolkken/kit#4104).
+function start_order(left: BoardRow, right: BoardRow): number {
+	const { not_before_ms: left_ms = -Infinity } = left.reason ?? {}
+	const { not_before_ms: right_ms = -Infinity } = right.reason ?? {}
+
+	return compared(left_ms, right_ms)
+}
+
 function unreached_rows(overlay: Drawn, is_people: boolean): Array<BoardRow> {
 	return overlay.plan.waves.unreached
 		.filter((child) => is_untouched(child, overlay))
 		.map((child) => plan_row(child, plan_state(child), overlay))
 		.filter((row) => (row.state === 'human') === is_people)
+		.toSorted(start_order)
 }
 
 // Every issue the plan holds, wave or unreached.
