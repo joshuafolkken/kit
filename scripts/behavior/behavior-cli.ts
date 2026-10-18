@@ -13,8 +13,8 @@ import { behavior_rules } from './behavior-rules'
 // **The scope is the current run, not the whole corpus.** The store holds thousands of transcripts
 // and over a gigabyte; walking all of it every gate would cost minutes, not the seconds the other
 // checks take. Each gate checks its own run, so across runs the whole corpus is covered a run at a
-// time — and the engine stays general, so a broad scan of past runs (the greenness check this seed
-// assertion was verified with) is the same walk over a different set of files.
+// time — and the engine stays general, so a broad scan of past runs (the greenness check each
+// assertion is verified with) is the same walk over a different set of files.
 
 const PASS_EXIT_CODE = 0
 const FAIL_EXIT_CODE = 1
