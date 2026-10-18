@@ -228,6 +228,22 @@ The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared wi
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:comment` in detail".
 
+### `josh issue:already-done`
+
+The exit for an Issue whose work is already merged (`issue-comments.md` → "When the work turns out to be already merged"): post the evidence comment, apply `already-done`, then `run:release <N>`, stopping at the first step that fails. An empty evidence file is refused before anything is written. The Issue is never closed.
+
+<!-- usage: issue:already-done -->
+
+```bash
+pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, label, release — in that order
+```
+
+**Options:**
+
+- `--evidence-file <path>` — the evidence comment: the merging PR or commit and, per acceptance criterion, its `file:line`. An empty file is refused before anything is written.
+
+<!-- /usage -->
+
 ### `josh pkg:scout`
 
 Before the Package-First tier decision, rank candidate packages by measured metrics so Tier A ("clearly best") and Tier B ("genuine toss-up") are read off the output rather than judged. It queries the npm registry and prints one line per candidate: npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
