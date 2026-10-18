@@ -108,7 +108,7 @@ const RUN_USAGE: Readonly<Record<string, CommandUsage>> = {
 		examples: [
 			{ arguments: '1839', note: 'take the cut and hand it to a fresh process' },
 			{
-				arguments: '--impl 1839 --handoff .claude/tmp/handoff-1839.json',
+				arguments: '--impl 1839 --handoff .josh/tmp/handoff-1839.json',
 				note: 'cut mid-implementation, carrying the instruction',
 			},
 			{ arguments: '--resume 1839', note: "a fresh process's entry check" },

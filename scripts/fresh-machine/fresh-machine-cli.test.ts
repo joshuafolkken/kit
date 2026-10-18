@@ -169,7 +169,7 @@ describe('fresh_machine_cli.run — the log', () => {
 
 		expect(request()).toMatchObject({
 			run_name: `${INIT_PATTERN}-1`,
-			log_path: path.join(paths_mock.root, '.claude/tmp/fresh-machine', `${INIT_PATTERN}-1.log`),
+			log_path: path.join(paths_mock.root, '.josh/tmp/fresh-machine', `${INIT_PATTERN}-1.log`),
 			is_rebuild: false,
 		})
 	})

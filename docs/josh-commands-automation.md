@@ -353,7 +353,7 @@ pnpm josh fresh:run --spec fresh/html-init.json   # a scenario another toolkit w
 - `--list` — print the pattern names and run nothing.
 - `--spec <file.json>` — run the scenario in this file instead of a named pattern; the path is relative to the project root.
 - `--package-version <version>` — the published version a `package_source: published` scenario installs. Default: the registry's latest version of the package the command is run from.
-- `--log-dir <dir>` — where the log is written. Default: `.claude/tmp/fresh-machine`.
+- `--log-dir <dir>` — where the log is written. Default: `.josh/tmp/fresh-machine`.
 - `--rebuild` — build the machine image without the layer cache.
 
 <!-- /usage -->
