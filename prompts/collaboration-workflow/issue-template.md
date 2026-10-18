@@ -1,6 +1,6 @@
 ## Step 1: Issue 作成テンプレ
 
-タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` で書き換える。本文は次のテンプレートの節をすべて含める:
+タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `pnpm josh issue:plan <N> --body-file <path> --title "<title>"` で計画と一緒に書き換える。本文は次のテンプレートの節をすべて含める:
 
 ````md
 ## 背景

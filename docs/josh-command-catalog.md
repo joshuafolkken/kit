@@ -1155,6 +1155,16 @@ Check an issue body file for the template's required headings
 
 ---
 
+### `josh issue:plan`
+
+> **Audience:** automation · **Side effects:** network
+
+`<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]`
+
+Record a plan: normalize the title, fill a blank body or comment, apply run:planned
+
+---
+
 ### `josh issue:read`
 
 > **Audience:** automation · **Side effects:** network

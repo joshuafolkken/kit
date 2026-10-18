@@ -89,6 +89,11 @@ const BODY_FIELD_PATTERN = /\bbody=/u
 const ISSUE_COMMENT_PATTERN = /\bgh\s+issue\s+comment\b/u
 const BODY_FLAG_PATTERN = /--body(?:-file)?\b/u
 
+// `josh issue:plan` posts the plan under no API path of its own, so it is named outright — **as the
+// command run**, at the start or after a `;` / `&&` / `|`, so a grep or a commit message that merely
+// quotes it is not the call.
+const ISSUE_PLAN_PATTERN = /(?:^|[;&|]\s*)pnpm\s+josh\s+issue:plan\b/u
+
 // **The add form, not the label's name anywhere in the command.** The prerequisite branch removes the
 // same label with `-X DELETE …/labels/in-progress`, which is a run ending its hold on an issue rather
 // than opening one — matched loosely, that call would move the run's start to somewhere near its end.
@@ -159,6 +164,10 @@ function is_issue_comment(command: string): boolean {
 	return ISSUE_COMMENT_PATTERN.test(command) && BODY_FLAG_PATTERN.test(command)
 }
 
+function is_plan_write(command: string): boolean {
+	return is_api_body_write(command) || is_issue_comment(command) || ISSUE_PLAN_PATTERN.test(command)
+}
+
 function is_in_progress_label(command: string): boolean {
 	return ISSUE_LABELS_PATTERN.test(command) && command.includes(IN_PROGRESS_FIELD)
 }
@@ -216,7 +225,7 @@ function bash_issue(command: string): number {
 function bash_marker(command: string): PhaseMarker {
 	if (is_run_start(command)) return WORKFLOW_MARKER
 
-	return is_api_body_write(command) || is_issue_comment(command) ? PLAN_MARKER : NO_MARKER
+	return is_plan_write(command) ? PLAN_MARKER : NO_MARKER
 }
 
 const time_markers = {

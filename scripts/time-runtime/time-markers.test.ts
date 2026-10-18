@@ -82,6 +82,21 @@ describe('time_markers.bash_marker', () => {
 		)
 	})
 
+	it('marks josh issue:plan, which records the plan under no API path', () => {
+		expect(time_markers.bash_marker('pnpm josh issue:plan 1269 --body-file plan.md')).toBe(
+			time_markers.PLAN_MARKER,
+		)
+		expect(time_markers.bash_marker('cd /lane && pnpm josh issue:plan 1269 --body-file p.md')).toBe(
+			time_markers.PLAN_MARKER,
+		)
+	})
+
+	it('leaves a command that only quotes josh issue:plan unmarked', () => {
+		expect(time_markers.bash_marker("grep -rn 'pnpm josh issue:plan' docs")).toBe(
+			time_markers.NO_MARKER,
+		)
+	})
+
 	it('marks a body passed as a file, which carries no body= at all', () => {
 		expect(time_markers.bash_marker('gh issue comment 1269 --body-file plan.md')).toBe(
 			time_markers.PLAN_MARKER,

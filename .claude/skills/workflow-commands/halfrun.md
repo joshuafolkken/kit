@@ -15,8 +15,8 @@ entry sequence and the stop branches are `entry-sequence.md`.
 
 ## The step list
 
-`halfrun #<N>`: read Issue #N and its comments → **normalize the title** (same as
-`fullrun`) → post the agreed plan only if the body is blank → `pnpm josh ms`, then `pnpm
+`halfrun #<N>`: read Issue #N and its comments → **record the agreed plan**, normalizing
+the title (`pnpm josh issue:plan`, same as `fullrun`) → `pnpm josh ms`, then `pnpm
 josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; the
 `dependency-update` skill) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
