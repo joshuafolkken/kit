@@ -1,12 +1,12 @@
 import { json_value } from '#scripts/lib/json-value'
+import { direct_pr_create } from '#scripts/rules/direct-pr-create'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import type { Block, TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
 import type { Assertion, Finding } from './behavior-assertion'
 
-// The behavior assertions checked against recorded transcripts. This is the
-// **seed set** — the issue's own plan is to land one rule that is green across the recorded corpus,
-// then add more one at a time, each verified green before it joins. Starting with many would land a
-// wall of red that says nothing about which behavior actually regressed.
+// The behavior assertions checked against recorded transcripts. Rules join one at a time, each
+// verified green across the recorded corpus first — starting with many would land a wall of red that
+// says nothing about which behavior actually regressed.
 
 const BASH_TOOL = 'Bash'
 const TOOL_USE = 'tool_use'
@@ -98,46 +98,69 @@ function denied_call_ids(lines: ReadonlyArray<TranscriptLine>): ReadonlySet<stri
 	)
 }
 
-// The direct index mutations one transcript line ran, each as a finding at that line's position. A
-// line is one assistant content block, so its position is a place a reader can open in the file.
-function line_mutations(
+// The Bash calls that ran on one transcript line and broke the rule, each as a finding at that line's
+// position. A line is one assistant content block, so its position is a place a reader can open.
+function line_findings(
 	line: TranscriptLine,
-	index: number,
+	position: number,
 	denied_ids: ReadonlySet<string>,
+	rule: BashRule,
 ): ReadonlyArray<Finding> {
 	return line.blocks
 		.filter((block) => !denied_ids.has(block.id))
 		.map((block) => command_of(block))
-		.filter((command): command is string => command !== undefined && is_index_mutation(command))
-		.map((command) => ({
-			assertion: INDEX_ASSERTION_NAME,
-			position: index + FIRST_POSITION_OFFSET,
-			detail: command,
-		}))
+		.filter((command): command is string => command !== undefined && rule.is_violation(command))
+		.map((command) => ({ assertion: rule.name, position, detail: command }))
 }
 
-function scan_index_mutation(lines: ReadonlyArray<TranscriptLine>): ReadonlyArray<Finding> {
-	const denied_ids = denied_call_ids(lines)
-
-	return lines.flatMap((line, index) => line_mutations(line, index, denied_ids))
+interface BashRule {
+	name: string
+	describe: string
+	is_violation: (command: string) => boolean
 }
 
-const index_mutation_assertion: Assertion = {
+// One assertion over the Bash calls a run actually executed: a call the permission layer or a
+// PreToolUse hook refused never ran, so it breaks nothing.
+function bash_assertion(rule: BashRule): Assertion {
+	function scan(lines: ReadonlyArray<TranscriptLine>): ReadonlyArray<Finding> {
+		const denied_ids = denied_call_ids(lines)
+
+		return lines.flatMap((line, index) =>
+			line_findings(line, index + FIRST_POSITION_OFFSET, denied_ids, rule),
+		)
+	}
+
+	return { name: rule.name, describe: rule.describe, scan }
+}
+
+const index_mutation_assertion = bash_assertion({
 	name: INDEX_ASSERTION_NAME,
 	describe: 'git staging or commit must go through `pnpm josh git`, never a direct git call',
-	scan: scan_index_mutation,
-}
+	is_violation: is_index_mutation,
+})
 
-// The seed set: every rule green across the recorded corpus today. A new rule is appended here only
-// after it has been verified green against past real runs.
-const ALL_ASSERTIONS: ReadonlyArray<Assertion> = [index_mutation_assertion]
+// The matcher is the `direct-pr-create` guard's own, so the assertion and the refusal cannot drift. The
+// guard refuses every match, so a finding means a direct PR call ran past it — every run since the
+// guard landed is green; the only hits in the corpus predate it.
+const PR_CREATE_ASSERTION_NAME = 'no-direct-pr-create'
+const pr_create_assertion = bash_assertion({
+	name: PR_CREATE_ASSERTION_NAME,
+	describe: 'a pull request must be opened with `pnpm josh pr`, never `gh pr create` or `gh api`',
+	is_violation: direct_pr_create.is_direct_pr_create,
+})
+
+// Every rule green across the recorded corpus. A new rule is appended here only after it has been
+// verified green against past real runs.
+const ALL_ASSERTIONS: ReadonlyArray<Assertion> = [index_mutation_assertion, pr_create_assertion]
 
 const behavior_rules = {
 	ALL_ASSERTIONS,
 	INDEX_ASSERTION_NAME,
+	PR_CREATE_ASSERTION_NAME,
 	command_of,
 	index_mutation_assertion,
 	is_index_mutation,
+	pr_create_assertion,
 }
 
 export { behavior_rules }
