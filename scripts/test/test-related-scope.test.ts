@@ -34,6 +34,7 @@ const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
 	dirty: [],
+	directories: ['docs', 'lib', 'notes', 'scripts'],
 	readers: {
 		[DOCUMENT_FILE]: [READER_FILE],
 		[path.join('docs', '*')]: [WALKER_FILE],

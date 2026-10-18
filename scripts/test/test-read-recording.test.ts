@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { git_spawn } from '#scripts/git/git-spawn'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map } from './test-read-map'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
@@ -12,11 +13,13 @@ import { test_read_trace } from './test-read-trace'
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { head_commit: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_since: vi.fn() } }))
+vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 
 const ROOT = path.resolve('/repo')
 const HEAD = 'cafe1234'
 const DIRTY = 'notes.md'
-const DOCUMENT = path.join('docs', 'a.md')
+const DIRECTORY = 'docs'
+const DOCUMENT = path.join(DIRECTORY, 'a.md')
 const READER = 'reader.ts'
 const FAILED = 1
 
@@ -30,6 +33,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	vi.mocked(git_command.head_commit).mockResolvedValue(HEAD)
 	vi.mocked(changed_paths.read_changed_since).mockResolvedValue([DIRTY])
+	vi.mocked(git_spawn.read).mockResolvedValue(`${DIRECTORY}\0`)
 	vi.spyOn(test_read_map, 'write_map').mockImplementation(() => {
 		// The real map is this checkout's; the test reads what would have been written.
 	})
@@ -65,6 +69,7 @@ describe('test_read_recording.with_read_recording', () => {
 			version: test_read_map.MAP_VERSION,
 			commit: HEAD,
 			dirty: [DIRTY],
+			directories: [DIRECTORY],
 			readers: { [DOCUMENT]: [READER] },
 		})
 	})

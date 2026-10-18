@@ -19,11 +19,14 @@ interface ReadMap {
 	// The files that differed from `commit` when the map was recorded, which count as changed for
 	// every narrowing read against it.
 	dirty: Array<string>
+	// The directories `commit` holds, so a directory new since then is told apart from one no test
+	// read — the map's own keys cannot say which, since an unread directory has none.
+	directories: Array<string>
 	readers: ReadRecords
 }
 
 // Bumped whenever the shape changes, so a map an older kit wrote reads as no map at all.
-const MAP_VERSION = 2
+const MAP_VERSION = 3
 
 const MAP_DIRECTORY = 'josh'
 const MAP_FILE = 'test-read-map.json'
@@ -60,13 +63,15 @@ function is_read_records(value: unknown): value is ReadRecords {
 	return is_object(value) && Object.values(value).every(is_string_array)
 }
 
+const PATH_LIST_FIELDS = ['dirty', 'directories'] as const
+
 function is_read_map(value: unknown): value is ReadMap {
 	if (!is_object(value)) return false
 
 	return (
 		Reflect.get(value, 'version') === MAP_VERSION &&
 		typeof Reflect.get(value, 'commit') === 'string' &&
-		is_string_array(Reflect.get(value, 'dirty')) &&
+		PATH_LIST_FIELDS.every((field) => is_string_array(Reflect.get(value, field))) &&
 		is_read_records(Reflect.get(value, 'readers'))
 	)
 }
@@ -100,40 +105,39 @@ function directories_above(relative: string): Array<string> {
 	return [parent, ...directories_above(parent)]
 }
 
-// Every directory the map holds a key in or under, which therefore existed when it was recorded.
-function recorded_directories(map: ReadMap): Set<string> {
-	return new Set(Object.keys(map.readers).flatMap((key) => [key, ...directories_above(key)]))
-}
-
-// The directories whose listing a change to the file can alter: its own, and the one above each
-// directory on its path the map never saw — a directory new since then is a new entry there. A
-// listing above a directory that already existed sees only its direct entries, which a change
-// deeper down leaves as they were.
-function changed_listings(
+// The directories on the file's path the recorded commit did not hold, innermost first. The root
+// always existed.
+function created_directories(
 	directories: ReadonlyArray<string>,
-	recorded: Set<string>,
+	recorded: ReadonlySet<string>,
 ): Array<string> {
-	const created = directories.slice(1).filter((_, index) => !recorded.has(directories[index] ?? ''))
-
-	return [directories[0] ?? test_read_trace.ROOT_ENTRY, ...created]
+	return directories.filter(
+		(directory) => directory !== test_read_trace.ROOT_ENTRY && !recorded.has(directory),
+	)
 }
 
-// A changed file is read by whoever read it, by whoever listed a directory whose entries it altered,
-// and by whoever walked a directory above it — the last two are what cover a file added since the
-// map was recorded.
-function lookup_keys(relative: string, recorded: Set<string>): Array<string> {
+// A changed file is read by whoever read it, listed its own directory or walked any directory above
+// it. A directory new since the recording is also a new entry in the listing above it and a probe of
+// it that now answers differently; a directory that already existed reads the same to both, whatever
+// changed deeper down.
+function lookup_keys(relative: string, recorded: ReadonlySet<string>): Array<string> {
 	const directories = directories_above(relative)
-	const listings = changed_listings(directories, recorded)
+	const created = created_directories(directories, recorded)
+	const listed = [
+		directories[0] ?? test_read_trace.ROOT_ENTRY,
+		...created.map((directory) => path.dirname(directory)),
+	]
 
 	return [
 		relative,
-		...listings.map((directory) => test_read_trace.read_key(directory, 'listing')),
+		...created,
+		...listed.map((directory) => test_read_trace.read_key(directory, 'listing')),
 		...directories.map((directory) => test_read_trace.read_key(directory, 'walk')),
 	]
 }
 
 function readers_of(map: ReadMap, relative: string): Array<string> {
-	const keys = lookup_keys(relative, recorded_directories(map))
+	const keys = lookup_keys(relative, new Set(map.directories))
 
 	return [...new Set(keys.flatMap((key) => map.readers[key] ?? []))]
 }

@@ -32,6 +32,13 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'abc',
 	dirty: ['notes.md'],
+	directories: [
+		'.josh',
+		path.dirname(DEEP_DOCUMENT),
+		'docs',
+		path.join('docs', 'guide'),
+		'prompts',
+	],
 	readers: {
 		[DOCUMENT]: [READER],
 		[test_read_trace.read_key('docs', 'walk')]: [WALKER],
@@ -107,10 +114,23 @@ describe('test_read_map.readers_of', () => {
 		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, 'notes.md')).toEqual([ROOT_LISTER])
 	})
 
-	it('reaches a file in a directory the map never saw through the listing that gains it', () => {
-		const added = path.join('prompts', 'new-dir', 'x.md')
+	it('leaves out the listing above a directory that existed though no test read it', () => {
+		const added = path.join('prompts', 'x.md')
+
+		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, added)).toEqual([])
+	})
+
+	it('reaches a file in a directory new since the recording through the listing that gains it', () => {
+		const added = path.join('scratch', 'x.md')
 
 		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, added)).toEqual([ROOT_LISTER])
+	})
+
+	it('reaches a file in a directory new since the recording through a probe of that directory', () => {
+		const created = path.join('prompts', 'new-dir')
+		const map = { ...SHALLOW_ROOT_MAP, readers: { [created]: [ROOT_PROBER] } }
+
+		expect(test_read_map.readers_of(map, path.join(created, 'x.md'))).toEqual([ROOT_PROBER])
 	})
 
 	it('answers nothing when neither the file nor any directory above it was read', () => {
