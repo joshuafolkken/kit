@@ -208,13 +208,20 @@ async function run_report_checks(): Promise<void> {
 	await run_stranded_detect.run_stranded_check()
 }
 
-// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop is
-// held or the hook acted on it (`stop-actions.ts`).
-async function write_stop_decision(raw_payload: string): Promise<void> {
-	hook_decision.load_environment_file()
+async function decided_envelope(raw_payload: string): Promise<string | undefined> {
 	await run_report_checks()
 
-	const envelope = await stop_actions.envelope_of(await outcome_of(raw_payload), session_lang())
+	return await stop_actions.envelope_of(await outcome_of(raw_payload), session_lang())
+}
+
+// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop is
+// held or the hook acted on it (`stop-actions.ts`). The report checks print too — a strand's skipped
+// notify line — and text ahead of the envelope makes the harness drop the refusal, as the #4091 child's
+// lane-background block was (joshuafolkken/kit#4101), so everything before the write goes to stderr.
+async function write_stop_decision(raw_payload: string): Promise<void> {
+	hook_decision.load_environment_file()
+
+	const envelope = await stop_actions.on_stderr(async () => await decided_envelope(raw_payload))
 
 	if (envelope === undefined) return
 

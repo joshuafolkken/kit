@@ -142,26 +142,36 @@ function rewrite_context(note: string, outcome: GuardOutcome): string {
 	return [note, outcome.notice ?? outcome.fault].filter(Boolean).join('\n\n')
 }
 
-// The envelope that replaces the outcome's own when a lane child backgrounded `josh ship` alone:
-// the call is run in the foreground instead of being refused. A refusal from
-// any guard still wins, and a notice the outcome carried rides along in the same context.
+function foreground_input_of(
+	raw_payload: string,
+	is_lane_child?: () => boolean,
+): Record<string, unknown> | undefined {
+	const call = guarded_call(raw_payload)
+
+	return call === undefined ? undefined : lane_background.foreground_input(call, is_lane_child)
+}
+
+// The envelope that replaces the outcome's own when a lane child runs `josh ship` alone: the call is
+// run in the foreground at the cap instead of being refused or moved aside. A refusal from any guard
+// still wins, and a notice the outcome carried rides along in the same context. On top of a row's
+// rewrite — `raw_payload` is then the rewritten call — it keeps that row's notes and its lack of a
+// permission decision, so the cap is never lost to a pipefail or tail rewrite (joshuafolkken/kit#4101).
 function foreground_rewrite(
 	outcome: GuardOutcome,
 	raw_payload: string,
 	is_lane_child?: () => boolean,
+	rewrite?: RuleRewrite,
 ): string | undefined {
-	if (outcome.reason !== undefined) return undefined
-
-	const call = guarded_call(raw_payload)
 	const input =
-		call === undefined ? undefined : lane_background.foreground_input(call, is_lane_child)
+		outcome.reason === undefined ? foreground_input_of(raw_payload, is_lane_child) : undefined
 
 	if (input === undefined) return undefined
 
-	return hook_decision.rewrite_envelope(
-		input,
-		rewrite_context(lane_background.FOREGROUND_NOTE, outcome),
-	)
+	const note = [rewrite?.note, lane_background.FOREGROUND_NOTE].filter(Boolean).join('\n\n')
+	const envelope_of =
+		rewrite === undefined ? hook_decision.rewrite_envelope : hook_decision.flow_rewrite_envelope
+
+	return envelope_of(input, rewrite_context(note, outcome))
 }
 
 // The rows' rewrite carries no permission decision: whatever else the line runs meets its own prompt.
@@ -176,7 +186,8 @@ function rule_envelope(
 
 // The hook's one write: a rewrite where one applies, the outcome's own envelope otherwise.
 function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite): void {
-	const envelope = rule_envelope(outcome, rewrite) ?? foreground_rewrite(outcome, raw_payload)
+	const envelope =
+		foreground_rewrite(outcome, raw_payload, undefined, rewrite) ?? rule_envelope(outcome, rewrite)
 
 	if (envelope === undefined) hook_decision.emit_outcome(outcome)
 	else process.stdout.write(`${envelope}\n`)

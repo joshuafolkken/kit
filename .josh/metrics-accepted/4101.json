@@ -1,0 +1,7 @@
+{
+	"reason": "#4101: the lane ship rewrite now also caps a foreground ship's timeout; round-2 review fixes: the foreground cap now composes on top of a row rewrite in pretool-guard, and the Stop hook's report checks run under the stderr guard so a refusal reaches the harness",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

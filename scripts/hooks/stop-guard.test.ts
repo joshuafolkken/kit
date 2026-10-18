@@ -191,9 +191,14 @@ describe('write_stop_decision — the session language is wired', () => {
 	})
 })
 
-// The stdout writes of one stop decision in a lane child whose transcript tail has `pending` tasks.
-async function decide_in_lane(pending: ReadonlyArray<string>): Promise<string> {
+// The stdout writes of one stop decision in a lane child whose transcript tail has `pending` tasks,
+// with `arrange` laid over the quiet world.
+async function decide_in_lane(
+	pending: ReadonlyArray<string>,
+	arrange: () => void = () => undefined,
+): Promise<string> {
 	quiet_world()
+	arrange()
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 	vi.spyOn(lane_background, 'pending_background_ids').mockReturnValue(pending)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
@@ -201,6 +206,17 @@ async function decide_in_lane(pending: ReadonlyArray<string>): Promise<string> {
 	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
 
 	return write.mock.calls.map((call) => String(call[0])).join('')
+}
+
+// A carried run whose strand check prints its skipped-notify line on stdout, as the #4091 one did.
+function strand_prints_skip_line(): void {
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(process.cwd())
+	vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: CARRY })
+	vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(false)
+	vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+	vi.spyOn(run_stranded_detect, 'run_stranded_check').mockImplementation(async () => {
+		await Promise.resolve(process.stdout.write('🔕 planning notifications are not opted in\n'))
+	})
 }
 
 const HELD: HoldRead = {
@@ -363,5 +379,13 @@ describe('write_stop_decision — the lane background wait is wired', () => {
 
 	it('lets a lane child with no task running stop', async () => {
 		expect(await decide_in_lane([])).not.toContain(lane_background.LANE_BACKGROUND_STOP_REASON)
+	})
+
+	// joshuafolkken/kit#4101: the strand check's skipped-notify line went out ahead of the #4091 child's
+	// refusal, and the harness dropped the block it could no longer parse.
+	it('keeps what the report checks print off stdout, so the refusal is the whole of it', async () => {
+		const written = await decide_in_lane(['b21bxb7uh'], strand_prints_skip_line)
+
+		expect(JSON.parse(written)).toHaveProperty('decision', 'block')
 	})
 })
