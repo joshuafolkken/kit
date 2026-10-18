@@ -5,8 +5,8 @@ import {
 	run_board_layout,
 	type BoardLayout,
 	type BoardPlan,
+	type QueuedEntry,
 	type RowReason,
-	type WaveEntry,
 } from './run-board-layout'
 import type { ItemStatus } from './run-board-status'
 
@@ -42,16 +42,16 @@ function plan_of(
 	}
 }
 
-function numbers_of(entry: WaveEntry): Array<number> {
+function numbers_of(entry: QueuedEntry): Array<number> {
 	return entry.kind === 'row' ? [entry.row.number] : entry.rows.map((row) => row.number)
 }
 
-function wave_numbers(layout: BoardLayout): Array<Array<number>> {
-	return layout.waves.map((wave) => wave.flatMap((entry) => numbers_of(entry)))
+function queued_numbers(layout: BoardLayout): Array<number> {
+	return layout.queued.flatMap((entry) => numbers_of(entry))
 }
 
 describe('run_board_layout.layout_of', () => {
-	it('draws the waves in the order the plan gives, and follows the plan when it changes', () => {
+	it('queues the rows in the order the plan gives, and follows the plan when it changes', () => {
 		const first = run_board_layout.layout_of(
 			plan_of([[child(1), child(2)], [child(3)]]),
 			NO_STATUSES,
@@ -61,8 +61,8 @@ describe('run_board_layout.layout_of', () => {
 			NO_STATUSES,
 		)
 
-		expect(wave_numbers(first)).toStrictEqual([[1, 2], [3]])
-		expect(wave_numbers(second)).toStrictEqual([[3], [2, 1]])
+		expect(queued_numbers(first)).toStrictEqual([1, 2, 3])
+		expect(queued_numbers(second)).toStrictEqual([3, 2, 1])
 	})
 
 	it('gathers an epic’s children under the epic where the first of them falls', () => {
@@ -75,26 +75,48 @@ describe('run_board_layout.layout_of', () => {
 			NO_STATUSES,
 		)
 
-		expect(layout.waves[0]?.map((entry) => entry.kind)).toStrictEqual(['epic', 'row'])
-		expect(layout.waves[0]?.[0]).toMatchObject({ kind: 'epic', epic: 10 })
-		expect(wave_numbers(layout)).toStrictEqual([[11, 12, 5]])
+		expect(layout.queued.map((entry) => entry.kind)).toStrictEqual(['epic', 'row'])
+		expect(layout.queued[0]).toMatchObject({ kind: 'epic', epic: 10 })
+		expect(queued_numbers(layout)).toStrictEqual([11, 12, 5])
 	})
 })
 
-// joshuafolkken/kit#3444: an epic row carries its title, and a wave row waiting on a decision is marked.
-describe('run_board_layout.layout_of wave rows', () => {
+// joshuafolkken/kit#4137: the board draws one queue, so an epic split over two waves is one group.
+describe('run_board_layout.layout_of across waves', () => {
+	it('gathers an epic’s children from every wave under one epic in the queue', () => {
+		const tracked = new Map([
+			[11, 10],
+			[12, 10],
+		])
+		const plan = plan_of(
+			[
+				[child(11), child(5)],
+				[child(6), child(12)],
+			],
+			[],
+			tracked,
+		)
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
+
+		expect(layout.queued.map((entry) => entry.kind)).toStrictEqual(['epic', 'row', 'row'])
+		expect(queued_numbers(layout)).toStrictEqual([11, 12, 5, 6])
+	})
+})
+
+// joshuafolkken/kit#3444: an epic row carries its title, and a queued row waiting on a decision is marked.
+describe('run_board_layout.layout_of queued rows', () => {
 	it('gives an epic the title the open listing holds for it', () => {
 		const plan = plan_of([[child(11)]], [], new Map([[11, 10]]))
 		const titled = { ...plan, context: { ...plan.context, titles: new Map([[10, 'Epic ten']]) } }
 		const layout = run_board_layout.layout_of(titled, NO_STATUSES)
 
-		expect(layout.waves[0]?.[0]).toMatchObject({ kind: 'epic', epic: 10, title: 'Epic ten' })
+		expect(layout.queued[0]).toMatchObject({ kind: 'epic', epic: 10, title: 'Epic ten' })
 	})
 
-	it('draws a needs-decision wave row as waiting on a person', () => {
+	it('draws a needs-decision queued row as waiting on a person', () => {
 		const plan = plan_of([[child(1), child(2, [], [NEEDS_DECISION_LABEL])]])
 		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
-		const states = layout.waves[0]?.map((entry) => (entry.kind === 'row' ? entry.row.state : ''))
+		const states = layout.queued.map((entry) => (entry.kind === 'row' ? entry.row.state : ''))
 
 		expect(states).toStrictEqual(['waiting', 'human'])
 	})
@@ -105,7 +127,7 @@ describe('run_board_layout.layout_of release kinds', () => {
 	it('gives a plan row the kind its own labels place it in, and none without one', () => {
 		const plan = plan_of([[child(1, [], ['bug']), child(2)]])
 		const layout = run_board_layout.layout_of(plan, NO_STATUSES)
-		const kinds = layout.waves[0]?.map((entry) => (entry.kind === 'row' ? entry.row.kind : ''))
+		const kinds = layout.queued.map((entry) => (entry.kind === 'row' ? entry.row.kind : ''))
 
 		expect(kinds).toStrictEqual(['bug', undefined])
 	})
@@ -213,7 +235,7 @@ describe('run_board_layout.waiting_children', () => {
 	})
 })
 
-describe('run_board_layout.layout_of outside the waves', () => {
+describe('run_board_layout.layout_of outside the queue', () => {
 	it('drops a blocker from the waiting note once the stream has seen it merge', () => {
 		const plan = plan_of([], [child(20, [3409, 3415])])
 		const merged = new Map<number, ItemStatus>([[3409, { state: 'merged' }]])
@@ -240,7 +262,7 @@ describe('run_board_layout.layout_of outside the waves', () => {
 		const layout = run_board_layout.layout_of(plan_of([[child(1), child(2)], [child(3)]]), statuses)
 
 		expect(layout.active.map((row) => row.number)).toStrictEqual([2, 1])
-		expect(wave_numbers(layout)).toStrictEqual([[3]])
+		expect(queued_numbers(layout)).toStrictEqual([3])
 		expect(run_board_layout.is_settled('merged')).toBe(true)
 		expect(run_board_layout.is_settled('running')).toBe(false)
 	})

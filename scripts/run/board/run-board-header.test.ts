@@ -27,7 +27,7 @@ const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = backlog_budget.MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -283,7 +283,7 @@ describe('run_board_header.counts_of', () => {
 		}
 		const layout: BoardLayout = {
 			active,
-			waves: [[epic, { kind: 'row', row: row(5, 'waiting') }]],
+			queued: [epic, { kind: 'row', row: row(5, 'waiting') }],
 			people: [row(6, 'human')],
 			unreached: [row(7, 'waiting')],
 		}

@@ -59,11 +59,11 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		expect(await row_of(HELD, LOCAL, POOL)).toMatch(/ {2}held by triage$/u)
 	})
 
-	it('draws no free lane from the count the local read carries', async () => {
+	it('draws next free lane from the count the local read carries', async () => {
 		const full = { ...LOCAL, free_lanes: NO_LANE_LEFT }
 		const plan = plan_of([child(HELD)])
 
-		expect(await row_of(HELD, full, plan)).toMatch(/ {2}no free lane$/u)
+		expect(await row_of(HELD, full, plan)).toMatch(/ {2}next free lane$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/lane/u)
 	})
 

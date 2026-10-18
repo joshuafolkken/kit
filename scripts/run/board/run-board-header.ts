@@ -130,7 +130,7 @@ function quiet_mark(header: BoardHeader): RunMark {
 
 	if (header.activity.setup !== undefined) return 'setup'
 
-	return layout?.waves.length === 0 && run_board_layout.people_of(layout).length > 0
+	return layout?.queued.length === 0 && run_board_layout.people_of(layout).length > 0
 		? 'human'
 		: 'idle'
 }

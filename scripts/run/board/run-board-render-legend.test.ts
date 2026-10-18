@@ -46,12 +46,12 @@ describe('run_board_render_legend.legend_of phases', () => {
 		const icons = new Set(['🚢', '🔨', '⚓'])
 
 		expect(legend_of([row(1)], { icons })).toStrictEqual([
-			'🔨 implement  🚢 ship  ⚓ followup  ⏳ waiting',
+			'🔨 implement  🚢 ship  ⚓ followup  ⏳ queued',
 		])
 	})
 
 	it('names no phase where the frame draws none', () => {
-		expect(legend_of([row(1)])).toStrictEqual(['⏳ waiting'])
+		expect(legend_of([row(1)])).toStrictEqual(['⏳ queued'])
 	})
 
 	it('names 🔄 only while a row leads with it, not for a row led by its phase', () => {
@@ -69,7 +69,7 @@ describe('run_board_render_legend.legend_of order', () => {
 		const leads = new Set([...rows.map((entry) => STATE_ICONS[entry.state]), '🔨'])
 
 		expect(legend_of(rows, { leads, icons: leads, named: [OPERATION] })).toStrictEqual([
-			`🔨 implement  ${OPERATION}  💤 parked  ⏳ waiting  🛑 stopped  🙋 decision  ✅ merged  🏁 done  🚫 withdrawn`,
+			`🔨 implement  ${OPERATION}  💤 parked  ⏳ queued  🛑 stopped  🙋 decision  ✅ merged  🏁 done  🚫 withdrawn`,
 		])
 	})
 
@@ -78,7 +78,7 @@ describe('run_board_render_legend.legend_of order', () => {
 		const kinds = [row(1, { kind: 'bug' }), row(2, { kind: 'breaking-change' }), row(3)]
 		const every = [...kinds, row(4, { kind: 'enhancement' })]
 
-		expect(legend_of(kinds)).toStrictEqual(['⏳ waiting', '🧨 breaking  🐛 fix'])
+		expect(legend_of(kinds)).toStrictEqual(['⏳ queued', '🧨 breaking  🐛 fix'])
 		expect(legend_of(every).at(-1)).toBe('🧨 breaking  ✨ feature  🐛 fix')
 	})
 
@@ -109,13 +109,13 @@ describe('run_board_render_legend.legend_of order', () => {
 
 describe('run_board_render_legend.legend_of with the third line’s kind', () => {
 	it('names the kind after the phases where the line’s own words do not name it', () => {
-		expect(legend_of([row(1)], { named: [OPERATION] })).toStrictEqual([`${OPERATION}  ⏳ waiting`])
+		expect(legend_of([row(1)], { named: [OPERATION] })).toStrictEqual([`${OPERATION}  ⏳ queued`])
 	})
 
 	// joshuafolkken/kit#3769: the header and a row's tail can both draw 🔧, named once.
 	it('names a kind the header and a row both draw once', () => {
 		expect(legend_of([row(1)], { named: [OPERATION, OPERATION] })).toStrictEqual([
-			`${OPERATION}  ⏳ waiting`,
+			`${OPERATION}  ⏳ queued`,
 		])
 	})
 })

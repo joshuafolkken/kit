@@ -52,6 +52,7 @@ const WORDS = {
 	in_progress: 'running',
 	stopped: 'stopped',
 	waiting: 'waiting',
+	queued: 'queued',
 	not_before: 'not before',
 	decision: 'decision',
 	waits: 'waits on',

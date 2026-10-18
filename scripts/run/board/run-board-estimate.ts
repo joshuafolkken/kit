@@ -50,11 +50,11 @@ function running_left(row: BoardRow, read: EstimateRead, usual: UsualTimes): num
 	return current + usual_sum(PATH.slice(PATH.indexOf(phase) + 1), usual)
 }
 
-// The waves' rows a lane will take, a decision a person owes left out.
+// The queued rows a lane will take, a decision a person owes left out.
 function waiting_count(layout: BoardLayout): number {
-	const waves: BoardLayout = { ...run_board_layout.EMPTY_LAYOUT, waves: layout.waves }
+	const queued: BoardLayout = { ...run_board_layout.EMPTY_LAYOUT, queued: layout.queued }
 
-	return run_board_layout.rows_of(waves).filter((row) => row.state === 'waiting').length
+	return run_board_layout.rows_of(queued).filter((row) => row.state === 'waiting').length
 }
 
 // Each lane's time to its end: a running child's, then each waiting child's onto the lane free first.

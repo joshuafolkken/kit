@@ -26,7 +26,7 @@ const LAYOUT: BoardLayout = {
 			status: { state: 'running', track: ['implement'], phase_ms: NOW - 5 * MINUTE },
 		},
 	],
-	waves: [[{ kind: 'row', row: row(2, 'waiting') }]],
+	queued: [{ kind: 'row', row: row(2, 'waiting') }],
 }
 
 function lines_with(extra: Partial<BoardHeader> = {}): Array<string> {

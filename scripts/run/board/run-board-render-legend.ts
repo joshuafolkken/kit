@@ -54,7 +54,7 @@ const PROGRESS_STATES: LeadWords = states_of([['running', 'in_progress']])
 const SETTLED_STATES: LeadWords = [
 	...states_of([
 		['parked', 'parked'],
-		['waiting', 'waiting'],
+		['waiting', 'queued'],
 	]),
 	[NOT_BEFORE_ICON, 'not_before'],
 	...states_of([
