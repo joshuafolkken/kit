@@ -223,54 +223,18 @@ describe('run_board_reason.reader — a lane that is no longer being opened', ()
 	})
 })
 
-// joshuafolkken/kit#3967: a `--only` run's rows read `no free lane` while lanes an earlier run left
-// filled the limit, and nothing on the row said which lanes those were.
-describe('run_board_reason.reader names the lanes that fill the limit', () => {
-	it('lists the occupying issues after no free lane', () => {
-		const full = { free_lanes: NO_LANE_LEFT, occupied_lanes: ['3943', '3948'] }
-
-		expect(reasons([child(HELD)], full)).toStrictEqual(['no free lane — 3943 3948 running'])
-	})
-
-	it('keeps the bare words when no occupying lane is known', () => {
-		const full = { free_lanes: NO_LANE_LEFT, occupied_lanes: [] }
-
-		expect(reasons([child(HELD)], full)).toStrictEqual([NO_LANE_WORD])
-	})
-})
-
-// joshuafolkken/kit#4028: `no free lane — 3988 4002 4005 4023` did not say that only #4023 was working;
-// #3988 had parked and #4002 / #4005 had ended doing nothing.
+// joshuafolkken/kit#4111: every waiting row repeated the same lane breakdown after `no free lane`.
 const LANE_LIMIT = 4
-const PARKED_LANE = 3988
 
-describe('run_board_reason.reader says what each occupying lane is doing', () => {
-	const full = {
-		free_lanes: NO_LANE_LEFT,
-		lane_limit: LANE_LIMIT,
-		occupied_lanes: ['3988', '4002', '4005', '4023'],
-		idle_lanes: ['3988', '4002', '4005'],
-		statuses: new Map<number, ItemStatus>([[PARKED_LANE, { state: 'parked' }]]),
-	}
+describe('run_board_reason.reader counts the lanes that fill the limit', () => {
+	const full = { free_lanes: NO_LANE_LEFT, lane_limit: LANE_LIMIT, occupied_count: LANE_LIMIT }
 
-	it('counts the lanes against the limit and groups them by state', () => {
-		expect(reasons([child(HELD)], full)).toStrictEqual([
-			'no free lane 4/4 — 4023 running · 3988 parked · 4002 4005 idle',
-		])
+	it('says the count against the limit and names no lane', () => {
+		expect(reasons([child(HELD)], full)).toStrictEqual(['no free lane 4/4'])
 	})
 
-	it('reads every lane running where no idle lane is known', () => {
-		const unread = { ...full, idle_lanes: undefined }
-
-		expect(reasons([child(HELD)], unread)).toStrictEqual([
-			'no free lane 4/4 — 3988 4002 4005 4023 running',
-		])
-	})
-
-	it('says the count alone when no occupying lane is known', () => {
-		expect(reasons([child(HELD)], { ...full, occupied_lanes: [] })).toStrictEqual([
-			'no free lane 0/4',
-		])
+	it('keeps the bare words where the limit could not be read', () => {
+		expect(reasons([child(HELD)], { ...full, lane_limit: undefined })).toStrictEqual([NO_LANE_WORD])
 	})
 })
 
