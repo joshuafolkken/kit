@@ -101,9 +101,8 @@
 
 `josh` が使えない環境での手作業手順:
 
-1. 子 Issue をすべて起票し、番号を控える。
-2. ラベルを用意する: `gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent 2>/dev/null || true`
-3. epic を作り、`id` ではなく **number** を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file> --jq .number`。本文は次の形にする（順序がなければ `Dependencies` に `None — the children are independent; any execution order works.` と書く）:
+1. 子 Issue をすべて起票し、番号を控える。`epic` ラベルは `josh sync` が用意する。
+2. epic を作り、`id` ではなく **number** を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file> --jq .number`。本文は次の形にする（順序がなければ `Dependencies` に `None — the children are independent; any execution order works.` と書く）:
 
    ```md
    ## Split rationale
@@ -124,4 +123,4 @@
    - [ ] #102 <title>
    ```
 
-4. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`
+3. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す。失敗しても止めない）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`

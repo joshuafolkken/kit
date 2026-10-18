@@ -102,6 +102,29 @@ Fail when a pull request adds any new SonarCloud issue — of any type or severi
 
 **Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), confirms the Issue closed — closing it with a comment when GitHub did not apply `closes #N` — removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive. Every CI poll and the step right before the merge also check the run's issue: a person's update the run has not acknowledged stops it unmerged, printing the update ([`josh issue:ack`](../josh-commands-backlog.md#josh-issueack)); the blocking `gh pr checks --watch` phase before the polls is not interrupted.
 
+**Stage timing:** one `followup stage: <name> <seconds>` row per stage, then `followup stages total:`.
+
+- A failed run prints it up to the stage that threw, named `interrupted`; the `merge` row appears only
+  on a run that merged.
+- A row named `<a>-and-<b>` is a batch of requests sent together; `checks-wait` is never overlapped.
+- The total is the sum of the stages, not the wall clock — the post-merge tail sits outside it.
+
+**AI-reviewer scan:** top-level PR comments from AI reviewers are scanned independently of CI status.
+
+- Blockers are structural, not NLP: a Claude Review body with `### Issues`, `### Problem`,
+  `#### Logic bug` or a numbered `### 1. …` heading; a CodeRabbit `Actionable comments posted: N` with
+  N > 0. Rate-limit notices and sign-offs (`All issues resolved ✓`) match nothing.
+- A standing blocker without `--ai-review-ignore-reason` sends a `confirmation` Telegram and exits
+  non-zero; with it, the reason is posted and the run proceeds. A comment listing that could not be
+  read is a standing blocker.
+- CodeRabbit is temporarily non-blocking end to end — out of the default required checks (restore via
+  `JOSH_REQUIRED_CHECKS`); its findings are audit notes.
+
+**Config claims:** every changed path is matched against what `josh sync` distributes
+(`AI_COPY_FILES`, `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`), and the claimed
+paths are reported in the notification and the Issue report. It stops nothing; `josh sync:scope`
+gives the same answer.
+
 ## `josh notify` in detail
 
 **Output / exit codes:** a send that reached nobody exits non-zero, naming the missing variables or the HTTP status (never the token values). `planning` / `completion` skip with exit 0 unless [`JOSH_NOTIFY_OPT_IN`](../environment-variables.md#notification-behavior) names them. `.env` is read via `--env-file-if-exists`. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, or `JOSH_NOTIFY=off` to skip.

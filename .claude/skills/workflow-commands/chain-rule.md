@@ -49,8 +49,8 @@ Review results and successful pushes are never turn boundaries.
    `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then `pnpm josh followup`.
 
 A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
-`pnpm josh ms` returned to the default branch, or when user judgment is required by an unverifiable
-CodeRabbit/Claude Review finding or a CI failure. In a lane `josh ms` refuses; the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
+`run:tail` returned to the default branch, or when user judgment is required by an unverifiable
+CodeRabbit/Claude Review finding or a CI failure. In a lane the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
 
 Recommendations are informational; severity decides. A CodeRabbit rate-limit warning is not a finding.
 

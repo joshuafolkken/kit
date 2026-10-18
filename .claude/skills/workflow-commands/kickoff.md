@@ -65,13 +65,7 @@ gate must hold **together**. The rest of `split-assessment.md` is read when a sp
   matters** (`execution-waves.md` → "When a wave may be declared") pass `--ordered`, which treats the
   argument order as the dependency order.
 
-  **Only where `josh` is unavailable**, the manual fallback: `gh api repos/{owner}/{repo}/labels -f
-  name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent
-  2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f
-  'labels[]=epic' -F body=@<body-file>` with the epic format of `issue-template.md`; an order is
-  recorded per pair with `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F
-  issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"` (the blocker's **database id**; a
-  failure is non-fatal), never folded into the creation call.
+  Without `josh`: `issue-template.md` → "複数 Issue に分割するときの epic Issue".
 
 `pnpm josh issue:file` lints the body and applies the classification labels it declares (`issue-template.md`; `docs/josh-commands-backlog.md` → `josh issue:file`).
 An Issue a consumer can use only once it is published is filed with `--release` (`kickoff new`), or linked with `pnpm josh issue:release <N>` (`kickoff #N`) — either makes it a blocker of the repository's `release` Issue, which never gets `auto-ok` on its own.

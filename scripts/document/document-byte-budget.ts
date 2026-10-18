@@ -58,7 +58,7 @@ function block_ceiling(size: number): number {
 // unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
-	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 12_288 },
+	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/execution-waves.md', bytes: 4096 },
 	{ path: '.claude/skills/verify-ui/SKILL.md', bytes: 4096 },
