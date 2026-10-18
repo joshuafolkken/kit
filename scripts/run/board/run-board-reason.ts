@@ -6,6 +6,7 @@ import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
+import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_setup } from './run-board-setup'
 import type { ItemStatus } from './run-board-status'
 
@@ -19,12 +20,14 @@ import type { ItemStatus } from './run-board-status'
 // Every word is English whatever the session language, as every other word on the board is.
 
 const { LANE_STAGE } = run_event_setup
+const { HEADER_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
 
 const WORDS = {
 	untriaged: 'untriaged',
 	held: 'held by triage',
 	no_lane: 'no free lane',
+	no_memory: 'no memory headroom',
 	overlaps: 'overlaps',
 } as const
 
@@ -52,6 +55,10 @@ interface ReasonRead extends Overlay {
 	lane_limit?: number | undefined
 	// The open lanes no child is working in (`lane-spent.ts`).
 	idle_lanes?: ReadonlyArray<string> | undefined
+	// The driver holds its offered issue for memory (`backlog-drive-memory.ts`).
+	is_memory_held?: boolean | undefined
+	// The machine's latest gauges, the figures a memory hold names.
+	gauges?: MachineGauges | undefined
 	// A stopped run opens no lane, so a stage its stream ends on is not one any lane is at.
 	is_stopped: boolean
 }
@@ -136,16 +143,42 @@ function no_lane_of(read: ReasonRead): string {
 	return `${WORDS.no_lane}${count} — ${lanes_by_state(occupied, read)}`
 }
 
+// `no memory headroom — 🧠 88% · 💾 12M/s`: run:board's own latest 🧠 / 💾, not the driver's reading,
+// so a hold the kernel's verdict alone raised may show both green. Each is drawn only where it was
+// read (#4084).
+function figure_of(
+	icon: string,
+	value: number | undefined,
+	format: (value: number) => string,
+): string | undefined {
+	return value === undefined ? undefined : `${icon} ${format(value).trim()}`
+}
+
+function no_memory_of(gauges: MachineGauges | undefined): string {
+	const { percent_text, rate_text } = run_board_machine
+	const figures = [
+		figure_of(HEADER_ICONS.memory, gauges?.memory_percent, percent_text),
+		figure_of(HEADER_ICONS.swap, gauges?.swap_mb_per_s, rate_text),
+	].filter((figure) => figure !== undefined)
+
+	if (figures.length === 0) return WORDS.no_memory
+
+	return `${WORDS.no_memory} — ${figures.join(LANE_SEPARATOR)}`
+}
+
+// The machine's room: no lane left under the limit, else no memory for one more.
+function room_wait(read: ReasonRead): string | undefined {
+	if (read.free_lanes === NO_FREE_LANES) return no_lane_of(read)
+
+	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
+}
+
 // A candidate nothing blocks, in the order `backlog:next` answers: the pool held for a judgment, then
-// a path a running issue declares, then a pool with no lane left.
+// a path a running issue declares, then a pool with no lane left, then a machine with no memory.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
 	if (pool.is_held) return WORDS.held
 
-	const overlap = overlap_of(child, read, pool)
-
-	if (overlap !== undefined) return overlap
-
-	return read.free_lanes === NO_FREE_LANES ? no_lane_of(read) : undefined
+	return overlap_of(child, read, pool) ?? room_wait(read)
 }
 
 // The start time the body declares and the clock has not reached, in the board's local time.

@@ -11,6 +11,7 @@ const WINDOW = lane_stats.window_of(1, NOW)
 const MS_PER_MINUTE = 60_000
 const BLOCKED = 'offer:wait:blocked'
 const HAND_BACK = 'hand-back:merge'
+const MEMORY = 'memory'
 const LONG_AGO_MINUTES = 300
 
 function minutes_before_now(minutes: number): string {
@@ -76,5 +77,32 @@ describe('lane_held_stats.table', () => {
 		expect(row_of([dispatch(1)], 'none')).toBe(
 			'| none | not measured | not measured | not measured | 0 | 0 |',
 		)
+	})
+})
+
+// joshuafolkken/kit#4084: a run held for memory is its own row.
+describe('lane_held_stats.table — a memory hold', () => {
+	it('rows a memory hold apart from the offer’s', () => {
+		const entries = [held(MEMORY, 30), held(BLOCKED, 20), dispatch(10)]
+
+		expect(row_of(entries, MEMORY)).toBe(`| ${MEMORY} | 10.0 | 10.0 | 10.0 | 1 | 0 |`)
+	})
+})
+
+// joshuafolkken/kit#4084: `run:board` reads the driver's memory hold off the hold still open.
+describe('lane_held_stats.open_reason', () => {
+	it('reads the reason of the last hold nothing ended', () => {
+		expect(lane_held_stats.open_reason([held(BLOCKED, 20), held(MEMORY, 10)])).toBe(MEMORY)
+	})
+
+	it('reads no reason once a dispatch or a release ended the last hold', () => {
+		const released: LedgerEntry = { kind: 'released', at: minutes_before_now(5) }
+
+		expect(lane_held_stats.open_reason([held(MEMORY, 10), dispatch(5)])).toBeUndefined()
+		expect(lane_held_stats.open_reason([held(MEMORY, 10), released])).toBeUndefined()
+	})
+
+	it('reads no reason from a ledger without a hold', () => {
+		expect(lane_held_stats.open_reason([])).toBeUndefined()
 	})
 })

@@ -19,44 +19,17 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
-import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
+import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_hold } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
+import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_seats } from './backlog-drive-seats'
+import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 
 const { MERGE_TOKEN } = run_merge_token
+const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
-// How the loop reads each `run:merge` token — keyed by the producer's own type, so a token added there
-// is a type error here until it is classified. `hand-back` ends the loop at once: a hand-off, a person's
-// stop, the environment down, a foreign owner, an unreadable state. `stop` — the failure guard, or a
-// failed child left unparked — collects the child, starts nothing more, and collects the children still
-// in flight before the loop ends. `await` is a cut resumed in place: the same lane is awaited again.
-//
-// **The offer `run:merge` passes through is never read here** (joshuafolkken/kit#3781): its `stop` —
-// only person-waiting issues left — is spelled like the control one, and acting on it ended the run
-// without the idle watch. The loop asks `backlog:offer` on the next pass instead, so whether a parked
-// backlog waits or ends is `backlog:budget`'s alone, after a merge as after any other pass.
-type TokenHandling = 'hand-back' | 'stop' | 'await'
-const TOKEN_HANDLING: Readonly<Record<MergeToken, TokenHandling>> = {
-	[MERGE_TOKEN.OVER]: 'hand-back',
-	[MERGE_TOKEN.HUMAN_REVIEW]: 'hand-back',
-	[MERGE_TOKEN.ENVIRONMENT]: 'hand-back',
-	[MERGE_TOKEN.BUSY]: 'hand-back',
-	[MERGE_TOKEN.RETRY]: 'hand-back',
-	[MERGE_TOKEN.STOP]: 'stop',
-	[MERGE_TOKEN.RESUMED]: 'await',
-}
-
-function tokens_handled(...handlings: ReadonlyArray<TokenHandling>): ReadonlySet<string> {
-	const entries = Object.entries(TOKEN_HANDLING)
-
-	return new Set(entries.filter(([, handling]) => handlings.includes(handling)).map(([key]) => key))
-}
-
-const IMMEDIATE_TOKENS = tokens_handled('hand-back')
-// Every token `run:merge` prints first even on a non-zero exit.
-const HANDOFF_TOKENS = tokens_handled('hand-back', 'stop')
 const MERGED_OUTCOME = 'merged'
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
@@ -100,6 +73,8 @@ interface DriveState {
 	stop_is_finish?: boolean | undefined
 	// The child whose merge answered `stop`, carried on the resume line: no offer re-derives that stop.
 	stopped_by?: string | undefined
+	// The last offer answered `run` on a machine with no memory to spare (`backlog-drive-memory.ts`).
+	is_memory_held?: boolean | undefined
 }
 
 interface DriveEnd {
@@ -133,6 +108,9 @@ interface DrivePorts {
 	// How many open issues lacking `auto-ok` still owe a judgement — `auto_ok_judge_read.owed` in
 	// production, `0` when the read failed.
 	judgement_owed: () => Promise<number>
+	// Whether the machine has no memory for one more lane — `backlog_drive_memory.gauge()` in production,
+	// which carries its hysteresis between calls.
+	memory_held: () => Promise<boolean>
 	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
 	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
 	hold: (reason: string | undefined) => Promise<void>
@@ -344,14 +322,26 @@ async function is_judgement_owed(read: OfferRead, ports: DrivePorts): Promise<bo
 	return (await ports.judgement_owed()) > 0
 }
 
+// An offer answered `run`: launched while the machine has memory to spare, held until it does otherwise.
+async function run_offered(
+	issues: ReadonlyArray<string>,
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	if (await ports.memory_held()) return await backlog_drive_memory.held(state, ports)
+
+	return await launch_all(issues, state, ports)
+}
+
+// Every offer answers the memory hold afresh: one that is not `run` leaves nothing held for memory.
 async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const read = await ports.offer(state)
 
 	if (read === undefined) return ended('offer', state)
 
-	const next = { ...state, retries: read.retries }
+	const next = { ...state, retries: read.retries, is_memory_held: false }
 
-	if (read.verdict === RUN_VERDICT) return await launch_all(read.issues, next, ports)
+	if (read.verdict === RUN_VERDICT) return await run_offered(read.issues, next, ports)
 	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
 	const result = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
@@ -424,10 +414,13 @@ function is_window_spent(run: LoopRun, config: LoopConfig, now_ms: number): bool
 type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
 
 // One pass of the loop: the offer is due on the first pass and then no oftener than `offer_ms`, bar the
-// passes that collected a child. A `next` carries the run to sleep on and pass again.
+// passes that collected a child and the one that finds a memory hold cleared. A `next` carries the run
+// to sleep on and pass again.
 async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
 	const now_ms = ports.now().getTime()
-	const is_due = now_ms - run.offered_ms >= config.offer_ms
+	const is_due =
+		now_ms - run.offered_ms >= config.offer_ms ||
+		(await backlog_drive_memory.is_cleared(run.state, ports))
 	const result = await run_pass(run.state, is_due, ports)
 
 	ports.on_state(result.state)

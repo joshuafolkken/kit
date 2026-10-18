@@ -112,6 +112,13 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_held_stats = { table }
+// The reason of the hold still open at the ledger's end, or `undefined` where the last one has ended.
+function open_reason(entries: ReadonlyArray<LedgerEntry>): string | undefined {
+	const last = entries.findLast((entry) => is_hold_end(entry))
+
+	return last !== undefined && is_held(last) ? last.reason : undefined
+}
+
+const lane_held_stats = { open_reason, table }
 
 export { lane_held_stats }
