@@ -31,10 +31,7 @@ const WORDS = {
 	overlaps: 'overlaps',
 } as const
 
-type LaneState = 'running' | 'parked' | 'idle'
-
-const LANE_STATES: ReadonlyArray<LaneState> = ['running', 'parked', 'idle']
-const LANE_SEPARATOR = ' · '
+const FIGURE_SEPARATOR = ' · '
 
 // A lane's stage as its row says it: the event's own words, cut to what fits beside a title.
 const STAGE_WORDS: ReadonlyArray<readonly [stage: string, word: string]> = [
@@ -48,13 +45,10 @@ interface ReasonRead extends Overlay {
 	events: ReadonlyArray<RunEvent>
 	// How many more lanes the limit allows; `undefined` where it could not be read.
 	free_lanes: number | undefined
-	// The issues whose lanes fill the limit, named after `no free lane` so a lane an earlier run left
-	// behind shows on the row it holds back.
-	occupied_lanes?: ReadonlyArray<string> | undefined
+	// How many lanes hold a place under the limit, counted after `no free lane`.
+	occupied_count?: number | undefined
 	// The limit those lanes fill; `undefined` where it could not be read.
 	lane_limit?: number | undefined
-	// The open lanes no child is working in (`lane-spent.ts`).
-	idle_lanes?: ReadonlyArray<string> | undefined
 	// The driver holds its offered issue for memory (`backlog-drive-memory.ts`).
 	is_memory_held?: boolean | undefined
 	// The machine's latest gauges, the figures a memory hold names.
@@ -115,32 +109,14 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 		: `${WORDS.overlaps} ${String(clash.holder)} (${clash.path})`
 }
 
-// What an occupying lane is doing: a child works in it, its child parked, or it stands with no child.
-function lane_state(issue: string, read: ReasonRead): LaneState {
-	if (!(read.idle_lanes ?? []).includes(issue)) return 'running'
-
-	return read.statuses.get(Number(issue))?.state === 'parked' ? 'parked' : 'idle'
-}
-
-// The occupying lanes grouped by state, `4023 running · 3988 parked · 4002 4005 idle`.
-function lanes_by_state(occupied: ReadonlyArray<string>, read: ReasonRead): string {
-	const groups = LANE_STATES.map(function group_of(state: LaneState): string {
-		const issues = occupied.filter((issue) => lane_state(issue, read) === state)
-
-		return issues.length === 0 ? '' : `${issues.join(' ')} ${state}`
-	})
-
-	return groups.filter((group) => group !== '').join(LANE_SEPARATOR)
-}
-
-// `no free lane 4/4 — …`: how many lanes hold a place against the limit, and what each is doing (#4028).
+// `no free lane 4/4`: how many lanes hold a place against the limit. Every waiting row repeated the
+// same breakdown of them, so the row counts them and names none (#4111).
 function no_lane_of(read: ReasonRead): string {
-	const { occupied_lanes: occupied = [], lane_limit } = read
-	const count = lane_limit === undefined ? '' : ` ${String(occupied.length)}/${String(lane_limit)}`
+	const { occupied_count = 0, lane_limit } = read
 
-	if (occupied.length === 0) return `${WORDS.no_lane}${count}`
+	if (lane_limit === undefined) return WORDS.no_lane
 
-	return `${WORDS.no_lane}${count} — ${lanes_by_state(occupied, read)}`
+	return `${WORDS.no_lane} ${String(occupied_count)}/${String(lane_limit)}`
 }
 
 // `no memory headroom — 🧠 88% · 💾 12M/s`: run:board's own latest 🧠 / 💾, not the driver's reading,
@@ -163,7 +139,7 @@ function no_memory_of(gauges: MachineGauges | undefined): string {
 
 	if (figures.length === 0) return WORDS.no_memory
 
-	return `${WORDS.no_memory} — ${figures.join(LANE_SEPARATOR)}`
+	return `${WORDS.no_memory} — ${figures.join(FIGURE_SEPARATOR)}`
 }
 
 // The machine's room: no lane left under the limit, else no memory for one more.
