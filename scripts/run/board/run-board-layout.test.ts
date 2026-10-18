@@ -189,6 +189,19 @@ describe('run_board_layout.layout_of ending reasons', () => {
 	})
 })
 
+// joshuafolkken/kit#4099: a child parked on a decision waits on a person, its section saying why.
+describe('run_board_layout.layout_of decision parks', () => {
+	const reason = `${NEEDS_DECISION_LABEL}: pick one`
+	const statuses = new Map<number, ItemStatus>([[1, { state: 'parked', started_ms: 100, reason }]])
+	const [row] = run_board_layout.layout_of(plan_of([]), statuses).active
+
+	it('draws a decision park as a human row with no reason', () => {
+		expect(row?.state).toBe('human')
+		expect(row?.reason).toBeUndefined()
+		expect(row?.status?.state).toBe('parked')
+	})
+})
+
 describe('run_board_layout.waiting_children', () => {
 	it('answers the children the run has not touched and no person is asked about', () => {
 		const statuses = new Map<number, ItemStatus>([[1, { state: 'merged' }]])

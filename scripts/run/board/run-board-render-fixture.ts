@@ -49,7 +49,7 @@ function rule(label: string): string {
 }
 
 function note(at_ms: number, text: string): BoardNote {
-	return { kind: 'note', at_ms, issue: '3415', text, is_decision: false }
+	return { kind: 'note', at_ms, issue: '3415', text }
 }
 
 const run_board_render_fixture = {

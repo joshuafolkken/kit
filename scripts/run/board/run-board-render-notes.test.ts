@@ -1,10 +1,8 @@
-import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_notes, type BoardNote } from './run-board-notes'
-import { run_board_render, type BoardView } from './run-board-render'
+import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#3430: what the board says below its plan — the findings, the resume command and a
@@ -24,7 +22,6 @@ describe('run_board_render findings and no run', () => {
 			issue: '3438',
 			text: 'Count seats',
 			found_during: '3415',
-			is_decision: false,
 		}
 		const lines = lines_of(header({ layout: undefined }), [filed, ...notes])
 
@@ -45,18 +42,21 @@ const filed: BoardNote = {
 	at_ms: NOW,
 	issue: '3473',
 	text: 'Lead',
-	is_decision: false,
 }
 const park: BoardNote = { ...filed, kind: 'park' }
-const NOTES_LEGEND = '📌 findings and decisions'
+const NOTES_LEGEND = '📌 findings'
+const NOTES_RULE = rule(NOTES_LEGEND)
 
 // joshuafolkken/kit#3478: the findings are named by icons the legend names, and by words where none is drawn.
 describe('run_board_render.render findings icons', () => {
-	it('draws the findings rule as 📌 and every row led by its icon with no kind word', () => {
+	it('draws the findings rule as 📌 findings and every row led by its icon with no kind word', () => {
 		const lines = lines_of(header(), [filed, park, note(NOW, 'seen')])
-		const board = lines.slice(0, -1).join('\n')
+		const board = lines
+			.slice(0, -1)
+			.filter((line) => line !== NOTES_RULE)
+			.join('\n')
 
-		expect(lines).toContain(rule('📌'))
+		expect(lines).toContain(NOTES_RULE)
 		expect(lines).toContain(`  🆕 ${minute_of(NOW)} 3473  Lead`)
 		expect(lines).toContain(`  💤 ${minute_of(NOW)} 3473  Lead`)
 		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415  seen`)
@@ -75,7 +75,7 @@ describe('run_board_render.render findings icons', () => {
 		const lines = lines_of(header({ form: 'chat' }), [filed])
 
 		expect(lines).toStrictEqual(lines_of(header(), [filed]))
-		expect(lines).toContain(rule('📌'))
+		expect(lines).toContain(NOTES_RULE)
 	})
 
 	it('keeps the heading and the kind words where no legend is drawn, before a plan is read', () => {
@@ -212,98 +212,6 @@ describe('run_board_render.render findings with no legend', () => {
 
 		expect(lines).toContain(rule(WORDS.notes))
 		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
-	})
-})
-
-function filed_as(issue: number, minutes_ago: number): BoardNote {
-	const reference = String(issue)
-
-	return {
-		...filed,
-		issue: reference,
-		at_ms: NOW - minutes_ago * MINUTE,
-		text: `Title ${reference}`,
-	}
-}
-
-function waiting(number: number): BoardRow {
-	const title = `Row ${String(number)}`
-
-	return { number, title, kind: undefined, state: 'waiting', status: undefined, waits: [] }
-}
-
-function listing(numbers: ReadonlyArray<number>): BoardHeader {
-	return header({ layout: { ...EMPTY_LAYOUT, active: numbers.map((number) => waiting(number)) } })
-}
-
-const LISTED = [4022, 4033, 4036, 4037, 4038, 4039]
-const FILED_RUN = '  filed this run  4036–4039  4033  4022'
-const WIDE = 500
-
-// joshuafolkken/kit#4046: the Issues a run filed that the plan draws a row for share one line of
-// numbers, so a title is not drawn twice.
-describe('run_board_render.render filed this run', () => {
-	const listed = [4039, 4038, 4022, 4037, 4036, 4033].map((issue, index) => filed_as(issue, index))
-
-	it('collapses the filed Issues with a row into one line of numbers, newest first, ranges joined', () => {
-		const lines = lines_of(listing(LISTED), listed)
-
-		expect(lines).toContain(FILED_RUN)
-		expect(lines.join('\n')).not.toContain('Title 40')
-	})
-
-	it('leads the line with no 📌, which only the heading and the legend carry', () => {
-		const lines = lines_of(listing(LISTED), listed)
-
-		expect(lines.filter((line) => line.includes('📌'))).toStrictEqual([rule('📌'), NOTES_LEGEND])
-	})
-
-	it('keeps a filed Issue with no row and every note on a line of its own', () => {
-		const notes = [filed_as(4039, 0), filed_as(4040, 1), note(NOW, 'seen')]
-		const lines = lines_of(listing([4039, 3415]), notes)
-
-		expect(lines).toContain('  filed this run  4039')
-		expect(lines).toContain(`  🆕 ${minute_of(NOW - MINUTE)} 4040  Title 4040`)
-		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415  seen`)
-	})
-
-	it('counts the line as one finding toward the limit, and names no 🆕 for it in the legend', () => {
-		const notes = Array.from({ length: run_board_render.NOTE_LIMIT - 2 }, (_, index) =>
-			note(NOW - index * MINUTE, `observation ${String(index)}`),
-		)
-		const lines = lines_of(listing(LISTED), [...listed, ...notes, filed_as(4040, 9)])
-
-		expect(lines).toContain(FILED_RUN)
-		expect(lines.join('\n')).not.toContain('more')
-		expect(lines.at(-1)).toBe(`${NOTES_LEGEND}  🆕 filed  💬 note`)
-	})
-})
-
-// Every frame a pane shorter than the whole board draws, tallest last.
-function frames_of(view: BoardView): Array<Array<string>> {
-	const heights = Array.from({ length: run_board_render.render(view).length }, (_, rows) => rows)
-
-	return heights.map((rows) =>
-		run_board_render
-			.render({ ...view, size: { rows, columns: WIDE } })
-			.map((line) => stripVTControlCharacters(line)),
-	)
-}
-
-function seen_count(frame: ReadonlyArray<string>): number {
-	return frame.filter((line) => line.includes('seen')).length
-}
-
-describe('run_board_render.render filed this run in a short pane', () => {
-	it('gives the line way as one finding, before the notes', () => {
-		const listed = LISTED.map((issue, index) => filed_as(issue, index))
-		const seen = [1, 2, 3].map((minutes) => note(NOW - minutes * MINUTE, `seen ${String(minutes)}`))
-		const frames = frames_of({ header: listing(LISTED), notes: [...listed, ...seen] })
-
-		expect(
-			frames.filter((frame) => frame.includes(FILED_RUN) && seen_count(frame) < seen.length),
-		).toHaveLength(0)
-		expect(frames.some((frame) => !frame.includes(FILED_RUN) && seen_count(frame) > 0)).toBe(true)
 	})
 })
 

@@ -5,13 +5,14 @@ import type { ItemState } from './run-board-status'
 // When an issue row gives way to a short pane (`run-board-fit.ts`): the stage its state yields in,
 // and how old it is within that stage.
 
-// The stage each state's row gives way in when the pane is short.
+// The stage each state's row gives way in when the pane is short. A row waiting on a person's decision
+// stays as long as a running one (joshuafolkken/kit#4099).
 const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
 	merged: 'finished',
 	done: 'finished',
 	withdrawn: 'finished',
 	waiting: 'pending',
-	human: 'pending',
+	human: 'decision',
 	parked: 'parked',
 	stopped: 'parked',
 	running: 'running',
@@ -24,8 +25,10 @@ function aged_ms(row: BoardRow): number | undefined {
 	return row.state === 'running' ? started : (row.status?.ended_ms ?? started)
 }
 
-function yield_of(row: BoardRow): RowYield {
-	return { stage: YIELD_STAGES[row.state], at_ms: aged_ms(row) }
+// The stage is the state's, unless the row's section gives it way as one — the 🔗 waiting rows before
+// the findings.
+function yield_of(row: BoardRow, stage: YieldStage = YIELD_STAGES[row.state]): RowYield {
+	return { stage, at_ms: aged_ms(row) }
 }
 
 const run_board_row_yield = { yield_of }

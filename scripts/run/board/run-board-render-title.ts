@@ -68,15 +68,24 @@ function overrun_of(text: string, is_kept: boolean, columns: number | undefined)
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
 
-// The columns the row's title takes as drawn: a waiting row's title is not padded, every other row's
-// is padded to the title column.
-function drawn_width(row: BoardRow): number {
-	return row.state === 'waiting' ? Math.min(TITLE_LIMIT, row.title?.length ?? 0) : TITLE_LIMIT
+// How a row is fitted: whether it keeps a held check, and the columns its title cell leads its title
+// with, a ✚ on a row the run filed.
+interface RowFit {
+	is_held?: boolean
+	lead?: number
+}
+
+// The columns the row's title cell takes as drawn: a waiting row's title is not padded, every other
+// row's is padded to the title column.
+function drawn_width(row: BoardRow, lead: number): number {
+	const title = (row.title?.length ?? 0) + lead
+
+	return row.state === 'waiting' ? Math.min(TITLE_LIMIT, title) : TITLE_LIMIT
 }
 
 // The row's title once it has given up `overrun` columns, never under the floor.
-function narrowed_limit(row: BoardRow, overrun: number): number {
-	return Math.max(TITLE_FLOOR, drawn_width(row) - overrun)
+function narrowed_limit(row: BoardRow, overrun: number, lead: number): number {
+	return Math.max(TITLE_FLOOR, drawn_width(row, lead) - overrun)
 }
 
 // A row's line at a narrowed title with its whole reason, or with the reason's end cut by the columns
@@ -100,12 +109,13 @@ function fitted(
 	row: BoardRow,
 	columns: number | undefined,
 	draw: (cut: RowCut) => string,
-	is_held = false,
+	fit: RowFit = {},
 ): string {
 	const text = draw(WHOLE)
-	const overrun = overrun_of(text, is_held || row.reason !== undefined, columns)
+	const overrun = overrun_of(text, fit.is_held === true || row.reason !== undefined, columns)
+	const limit = narrowed_limit(row, overrun, fit.lead ?? 0)
 
-	return overrun === 0 ? text : reason_fitted(row, columns, narrowed_limit(row, overrun), draw)
+	return overrun === 0 ? text : reason_fitted(row, columns, limit, draw)
 }
 
 const run_board_render_title = { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of }

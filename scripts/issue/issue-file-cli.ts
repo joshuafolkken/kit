@@ -14,6 +14,7 @@ import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_hold_member } from '#scripts/run/hold/run-hold-member'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
@@ -223,8 +224,9 @@ async function place(url: string, target: string): Promise<void> {
 }
 
 // Every filing lands on the run's event stream: this is the one filing path, so
-// one append here reaches `run:board` from every route. A filing outside a run lands too and is left
-// out by the board's own scope to the invocation; the append is best-effort, as every emit is.
+// one append here reaches `run:board` from every route. A filing outside a run lands too, unmarked as
+// the run's (`run_hold_member`), and the board counts only the marked ones; the append is best-effort,
+// as every emit is.
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain(
@@ -233,7 +235,9 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 	)
 	const found_during = await issue_file_fold.finder()
 	const kind = run_event_filed.kind_of(labels)
-	const text = run_event_filed.text_of({ reference, kind, title: filing.args.title, found_during })
+	const is_run = await run_hold_member.is_run_member()
+	const { title } = filing.args
+	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
 }
