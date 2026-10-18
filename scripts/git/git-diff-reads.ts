@@ -165,6 +165,23 @@ async function diff_names_since(commit: string): Promise<string> {
 	])
 }
 
+// Which of `paths` a commit's tree holds. `josh test:related` asks it of the tree its test-read map
+// was recorded on: a file that tree held and no test read is one no test reads, while a file added
+// since is one the map knows nothing about. **Callers pass at least one path** — with none, `ls-tree`
+// lists the whole tree.
+async function tree_names_at(commit: string, paths: ReadonlyArray<string>): Promise<string> {
+	return await git_spawn.read([
+		...NO_PATH_QUOTING,
+		'ls-tree',
+		'-r',
+		NAME_ONLY_FLAG,
+		'--full-tree',
+		commit,
+		'--',
+		...paths,
+	])
+}
+
 async function diff_main_names(): Promise<string> {
 	return await diff_names_since(await change_base())
 }
@@ -232,6 +249,7 @@ const git_diff_reads = {
 	diff_main_numstat,
 	diff_names_since,
 	get_default_branch,
+	tree_names_at,
 	untracked_names,
 }
 

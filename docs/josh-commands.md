@@ -235,8 +235,9 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 <!-- /usage -->
 
-- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader, or a changed file is one every test depends on; a narrowed run matching nothing prints `No test files found` and exits 0.
+- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on; a narrowed run matching nothing prints `No test files found` and exits 0.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.json`); with no map the changed set is the branch diff.
+- A change made only of non-code files the map's tree held and no test read runs no test: it says why and exits 0 without starting vitest.
 
 ### `josh test:declared`
 

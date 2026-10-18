@@ -54,8 +54,11 @@ function request(
 	changed: ScopeRequest['changed'],
 	overrides: Partial<ScopeRequest> = {},
 ): ScopeRequest {
-	return { root: ROOT, changed, map: MAP, is_present: present, ...overrides }
+	return { root: ROOT, changed, map: MAP, recorded: new Set(), is_present: present, ...overrides }
 }
+
+// The recorded tree held the unread note, so its having no reader means no test reads it.
+const HELD_UNREAD = new Set([UNREAD_FILE])
 
 describe('related_scope.is_relatable', () => {
 	it.each(['a.ts', 'a.tsx', 'a.mts', 'a.js', 'a.svelte'])('accepts %j', (file) => {
@@ -116,11 +119,55 @@ describe('related_scope.resolve_scope — non-code files through the map', () =>
 		expect(scope.reason).toContain(UNREAD_FILE)
 	})
 
+	it('falls back on an unread non-code file added since the recorded tree', () => {
+		const scope = related_scope.resolve_scope(
+			request([UNREAD_FILE], { recorded: new Set([DOCUMENT_FILE]) }),
+		)
+
+		expect(scope.mode).toBe('all')
+		expect(scope.reason).toContain(UNREAD_FILE)
+	})
+
 	it('falls back to the whole suite on a non-code file when there is no map', () => {
 		const scope = related_scope.resolve_scope(request([DOCUMENT_FILE], { map: undefined }))
 
 		expect(scope.mode).toBe('all')
 		expect(scope.reason).toContain(related_scope.NO_MAP_REASON)
+	})
+})
+
+// joshuafolkken/kit#4073: a file the recorded tree held and no test read is one no test reads.
+describe('related_scope.resolve_scope — files known to reach no test', () => {
+	it('runs no test when every changed file is one the recorded tree held and no test read', () => {
+		const scope = related_scope.resolve_scope(request([UNREAD_FILE], { recorded: HELD_UNREAD }))
+
+		expect(scope.mode).toBe('none')
+		expect(scope.files).toEqual([at(UNREAD_FILE)])
+	})
+
+	it('runs the readers of the rest when such a file changes beside them', () => {
+		const scope = related_scope.resolve_scope(
+			request([UNREAD_FILE, DOCUMENT_FILE], { recorded: HELD_UNREAD }),
+		)
+
+		expect(scope.mode).toBe('related')
+		expect(scope.files).toEqual([at(READER_FILE), at(WALKER_FILE)])
+	})
+
+	it('falls back rather than running nothing when a changed module beside it has left the tree', () => {
+		const scope = related_scope.resolve_scope(
+			request([SOURCE_FILE, UNREAD_FILE], { recorded: HELD_UNREAD, is_present: absent }),
+		)
+
+		expect(scope.mode).toBe('all')
+	})
+
+	it('says it runs no test, why, and which files settled it', () => {
+		const scope = related_scope.resolve_scope(request([UNREAD_FILE], { recorded: HELD_UNREAD }))
+		const description = related_scope.describe_scope(scope, ROOT)
+
+		expect(description).toContain('1 changed file(s) no test reads — running no tests')
+		expect(description).toContain(UNREAD_FILE)
 	})
 })
 

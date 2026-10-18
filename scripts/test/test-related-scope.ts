@@ -13,7 +13,9 @@ import { unit_setup_files } from './unit-setup-files'
 // the tests importing it through `vitest related`, and the tests reading it as data through the
 // test-read map a whole-suite run records (`test-read-map.ts`). A changed document, config or
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
-// non-code file no recorded test read, or a file every test depends on. CI runs the whole suite
+// non-code file added since the recorded tree that no recorded test read, or a file every test
+// depends on. A non-code file the recorded tree already held and no test read is one no test reads
+// (joshuafolkken/kit#4073), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
 // before the merge.
 //
@@ -21,7 +23,15 @@ import { unit_setup_files } from './unit-setup-files'
 // the unreadable-change reason — is `changed-file-scope.ts`, so the two commands cannot drift apart
 // about what they print.
 
-type RelatedScope = ChangedFileScope
+// The third answer only this command has: the change is known to reach no test, so nothing runs.
+// `files` holds the changed files that settled it, for the line that says why.
+interface NoTestScope {
+	mode: 'none'
+	files: ReadonlyArray<string>
+	reason: string
+}
+
+type RelatedScope = ChangedFileScope | NoTestScope
 
 // The extensions vitest can walk a module graph back from. Every other changed file is resolved
 // through the test-read map instead.
@@ -79,21 +89,33 @@ const VOCABULARY = {
 	narrowed_suffix: 'running only the tests related to them',
 }
 
+const NONE_SUFFIX = 'running no tests'
+
 const RUN_FLAG = '--run'
 const RELATED_SUBCOMMAND = 'related'
 const RUN_SUBCOMMAND = 'run'
 
-// Bundled so the CLI and the tests hand the decision the same four facts.
+// Bundled so the CLI and the tests hand the decision the same five facts.
 interface ScopeRequest {
 	root: string
 	// Repository-root-relative paths, or `undefined` when the change could not be read.
 	changed: ReadonlyArray<string> | undefined
 	map: ReadMap | undefined
+	// The changed non-code files the map's tree held, and that did not differ from it when the map
+	// was recorded — the ones whose having no reader in the map means no test reads them.
+	recorded: ReadonlySet<string>
 	is_present: (file_path: string) => boolean
 }
 
-// Either the modules the changed non-code files resolve to, or why they cannot be resolved.
-type MapResolution = { files: Array<string> } | { reason: string }
+// What the decision narrows to: the files to hand vitest, and the changed files known to reach no
+// test.
+interface Selection {
+	files: ReadonlyArray<string>
+	unread: ReadonlyArray<string>
+}
+
+// Either the selection the changed non-code files resolve to, or why they cannot be resolved.
+type MapResolution = Selection | { reason: string }
 
 function is_relatable(file_path: string): boolean {
 	return RELATABLE_EXTENSIONS.has(path.extname(file_path))
@@ -103,18 +125,20 @@ function all_scope(reason: string): RelatedScope {
 	return { mode: 'all', files: [], reason }
 }
 
-function resolve_through_map(
-	others: ReadonlyArray<string>,
-	map: ReadMap | undefined,
-): MapResolution {
-	if (others.length === 0) return { files: [] }
+// A file no recorded test read narrows only when the recorded tree held it: one added since is a file
+// the recorder never saw, so its having no reader says nothing.
+function resolve_through_map(others: ReadonlyArray<string>, request: ScopeRequest): MapResolution {
+	const { map, recorded } = request
+
+	if (others.length === 0) return { files: [], unread: [] }
 	if (map === undefined) return { reason: `${NO_MAP_REASON} ${String(others[0])}` }
 
-	const unread = others.find((file) => test_read_map.readers_of(map, file).length === 0)
+	const unread = others.filter((file) => test_read_map.readers_of(map, file).length === 0)
+	const unknown = unread.find((file) => !recorded.has(file))
 
-	if (unread !== undefined) return { reason: `${unread} is read by no recorded test` }
+	if (unknown !== undefined) return { reason: `${unknown} is read by no recorded test` }
 
-	return { files: others.flatMap((file) => test_read_map.readers_of(map, file)) }
+	return { files: others.flatMap((file) => test_read_map.readers_of(map, file)), unread }
 }
 
 // A changed module is also data to a test that reads it through `fs` rather than importing it, and
@@ -126,8 +150,20 @@ function code_readers(code: ReadonlyArray<string>, map: ReadMap | undefined): Ar
 	return code.flatMap((file) => test_read_map.readers_of(map, file))
 }
 
-function narrowed_scope(files: ReadonlyArray<string>, request: ScopeRequest): RelatedScope {
-	const present = [...new Set(files)]
+function none_scope(unread: ReadonlyArray<string>, root: string): NoTestScope {
+	const files = unread.map((file) => path.join(root, file))
+
+	return { mode: 'none', files, reason: `${String(files.length)} changed file(s) no test reads` }
+}
+
+// Nothing to select is "no test" only when something settled it; an empty or vanished selection
+// still runs the whole suite.
+function narrowed_scope(selection: Selection, request: ScopeRequest): RelatedScope {
+	if (selection.files.length === 0 && selection.unread.length > 0) {
+		return none_scope(selection.unread, request.root)
+	}
+
+	const present = [...new Set(selection.files)]
 		.map((file) => path.join(request.root, file))
 		.filter((file) => request.is_present(file))
 
@@ -150,16 +186,22 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 	const code = changed.filter((file) => is_relatable(file))
 	const resolution = resolve_through_map(
 		changed.filter((file) => !is_relatable(file)),
-		request.map,
+		request,
 	)
 
 	if ('reason' in resolution) return all_scope(resolution.reason)
 
-	return narrowed_scope([...code, ...code_readers(code, request.map), ...resolution.files], request)
+	const files = [...code, ...code_readers(code, request.map), ...resolution.files]
+
+	return narrowed_scope({ files, unread: resolution.unread }, request)
 }
 
 function describe_scope(scope: RelatedScope, root: string): string {
-	return changed_file_scope.describe_scope(scope, root, VOCABULARY)
+	if (scope.mode !== 'none') return changed_file_scope.describe_scope(scope, root, VOCABULARY)
+
+	const listing = changed_file_scope.format_file_list(scope.files, root)
+
+	return `${COMMAND_LABEL}: ${scope.reason} — ${NONE_SUFFIX}.\n${listing}`
 }
 
 // `--run` is what keeps `vitest related` out of watch mode; the `run` sub-command already implies it
@@ -168,7 +210,7 @@ function vitest_arguments(
 	scope: RelatedScope,
 	extra_flags: ReadonlyArray<string> = [],
 ): ReadonlyArray<string> {
-	if (scope.mode === 'all') return [RUN_SUBCOMMAND, ...extra_flags]
+	if (scope.mode !== 'related') return [RUN_SUBCOMMAND, ...extra_flags]
 
 	return [RELATED_SUBCOMMAND, ...scope.files, RUN_FLAG, ...extra_flags]
 }
@@ -187,5 +229,5 @@ const related_scope = {
 }
 
 export type { ScopeMode } from '#scripts/git/changed-file-scope'
-export type { ScopeRequest }
+export type { RelatedScope, ScopeRequest }
 export { related_scope }
