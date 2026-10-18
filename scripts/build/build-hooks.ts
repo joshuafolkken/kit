@@ -14,7 +14,8 @@ import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { error_text } from '#scripts/lib/error-message'
 import { build, type OnLoadArgs, type OutputFile, type Plugin, type PluginBuild } from 'esbuild'
 
-const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const BUILD_SCRIPT = fileURLToPath(import.meta.url)
+const PACKAGE_DIR = path.join(path.dirname(BUILD_SCRIPT), '..', '..')
 const OUT_DIR = path.join(PACKAGE_DIR, 'dist', 'hooks')
 const { STAMP_NAME } = hook_bundle_stamp
 const CHUNK_PREFIX = 'chunk-'
@@ -83,9 +84,22 @@ function prune_stale_outputs(out_directory: string, outputs: ReadonlyArray<strin
 	}
 }
 
+// **A module inlined into an entry keeps no self-invoke.** Its `import.meta.url` collapses to the
+// entry's output path, so its guard would match `argv[1]` and its main would run beside the hook's:
+// `stop-guard` ran `josh run:hold`'s, `josh notify`'s and `josh run:tidy`'s on every stop, and their
+// stdout ahead of the envelope made the harness drop the refusal (joshuafolkken/kit#4123). Only the
+// launched entry runs a main, so every other module's guard is built as `false`.
+const SELF_INVOKE_GUARD = 'process.argv[1] === fileURLToPath(import.meta.url)'
+
+function loaded_contents(contents: Uint8Array, is_entry: boolean): string {
+	const source = Buffer.from(contents).toString('utf8')
+
+	return is_entry ? source : source.replaceAll(SELF_INVOKE_GUARD, 'false')
+}
+
 // Every file the build loads is read here, so the stamp digests the exact bytes that were bundled —
 // a source edited mid-build is recorded as what it was, and the next launch rebuilds it.
-function source_recorder(sources: Map<string, Uint8Array>): Plugin {
+function source_recorder(sources: Map<string, Uint8Array>, entries: ReadonlySet<string>): Plugin {
 	return {
 		name: 'hook-source-recorder',
 		setup(plugin_build: PluginBuild): void {
@@ -94,7 +108,7 @@ function source_recorder(sources: Map<string, Uint8Array>): Plugin {
 
 				sources.set(path.relative(PACKAGE_DIR, args.path), contents)
 
-				return { contents, loader: 'default' }
+				return { contents: loaded_contents(contents, entries.has(args.path)), loader: 'default' }
 			})
 		},
 	}
@@ -142,11 +156,18 @@ function place_build(out_directory: string, files: ReadonlyArray<OutputFile>, st
 // every tool call, and an emptied directory would make a hook launched mid-build fail to load and its
 // guard fail open. The source digest is placed last (`hook-bundle-stamp.ts`), so a launch only reads
 // the bundles as fresh once every one of them is in place.
+//
+// This script is an input too: it rewrites what it loads, so an edit to it changes the bundles while
+// every bundled source stays byte-identical.
 async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
-	const sources = new Map<string, Uint8Array>()
+	const sources = new Map<string, Uint8Array>([
+		[path.relative(PACKAGE_DIR, BUILD_SCRIPT), readFileSync(BUILD_SCRIPT)],
+	])
+	const entry_points = HOOK_BUNDLES.map((bundle) => entry_point(bundle))
+	const entries = new Set(entry_points.map((entry) => entry.in))
 	const { outputFiles: files } = await build({
 		absWorkingDir: PACKAGE_DIR,
-		entryPoints: HOOK_BUNDLES.map((bundle) => entry_point(bundle)),
+		entryPoints: entry_points,
 		outdir: out_directory,
 		bundle: true,
 		splitting: true,
@@ -155,7 +176,7 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 		target: 'node22',
 		packages: 'external',
 		write: false,
-		plugins: [source_recorder(sources)],
+		plugins: [source_recorder(sources, entries)],
 	})
 	const stamp = hook_bundle_stamp.stamp_text(
 		sources,
