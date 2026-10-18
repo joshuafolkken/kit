@@ -35,7 +35,7 @@ Single source: [`.claude/skills/workflow-commands/needs-human-review.md`](../.cl
 
 ### `already-done` — the exit for work that is already merged
 
-The exit for a run that verifies its issue's work is already in `main`: nothing to implement, and it cannot close the issue (Tier C). Not `needs-decision` — that waits for an answer; this one has its answer and only the close is outstanding. A run applies it; only a person removes it, by closing the issue.
+The exit for a run that verifies its issue's work is already in `main`: nothing to implement, and it cannot close the issue (Tier C). Not `needs-decision` — that waits for an answer; this one has its answer and only the close is outstanding. A run applies it with `josh issue:already-done`; only a person removes it, by closing the issue.
 
 ```bash
 gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it"

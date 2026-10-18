@@ -14,22 +14,23 @@ The issues that introduced or reshaped each command, kept here so the reference 
 provenance citations. Read an issue for the decision behind a behavior; the reference states only
 the behavior. joshuafolkken/kit#3280 moved these commands out of the automation reference.
 
-| Command                | Issues                                   |
-| ---------------------- | ---------------------------------------- |
-| `josh issue:comment`   | #2304                                    |
-| `josh pkg:scout`       | #2216                                    |
-| `josh issue:lint`      | #2123, #2212, #2353                      |
-| `josh defect:rate`     | #2449, #2455                             |
-| `josh report:lint`     | #2123                                    |
-| `josh stash:pop`       | #2050                                    |
-| `josh epic:next`       | #2779                                    |
-| `josh auto-ok:next`    | #2928                                    |
-| `josh backlog:next`    | #2244, #2449, #2455, #2776, #2779, #2928 |
-| `josh backlog:plan`    | #2778                                    |
-| `josh backlog:stalled` | #2359                                    |
-| `josh backlog:offer`   | #2335                                    |
-| `josh backlog:drive`   | #2499, #2508, #2881                      |
-| `josh oracle:list`     | #2324, #2334, #2808                      |
+| Command                   | Issues                                   |
+| ------------------------- | ---------------------------------------- |
+| `josh issue:comment`      | #2304                                    |
+| `josh issue:already-done` | #4130                                    |
+| `josh pkg:scout`          | #2216                                    |
+| `josh issue:lint`         | #2123, #2212, #2353                      |
+| `josh defect:rate`        | #2449, #2455                             |
+| `josh report:lint`        | #2123                                    |
+| `josh stash:pop`          | #2050                                    |
+| `josh epic:next`          | #2779                                    |
+| `josh auto-ok:next`       | #2928                                    |
+| `josh backlog:next`       | #2244, #2449, #2455, #2776, #2779, #2928 |
+| `josh backlog:plan`       | #2778                                    |
+| `josh backlog:stalled`    | #2359                                    |
+| `josh backlog:offer`      | #2335                                    |
+| `josh backlog:drive`      | #2499, #2508, #2881                      |
+| `josh oracle:list`        | #2324, #2334, #2808                      |
 
 ## `josh issue:ack` in detail
 
