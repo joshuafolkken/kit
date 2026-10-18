@@ -14,7 +14,7 @@ import {
 	run_board_layout,
 	type BoardLayout,
 	type BoardRow,
-	type WaveEntry,
+	type QueuedEntry,
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
@@ -226,7 +226,10 @@ function bare(text: string): PlanLine {
 	return { text, row: undefined }
 }
 
-function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame): Array<PlanLine> {
+function epic_lines(
+	entry: Extract<QueuedEntry, { kind: 'epic' }>,
+	frame: RowFrame,
+): Array<PlanLine> {
 	const last = entry.rows.length - 1
 	const children = entry.rows.map((row, index) =>
 		row_line(index === last ? LAST_BRANCH : BRANCH, row, frame),
@@ -238,7 +241,7 @@ function epic_lines(entry: Extract<WaveEntry, { kind: 'epic' }>, frame: RowFrame
 	return [bare(`${INDENT}📁 ${epic}`), ...children]
 }
 
-function entry_lines(entry: WaveEntry, frame: RowFrame): Array<PlanLine> {
+function entry_lines(entry: QueuedEntry, frame: RowFrame): Array<PlanLine> {
 	if (entry.kind === 'row') return [row_line(INDENT, entry.row, frame)]
 
 	return epic_lines(entry, frame)
@@ -294,12 +297,12 @@ function frame_of(
 	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usage: undefined }
 }
 
-function wave_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
-	return layout.waves.flatMap((wave, index) =>
-		plan_section(
-			String(index + 1),
-			wave.flatMap((entry) => entry_lines(entry, frame)),
-		),
+// The rows not yet started under one heading, in the order they are offered: a running batch starts
+// each once a lane and its paths are free, never wave by wave (joshuafolkken/kit#4137).
+function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+	return plan_section(
+		`${STATE_ICONS.waiting} ${WORDS.queued}`,
+		layout.queued.flatMap((entry) => entry_lines(entry, frame)),
 	)
 }
 
@@ -334,7 +337,7 @@ function plan_parts(
 	return {
 		plan: active_sections(layout, frame, done),
 		below: [
-			...wave_sections(layout, frame),
+			...queued_section(layout, frame),
 			...rows_section(waiting, layout.unreached, frame, 'waiting'),
 			...done_section(done, (row) => row_line(INDENT, row, frame)),
 		],

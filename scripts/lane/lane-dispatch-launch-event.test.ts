@@ -7,6 +7,7 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_park } from '#scripts/run/park/run-park'
 import { run_label } from '#scripts/run/run-label'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
@@ -101,6 +102,19 @@ describe('lane_dispatch.dispatch_child — the dispatch the implementation is ti
 		await lane_dispatch.dispatch_child(ISSUE)
 
 		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4132: a park a person cleared by hand on GitHub left its record behind, and the
+// re-dispatched child's stop then read as parked.
+describe('lane_dispatch.dispatch_child — a park left by an earlier child', () => {
+	it('clears the issue park record before the child starts', async () => {
+		const clear = vi.spyOn(run_park, 'clear').mockReturnValue()
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(clear).toHaveBeenCalledExactlyOnceWith(ISSUE, LANE_DIRECTORY)
 	})
 })
 

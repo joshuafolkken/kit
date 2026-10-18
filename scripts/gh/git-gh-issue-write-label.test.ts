@@ -77,3 +77,43 @@ describe('issue_apply_label', () => {
 		expect(await git_gh_issue_write.issue_add_label(ISSUE_NUMBER, LABEL_NAME)).toBe(true)
 	})
 })
+
+// The DELETE throws; the read-back answers what `read_back` does.
+function serve_failed_delete(read_back: () => Promise<string>): void {
+	mocked_api.mockImplementation(async (request) => {
+		if (request.method === 'DELETE') throw new Error(WRITE_FAILED)
+
+		return await read_back()
+	})
+}
+
+async function clear(): Promise<boolean> {
+	return await git_gh_issue_write.issue_clear_label(ISSUE_NUMBER, LABEL_NAME)
+}
+
+describe('issue_clear_label', () => {
+	it('answers true when the delete succeeds', async () => {
+		expect(await clear()).toBe(true)
+		expect(mocked_api).toHaveBeenCalledTimes(1)
+	})
+
+	it('answers true when the delete throws and the read-back lacks the label', async () => {
+		serve_failed_delete(async () => 'bug\n')
+
+		expect(await clear()).toBe(true)
+	})
+
+	it('answers false when the delete throws and the read-back still has the label', async () => {
+		serve_failed_delete(async () => `bug\n${LABEL_NAME}\n`)
+
+		expect(await clear()).toBe(false)
+	})
+
+	it('answers false when the delete throws and the read-back itself fails', async () => {
+		serve_failed_delete(async () => {
+			throw new Error(READ_FAILED)
+		})
+
+		expect(await clear()).toBe(false)
+	})
+})

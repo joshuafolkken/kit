@@ -1575,6 +1575,16 @@ Print the next step a fullrun takes, computed from the run’s state
 
 ---
 
+### `josh run:park`
+
+> **Audience:** automation · **Side effects:** files, network
+
+`<issue> --body-file <path> | <issue> --clear`
+
+Park a lane child for a decision, or clear the park
+
+---
+
 ### `josh run:prep`
 
 > **Audience:** automation · **Side effects:** network

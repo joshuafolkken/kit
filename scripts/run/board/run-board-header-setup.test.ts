@@ -17,7 +17,7 @@ const NOW = STARTED + 10 * SECOND
 const SPINNER = '⠋'
 const { STAGE } = run_event_setup
 const OPENING = run_event_setup.opening_lane('278')
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 const STALE_MS = 40 * backlog_budget.MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
 // The third line's blank under the run's mark and name, then the gap before its words.

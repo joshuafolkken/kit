@@ -26,9 +26,9 @@ const NO_FREE_LANES = 0
 const WORDS = {
 	untriaged: 'untriaged',
 	held: 'held by triage',
-	no_lane: 'no free lane',
+	no_lane: 'next free lane',
 	no_memory: 'no memory headroom',
-	overlaps: 'overlaps',
+	after: 'after',
 } as const
 
 const FIGURE_SEPARATOR = ' · '
@@ -45,7 +45,7 @@ interface ReasonRead extends Overlay {
 	events: ReadonlyArray<RunEvent>
 	// How many more lanes the limit allows; `undefined` where it could not be read.
 	free_lanes: number | undefined
-	// How many lanes hold a place under the limit, counted after `no free lane`.
+	// How many lanes hold a place under the limit, counted after `next free lane`.
 	occupied_count?: number | undefined
 	// The limit those lanes fill; `undefined` where it could not be read.
 	lane_limit?: number | undefined
@@ -106,17 +106,18 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 
 	return clash === undefined
 		? undefined
-		: `${WORDS.overlaps} ${String(clash.holder)} (${clash.path})`
+		: `${WORDS.after} ${String(clash.holder)}${FIGURE_SEPARATOR}${clash.path}`
 }
 
-// `no free lane 4/4`: how many lanes hold a place against the limit. Every waiting row repeated the
-// same breakdown of them, so the row counts them and names none (#4111).
+// `next free lane (4/4)`: what the row starts after, and how many lanes hold a place against the
+// limit. Every waiting row repeated the same breakdown of them, so the row counts them and names none
+// (#4111); it says what it starts after rather than what it lacks (joshuafolkken/kit#4137).
 function no_lane_of(read: ReasonRead): string {
 	const { occupied_count = 0, lane_limit } = read
 
 	if (lane_limit === undefined) return WORDS.no_lane
 
-	return `${WORDS.no_lane} ${String(occupied_count)}/${String(lane_limit)}`
+	return `${WORDS.no_lane} (${String(occupied_count)}/${String(lane_limit)})`
 }
 
 // `no memory headroom — 🧠 88% · 💾 12M/s`: run:board's own latest 🧠 / 💾, not the driver's reading,

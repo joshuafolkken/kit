@@ -99,6 +99,7 @@ describe('rule_delivery — a lane child that promoted its own issue', () => {
 	it.each([
 		['the REST label write onto the epic', EPIC_LABEL_COMMAND],
 		['the gh issue edit label write onto the epic', EDIT_LABEL_COMMAND],
+		['the josh run:park onto the epic', `pnpm josh run:park ${ISSUE} --body-file /tmp/park.md`],
 		['the confirmation notify about the epic', NOTIFY_COMMAND],
 	])('refuses %s on every reissue', (name, command) => {
 		const payload = payload_of(`split-${name}`, command, PROMOTE_LINE)

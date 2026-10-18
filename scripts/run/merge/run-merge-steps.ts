@@ -7,6 +7,7 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_park } from '#scripts/issue/issue-park'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
@@ -365,15 +366,10 @@ async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResu
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
 	await release_child(ctx.child)
-	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, RUN_STALLED_LABEL)
+	const reason = { child: ctx.child, cause, carry, output: ctx.output }
+	const park = await issue_park.apply(ctx.child, RUN_STALLED_LABEL, run_merge.park_comment(reason))
 
-	if (is_parked) {
-		const reason = { child: ctx.child, cause, carry, output: ctx.output }
-
-		await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.park_comment(reason))
-	}
-
-	return { carry, is_parked, is_refused: false, waits: NO_WAITS }
+	return { carry, is_parked: park.is_labelled, is_refused: false, waits: NO_WAITS }
 }
 
 // A child that ended unfinished: waiting when it records an open blocker or a start date still ahead

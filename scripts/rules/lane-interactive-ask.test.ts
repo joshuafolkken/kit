@@ -148,7 +148,7 @@ describe('LANE_INTERACTIVE_ASK_REASON', () => {
 	it.each([
 		// The park it asks for, and the command that records it — the only thing that makes it actionable.
 		['needs-decision'],
-		["labels[]=needs-decision'"],
+		['pnpm josh run:park <N> --body-file <path>'],
 		// The pointer to the procedure, never a resident document.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		['backlogrun-park.md'],

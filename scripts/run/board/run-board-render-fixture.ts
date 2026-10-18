@@ -15,7 +15,7 @@ const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 // The run has gone 130 minutes, so a row past an hour reads as `2°05′30″` and the header as `2°10′00″`.
 const RUN_MINUTES = 130
 const NOW = STARTED + RUN_MINUTES * MINUTE
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 const RULE_WIDTH = 50
 
 function header(extra: Partial<BoardHeader> = {}): BoardHeader {

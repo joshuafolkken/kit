@@ -1,0 +1,9 @@
+{
+	"reason": "run:park adds one import of issue_number_shape after main moved single_issue_number into it (#4130)",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 162,
+		"ai_cost.on_demand_bytes": 3,
+		"prose.excess_bold": 1
+	}
+}
