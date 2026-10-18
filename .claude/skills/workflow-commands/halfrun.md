@@ -23,19 +23,12 @@ start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm jos
 join the gate before the stop, iterate to no high/medium findings, within the round cap (`prompts/review.md`) → `pnpm josh
 test:e2e`, run by **you**, because `halfrun` opens no pull request and there is no CI E2E job; a printed
 skip is the answer where the project has no suite) → **mark the stop: `pnpm josh run:hold <N>
---halfrun-stop`** (the record `fullrun #<N>` adopts; `new` passes the filed number) → send a
-`confirmation` Telegram with the resume commands in the body → **stop**. Plan comments are in the session language. The `confirmation` Telegram
-body MUST include the exact resume commands — **the `Next:` line first**, since that is how a verified
-`halfrun` ships: its `run:entry` adopts this stop's marked hold and resumes at
-the gate. The direct commands follow for shipping without an agent:
-`pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'halfrun ready for manual
-verification\nNext: prrun #<N> | fullrun #<N>\nWithout an agent: pnpm josh git -y "<title> #<N>" && pnpm josh
-followup "<title> #<N>" --notify-message "Implemented <title>\\nCause: ...\\nFix: ...\\nResult:
-...\\n\\nDetails:\\n- <change1>"' --recommended "Verify by hand, then prrun #<N>" --alternative "fullrun
-#<N>"`. The stop report names the same two, in the same order.
+--halfrun-stop`** (the record `fullrun #<N>` adopts; `new` passes the filed number; it also sends the
+`confirmation` Telegram, its body led by `Next: prrun #<N> | fullrun #<N>` — never compose one) → **stop**. Plan comments are in
+the session language. The stop report names `prrun #<N>` (recommended) and `fullrun #<N>`, in that order.
 **Invoking `halfrun` is _not_ authorization to commit, push, or merge** — do not run `pnpm josh git -y` or `pnpm josh followup` yourself. If the user comes
-back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, send another
-`confirmation` Telegram, stop again.
+back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, mark the stop again
+(it sends the `confirmation`), stop again.
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
@@ -46,5 +39,5 @@ any pre-existing changes with `git stash push -m "halfrun new: pre-existing chan
 (the pathspec keeps the observation ledger in the tree for this run's commit), popped by
 message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
 `pnpm josh ms` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
-josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` → send the `confirmation`
-Telegram and **stop**.
+josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
+→ **stop**.

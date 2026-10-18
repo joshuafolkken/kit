@@ -5,7 +5,7 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 Only these load `.env` themselves, and only when it exists:
 
 - **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
-- **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
+- **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:sample`, `josh lane:stats`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.
 - **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
