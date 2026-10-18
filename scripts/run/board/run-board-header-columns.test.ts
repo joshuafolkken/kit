@@ -90,7 +90,7 @@ describe('run_board_header.header_lines — the time column', () => {
 		const [first, second] = header_of({ repo: KIT })
 
 		expect(first).toMatch(/^⏸ backlogrun {2}⏰ 2°10′00″ {2}✅/u)
-		expect(second).toMatch(/^ {2}kit {9}💓 {4}1′00″ {2}⚡/u)
+		expect(second).toMatch(/^ {2}kit {9}💓 {4}1′00″ {2}💪/u)
 		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
 	})
 
@@ -121,7 +121,7 @@ describe('run_board_header.header_lines — the time column once the run has end
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms, repo: KIT, machine: machine(9) }))
 
-		expect(bar_start_of(lines[1], '⚡')).toBe(bar_start_of(lines[0], '✅'))
+		expect(bar_start_of(lines[1], '💪')).toBe(bar_start_of(lines[0], '✅'))
 	})
 })
 
@@ -165,7 +165,7 @@ describe('run_board_header.header_lines — the gauge column', () => {
 
 		expect(first).toContain(`${String(settled)}/${String(total)} `)
 		expect(second).toContain(`${String(cpu)}% `)
-		expect(bar_start_of(second, '⚡')).toBe(bar_start_of(first, '✅'))
+		expect(bar_start_of(second, '💪')).toBe(bar_start_of(first, '✅'))
 	})
 
 	it('keeps the progress bar where it is as the count and the percent gain a digit', () => {
@@ -188,7 +188,7 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const screen = header_of({ machine: machine(11), repo: KIT })
 		const chat = header_of({ machine: machine(11), repo: KIT, form: 'chat' })
 
-		expect(chat[1]).not.toContain('⚡')
+		expect(chat[1]).not.toContain('💪')
 		expect(start_of(chat[1], '💓')).toBe(start_of(screen[1], '💓'))
 		expect(time_end_of(chat[1], '💓')).toBe(time_end_of(chat[0], '⏰'))
 		expect(bar_start_of(chat[1], '🧠')).toBe(bar_start_of(chat[0], '✅'))
@@ -202,7 +202,7 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const layout = plan(settled, total)
 		const [first, second] = header_of({ layout, machine: machine(11), form: 'chat' })
 
-		expect(second).not.toContain('⚡')
+		expect(second).not.toContain('💪')
 		expect(bar_start_of(second, '🧠')).toBe(bar_start_of(first, '✅'))
 	})
 
@@ -211,6 +211,6 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const [first, second] = header_of({ activity })
 
 		expect(second).not.toContain('💓')
-		expect(start_of(second, '⚡')).toBe(start_of(first, '✅'))
+		expect(start_of(second, '💪')).toBe(start_of(first, '✅'))
 	})
 })

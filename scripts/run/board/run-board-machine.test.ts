@@ -107,13 +107,13 @@ describe('run_board_machine.line_of', () => {
 	it('draws each gauge as icon, right-aligned figure, then bar, two spaces apart', () => {
 		const gauges = { ...UNREAD, cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
 
-		expect(plain(gauges)).toBe('⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────')
+		expect(plain(gauges)).toBe('💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────')
 	})
 
 	it('stops the bar full past the gauge’s end, keeping the figure the same width', () => {
 		const gauges = { ...UNREAD, cpu_percent: 100, swap_mb_per_s: 42 }
 
-		expect(plain(gauges)).toBe(`⚡ 100% ${'■'.repeat(10)}  💾  42M/s ${'■'.repeat(10)}`)
+		expect(plain(gauges)).toBe(`💪 100% ${'■'.repeat(10)}  💾  42M/s ${'■'.repeat(10)}`)
 	})
 
 	it('leaves out an unread gauge, and the whole line when none was read', () => {
@@ -140,12 +140,12 @@ describe('run_board_machine.line_of colors', () => {
 	it('draws a quiet CPU green and colors it yellow and red past its thresholds', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`⚡  30% ${bar(3, 'green')}`)
+		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`💪  30% ${bar(3, 'green')}`)
 		expect(line_of({ ...UNREAD, cpu_percent: 75 })).toBe(
-			`⚡ ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`,
+			`💪 ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`,
 		)
 		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
-			`⚡ ${styleText('red', ' 95%')} ${bar(10, 'red')}`,
+			`💪 ${styleText('red', ' 95%')} ${bar(10, 'red')}`,
 		)
 	})
 
@@ -175,12 +175,12 @@ describe('run_board_machine.line_of in 24-bit color', () => {
 	it('draws the CPU gauge in its 24-bit green, yellow and red where the output has them', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`⚡  30% ${rgb_bar(3, GREEN_RGB)}`)
+		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`💪  30% ${rgb_bar(3, GREEN_RGB)}`)
 		expect(line_of({ ...UNREAD, cpu_percent: 75 })).toBe(
-			`⚡ ${rgb(YELLOW_RGB, ' 75%')} ${rgb_bar(8, YELLOW_RGB)}`,
+			`💪 ${rgb(YELLOW_RGB, ' 75%')} ${rgb_bar(8, YELLOW_RGB)}`,
 		)
 		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
-			`⚡ ${rgb(RED_RGB, ' 95%')} ${rgb(RED_RGB, '■'.repeat(BAR_WIDTH))}`,
+			`💪 ${rgb(RED_RGB, ' 95%')} ${rgb(RED_RGB, '■'.repeat(BAR_WIDTH))}`,
 		)
 	})
 })

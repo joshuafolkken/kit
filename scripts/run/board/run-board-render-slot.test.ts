@@ -51,7 +51,7 @@ describe('run_board_render_slot.slot_of', () => {
 	it('draws a running row’s usage', () => {
 		const drawn = slot_of(row(1, 'running'), slot, NOW) ?? ''
 
-		expect(stripVTControlCharacters(drawn)).toBe('⚡ 20% 🧠1.6G')
+		expect(stripVTControlCharacters(drawn)).toBe('💪 20% 🧠1.6G')
 	})
 
 	it('shades a running row against the share of the frame’s running rows', () => {

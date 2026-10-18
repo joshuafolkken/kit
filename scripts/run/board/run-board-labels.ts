@@ -193,11 +193,11 @@ const KIND_WORDS: Readonly<Record<FiledKind, keyof Words>> = {
 	bug: 'fix',
 }
 
-// The header's gauges and marks. ⚡ rather than 🔥: a fire beside a gauge drawn green reads as an
-// alarm. ⏰ rather than ⏱, a text symbol some terminals draw one column wide: under it the 💓's digits
-// would stand a column off.
+// The header's gauges and marks. 💪 for the CPU: ⚡ is drawn too thin to see, a 🔥 beside a gauge
+// drawn green reads as an alarm, and 💻 is hard to tell from 💾. ⏰ rather than ⏱, a text symbol
+// some terminals draw one column wide: under it the 💓's digits would stand a column off.
 const HEADER_ICONS = {
-	cpu: '⚡',
+	cpu: '💪',
 	memory: '🧠',
 	swap: '💾',
 	ended: '🔚',
@@ -208,7 +208,7 @@ const HEADER_ICONS = {
 	estimate: STATE_ICONS.done,
 } as const
 
-// The kind of what the header's third line says, under the `⚡` (joshuafolkken/kit#3767): a call a
+// The kind of what the header's third line says, under the `💪` (joshuafolkken/kit#3767): a call a
 // session made, the run watching its pool, the run ended, or each of the run's own stages, keyed by the
 // stage's words before any issue. A child's event draws its row's phase icon instead. The run ended
 // draws the header's own end mark — 🏁 is already a done row's state icon.

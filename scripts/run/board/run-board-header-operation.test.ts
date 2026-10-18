@@ -6,7 +6,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#3757: the header's third line draws the newest operation of a child the board
 // draws as running, the same on a screen and in a chat. joshuafolkken/kit#3767: its spinner under the
-// `⏰` and `💓`, its time in their format under their digits, its kind's icon under the `⚡`, and the
+// `⏰` and `💓`, its time in their format under their digits, its kind's icon under the `💪`, and the
 // child's newest event where that is newer than its newest operation.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
@@ -14,7 +14,7 @@ const SECOND = 1000
 const THIRD = 2
 // No repository is named, so the name column is blank past the first line.
 const NAME_BLANK = ' '.repeat('▶ backlogrun'.length)
-const BEAT_LINE = `${NAME_BLANK}  💓    1′00″  ⚡ -  🧠 -  💾 -`
+const BEAT_LINE = `${NAME_BLANK}  💓    1′00″  💪 -  🧠 -  💾 -`
 const GATE_TEXT = '🔧 #7 · Bash pnpm josh gate'
 // The third line with no spinner turning: its place blank, two columns wide as the `💓`.
 const STILL_LINE = `${NAME_BLANK}           4″  ${GATE_TEXT}`
@@ -47,7 +47,7 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 		expect(third_of({ operations: OPERATIONS })).toBe(STILL_LINE)
 	})
 
-	it('lines the spinner up under the ⏰ and 💓, the time under their digits, the icon under ⚡', () => {
+	it('lines the spinner up under the ⏰ and 💓, the time under their digits, the icon under 💪', () => {
 		expect(header_lines_of({ operations: OPERATIONS, spinner: '⠙' })).toStrictEqual([
 			'▶ backlogrun  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  ⏳ 0  💤 0',
 			BEAT_LINE,

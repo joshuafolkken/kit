@@ -94,6 +94,6 @@ describe('run_board_render_drawn.drawn_of a held row', () => {
 
 		expect(drawn.icons).toContain('⚓')
 		expect(drawn.checks).toStrictEqual([])
-		expect(drawn.held).toStrictEqual(['🚧 held check', '⚡ cores'])
+		expect(drawn.held).toStrictEqual(['🚧 held check', '💪 cores'])
 	})
 })

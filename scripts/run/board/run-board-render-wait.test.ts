@@ -12,7 +12,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 const { minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
-const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
+const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 const EMPTY_BAR = '─'.repeat(10)
 const COUNTS = `✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`
 // The second line's name column with no repository to name.
