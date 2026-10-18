@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/hooks/pretool-guard.ts:172 | 2026-10-18 | #4101
+- rf:comments | low | scripts/rules/lane-background.ts:71 | 2026-10-18 | #4101
