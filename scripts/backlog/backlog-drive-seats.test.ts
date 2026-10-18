@@ -5,19 +5,47 @@ import { backlog_drive_seats } from './backlog-drive-seats'
 
 const KEPT = '3869'
 
-function ports(free: number): Parameters<typeof backlog_drive_seats.seated>[1] {
-	return { free_lanes: async () => free, has_lane: async (issue) => issue === KEPT }
+const KEPT_TOO = '3871'
+
+function ports(free: number, room = free): Parameters<typeof backlog_drive_seats.seated>[1] {
+	return {
+		free_lanes: async () => free,
+		limit_room: async () => room,
+		has_lane: async (issue) => issue === KEPT || issue === KEPT_TOO,
+	}
 }
 
-it('seats an issue holding a kept lane first and the rest up to the free lanes', async () => {
-	expect(await backlog_drive_seats.seated(['3870', KEPT, '3874'], ports(1))).toStrictEqual([
-		KEPT,
-		'3870',
-	])
-})
+// joshuafolkken/kit#4107: a lane with no child in it holds no place under the limit, so resuming its
+// issue takes a place under it — ahead of a fresh launch, and never past the limit. It keeps its port
+// seat, so seats filled by idle kept lanes do not shut out their resumes.
+describe('backlog_drive_seats.seated', () => {
+	it('resumes kept lanes by the limit room when idle kept lanes fill every seat', async () => {
+		expect(await backlog_drive_seats.seated(['3870', KEPT, KEPT_TOO], ports(0, 1))).toStrictEqual([
+			KEPT,
+		])
+	})
 
-it('seats a kept-lane issue even when no lane is free', async () => {
-	expect(await backlog_drive_seats.seated(['3870', KEPT], ports(0))).toStrictEqual([KEPT])
+	it('seats fresh launches only in what the resumes leave of the limit room', async () => {
+		expect(await backlog_drive_seats.seated([KEPT, '3870', '3874'], ports(2, 2))).toStrictEqual([
+			KEPT,
+			'3870',
+		])
+	})
+
+	it('seats an issue holding a kept lane first, inside the free lanes', async () => {
+		expect(await backlog_drive_seats.seated(['3870', KEPT, '3874'], ports(1))).toStrictEqual([KEPT])
+	})
+
+	it('seats the rest after the kept-lane issue up to the free lanes', async () => {
+		expect(await backlog_drive_seats.seated(['3870', KEPT, '3874'], ports(2))).toStrictEqual([
+			KEPT,
+			'3870',
+		])
+	})
+
+	it('seats no issue, a kept-lane one included, when no lane is free', async () => {
+		expect(await backlog_drive_seats.seated(['3870', KEPT], ports(0))).toStrictEqual([])
+	})
 })
 
 // joshuafolkken/kit#4028: a vacant lane holds no place under the limit, so an issue reusing one must

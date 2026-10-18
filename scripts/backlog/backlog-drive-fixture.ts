@@ -43,6 +43,8 @@ interface Script {
 	unopened_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
+	// The limit-room answers in order, the last repeating; unset reads as the free-lane answers.
+	limit_room?: ReadonlyArray<number>
 	// The issues that already hold a kept lane; unset reads as none.
 	kept_lanes?: ReadonlyArray<string>
 	// How many open issues owe an `auto-ok` judgement; unset reads as none.
@@ -94,13 +96,10 @@ function dispatch_ports(
 	script: Script,
 	calls: Array<string>,
 	offers: Array<DriveState>,
-): Pick<LoopPorts, 'offer' | 'launch' | 'free_lanes' | 'has_lane' | 'judgement_owed'> {
+): Pick<LoopPorts, 'offer' | 'launch' | 'judgement_owed'> {
 	const queue = [...(script.offers ?? [])]
-	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
 
 	return {
-		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
-		has_lane: async (issue) => script.kept_lanes?.includes(issue) === true,
 		judgement_owed: async () => {
 			calls.push('judgement')
 
@@ -117,6 +116,18 @@ function dispatch_ports(
 
 			return launch_outcome(script, issue)
 		},
+	}
+}
+
+// The lane room, each read answered from the script's queue, the last answer repeating.
+function room_ports(script: Script): Pick<LoopPorts, 'free_lanes' | 'limit_room' | 'has_lane'> {
+	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
+	const room = [...(script.limit_room ?? script.free_lanes ?? [ROOMY_POOL])]
+
+	return {
+		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
+		limit_room: async () => (room.length > 1 ? room.shift() : room[0]) ?? ROOMY_POOL,
+		has_lane: async (issue) => script.kept_lanes?.includes(issue) === true,
 	}
 }
 
@@ -181,6 +192,7 @@ function harness(script: Script): Harness {
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
+			...room_ports(script),
 			...memory_port(script),
 			...loop_ports(calls, states),
 			...report_ports(holds, idles),

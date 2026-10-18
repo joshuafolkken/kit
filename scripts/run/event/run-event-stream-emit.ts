@@ -127,9 +127,10 @@ async function emit_heartbeat(line: string): Promise<void> {
 	await emit(run_event_stream.EVENT_KIND.HEARTBEAT, line)
 }
 
-// The events of the invocation now running, `undefined` where the invocation's scope could not be told
-// — for a reader that must not take "no events" for "nothing launched" (`backlog-occupied.ts`).
-async function scoped_current_events(): Promise<ReadonlyArray<RunEvent> | undefined> {
+// The events of the invocation now running, for a reader restoring the run from its stream
+// (`backlog:drive`). Fail-quiet like the writers: no repository, an unreadable stream or an
+// undetermined scope is an empty invocation.
+async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 	try {
 		const repository = await run_carry.repository_directory()
 
@@ -139,17 +140,10 @@ async function scoped_current_events(): Promise<ReadonlyArray<RunEvent> | undefi
 		const scope = run_event_scope.scope_of(read)
 		const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 
-		return run_event_scope.scoped_events(events, scope)
+		return run_event_scope.scoped_events(events, scope) ?? []
 	} catch {
-		return undefined
+		return []
 	}
-}
-
-// The events of the invocation now running, for a reader restoring the run from its stream
-// (`backlog:drive`). Fail-quiet like the writers: no repository, an unreadable stream or an
-// undetermined scope is an empty invocation.
-async function current_events(): Promise<ReadonlyArray<RunEvent>> {
-	return (await scoped_current_events()) ?? []
 }
 
 // The invocation's events for a writer deciding whether a marker is already there: unlike
@@ -188,7 +182,6 @@ const run_event_stream_emit = {
 	emit_once_since,
 	emit_once_since_with,
 	invocation_or_all_events,
-	scoped_current_events,
 	stream_target,
 }
 
