@@ -47,6 +47,8 @@ interface Script {
 	kept_lanes?: ReadonlyArray<string>
 	// How many open issues owe an `auto-ok` judgement; unset reads as none.
 	judgement_owed?: number
+	// The memory-hold answers in order, the last repeating; unset reads as memory to spare.
+	memory_held?: ReadonlyArray<boolean>
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -118,6 +120,15 @@ function dispatch_ports(
 	}
 }
 
+// The memory hold, answered from the script's queue, the last answer repeating.
+function memory_port(script: Script): Pick<LoopPorts, 'memory_held'> {
+	const memory = [...(script.memory_held ?? [false])]
+
+	return {
+		memory_held: async () => (memory.length > 1 ? memory.shift() : memory[0]) ?? false,
+	}
+}
+
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.
 function loop_ports(
 	calls: Array<string>,
@@ -139,6 +150,21 @@ function loop_ports(
 	}
 }
 
+// The reports an offered pass leaves, kept for the suite to read.
+function report_ports(
+	holds: Array<string | undefined>,
+	idles: Array<DriveState>,
+): Pick<LoopPorts, 'hold' | 'idle'> {
+	return {
+		hold: async (reason) => {
+			holds.push(reason)
+		},
+		idle: async (idle_state) => {
+			idles.push(idle_state)
+		},
+	}
+}
+
 function harness(script: Script): Harness {
 	const calls: Array<string> = []
 	const offers: Array<DriveState> = []
@@ -155,13 +181,9 @@ function harness(script: Script): Harness {
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
+			...memory_port(script),
 			...loop_ports(calls, states),
-			hold: async (reason) => {
-				holds.push(reason)
-			},
-			idle: async (idle_state) => {
-				idles.push(idle_state)
-			},
+			...report_ports(holds, idles),
 		},
 	}
 }

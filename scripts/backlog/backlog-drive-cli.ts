@@ -29,6 +29,7 @@ import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_hold, type HoldRecorder } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_launch } from './backlog-drive-launch'
+import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
@@ -188,6 +189,15 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle'> {
 	return { hold: holds.hold, idle: backlog_drive_idle.notify }
 }
 
+// What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.
+function room_ports(): Pick<LoopPorts, 'free_lanes' | 'has_lane' | 'memory_held'> {
+	return {
+		free_lanes: backlog_ready.drive_free_lane_count,
+		has_lane: backlog_drive_seats.has_kept_lane,
+		memory_held: backlog_drive_memory.gauge(),
+	}
+}
+
 function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
@@ -199,8 +209,7 @@ function ports_of(
 		merge: async (issue) => await merge(issue, context.owner),
 		offer: async (state) => await read_offer(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
-		free_lanes: backlog_ready.drive_free_lane_count,
-		has_lane: backlog_drive_seats.has_kept_lane,
+		...room_ports(),
 		judgement_owed: judgement_reader(),
 		...reporters(holds),
 		now: () => new Date(),

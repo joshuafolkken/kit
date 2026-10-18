@@ -10,7 +10,7 @@ import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
-import { run_board_reason } from './run-board-reason'
+import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
@@ -124,6 +124,23 @@ function activity_here(local: LocalRead): RunActivity {
 	)
 }
 
+type RoomRead = Pick<
+	ReasonRead,
+	'free_lanes' | 'occupied_lanes' | 'lane_limit' | 'idle_lanes' | 'is_memory_held' | 'gauges'
+>
+
+// The room a waiting row is weighed against: the lanes under the limit, and the machine's memory.
+function room_of(state: BoardState, local: LocalRead): RoomRead {
+	return {
+		free_lanes: local.free_lanes,
+		occupied_lanes: local.occupied_lanes,
+		lane_limit: local.lane_limit,
+		idle_lanes: local.idle_lanes,
+		is_memory_held: local.is_memory_held,
+		gauges: state.gauges,
+	}
+}
+
 // The plan laid under its statuses, each waiting row saying why it waits.
 function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
 	const { closed } = state
@@ -141,10 +158,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		plan,
 		statuses,
 		events: local.events,
-		free_lanes: local.free_lanes,
-		occupied_lanes: local.occupied_lanes,
-		lane_limit: local.lane_limit,
-		idle_lanes: local.idle_lanes,
+		...room_of(state, local),
 		is_stopped: activity_here(local).is_stopped,
 	})
 

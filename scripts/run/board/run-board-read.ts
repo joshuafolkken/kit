@@ -1,6 +1,9 @@
+import { backlog_drive_memory } from '#scripts/backlog/backlog-drive-memory'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { lane_held_stats } from '#scripts/lane/lane-held-stats'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -50,6 +53,9 @@ interface LocalRead {
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
+	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
+	// open hold is `backlog-drive-memory.ts`'s.
+	is_memory_held?: boolean | undefined
 }
 
 const NO_SPAN: SpanHere = { span: undefined, resume: undefined, transcript: undefined }
@@ -110,6 +116,17 @@ async function lane_room_of(lanes: ReadonlyArray<LaneInfo>): Promise<LaneRoomRea
 	}
 }
 
+// The repository's lane ledger, read once for the usual times and the driver's open hold.
+function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_held'> {
+	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
+
+	return {
+		usual: run_board_usual.usual_of(entries),
+		is_memory_held:
+			lane_held_stats.open_reason(entries, Date.now()) === backlog_drive_memory.HOLD_REASON,
+	}
+}
+
 // `undefined` when no run has started here.
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
@@ -132,7 +149,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		idle_lanes: lane_spent.idle_lanes(lanes),
 		earlier_lanes: earlier_lanes(lanes, span.started_ms),
 		...(await lane_room_of(lanes)),
-		usual: run_board_usual.read(repository),
+		...ledger_here(repository),
 	}
 }
 

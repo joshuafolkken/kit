@@ -1,5 +1,6 @@
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
+import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
@@ -12,7 +13,6 @@ import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_read } from './run-board-read'
-import { run_board_usual } from './run-board-usual'
 
 const MINUTE_MS = 60_000
 
@@ -109,6 +109,7 @@ describe('run_board_read.read_local', () => {
 			earlier_lanes: [],
 			...LANE_ROOM,
 			usual: new Map(),
+			is_memory_held: false,
 		})
 	})
 
@@ -137,13 +138,44 @@ describe('run_board_read.read_local', () => {
 
 // joshuafolkken/kit#3769: how long each phase usually takes is read off the repository's ledger.
 describe('run_board_read.read_local usual times', () => {
-	it('reads each phase’s usual time from the repository', async () => {
+	it('reads each phase’s usual time from the repository’s ledger', async () => {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		const usual = new Map([['review' as const, MINUTE_MS]])
-		const read = vi.spyOn(run_board_usual, 'read').mockReturnValue(usual)
+		const stage: LedgerEntry = {
+			kind: 'stage',
+			at: STARTED_AT,
+			stage: 'round-2',
+			elapsed_ms: MINUTE_MS,
+		}
+		const read = vi.spyOn(lane_ledger, 'read_entries').mockReturnValue([stage])
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ usual })
-		expect(read).toHaveBeenCalledWith(REPOSITORY)
+		await expect(run_board_read.read_local()).resolves.toMatchObject({
+			usual: new Map([['round_two', MINUTE_MS]]),
+		})
+		expect(read).toHaveBeenCalledWith(lane_ledger.target_of(REPOSITORY))
+	})
+})
+
+// joshuafolkken/kit#4084: the driver's memory hold is the hold the ledger leaves open.
+describe('run_board_read.read_local memory hold', () => {
+	const MEMORY_HOLD: LedgerEntry = { kind: 'held', at: STARTED_AT, reason: 'memory' }
+
+	function arrange_ledger(entries: ReadonlyArray<LedgerEntry>): void {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValue(entries)
+		// Inside the hold's cap, so the open hold is not read as a driver killed while held.
+		vi.spyOn(Date, 'now').mockReturnValue(Date.parse(INSIDE.at))
+	}
+
+	it('reads a memory hold the ledger leaves open', async () => {
+		arrange_ledger([MEMORY_HOLD])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ is_memory_held: true })
+	})
+
+	it('reads no memory hold once a dispatch ended it', async () => {
+		arrange_ledger([MEMORY_HOLD, { kind: 'dispatch', at: ENDED_AT, issue: 1 }])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ is_memory_held: false })
 	})
 })
 

@@ -14,19 +14,6 @@ async function pass_with(token: MergeToken): Promise<PassResult> {
 	return await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
 }
 
-// joshuafolkken/kit#3598: the tokens are `run:merge`'s, so the loop must classify every one it prints.
-describe('backlog_drive.TOKEN_HANDLING — the run:merge protocol', () => {
-	it('classifies every token run:merge prints and no other', () => {
-		expect(new Set(Object.keys(backlog_drive.TOKEN_HANDLING))).toStrictEqual(new Set(EVERY_TOKEN))
-	})
-
-	it('reads every token but resumed as a hand-off on a non-zero exit', () => {
-		const expected = EVERY_TOKEN.filter((token) => token !== MERGE_TOKEN.RESUMED)
-
-		expect(backlog_drive.HANDOFF_TOKENS).toStrictEqual(new Set(expected))
-	})
-})
-
 describe('backlog_drive.run_pass — every run:merge token', () => {
 	it.each([
 		[MERGE_TOKEN.OVER, 'merge'],

@@ -33,6 +33,7 @@ const CPU_RED = 90
 const MEMORY_YELLOW = 70
 const MEMORY_RED = 85
 const SWAP_FULL_MB_PER_S = 20
+const SWAP_YELLOW_MB_PER_S = 1
 const SWAP_RED_MB_PER_S = 10
 
 type Alert = 'normal' | 'yellow' | 'red'
@@ -101,7 +102,7 @@ const SPECS = {
 		icon: HEADER_ICONS.swap,
 		normal: undefined,
 		full: SWAP_FULL_MB_PER_S,
-		yellow: 1,
+		yellow: SWAP_YELLOW_MB_PER_S,
 		red: SWAP_RED_MB_PER_S,
 		format: rate_text,
 	},
@@ -199,11 +200,16 @@ function line_of(gauges: MachineGauges | undefined, width = 0): string | undefin
 const run_board_machine = {
 	CPU_YELLOW,
 	GAP,
+	MEMORY_RED,
 	MEMORY_YELLOW,
 	PERCENT_WIDTH,
+	PRESSURE_WARNING,
+	SWAP_RED_MB_PER_S,
+	SWAP_YELLOW_MB_PER_S,
 	gauges_of,
 	line_of,
 	percent_text,
+	rate_text,
 	threshold_alert,
 }
 
