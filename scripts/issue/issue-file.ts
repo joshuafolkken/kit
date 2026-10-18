@@ -13,6 +13,7 @@ import {
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 } from './issue-labels'
+import { issue_not_before_label } from './issue-not-before-label'
 import { markdown_section } from './markdown-section'
 
 // The decisions behind `josh issue:file`, kept apart from the command that
@@ -147,11 +148,15 @@ function is_undeclared_classification(label: string, body: string): boolean {
 // Every label the filing carries: the depth, the route when there is one, the classification labels
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
 // extra `--label`, then `auto-ok` when the filing is judged in (`issue-auto-ok.ts`) and no `--label`
-// already named it. One request applies them all, so no label is a separate step to forget.
+// already named it, and `not-before` while the body's start time is ahead (`issue-not-before-label.ts`).
+// One request applies them all, so no label is a separate step to forget.
 function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))
 	const declared = [args.depth, ...(args.route === undefined ? [] : [args.route]), ...extra]
-	const labels = issue_classification.labels_for(body, declared)
+	const labels = issue_not_before_label.with_label(
+		issue_classification.labels_for(body, declared),
+		body,
+	)
 
 	if (!is_auto_ok || has_label_name(labels, AUTO_OK_LABEL)) return labels
 

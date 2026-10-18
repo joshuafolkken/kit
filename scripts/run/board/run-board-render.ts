@@ -36,7 +36,8 @@ import type { Thanks } from './run-board-thanks-csv'
 // what differs between rows. Every word is English whatever the session language: one set of words
 // reads the same on every board.
 
-const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { FILED_KIND_ICONS, KIND_BLANK, NOT_BEFORE_ICON, NOTES_ICON, PHASE_ICONS, STATE_ICONS } =
+	run_board_labels
 const { WAITS_ICON, WORDS } = run_board_labels
 const { clock_of, span_of } = run_board_labels
 const { NOTE_LIMIT } = run_board_render_notes
@@ -142,12 +143,17 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	return [title.padEnd(frame.title_limit), padded(time, frame.time_width, fresh)]
 }
 
+// A row waiting on the start time its body declares leads with 📅 in place of its state's icon.
+function state_lead(row: BoardRow): string {
+	return row.reason?.is_not_before === true ? NOT_BEFORE_ICON : STATE_ICONS[row.state]
+}
+
 // A running row leads with the icon of the phase it is in now — the last its track reached — and
 // with 🔄 while it has reached none yet.
 function phase_lead(row: BoardRow): string {
 	const current = row.state === 'running' ? row.status?.track?.at(-1) : undefined
 
-	return current === undefined ? STATE_ICONS[row.state] : PHASE_ICONS[current]
+	return current === undefined ? state_lead(row) : PHASE_ICONS[current]
 }
 
 // 🚧 while the row's lane is held (joshuafolkken/kit#4052), its end keeping the phase's icon.

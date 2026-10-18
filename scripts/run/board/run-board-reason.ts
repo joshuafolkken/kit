@@ -26,7 +26,6 @@ const WORDS = {
 	held: 'held by triage',
 	no_lane: 'no free lane',
 	overlaps: 'overlaps',
-	not_before: 'not before',
 } as const
 
 type LaneState = 'running' | 'parked' | 'idle'
@@ -150,17 +149,26 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | un
 }
 
 // The start time the body declares and the clock has not reached, in the board's local time.
-function not_before_of(child: EpicChild): string | undefined {
+function not_before_of(child: EpicChild): RowReason | undefined {
 	const ms = issue_not_before.waiting_ms(child.body)
 
-	return ms === undefined ? undefined : `${WORDS.not_before} ${run_board_labels.date_minute_of(ms)}`
+	if (ms === undefined) return undefined
+
+	return {
+		text: `${run_board_labels.WORDS.not_before} ${run_board_labels.date_minute_of(ms)}`,
+		is_not_before: true,
+	}
 }
 
 function wait_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return { text: WORDS.untriaged }
 	if (run_board_layout.is_blocked(child, read)) return undefined
 
-	const text = not_before_of(child) ?? offer_wait(child, read, pool)
+	const dated = not_before_of(child)
+
+	if (dated !== undefined) return dated
+
+	const text = offer_wait(child, read, pool)
 
 	return text === undefined ? undefined : { text }
 }

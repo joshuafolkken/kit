@@ -14,6 +14,7 @@ import { epic_triage, type TriageVerdict } from '#scripts/epic/epic-triage'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
@@ -408,6 +409,11 @@ async function context_of(
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
+	// The scan has every opted-in body and its labels already, so it keeps `not-before` in line with them
+	// and with every other issue the label is on — before any answer, so a drained backlog or a failed
+	// read still takes a passed label off.
+	await issue_not_before_label.sweep(opted_in.issues)
+
 	if (opted_in.issues.length === 0) return report_none()
 
 	const context = await context_of(opted_in, exclude)

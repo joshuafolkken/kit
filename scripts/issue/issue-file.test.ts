@@ -115,6 +115,18 @@ describe('issue_file.labels_of — every label in one create call', () => {
 	})
 })
 
+// joshuafolkken/kit#4079: a body whose start time is still ahead is filed with `not-before`.
+describe('issue_file.labels_of — a filing that declares a start time', () => {
+	it.each([
+		['ahead', '2999-01-01T00:00Z', ['depth:1', 'enhancement', 'not-before']],
+		['past', '2000-01-01T00:00Z', ['depth:1', 'enhancement']],
+	])('carries not-before only for a time %s', (_label, date, expected) => {
+		const body = `${ENHANCEMENT_BODY}- 実施可能日: ${date}\n`
+
+		expect(issue_file.labels_of(args_of(), body)).toStrictEqual(expected)
+	})
+})
+
 describe('issue_file.triage_problem — the run label an auto-ok filing owes', () => {
 	it('refuses auto-ok with neither run:lane nor run:solo', () => {
 		expect(issue_file.triage_problem(['depth:1', 'auto-ok'])).toContain('--label run:lane')

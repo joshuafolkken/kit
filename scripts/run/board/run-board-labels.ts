@@ -52,6 +52,7 @@ const WORDS = {
 	in_progress: 'running',
 	stopped: 'stopped',
 	waiting: 'waiting',
+	not_before: 'not before',
 	decision: 'decision',
 	waits: 'waits on',
 	// A check held back by the machine-wide core budget, and why.
@@ -127,6 +128,10 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
+
+// A waiting row that waits on the start time its body declares rather than on a blocker
+// (joshuafolkken/kit#4079), chosen on the same rule: 🗓 is a text symbol.
+const NOT_BEFORE_ICON = '📅'
 
 // A running row's phases as icons, chosen on the same rule; the row draws every phase it has passed,
 // so the rightmost icon is what it is doing now. Each of `josh ship`'s stages has its own; ⚓ rather
@@ -350,6 +355,7 @@ const run_board_labels = {
 	KIND_WORDS,
 	NOTES_ICON,
 	NOTE_ICONS,
+	NOT_BEFORE_ICON,
 	NOW_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,

@@ -13,8 +13,16 @@ import type { ItemState } from './run-board-status'
 // joshuafolkken/kit#4047: what is in progress, waiting and done on one line, the kinds and the rest
 // on the next, each naming only what the frame draws.
 
-const { FILED_KIND_ICONS, KIND_WORDS, PHASE_ICONS, PHASE_WORDS, STATE_ICONS, WAITS_ICON, WORDS } =
-	run_board_labels
+const {
+	FILED_KIND_ICONS,
+	KIND_WORDS,
+	NOT_BEFORE_ICON,
+	PHASE_ICONS,
+	PHASE_WORDS,
+	STATE_ICONS,
+	WAITS_ICON,
+	WORDS,
+} = run_board_labels
 const GAP = '  '
 
 // What the frame draws, as the legend reads it.
@@ -33,24 +41,32 @@ interface LegendDrawn {
 	held: ReadonlyArray<string>
 }
 
-type StateWords = ReadonlyArray<readonly [ItemState, keyof Words]>
+type LeadWords = ReadonlyArray<readonly [string, keyof Words]>
 
-// The row states the legend can name, each with its word: in progress first, then waiting, then done.
-const PROGRESS_STATES: StateWords = [['running', 'in_progress']]
-const SETTLED_STATES: StateWords = [
-	['parked', 'parked'],
-	['waiting', 'waiting'],
-	['stopped', 'stopped'],
-	['human', 'decision'],
-	['merged', 'merged'],
-	['done', 'done'],
-	['withdrawn', 'withdrawn'],
+function states_of(states: ReadonlyArray<readonly [ItemState, keyof Words]>): LeadWords {
+	return states.map(([state, word]) => [STATE_ICONS[state], word] as const)
+}
+
+// The row leads the legend can name, each with its word: in progress first, then waiting, then done.
+// 📅 sits beside ⏳: both are a waiting row, one on the clock and the other on the pool.
+const PROGRESS_STATES: LeadWords = states_of([['running', 'in_progress']])
+const SETTLED_STATES: LeadWords = [
+	...states_of([
+		['parked', 'parked'],
+		['waiting', 'waiting'],
+	]),
+	[NOT_BEFORE_ICON, 'not_before'],
+	...states_of([
+		['stopped', 'stopped'],
+		['human', 'decision'],
+		['merged', 'merged'],
+		['done', 'done'],
+		['withdrawn', 'withdrawn'],
+	]),
 ]
 
-function state_legend(states: StateWords, leads: ReadonlySet<string>): Array<string> {
-	return states
-		.filter(([state]) => leads.has(STATE_ICONS[state]))
-		.map(([state, word]) => `${STATE_ICONS[state]} ${WORDS[word]}`)
+function state_legend(states: LeadWords, leads: ReadonlySet<string>): Array<string> {
+	return states.filter(([icon]) => leads.has(icon)).map(([icon, word]) => `${icon} ${WORDS[word]}`)
 }
 
 // The phases the frame draws, in the order a run passes them.

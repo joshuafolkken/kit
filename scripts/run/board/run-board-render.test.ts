@@ -123,6 +123,19 @@ describe('run_board_render.render release kinds', () => {
 	})
 })
 
+// joshuafolkken/kit#4079: a row waiting on its declared start time leads with 📅, a blocked one ⏳.
+describe('run_board_render.render a row waiting on its start time', () => {
+	it('leads the row with 📅 and names it in the legend beside ⏳', () => {
+		const dated = row(14, { reason: { text: 'not before 2999-01-01 09:00', is_not_before: true } })
+		const blocked = row(15, { waits: ['3'] })
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [dated, blocked] } }))
+
+		expect(lines.some((line) => line.startsWith('  📅 14'))).toBe(true)
+		expect(lines.some((line) => line.startsWith('  ⏳ 15'))).toBe(true)
+		expect(lines.at(-2)).toBe('⏳ waiting  📅 not before')
+	})
+})
+
 describe('run_board_render.render sections', () => {
 	it('draws an epic with its title as a tree, a wait as a link, and cuts a long title', () => {
 		const long_title = 'x'.repeat(run_board_render.TITLE_LIMIT + 5)
