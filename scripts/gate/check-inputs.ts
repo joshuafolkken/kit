@@ -1,12 +1,19 @@
 import path from 'node:path'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { gate_plan } from './gate-plan'
+import { toolchain_config } from './toolchain-config'
 
 // Which paths each gate check reads, so a gate re-run reuses a check none of whose inputs moved
 // (`check-reuse.ts`). **A check with no scope here always runs**: `cspell` reads every
-// text file, the unit suite reads documents and fixtures as well as code, `behavior` reads a transcript
-// outside the tree and `metrics` reads whatever it measures. Naming a scope for any of them would be a
-// guess, and a wrong guess is a check reported green without having run.
+// text file, the unit suite reads documents and fixtures as well as code, and `behavior` reads a
+// transcript outside the tree. Naming a scope for any of them would be a guess, and a wrong guess is a
+// check reported green without having run.
+//
+// `metrics` reads the scripts it counts, the approvals under `.josh/metrics-accepted/` (JSON) and the
+// Markdown it measures (`metrics-command.ts`), so its inputs are the sources plus every `.md` — a
+// change of only a spelling list or a workflow file leaves its last green standing
+// (joshuafolkken/kit#4085). The merge-base it is held to moving is the base diff `check-reuse.ts`
+// already reads.
 //
 // **The scopes over-approximate, never under**: a path in doubt is an input. `check` and `exports`
 // read source modules and the JSON they import. `lint` is prettier plus eslint, so its inputs are those
@@ -32,36 +39,13 @@ const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
 	'.jsonc',
 ])
 
-const GIT_IGNORE = '.gitignore'
-const PRETTIER_IGNORE = '.prettierignore'
-const PRETTIER_IGNORE_FILES = [GIT_IGNORE, PRETTIER_IGNORE] as const
-
-const CONFIG_FILES: ReadonlySet<string> = new Set([
-	'package.json',
-	'pnpm-lock.yaml',
-	'pnpm-workspace.yaml',
-	'package-lock.json',
-	'yarn.lock',
-	'bun.lock',
-	'bun.lockb',
-	'.npmrc',
-	'.editorconfig',
-	...PRETTIER_IGNORE_FILES,
-])
-
-const PRETTIER_CONFIG_PREFIX = '.prettierrc'
+const MARKDOWN_EXTENSION = '.md'
 
 // Whether prettier would leave `relative` out; `false` when prettier cannot be asked, which keeps the
 // path an input.
 type PrettierIgnored = (relative: string) => Promise<boolean>
 
 type InputTest = (relative: string, is_ignored: PrettierIgnored) => Promise<boolean>
-
-function is_config(relative: string): boolean {
-	const name = path.basename(relative)
-
-	return CONFIG_FILES.has(name) || name.startsWith(PRETTIER_CONFIG_PREFIX)
-}
 
 function is_source(relative: string): boolean {
 	return SOURCE_EXTENSIONS.has(path.extname(relative))
@@ -78,8 +62,12 @@ async function is_source_input(relative: string): Promise<boolean> {
 	return is_source(relative)
 }
 
+async function is_metrics_input(relative: string): Promise<boolean> {
+	return is_source(relative) || path.extname(relative) === MARKDOWN_EXTENSION
+}
+
 function prettier_ignored(root: string): PrettierIgnored {
-	const ignore_path = PRETTIER_IGNORE_FILES.map((name) => path.join(root, name))
+	const ignore_path = toolchain_config.PRETTIER_IGNORE_FILES.map((name) => path.join(root, name))
 
 	return async function is_ignored(relative: string): Promise<boolean> {
 		try {
@@ -99,6 +87,7 @@ const SCOPES: ReadonlyMap<string, InputTest> = new Map([
 	[gate_plan.LINT_LABEL, is_lint_input],
 	[gate_plan.TYPE_CHECK_LABEL, is_source_input],
 	[gate_plan.EXPORTS_LABEL, is_source_input],
+	[gate_plan.METRICS_LABEL, is_metrics_input],
 ])
 
 function is_scoped(label: string): boolean {
@@ -114,7 +103,7 @@ async function touches_inputs(
 ): Promise<boolean> {
 	const scope = SCOPES.get(label)
 
-	if (scope === undefined || paths.some((relative) => is_config(relative))) return true
+	if (scope === undefined || toolchain_config.has_config(paths)) return true
 
 	const answers = await Promise.all(
 		paths.map(async (relative) => await scope(relative, is_ignored)),

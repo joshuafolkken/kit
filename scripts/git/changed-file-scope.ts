@@ -11,9 +11,9 @@ import { git_command } from './git-command'
 // nothing, and listing what was narrowed by — is identical, so it lives here once rather than in
 // each command.
 //
-// A narrowed lint run is added in front of the whole check, never in place of it. The narrowed unit
-// run replaces the whole suite in the gate (joshuafolkken/kit#4065), with CI's whole-suite run behind
-// it. Either way both fallbacks end at the whole check, and each says which of the two it was: the
+// The narrowed unit run replaces the whole suite in the gate (joshuafolkken/kit#4065), and the
+// narrowed lint the whole-tree lint (joshuafolkken/kit#4085), each with CI's whole run behind it.
+// Either way both fallbacks end at the whole check, and each says which of the two it was: the
 // one thing this must never do is answer "nothing to run" quietly.
 
 type ScopeMode = 'all' | 'related'

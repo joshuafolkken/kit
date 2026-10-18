@@ -26,7 +26,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lint/lint-parallel.ts',
 		description: 'Check code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
-		reference: ['', 'developer', ['processes']],
+		reference: ['[--changed]', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.lint,
 		memory_mb: core_budget.MEMORY_MB.lint,
 	},

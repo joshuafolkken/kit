@@ -129,7 +129,7 @@ Print a file's code lines against the max-lines limit and the headroom left
 
 > **Audience:** developer · **Side effects:** processes
 
-_No arguments._
+`[--changed]`
 
 Check code with prettier and eslint (skips a tool a basic project lacks)
 

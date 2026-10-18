@@ -18,7 +18,12 @@ const DEVELOPER_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ arguments: '--no-unit', note: 'the static checks only (CI only)' },
 		],
 	},
-	lint: { examples: [{ arguments: '' }] },
+	lint: {
+		examples: [
+			{ arguments: '' },
+			{ arguments: '--changed', note: "the branch's changed files — the gate's form" },
+		],
+	},
 	'lint:related': { examples: [{ arguments: '' }, NARROWED] },
 	lines: {
 		examples: [{ arguments: 'scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts' }],

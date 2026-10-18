@@ -204,8 +204,8 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // warm from its own second call onwards, and the gate's stays exactly as the gate left it.
 //
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
-// `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
-// whole tree before any commit. The scoped lint's prettier cache is its own for the same reason:
+// `josh lint:related` and the gate's `josh lint --changed` each narrow to the change, on caches of
+// their own. The scoped lint's prettier cache is its own for the same reason:
 // prettier rewrites its cache file whole as well.
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
 // written from. The gate's, the edit hook's, the scoped lint's and the pre-commit hook's — a cache

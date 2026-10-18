@@ -325,6 +325,13 @@ describe('gate_plan the checks a gate runs', () => {
 			['test:unit', 'test:related'],
 		])
 	})
+
+	// joshuafolkken/kit#4085: the lint reads the branch's changed files, not the whole tree.
+	it('lints the changed files', () => {
+		const lint = gate_plan.GATE_CHECKS.find((check) => check.label === gate_plan.LINT_LABEL)
+
+		expect(lint?.args).toStrictEqual(['--changed'])
+	})
 })
 
 describe('gate_plan without the unit suite', () => {
