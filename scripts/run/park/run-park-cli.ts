@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_comment_cli, type CommentRequest } from '#scripts/issue/issue-comment-cli'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_park } from '#scripts/issue/issue-park'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -31,7 +32,7 @@ function clear_issue(argv: ReadonlyArray<string>): string | undefined {
 
 	if (parsed === undefined) return undefined
 
-	return issue_comment_cli.single_issue_number(parsed.positionals)
+	return issue_number_shape.single_of(parsed.positionals)
 }
 
 async function park(request: CommentRequest, directory: string): Promise<number> {
