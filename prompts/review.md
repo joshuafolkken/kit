@@ -95,13 +95,8 @@ deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot i
 One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
 code line, or a source file whose comment-free text cannot be read.
 
-Record a skipped round on the Issue:
-
-1. Label the Issue `review-round2-skipped`, created once per repository:
-   `gh api repos/{owner}/{repo}/labels -f name=review-round2-skipped -f color=c5def5 -f description="Review round 2 was skipped under the condition in prompts/review.md" --silent 2>/dev/null || true`,
-   then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=review-round2-skipped'`.
-2. Comment under `## Round 2 skipped`, naming which arm fired and quoting the command's reason line
-   verbatim.
+Record a skipped round on the Issue with a comment under `## Round 2 skipped`, naming which arm fired
+and quoting the command's reason line verbatim.
 
 ### Three-way disposition after the cap
 

@@ -22,8 +22,8 @@ describe('release note classification', () => {
 		const config = RELEASE_CONFIG.parse(yaml_config_fixture.load_yaml_config(RELEASE_PATH))
 
 		expect(config.changelog.categories.map((category) => category.labels)).toEqual([
-			['Semver-Major', 'breaking-change'],
-			['Semver-Minor', 'enhancement'],
+			['breaking-change'],
+			['enhancement'],
 			['bugfix'],
 			['*'],
 		])

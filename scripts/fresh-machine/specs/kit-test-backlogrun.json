@@ -12,7 +12,7 @@
 		"printf '{ \"private\": true }\\n' > package.json",
 		"cp \"$PACKAGE_TARBALL\" . && pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver \"./$(basename \"$PACKAGE_TARBALL\")\"",
 		"pnpm exec josh start --yes --github",
-		"gh label list --limit 100 --json name --jq '.[].name' > \"$HOME/labels.txt\"; grep -xE 'auto-ok|needs-decision|needs-human-review|already-done|review-round2-skipped|bug' \"$HOME/labels.txt\"; test \"$(grep -cxE 'auto-ok|needs-decision|needs-human-review|already-done|review-round2-skipped|bug' \"$HOME/labels.txt\")\" -eq 6",
+		"gh label list --limit 100 --json name --jq '.[].name' > \"$HOME/labels.txt\"; grep -xE 'auto-ok|needs-decision|needs-human-review|already-done|bug' \"$HOME/labels.txt\"; test \"$(grep -cxE 'auto-ok|needs-decision|needs-human-review|already-done|bug' \"$HOME/labels.txt\")\" -eq 5",
 		"curl -fsSL https://claude.ai/install.sh | bash && export PATH=\"$HOME/.local/bin:$PATH\" && claude --version",
 		"gh issue create --title 'Add a heading to index.html' --body 'Add an h2 under the h1.' --label auto-ok --label run:lane",
 		"timeout 60 pnpm josh backlogrun > \"$HOME/backlogrun.out\" 2>&1; cat \"$HOME/backlogrun.out\"; grep -q '^backlogrun: started' \"$HOME/backlogrun.out\"",

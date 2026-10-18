@@ -8,14 +8,11 @@ import { run_board_kind } from './run-board-kind'
 const BREAKING: FiledKind = 'breaking-change'
 const FEATURE: FiledKind = 'enhancement'
 const FIX: FiledKind = 'bug'
-const SEMVER_MAJOR = 'Semver-Major'
 
 describe('run_board_kind.kind_of', () => {
 	it.each([
 		[BREAKING, BREAKING],
-		[SEMVER_MAJOR, BREAKING],
 		[FEATURE, FEATURE],
-		['Semver-Minor', FEATURE],
 		['bugfix', FIX],
 		[FIX, FIX],
 		['Bug', FIX],
@@ -25,7 +22,12 @@ describe('run_board_kind.kind_of', () => {
 
 	it('takes the first category in the release notes’ order where several apply', () => {
 		expect(run_board_kind.kind_of([FIX, FEATURE])).toBe(FEATURE)
-		expect(run_board_kind.kind_of(['bugfix', FEATURE, SEMVER_MAJOR])).toBe(BREAKING)
+		expect(run_board_kind.kind_of(['bugfix', FEATURE, BREAKING])).toBe(BREAKING)
+	})
+
+	// joshuafolkken/kit#4109: the retired Semver-* aliases place a row in no category.
+	it.each(['Semver-Major', 'Semver-Minor'])('reads the retired %s as no kind', (label) => {
+		expect(run_board_kind.kind_of([label, 'auto-ok'])).toBeUndefined()
 	})
 
 	it('reads no kind for an Other Change, or for labels not read', () => {

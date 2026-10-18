@@ -26,7 +26,6 @@ import {
 	RELEASE_LABEL,
 	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
-	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
@@ -124,7 +123,6 @@ describe('WORKFLOW_LABELS', () => {
 			RUN_STALLED_LABEL,
 			NEEDS_HUMAN_REVIEW_LABEL,
 			ALREADY_DONE_LABEL,
-			REVIEW_ROUND2_SKIPPED_LABEL,
 			NOT_BEFORE_LABEL,
 			BUG_LABEL,
 			...FILING_ROUTE_LABELS.map((label) => label.name),
@@ -150,6 +148,14 @@ describe('REPOSITORY_LABELS', () => {
 			expect(ALL_LABELS.has(name)).toBe(true)
 			expect(reason.length).toBeGreaterThan(0)
 		}
+	})
+
+	// joshuafolkken/kit#4109: no run applies or reads it, so `josh start` no longer creates it.
+	it('neither manages nor provisions the retired review-round2-skipped label', () => {
+		const retired = 'review-round2-skipped'
+
+		expect(ALL_LABELS.has(retired)).toBe(false)
+		expect(REPOSITORY_LABELS.map((label) => label.name)).not.toContain(retired)
 	})
 
 	it('gives every provisioned label a six-digit hex color and a description', () => {
