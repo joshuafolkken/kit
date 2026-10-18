@@ -35,9 +35,8 @@ mirror `fullrun new` (1)–(8): derive an English title (or use the provided one
 (`pnpm josh issue:file "<title>" --body-file <body-file>`, with the labels
 `kickoff.md` → "Words typed after `new`" maps, body per
 `prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` (as `fullrun new` (3)) → post the agreed plan → stash
-any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!.josh/observations'`
-(the pathspec keeps the observation ledger in the tree for this run's commit), popped by
-message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
+any pre-existing changes with `pnpm josh stash:push "halfrun new: pre-existing changes"`, popped
+after `stashed` by message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
 `pnpm josh ms` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
 → **stop**.

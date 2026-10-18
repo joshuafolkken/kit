@@ -350,6 +350,26 @@ pnpm josh report:lint < summary.md
 
 Prints `ok` (exit 0), or the violations one per line followed by one line naming the template's section in `report-format.md` (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it.
 
+### `josh stash:push`
+
+Stash the working tree under a message `josh stash:pop` later targets — untracked files included, the observation ledger (`.josh/observations/`) left in the tree.
+
+<!-- usage: stash:push -->
+
+```bash
+pnpm josh stash:push "backlogrun: josh latest before lanes"
+```
+
+**Options:**
+
+- `--dir <path>` — stashes that work tree (`git -C <path>`); without it the current checkout.
+
+<!-- /usage -->
+
+**Verdicts:** `stashed` and `clean` (exit 0); a missing message prints the usage (exit 1). `clean` means nothing outside the ledger changed and nothing was pushed, so pop only after `stashed`.
+
+Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh stash:push` in detail".
+
 ### `josh stash:pop`
 
 Pop the stash whose message matches, and no other — never whatever entry another lane left on top of the shared stack.

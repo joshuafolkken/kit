@@ -1735,6 +1735,16 @@ Pop the stash matching this message, not whichever a shared stack has on top
 
 ---
 
+### `josh stash:push`
+
+> **Audience:** automation · **Side effects:** git
+
+`<message>`
+
+Stash the working tree, untracked files included, leaving the observation ledger
+
+---
+
 ### `josh time` · `josh tm`
 
 > **Audience:** maintainer · **Side effects:** none · **kit only**

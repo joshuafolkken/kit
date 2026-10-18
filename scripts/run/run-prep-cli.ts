@@ -88,7 +88,7 @@ async function lane_has_changes(): Promise<boolean> {
 	if (!lane_child_marker.is_child_of(process.cwd())) return false
 
 	try {
-		return await git_stash.has_changes(process.cwd())
+		return await git_stash.has_stashable_changes(process.cwd())
 	} catch (error) {
 		error_text.trace_swallowed('run_prep_cli.lane_has_changes', error)
 

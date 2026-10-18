@@ -157,7 +157,7 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
 		const content = read_skill_file(WORKFLOW_SKILL, filename)
 
-		expect(content).toContain('git stash push')
+		expect(content).toContain('pnpm josh stash:push')
 		expect(content).toContain('pnpm josh stash:pop')
 	})
 

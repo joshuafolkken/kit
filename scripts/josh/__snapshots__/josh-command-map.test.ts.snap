@@ -1257,6 +1257,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "git",
       ],
     ],
+    "stash:push": [
+      "<message>",
+      "automation",
+      [
+        "git",
+      ],
+    ],
     "stop:guard": [
       "",
       "automation",

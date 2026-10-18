@@ -33,6 +33,7 @@ const EPIC_NEXT_REFERENCE = 'docs/josh-commands-backlog.md → `josh epic:next`'
 const BACKLOG_BUDGET_REFERENCE = 'docs/josh-commands-backlog.md → `josh backlog:budget`'
 const RUN_LIVENESS_REFERENCE = 'docs/josh-commands-run.md → `josh run:liveness`'
 const AUTO_OK_NEXT_REFERENCE = 'docs/josh-commands-backlog.md → `josh auto-ok:next`'
+const STASH_PUSH_REFERENCE = 'docs/josh-commands-backlog.md → `josh stash:push`'
 
 // Command used by two separate oracle entries (run:cut:resume and run:cut:gate).
 const RUN_CUT_CMD = 'run:cut'
@@ -67,6 +68,13 @@ const BATCH_ORACLES: ReadonlyArray<DecisionOracle> = [
 		args: `${ISSUE_N_ARG} --output <path>`,
 		vocabulary: ['alive', 'stopped', 'settled', 'undetermined'],
 		single_source: RUN_LIVENESS_REFERENCE,
+	},
+	{
+		name: 'stash:push',
+		decision: 'Whether the working tree had anything outside the observation ledger to set aside',
+		args: '<message>',
+		vocabulary: ['stashed', 'clean'],
+		single_source: STASH_PUSH_REFERENCE,
 	},
 	{
 		name: 'stash:pop',

@@ -118,7 +118,7 @@ Something else in **this** repository has to land first: not a split, not an ups
 2. **Stash the work in progress**:
 
    ```bash
-   git stash push -u -m "backlogrun: paused #<M> for prerequisite #<N>"
+   pnpm josh stash:push "backlogrun: paused #<M> for prerequisite #<N>"
    pnpm josh issue:comment <M> --body-file <path>   # what was stashed, and that #<N> must land first
    ```
 

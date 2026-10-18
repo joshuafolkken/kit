@@ -11,5 +11,5 @@ change to this file changes no rule.
   joshuafolkken/kit#3174.
 - The `Next:` line leading the stop's `confirmation` Telegram, because a verified `halfrun` ships by a
   `fullrun` / `prrun` whose `run:entry` adopts the marked hold — joshuafolkken/kit#2796.
-- The `-- ':!.josh/observations'` pathspec on the `halfrun new` pre-existing-changes stash —
-  joshuafolkken/kit#2919.
+- The `halfrun new` pre-existing-changes stash leaving the observation ledger in the tree —
+  joshuafolkken/kit#2919; the exclusion moved into `josh stash:push` — joshuafolkken/kit#4131.

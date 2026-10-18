@@ -1,0 +1,74 @@
+import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
+import { git_stash } from './git-stash'
+import { stash_args, type Request } from './stash-args'
+
+// `josh stash:push "<message>"` — the one way a workflow sets its working tree aside, paired with
+// `josh stash:pop "<message>"` that brings it back. Two rules fix what it takes:
+//
+// - **Untracked files go with it (`-u`).** Work in progress almost always includes a new, untracked
+//   `*.test.ts`; a stash that leaves it behind leaves it for the next `pnpm josh ms` to refuse.
+// - **The observation ledger stays** — every path `observation_ledger.is_ledger_path` names, legacy
+//   ones included (`git_stash.STASHABLE_PATHSPEC`). A run appends its own lines to `.josh/observations/` and they
+//   ride on that run's commit; a stash would take them off the tree before the commit or the
+//   batch-end flush could see them.
+//
+// A tree with nothing outside the ledger to set aside pushes nothing and says `clean`, so a procedure
+// can call it unconditionally and pop only after `stashed`.
+
+const COMMAND = 'stash:push'
+
+const STASHED_VERDICT = 'stashed'
+const CLEAN_VERDICT = 'clean'
+
+const SUCCESS_EXIT_CODE = 0
+const FAILURE_EXIT_CODE = 1
+const ARGV_OFFSET = 2
+
+function report(verdict: string, detail: string): number {
+	console.info(verdict)
+	console.error(detail)
+
+	return SUCCESS_EXIT_CODE
+}
+
+function refuse(): number {
+	console.error(stash_args.usage(COMMAND))
+
+	return FAILURE_EXIT_CODE
+}
+
+async function answer(request: Request): Promise<number> {
+	if (!(await git_stash.has_stashable_changes(request.dir))) {
+		return report(CLEAN_VERDICT, 'Nothing to stash.')
+	}
+
+	await git_stash.push(request.message, request.dir, git_stash.STASHABLE_PATHSPEC)
+
+	return report(STASHED_VERDICT, `Stashed as "${request.message}".`)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = stash_args.read_arguments(argv)
+	const request = parsed === undefined ? undefined : stash_args.to_request(parsed)
+
+	if (request === undefined) return refuse()
+
+	try {
+		return await answer(request)
+	} catch (error) {
+		console.error(error_text.message_of(error))
+
+		return FAILURE_EXIT_CODE
+	}
+}
+
+async function main(argv: ReadonlyArray<string>): Promise<void> {
+	process.exitCode = await run(argv)
+}
+
+const stash_push_cli = { CLEAN_VERDICT, STASHED_VERDICT, run }
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
+
+export { stash_push_cli }

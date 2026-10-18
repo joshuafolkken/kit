@@ -35,7 +35,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 const has_changes_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/git/stash/git-stash', () => ({
-	git_stash: { has_changes: has_changes_mock },
+	git_stash: { has_stashable_changes: has_changes_mock },
 }))
 
 const ahead_mock = vi.hoisted(() => vi.fn<(issue_number: string) => Promise<Array<string>>>())

@@ -209,7 +209,8 @@ const GUARD_ROWS: ReadonlyArray<RegisteredRule> = [
 		entry: RULE_GUARD,
 		fires:
 			'`git checkout -- <path>` / `git restore <path>` / forced `git clean -f` / an unauthorized `git stash` (bare, push without a message, positional pop). Every occurrence',
-		quiet: '`git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:pop`',
+		quiet:
+			'`git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`',
 	},
 	{
 		id: 'file-body',

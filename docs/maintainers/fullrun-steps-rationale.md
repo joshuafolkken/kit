@@ -17,9 +17,9 @@ no rule.
   the clean path — joshuafolkken/kit#2398.
 - `run:tail` folding the post-merge bookkeeping (`observations:flush`, `issue:cite`, `release:scope`)
   into one round trip — joshuafolkken/kit#2372.
-- The `-- ':!.josh/observations'` pathspec on the `fullrun new` pre-existing-changes stash, and
+- The `fullrun new` pre-existing-changes stash leaving the observation ledger in the tree, and
   `observations:flush` committing ledger lines written outside any issue's run —
-  joshuafolkken/kit#2919.
+  joshuafolkken/kit#2919; the exclusion moved into `josh stash:push` — joshuafolkken/kit#4131.
 
 ## Why a lane child skips `josh ms`
 
