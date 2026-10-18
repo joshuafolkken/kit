@@ -21,7 +21,9 @@ const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const LAUNCHER = 'scripts/hooks/run-hook.sh'
 const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
 const REFUSED = 2
-const REAL_HOOK_TIMEOUT_MS = 60_000
+// A whole launch starts real git and node processes, which the full suite's load can slow past the
+// project's default timeout.
+const LAUNCH_TIMEOUT_MS = 60_000
 const BUNDLE_RAN = 'bundle first second cleared'
 const GATE_RAN = 'gate demo-hook demo:hook first second cleared'
 const LAUNCH_LOG = 'launches.log'
@@ -189,15 +191,19 @@ describe('run-hook.sh in installed package', () => {
 // joshuafolkken/kit#3946: a hook runs on every tool call, so its launch starts git once — the root
 // lookup — and node once, with no `env` or `dirname` process around them.
 describe('the hook command launch', () => {
-	it('starts git once and node once', () => {
-		create_package('.')
-		initialize_repository(['init', '-q'])
+	it(
+		'starts git once and node once',
+		() => {
+			create_package('.')
+			initialize_repository(['init', '-q'])
 
-		const result = launch_hook_command()
+			const result = launch_hook_command()
 
-		expect(result.stdout).toBe(GATE_RAN)
-		expect(result.launches).toEqual({ node: 1, git: 1, env: 0, dirname: 0 })
-	})
+			expect(result.stdout).toBe(GATE_RAN)
+			expect(result.launches).toEqual({ node: 1, git: 1, env: 0, dirname: 0 })
+		},
+		LAUNCH_TIMEOUT_MS,
+	)
 })
 
 describe('the hook command and git location variables', () => {
@@ -238,6 +244,6 @@ describe('run-hook.sh with a real hook', () => {
 			expect(result.stdout).toContain('JOSH_SESSION_LANG): en')
 			expect(result.node_launches).toBe(1)
 		},
-		REAL_HOOK_TIMEOUT_MS,
+		LAUNCH_TIMEOUT_MS,
 	)
 })

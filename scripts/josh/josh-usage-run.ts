@@ -20,11 +20,13 @@ const RUN_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ names: ['--fullrun'], description: "marks the record as `fullrun #N`'s." },
 			{
 				names: ['--halfrun-stop'],
-				description: 'marks a `halfrun` stop for `run:entry` to adopt.',
+				description:
+					'marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram.',
 			},
 			{
 				names: ['--prrun-stop'],
-				description: 'marks a `prrun` stop with the commit its pull request is on.',
+				description:
+					'marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.',
 			},
 		],
 	},

@@ -8,6 +8,7 @@ import { run_preflight, type PreflightDecision } from '#scripts/run/run-prefligh
 import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
 import { run_tidy_cli } from '#scripts/run/tidy/run-tidy-cli'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
+import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
 // entry points ask before they start.
@@ -341,14 +342,24 @@ function report_usage(): number {
 
 // **A `halfrun` stop marks its own record** — the positive "this run has ended over its verified diff"
 // that `run:entry` adopts on `fullrun #N`. Another run's record is left alone. A `prrun` stop marks
-// its record the same way, with the commit it stopped on.
+// its record the same way, with the commit it stopped on. **A marked stop then sends its own
+// `confirmation`** (`run-stop-notify.ts`), after the mark, since the mark rewrites the record its send
+// is stamped on.
+async function marked_stop(target: string, request: StopRequest): Promise<number> {
+	await (request.kind === PRRUN_STOP_KIND
+		? run_stop_notify.send_prrun(target, request.issue)
+		: run_stop_notify.send_halfrun(target, request.issue))
+
+	return report_hold()
+}
+
 async function mark_stop(target: string, request: StopRequest): Promise<number> {
 	const mark =
 		request.kind === PRRUN_STOP_KIND
 			? await run_prrun_resume.mark_stop_at(target, request.issue)
 			: run_halfrun_resume.mark_stop_at(target, request.issue)
 
-	if (mark === run_halfrun_resume.MARKED) return report_hold()
+	if (mark === run_halfrun_resume.MARKED) return await marked_stop(target, request)
 
 	if (mark === run_halfrun_resume.UNREADABLE) return report_unreadable_record()
 

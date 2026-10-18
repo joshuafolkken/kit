@@ -119,7 +119,7 @@ describe('run_board_render.render release kinds', () => {
 	it('names the drawn kinds in the legend', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(1, { kind: 'bug' }), row(2)] }
 
-		expect(lines_of(header({ layout })).slice(-2)).toStrictEqual(['⏳ waiting', '🐛 fix'])
+		expect(lines_of(header({ layout })).slice(-2)).toStrictEqual(['⏳ queued', '🐛 fix'])
 	})
 })
 
@@ -132,7 +132,7 @@ describe('run_board_render.render a row waiting on its start time', () => {
 
 		expect(lines.some((line) => line.startsWith('  📅 14'))).toBe(true)
 		expect(lines.some((line) => line.startsWith('  ⏳ 15'))).toBe(true)
-		expect(lines.at(-2)).toBe('⏳ waiting  📅 not before')
+		expect(lines.at(-2)).toBe('⏳ queued  📅 not before')
 	})
 })
 
@@ -142,12 +142,12 @@ describe('run_board_render.render sections', () => {
 		const long = row(5, { title: long_title, waits: ['3409'] })
 		const children = [row(11), row(12)]
 		const epic = { kind: 'epic' as const, epic: 10, title: 'Epic ten', rows: children }
-		const layout = { ...EMPTY_LAYOUT, waves: [[epic, { kind: 'row' as const, row: long }]] }
+		const layout = { ...EMPTY_LAYOUT, queued: [epic, { kind: 'row' as const, row: long }] }
 		const lines = lines_of(header({ layout }))
-		const wave_rule = rule('1')
+		const queued_rule = rule('⏳ queued')
 
-		expect(lines.slice(lines.indexOf(wave_rule), -3)).toStrictEqual([
-			wave_rule,
+		expect(lines.slice(lines.indexOf(queued_rule), -3)).toStrictEqual([
+			queued_rule,
 			'  📁 10  Epic ten',
 			'     ├ ⏳ 11    Issue 11',
 			'     └ ⏳ 12    Issue 12',
@@ -236,8 +236,8 @@ describe('run_board_render.render running row lead', () => {
 
 	it('turns the spinner in the first column of a running epic child’s branch', () => {
 		const rows = [running(4, NOW, 'gate'), row(5)]
-		const waves = [[{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]]
-		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, waves }, spinner: '⠙' }))
+		const queued = [{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued }, spinner: '⠙' }))
 
 		expect(lines.some((line) => line.startsWith('⠙    ├ 🚦 4    Issue 4'))).toBe(true)
 		expect(lines).toContain('     └ ⏳ 5    Issue 5')
@@ -274,7 +274,7 @@ describe('run_board_render.render links', () => {
 	const settled = { state: 'merged' as const, started_ms: STARTED, ended_ms: STARTED + MINUTE }
 	const active = [row(2, { state: 'merged', status: settled, waits: ['other/repo#7'] })]
 	const epic = { kind: 'epic' as const, epic: 10, title: undefined, rows: [row(11)] }
-	const layout = { ...EMPTY_LAYOUT, active, waves: [[epic]] }
+	const layout = { ...EMPTY_LAYOUT, active, queued: [epic] }
 
 	it('links every issue number, the epic and the wait', () => {
 		const lines = lines_of(header({ layout, link: bracketed }))

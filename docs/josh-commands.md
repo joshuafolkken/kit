@@ -856,7 +856,7 @@ pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies aga
 - The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes the parent within a minute to fill the freed lanes.
 - Lowering it stops no running child: a lane that finishes is simply not refilled.
 - The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A lane read with no child in it is not counted, whatever it waits on — its tree, branch and port seat stay, and when its issue is picked up again the driver starts it ahead of a fresh launch, inside the free lanes.
-- `run:board` prints `no free lane <used>/<limit>`; the waiting row counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
+- `run:board` prints `next free lane (<used>/<limit>)`; the waiting row counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
 - The limit counts lanes, not memory: under it, the driver still opens no lane while memory is under pressure, and `run:board` prints `no memory headroom`.
 - A limit above the nine port seats is shown and counted at the seats, as `JOSH_LANE_LIMIT` already is. A value that is not a positive integer is refused by the same rule.
 - The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.

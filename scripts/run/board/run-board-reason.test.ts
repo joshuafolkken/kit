@@ -27,8 +27,9 @@ const ONE_LANE_LEFT = 1
 const UNTRIAGED_WORD = 'untriaged'
 const HELD_WORD = 'held by triage'
 const OPENING_WORD = 'opening lane'
-const NO_LANE_WORD = 'no free lane'
-const OVERLAP = `overlaps ${String(RUNNING)} (${SHARED})`
+// joshuafolkken/kit#4137: a queued row says what it starts after.
+const NO_LANE_WORD = 'next free lane'
+const OVERLAP = `after ${String(RUNNING)} · ${SHARED}`
 const DECLARED = new Map([
 	[RUNNING, new Set([SHARED])],
 	[HELD, new Set([SHARED])],
@@ -223,14 +224,14 @@ describe('run_board_reason.reader — a lane that is no longer being opened', ()
 	})
 })
 
-// joshuafolkken/kit#4111: every waiting row repeated the same lane breakdown after `no free lane`.
+// joshuafolkken/kit#4111: every waiting row repeated the same lane breakdown after `next free lane`.
 const LANE_LIMIT = 4
 
 describe('run_board_reason.reader counts the lanes that fill the limit', () => {
 	const full = { free_lanes: NO_LANE_LEFT, lane_limit: LANE_LIMIT, occupied_count: LANE_LIMIT }
 
 	it('says the count against the limit and names no lane', () => {
-		expect(reasons([child(HELD)], full)).toStrictEqual(['no free lane 4/4'])
+		expect(reasons([child(HELD)], full)).toStrictEqual(['next free lane (4/4)'])
 	})
 
 	it('keeps the bare words where the limit could not be read', () => {
@@ -302,7 +303,7 @@ describe('run_board_reason.reader — a row the machine’s memory keeps waiting
 		expect(reasons([child(HELD)], { is_memory_held: true })).toStrictEqual(['no memory headroom'])
 	})
 
-	it('says no free lane first when the lanes are full as well', () => {
+	it('says next free lane first when the lanes are full as well', () => {
 		const full = { is_memory_held: true, gauges: PRESSED, free_lanes: NO_LANE_LEFT }
 
 		expect(reasons([child(HELD)], full)).toStrictEqual([NO_LANE_WORD])

@@ -3,6 +3,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_cite_cli } from '#scripts/issue/issue-cite-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
 import { issue_citation } from '#scripts/rules/issue-citation'
@@ -124,26 +125,6 @@ async function run_action(action: StopAction): Promise<string | undefined> {
 	return await cite(action.references)
 }
 
-// **The hook's stdout is the decision envelope, so nothing else may reach it**: the reused calls report
-// on stdout (`josh run:release`'s verdict token, the notify's sent line) and are sent to stderr instead.
-type StreamWrite = typeof process.stdout.write
-
-function set_stdout_write(stream_write: StreamWrite): void {
-	process.stdout.write = stream_write
-}
-
-async function on_stderr<T>(work: () => Promise<T>): Promise<T> {
-	const saved = { write: process.stdout.write.bind(process.stdout) }
-
-	set_stdout_write(process.stderr.write.bind(process.stderr))
-
-	try {
-		return await work()
-	} finally {
-		set_stdout_write(saved.write)
-	}
-}
-
 // A throw is an action that did not take, the same as one that answered it had failed.
 async function attempt(action: StopAction): Promise<string | undefined> {
 	try {
@@ -160,7 +141,7 @@ function is_notice(notice: string | undefined): notice is string {
 // In order, one at a time: the notify reports the hold the release then ends. The first failure is the
 // one refused with, as the rule order put it first.
 async function settle(actions: ReadonlyArray<StopAction>): Promise<Settled> {
-	const notices = await on_stderr(
+	const notices = await stdout_on_stderr.run(
 		async () => await bounded_pool.bounded_map(actions, SEQUENTIAL, attempt),
 	)
 	const failed = actions.find((_action, index) => notices[index] === undefined)
@@ -199,6 +180,6 @@ async function envelope_of(outcome: StopOutcome, lang: string): Promise<string |
 	return settled_envelope(settled, outcome.blocks_on_failure, lang)
 }
 
-const stop_actions = { envelope_of, on_stderr, summary_of }
+const stop_actions = { envelope_of, summary_of }
 
 export { stop_actions }

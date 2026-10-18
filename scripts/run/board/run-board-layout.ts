@@ -14,9 +14,11 @@ import { run_board_kind } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
 // The plan with each issue's status laid over it — pure, so the order the board
-// draws is tested apart from the screen. **The order is the plan's**: the waves are `backlog_waves.build`'s,
-// the same play-forward `backlog:plan --waves` prints, so a merge, a park or a new arrival that changes the
-// plan changes the board with it. The plan leaves out what a run already holds or has closed, so those
+// draws is tested apart from the screen. **The order is the plan's**: the queued rows run in
+// `backlog_waves.build`'s order, the same play-forward `backlog:plan --waves` prints, so a merge, a park or
+// a new arrival that changes the plan changes the board with it. The board draws them as one queue, not
+// as waves: a running batch dispatches each row once a lane is free and its paths are, never wave by
+// wave (joshuafolkken/kit#4137). The plan leaves out what a run already holds or has closed, so those
 // rows come from the stream instead, in the leading active section.
 //
 // **An epic and its children are a tree; every other dependency is not.** A child an opted-in epic
@@ -62,13 +64,13 @@ interface BoardRow {
 	reason?: RowReason | undefined
 }
 
-type WaveEntry =
+type QueuedEntry =
 	| { kind: 'row'; row: BoardRow }
 	| { kind: 'epic'; epic: number; title: string | undefined; rows: Array<BoardRow> }
 
 interface BoardLayout {
 	active: ReadonlyArray<BoardRow>
-	waves: ReadonlyArray<ReadonlyArray<WaveEntry>>
+	queued: ReadonlyArray<QueuedEntry>
 	people: ReadonlyArray<BoardRow>
 	unreached: ReadonlyArray<BoardRow>
 }
@@ -202,7 +204,7 @@ function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): 
 // The epic row carries its own title, read from the same open listing as its children's — an opted-in
 // epic is an open issue.
 function place_in_epic(
-	entries: Array<WaveEntry>,
+	entries: Array<QueuedEntry>,
 	epic: number,
 	overlay: Drawn,
 	row: BoardRow,
@@ -226,12 +228,12 @@ function plan_state(child: EpicChild): ItemState {
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
 }
 
-// One wave, its rows in the plan's order, an epic's children gathered under the epic where the first
+// The queue, its rows in the plan's order, an epic's children gathered under the epic where the first
 // of them falls.
-function wave_entries(wave: ReadonlyArray<EpicChild>, overlay: Drawn): Array<WaveEntry> {
-	const entries: Array<WaveEntry> = []
+function queued_entries(queue: ReadonlyArray<EpicChild>, overlay: Drawn): Array<QueuedEntry> {
+	const entries: Array<QueuedEntry> = []
 
-	for (const child of wave) {
+	for (const child of queue) {
 		const row = plan_row(child, plan_state(child), overlay)
 		const epic = overlay.plan.tracked.get(child.number)
 
@@ -278,22 +280,17 @@ function layout_of(
 	reason_of?: ReasonOf,
 ): BoardLayout {
 	const overlay = { plan, statuses, reason_of }
-	const waves = plan.waves.waves.map((wave) =>
-		wave_entries(
-			wave.filter((child) => is_untouched(child, overlay)),
-			overlay,
-		),
-	)
+	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
 
 	return {
 		active: active_rows(statuses, { titles: plan.context.titles, labels: plan.labels }),
-		waves: waves.filter((wave) => wave.length > 0),
+		queued: queued_entries(queue, overlay),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
 	}
 }
 
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 
 // The run's own children before the plan is read: the stream and the lanes are local and read at
 // once, so the rows, their states and how long each has run are drawn while GitHub answers; the titles
@@ -312,11 +309,9 @@ function numbers_of(plan: BoardPlan): ReadonlySet<number> {
 
 // Every row the layout draws, an epic's children among them — what the header counts and the legend reads.
 function rows_of(layout: BoardLayout): Array<BoardRow> {
-	const waves = layout.waves
-		.flat()
-		.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
+	const queued = layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
 
-	return [...layout.active, ...waves, ...layout.people, ...layout.unreached]
+	return [...layout.active, ...queued, ...layout.people, ...layout.unreached]
 }
 
 // Every row waiting on a person's decision: the touched children parked on one, then the untouched
@@ -352,4 +347,4 @@ const run_board_layout = {
 }
 
 export { run_board_layout }
-export type { BoardLayout, BoardPlan, BoardRow, Overlay, ReasonOf, RowReason, WaveEntry }
+export type { BoardLayout, BoardPlan, BoardRow, Overlay, QueuedEntry, ReasonOf, RowReason }
