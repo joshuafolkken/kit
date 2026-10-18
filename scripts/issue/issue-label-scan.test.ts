@@ -15,9 +15,16 @@ const SCRIPTS_ROOT = path.resolve(import.meta.dirname, '..')
 const LABELS_MODULE = path.join('issue', 'issue-labels.ts')
 const BOGUS = 'bogus-label'
 
+// Fixture modules hold synthetic sources by design; only the file name marks one, not its directory.
+function is_scanned(file: string): boolean {
+	return (
+		file.endsWith('.ts') && !file.endsWith('.test.ts') && !path.basename(file).includes('fixture')
+	)
+}
+
 function source_files(): Array<string> {
-	return readdirSync(SCRIPTS_ROOT, { recursive: true, encoding: 'utf8' }).filter(
-		(file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.includes('fixture'),
+	return readdirSync(SCRIPTS_ROOT, { recursive: true, encoding: 'utf8' }).filter((file) =>
+		is_scanned(file),
 	)
 }
 
@@ -57,6 +64,14 @@ describe('the labels the scripts use', () => {
 	it('applies, removes and creates only labels ALL_LABELS holds', () => {
 		expect(offenders(unmanaged_applied)).toStrictEqual([])
 	})
+
+	it.each([
+		['fixture-home/issue-x.ts', true],
+		['issue/issue-x-fixture.ts', false],
+		['issue/issue-x.test.ts', false],
+	])('scans %s: %s', (file, expected) => {
+		expect(is_scanned(file)).toBe(expected)
+	})
 })
 
 // The scans are only worth keeping if they fail on the thing they exist to catch.
@@ -74,6 +89,8 @@ describe('issue_label_scan', () => {
 		["await issue_add_label(\n\tString(number),\n\t'bogus-label',\n)"],
 		["issue_create_request({ title, body, labels: ['bogus-label'] })"],
 		['const RECOVERY = "gh api … -f \'labels[]=bogus-label\'"'],
+		["const X_LABEL = 'bogus-label'\nawait issue_add_label(number, X_LABEL)"],
+		["const X = 'bogus-label'\nissue_create_request({ title, labels: [X] })"],
 	])('flags the unmanaged name in %s', (source) => {
 		expect(unmanaged(applied_label_names(source))).toStrictEqual([BOGUS])
 	})
