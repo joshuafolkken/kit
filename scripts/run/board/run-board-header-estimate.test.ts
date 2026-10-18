@@ -52,12 +52,12 @@ describe('run_board_header.header_lines estimated finish', () => {
 		expect(first).toMatch(/[■─] {2}🏁 ~35′ {2}🔄 1/u)
 	})
 
-	// The machine line before a gauge is read leads with ⚡, where a chat's leads with 🧠.
-	it('keeps the ⏰/💓 and ✅/⚡ columns aligned', () => {
+	// The machine line before a gauge is read leads with 💪, where a chat's leads with 🧠.
+	it('keeps the ⏰/💓 and ✅/💪 columns aligned', () => {
 		const [first, second] = lines_with()
 
 		expect(start_of(first, '⏰')).toBe(start_of(second, '💓'))
-		expect(start_of(first, '✅')).toBe(start_of(second, '⚡'))
+		expect(start_of(first, '✅')).toBe(start_of(second, '💪'))
 	})
 
 	it('draws no 🏁 without a usual time', () => {

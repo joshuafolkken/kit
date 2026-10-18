@@ -94,10 +94,10 @@ describe('run_board_render_legend.legend_of order', () => {
 	// joshuafolkken/kit#4052: a held check and its reasons, after 🔗 and before the checks.
 	it('names the held check and its reasons after 🔗, only where the frame draws them', () => {
 		const rows = [row(1, { waits: ['2'] })]
-		const held = ['🚧 held check', '⚡ cores']
+		const held = ['🚧 held check', '💪 cores']
 
 		expect(legend_of(rows, { held, checks: [CODERABBIT] }).at(-1)).toBe(
-			`🔗 waits on  🚧 held check  ⚡ cores  ${CODERABBIT}`,
+			`🔗 waits on  🚧 held check  💪 cores  ${CODERABBIT}`,
 		)
 		expect(legend_of(rows).join('\n')).not.toContain('🚧')
 	})

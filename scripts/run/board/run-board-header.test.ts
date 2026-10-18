@@ -13,7 +13,7 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 
 const { minute_of } = run_board_labels
 const { WORDS } = run_board_labels
-const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
+const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 // The second line's first two columns where nothing is drawn in them: no repository, no heartbeat.
 const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
 const TIME_BLANK = ' '.repeat('⏰ 30′00″'.length + 1)
@@ -145,7 +145,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(clock_line_of(header({ machine }))).toBe(
-			`${NAME_BLANK}  ${TIME_BLANK}  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
+			`${NAME_BLANK}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
 		)
 	})
 })

@@ -43,7 +43,7 @@ interface NowRead {
 }
 
 interface NowLine {
-	// The kind's icon, drawn under the `⚡`.
+	// The kind's icon, drawn under the `💪`.
 	icon: string
 	// The icon's word in the legend, `undefined` where the line's own words or the phase legend name it.
 	legend?: string | undefined

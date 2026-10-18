@@ -1,9 +1,9 @@
-// Each lane's CPU and memory on its `run:board` row: which lane is loading the machine the header's ⚡
+// Each lane's CPU and memory on its `run:board` row: which lane is loading the machine the header's 💪
 // and 🧠 show. How the processes are read is `run-board-usage-read.ts`'s; this file turns two readings
 // into each lane's figures.
 //
 // A lane's CPU is its processes' CPU time between two samples as a share of the whole machine — the
-// header's ⚡ scale, so the two read side by side, never Activity Monitor's one-core-is-100% — and its
+// header's 💪 scale, so the two read side by side, never Activity Monitor's one-core-is-100% — and its
 // memory the sum of their resident sets. Shared pages are counted once per process, so the figure is
 // larger than what the kernel holds; it compares lanes, which is all the column is for.
 

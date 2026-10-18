@@ -14,7 +14,7 @@ import type { LaneUsages } from './run-board-usage'
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const { minute_of } = run_board_labels
 const GB = 1024 * 1024 * 1024
-const CPU = '⚡'
+const CPU = '💪'
 const TITLE_WIDTH = 48
 
 const PLANNED: ReadonlyArray<Phase> = ['investigate', 'plan']
@@ -100,7 +100,7 @@ describe('run_board_render.render running rows', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2    ${title}  5′00″  ⚡  8% 🧠0.5G  🚦 2′00″ · 🚦 1′00″`,
+			`  🚦 2    ${title}  5′00″  💪  8% 🧠0.5G  🚦 2′00″ · 🚦 1′00″`,
 		)
 	})
 })

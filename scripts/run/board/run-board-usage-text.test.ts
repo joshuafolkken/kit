@@ -3,7 +3,7 @@ import { run_board_labels } from './run-board-labels'
 import type { LaneUsage } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
-// joshuafolkken/kit#3489: a running row's `⚡ 20% 🧠1.6G`, green, yellow or red.
+// joshuafolkken/kit#3489: a running row's `💪 20% 🧠1.6G`, green, yellow or red.
 // joshuafolkken/kit#3612: the thresholds are the lane's share of the header's yellow threshold among
 // the running rows — yellow at three quarters of the share, red at the share itself.
 
@@ -34,7 +34,7 @@ describe('run_board_usage_text.text_of', () => {
 	it('draws the CPU share and the memory in gigabytes', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(text_of(usage(20.4), 1)).toBe('⚡ 20% 🧠1.6G')
+		expect(text_of(usage(20.4), 1)).toBe('💪 20% 🧠1.6G')
 	})
 
 	it('draws the memory alone before a CPU share is known, and nothing for a lane with no process', () => {
@@ -74,7 +74,7 @@ describe('run_board_usage_text.text_of — the CPU figure', () => {
 		const text = '20%'.padStart(4)
 
 		expect(text_of(usage(20, 0), 3)).toBe(
-			`⚡${painted(GAUGE_SHADES.yellow, text)} ${memory_shaded('normal')}`,
+			`💪${painted(GAUGE_SHADES.yellow, text)} ${memory_shaded('normal')}`,
 		)
 	})
 })
