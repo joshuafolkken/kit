@@ -1,0 +1,7 @@
+{
+	"reason": "New josh issue:already-done command (#4130) replaces a four-step manual exit procedure",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 92
+	}
+}

@@ -50,6 +50,19 @@ describe('issue_number_shape', () => {
 	})
 })
 
+describe('issue_number_shape.single_of', () => {
+	it('answers the one positional when it is an issue number', () => {
+		expect(issue_number_shape.single_of(['4130'])).toBe('4130')
+	})
+
+	it.each([[[]], [['0']], [['12', '13']], [['abc']]])(
+		'refuses the positionals %j',
+		(positionals) => {
+			expect(issue_number_shape.single_of(positionals)).toBeUndefined()
+		},
+	)
+})
+
 describe('the issue-number shape is declared once', () => {
 	it('finds no copy of the pattern in another script', () => {
 		expect(source_files().filter((file) => has_issue_copy(file))).toStrictEqual([])
