@@ -11,6 +11,7 @@ import { run_board_machine } from './run-board-machine'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason } from './run-board-reason'
+import { run_board_released } from './run-board-released'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
@@ -132,7 +133,10 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		closed,
 		labels: plan.labels,
 	}
-	const statuses = run_board_status.settle_closed(statuses_for(state, plan, local), read)
+	const statuses = run_board_released.without_released(
+		run_board_status.settle_closed(statuses_for(state, plan, local), read),
+		read,
+	)
 	const reason_of = run_board_reason.reader({
 		plan,
 		statuses,
