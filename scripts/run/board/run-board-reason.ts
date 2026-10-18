@@ -189,7 +189,7 @@ function not_before_of(child: EpicChild): RowReason | undefined {
 
 	return {
 		text: `${run_board_labels.WORDS.not_before} ${run_board_labels.date_minute_of(ms)}`,
-		is_not_before: true,
+		not_before_ms: ms,
 	}
 }
 

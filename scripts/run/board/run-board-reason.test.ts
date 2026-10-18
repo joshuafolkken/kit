@@ -307,11 +307,15 @@ describe('run_board_reason.reader — a row whose declared start time is ahead',
 	})
 
 	// joshuafolkken/kit#4079: the row leads with 📅, so the reason says it waits on the clock.
-	it('marks the start-time reason, and no reason the pool gives', () => {
+	// joshuafolkken/kit#4104: it carries the start time itself, which the 📅 rows are ordered by.
+	it('carries the start time on the start-time reason, and none on a reason the pool gives', () => {
 		const pool = [not_before(FUTURE), not_before(PAST)]
 		const reason_of = run_board_reason.reader(read_of(plan_of(pool), { free_lanes: NO_LANE_LEFT }))
 
-		expect(pool.map((item) => reason_of(item)?.is_not_before)).toStrictEqual([true, undefined])
+		expect(pool.map((item) => reason_of(item)?.not_before_ms)).toStrictEqual([
+			Date.parse(FUTURE),
+			undefined,
+		])
 	})
 })
 
