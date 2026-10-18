@@ -65,6 +65,8 @@ Performance is a goal no change may worsen (`prompts/collaboration-workflow/prin
 
 ## `josh behavior` in detail
 
+- An assertion covers a rule a guard already refuses. The gate reads the whole session, so a violation of a rule that is only measured would leave every later gate in that run red.
+- The piped-verification rule is measured, not refused, for `| head`, so it is not an assertion yet. Whether a turn was a consultation, and whether the work summary was given, cannot be decided from a transcript (joshuafolkken/kit#4086).
 - **The scope is the current run, not the whole corpus.** The store holds thousands of transcripts and over a gigabyte; walking all of it every gate would cost minutes. Each gate checks its own run — the newest session transcript, resolved exactly as `josh cost` resolves "the run that just finished" — so across runs the whole corpus is covered a run at a time. The engine stays general, so a broad scan of past runs (how a new assertion is verified green before it is added) is the same walk over a different set of files.
 
 ## `josh test:unit` in detail
