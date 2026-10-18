@@ -275,7 +275,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 7 of 7 checks at once, test:unit at 7 workers (11 cores)',
+			'plan: 8 of 8 checks at once, test:unit at 7 workers (11 cores)',
 		)
 	})
 
@@ -298,7 +298,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 1 of 7 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+			'plan: 1 of 8 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
 		)
 	})
 
@@ -314,7 +314,7 @@ describe('gate_plan.format_gate_plan', () => {
 // joshuafolkken/kit#3874: speeding the gate up must never mean checking less, so the set it runs —
 // each check and the command behind it — is written out here rather than read from the constant.
 describe('gate_plan the checks a gate runs', () => {
-	it('is exactly the lint, type, spell, behavior, exports, metrics and unit checks', () => {
+	it('is exactly the lint, type, spell, behavior, exports, metrics, lockfile and unit checks', () => {
 		expect(gate_plan.GATE_CHECKS.map((check) => [check.label, check.target])).toStrictEqual([
 			['lint', 'lint'],
 			['check', 'check'],
@@ -322,6 +322,7 @@ describe('gate_plan the checks a gate runs', () => {
 			['behavior', 'behavior'],
 			['exports', 'exports:unused'],
 			['metrics', 'metrics'],
+			['lockfile', 'lockfile:policy'],
 			['test:unit', 'test:related'],
 		])
 	})
@@ -352,7 +353,7 @@ describe('gate_plan without the unit suite', () => {
 
 		expect(plan.unit_worker_cap).toBeUndefined()
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 6 of 6 checks at once, test:unit elsewhere (11 cores)',
+			'plan: 7 of 7 checks at once, test:unit elsewhere (11 cores)',
 		)
 	})
 

@@ -211,6 +211,7 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 			'behavior',
 			'exports:unused',
 			'metrics',
+			'lockfile:policy',
 			'test:related',
 		])
 	})

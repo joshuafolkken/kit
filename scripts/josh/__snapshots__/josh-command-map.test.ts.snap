@@ -687,6 +687,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "lockfile:policy": [
+      "",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "main:merge": [
       "",
       "developer",

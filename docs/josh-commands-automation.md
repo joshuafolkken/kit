@@ -766,6 +766,20 @@ pnpm josh audit:provision --force   # ignore backoff, allow a longer download
 
 **Output / exit codes:** the version is pinned and its SHA256 verified before install. Any failure (network, non-OK response, checksum mismatch, no published build) is reported and exits `0` — the missing scanner surfaces at the pre-push audit instead.
 
+### `josh lockfile:policy`
+
+Re-verify the lockfile against `minimumReleaseAge` with pnpm's own check, which `trustLockfile: true` skips on install — a raised window leaves younger versions locked until Safe Chain refuses them. Kit's own; the gate's `lockfile` check.
+
+<!-- usage: lockfile:policy -->
+
+```bash
+pnpm josh lockfile:policy   # verify when the lockfile or its policy moved
+```
+
+<!-- /usage -->
+
+**Output / exit codes:** silent `0` when neither `pnpm-lock.yaml` nor `pnpm-workspace.yaml` moved from the merge-base; otherwise pnpm's verdict (about a minute).
+
 ### `josh reconcile-templates`
 
 Keep the distributed templates in sync with the root files they come from. **Copy pairs** are byte-for-byte copies regenerated automatically (`.gitignore` → `templates/gitignore`); **tripwire pairs** intentionally diverge and only force a conscious review via a recorded hash (`sonar-project.properties` → `templates/sonar-project.properties`).

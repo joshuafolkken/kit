@@ -675,6 +675,16 @@ Update all dependencies to latest
 
 ---
 
+### `josh lockfile:policy`
+
+> **Audience:** automation · **Side effects:** network · **kit only**
+
+_No arguments._
+
+Verify the lockfile against pnpm's supply-chain policy (minimumReleaseAge) when it or the policy moved from the merge-base
+
+---
+
 ### `josh overrides` · `josh ov`
 
 > **Audience:** developer · **Side effects:** files

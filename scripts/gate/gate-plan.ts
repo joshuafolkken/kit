@@ -121,6 +121,10 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 		is_kit_only: true,
 	},
+	// The lockfile policy check is network-bound and usually instant: it verifies only when the
+	// lockfile or `pnpm-workspace.yaml` moved from the merge-base (joshuafolkken/kit#4090), so it
+	// reserves no core. Kit's own until a consumer's private-registry entries are known to verify.
+	{ label: 'lockfile', target: 'lockfile:policy', reserved_cores: 0, is_kit_only: true },
 ]
 
 // The checks, in the order their output is printed — the static set, then the unit suite last (the

@@ -123,6 +123,9 @@ const WORKFLOW_USAGE: Readonly<Record<string, CommandUsage>> = {
 			},
 		],
 	},
+	'lockfile:policy': {
+		examples: [{ arguments: '', note: 'verify when the lockfile or its policy moved' }],
+	},
 	'audit:provision': {
 		examples: [
 			{ arguments: '', note: 'no-op if a scanner is already present' },
