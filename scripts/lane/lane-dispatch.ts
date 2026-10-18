@@ -10,6 +10,7 @@ import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_park } from '#scripts/run/park/run-park'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
@@ -244,10 +245,15 @@ async function dispatched_start(
 		: dispatched_of(request, pid, notes)
 }
 
+// **A dispatch takes back any park the issue's earlier child recorded**: the issue is offered
+// again only once `needs-decision` is off, so a record still on disk is one a person cleared by hand on
+// GitHub, and left in place it would silence `lane-park` on this child's own stop
+// (joshuafolkken/kit#4132).
 async function started(request: StartRequest): Promise<DispatchOutcome> {
 	const notes: Array<string> = []
 	const existing = existing_dispatch(request)
 	if (existing !== undefined) return existing
+	run_park.clear(request.lane.issue, request.lane.directory)
 	const nonce =
 		request.profile.provider === 'openai' ? openai_lane_supervisor.new_nonce() : undefined
 	const result = detached_launch.launch(

@@ -147,7 +147,7 @@ turn boundary (`chain-rule.md`).
 defect) parks its own Issue first — `backlogrun-park.md` → "park and continue" — so `pnpm josh
 run:liveness` reads it `settled`. A `needs-human-review` or `already-done` stop already carries its
 label. `pnpm josh rule:guard` refuses `pnpm josh notify --task-type confirmation` from a marked child
-until then — **It fires once per run.** (`scripts/rules/lane-park.ts`).
+until `pnpm josh run:park` has recorded the park — **It fires once per run.** (`scripts/rules/lane-park.ts`).
 
 **A split is not a park**: a child that promoted its Issue to an `epic` stops without
 `needs-decision` — `backlogrun-park.md` → "Splitting a child mid-run". `pnpm josh rule:guard` refuses a

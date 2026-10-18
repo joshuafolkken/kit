@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { run_park } from '#scripts/run/park/run-park'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_park } from './lane-park'
@@ -24,6 +25,7 @@ const CONFIRMATION_EQUALS = 'pnpm josh notify --task-type=confirmation --body-fi
 const PROGRESS_NOTIFY = 'pnpm josh notify --task-type progress --body-file /tmp/b.md'
 const APPLY_PARK = `gh api repos/o/r/issues/${ISSUE}/labels -f 'labels[]=needs-decision'`
 const APPLY_PARK_EDIT = `gh issue edit ${ISSUE} --add-label needs-decision`
+const RUN_PARK = `pnpm josh run:park ${ISSUE} --body-file /tmp/b.md`
 const NOW_MS = 1_700_000_000_000
 const SAYS_NOTHING = 'says nothing about %j'
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-park-'))
@@ -166,15 +168,54 @@ describe('is_parking_child', () => {
 	})
 })
 
-describe('records_the_park', () => {
-	it.each([[APPLY_PARK], [APPLY_PARK_EDIT]])('reads %j as recording the park', (command) => {
-		expect(lane_park.records_the_park(command)).toBe(true)
+// joshuafolkken/kit#4132: the guard reads `run:park`'s local record, so a child that parked is silent.
+describe('is_unparked_child', () => {
+	beforeEach(() => {
+		process.env[lane_child_marker.KEY] = ISSUE
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+		vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(false)
 	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads a parking child with no park record as unparked', () => {
+		vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(false)
+
+		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(true)
+	})
+
+	it('reads a parking child whose park is recorded as parked', () => {
+		const parked = vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(true)
+
+		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
+		expect(parked).toHaveBeenCalledWith(ISSUE, WORK_DIRECTORY)
+	})
+
+	it('reads a session that is not a parking child as not unparked, without the record', () => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+		const parked = vi.spyOn(run_park, 'is_parked_sync')
+
+		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
+		expect(parked).not.toHaveBeenCalled()
+	})
+})
+
+describe('records_the_park', () => {
+	it.each([[APPLY_PARK], [APPLY_PARK_EDIT], [RUN_PARK], [`git status && ${RUN_PARK}`]])(
+		'reads %j as recording the park',
+		(command) => {
+			expect(lane_park.records_the_park(command)).toBe(true)
+		},
+	)
 
 	// A different label is not the park, and a comment alone records nothing the parent reads as parked.
 	it.each([
 		[`gh api repos/o/r/issues/${ISSUE}/labels -f 'labels[]=in-progress'`],
 		[`gh api repos/o/r/issues/${ISSUE}/comments --field body=@/tmp/b.md`],
+		// Taking the park off is not recording it.
+		[`pnpm josh run:park ${ISSUE} --clear`],
 	])(SAYS_NOTHING, (command) => {
 		expect(lane_park.records_the_park(command)).toBe(false)
 	})
@@ -238,9 +279,9 @@ describe('rule_delivery — outside a lane checkout', () => {
 
 describe('LANE_PARK_REASON', () => {
 	it.each([
-		// The park it asks for, and the commands that record it — the only thing that makes it actionable.
+		// The park it asks for, and the command that records it — the only thing that makes it actionable.
 		['needs-decision'],
-		["-f 'labels[]=needs-decision'"],
+		['pnpm josh run:park <N> --body-file <path>'],
 		// The other stops that already carry their label, so the child is not sent to add a second one.
 		['needs-human-review'],
 		['already-done'],

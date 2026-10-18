@@ -91,7 +91,7 @@ Waiting on a person, Out of scope) in the session language, with any truncated-l
 **Settle every `needs-decision` issue the plan listed in one pass**, from one `pnpm josh issue:read <N>
 <N> …` call (`issue-comments.md`):
 
-- **An answer already in the issue** — record it as a comment and **remove the label** (Tier A).
+- **An answer already in the issue** — record it as a comment and **remove the label** with `pnpm josh run:park <N> --clear` (Tier A).
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
   carries `needs-decision`").
