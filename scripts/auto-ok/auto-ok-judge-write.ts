@@ -2,11 +2,8 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_auto_ok, type AutoOkDecision } from '#scripts/issue/issue-auto-ok'
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
-import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 import { auto_ok_judge } from './auto-ok-judge'
 
@@ -20,7 +17,8 @@ import { auto_ok_judge } from './auto-ok-judge'
 // `--apply <N>` — the refusal names it, since the listing reads the comment as judged. **The
 // run label lands before `auto-ok`**, so the pool never holds an opted-in issue that `backlog:next`
 // would withhold as untriaged. Both answers leave the judgement comment the next listing reads as the
-// record, and an applied one is a `note` on the board's 📌.
+// record; an applied one writes nothing to the run board, which shows the issue once it is dispatched
+// (joshuafolkken/kit#4133).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -55,8 +53,7 @@ async function read_issue(issue: string): Promise<IssueRead | undefined> {
 }
 
 // Why an apply has nothing to write: a closed issue is past the pool, and one already opted in was
-// judged and noted once — writing again would repeat the comment and the board's note
-// (joshuafolkken/kit#4097).
+// judged once — writing again would repeat the comment (joshuafolkken/kit#4097).
 function settled_of(read: IssueRead): string | undefined {
 	if (read.is_closed) return 'the issue is closed'
 
@@ -109,14 +106,7 @@ async function apply_to(issue: string, run_label: string, read: IssueRead): Prom
 
 	const problem = await apply_labels(issue, run_label)
 
-	if (problem !== undefined) return refused(issue, `${problem}; ${RETRY_HINT}`)
-
-	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.NOTE,
-		`${issue_cite.plain(issue)} auto-ok applied`,
-	)
-
-	return SUCCESS_EXIT_CODE
+	return problem === undefined ? SUCCESS_EXIT_CODE : refused(issue, `${problem}; ${RETRY_HINT}`)
 }
 
 async function apply(issue: string, run_label: string): Promise<number> {

@@ -50,7 +50,6 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['notify/git-notify.ts', 1],
 	['backlog/backlog-drive-idle.ts', 1],
 	// A program reads it back: the run event stream, a process pattern, a child prompt, a parse key.
-	['auto-ok/auto-ok-judge-write.ts', 1],
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],

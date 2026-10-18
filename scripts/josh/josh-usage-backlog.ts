@@ -106,7 +106,7 @@ const BACKLOG_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{
 				names: ['--apply <N> --lane|--solo'],
 				description:
-					'checks the exclusions again against the labels as they stand, applies the run label and then `auto-ok`, and notes it on the progress board.',
+					'checks the exclusions again against the labels as they stand, records the judgement on the issue, then applies the run label and then `auto-ok`.',
 			},
 			{ names: ['--decline <N> --reason <text>'], description: 'applies nothing.' },
 		],
