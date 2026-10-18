@@ -47,21 +47,19 @@ means "waiting for an answer", and here the answer exists.
 the Issue (`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` →
 `human`), and `epic:busy` stops counting it. **Only a person removes it, by closing the Issue.**
 
+**Commit nothing, push nothing, open no pull request** — run one command; it posts the evidence,
+applies `already-done` and releases the hold, in that order, stopping at the first failure:
+
 ```bash
-gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it" --silent 2>/dev/null || true
-gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=already-done'
+pnpm josh issue:already-done <N> --evidence-file <path>
 ```
 
-1. **Record the evidence as an Issue comment, before the label**: the merging pull request or commit
-   and, per acceptance criterion, the file and lines that satisfy it. **A claim with no citations is not
-   the finding this exit is for.**
-2. **Apply `already-done`** — the two commands above.
-3. **Commit nothing, push nothing, open no pull request.** Release the hold with
-   `pnpm josh run:release <N>`, which also removes `in-progress`.
-4. **Then behave as the entry point does for a parked child.** A typed `fullrun` / `halfrun` sends a
-   `confirmation` Telegram naming the Issue and the covering merge, and stops; a `backlogrun` child is
-   park-and-continue (`backlogrun-park.md` → "park and continue").
-5. **Never close the Issue** — Tier C at every entry point.
+**The evidence file names the merging pull request or commit and, per acceptance criterion, the
+`file:line` that satisfies it.** **A claim with no citations is not the finding this exit is for.**
+
+Then behave as the entry point does for a parked child: a typed `fullrun` / `halfrun` sends a
+`confirmation` Telegram naming the Issue and the covering merge, and stops; a `backlogrun` child is
+park-and-continue (`backlogrun-park.md` → "park and continue"). **Never close the Issue** — Tier C.
 
 **Looking familiar is no license to skip the work**: a criterion you cannot point at merged code for is
 one this run still owes.

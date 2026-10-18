@@ -156,6 +156,21 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 			},
 		],
 	},
+	'issue:already-done': {
+		examples: [
+			{
+				arguments: '4130 --evidence-file .josh/tmp/already-done.md',
+				note: 'comment, label, release — in that order',
+			},
+		],
+		flags: [
+			{
+				names: ['--evidence-file <path>'],
+				description:
+					'the evidence comment: the merging PR or commit and, per acceptance criterion, its `file:line`. An empty file is refused before anything is written.',
+			},
+		],
+	},
 	'pkg:scout': {
 		examples: [{ arguments: '"date formatting" --size 5' }],
 		flags: [
