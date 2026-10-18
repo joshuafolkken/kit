@@ -184,7 +184,7 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // The `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file at `--cache-location`
 // whenever it is started without `--cache` — so a shared file would be wiped by every single edit,
 // leaving the gate a cold lint. The hook is given a location of its own rather than the
-// gate's because the two run at the same time: `josh gate` lints the whole tree beside the review
+// gate's because the two run at the same time: `josh gate` lints beside the review
 // while this hook fires on every edit, and each eslint run rewrites its cache file whole from the
 // copy it loaded at start-up — so two writers silently discard each other's entries. A file of its
 // own makes the hook structurally unable to degrade the cache this exists to protect.
@@ -193,7 +193,7 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
 // file would keep the entries that run never visited.
 // The same reasoning for the scoped lint. `josh lint:related` is what an implementation loop calls
-// between edits, and `josh gate` lints the whole tree beside the review — so those two run at the
+// between edits, and `josh gate` lints beside the review — so those two run at the
 // same time as readily as the hook and the gate do. Whichever of a pair sharing one file wrote last
 // would replace it with "the copy I loaded at start-up plus what I visited", so a narrowed run
 // finishing during a whole-tree run would roll the cache back to its pre-gate state, and a
@@ -204,8 +204,8 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // warm from its own second call onwards, and the gate's stays exactly as the gate left it.
 //
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
-// `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
-// whole tree before any commit. The scoped lint's prettier cache is its own for the same reason:
+// `josh lint:related` and the gate's `josh lint --changed` each narrow to the change, on caches of
+// their own. The scoped lint's prettier cache is its own for the same reason:
 // prettier rewrites its cache file whole as well.
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
 // written from. The gate's, the edit hook's, the scoped lint's and the pre-commit hook's — a cache

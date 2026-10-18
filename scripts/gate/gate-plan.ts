@@ -85,9 +85,12 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
 // that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
+	// **The lint reads the branch's changed files, not the whole tree** (joshuafolkken/kit#4085), and
+	// falls back to the whole tree in CI and on a changed configuration (`lint-gate-scope.ts`).
 	{
 		label: LINT_LABEL,
 		target: 'lint',
+		args: ['--changed'],
 		reserved_cores: core_budget.CORE_WEIGHTS.lint,
 		memory_mb: core_budget.MEMORY_MB.lint,
 	},

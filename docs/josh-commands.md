@@ -52,13 +52,16 @@ Check code with prettier and eslint.
 
 ```bash
 pnpm josh lint
+pnpm josh lint --changed   # the branch's changed files — the gate's form
 ```
 
 <!-- /usage -->
 
+- `--changed` is what `josh gate` runs: the branch's changed files on the gate's caches. It checks the whole tree in CI, when a toolchain, ignore, eslint or TypeScript configuration file changed, and when the change cannot be read.
+
 ### `josh lint:related`
 
-Check only the files the change touched — the lint check an implementation loop repeats between edits. Added in front of the whole-tree `josh lint`, never in place of it.
+Check only the files the change touched — the lint check an implementation loop repeats between edits. It keeps caches of its own, apart from the gate's.
 
 <!-- usage: lint:related -->
 
