@@ -350,7 +350,7 @@ function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus 
 // longer holds is drawn finished instead — merged and timed once GitHub was read for it, finished
 // without a time while that read has not answered. One the listing still holds is drawn as its labels
 // say, so a child that stopped with no parent to record it does not read as running. A parked child is
-// settled again only by a closed read.
+// settled again only by a closed read; one a person released is dropped after it (`run-board-released.ts`).
 function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: OpenRead,

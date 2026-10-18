@@ -1,0 +1,7 @@
+{
+	"reason": "#4080: run:board drops a parked child a person released by removing needs-decision (new run-board-released module), keeping an already-done park parked",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}
