@@ -3,6 +3,7 @@ import { git_pr_merge_checked } from '#scripts/gh/git-pr-merge-checked'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
+import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
 import { release_issue_close } from './release-issue-close'
@@ -22,7 +23,6 @@ import { release_worktree } from './release-worktree'
 const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const IGNORE_FOR_RELEASE_LABEL = 'ignore-for-release'
 const RELEASE_LOCK_PREFIX = 'josh-release-lock-'
 // A release waits on CI for minutes, so a second run refuses rather than queueing behind it.
 const RELEASE_LOCK_MAX_WAIT_MS = 0

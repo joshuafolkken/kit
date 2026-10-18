@@ -1,6 +1,12 @@
 // The workflow label names, defined once. The epic auto-close, the epic validator, the issue-prep
 // labeler and the next-issues display all key on these exact strings, and a drifted copy would
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
+//
+// **A new label is defined here and added to `REPOSITORY_LABELS`**, so `josh start` and `josh sync`
+// create it; a label deliberately not provisioned goes into `EXEMPT_FROM_PROVISIONING` with its
+// reason. Every other module imports the constant rather than spelling the name —
+// `issue-label-scan.test.ts` fails on a `*_LABEL` constant missing from `ALL_LABELS`, on a label name
+// spelled outside this module, and on a label call naming a label `ALL_LABELS` does not hold.
 const EPIC_LABEL = 'epic'
 const BUG_LABEL = 'bug'
 const ENHANCEMENT_LABEL = 'enhancement'
@@ -76,7 +82,7 @@ const ALREADY_DONE_LABEL = 'already-done'
 // and only a person opts it into unattended execution.
 const RELEASE_LABEL = 'release'
 // A person's mark for work set aside for now; `issue-auto-ok.ts` reads it as an exclusion. Applied by
-// hand and never provisioned, so it is not in `REPOSITORY_LABELS`.
+// hand, so it is provisioned: a person cannot apply a label the repository does not have.
 const DEFERRED_LABEL = 'deferred'
 // A copy of the body's start-time declaration while that time is still ahead (`issue-not-before.ts`), so a
 // listing tells an issue that waits on the clock from one that can start. The body stays the source:
@@ -232,6 +238,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Verified already merged — a person closes it',
 	},
 	{
+		name: DEFERRED_LABEL,
+		color: 'd4c5f9',
+		description: 'Set aside for now; never opted in to unattended execution',
+	},
+	{
 		name: NOT_BEFORE_LABEL,
 		color: 'bfd4f2',
 		description: "Waiting: the body's 実施可能日 has not arrived yet",
@@ -338,6 +349,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
+	DEFERRED_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_LABEL,
 	NOT_BEFORE_LABEL,

@@ -422,7 +422,7 @@ The `full` profile's pre-push hook runs `josh audit`, which needs `osv-scanner`.
 2. The same setup `josh init` runs, with the confirmed profile
 3. The initial commit of every file — only without commits
 4. `gh repo create <directory name> --private` (or `--public`) and push `main` — only without an origin
-5. The missing workflow and release-classification labels; existing ones are left unchanged
+5. The missing workflow and release-classification labels; existing ones are left unchanged. A new label is defined in `scripts/issue/issue-labels.ts` and added to `REPOSITORY_LABELS`, or exempted with a reason in `EXEMPT_FROM_PROVISIONING`; other modules import its constant, and `issue-label-scan.test.ts` fails on a label the scripts use that neither list holds
 6. The setup pull request — only while `main` has commits but no kit: an Issue, a commit of only kit's files on its branch, and the pull request. It never merges
 
 What `--dry-run` prints: [init.md → Preview with `--dry-run`](./init.md#preview-with---dry-run).

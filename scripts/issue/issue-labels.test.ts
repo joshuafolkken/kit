@@ -5,6 +5,7 @@ import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
+	DEFERRED_LABEL,
 	EPIC_LABEL,
 	EXEMPT_FROM_PROVISIONING,
 	FILING_ROUTE_LABELS,
@@ -52,6 +53,8 @@ const ALREADY_DONE_SPELLING = 'already-done'
 // joshuafolkken/kit#4102: the park a mechanical failure gets, kept apart from a person's decision.
 const RUN_STALLED_SPELLING = 'run:stalled'
 const RUN_STALLED_CREATED_CASING = 'Run:Stalled'
+// joshuafolkken/kit#4103: the exclusion `issue-auto-ok.ts` reads, now provisioned so a person can apply it.
+const DEFERRED_SPELLING = 'deferred'
 const NOT_DIRECTLY_RUNNABLE_COUNT = 5
 const PARKED_COUNT = 3
 // joshuafolkken/kit#1083: the route labels are the same GitHub contract, and the aggregation query
@@ -73,6 +76,7 @@ describe('the label names', () => {
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
 		[ALREADY_DONE_LABEL, ALREADY_DONE_SPELLING],
+		[DEFERRED_LABEL, DEFERRED_SPELLING],
 		[INTERRUPT_ROUTE_LABEL, INTERRUPT_ROUTE_SPELLING],
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
 		[SPLIT_ROUTE_LABEL, SPLIT_ROUTE_SPELLING],
@@ -122,6 +126,7 @@ describe('WORKFLOW_LABELS', () => {
 			RUN_STALLED_LABEL,
 			NEEDS_HUMAN_REVIEW_LABEL,
 			ALREADY_DONE_LABEL,
+			DEFERRED_LABEL,
 			NOT_BEFORE_LABEL,
 			BUG_LABEL,
 			...FILING_ROUTE_LABELS.map((label) => label.name),
@@ -170,6 +175,14 @@ describe('REPOSITORY_LABELS', () => {
 			expect(label.color).toMatch(/^[0-9a-f]{6}$/u)
 			expect(label.description.length).toBeGreaterThan(0)
 		}
+	})
+})
+
+// joshuafolkken/kit#4103: `issue-auto-ok.ts` reads it, yet a `josh start` repository lacked it.
+describe('the deferred label', () => {
+	it('is managed and provisioned', () => {
+		expect(ALL_LABELS.has(DEFERRED_LABEL)).toBe(true)
+		expect(REPOSITORY_LABELS.map((label) => label.name)).toContain(DEFERRED_LABEL)
 	})
 })
 

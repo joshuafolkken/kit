@@ -1,0 +1,7 @@
+{
+	"reason": "#4103 adds the label scan the Issue asks for (issue-label-scan-fixture.ts) and provisions the deferred label",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}
