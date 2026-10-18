@@ -10,6 +10,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
@@ -221,7 +222,7 @@ async function decided_envelope(raw_payload: string): Promise<string | undefined
 async function write_stop_decision(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
 
-	const envelope = await stop_actions.on_stderr(async () => await decided_envelope(raw_payload))
+	const envelope = await stdout_on_stderr.run(async () => await decided_envelope(raw_payload))
 
 	if (envelope === undefined) return
 

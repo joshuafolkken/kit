@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The issue-reading and issue-citation commands, split out of `josh-commands-ai.ts` when the mandated
 // `issue:cite` section pushed that file past its 300-line ceiling — the same
@@ -74,6 +74,8 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold',
 		category: 'AI tools',
+		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: ['<issue> --evidence-file <path>', 'automation', ['network', 'files']],
 	},
 	'issue:file': {

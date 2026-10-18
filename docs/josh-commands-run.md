@@ -20,8 +20,8 @@ pnpm josh run:hold 1091 --fullrun   # claim as `fullrun #1091` (what `run:entry`
 **Options:**
 
 - `--fullrun` — marks the record as `fullrun #N`'s.
-- `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt.
-- `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on.
+- `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram.
+- `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
 <!-- /usage -->
 
