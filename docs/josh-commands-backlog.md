@@ -532,7 +532,7 @@ pnpm josh auto-ok:judge --decline 913 --reason "<why>"   # record why it stays o
 
 **Options:**
 
-- `--apply <N> --lane|--solo` — checks the exclusions again against the labels as they stand, applies the run label and then `auto-ok`, and notes it on the progress board.
+- `--apply <N> --lane|--solo` — checks the exclusions again against the labels as they stand, records the judgement on the issue, then applies the run label and then `auto-ok`.
 - `--decline <N> --reason <text>` — applies nothing.
 
 <!-- /usage -->

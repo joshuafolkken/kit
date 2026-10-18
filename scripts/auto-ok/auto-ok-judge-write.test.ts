@@ -1,4 +1,3 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { AUTO_OK_LABEL, DEFERRED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,7 +32,7 @@ beforeEach(() => {
 })
 
 describe('auto_ok_judge_write.apply', () => {
-	it('applies the run label before auto-ok, notes it and records the judgement', async () => {
+	it('applies the run label before auto-ok and records the judgement without a board note', async () => {
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 
 		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(SUCCESS_EXIT_CODE)
@@ -41,10 +40,7 @@ describe('auto_ok_judge_write.apply', () => {
 			RUN_LANE_LABEL,
 			AUTO_OK_LABEL,
 		])
-		expect(emit).toHaveBeenCalledWith(
-			expect.anything(),
-			`${issue_cite.plain(ISSUE)} auto-ok applied`,
-		)
+		expect(emit).not.toHaveBeenCalled()
 		expect(post_comment.mock.calls[0]?.[1]).toContain('<!-- josh:auto-ok-judged body=')
 		expect(post_comment.mock.calls[0]?.[1]).toContain(`(${RUN_LANE_LABEL})`)
 	})
@@ -97,7 +93,7 @@ describe('auto_ok_judge_write.apply write order', () => {
 	})
 })
 
-// joshuafolkken/kit#4097: a second apply to a merged issue repeated the comment and the board's note.
+// joshuafolkken/kit#4097: a second apply to a merged issue repeated the comment.
 describe('auto_ok_judge_write.apply on a settled issue', () => {
 	it.each([
 		['a closed issue', JSON.stringify({ state: 'CLOSED', labels: [], body: 'Fix.' })],
