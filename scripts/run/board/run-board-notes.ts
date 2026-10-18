@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_filed, type FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
@@ -23,6 +24,8 @@ interface BoardNote {
 	filed_kind?: FiledKind | undefined
 	// A park waiting on a person's decision, drawn apart from an ordinary park.
 	is_decision: boolean
+	// The text where the legend names the line's 🙋, which already says `needs-decision`.
+	legend_text?: string | undefined
 }
 
 const KIND = run_event_stream.EVENT_KIND
@@ -59,6 +62,7 @@ function park_note(event: RunEvent, titles: Titles): BoardNote {
 	const issue = run_event_scope.issue_named(event)
 	const title = issue === undefined ? undefined : titles.get(Number(issue))
 	const is_decision = reason.includes(NEEDS_DECISION_LABEL)
+	const is_icon_reason = title !== undefined && reason === NEEDS_DECISION_LABEL
 
 	return {
 		kind: 'park',
@@ -66,13 +70,25 @@ function park_note(event: RunEvent, titles: Titles): BoardNote {
 		issue,
 		text: park_text(title, reason),
 		is_decision,
+		legend_text: is_icon_reason ? title : undefined,
 	}
+}
+
+// The line already leads with the number a note names, so a text that opens with it does not say it
+// again (joshuafolkken/kit#4097).
+function note_body(text: string, issue: string | undefined): string {
+	if (issue === undefined) return text
+
+	const lead = `${issue_cite.plain(issue)} `
+
+	return text.startsWith(lead) ? text.slice(lead.length) : text
 }
 
 function plain_note(event: RunEvent): BoardNote {
 	const issue = run_event_scope.issue_named(event)
+	const text = note_body(event.text, issue)
 
-	return { kind: 'note', at_ms: Date.parse(event.at), issue, text: event.text, is_decision: false }
+	return { kind: 'note', at_ms: Date.parse(event.at), issue, text, is_decision: false }
 }
 
 function note_of(event: RunEvent, titles: Titles): BoardNote | undefined {
