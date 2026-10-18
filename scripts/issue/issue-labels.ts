@@ -77,9 +77,6 @@ const DEFERRED_LABEL = 'deferred'
 // listing tells an issue that waits on the clock from one that can start. The body stays the source:
 // `issue-not-before-label.ts` applies and removes it, and nothing reads it as a reason to wait.
 const NOT_BEFORE_LABEL = 'not-before'
-// Applied to an Issue whose second review round was skipped, so the condition stays auditable
-// (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not").
-const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 
 // The four labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
@@ -269,11 +266,6 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Verified already merged — a person closes it',
 	},
 	{
-		name: REVIEW_ROUND2_SKIPPED_LABEL,
-		color: 'c5def5',
-		description: 'Review round 2 was skipped under the condition in prompts/review.md',
-	},
-	{
 		name: NOT_BEFORE_LABEL,
 		color: 'bfd4f2',
 		description: "Waiting: the body's 実施可能日 has not arrived yet",
@@ -389,7 +381,6 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	NOT_BEFORE_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
-	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
@@ -444,7 +435,6 @@ export {
 	RELEASE_LABEL,
 	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
-	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
