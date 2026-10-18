@@ -1,0 +1,7 @@
+{
+	"reason": "Quote-aware cut for the direct-pr-create guard (#4091), plus the round-1 review fix that keeps sh -lc / ssh / comment-joined lines on the plain cut so real PR creation is still refused",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 34
+	}
+}
