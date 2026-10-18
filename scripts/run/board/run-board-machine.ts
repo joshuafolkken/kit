@@ -5,7 +5,7 @@ import { run_board_labels, type Paint } from './run-board-labels'
 // run out of room.
 //
 // **The reading is the gate's own** (`machine-capacity.ts`), so the board shows what the core budget
-// admits against. 🔥 is the busy share of the CPU between two samples; 🧠 the kernel's memory pressure,
+// admits against. 💪 is the busy share of the CPU between two samples; 🧠 the kernel's memory pressure,
 // never a GB figure that would disagree with Activity Monitor's "memory used"; 💾 how fast pages are
 // swapped, never how much swap is held — macOS grows its swap files, so a usage share reads near 100%
 // and the amount itself does no harm. A figure that needs two samples is not drawn on the first, and a

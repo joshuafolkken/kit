@@ -2,7 +2,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_machine } from './run-board-machine'
 import type { LaneUsage } from './run-board-usage'
 
-// A running row's CPU and memory column: `⚡ 20% 🧠1.6G`, each figure green, yellow or red in the
+// A running row's CPU and memory column: `💪 20% 🧠1.6G`, each figure green, yellow or red in the
 // header gauges' `GAUGE_SHADES`. **A lane's thresholds are its share of what the running lanes may
 // use together**: the header's yellow threshold (`CPU_YELLOW` / `MEMORY_YELLOW`), never the whole
 // machine — the OS, the IDE and the browser always hold some of it — divided by the running rows the

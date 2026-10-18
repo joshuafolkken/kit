@@ -66,7 +66,7 @@ describe('run_board_render_waits.held_text', () => {
 		const { held_text } = run_board_render_waits
 
 		expect(held_text(wait(), 0)).toBe('🧠 9″ lint')
-		expect(held_text(wait({ reason: 'cores', command: 'gate test' }), 0)).toBe('⚡ 9″ test')
+		expect(held_text(wait({ reason: 'cores', command: 'gate test' }), 0)).toBe('💪 9″ test')
 		expect(held_text(wait({ reason: 'memory', command: undefined }), 4)).toBe('🧠   9″ step')
 		expect(held_text(wait({ command: 'test:related', waited_ms: 75_000 }), 0)).toBe('🧠 1′15″ test')
 	})
@@ -105,7 +105,7 @@ describe('run_board_render.render — a wait no row owns', () => {
 		wait({ lane: undefined, reason: 'cores', command: 'check', waited_ms: 3000 }),
 		wait({ lane: undefined, elsewhere: '.app-kit-lanes/12', command: 'audit', waited_ms: 0 }),
 	]
-	const drawn = ['  🚧 ⚡ 3″ check main', '  🚧 🧠 0″ audit .app-kit-lanes/12']
+	const drawn = ['  🚧 💪 3″ check main', '  🚧 🧠 0″ audit .app-kit-lanes/12']
 
 	it('draws each on one line right before the legend, after the plan', () => {
 		const lines = plain_lines(stray)
@@ -136,7 +136,7 @@ describe('run_board_render.render — the held check’s legend', () => {
 		const legend = plain_lines([wait()]).slice(-2).join('\n')
 
 		expect(legend).toContain('🚧 held check  🧠 memory')
-		expect(legend).not.toContain('⚡ cores')
+		expect(legend).not.toContain('💪 cores')
 		expect(legend).toContain('🔨 implement')
 	})
 
@@ -144,8 +144,8 @@ describe('run_board_render.render — the held check’s legend', () => {
 		const waits = [wait({ waited_ms: 2000 }), wait({ reason: 'cores', command: 'gate test' })]
 		const lines = plain_lines(waits)
 
-		expect(lane_line(waits)).toMatch(/⚡ 9″ test$/u)
-		expect(lines.join('\n')).toContain('⚡ cores')
+		expect(lane_line(waits)).toMatch(/💪 9″ test$/u)
+		expect(lines.join('\n')).toContain('💪 cores')
 		expect(lines.join('\n')).not.toContain('🧠 memory')
 	})
 

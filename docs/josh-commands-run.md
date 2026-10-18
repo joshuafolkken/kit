@@ -603,13 +603,13 @@ The header is three lines — the first two in three columns, the third a spinne
 
 ```
 ▶ backlogrun  ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0
-  kit         💓      20″  ⚡  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
+  kit         💓      20″  💪  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
               ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
 The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board is written so; a colon is a time of day), a progress bar and per-state counts.
 
-The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`⚡` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned, and both lines' first bars start in one.
+The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
 The third line is what the run is doing now: a spinner, how long ago it happened, then the kind's icon and words.
 

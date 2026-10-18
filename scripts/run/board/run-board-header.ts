@@ -388,7 +388,7 @@ function column_of(cells: ReadonlyArray<string>): Array<string> {
 }
 
 // The run's name, age and progress, then its repository, heartbeat and machine under them, then what
-// it is doing now — its time under theirs, its kind's icon under the `⚡`, the name's column left blank
+// it is doing now — its time under theirs, its kind's icon under the `💪`, the name's column left blank
 // and no label — in every state the board can be in. A stream with no event yet leaves it blank.
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))

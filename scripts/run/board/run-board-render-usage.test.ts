@@ -12,7 +12,7 @@ import type { LaneUsages } from './run-board-usage'
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const GB = 1024 * 1024 * 1024
-const USAGE = '⚡ 20% 🧠1.6G'
+const USAGE = '💪 20% 🧠1.6G'
 const WIDE = 200
 const NARROW = 80
 // Wide enough for a running row up to its usage, not for its tail and what it waits on after it too.
@@ -66,8 +66,8 @@ describe('run_board_render.render usage column', () => {
 	it('draws a running row’s usage before its tail, and both before what it waits on', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}⚡ 20% 🧠1\.6G {2}🔨 0″ {2}🔗 3$/u)
-		expect(row_line(lines, 'Issue 2')).not.toContain('⚡')
+		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}💪 20% 🧠1\.6G {2}🔨 0″ {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 2')).not.toContain('💪')
 	})
 
 	it('draws the usage in a chat as on a screen', () => {
@@ -78,7 +78,7 @@ describe('run_board_render.render usage column', () => {
 
 	it('drops the column from every row where a running row would wrap with it', () => {
 		expect(row_line(sized(WIDE), 'Issue 1')).toContain(USAGE)
-		expect(row_line(sized(NARROW), 'Issue 1')).not.toContain('⚡')
+		expect(row_line(sized(NARROW), 'Issue 1')).not.toContain('💪')
 		expect(row_line(sized(NARROW), 'Issue 1')).toContain('Issue 1')
 	})
 
@@ -172,7 +172,7 @@ describe('run_board_render.render usage column on every row', () => {
 	it('drops the finish time with the usage where the column does not fit', () => {
 		const lines = mixed_lines({}, NARROW)
 
-		expect(lines.join('\n')).not.toMatch(/[🔚⚡]/u)
+		expect(lines.join('\n')).not.toMatch(/[🔚💪]/u)
 		expect(row_line(lines, 'Issue 3')).toMatch(/\d″$/u)
 	})
 
