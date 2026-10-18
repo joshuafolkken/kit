@@ -4,18 +4,20 @@
   nothing and prints the stage line alone; on `start: reached` report the stage line and **stop**. Then:
   1. Read Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; the later text is the
      agreement in force (`issue-comments.md`, which also carries the answers that stop the run).
-  2. **Normalize the title** to clear English: `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`.
+  2. Derive a clear English title.
   3. Analyze requirements → **scope assessment per `split-assessment.md`**.
-  4. Post the plan — a blank body takes `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"`,
-     otherwise `pnpm josh issue:comment <N> --body-file <path>` — in the session language
-     (`JOSH_SESSION_LANG`, default `ja`).
-  5. **Apply the `run:planned` label** — the next command's `run:entry` starts at the implementation
-     (`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=run:planned' --silent`).
-  6. Send the Telegram notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` →
+  4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
+     `ja`), then `pnpm josh issue:plan <N> --body-file <path> --title "<title>" --planned`: it renames
+     the issue, fills a blank body or comments otherwise, and applies `run:planned`, so the next
+     command's `run:entry` starts at the implementation. A target named in front of the reference
+     adds `--repo <owner/name>`.
+  5. Send the Telegram notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` →
      **stop** (do not implement).
 
-  **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
-  children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
+  **Two or more separately-mergeable deliverables** take the split path instead of a plan: rename `#N`
+  to the step-2 title (`gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` — neither
+  `issue:plan` nor `epic --promote` runs here to apply it), create the children as in `kickoff new`,
+  then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
   ... [--ordered] [--rationale-file <path|->]` (when `#N` is a request, a discussion or a container), or
   keep `#N` as a child and create a new epic with `pnpm josh epic`. That branch is Tier A: choose and
   record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.

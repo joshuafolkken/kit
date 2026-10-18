@@ -92,6 +92,17 @@ describe('issue_edit_body', () => {
 	})
 })
 
+describe('issue_edit_title', () => {
+	it('patches only the title and answers the browser URL', async () => {
+		const title = 'A clearer title'
+		const url = await git_gh_issue_write.issue_edit_title(ISSUE_NUMBER, title)
+
+		expect(url).toBe(ISSUE_URL)
+		expect(first_request()).toMatchObject({ path: ISSUE_PATH, method: 'PATCH' })
+		expect(parsed_body(first_request())).toStrictEqual({ title })
+	})
+})
+
 describe('issue_comment', () => {
 	it('posts to the comments endpoint and answers the comment URL', async () => {
 		const url = await git_gh_issue_write.issue_comment(ISSUE_NUMBER, MULTILINE_BODY)

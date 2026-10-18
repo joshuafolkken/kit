@@ -29,7 +29,11 @@ const CORRECTIONS: ReadonlyArray<Correction> = [
 		absent: 'package.json の overrides に',
 	},
 	{ document_path: PLAN_COMMENT, present: 'pnpm josh latest:scope', absent: 'pnpm latest' },
-	{ document_path: PLAN_COMMENT, present: '--field body=@<path>', absent: '-f body="' },
+	{
+		document_path: PLAN_COMMENT,
+		present: 'pnpm josh issue:plan <N> --body-file <path>',
+		absent: '-f body="',
+	},
 	{ document_path: UPSTREAM, present: 'pnpm josh repo:party', absent: 'kit / app-kit / game-kit' },
 	{ document_path: UPSTREAM, present: CLAUDE_HEADING, absent: 'then always stop' },
 ]

@@ -1,0 +1,8 @@
+{
+	"reason": "Review round 1 fixes: issue:plan gains --repo threaded through the issue write helpers, plus tests pinning repo threading and write ordering; kickoff's split path now states the title rename it lost",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 162,
+		"prose.long_paragraphs": 1
+	}
+}

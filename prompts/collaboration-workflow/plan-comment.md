@@ -1,7 +1,7 @@
 ## Step 3: 計画コメントを記録して通知する
 
 1. 提案を人間が判断する
-2. 採用した計画を Issue に記録する。body が空なら計画をファイルに書き `gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>` で書き込む（本文はパスで渡す — `shell-body.md`）。body があれば `pnpm josh issue:comment <N> --body-file <path>` でコメントする
+2. 採用した計画をファイルに書き、`pnpm josh issue:plan <N> --body-file <path>` で Issue に記録する。body が空なら本文に、空でなければコメントになる（本文はパスで渡す — `shell-body.md`）
    - 計画が stash の復元を含むときの書き方: `operating-rules.md` → "no-self-staging"
 3. Telegram で計画開始を通知する:
 

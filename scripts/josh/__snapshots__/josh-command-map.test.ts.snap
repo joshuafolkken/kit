@@ -504,6 +504,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "issue:plan": [
+      "<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "issue:read": [
       "<issue...>",
       "automation",

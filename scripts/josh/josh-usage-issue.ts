@@ -156,6 +156,30 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 			},
 		],
 	},
+	'issue:plan': {
+		examples: [
+			{
+				arguments: '4134 --body-file plan.md --title "Add issue:plan" --planned',
+				note: "kickoff's three writes",
+			},
+		],
+		flags: [
+			{
+				names: [BODY_FILE],
+				description: 'the plan, from a file or stdin (`-`): a blank body takes it, else a comment.',
+			},
+			{ names: ['--title <title>'], description: 'replace the issue title first.' },
+			{
+				names: ['--planned'],
+				description:
+					'apply `run:planned` once the plan is posted, so the next entry skips planning.',
+			},
+			{
+				names: ['--repo <owner/name>'],
+				description: "write to that repository's issue.",
+			},
+		],
+	},
 	'issue:already-done': {
 		examples: [
 			{

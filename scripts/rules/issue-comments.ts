@@ -21,7 +21,7 @@ const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${gh_api.GH_FLAGS}issue\s
 // (`…/issues`) and every sub-resource under it (`…/issues/1319/comments`) are left alone.
 const ISSUE_BODY_PATH = /repos\/[^\s'"]*\/issues\/\d+(?=$|["'\s])/u
 // **A write to that path is not a read of it**, which is why the body read below asks `gh_api.is_read`:
-// `gh api` sends POST as soon as any field flag appears, and `kickoff` PATCHes `…/issues/<N>` to
+// `gh api` sends POST as soon as any field flag appears, and a run PATCHes `…/issues/<N>` to
 // normalize a title and to fill a blank body — so without the read check the delivery would be spent
 // refusing a write, and the genuine body read later in the same run would never be guarded.
 // A segment that fetches comments: the flag, a `comments` field in a `--json` projection, or the

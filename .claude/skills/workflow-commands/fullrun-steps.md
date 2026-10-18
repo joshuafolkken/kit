@@ -9,11 +9,9 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 
 **`in-progress` is already on the Issue** — `run:entry` applied it once the tree was held and the
 budget allowed the run, and `run:release <N>` takes it back off → Read Issue #N and its comments
-(`issue-comments.md`) → **normalize the title** (if not in English or can be phrased more clearly,
-derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`)
-→ post the agreed plan only if the Issue body is blank (`gh api -X PATCH
-repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
-plan-posting step → implement (the `plan` event `run:board` draws 📝 from is written by code — by
+(`issue-comments.md`) → **record the agreed plan** with `pnpm josh issue:plan <N> --body-file
+<path>`, adding `--title "<title>"` when the title is not in English or can be phrased more clearly
+(a blank body takes the plan, otherwise it becomes a comment) → implement (the `plan` event `run:board` draws 📝 from is written by code — by
 `run:entry` for a `run:planned` issue, else at the first implementation edit — never by hand; no cut
 follows the plan — a lane child's context is bounded by the
 threshold-gated implementation cut alone) → run the **verification gate** (the full procedure is `chain-rule.md`;
@@ -48,9 +46,8 @@ with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
 `<N>`. (3) Add `in-progress` (the bare hold named no issue):
-`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Post the agreed plan
-in the session language: fill the body if blank,
-otherwise add a comment. (5) If the working tree already has staged or modified files,
+`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Record the agreed plan
+in the session language: `pnpm josh issue:plan <N> --body-file <path>`. (5) If the working tree already has staged or modified files,
 `git stash push -m "fullrun new: pre-existing changes" -- ':!.josh/observations'` first. (6) `pnpm josh ms`. (7)
 `pnpm josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on
 `skip` neither runs (`latest-gate.md` is the single source). If you stashed in (5),

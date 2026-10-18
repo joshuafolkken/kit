@@ -228,6 +228,25 @@ The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared wi
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:comment` in detail".
 
+### `josh issue:plan`
+
+Record a plan in one call: the title, the plan (a blank body, else a comment) and `run:planned`.
+
+<!-- usage: issue:plan -->
+
+```bash
+pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned   # kickoff's three writes
+```
+
+**Options:**
+
+- `--body-file <path>` — the plan, from a file or stdin (`-`): a blank body takes it, else a comment.
+- `--title <title>` — replace the issue title first.
+- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning.
+- `--repo <owner/name>` — write to that repository's issue.
+
+<!-- /usage -->
+
 ### `josh issue:already-done`
 
 The exit for an Issue whose work is already merged (`issue-comments.md` → "When the work turns out to be already merged"): post the evidence comment, apply `already-done`, then `run:release <N>`, stopping at the first step that fails. An empty evidence file is refused before anything is written. The Issue is never closed.

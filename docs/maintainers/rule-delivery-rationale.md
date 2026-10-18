@@ -170,7 +170,7 @@ appears far more often inside `--jq`). Without that, a write quoting `gh issue v
 would vanish.
 
 **A write is not a read.** `gh api` becomes a POST as soon as `-f` / `-F` / `--field` / `--raw-field`
-/ `--input` appears, and `kickoff` PATCHes `…/issues/<N>` to normalize the title and fill an empty
+/ `--input` appears, and a run PATCHes `…/issues/<N>` to normalize the title and fill an empty
 body. A call whose method is not explicitly `GET`, or that carries a field flag, is out of scope.
 
 **`-c` does not count as "with comments".** `gh issue view <N> -c` is a correct read, but `-c` belongs

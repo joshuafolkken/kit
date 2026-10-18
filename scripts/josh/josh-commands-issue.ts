@@ -69,6 +69,17 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> --body <text> | --body-file <path>', 'automation', ['network']],
 	},
+	'issue:plan': {
+		script: 'scripts/issue/issue-plan-cli.ts',
+		description:
+			'Record a plan: normalize the title, fill a blank body or comment, apply run:planned',
+		category: 'AI tools',
+		reference: [
+			'<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]',
+			'automation',
+			['network'],
+		],
+	},
 	'issue:already-done': {
 		script: 'scripts/issue/issue-already-done-cli.ts',
 		description:

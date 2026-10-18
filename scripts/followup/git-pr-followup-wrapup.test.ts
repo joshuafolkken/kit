@@ -154,14 +154,14 @@ describe('post_notify_issue — blank body uses edit, non-blank uses comment', (
 
 		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
 
-		expect(mocked_edit_body).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
+		expect(mocked_edit_body).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY, undefined)
 		expect(mocked_comment).not.toHaveBeenCalled()
 	})
 
 	it('calls issue_comment when issue body is non-blank', async () => {
 		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
 
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
+		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY, undefined)
 		expect(mocked_edit_body).not.toHaveBeenCalled()
 	})
 
@@ -170,7 +170,7 @@ describe('post_notify_issue — blank body uses edit, non-blank uses comment', (
 
 		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
 
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
+		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY, undefined)
 		expect(mocked_edit_body).not.toHaveBeenCalled()
 	})
 
