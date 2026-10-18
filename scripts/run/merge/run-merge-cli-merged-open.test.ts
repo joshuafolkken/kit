@@ -62,7 +62,7 @@ beforeEach(() => {
 	do_merged_mock.mockReset().mockResolvedValue(undefined)
 	do_failed_mock
 		.mockReset()
-		.mockResolvedValue({ carry: undefined, is_parked: true, is_refused: false, blockers: [] })
+		.mockResolvedValue({ carry: undefined, is_parked: true, is_refused: false, waits: [] })
 	has_resumable_cut_mock.mockReset().mockResolvedValue(false)
 	resume_cut_mock.mockReset().mockResolvedValue(false)
 	emit_mock.mockReset()

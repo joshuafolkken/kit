@@ -72,6 +72,7 @@ beforeEach(() => {
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(LANE)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
 })
 
 describe('run_merge_steps — a child that ended without a merge', () => {
@@ -103,7 +104,7 @@ describe('run_merge_steps — a child that ended without a merge', () => {
 
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
-		expect(result.blockers).toHaveLength(1)
+		expect(result.waits).toHaveLength(1)
 		expect(josh_command.josh_run).toHaveBeenCalledWith([LANE_CLOSE, CHILD])
 	})
 

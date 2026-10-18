@@ -71,7 +71,7 @@ const IN_PROGRESS = 'in-progress'
 const EPIC = 'epic'
 const NEEDS_DECISION = 'needs-decision'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
-const NOT_REFUSED = { is_refused: false, blockers: [] }
+const NOT_REFUSED = { is_refused: false, waits: [] }
 const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, ...NOT_REFUSED }
 
 function state_read(
@@ -179,7 +179,7 @@ describe('run_merge_cli.run — a failed child', () => {
 			carry: { failures: AT_GUARD },
 			is_parked: true,
 			is_refused: false,
-			blockers: [],
+			waits: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
@@ -299,7 +299,7 @@ describe('run_merge_cli.run — a carry ownership refusal', () => {
 			carry: { failures: BELOW_GUARD },
 			is_parked: false,
 			is_refused: true,
-			blockers: [],
+			waits: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
@@ -329,7 +329,7 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 			carry: { failures: BELOW_GUARD },
 			is_parked: false,
 			is_refused: false,
-			blockers: [],
+			waits: [],
 		})
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
