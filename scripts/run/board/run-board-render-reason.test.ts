@@ -109,10 +109,10 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 	})
 
 	it('never cuts the title under what tells two rows apart', () => {
-		const reason = { text: 'overlaps 3701 (scripts/run/board/run-board-render.ts)' }
+		const reason = { text: 'after 3701 · scripts/run/board/run-board-render.ts' }
 		const line = line_of(waiting({ title: LONG_TITLE, reason }), NARROW)
 
-		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  overlaps 3701`)
+		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  after 3701`)
 	})
 
 	it('leaves a title that already fits the pane whole', () => {

@@ -622,7 +622,9 @@ The third line is what the run is doing now: a spinner, how long ago it happened
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, the time counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at — so a judgment session's minutes are not counted as watching).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), the wave order, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+
+`⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no numbered wave headings: a running batch starts each row once a lane is free and its declared paths are, not wave by wave, so the reason at a row's end is what it waits on. An epic's children stay gathered under the epic.
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped, with no elapsed time; a probe that does not answer leaves it running. A single frame that finds an idle lane waits out the window and reads again.
 
@@ -631,8 +633,8 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 - `untriaged` — the issue carries neither `run:lane` nor `run:solo`, so nobody has judged it. It is the one reason drawn beside a `🔗`, since judging it is what a person can do meanwhile.
 - `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue until then. The board shows it as the local `YYYY-MM-DD HH:MM`, as it does every other time; `backlog:next` keeps the UTC spelling. It comes before every reason below.
 - `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
-- `overlaps <N> (<file>)` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
-- `no free lane <used>/<limit>` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read: `no free lane 4/4`. The lanes are counted, not named — every lane `lane:limit` counts, even one an earlier run left that no row shows. An unread limit leaves `no free lane` alone.
+- `after <N> · <file>` — a path its body declares overlaps one the running issue `<N>` declares, so it starts after `<N>`: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
+- `next free lane (<used>/<limit>)` — nothing else keeps it waiting and the open lanes have reached the lane limit — the free count `lane:limit` prints, read at the board's last local read: `next free lane (4/4)`. The lanes are counted, not named — every lane `lane:limit` counts, even one an earlier run left that no row shows. An unread limit leaves `next free lane` alone.
 - `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads normal and 🧠 is under yellow. The ledger records the hold as `memory`, its own `lane:stats` row. An unread figure is left out.
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows that lane's stage, such as `opening lane 5″`.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_estimate, type EstimateRead } from './run-board-estimate'
-import type { BoardLayout, BoardRow, WaveEntry } from './run-board-layout'
+import type { BoardLayout, BoardRow, QueuedEntry } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 import type { UsualTimes } from './run-board-usual'
@@ -11,7 +11,7 @@ import type { UsualTimes } from './run-board-usual'
 
 const MINUTE = 60_000
 const NOW = Date.parse('2026-10-18T09:00:00.000Z')
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 // One child usually takes 30 minutes: 20 implementing, 6 in the gate, 4 in the followup.
 const USUAL: UsualTimes = new Map<Phase, number>([
 	['implement', 20 * MINUTE],
@@ -31,7 +31,7 @@ function running(number: number, phase: Phase, spent: number): BoardRow {
 	return { ...row(number, 'running'), status }
 }
 
-function wave(...rows: ReadonlyArray<BoardRow>): Array<WaveEntry> {
+function queue(...rows: ReadonlyArray<BoardRow>): Array<QueuedEntry> {
 	return rows.map((entry) => ({ kind: 'row' as const, row: entry }))
 }
 
@@ -67,32 +67,32 @@ describe('run_board_estimate.left_ms for a running child', () => {
 	})
 })
 
-describe('run_board_estimate.left_ms for the waves', () => {
+describe('run_board_estimate.left_ms for the queue', () => {
 	it('stacks each waiting child onto the lane that frees first', () => {
 		const active = [running(1, 'gate', 0)]
-		const waves = [wave(row(2, 'waiting'), row(3, 'waiting'))]
+		const queued = queue(row(2, 'waiting'), row(3, 'waiting'))
 
 		// Lane 1 frees at 10′ and lane 2 is free: 2 → lane 2 (30′), 3 → lane 1 (10′ + 30′).
-		expect(run_board_estimate.left_ms(read({ active, waves }))).toBe(40 * MINUTE)
+		expect(run_board_estimate.left_ms(read({ active, queued }))).toBe(40 * MINUTE)
 	})
 
 	it('runs as many lanes as are running where no lane limit is read', () => {
-		const waves = [wave(row(2, 'waiting'), row(3, 'waiting'))]
+		const queued = queue(row(2, 'waiting'), row(3, 'waiting'))
 
-		expect(run_board_estimate.left_ms(read({ waves }, { lane_limit: undefined }))).toBe(
+		expect(run_board_estimate.left_ms(read({ queued }, { lane_limit: undefined }))).toBe(
 			2 * PER_CHILD,
 		)
 	})
 
 	it('counts an epic’s waiting children and leaves a decision out', () => {
-		const epic: WaveEntry = {
+		const epic: QueuedEntry = {
 			kind: 'epic',
 			epic: 9,
 			title: undefined,
 			rows: [row(2, 'waiting'), row(3, 'human')],
 		}
 
-		expect(run_board_estimate.left_ms(read({ waves: [[epic]] }))).toBe(PER_CHILD)
+		expect(run_board_estimate.left_ms(read({ queued: [epic] }))).toBe(PER_CHILD)
 	})
 })
 

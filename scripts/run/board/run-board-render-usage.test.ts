@@ -188,8 +188,8 @@ describe('run_board_render.render usage column on every row', () => {
 // waits on follows its title rather than starting where a running row's tail does.
 function planned_lines(): Array<string> {
 	const planned: BoardRow = { ...waiting, number: 9, title: 'Planned', waits: ['3554'] }
-	const waves = [[{ kind: 'row' as const, row: planned }]]
-	const layout = { ...EMPTY_LAYOUT, active: mixed, waves }
+	const queued = [{ kind: 'row' as const, row: planned }]
+	const layout = { ...EMPTY_LAYOUT, active: mixed, queued }
 	const size = { columns: WIDE, rows: 50 }
 	const lines = run_board_render.render({
 		header: header({ layout, usages: mixed_usages }),
