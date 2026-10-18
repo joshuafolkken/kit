@@ -11,6 +11,8 @@ file changes no rule.
 - The Anthropic lane's stop prompt naming the re-detach to run after the fix — joshuafolkken/kit#2964.
 - A backgrounded `ship` issued alone being moved to the foreground by the hook rather than refused —
   joshuafolkken/kit#3154.
+- A foreground `ship` given the 600000 ms cap, so the Bash timeout never moves it aside —
+  joshuafolkken/kit#4101.
 - The pre-gate cut `pnpm josh run:cut <N>` — joshuafolkken/kit#2177.
 - `pnpm josh run:review` starting the gate and printing the brief in one call — joshuafolkken/kit#2179.
 - Naming the review subagent's agent type (a guessed type name fails) — joshuafolkken/kit#2297.

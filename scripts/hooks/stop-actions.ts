@@ -199,6 +199,6 @@ async function envelope_of(outcome: StopOutcome, lang: string): Promise<string |
 	return settled_envelope(settled, outcome.blocks_on_failure, lang)
 }
 
-const stop_actions = { envelope_of, summary_of }
+const stop_actions = { envelope_of, on_stderr, summary_of }
 
 export { stop_actions }

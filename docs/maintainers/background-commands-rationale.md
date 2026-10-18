@@ -82,3 +82,7 @@ region to a foreground `pnpm josh ship --detach`. Because a foreground `ship` in
 detaches itself after its preflight, the `PreToolUse` hook rewrites a backgrounded `ship` issued alone
 into that foreground call (`updatedInput`) instead of refusing it — the refusal only ever asked for the
 same call again (joshuafolkken/kit#3154).
+
+A foreground `ship` left at the two-minute default is moved to the background once its preflight
+outruns it and dies the same way, so the hook sets the 600000 ms cap on it too
+(joshuafolkken/kit#4101).
