@@ -73,6 +73,10 @@ const RELEASE_LABEL = 'release'
 // A person's mark for work set aside for now; `issue-auto-ok.ts` reads it as an exclusion. Applied by
 // hand and never provisioned, so it is not in `REPOSITORY_LABELS`.
 const DEFERRED_LABEL = 'deferred'
+// A copy of the body's start-time declaration while that time is still ahead (`issue-not-before.ts`), so a
+// listing tells an issue that waits on the clock from one that can start. The body stays the source:
+// `issue-not-before-label.ts` applies and removes it, and nothing reads it as a reason to wait.
+const NOT_BEFORE_LABEL = 'not-before'
 // Applied to an Issue whose second review round was skipped, so the condition stays auditable
 // (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not").
 const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
@@ -269,6 +273,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		color: 'c5def5',
 		description: 'Review round 2 was skipped under the condition in prompts/review.md',
 	},
+	{
+		name: NOT_BEFORE_LABEL,
+		color: 'bfd4f2',
+		description: "Waiting: the body's 実施可能日 has not arrived yet",
+	},
 	{ name: BUG_LABEL, color: 'd73a4a', description: "Something isn't working" },
 	...FILING_ROUTE_LABELS,
 	...DEPTH_LABELS,
@@ -377,6 +386,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	ALREADY_DONE_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_LABEL,
+	NOT_BEFORE_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
 	REVIEW_ROUND2_SKIPPED_LABEL,
@@ -424,6 +434,7 @@ export {
 	label_name_of,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
 	PLANNED_LABEL,

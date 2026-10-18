@@ -37,6 +37,8 @@ interface RowReason {
 	// When the row entered a stage, where the reason is one — how long it has stood there is counted
 	// from it.
 	since_ms?: number | undefined
+	// The row waits on the start time its body declares, which it leads with 📅 rather than ⏳.
+	is_not_before?: boolean | undefined
 }
 
 // What a waiting child's row says after its blockers; `undefined` says nothing.

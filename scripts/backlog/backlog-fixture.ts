@@ -11,7 +11,7 @@ import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import { NOT_BEFORE_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
 import { vi } from 'vitest'
 
@@ -63,6 +63,8 @@ interface BacklogInput {
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
 	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
+	// The open issues carrying `not-before`, whether opted in or not. Left out, none does.
+	not_before?: ReadonlyArray<{ number: number; body?: string }>
 	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
 	// label. Left out, every holder is running.
 	stale?: ReadonlyArray<number>
@@ -189,8 +191,12 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockResolvedValue(
 		listing_outcome(JSON.stringify(rows)),
 	)
-	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(
-		listing_outcome(auto_ok_fixture.epic_listing(epics)),
+	vi.spyOn(git_gh_command, 'issue_list_by_label').mockImplementation(async (label) =>
+		listing_outcome(
+			label === NOT_BEFORE_LABEL
+				? JSON.stringify(input.not_before ?? [])
+				: auto_ok_fixture.epic_listing(epics),
+		),
 	)
 	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
 		listing_outcome(JSON.stringify(input.in_progress ?? [])),

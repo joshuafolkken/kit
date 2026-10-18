@@ -1,0 +1,7 @@
+{
+	"reason": "Review round 2: backlog:next also reads the not-before listing so a labelled issue that is never opted in loses the label once its start time passes",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 138
+	}
+}

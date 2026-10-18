@@ -4,6 +4,7 @@ import {
 	OLD_ISSUE_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -18,6 +19,7 @@ const { issue, console_streams } = auto_ok_fixture
 const FUTURE = '2999-01-01T00:00Z'
 const PAST = '2000-01-01T00:00Z'
 const READING_REPO = 'joshuafolkken/kit'
+const NOT_BEFORE = 'not-before'
 
 const streams = console_streams()
 const { stdout, stderr } = streams
@@ -39,6 +41,9 @@ beforeEach(() => {
 	vi.restoreAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
+	vi.spyOn(git_gh_issue_write, 'label_ensure').mockResolvedValue()
+	vi.spyOn(git_gh_issue_write, 'issue_add_label').mockResolvedValue(true)
+	vi.spyOn(git_gh_issue_write, 'issue_remove_label').mockResolvedValue()
 	streams.reset()
 })
 
@@ -70,5 +75,28 @@ describe('backlog:next with a declared start time', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 		expect(stderr()).not.toContain('not before')
+	})
+})
+
+// joshuafolkken/kit#4079: the scan keeps `not-before` in line with each body it reads.
+describe('backlog:next keeps the not-before label in line', () => {
+	it('labels an issue whose time is ahead', async () => {
+		backlog_fixture.stub_backlog({ opted_in: [dated(FUTURE)] })
+		await backlog_next.run([])
+
+		expect(git_gh_issue_write.issue_add_label).toHaveBeenCalledWith(
+			String(OLD_ISSUE_NUMBER),
+			NOT_BEFORE,
+		)
+	})
+
+	it('takes the label off an issue whose time has passed', async () => {
+		backlog_fixture.stub_backlog({ opted_in: [{ ...dated(PAST), labels: [{ name: NOT_BEFORE }] }] })
+		await backlog_next.run([])
+
+		expect(git_gh_issue_write.issue_remove_label).toHaveBeenCalledWith(
+			String(OLD_ISSUE_NUMBER),
+			NOT_BEFORE,
+		)
 	})
 })
