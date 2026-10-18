@@ -20,13 +20,17 @@ function event_of(pos: number, at: string, kind: string, verb: string): RunEvent
 	return { pos, at, kind, text: `#${String(ISSUE)} ${verb}` }
 }
 
-const LOCAL_PARKED = {
-	...LOCAL,
-	events: [
-		event_of(1, LAUNCHED_AT, 'child-launch', 'launched'),
-		event_of(2, PARKED_AT, 'park', 'parked (needs-decision)'),
-	],
+function local_parked(verb: string): typeof LOCAL {
+	return {
+		...LOCAL,
+		events: [
+			event_of(1, LAUNCHED_AT, 'child-launch', 'launched'),
+			event_of(2, PARKED_AT, 'park', verb),
+		],
+	}
 }
+
+const LOCAL_PARKED = local_parked('parked (needs-decision)')
 // A listing read whole that no longer holds the child.
 const PLAN: BoardPlan = {
 	waves: { waves: [], unreached: [] },
@@ -48,8 +52,8 @@ function answer_of(closed: Partial<ClosedIssue>): ClosedAnswer {
 	return { closed: new Map([[ISSUE, issue]]), is_whole: true }
 }
 
-async function frame_after(answer: ClosedAnswer): Promise<Array<string>> {
-	const { ports, frames, read_closed } = harness(LOCAL_PARKED, [PLAN])
+async function frame_after(answer: ClosedAnswer, local = LOCAL_PARKED): Promise<Array<string>> {
+	const { ports, frames, read_closed } = harness(local, [PLAN])
 
 	read_closed.mockResolvedValue(answer)
 	await tick(FRESH_STATE, ports)
@@ -85,5 +89,26 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
 		expect(lines[0]).toContain('⏳ 1  💤 0')
+	})
+})
+
+// joshuafolkken/kit#4127: the findings section read the park off the stream and kept saying it after
+// the child closed.
+describe('run_board_tick.tick — the findings line of a park', () => {
+	// A findings line leads with the park's clock time, which a row does not.
+	const FINDING = new RegExp(String.raw`💤 \d{2}:\d{2} ${String(ISSUE)} `, 'u')
+
+	it('leaves out the park of a child closed after it', async () => {
+		const local = local_parked('waiting on #4085')
+		const lines = await frame_after(answer_of({ is_not_planned: true }), local)
+
+		expect(lines.join('\n')).not.toContain('(waiting on #4085)')
+		expect(lines.some((line) => FINDING.test(line))).toBe(false)
+	})
+
+	it('keeps the park of a child still parked whose row draws no reason', async () => {
+		const lines = await frame_after({ closed: new Map(), is_whole: true }, local_parked('parked'))
+
+		expect(lines.some((line) => FINDING.test(line))).toBe(true)
 	})
 })

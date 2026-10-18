@@ -184,8 +184,9 @@ describe('run_board_layout.layout_of ending reasons', () => {
 		])
 	})
 
-	it('answers the parked rows that draw their reason', () => {
-		expect([...run_board_layout.drawn_parks(layout)]).toStrictEqual([1])
+	// joshuafolkken/kit#4127: the findings section says the park of a parked row drawing no reason.
+	it('answers the parked rows that draw no reason', () => {
+		expect([...run_board_layout.listed_parks(layout)]).toStrictEqual([4])
 	})
 })
 
