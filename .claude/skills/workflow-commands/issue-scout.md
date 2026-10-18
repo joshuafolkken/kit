@@ -6,8 +6,8 @@ Every filing asks whether the work already exists and which epic owns it; the co
 named in `--distinct`:
 
 ```bash
-pnpm josh issue:file "<title>" --body-file <complete-draft.md> --depth <n> [--route <route>]
-pnpm josh issue:file "<title>" --body-file <complete-draft.md> --depth <n> --distinct 2801,2795
+pnpm josh issue:file "<title>" --body-file <complete-draft.md> [--route <route>]
+pnpm josh issue:file "<title>" --body-file <complete-draft.md> --distinct 2801,2795
 ```
 
 - **`Duplicates:` is read, not skimmed.** Open each candidate and apply `issue-fold-existing.md`

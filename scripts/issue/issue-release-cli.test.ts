@@ -59,7 +59,7 @@ describe('issue_release_cli.run — no release Issue is open', () => {
 		)
 		expect(create_body()).toMatchObject({
 			title: `Release ${HERE} (next version)`,
-			labels: ['release', 'depth:0'],
+			labels: ['release'],
 		})
 		expect(add_blocked_by).toHaveBeenCalledWith(String(FILED_RELEASE), String(ISSUE_NUMBER))
 	})
@@ -111,7 +111,8 @@ describe('issue_release_cli.run --wait', () => {
 
 	it('files a release Issue when none is open and waits on it', async () => {
 		expect(await issue_release_cli.run(['--wait', String(ISSUE_NUMBER)])).toBe(SUCCESS_EXIT_CODE)
-		expect(create_body()).toMatchObject({ labels: ['release', 'depth:0'] })
+		// joshuafolkken/kit#4108: the retired depth label is no longer applied.
+		expect(create_body()).toMatchObject({ labels: ['release'] })
 		expect(add_blocked_by).toHaveBeenCalledWith(String(ISSUE_NUMBER), String(FILED_RELEASE))
 	})
 

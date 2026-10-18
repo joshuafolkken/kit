@@ -134,7 +134,7 @@ Branch 2 only:
   a `fold`; the first filing asks nothing.
 
   1. Before the current Issue closes, file it tagged `route:review-cap`:
-     `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`. It lints
+     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap`. It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
      (`docs/josh-commands-backlog.md` → `josh issue:file`). `epic:bundle` reads open issues only, so
      after the parent closes it answers `none` permanently.

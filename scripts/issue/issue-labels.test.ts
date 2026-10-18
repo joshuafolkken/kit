@@ -5,7 +5,6 @@ import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
-	DEPTH_LABELS,
 	EPIC_LABEL,
 	EXEMPT_FROM_PROVISIONING,
 	FILING_ROUTE_LABELS,
@@ -109,7 +108,7 @@ describe('FILING_ROUTE_LABELS', () => {
 
 describe('WORKFLOW_LABELS', () => {
 	// What josh start provisions: every label a run applies, and every one a person applies too.
-	it('carries the workflow, opt-in, parking, review and bug labels, then every route and depth label', () => {
+	it('carries the workflow, opt-in, parking, review and bug labels, then every route label', () => {
 		expect(WORKFLOW_LABELS.map((label) => label.name)).toStrictEqual([
 			EPIC_LABEL,
 			IN_PROGRESS_LABEL,
@@ -126,7 +125,6 @@ describe('WORKFLOW_LABELS', () => {
 			NOT_BEFORE_LABEL,
 			BUG_LABEL,
 			...FILING_ROUTE_LABELS.map((label) => label.name),
-			...DEPTH_LABELS.map((label) => label.name),
 		])
 	})
 })
@@ -157,6 +155,15 @@ describe('REPOSITORY_LABELS', () => {
 		expect(ALL_LABELS.has(retired)).toBe(false)
 		expect(REPOSITORY_LABELS.map((label) => label.name)).not.toContain(retired)
 	})
+
+	// joshuafolkken/kit#4108: nothing reads a depth label, so `josh start` no longer creates them.
+	it.each(['depth:0', 'depth:1', 'depth:2'])(
+		'neither manages nor provisions the retired %s',
+		(retired) => {
+			expect(ALL_LABELS.has(retired)).toBe(false)
+			expect(REPOSITORY_LABELS.map((label) => label.name)).not.toContain(retired)
+		},
+	)
 
 	it('gives every provisioned label a six-digit hex color and a description', () => {
 		for (const label of REPOSITORY_LABELS) {

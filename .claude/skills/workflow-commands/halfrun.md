@@ -1,6 +1,6 @@
 # `halfrun` — the manifest (implement + verify, stop before commit)
 
-When this run files a new Issue, file it with `pnpm josh issue:file`, which lints the body and applies the classification labels it declares beside the `--depth` and `--route` labels; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification.
+When this run files a new Issue, file it with `pnpm josh issue:file`, which lints the body and applies the classification labels it declares beside the `--route` label; `prompts/collaboration-workflow/issue-template.md` is the single source for this classification.
 
 `halfrun` implements the change and runs the full verification gate, then **stops before commit** —
 nothing is committed, pushed, or opened as a PR — so a person verifies the working tree by hand. The
@@ -39,7 +39,7 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 
 `halfrun new` or `halfrun new "<title>"`: `kickoff new` + `halfrun #<N>` (no Issue exists yet). Steps
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
-(`pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`, with the labels
+(`pnpm josh issue:file "<title>" --body-file <body-file>`, with the labels
 `kickoff.md` → "Words typed after `new`" maps, body per
 `prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → add `in-progress` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `git stash push -m "halfrun new: pre-existing changes" -- ':!.josh/observations'`

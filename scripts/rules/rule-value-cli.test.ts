@@ -13,7 +13,7 @@ import { rule_value_fixture } from './rule-value-fixture'
 // declares no `keeps`, so it reads unmeasured.
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 const BODY_READ = 'gh api repos/o/r/issues/12'
-const FILING = 'pnpm josh issue:file "x" --body-file b.md --depth 1'
+const FILING = 'pnpm josh issue:file "x" --body-file b.md'
 const FILING_CAP = 'filing-cap'
 const ISSUE_COMMENTS = 'issue-comments'
 const TEMPORARY_PREFIX = 'rule-value-cli-'

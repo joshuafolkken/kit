@@ -80,7 +80,7 @@ const OVER_CAP_LISTING = listing_of(issue_wip.WIP_CAP + 1)
 const OVER_CAP_FLAG = '--over-cap'
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {
-	return [TITLE, '--body-file', body_path, '--depth', '1', ...extra]
+	return [TITLE, '--body-file', body_path, ...extra]
 }
 
 function create_body(): unknown {
@@ -119,7 +119,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 		expect(exec_gh_api).toHaveBeenCalledTimes(1)
 		expect(create_body()).toStrictEqual({
 			title: TITLE,
-			labels: ['depth:1', 'route:interrupt', 'bug'],
+			labels: ['route:interrupt', 'bug'],
 			body: VALID_BODY,
 		})
 		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, issue_file_cli.FRESH_ISSUE_POLL)
@@ -157,7 +157,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 	})
 })
 
-// joshuafolkken/kit#3176: a repository missing the depth labels gets them before the create call, so
+// joshuafolkken/kit#3176: a repository missing the workflow labels gets them before the create call, so
 // the create never auto-creates one with a generated color.
 describe('issue_file_cli.run — the labels it applies exist first', () => {
 	it('provisions the missing labels in the target repository before the create call', async () => {
@@ -176,7 +176,7 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:lane'))).toBe(
 			SUCCESS_EXIT_CODE,
 		)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:lane', 'bug', 'auto-ok'] })
+		expect(create_body()).toMatchObject({ labels: ['run:lane', 'bug', 'auto-ok'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: applied — ')
 	})
 
@@ -215,12 +215,12 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo'))).toBe(
 			SUCCESS_EXIT_CODE,
 		)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:solo', 'bug', 'auto-ok'] })
+		expect(create_body()).toMatchObject({ labels: ['run:solo', 'bug', 'auto-ok'] })
 	})
 
 	it('files without a run label when auto-ok is not applied, as before', async () => {
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
+		expect(create_body()).toMatchObject({ labels: ['bug'] })
 	})
 })
 
@@ -229,7 +229,7 @@ describe('issue_file_cli.run — a named auto-ok', () => {
 		const argv = argv_of(judged_in_path, '--label', 'auto-ok', '--label', 'run:lane')
 
 		expect(await issue_file_cli.run(argv)).toBe(SUCCESS_EXIT_CODE)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
+		expect(create_body()).toMatchObject({ labels: ['auto-ok', 'run:lane', 'bug'] })
 	})
 
 	it('no longer accepts --requested', async () => {

@@ -14,7 +14,7 @@ const IN_PROGRESS = 'in-progress'
 // GitHub keeps the casing a label was created with, so a repository that created it before these
 // scripts did answers with this spelling for the same label (joshuafolkken/kit#1132).
 const CREATED_CASING = 'In-Progress'
-const DEPTH_LABEL = 'depth:1'
+const OTHER_LABEL = 'route:split'
 const UNREADABLE = /no readable labels/u
 
 const mocked_read = vi.mocked(git_gh_command.issue_get_labels_and_body)
@@ -26,7 +26,7 @@ function serve_labels(...names: ReadonlyArray<string>): void {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	serve_labels(IN_PROGRESS, DEPTH_LABEL)
+	serve_labels(IN_PROGRESS, OTHER_LABEL)
 	mocked_remove.mockResolvedValue()
 })
 
@@ -38,7 +38,7 @@ describe('strip_in_progress — the label a merged run no longer holds', () => {
 	})
 
 	it('leaves the issue alone when it does not carry the label', async () => {
-		serve_labels(DEPTH_LABEL)
+		serve_labels(OTHER_LABEL)
 
 		await git_followup_label.strip_in_progress(ISSUE_NUMBER)
 

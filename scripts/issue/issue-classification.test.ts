@@ -3,7 +3,7 @@ import { issue_classification } from './issue-classification'
 import { BREAKING_CHANGE_LABEL, ENHANCEMENT_LABEL } from './issue-labels'
 
 const BODY = '## 背景\n\n'
-const EXISTING = ['route:split', 'depth:1']
+const EXISTING = ['route:split', 'run:lane']
 const NON_BUG = '- 種別: 非不具合'
 const BUG_ENHANCEMENT_CONFLICT = 'bug and enhancement declarations cannot be combined'
 const BUG_CLASSIFICATION_CONFLICT = 'conflicting bug classifications'

@@ -61,20 +61,12 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 	},
 	'issue:file': {
 		examples: [
-			{ arguments: '"<title>" --body-file body.md --depth 1' },
-			{
-				arguments:
-					'"<title>" --body-file body.md --depth 0 --route tier-a --repo joshuafolkken/kit',
-			},
-			{ arguments: '"<title>" --body-file body.md --depth 1 --distinct 2801,2795' },
+			{ arguments: '"<title>" --body-file body.md' },
+			{ arguments: '"<title>" --body-file body.md --route tier-a --repo joshuafolkken/kit' },
+			{ arguments: '"<title>" --body-file body.md --distinct 2801,2795' },
 		],
 		flags: [
 			{ names: [BODY_FILE], description: 'the body. Required.' },
-			{
-				names: ['--depth <0|1|2>'],
-				description:
-					'the depth label. Required. The criteria are `.claude/skills/workflow-commands/observation-filing.md` → "The depth test".',
-			},
 			{
 				names: ['--route <tier-a|split|interrupt|review-cap>'],
 				description:
