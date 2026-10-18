@@ -33,6 +33,27 @@ function commands_of(command: string): Array<string> {
 	return command.split(COMMAND_SEPARATOR).map((segment) => segment.trim())
 }
 
+const COMMAND_SEPARATORS = new RegExp(COMMAND_SEPARATOR.source, 'gu')
+
+/**
+ * The `commands_of` cut taken where the quote-blanked line puts each separator, so a `|` or `;`
+ * inside a quoted argument does not cut it; a heredoc line falls back to `commands_of`.
+ */
+function quote_aware_commands_of(command: string): Array<string> {
+	const plain = time_shell.blanked(command)
+
+	if (plain === undefined) return commands_of(command)
+
+	const cuts = [...plain.matchAll(COMMAND_SEPARATORS)].map((match) => ({
+		begin: match.index,
+		end: match.index + match[0].length,
+	}))
+	const starts = [0, ...cuts.map((cut) => cut.end)]
+	const stops = cuts.map((cut) => cut.begin)
+
+	return starts.map((start, index) => command.slice(start, stops[index] ?? command.length).trim())
+}
+
 /** The same cut, untrimmed and with each separator kept between its commands, so the parts join back to the line. */
 function parts_of(command: string): Array<string> {
 	return command.split(SEGMENT_PARTS)
@@ -71,6 +92,7 @@ const shell_segments = {
 	first_of,
 	is_josh_command,
 	parts_of,
+	quote_aware_commands_of,
 	segments_of,
 }
 
