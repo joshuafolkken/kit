@@ -1,0 +1,2 @@
+- rf:assumptions | low | scripts/run/board/run-board-fit.ts:227 | 2026-10-18 | #4099
+- rf:assumptions | low | scripts/run/board/run-board-row-yield.ts:15 | 2026-10-18 | #4099

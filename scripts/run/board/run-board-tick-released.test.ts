@@ -16,7 +16,7 @@ const ISSUE = 4067
 const TITLE = 'Measure the gate unit leg'
 const REPO = 'joshuafolkken/kit'
 const FUTURE = '2026-10-24T23:29Z'
-const RELEASED_LABELS = ['auto-ok', 'depth:0', 'run:lane']
+const RELEASED_LABELS = ['auto-ok', 'run:lane']
 
 function event_of(pos: number, at: string, kind: string, verb: string): RunEvent {
 	return { pos, at, kind, text: `#${String(ISSUE)} ${verb}` }

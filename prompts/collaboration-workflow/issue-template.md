@@ -59,7 +59,7 @@
 
 ### `## 背景` 直下の宣言と分類ラベル
 
-起票は `pnpm josh issue:file "<title>" --body-file <本文ファイル> --depth <n>` で行い、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証の不具合なら `run:solo`）も付ける — 無ければ `issue:file` が拒否する。
+起票は `pnpm josh issue:file "<title>" --body-file <本文ファイル>` で行い、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証の不具合なら `run:solo`）も付ける — 無ければ `issue:file` が拒否する。
 
 | 宣言                   | 付くラベル                        | 選ぶ基準                                                   |
 | ---------------------- | --------------------------------- | ---------------------------------------------------------- |

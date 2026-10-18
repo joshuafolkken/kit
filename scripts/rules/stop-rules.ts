@@ -169,7 +169,7 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 const FILING_OFFER_REASON =
 	'⛔ filing offer: your reply offers to file an Issue instead of filing it, and this run is ' +
 	'unattended — nobody is there to answer. Run ' +
-	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` (Tier A, ' +
+	'`pnpm josh issue:file "<title>" --body-file <path>` (Tier A, ' +
 	'`observation-filing.md`), then end with the one-line citation of what was filed; do not repeat ' +
 	'your previous reply. If it is not worth filing after all, say so in one line instead.'
 

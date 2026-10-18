@@ -37,7 +37,7 @@ open), then stash, comment and `pnpm josh run:release <M>` as for a prerequisite
 so the observation row carries no `route:` label (`observation-filing.md`):
 
 ```bash
-pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route tier-a
+pnpm josh issue:file "<title>" --body-file <body-file> --route tier-a
 ```
 
 The command lints the body against `prompts/collaboration-workflow/issue-template.md`, applies the

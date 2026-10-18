@@ -165,61 +165,6 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 	},
 ]
 
-// The depth of an issue's subject, recorded as a label at filing time.
-//
-// **The definition is not here.** `.claude/skills/workflow-commands/observation-filing.md` → "The depth test",
-// is the single source: depth 0 is what a consumer of this package touches, depth 1 the run
-// orchestration that executes an Issue, depth 2 what measures a run. These constants are the
-// recording of that table, never a second copy of it — a label whose description restated the rule
-// would be the clone `CLAUDE.md` prohibits, and the descriptions below therefore name the section
-// rather than paraphrase it.
-//
-// **Why a label at all.** The share of open issues at depth 0 is a measured target, and without a
-// recorded depth it could only be obtained by reading every open issue's body by hand — hand counts
-// disagree on the denominator and are not comparable, which is the failure a recorded label removes.
-//
-// **The depth is read off the subject, so a run applies it.** Unlike `auto-ok` and
-// `needs-human-review` this is not a person's judgement about authorization; it is the same reading
-// `observation-filing.md` already asks a run to make before it files, and none of the three withholds or widens anything
-// a run may do.
-const DEPTH_0_LABEL = 'depth:0'
-const DEPTH_1_LABEL = 'depth:1'
-const DEPTH_2_LABEL = 'depth:2'
-
-// Ordered shallowest first, which is what makes `depth_label_of` deterministic: an issue carrying
-// more than one depth label counts as the **lowest** depth present, the one closest to the consumer.
-// Without a fixed tie-break the same listing measured twice could answer differently.
-const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, DEPTH_2_LABEL]
-
-// The metadata `gh api ... labels` needs, in the shape `FILING_ROUTE_LABELS` above uses and for the
-// same reason: applying a label at issue-creation auto-creates it with a generated color and no
-// description, so provisioning from here is what gives each one a stable color a reader can scan by.
-// Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
-//
-// **`josh issue:file` provisions them** through `repository_labels.ensure_labels` before its create
-// call, so no document carries a creation command to keep in step.
-const DEPTH_LABELS: ReadonlyArray<{
-	name: string
-	color: string
-	description: string
-}> = [
-	{
-		name: DEPTH_0_LABEL,
-		color: '0e8a16',
-		description: 'Depth 0 — what a consumer of this package touches (observation-filing.md)',
-	},
-	{
-		name: DEPTH_1_LABEL,
-		color: 'fbc02d',
-		description: 'Depth 1 — the run orchestration that executes an Issue (observation-filing.md)',
-	},
-	{
-		name: DEPTH_2_LABEL,
-		color: 'c5def5',
-		description: 'Depth 2 — what measures a run (observation-filing.md)',
-	},
-]
-
 interface LabelDefinition {
 	name: string
 	color: string
@@ -293,7 +238,6 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	},
 	{ name: BUG_LABEL, color: 'd73a4a', description: "Something isn't working" },
 	...FILING_ROUTE_LABELS,
-	...DEPTH_LABELS,
 ]
 
 // The pull request release classifications `pr-classification.yml` requires exactly one of.
@@ -377,15 +321,6 @@ function has_parked_label(labels: ReadonlyArray<string>): boolean {
 	return [...PARKED_LABELS].some((label) => has_label_name(labels, label))
 }
 
-// The depth recorded on one listing row, or `undefined` where none is — the reading every share
-// measurement makes. Lowercased through the same comparison as every other membership test above,
-// because GitHub keeps the casing a label was created with and `Depth:0` is the same label.
-function depth_label_of(labels: ReadonlyArray<LabelReference> | undefined): string | undefined {
-	const names = new Set((labels ?? []).map((label) => label.name.toLowerCase()))
-
-	return DEPTH_LABEL_ORDER.find((name) => names.has(name))
-}
-
 // Every workflow label this package manages. The label-reference scan
 // (`scripts/document/label-reference.test.ts`) reads this to check that no
 // document operates on a label name that does not exist here — a stale or mistyped `labels[]=…`
@@ -412,9 +347,6 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
-	DEPTH_0_LABEL,
-	DEPTH_1_LABEL,
-	DEPTH_2_LABEL,
 	BUGFIX_LABEL,
 	OTHER_CHANGE_LABEL,
 	IGNORE_FOR_RELEASE_LABEL,
@@ -434,12 +366,6 @@ export {
 	BUGFIX_LABEL,
 	BREAKING_CHANGE_LABEL,
 	DEFERRED_LABEL,
-	depth_label_of,
-	DEPTH_0_LABEL,
-	DEPTH_1_LABEL,
-	DEPTH_2_LABEL,
-	DEPTH_LABEL_ORDER,
-	DEPTH_LABELS,
 	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
 	EXEMPT_FROM_PROVISIONING,

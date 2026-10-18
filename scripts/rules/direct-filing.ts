@@ -8,8 +8,8 @@ import { bash_triggers } from './bash-triggers'
 // pointed there.
 
 const DIRECT_FILING_REASON =
-	'⛔ direct filing: an Issue is filed with `pnpm josh issue:file "<title>" --body-file <path> ' +
-	'--depth <0|1|2>`, never with `gh api …/issues` or `gh issue create` — it runs the scout, the lint, ' +
+	'⛔ direct filing: an Issue is filed with `pnpm josh issue:file "<title>" --body-file <path>`, ' +
+	'never with `gh api …/issues` or `gh issue create` — it runs the scout, the lint, ' +
 	'the labels and `epic:bundle` itself. It fires on every occurrence (`docs/josh-commands-backlog.md` ' +
 	'→ "`josh issue:file`").'
 

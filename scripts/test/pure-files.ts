@@ -305,7 +305,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/rules/implementation-cut-rule.test.ts',
 	'scripts/rules/issue-citation.test.ts',
 	'scripts/rules/issue-comments-rule.test.ts',
-	'scripts/rules/issue-depth-label.test.ts',
 	'scripts/rules/josh-git-bare.test.ts',
 	'scripts/rules/lane-interactive-ask-rule.test.ts',
 	'scripts/rules/lane-park-rule.test.ts',

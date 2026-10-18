@@ -40,24 +40,7 @@ question and holds a `fold` (`split-assessment.md` → "The same two questions d
 | **1** | The run orchestration that executes an Issue | `fullrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
 | **2** | What measures a run | `josh cost` and the run-timing report |
 
-**The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed.**
-`depth:0` / `depth:1` / `depth:2` are defined in `scripts/issue/issue-labels.ts` with no definition of
-their own — **the table above is the single source**. **Every filing route applies one**: each route
-of `prerequisite.md`'s table, a split child and a review branch-2 filing pass `--depth <n>` to
-`pnpm josh issue:file`, beside any `--route`.
-
-```bash
-pnpm josh issue:file "<title>" --body-file <body-file> --depth 1
-gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
-```
-
-`issue:file` creates any missing workflow label from `DEPTH_LABELS` before the create call.
-
-- **It is read off the subject, exactly as the table is** — not a judgement, unlike `auto-ok` and
-  `needs-human-review`; it withholds nothing.
-- **Applied at filing, not at completion.**
-- **An Issue carrying more than one counts as the lowest depth present.**
-- **An `epic` takes no depth label** and is excluded from the share's denominator.
+**The depth is read, not recorded** — no label carries it.
 
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — an Issue number or a run, never "this would slow runs down". **Cannot cite
@@ -79,22 +62,6 @@ to branch 2 of `prompts/review.md` → "Review round cap" is filed under that se
 **And a PR that *adds* a measurement names its reader in the same way** — the Issue that read the value
 to decide something, or the path of the rule that reads it. **A measurement with no reader is not
 added.** `route:tier-a` and `route:interrupt` carry over unchanged.
-
-### The depth-0 share — what is counted
-
-**The depth-0 share is the share of open Issues at depth 0.**
-
-**The denominator is a rule, not a choice, and this is it:**
-
-- **Counted: every open Issue that does not carry `epic`.**
-- **`route:tier-a` and `route:interrupt` are counted like anything else.**
-- **An Issue with no depth label is in the denominator**, counted separately as `unlabelled`.
-- **The numerator is what is left**: open, non-epic Issues carrying `depth:0`.
-
-**Two readings of the same backlog give the same number.**
-
-**What the number is for is not decided here** — no `backlog:next` change and no target value until it
-has been measured the same way more than once.
 
 ### A delegated child does not take this route
 

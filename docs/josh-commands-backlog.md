@@ -110,15 +110,14 @@ The one path for filing an issue. It runs every filing step, in order. A direct 
 <!-- usage: issue:file -->
 
 ```bash
-pnpm josh issue:file "<title>" --body-file body.md --depth 1
-pnpm josh issue:file "<title>" --body-file body.md --depth 0 --route tier-a --repo joshuafolkken/kit
-pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,2795
+pnpm josh issue:file "<title>" --body-file body.md
+pnpm josh issue:file "<title>" --body-file body.md --route tier-a --repo joshuafolkken/kit
+pnpm josh issue:file "<title>" --body-file body.md --distinct 2801,2795
 ```
 
 **Options:**
 
 - `--body-file <path>` — the body. Required.
-- `--depth <0|1|2>` — the depth label. Required. The criteria are `.claude/skills/workflow-commands/observation-filing.md` → "The depth test".
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
@@ -138,7 +137,7 @@ pnpm josh issue:file "<title>" --body-file body.md --depth 1 --distinct 2801,279
 5. On a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. While there are candidates, file nothing until every one is named in `--distinct`. A duplicate is not filed; it is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the duplicate search and the epic decision run there.
-8. Create any missing workflow label (depth / route) with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
+8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created is printed with a warning, and the filing goes on.
 9. File with all labels in one request; print the URL.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` so a `--repo` filing is linked in the target rather than the current repository.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run. The issue already exists, so the exit code stays 0.

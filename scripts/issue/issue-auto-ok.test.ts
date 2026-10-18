@@ -16,7 +16,7 @@ function filing_of(overrides: Partial<AutoOkFiling>): AutoOkFiling {
 	return {
 		is_opted_out: false,
 		is_cross_repository: false,
-		labels: ['depth:0', 'enhancement'],
+		labels: ['route:split', 'enhancement'],
 		body: NOT_NEEDED_BODY,
 		...overrides,
 	}
@@ -67,7 +67,7 @@ describe('issue_auto_ok.decide — an excluded label', () => {
 		'epic',
 		'Needs-Human-Review',
 	])('does not apply auto-ok to a filing labelled %s, and names the label', (label) => {
-		const decision = issue_auto_ok.decide(filing_of({ labels: ['depth:0', label] }))
+		const decision = issue_auto_ok.decide(filing_of({ labels: ['bug', label] }))
 
 		expect(decision.is_applied).toBe(false)
 		expect(decision.reason).toContain(`a \`${label.toLowerCase()}\` Issue`)

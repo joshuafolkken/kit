@@ -41,13 +41,13 @@ gate must hold **together**. The rest of `split-assessment.md` is read when a sp
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
   deliverable takes the **single-issue path**, several the **multi-issue split path**.
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
-    "<title>" --body-file <body-file> --depth <n>` plus the labels the words typed after `new` name
+    "<title>" --body-file <body-file>` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
     its duplicate scan runs first, and a candidate covering the same work stops the run (`SKILL.md` →
     `issue-scout.md`). Capture `<N>`. (3) Post the plan as `kickoff #<N>` does. (4) Telegram. (5)
     **Stop**.
   - **Multi-issue split path**: (1) Per deliverable, `pnpm josh issue:file "<sub-title>" --body-file
-    <body-file> --depth <n> --route split` plus the labels the words after `new` name (duplicate scan
+    <body-file> --route split` plus the labels the words after `new` name (duplicate scan
     per `issue-scout.md`). A split filed into another repository gives every child body the `## Origin`
     backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
