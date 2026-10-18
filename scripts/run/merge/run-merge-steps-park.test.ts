@@ -63,6 +63,7 @@ beforeEach(() => {
 	ship_cause_mock.mockReset().mockReturnValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	serve_labels(IN_PROGRESS)
 })
@@ -183,13 +184,13 @@ describe('run_merge_steps.do_failed — a child waiting on an open blocker', () 
 			carry: undefined,
 			is_parked: false,
 			is_refused: false,
-			blockers: [`${KIT}#${String(BLOCKER)}`],
+			waits: [`${KIT}#${String(BLOCKER)}`],
 		})
 		expect(add_label_mock).not.toHaveBeenCalled()
 		expect(apply_spy).not.toHaveBeenCalled()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`open blockers: ${KIT}#${String(BLOCKER)}`),
+			expect.stringContaining(`waits on: ${KIT}#${String(BLOCKER)}`),
 		)
 		expect(remove_label_mock).toHaveBeenCalledWith(CHILD, IN_PROGRESS)
 	})
@@ -212,7 +213,7 @@ describe('run_merge_steps.do_failed — a child with no open blocker is parked a
 
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
-		expect(result.blockers).toStrictEqual([])
+		expect(result.waits).toStrictEqual([])
 		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
 	})
 
@@ -222,6 +223,50 @@ describe('run_merge_steps.do_failed — a child with no open blocker is parked a
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(result.is_parked).toBe(true)
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+	})
+})
+
+// joshuafolkken/kit#4076: a child whose body declares a start date still ahead was released by its
+// session to wait for it — the date is recorded, so nothing for a person to decide and no failure.
+const DAY_MS = 86_400_000
+
+function start_date_body(offset_ms: number): string {
+	const date = new Date(Date.now() + offset_ms).toISOString().slice(0, '2026-10-24T23:29'.length)
+
+	return `## 背景\n\n- 種別: 不具合\n- 実施可能日: ${date}Z\n\n## 現象\n`
+}
+
+describe('run_merge_steps.do_failed — a child waiting on its declared start date', () => {
+	it('releases the child to wait, naming the date, without needs-decision or a count', async () => {
+		const body = start_date_body(DAY_MS)
+		const date = /実施可能日: (?<date>\S+)/u.exec(body)?.groups?.['date']
+
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
+		spy_carry(OWN_CARRY)
+		const apply_spy = vi.spyOn(run_carry, 'apply_change').mockReturnValue(OWN_CARRY)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual([`start date ${String(date)}`])
+		expect(add_label_mock).not.toHaveBeenCalled()
+		expect(apply_spy).not.toHaveBeenCalled()
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining(`waits on: start date ${String(date)}`),
+		)
+	})
+
+	it.each([
+		['a date already past', start_date_body(-DAY_MS)],
+		['no declaration', '## 背景\n\n- 種別: 不具合\n'],
+		['an unreadable body', undefined],
+	])('parks the child for %s', async (_label, body) => {
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual([])
 		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
 	})
 })

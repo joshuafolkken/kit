@@ -55,11 +55,16 @@ function waiting_ms(body: string | undefined, now: number = Date.now()): number 
 	return Date.parse(String(date_of(body)))
 }
 
+// The declared time as written while it is still ahead, or `undefined` when the issue is due.
+function waiting_date(body: string | undefined, now: number = Date.now()): string | undefined {
+	return is_due(body, now) ? undefined : date_of(body)
+}
+
 // Why `backlog:next` holds an issue back, or `undefined` when it is due. The caller cites the issue.
 function waiting_reason(body: string | undefined, now: number = Date.now()): string | undefined {
-	if (is_due(body, now)) return undefined
+	const date = waiting_date(body, now)
 
-	return `not before ${String(date_of(body))}`
+	return date === undefined ? undefined : `not before ${date}`
 }
 
 function problems(body: string): ReadonlyArray<string> {
@@ -68,6 +73,6 @@ function problems(body: string): ReadonlyArray<string> {
 	return value === undefined || is_valid(value) ? [] : [MALFORMED]
 }
 
-const issue_not_before = { is_due, problems, waiting_ms, waiting_reason }
+const issue_not_before = { is_due, problems, waiting_date, waiting_ms, waiting_reason }
 
 export { issue_not_before }

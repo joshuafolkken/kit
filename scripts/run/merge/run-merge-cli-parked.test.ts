@@ -108,7 +108,7 @@ describe('run_merge_cli.merge_child — a child waiting on an open blocker', () 
 			carry: undefined,
 			is_parked: false,
 			is_refused: false,
-			blockers: ['#3501'],
+			waits: ['#3501'],
 		})
 
 		const result = await run_merge_cli.merge_child(context())

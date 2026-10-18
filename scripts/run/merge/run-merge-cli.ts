@@ -225,16 +225,13 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child released to wait on its open blockers: settled for this run like a parked one, so it goes on
-// the stream the same way, but nothing was counted — the failure guard is not read, and the next child
-// is offered.
-async function on_waiting(
-	ctx: MergeContext,
-	blockers: ReadonlyArray<string>,
-): Promise<MergeVerdict> {
+// A child released to wait on its open blockers or its start date: settled for this run like a parked
+// one, so it goes on the stream the same way, but nothing was counted — the failure guard is not read,
+// and the next child is offered.
+async function on_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Promise<MergeVerdict> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} waiting on ${blockers.join(', ')}`,
+		`${issue_cite.plain(ctx.child)} waiting on ${waits.join(', ')}`,
 	)
 
 	return await offered(ctx)
@@ -264,7 +261,7 @@ async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdic
 
 	if (result.is_refused) return report_count_refused(result.carry)
 
-	if (result.blockers.length > 0) return await on_waiting(ctx, result.blockers)
+	if (result.waits.length > 0) return await on_waiting(ctx, result.waits)
 
 	return await on_parked_failure(ctx, result)
 }

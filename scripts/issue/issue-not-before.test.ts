@@ -48,6 +48,17 @@ describe('issue_not_before.waiting_ms', () => {
 	})
 })
 
+describe('issue_not_before.waiting_date', () => {
+	it('is the declared time as written while it is ahead', () => {
+		expect(issue_not_before.waiting_date(DATED_BODY, NOW_BEFORE)).toBe(DATE)
+	})
+
+	it('is undefined once due, or with no declaration', () => {
+		expect(issue_not_before.waiting_date(DATED_BODY, NOW_AFTER)).toBeUndefined()
+		expect(issue_not_before.waiting_date(body_with(''), NOW_BEFORE)).toBeUndefined()
+	})
+})
+
 describe('issue_not_before.waiting_reason', () => {
 	it('names the time before it is due', () => {
 		expect(issue_not_before.waiting_reason(DATED_BODY, NOW_BEFORE)).toBe(`not before ${DATE}`)

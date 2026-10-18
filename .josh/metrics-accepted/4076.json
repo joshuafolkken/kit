@@ -1,0 +1,7 @@
+{
+	"reason": "#4076 reads the child's declared start date in run:merge's waiting decision (start_date_wait + waiting_date)",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

@@ -168,6 +168,17 @@ describe('classify_child — withdrawn by a person', () => {
 	})
 })
 
+// joshuafolkken/kit#4076: a release to wait names what the child waits on, a start date included.
+describe('waiting_comment', () => {
+	it('names every wait and says the child is neither parked nor counted', () => {
+		const comment = run_merge.waiting_comment(['#3501', 'start date 2026-10-24T23:29Z'])
+
+		expect(comment).toContain('not parked, and not counted as a failure')
+		expect(comment).toContain('waits on: #3501, start date 2026-10-24T23:29Z.')
+		expect(comment).not.toContain(NEEDS_DECISION)
+	})
+})
+
 // joshuafolkken/kit#2769: a park the driver makes is explained on the issue — why, what was read, and
 // what a person does next.
 describe('park_comment', () => {

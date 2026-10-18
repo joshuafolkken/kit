@@ -387,16 +387,15 @@ Confirms the child from GitHub and, by what it turned out to be, does the post-m
 child (CLOSED) is counted into the carry record (which resets the failure streak), then `main:sync`,
 `lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`
 or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
-reach the API) has its stale `in-progress` dropped but is **not** parked and
-**not** counted, staying re-dispatchable; a **failed** child (OPEN, unparked, not an outage) has its
-stale `in-progress` dropped, is parked with `needs-decision`, and counts against the failure guard.
-A failed child whose detached `josh ship` has ended is parked for the ship's stop: the park comment's
-`Why` names the newest `ship-stop` line since the ship's launch, or the ship's result and
-`pnpm josh ship --log <N>` when it ended without one.
-A **cut** child (OPEN, unparked, its lane holding a declared cut with its handoff that no successor
-adopted) is neither parked nor counted: its successor is relaunched in the same
-lane through the relaunch the cut itself uses, once per cut; a relaunch that cannot start, or a second
-unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
+reach the API) has it dropped, unparked and uncounted, so re-dispatchable;
+a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `needs-decision`,
+and counts against the failure guard — unless it records an open blocker or a `- 実施可能日:` still
+ahead: then it is **waiting**, unparked and uncounted, its comment naming the wait.
+A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
+newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`.
+A **cut** child (OPEN, unparked, its lane holding a declared cut no successor adopted) is neither
+parked nor counted: its successor is relaunched in the same lane through the cut's own relaunch, once
+per cut; a relaunch that cannot start, or a second unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
 A parked, failed, waiting or outage child's lane is closed when vacant (no commit past the default
 branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 

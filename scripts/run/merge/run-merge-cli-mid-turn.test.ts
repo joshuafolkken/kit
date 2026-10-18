@@ -49,7 +49,7 @@ const { run_merge_cli } = await import('./run-merge-cli')
 
 const CHILD = '3867'
 const OUTPUT = '/Users/runner/.kit-lanes/3867/transcript.log'
-const FAILED = { carry: { failures: 1 }, is_parked: true, is_refused: false, blockers: [] }
+const FAILED = { carry: { failures: 1 }, is_parked: true, is_refused: false, waits: [] }
 const OUTAGE = { pos: 1, at: '2026-10-15T00:00:00.000Z', kind: 'outage', text: `#${CHILD} outage` }
 
 async function merge_child(): Promise<void> {

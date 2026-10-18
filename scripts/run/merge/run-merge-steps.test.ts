@@ -59,6 +59,7 @@ beforeEach(() => {
 	reap_mock.mockReset().mockReturnValue([])
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 })
 
@@ -95,7 +96,7 @@ describe('run_merge_steps.do_failed — parking is part of the result', () => {
 			carry: undefined,
 			is_parked: false,
 			is_refused: false,
-			blockers: [],
+			waits: [],
 		})
 	})
 })
