@@ -658,6 +658,8 @@ The watch budgets are read from the environment:
 
 **Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or a watched stage — the `v<version>` tag, the npm version, the GitHub Release — never appears, which prints that stage with ❌.
 
+The npm watch stops early when the tag's `Publish` run fails, and its ❌ line names that run's ID.
+
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh release` in detail".
 
 ### `josh release:scope`
