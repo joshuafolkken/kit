@@ -50,14 +50,14 @@ interface GitCall {
 	args: ReadonlyArray<string>
 }
 
-// Split on whitespace alone. A refspec such as `:branch` and a short cluster such as `-uf` are single
-// tokens with no inner spaces, and neither force detection nor stash detection needs to look inside a
-// quoted argument — the one place a quote matters (a commit message) belongs to a subcommand neither
-// caller judges.
-const WHITESPACE = /\s+/u
+// Split on whitespace outside quotes, keeping each quote in its word. A quoted span is one word, so
+// `c='x; gh pr create'` is one environment assignment rather than an assignment followed by a `gh`
+// call (joshuafolkken/kit#4091); a backslash-escaped character outside quotes opens no span, and a
+// quote left unclosed is read as a plain character.
+const WORD = /(?:\\.|'[^']*'|"(?:\\.|[^"\\])*"|\S)+/gsu
 
 function words_of(segment: string): Array<string> {
-	return segment.split(WHITESPACE).filter((word) => word !== '')
+	return segment.match(WORD) ?? []
 }
 
 const PATH_SEPARATOR = '/'

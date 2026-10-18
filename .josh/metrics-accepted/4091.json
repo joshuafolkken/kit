@@ -1,0 +1,7 @@
+{
+	"reason": "Quote-aware cut for the direct-pr-create guard, plus a program-position check so ssh/eval only fall back to the plain cut when they run the segment",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 39
+	}
+}

@@ -1075,6 +1075,16 @@ Record that the run read a person's update to its issue, printing the update it 
 
 ---
 
+### `josh issue:already-done`
+
+> **Audience:** automation · **Side effects:** network, files
+
+`<issue> --evidence-file <path>`
+
+Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold
+
+---
+
 ### `josh issue:backlinks`
 
 > **Audience:** automation · **Side effects:** network

@@ -69,6 +69,13 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> --body <text> | --body-file <path>', 'automation', ['network']],
 	},
+	'issue:already-done': {
+		script: 'scripts/issue/issue-already-done-cli.ts',
+		description:
+			'Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold',
+		category: 'AI tools',
+		reference: ['<issue> --evidence-file <path>', 'automation', ['network', 'files']],
+	},
 	'issue:file': {
 		script: 'scripts/issue/issue-file-cli.ts',
 		description:

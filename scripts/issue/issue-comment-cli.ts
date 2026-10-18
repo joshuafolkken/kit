@@ -33,23 +33,12 @@ interface CommentRequest {
 // ignored. `cli_body.resolve` owns the both-flags-at-once refusal and the file read.
 const OPTIONS = { body: { type: 'string' }, 'body-file': { type: 'string' } } as const
 
-// The number is the one positional, and it must be a real issue number: a missing, malformed or
-// second one refuses the whole call rather than posting to some other issue.
-function single_issue_number(positionals: ReadonlyArray<string>): string | undefined {
-	const [issue_number, ...rest] = positionals
-	const is_single = rest.length === 0 && issue_number !== undefined
-
-	return is_single && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
-		? issue_number
-		: undefined
-}
-
 // `resolve` may throw when both body flags are given, which `run` reports — the message names the two
 // flags a caller must pick between.
 function parse_request(argv: ReadonlyArray<string>): CommentRequest | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 	if (parsed === undefined) return undefined
-	const issue_number = single_issue_number(parsed.positionals)
+	const issue_number = issue_number_shape.single_of(parsed.positionals)
 	if (issue_number === undefined) return undefined
 
 	const body = cli_body.resolve({

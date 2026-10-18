@@ -54,6 +54,25 @@ describe('git_argv.arguments_of', () => {
 	it('is undefined when the segment invokes another command', () => {
 		expect(git_argv.arguments_of('echo rm -rf x', 'rm')).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4091: a quoted span is one word, so an assignment's value is not a program.
+	it('reads a quoted assignment value as part of the wrapper', () => {
+		expect(git_argv.arguments_of("c='x gh pr create'", 'gh')).toBeUndefined()
+	})
+
+	it('keeps a quoted argument whole, quotes included', () => {
+		expect(git_argv.arguments_of('X="a b" gh pr view "1 2"', 'gh')).toStrictEqual([
+			'pr',
+			'view',
+			'"1 2"',
+		])
+	})
+
+	it('reads an escaped quote outside quotes as a plain character, opening no span', () => {
+		expect(
+			git_argv.arguments_of(String.raw`git push origin a\'b --force 'x'`, 'git'),
+		).toStrictEqual(['push', 'origin', String.raw`a\'b`, '--force', "'x'"])
+	})
 })
 
 describe('git_argv.short_cluster_has', () => {
