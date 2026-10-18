@@ -102,8 +102,10 @@ interface DrivePorts {
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
 	free_lanes: () => Promise<number>
-	// Whether the issue already holds a kept lane (one a child was dispatched into) — it is reused, so it
-	// takes no free seat.
+	// The places left under the limit, port seats aside — `backlog_ready.drive_limit_room` in production.
+	limit_room: () => Promise<number>
+	// Whether the issue already holds a kept lane (one a child was dispatched into) — it is reused, and
+	// seated ahead of a fresh launch inside the limit room (`backlog-drive-seats.ts`).
 	has_lane: (issue: string) => Promise<boolean>
 	// How many open issues lacking `auto-ok` still owe a judgement — `auto_ok_judge_read.owed` in
 	// production, `0` when the read failed.
@@ -249,8 +251,8 @@ async function refused(
 
 // **No more new lanes than free lanes**. `backlog:offer` lists every ready issue without reading the
 // lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran out of seats. An issue
-// that already holds a kept lane reuses it and takes no seat (`backlog-drive-seats.ts`); the rest launch
-// up to the free count, read once before the first launch.
+// that already holds a kept lane reuses its port seat but takes a place under the limit, ahead of a
+// fresh launch; the rest launch up to the free count (`backlog-drive-seats.ts`), read before the first.
 //
 // **Only a launch is activity**: a pass that started nothing — every lane taken
 // — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.

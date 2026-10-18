@@ -192,9 +192,10 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle'> {
 }
 
 // What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.
-function room_ports(): Pick<LoopPorts, 'free_lanes' | 'has_lane' | 'memory_held'> {
+function room_ports(): Pick<LoopPorts, 'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held'> {
 	return {
 		free_lanes: backlog_ready.drive_free_lane_count,
+		limit_room: backlog_ready.drive_limit_room,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		memory_held: backlog_drive_memory.gauge(),
 	}

@@ -87,6 +87,7 @@ function ports(world_state: World): LoopPorts {
 			return 'launched'
 		},
 		free_lanes: async () => FREE_LANES,
+		limit_room: async () => FREE_LANES,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
 		memory_held: async () => false,

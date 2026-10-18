@@ -4,7 +4,6 @@ import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -113,7 +112,7 @@ describe('backlog_ready.free_lanes_beside', () => {
 	beforeEach(() => {
 		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
-		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(undefined)
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
 	})
 
 	it('answers the free count `lane:limit` prints', async () => {
@@ -133,32 +132,51 @@ describe('backlog_ready.free_lanes_beside', () => {
 	})
 })
 
-// joshuafolkken/kit#3967: a `--only` run waited on lanes an earlier run left with no child in them.
-describe('backlog_ready.lane_use under the live run', () => {
+// joshuafolkken/kit#4107: a drain run's lane with no child in it filled the limit, and `run:board`
+// drew `no free lane 4/4` beside three running children.
+describe('backlog_ready.lane_use', () => {
 	beforeEach(() => {
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
-		vi.spyOn(run_event_stream_emit, 'scoped_current_events').mockResolvedValue([])
-		// Each lane's child is probed with `pgrep`: never a real process from a test.
-		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue(OPEN.map((lane) => lane.issue))
 	})
 
-	it('counts only the lanes a --only run names once every child is gone', async () => {
-		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun #3865 --only'))
+	it('counts only the lanes whose child still works, while every open lane keeps its seat', async () => {
+		// Each lane's child is probed with `pgrep`: never a real process from a test.
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue(['3867', '3868'])
 
-		// The uncounted lanes still hold their seats.
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
-			occupied: 1,
+			occupied: OPEN.length - ['3867', '3868'].length,
 			seated: OPEN.length,
 		})
 	})
 
-	it('counts every open lane under a run that drains the pool', async () => {
-		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun'))
+	it('counts every open lane while every child works', async () => {
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
 
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length,
 			seated: OPEN.length,
 		})
+	})
+})
+
+// joshuafolkken/kit#4107: idle kept lanes filling every port seat must not shut out their resumes.
+describe('backlog_ready.drive_limit_room', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
+		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+	})
+
+	it('reads the limit less the working lanes, the seats the idle ones hold aside', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', String(OPEN.length))
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue(['3867', '3868'])
+
+		await expect(backlog_ready.drive_limit_room()).resolves.toBe(['3867', '3868'].length)
+	})
+
+	it('throws on an unreadable lane limit', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
+
+		await expect(backlog_ready.drive_limit_room()).rejects.toThrow('JOSH_LANE_LIMIT')
 	})
 })
 

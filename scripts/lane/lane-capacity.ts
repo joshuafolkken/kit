@@ -76,17 +76,23 @@ function seated_limit(limit: number): number {
 //
 // **A lane that holds no place under the limit still holds its port seat** (joshuafolkken/kit#3967):
 // `seated` counts every open lane, so the free count never offers more launches than seats are left.
+// The places left under the limit, port seats aside: what resuming a lane that keeps its seat is
+// weighed against (joshuafolkken/kit#4107).
+function limit_room(limit: number, occupied: number): number {
+	return Math.max(NO_LANES, seated_limit(limit) - occupied)
+}
+
 function free_lanes(limit: number, occupied: number, seated = occupied): number {
-	const by_limit = seated_limit(limit) - occupied
 	const by_seats = lane_seed_policy.LAST_LANE_SEAT - seated
 
-	return Math.max(NO_LANES, Math.min(by_limit, by_seats))
+	return Math.max(NO_LANES, Math.min(limit_room(limit, occupied), by_seats))
 }
 
 const lane_capacity = {
 	LANE_LIMIT_KEY,
 	free_lanes,
 	lane_limit,
+	limit_room,
 	read_limit,
 	seated_limit,
 }

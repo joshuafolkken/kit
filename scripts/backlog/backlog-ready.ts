@@ -4,12 +4,10 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
-import { lane_vacant } from '#scripts/lane/lane-vacant'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
-import { backlog_occupied, type OccupiedRead } from './backlog-occupied'
+import { backlog_occupied } from './backlog-occupied'
 import { backlog_stalled } from './backlog-stalled'
 
 // The ready line reports runnable work to the driving backlogrun parent on a watcher wake.
@@ -44,23 +42,11 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-// What decides which open lanes hold a place, read from this checkout's live run.
-async function occupied_read(): Promise<OccupiedRead> {
-	const carry = await run_headless.current_carry()
-
-	return {
-		invocation: carry?.invocation,
-		events: carry === undefined ? [] : await run_event_stream_emit.scoped_current_events(),
-		idle: lane_spent.idle_lanes,
-		vacant: lane_vacant.vacant_issues,
-	}
-}
-
 // The lanes that hold a place under the limit (`backlog-occupied.ts`).
 async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<LaneInfo>> {
 	const open = lanes ?? (await lane_registry.list_lanes())
 
-	return await backlog_occupied.occupied_lanes(open, await occupied_read())
+	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes)
 }
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
@@ -120,12 +106,24 @@ async function free_lane_count(): Promise<number> {
 // **The drive's count throws on an unreadable limit**. The drive launches no
 // more than this count, so the safe-direction zero above would leave it launching nothing and reporting
 // nothing for good; a bad setting is the hard error `lane_capacity` says it is, ending the drive loudly.
-async function drive_free_lane_count(): Promise<number> {
+async function drive_limit(): Promise<number> {
 	const limit = await lane_capacity.lane_limit()
 
 	if (limit.kind !== 'limit') throw new Error(limit.problem)
 
-	return await free_under(limit.limit)
+	return limit.limit
+}
+
+async function drive_free_lane_count(): Promise<number> {
+	return await free_under(await drive_limit())
+}
+
+// The drive's room under the limit alone, for resuming a kept lane, which already holds its port seat.
+async function drive_limit_room(): Promise<number> {
+	const limit = await drive_limit()
+	const use = await lane_use()
+
+	return lane_capacity.limit_room(limit, use.occupied)
 }
 
 // **A `--only` run has no pool to drain**. `backlog:next` lists the opted-in
@@ -238,6 +236,7 @@ const backlog_ready = {
 	lane_room,
 	lane_use,
 	drive_free_lane_count,
+	drive_limit_room,
 	drains_pool,
 	print_ready_line,
 	read_ready,
