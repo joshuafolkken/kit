@@ -178,7 +178,10 @@ pnpm josh behavior
 - **The data is what every run already writes.** Claude Code files each session's transcript under `~/.claude/projects/**/*.jsonl`; an assertion read off a recorded transcript is deterministic, re-runnable and never calls a model — which is exactly what joshuafolkken/kit#1922 removed the slow five-live-session `josh eval` path for lacking.
 - **The scope is the current run** — the newest session transcript — not the whole corpus.
 - **A run with no transcript passes** without the skip marker, so a CI runner — which has none — never withholds the gate's green record.
-- **The seed set is one assertion**, green across the recorded corpus today: `no-direct-git-index-mutation` — `git add` / `git commit` / `git rm --cached` / `git restore --staged` must go through `pnpm josh git` (dry runs excluded). New assertions are added one at a time, each verified green against past real runs first. A break prints which run and which point it broke at.
+- **The assertions**, each verified green against past real runs before it joined; a Bash call refused before it ran breaks none of them:
+  - `no-direct-git-index-mutation` — `git add` / `git commit` / `git rm --cached` / `git restore --staged` must go through `pnpm josh git` (dry runs excluded).
+  - `no-direct-pr-create` — a pull request must be opened with `pnpm josh pr`, never `gh pr create` / `gh pr new` or a `gh api` POST to the pulls path; the matcher is the `direct-pr-create` guard's own.
+- New assertions are added one at a time. A break prints which run and which point it broke at.
 - **The manual `josh eval` is untouched**: this restores behavior verification without reviving the live-session path it removed.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh behavior` in detail".
