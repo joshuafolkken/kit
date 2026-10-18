@@ -36,6 +36,37 @@ describe('test_read_capture.record_read', () => {
 
 		expect(test_read_trace.to_records(state.records)[READ_FILE]).toContain(THIS_TEST)
 	})
+
+	// joshuafolkken/kit#4071
+	it.each([
+		['listing', path.join('scripts', '*')],
+		['walk', path.join('scripts', '**')],
+	] as const)('records a %s of a directory under its kind’s key', (kind, key) => {
+		const state = fresh_state()
+
+		test_read_capture.record_read(state, 'scripts', kind)
+
+		expect(test_read_trace.to_records(state.records)[key]).toContain(THIS_TEST)
+	})
+})
+
+describe('test_read_capture.wrap_read', () => {
+	// joshuafolkken/kit#4071: the wrapped call's own name and options decide the kind it records.
+	it.each([
+		['readFileSync', undefined, 'scripts'],
+		['readdirSync', undefined, path.join('scripts', '*')],
+		['readdirSync', { recursive: true }, path.join('scripts', '**')],
+	])('records a %s call with options %o under %s', (name, options, key) => {
+		const state = fresh_state()
+		const owner: Record<string, (...parameters: Array<unknown>) => unknown> = {
+			[name]: (): undefined => undefined,
+		}
+
+		test_read_capture.wrap_read(owner, name, state)
+		owner[name]?.('scripts', options)
+
+		expect(test_read_trace.to_records(state.records)[key]).toContain(THIS_TEST)
+	})
 })
 
 describe('test_read_capture.flush', () => {

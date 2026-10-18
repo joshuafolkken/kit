@@ -26,6 +26,33 @@ describe('test_read_trace.script_path', () => {
 	})
 })
 
+// joshuafolkken/kit#4071: a listing of a directory depends on its entries, not on everything
+// beneath it, so the kind of read is part of what the map records.
+describe('test_read_trace.read_kind', () => {
+	it.each([
+		['readFileSync', undefined, 'path'],
+		['statSync', undefined, 'path'],
+		['existsSync', undefined, 'path'],
+		['readdirSync', undefined, 'listing'],
+		['readdir', { withFileTypes: true }, 'listing'],
+		['readdir', () => undefined, 'listing'],
+		['opendir', { recursive: false }, 'listing'],
+		['readdirSync', { recursive: true }, 'walk'],
+		['opendirSync', { recursive: true }, 'walk'],
+	])('reads %s with %j as a %s read', (name, options, kind) => {
+		expect(test_read_trace.read_kind(name, options)).toBe(kind)
+	})
+})
+
+describe('test_read_trace.read_key', () => {
+	it('keys a path read by the path, and a directory read by a glob-shaped suffix', () => {
+		expect(test_read_trace.read_key(DOCUMENT, 'path')).toBe(DOCUMENT)
+		expect(test_read_trace.read_key('docs', 'listing')).toBe(path.join('docs', '*'))
+		expect(test_read_trace.read_key('docs', 'walk')).toBe(path.join('docs', '**'))
+		expect(test_read_trace.read_key(test_read_trace.ROOT_ENTRY, 'listing')).toBe('*')
+	})
+})
+
 describe('test_read_trace.repository_path', () => {
 	it('answers a path relative to the root, and `.` for the root itself', () => {
 		expect(test_read_trace.repository_path(ROOT, path.join(ROOT, 'docs', 'a.md'))).toBe(

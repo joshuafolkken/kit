@@ -25,6 +25,39 @@ const NODE_MODULES = 'node_modules'
 const GIT_DIRECTORY = '.git'
 const ROOT_ENTRY = '.'
 
+// **What a read depends on is decided by the call, not by the path alone.** Reading or probing a
+// path depends on that path; listing a directory depends on its direct entries; a recursive listing
+// depends on everything beneath it. The two directory kinds are keyed with a glob-shaped suffix so
+// the map keeps one shape: `scripts/*` is a listing of `scripts`, `scripts/**` a walk over it, and a
+// listing of the root is `*`.
+type ReadKind = 'path' | 'listing' | 'walk'
+
+const LISTING_READS: ReadonlySet<string> = new Set([
+	'readdir',
+	'readdirSync',
+	'opendir',
+	'opendirSync',
+])
+
+const KIND_SUFFIX: Record<Exclude<ReadKind, 'path'>, string> = { listing: '*', walk: '**' }
+
+function is_recursive(options: unknown): boolean {
+	return (
+		typeof options === 'object' && options !== null && Reflect.get(options, 'recursive') === true
+	)
+}
+
+// The kind of read an `fs` call by this name makes, given its second argument.
+function read_kind(name: string, options: unknown): ReadKind {
+	if (!LISTING_READS.has(name)) return 'path'
+
+	return is_recursive(options) ? 'walk' : 'listing'
+}
+
+function read_key(relative: string, kind: ReadKind): string {
+	return kind === 'path' ? relative : path.join(relative, KIND_SUFFIX[kind])
+}
+
 // The file a call site's script name points at — an absolute path or a `file://` URL — or
 // `undefined` for a `node:` internal or an evaluated string.
 function script_path(script_name: string): string | undefined {
@@ -44,7 +77,7 @@ function is_ignored(relative: string): boolean {
 }
 
 // A path relative to the root, or `undefined` when it lies outside it or inside a directory no test
-// result depends on. The root itself is `.`, so a walk over the whole tree matches every file.
+// result depends on. The root itself is `.`.
 function repository_path(root: string, file_path: string): string | undefined {
 	const relative = path.relative(root, file_path)
 
@@ -101,6 +134,8 @@ const test_read_trace = {
 	ROOT_ENTRY,
 	ROOT_KEY,
 	add_reader,
+	read_key,
+	read_kind,
 	read_target,
 	repository_path,
 	script_path,
@@ -108,5 +143,5 @@ const test_read_trace = {
 	to_records,
 }
 
-export type { ReaderQuery, ReadRecords }
+export type { ReadKind, ReaderQuery, ReadRecords }
 export { test_read_trace }

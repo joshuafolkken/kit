@@ -1,0 +1,7 @@
+{
+	"reason": "Round-1 review fix: a changed file in a directory the map never saw also selects the listing of the directory that gains it, and the fs-call-to-read-kind wiring is exported for its test",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 45
+	}
+}

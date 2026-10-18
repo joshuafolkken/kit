@@ -23,7 +23,7 @@ interface ReadMap {
 }
 
 // Bumped whenever the shape changes, so a map an older kit wrote reads as no map at all.
-const MAP_VERSION = 1
+const MAP_VERSION = 2
 
 const MAP_DIRECTORY = 'josh'
 const MAP_FILE = 'test-read-map.json'
@@ -91,16 +91,51 @@ function parse_records(text: string): ReadRecords {
 	return is_read_records(value) ? value : {}
 }
 
-// A changed file is read by whoever read it, and by whoever walked a directory above it — which is
-// what covers a file added since the map was recorded.
-function lookup_keys(relative: string): Array<string> {
-	if (relative === test_read_trace.ROOT_ENTRY) return [relative]
+// Innermost first, ending at the root `.`.
+function directories_above(relative: string): Array<string> {
+	const parent = path.dirname(relative)
 
-	return [relative, ...lookup_keys(path.dirname(relative))]
+	if (parent === relative) return []
+
+	return [parent, ...directories_above(parent)]
+}
+
+// Every directory the map holds a key in or under, which therefore existed when it was recorded.
+function recorded_directories(map: ReadMap): Set<string> {
+	return new Set(Object.keys(map.readers).flatMap((key) => [key, ...directories_above(key)]))
+}
+
+// The directories whose listing a change to the file can alter: its own, and the one above each
+// directory on its path the map never saw — a directory new since then is a new entry there. A
+// listing above a directory that already existed sees only its direct entries, which a change
+// deeper down leaves as they were.
+function changed_listings(
+	directories: ReadonlyArray<string>,
+	recorded: Set<string>,
+): Array<string> {
+	const created = directories.slice(1).filter((_, index) => !recorded.has(directories[index] ?? ''))
+
+	return [directories[0] ?? test_read_trace.ROOT_ENTRY, ...created]
+}
+
+// A changed file is read by whoever read it, by whoever listed a directory whose entries it altered,
+// and by whoever walked a directory above it — the last two are what cover a file added since the
+// map was recorded.
+function lookup_keys(relative: string, recorded: Set<string>): Array<string> {
+	const directories = directories_above(relative)
+	const listings = changed_listings(directories, recorded)
+
+	return [
+		relative,
+		...listings.map((directory) => test_read_trace.read_key(directory, 'listing')),
+		...directories.map((directory) => test_read_trace.read_key(directory, 'walk')),
+	]
 }
 
 function readers_of(map: ReadMap, relative: string): Array<string> {
-	return [...new Set(lookup_keys(relative).flatMap((key) => map.readers[key] ?? []))]
+	const keys = lookup_keys(relative, recorded_directories(map))
+
+	return [...new Set(keys.flatMap((key) => map.readers[key] ?? []))]
 }
 
 function map_path(root: string): string | undefined {
