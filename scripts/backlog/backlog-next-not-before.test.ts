@@ -20,12 +20,17 @@ const FUTURE = '2999-01-01T00:00Z'
 const PAST = '2000-01-01T00:00Z'
 const READING_REPO = 'joshuafolkken/kit'
 const NOT_BEFORE = 'not-before'
+const OTHER_ISSUE_NUMBER = 9001
 
 const streams = console_streams()
 const { stdout, stderr } = streams
 
+function declaring(date: string): string {
+	return `## 背景\n\n- 実施可能日: ${date}\n`
+}
+
 function dated(date: string): OpenIssueData {
-	return { ...issue(OLD_ISSUE_NUMBER, CREATED_EARLIER), body: `## 背景\n\n- 実施可能日: ${date}\n` }
+	return { ...issue(OLD_ISSUE_NUMBER, CREATED_EARLIER), body: declaring(date) }
 }
 
 function classify(row: OpenIssueData): ReturnType<typeof backlog_pool.classify_standalone> {
@@ -96,6 +101,34 @@ describe('backlog:next keeps the not-before label in line', () => {
 
 		expect(git_gh_issue_write.issue_remove_label).toHaveBeenCalledWith(
 			String(OLD_ISSUE_NUMBER),
+			NOT_BEFORE,
+		)
+	})
+})
+
+describe('backlog:next sweeps issues only the not-before listing returns', () => {
+	it('takes the label off an issue never opted in', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [dated(FUTURE)],
+			not_before: [{ number: OTHER_ISSUE_NUMBER, body: declaring(PAST) }],
+		})
+		await backlog_next.run([])
+
+		expect(git_gh_issue_write.issue_remove_label).toHaveBeenCalledWith(
+			String(OTHER_ISSUE_NUMBER),
+			NOT_BEFORE,
+		)
+	})
+
+	it('takes a passed label off with nothing opted in', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [],
+			not_before: [{ number: OTHER_ISSUE_NUMBER, body: declaring(PAST) }],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(git_gh_issue_write.issue_remove_label).toHaveBeenCalledWith(
+			String(OTHER_ISSUE_NUMBER),
 			NOT_BEFORE,
 		)
 	})

@@ -409,15 +409,16 @@ async function context_of(
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
+	// The scan has every opted-in body and its labels already, so it keeps `not-before` in line with them
+	// and with every other issue the label is on — before any answer, so a drained backlog or a failed
+	// read still takes a passed label off.
+	await issue_not_before_label.sweep(opted_in.issues)
+
 	if (opted_in.issues.length === 0) return report_none()
 
 	const context = await context_of(opted_in, exclude)
 
 	if (context === undefined) return FAILURE_EXIT_CODE
-
-	// The scan has every opted-in body and its labels already, so it keeps `not-before` in line with them
-	// and with every other issue the label is on.
-	await issue_not_before_label.sweep(context.opted_in.issues)
 
 	return await answer_pool(context)
 }
