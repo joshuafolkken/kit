@@ -136,7 +136,7 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 	'issue:comment': {
 		examples: [
 			{
-				arguments: '2304 --body-file .claude/tmp/park.md',
+				arguments: '2304 --body-file .josh/tmp/park.md',
 				note: 'the body from a file — no shell evaluates it',
 			},
 			{
@@ -162,7 +162,7 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ names: ['--size <n>'], description: 'how many candidates to fetch and rank (default 10).' },
 		],
 	},
-	'issue:lint': { examples: [{ arguments: '.claude/tmp/issue-body.md' }] },
+	'issue:lint': { examples: [{ arguments: '.josh/tmp/issue-body.md' }] },
 	'defect:rate': {
 		examples: [{ arguments: '', note: 'the last 14 days' }, { arguments: '--days 30' }],
 		flags: [

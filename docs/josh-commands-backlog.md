@@ -213,8 +213,8 @@ Post one comment to an issue (or a PR) with the body passed by path, and print t
 <!-- usage: issue:comment -->
 
 ```bash
-pnpm josh issue:comment 2304 --body-file .claude/tmp/park.md   # the body from a file — no shell evaluates it
-pnpm josh issue:comment 2304 --body "a short note"             # inline, for a body with no backticks or $
+pnpm josh issue:comment 2304 --body-file .josh/tmp/park.md   # the body from a file — no shell evaluates it
+pnpm josh issue:comment 2304 --body "a short note"           # inline, for a body with no backticks or $
 ```
 
 **Options:**
@@ -253,7 +253,7 @@ Check an issue body file against the template's four required headings — `## �
 <!-- usage: issue:lint -->
 
 ```bash
-pnpm josh issue:lint .claude/tmp/issue-body.md
+pnpm josh issue:lint .josh/tmp/issue-body.md
 ```
 
 <!-- /usage -->

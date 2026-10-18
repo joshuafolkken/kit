@@ -78,7 +78,10 @@ e2e/.auth/chrome-profile/
 .claude/scheduled_tasks.lock
 .claude/tmp/
 
-# Run handoff notes (written for josh run:cut --handoff); they belong in .claude/tmp/, and the
+# Scratch files any agent writes (Issue / PR bodies, plans, handoffs, logs); the rest of .josh/ is tracked
+.josh/tmp/
+
+# Run handoff notes (written for josh run:cut --handoff); they belong in .josh/tmp/, and the
 # names below are the ones that were once written beside the code and committed with it
 /.git-handoff-*.json
 /.josh-handoff-*.json

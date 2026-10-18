@@ -16,7 +16,7 @@ gh api repos/{owner}/{repo}/issues/1535/comments -f body="… `pnpm josh ms` は
 
 ### 安全な書き方
 
-**本文をファイルに書いて、パスで渡す。**
+**本文をファイルに書いて、パスで渡す。** `--body-file` の本文や計画メモは `.josh/tmp/` に置く（ignore 済みなのでコミットに混ざらない）。
 
 ```bash
 pnpm josh issue:comment <N> --body-file <path>

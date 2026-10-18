@@ -34,15 +34,19 @@ afterEach(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-// .claude/tmp/ holds a session's throwaway drafts (Issue / PR bodies, plans, handoffs);
-// the distributed template carries the rule to every consumer through josh sync.
+// .josh/tmp/ holds any agent's throwaway drafts (Issue / PR bodies, plans, handoffs, logs), and
+// .claude/tmp/ the ones written before it; the distributed template carries the rule to every
+// consumer through josh sync.
 describe.each([GITIGNORE, 'templates/gitignore'])('%s', (gitignore_source) => {
-	it.each(['.claude/tmp/handoff-1.json', '.claude/tmp/pr-body-1.md', '.claude/tmp/nested/plan.md'])(
-		'ignores %s',
-		(relative_path) => {
-			expect(is_ignored_by(gitignore_source, relative_path)).toBe(true)
-		},
-	)
+	it.each([
+		'.josh/tmp/4091-decision.md',
+		'.josh/tmp/pr-body-1.md',
+		'.josh/tmp/nested/plan.md',
+		'.claude/tmp/handoff-1.json',
+		'.claude/tmp/nested/plan.md',
+	])('ignores %s', (relative_path) => {
+		expect(is_ignored_by(gitignore_source, relative_path)).toBe(true)
+	})
 
 	it('keeps the rest of .claude/ tracked', () => {
 		expect(is_ignored_by(gitignore_source, '.claude/settings.json')).toBe(false)
@@ -59,9 +63,12 @@ describe.each([GITIGNORE, 'templates/gitignore'])('%s', (gitignore_source) => {
 		expect(is_ignored_by(gitignore_source, relative_path)).toBe(true)
 	})
 
-	it('keeps the rest of .josh/ tracked', () => {
-		expect(is_ignored_by(gitignore_source, '.josh/metrics-accepted/1.json')).toBe(false)
-	})
+	it.each(['.josh/metrics-accepted/1.json', '.josh/observations/1.md'])(
+		'keeps the rest of .josh/ tracked: %s',
+		(relative_path) => {
+			expect(is_ignored_by(gitignore_source, relative_path)).toBe(false)
+		},
+	)
 })
 
 // An ignore rule does not untrack a file already committed, so the rule alone would leave the notes

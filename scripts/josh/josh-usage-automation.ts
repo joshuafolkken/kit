@@ -65,7 +65,7 @@ const AUTOMATION_USAGE: Readonly<Record<string, CommandUsage>> = {
 			},
 			{
 				names: ['--log-dir <dir>'],
-				description: 'where the log is written. Default: `.claude/tmp/fresh-machine`.',
+				description: 'where the log is written. Default: `.josh/tmp/fresh-machine`.',
 			},
 			{ names: ['--rebuild'], description: 'build the machine image without the layer cache.' },
 		],
