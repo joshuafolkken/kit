@@ -112,6 +112,18 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_held_stats = { table }
+function is_open_at(held: HeldEntry, now_ms: number): boolean {
+	return now_ms - Date.parse(held.at) < MAX_HOLD_MS
+}
+
+// The reason of the hold still open at the ledger's end, or `undefined` where the last one has ended —
+// or is past `MAX_HOLD_MS`, a driver killed while held that wrote no hand-back.
+function open_reason(entries: ReadonlyArray<LedgerEntry>, now_ms: number): string | undefined {
+	const last = entries.findLast((entry) => is_hold_end(entry))
+
+	return last !== undefined && is_held(last) && is_open_at(last, now_ms) ? last.reason : undefined
+}
+
+const lane_held_stats = { open_reason, table }
 
 export { lane_held_stats }

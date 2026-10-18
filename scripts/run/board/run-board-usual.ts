@@ -1,4 +1,4 @@
-import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_stage_stats } from '#scripts/lane/lane-stage-stats'
 import { run_board_phase, type Phase } from './run-board-phase'
 
@@ -33,12 +33,7 @@ function usual_of(entries: ReadonlyArray<LedgerEntry>): UsualTimes {
 	)
 }
 
-// The repository's whole ledger, read where the board reads its stream; an absent one has no usual time.
-function read(repository: string): UsualTimes {
-	return usual_of(lane_ledger.read_entries(lane_ledger.target_of(repository)))
-}
-
-const run_board_usual = { read, usual_of }
+const run_board_usual = { usual_of }
 
 export { run_board_usual }
 export type { UsualTimes }
