@@ -163,14 +163,15 @@ describe('run_board_render.render sections', () => {
 		expect(lines_of(header({ layout }))).toContain(`  ⏳ 7    ${title}`)
 	})
 
-	it('draws a decision row under the people rule and the legend at the foot', () => {
+	it('draws a decision row under the decision rule and the legend at the foot', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
-		const people_rule = rule('🙋')
-		const start = lines.indexOf(people_rule)
+		const decision = '🙋 decision'
+		const decision_rule = rule(decision)
+		const start = lines.indexOf(decision_rule)
 
-		expect(lines.slice(start, start + 2)).toStrictEqual([people_rule, '  🙋 6    Issue 6'])
-		expect(lines.at(-1)).toBe('🙋 decision')
+		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, '  🙋 6    Issue 6'])
+		expect(lines.at(-1)).toBe(decision)
 	})
 })
 
@@ -189,7 +190,7 @@ describe('run_board_render.render chat', () => {
 		const lines = lines_of(header({ layout, usages: new Map(), form: 'chat' }), notes)
 
 		expect(lines).toStrictEqual(screen)
-		expect(lines.join('\n')).toMatch(/x… {2}.*🔚 .*\n[^]*── 📌 [^]*\n.*✅ merged/u)
+		expect(lines.join('\n')).toMatch(/── 📌 findings [^]*\n.*x… {2}.*🔚 .*\n[^]*✅ merged/u)
 	})
 })
 

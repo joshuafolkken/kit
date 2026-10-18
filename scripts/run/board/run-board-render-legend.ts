@@ -3,7 +3,7 @@ import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
-import type { BoardNote } from './run-board-notes'
+import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_phase } from './run-board-phase'
 import { run_board_render_notes } from './run-board-render-notes'
 import type { ItemState } from './run-board-status'
@@ -15,6 +15,7 @@ import type { ItemState } from './run-board-status'
 
 const {
 	FILED_KIND_ICONS,
+	FILED_RUN_MARK,
 	KIND_WORDS,
 	NOT_BEFORE_ICON,
 	PHASE_ICONS,
@@ -87,6 +88,16 @@ function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
 }
 
+// ✚ is named only while a row the run filed draws it (joshuafolkken/kit#4099).
+function filed_legend(
+	rows: ReadonlyArray<BoardRow>,
+	notes: ReadonlyArray<BoardNote>,
+): Array<string> {
+	const filed = run_board_notes.filed_numbers(notes)
+
+	return rows.some((row) => filed.has(row.number)) ? [`${FILED_RUN_MARK} ${WORDS.filed_run}`] : []
+}
+
 // What is in progress, waiting and done.
 function states_line(drawn: LegendDrawn): Array<string> {
 	return [
@@ -112,6 +123,7 @@ function others_line(
 	return [
 		...kind_named,
 		...waits_legend(rows),
+		...filed_legend(rows, notes),
 		...drawn.held,
 		...drawn.checks,
 		...run_board_render_notes.notes_legend(notes, named, rows),

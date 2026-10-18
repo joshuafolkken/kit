@@ -118,6 +118,22 @@ describe('run_board_render_title.fitted', () => {
 		expect(run_board_fit.width_of(line)).toBe(FLOOR_PANE)
 	})
 
+	// joshuafolkken/kit#4099: a waiting row the run filed leads its title, not padded, with ✚.
+	it('gives up exactly the overrun on a waiting row whose title cell has a lead', () => {
+		const lead = '✚ '
+		const row = row_of({ title: 'A waiting title under the limit', reason: UNTRIAGED })
+
+		function draw({ title_limit, reason_cut }: RowCut): string {
+			const title = title_of(row.title, title_limit - lead.length)
+
+			return `${lead}${title} ${reason_text(row, NOW, reason_cut) ?? ''}`
+		}
+
+		const columns = run_board_fit.width_of(draw(WHOLE)) - OVERRUN
+
+		expect(run_board_fit.width_of(fitted(row, columns, draw, { lead: lead.length }))).toBe(columns)
+	})
+
 	it('leaves a row with no reason at the title column', () => {
 		const row = row_of()
 

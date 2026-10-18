@@ -1,4 +1,4 @@
-import { run_event_filed } from '#scripts/run/event/run-event-filed'
+import { run_event_filed, type Filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_board_notes } from './run-board-notes'
@@ -16,65 +16,73 @@ const PARKED_TITLE = 'Read the lanes'
 const BARE_PARK = '#13 parked'
 const DECISION_PARK_13 = '#13 parked (needs-decision)'
 const WAITING_PARK_13 = '#13 waiting on #7'
+const ELSEWHERE = 'joshuafolkken/app-kit#12'
+const FILED: Filed = {
+	reference: '#3438',
+	kind: 'enhancement',
+	title: TITLE,
+	found_during: FOUND_DURING,
+	is_run: true,
+}
 
 function event(kind: string, text: string, pos = 1): RunEvent {
 	return { pos, at: AT, kind, text }
 }
 
-function park_texts(texts: ReadonlyArray<string>): Array<[string, boolean]> {
+function filed_event(filed: Partial<Filed>, pos = 1): RunEvent {
+	return event(KIND.FILED, run_event_filed.text_of({ ...FILED, ...filed }), pos)
+}
+
+function park_texts(texts: ReadonlyArray<string>): Array<string> {
 	const titles = new Map([[13, PARKED_TITLE]])
 	const events = texts.map((text) => event(KIND.PARK, text))
 
 	return run_board_notes
 		.notes_of(events, titles)
 		.toReversed()
-		.map((note) => [note.text, note.is_decision])
+		.map((note) => note.text)
 }
 
 // joshuafolkken/kit#3531: a park names the parked issue by the board's title, its reason after it.
 describe('run_board_notes.notes_of park titles', () => {
 	it('names a bare park by its title', () => {
-		expect(park_texts([BARE_PARK])).toStrictEqual([[PARKED_TITLE, false]])
+		expect(park_texts([BARE_PARK])).toStrictEqual([PARKED_TITLE])
 	})
 
-	it('puts the reason after the title, a decision still told apart', () => {
-		expect(park_texts([DECISION_PARK_13, WAITING_PARK_13])).toStrictEqual([
-			[`${PARKED_TITLE} (needs-decision)`, true],
-			[`${PARKED_TITLE} (waiting on #7)`, false],
-		])
+	it('puts the reason after the title', () => {
+		expect(park_texts([WAITING_PARK_13])).toStrictEqual([`${PARKED_TITLE} (waiting on #7)`])
 	})
 
 	// joshuafolkken/kit#4045: a park its row already says the reason of is not repeated here.
-	it('leaves out a park its row draws the reason of, and keeps a decision park', () => {
-		const events = [WAITING_PARK_13, DECISION_PARK_13, '#14 parked (cap)'].map((text) =>
-			event(KIND.PARK, text),
-		)
+	it('leaves out a park its row draws the reason of', () => {
+		const events = [WAITING_PARK_13, '#14 parked (cap)'].map((text) => event(KIND.PARK, text))
 		const notes = run_board_notes.notes_of(events, NO_TITLES, new Set([13]))
 
-		expect(notes.map((note) => [note.issue, note.is_decision])).toStrictEqual([
-			['14', false],
-			['13', true],
-		])
+		expect(notes.map((note) => note.issue)).toStrictEqual(['14'])
 	})
 
 	it('keeps the reason alone for an issue the board has no title for', () => {
-		expect(park_texts(['#14 waiting on #7', '#14 parked'])).toStrictEqual([
-			['waiting on #7', false],
-			['', false],
-		])
+		expect(park_texts(['#14 waiting on #7', '#14 parked'])).toStrictEqual(['waiting on #7', ''])
+	})
+})
+
+// joshuafolkken/kit#4099: a decision park is no finding — its row is in the 🙋 decision section while
+// it stays parked, and once the child resumes the decision is made.
+describe('run_board_notes.notes_of decision parks', () => {
+	it('leaves out a park waiting on a decision, drawn row or not', () => {
+		const events = [
+			event(KIND.PARK, DECISION_PARK_13),
+			event(KIND.PARK, '#12 parked (needs-decision)'),
+		]
+
+		expect(run_board_notes.notes_of(events, NO_TITLES, new Set([13]))).toStrictEqual([])
+		expect(run_board_notes.notes_of(events, NO_TITLES)).toStrictEqual([])
 	})
 })
 
 describe('run_board_notes.notes_of filings', () => {
 	it('reads a filing with the child that found it', () => {
-		const text = run_event_filed.text_of({
-			reference: '#3438',
-			kind: 'enhancement',
-			title: TITLE,
-			found_during: FOUND_DURING,
-		})
-
-		expect(run_board_notes.notes_of([event(KIND.FILED, text)], NO_TITLES)).toStrictEqual([
+		expect(run_board_notes.notes_of([filed_event({})], NO_TITLES)).toStrictEqual([
 			{
 				kind: 'filed',
 				at_ms: AT_MS,
@@ -82,25 +90,36 @@ describe('run_board_notes.notes_of filings', () => {
 				text: TITLE,
 				found_during: FOUND_DURING,
 				filed_kind: 'enhancement',
-				is_decision: false,
 			},
 		])
 	})
+
+	// joshuafolkken/kit#4099: a session outside the run writes to the same stream.
+	it('leaves out a filing no run session marked, and one written before the mark', () => {
+		const events = [
+			filed_event({ is_run: false }, 1),
+			event(KIND.FILED, '#3439 Count the seats again (found during #3415)', 2),
+		]
+
+		expect(run_board_notes.notes_of(events, NO_TITLES)).toStrictEqual([])
+	})
 })
 
-describe('run_board_notes.notes_of parks and order', () => {
-	it('reads a park waiting on a decision apart from a bare park', () => {
-		const notes = run_board_notes.notes_of(
-			[event(KIND.PARK, '#12 parked (needs-decision)'), event(KIND.PARK, BARE_PARK)],
-			NO_TITLES,
-		)
+describe('run_board_notes.filed_numbers', () => {
+	it('names the issues the run filed in this repository, and none filed elsewhere', () => {
+		const events = [
+			filed_event({}, 1),
+			filed_event({ reference: ELSEWHERE }, 2),
+			filed_event({ reference: '#3440', is_run: false }, 3),
+			event(KIND.NOTE, '#3441 note', 4),
+		]
+		const notes = run_board_notes.notes_of(events, NO_TITLES)
 
-		expect(notes.map((note) => [note.issue, note.text, note.is_decision])).toStrictEqual([
-			['13', '', false],
-			['12', 'needs-decision', true],
-		])
+		expect(run_board_notes.filed_numbers(notes)).toStrictEqual(new Set([3438]))
 	})
+})
 
+describe('run_board_notes.notes_of order', () => {
 	it('keeps notes newest first and leaves out every other event and an unreadable filing', () => {
 		const notes = run_board_notes.notes_of(
 			[
@@ -117,28 +136,27 @@ describe('run_board_notes.notes_of parks and order', () => {
 			['first #7', '7'],
 		])
 	})
-})
 
-describe('run_board_notes.notes_of', () => {
-	it('lists filings, parks and notes newest first, telling a needs-decision park apart', () => {
+	it('lists filings, parks and notes newest first', () => {
 		const events = [
-			event(KIND.FILED, '#3438 Count the seats again (found during #3415)', 1),
-			event(KIND.PARK, '#3433 parked (needs-decision)', 2),
+			filed_event({}, 1),
+			event(KIND.PARK, '#3433 parked (cap)', 2),
 			event(KIND.NOTE, '#3415 gate took 40% longer', 3),
 			event(KIND.PARK, '#3409 parked', 4),
 			event(KIND.MERGE, '#3420 merged', 5),
 		]
 		const notes = run_board_notes.notes_of(events, NO_TITLES)
 
-		expect(notes.map((note) => [note.kind, note.issue, note.is_decision])).toStrictEqual([
-			['park', '3409', false],
-			['note', '3415', false],
-			['park', '3433', true],
-			['filed', '3438', false],
+		expect(notes.map((note) => [note.kind, note.issue])).toStrictEqual([
+			['park', '3409'],
+			['note', '3415'],
+			['park', '3433'],
+			['filed', '3438'],
 		])
-		expect(notes.at(-1)).toMatchObject({ text: 'Count the seats again', found_during: '3415' })
 	})
+})
 
+describe('run_board_notes.notes_of texts', () => {
 	// joshuafolkken/kit#4097: the line leads with the number already.
 	it('drops the number a note opens with, and keeps a text that names another', () => {
 		const other = 'saw #4073 again'
@@ -151,11 +169,8 @@ describe('run_board_notes.notes_of', () => {
 	})
 
 	it('keeps an Issue filed elsewhere qualified', () => {
-		const [note] = run_board_notes.notes_of(
-			[event(KIND.FILED, 'joshuafolkken/app-kit#12 Fix the port')],
-			NO_TITLES,
-		)
+		const [note] = run_board_notes.notes_of([filed_event({ reference: ELSEWHERE })], NO_TITLES)
 
-		expect(note?.issue).toBe('joshuafolkken/app-kit#12')
+		expect(note?.issue).toBe(ELSEWHERE)
 	})
 })

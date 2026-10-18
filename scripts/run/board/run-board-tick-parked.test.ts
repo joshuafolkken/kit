@@ -78,10 +78,12 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 		expect(row_of(lines)).toMatch(new RegExp(`🚫 ${String(ISSUE)} +${TITLE}$`, 'u'))
 	})
 
-	it('keeps a child still open parked and counted', async () => {
+	// joshuafolkken/kit#4099: its park waits on a decision, so its row is drawn 🙋 and counted with the
+	// rows still to come, as an untouched needs-decision row is.
+	it('keeps a child still open on a decision and counted as remaining', async () => {
 		const lines = await frame_after({ closed: new Map(), is_whole: true })
 
-		expect(row_of(lines)).toContain(`💤 ${String(ISSUE)}`)
-		expect(lines[0]).toContain('💤 1')
+		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
+		expect(lines[0]).toContain('⏳ 1  💤 0')
 	})
 })

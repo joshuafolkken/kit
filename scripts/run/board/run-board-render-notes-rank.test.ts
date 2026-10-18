@@ -16,7 +16,7 @@ const KIND = run_event_stream.EVENT_KIND
 const REPO = 'joshuafolkken/kit'
 const GUARD = 'Stop the guard'
 const TITLES = new Map([[4091, GUARD]])
-const NOTES_LEGEND = '📌 findings and decisions'
+const NOTES_LEGEND = '📌 findings'
 
 function event(kind: string, text: string): RunEvent {
 	return { pos: 1, at: new Date(NOW).toISOString(), kind, text }
@@ -41,13 +41,13 @@ describe('run_board_render.render findings without repeated words', () => {
 		expect(lines).toContain(`  💬 ${minute_of(NOW)} 4073  auto-ok applied`)
 	})
 
-	it('leaves needs-decision to the 🙋 the legend names, and keeps it where no legend is drawn', () => {
+	// joshuafolkken/kit#4099: the child is a 🙋 decision row while it stays parked, and once it resumes
+	// the decision is made.
+	it('draws no finding for a park waiting on a decision, with a legend or without one', () => {
 		const notes = notes_of([event(KIND.PARK, '#4091 parked (needs-decision)')])
 
-		expect(lines_of(header(), notes)).toContain(`  🙋 ${minute_of(NOW)} 4091  ${GUARD}`)
-		expect(lines_of(header({ layout: undefined }), notes)).toContain(
-			`  🙋 ${minute_of(NOW)} 4091 park  ${GUARD} (needs-decision)`,
-		)
+		expect(lines_of(header(), notes).join('\n')).not.toContain(GUARD)
+		expect(lines_of(header({ layout: undefined }), notes).join('\n')).not.toContain(GUARD)
 	})
 
 	it('draws a reference to the board’s own repository as #N and keeps another one’s name', () => {
@@ -60,47 +60,33 @@ describe('run_board_render.render findings without repeated words', () => {
 	})
 })
 
-const decision: BoardNote = {
-	kind: 'park',
-	at_ms: NOW - 2 * MINUTE,
-	issue: '4091',
-	text: GUARD,
-	is_decision: true,
-}
-const park: BoardNote = { ...decision, issue: '4095', text: 'Measure', is_decision: false }
-const filed: BoardNote = {
-	...decision,
-	kind: 'filed',
-	issue: '4096',
-	text: 'Fix',
-	is_decision: false,
-}
+const park: BoardNote = { kind: 'park', at_ms: NOW - 2 * MINUTE, issue: '4095', text: 'Measure' }
+const filed: BoardNote = { ...park, kind: 'filed', issue: '4096', text: 'Fix' }
 const listed: BoardNote = { ...filed, issue: '4100', at_ms: NOW }
 
 describe('run_board_render.render a full findings section', () => {
 	const seen = Array.from({ length: run_board_render.NOTE_LIMIT }, (_, index) =>
 		note(NOW - index * MINUTE, `seen ${String(index)}`),
 	)
-	const lines = lines_of(listing([4100]), [listed, ...seen, park, filed, decision])
+	const lines = lines_of(listing([4100]), [listed, ...seen, park, filed])
 	const drawn = lines
-		.slice(lines.indexOf(rule('📌')) + 1)
+		.slice(lines.indexOf(rule(NOTES_LEGEND)) + 1)
 		.filter((line) => line.startsWith('  ') && !line.startsWith('  more'))
 
-	it('keeps 🙋, then 💤, then a filed Issue with no row, then notes, and cuts filed this run first', () => {
-		expect(drawn.slice(0, 3)).toStrictEqual([
-			`  🙋 ${minute_of(decision.at_ms)} 4091  ${GUARD}`,
+	it('keeps 💤, then a filed Issue with no row, then notes, and draws no line for a filed row', () => {
+		expect(drawn.slice(0, 2)).toStrictEqual([
 			`  💤 ${minute_of(park.at_ms)} 4095  Measure`,
 			`  🆕 ${minute_of(filed.at_ms)} 4096  Fix`,
 		])
-		expect(drawn.slice(3)).toStrictEqual(
-			[0, 1, 2].map(
+		expect(drawn.slice(2)).toStrictEqual(
+			[0, 1, 2, 3].map(
 				(index) => `  💬 ${minute_of(NOW - index * MINUTE)} 3415  seen ${String(index)}`,
 			),
 		)
-		expect(lines).toContain('  more 4')
+		expect(lines).toContain('  more 2')
 	})
 
-	it('names in the legend only the kinds drawn, 🙋 among them where no row names it', () => {
-		expect(lines.at(-1)).toBe(`${NOTES_LEGEND}  🆕 filed  🙋 decision  💤 parked  💬 note`)
+	it('names ✚ for the filed row, and in the findings only the kinds drawn', () => {
+		expect(lines.at(-1)).toBe(`✚ filed this run  ${NOTES_LEGEND}  🆕 filed  💤 parked  💬 note`)
 	})
 })

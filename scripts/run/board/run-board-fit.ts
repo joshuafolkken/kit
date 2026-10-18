@@ -4,10 +4,11 @@ import { run_board_labels } from './run-board-labels'
 
 // A live `run:board` frame kept within the terminal. A frame taller than the pane scrolls the
 // alternate screen as it is written, and the header — the lines that say whether the run moves and
-// how far it is — is what scrolls off. So the parts below it give way instead, least wanted first:
-// the footer, the legend, the oldest notes until three are left, the finished rows, the rest of the
-// notes, the reviewers thanked above the legend, the rows not yet started, the parked rows and, last,
-// the running rows — what a person keeps the board open to see. Each stage stops once the
+// how far it is — is what scrolls off. So the parts below it give way instead, least wanted first and
+// in the order the frame draws them from the bottom (joshuafolkken/kit#4099): the footer, the legend,
+// the rows under the notes — the finished, the 🔗 waiting, the not yet started — the notes from the
+// oldest, the reviewers thanked above the legend, the parked rows and, last, the rows waiting on a person's decision
+// and the running rows — what a person keeps the board open to see. Each stage stops once the
 // frame fits, a cut row is counted on the plan's `more N` line — or on its folding section's own last
 // line while that section keeps a row (joshuafolkken/kit#4042) — and the order a row is drawn in
 // never changes. A line wider than the pane wraps, so every line is counted by the rows it takes on
@@ -15,8 +16,6 @@ import { run_board_labels } from './run-board-labels'
 
 const { WORDS } = run_board_labels
 const INDENT = '  '
-// The newest notes kept until the finished rows are gone; the older ones give way before them.
-const NOTES_KEPT = 3
 
 interface TerminalSize {
 	rows: number
@@ -24,7 +23,7 @@ interface TerminalSize {
 }
 
 // The stage an issue row gives way in, the earlier first.
-type YieldStage = 'finished' | 'pending' | 'parked' | 'running'
+type YieldStage = 'finished' | 'waiting' | 'pending' | 'parked' | 'decision' | 'running'
 
 // When a row's stage gives it way: the oldest first, a row with no time before every timed one.
 interface RowYield {
@@ -53,11 +52,13 @@ interface NotesPart {
 	hidden: number
 }
 
-// A frame in its parts, top to bottom: the header above stays.
+// A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around
+// the notes: `plan` above them, `below` under them.
 interface FrameParts {
 	above: ReadonlyArray<string>
 	plan: ReadonlyArray<PlanSection>
 	notes: NotesPart
+	below?: ReadonlyArray<PlanSection> | undefined
 	// The reviewers thanked, drawn right above the legend; none where nobody is.
 	thanks?: ReadonlyArray<string> | undefined
 	legend: ReadonlyArray<string>
@@ -133,15 +134,6 @@ function unfolded(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>):
 	return [...cut].filter((line) => !folded.has(line)).length
 }
 
-// The plan's cut rows are counted on one line at its end, under a blank when no section is left.
-function plan_lines(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>): Array<string> {
-	const drawn = plan.flatMap((section) => section_lines(section, cut))
-	const hidden = unfolded(plan, cut)
-	const lead = drawn.length === 0 && hidden > 0 ? [''] : []
-
-	return [...lead, ...drawn, ...more_lines(hidden)]
-}
-
 // The notes give way from the oldest shown; with none left the section goes, heading and all.
 function notes_lines(notes: NotesPart, cut: number): Array<string> {
 	const kept = notes.lines.slice(0, notes.lines.length - cut)
@@ -151,11 +143,36 @@ function notes_lines(notes: NotesPart, cut: number): Array<string> {
 	return [...notes.head, ...kept, ...more_lines(notes.hidden + cut)]
 }
 
+function sections_lines(
+	sections: ReadonlyArray<PlanSection>,
+	cut: ReadonlySet<PlanLine>,
+): Array<string> {
+	return sections.flatMap((section) => section_lines(section, cut))
+}
+
+// The plan's sections around the notes, its cut rows counted on one line after its last drawn section —
+// under `below` while any of it is drawn, else above the notes, never under the notes' own `more` — and
+// under a blank when no section is left above it.
+function body_lines(parts: FrameParts, cut: Cut): Array<string> {
+	const below = parts.below ?? []
+	const [plan, notes, under] = [
+		sections_lines(parts.plan, cut.rows),
+		notes_lines(parts.notes, cut.notes),
+		sections_lines(below, cut.rows),
+	]
+	const more = more_lines(unfolded([...parts.plan, ...below], cut.rows))
+
+	if (under.length > 0) return [...plan, ...notes, ...under, ...more]
+
+	const lead = plan.length === 0 && more.length > 0 ? [''] : []
+
+	return [...lead, ...plan, ...more, ...notes]
+}
+
 function compose(parts: FrameParts, cut: Cut): Array<string> {
 	return [
 		...parts.above,
-		...plan_lines(parts.plan, cut.rows),
-		...notes_lines(parts.notes, cut.notes),
+		...body_lines(parts, cut),
 		...(cut.thanks ? [] : (parts.thanks ?? [])),
 		...(cut.legend ? [] : parts.legend),
 		...(cut.footer ? [] : parts.footer),
@@ -187,25 +204,38 @@ function yielding(rows: ReadonlyArray<Indexed>, stage: YieldStage): Array<PlanLi
 		.map((entry) => entry.line)
 }
 
-// Everything that gives way, in the order it does.
-function order_of(parts: FrameParts): Array<Yielder> {
-	const rows = parts.plan
+// The stages in the order their rows give way.
+const STAGES: ReadonlyArray<YieldStage> = [
+	'finished',
+	'waiting',
+	'pending',
+	'parked',
+	'decision',
+	'running',
+]
+
+// The issue rows of some sections, in the order they give way.
+function rows_yielding(sections: ReadonlyArray<PlanSection>): Array<PlanLine> {
+	const rows = sections
 		.flatMap((section) => section.lines)
 		.map((line, index) => ({ line, index }))
 		.filter((entry) => entry.line.row !== undefined)
+
+	return STAGES.flatMap((stage) => yielding(rows, stage))
+}
+
+// Everything that gives way, in the order it does: the rows drawn under the notes before them, the
+// rows above them after the thanks.
+function order_of(parts: FrameParts): Array<Yielder> {
 	const notes = parts.notes.lines.map((): Yielder => 'note')
-	const surplus = Math.max(0, notes.length - NOTES_KEPT)
 
 	return [
 		'footer',
 		'legend',
-		...notes.slice(0, surplus),
-		...yielding(rows, 'finished'),
-		...notes.slice(surplus),
+		...rows_yielding(parts.below ?? []),
+		...notes,
 		'thanks',
-		...yielding(rows, 'pending'),
-		...yielding(rows, 'parked'),
-		...yielding(rows, 'running'),
+		...rows_yielding(parts.plan),
 	]
 }
 

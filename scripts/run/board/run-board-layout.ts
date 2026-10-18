@@ -135,7 +135,8 @@ function is_finished(state: ItemState): boolean {
 	return FINISHED_STATES.has(state)
 }
 
-// Running rows first, then the parked and stopped ones, then the finished ones.
+// Running rows first, then the parked and stopped ones, then the finished ones. A row parked on a
+// decision ranks among the parked, though the render draws it in its own 🙋 section.
 function rank_of(row: BoardRow): number {
 	if (row.state === 'running') return 0
 
@@ -164,18 +165,32 @@ function ending_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
 	return status.reason === undefined ? {} : { reason: { text: status.reason } }
 }
 
-// Every child the run has touched: the running ones and then the parked ones in the order each
-// started, then the finished ones from the newest end.
-function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): Array<BoardRow> {
-	const rows = [...statuses].map(([number, status]) => ({
-		...ending_reason(status),
+// A park waiting on a person's decision (joshuafolkken/kit#4099) — the one answer the 🙋 decision
+// section and the findings section read a park reason by.
+function is_decision(reason: string | undefined): boolean {
+	return reason?.includes(NEEDS_DECISION_LABEL) === true
+}
+
+// A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
+// child does, and the section it is drawn in already says why, so its row draws no reason.
+function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
+	const is_asked = status.state === 'parked' && is_decision(status.reason)
+
+	return {
+		...(!is_asked && ending_reason(status)),
 		number,
 		title: read.titles.get(number),
 		kind: run_board_kind.kind_of(read.labels.get(number)),
-		state: status.state,
+		state: is_asked ? 'human' : status.state,
 		status,
 		waits: [],
-	}))
+	}
+}
+
+// Every child the run has touched: the running ones and then the parked ones in the order each
+// started, then the finished ones from the newest end.
+function active_rows(statuses: ReadonlyMap<number, ItemStatus>, read: RowRead): Array<BoardRow> {
+	const rows = [...statuses].map(([number, status]) => touched_row(number, status, read))
 
 	return rows.toSorted(active_order)
 }
@@ -292,6 +307,14 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 	return [...layout.active, ...waves, ...layout.people, ...layout.unreached]
 }
 
+// Every row waiting on a person's decision: the touched children parked on one, then the untouched
+// `needs-decision` children — what the 🙋 section draws and the header counts as a person's.
+function people_of(layout: BoardLayout): Array<BoardRow> {
+	const asked = layout.active.filter((row) => row.state === 'human')
+
+	return [...asked, ...layout.people]
+}
+
 // The parked children whose rows draw their park reason, so the findings section does not repeat it.
 function drawn_parks(layout: BoardLayout): ReadonlySet<number> {
 	const parks = layout.active.filter((row) => row.state === 'parked' && row.reason !== undefined)
@@ -303,10 +326,12 @@ const run_board_layout = {
 	EMPTY_LAYOUT,
 	drawn_parks,
 	is_blocked,
+	is_decision,
 	is_finished,
 	is_settled,
 	layout_of,
 	local_layout_of,
+	people_of,
 	numbers_of,
 	rows_of,
 	waiting_children,

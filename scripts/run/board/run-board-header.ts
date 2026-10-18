@@ -130,7 +130,9 @@ function quiet_mark(header: BoardHeader): RunMark {
 
 	if (header.activity.setup !== undefined) return 'setup'
 
-	return layout?.waves.length === 0 && layout.people.length > 0 ? 'human' : 'idle'
+	return layout?.waves.length === 0 && run_board_layout.people_of(layout).length > 0
+		? 'human'
+		: 'idle'
 }
 
 // The run's state, each state overriding the ones below it.
@@ -355,7 +357,7 @@ function now_line(counts: BoardCounts, header: BoardHeader): NowLine | undefined
 		children: running_issues(layout_of(header)),
 		running: counts.running,
 		waiting: is_plan_read(header) ? counts.remaining : undefined,
-		people: layout_of(header).people.length,
+		people: run_board_layout.people_of(layout_of(header)).length,
 	})
 }
 

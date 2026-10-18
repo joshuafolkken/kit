@@ -163,7 +163,9 @@ describe('run_board_render_title.fitted — a held row on a narrow pane', () => 
 		const row = running(LANE)
 		const { fitted } = run_board_render_title
 
-		expect(run_board_fit.width_of(fitted(row, NARROW_COLUMNS, draw, true))).toBe(NARROW_COLUMNS)
+		expect(run_board_fit.width_of(fitted(row, NARROW_COLUMNS, draw, { is_held: true }))).toBe(
+			NARROW_COLUMNS,
+		)
 		expect(fitted(row, NARROW_COLUMNS, draw)).toBe(draw(run_board_render_title.WHOLE))
 	})
 })

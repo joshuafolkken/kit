@@ -5,6 +5,7 @@ import {
 	type PlanLine,
 	type PlanSection,
 	type TerminalSize,
+	type YieldStage,
 } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -16,36 +17,40 @@ import {
 	type WaveEntry,
 } from './run-board-layout'
 import type { Link } from './run-board-link'
-import type { BoardNote } from './run-board-notes'
+import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_render_drawn } from './run-board-render-drawn'
+import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_thanks } from './run-board-render-thanks'
+import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title } from './run-board-render-title'
 import { run_board_render_waits } from './run-board-render-waits'
 import { run_board_row_yield } from './run-board-row-yield'
 import type { Thanks } from './run-board-thanks-csv'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
-// terminal. The header says where the run is; the sections below it follow the plan's order; the
-// findings at the bottom are what the run would otherwise have said in no chat anyone reads. A section
-// is a rule rather than a heading, and the legend at the foot names the symbols, so a row carries only
-// what differs between rows. Every word is English whatever the session language: one set of words
-// reads the same on every board.
+// terminal. The header says where the run is; under it the run's own rows, then the ones waiting on a
+// person's decision, then the findings — what the run would otherwise have said in no chat anyone
+// reads — and the plan's rest in its order. A section is a rule rather than a heading, and the legend
+// at the foot names the symbols, so a row carries only what differs between rows. Every word is
+// English whatever the session language: one set of words reads the same on every board.
 
-const { FILED_KIND_ICONS, KIND_BLANK, NOT_BEFORE_ICON, NOTES_ICON, PHASE_ICONS, STATE_ICONS } =
+const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, STATE_ICONS, WAITS_ICON, WORDS } =
 	run_board_labels
-const { WAITS_ICON, WORDS } = run_board_labels
-const { clock_of, span_of } = run_board_labels
+const { clock_of } = run_board_labels
+const { time_of, time_width } = run_board_render_time
+const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
 const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of } = run_board_render_title
 const { padded } = run_board_fresh
 const GAP = '  '
 const INDENT = '  '
+const FILED_LEAD = `${run_board_labels.FILED_RUN_MARK} `
 const BRANCH = '     ├ '
 const LAST_BRANCH = '     └ '
 const { done_section, heading_lines, plan_section } = run_board_render_section
@@ -81,6 +86,8 @@ interface RowFrame {
 	reason_cut: number
 	// The pane's width where the frame is kept within one.
 	columns: number | undefined
+	// The issues the run filed, whose rows lead their title with ✚.
+	filed: ReadonlySet<number>
 }
 
 // A row drawn before the plan is read has no title yet, and says so.
@@ -88,28 +95,6 @@ function row_title(row: BoardRow, header: BoardHeader): string | undefined {
 	if (row.title !== undefined || run_board_header.is_plan_read(header)) return row.title
 
 	return ELLIPSIS
-}
-
-// A running row runs until now; a settled one until its recorded end. A child settled from the open
-// listing has none, so it draws no time rather than one that keeps counting.
-function end_of(row: BoardRow, now_ms: number): number | undefined {
-	return row.state === 'running' ? now_ms : row.status?.ended_ms
-}
-
-// How long a row has run: a running one until now, a settled one its whole span.
-function elapsed_ms(row: BoardRow, now_ms: number): number | undefined {
-	const started = row.status?.started_ms
-	const ended = end_of(row, now_ms)
-
-	if (started === undefined || ended === undefined) return undefined
-
-	return ended - started
-}
-
-function time_of(row: BoardRow, now_ms: number): string | undefined {
-	const elapsed = elapsed_ms(row, now_ms)
-
-	return elapsed === undefined ? undefined : span_of(elapsed)
 }
 
 function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
@@ -129,11 +114,21 @@ function running_fresh(
 	return row.state === 'running' ? run_board_fresh.since(text, at_ms, header) : text
 }
 
+// A row the run filed leads its title with ✚ (joshuafolkken/kit#4099), cut by as many columns, so every
+// column after it stays where an unmarked row has it.
+function title_text(row: BoardRow, frame: RowFrame): string {
+	const title = row_title(row, frame.header)
+
+	if (!frame.filed.has(row.number)) return title_of(title, frame.title_limit)
+
+	return `${FILED_LEAD}${title_of(title, frame.title_limit - FILED_LEAD.length)}`
+}
+
 // The title padded to the title column and the time to the time column — blanks where a row has none —
 // so the times form one column, and what follows them starts in one column on every row but a waiting
 // one, whose title is not padded.
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
-	const title = title_of(row_title(row, frame.header), frame.title_limit)
+	const title = title_text(row, frame)
 
 	if (row.state === 'waiting') return [title]
 
@@ -141,26 +136,6 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	const fresh = running_fresh(row, time, row.status?.started_ms, frame.header)
 
 	return [title.padEnd(frame.title_limit), padded(time, frame.time_width, fresh)]
-}
-
-// A row waiting on the start time its body declares leads with 📅 in place of its state's icon.
-function state_lead(row: BoardRow): string {
-	return row.reason?.is_not_before === true ? NOT_BEFORE_ICON : STATE_ICONS[row.state]
-}
-
-// A running row leads with the icon of the phase it is in now — the last its track reached — and
-// with 🔄 while it has reached none yet.
-function phase_lead(row: BoardRow): string {
-	const current = row.state === 'running' ? row.status?.track?.at(-1) : undefined
-
-	return current === undefined ? state_lead(row) : PHASE_ICONS[current]
-}
-
-// 🚧 while the row's lane is held (joshuafolkken/kit#4052), its end keeping the phase's icon.
-function state_icon(row: BoardRow, header: BoardHeader): string {
-	const { BUDGET_ICON, held_of } = run_board_render_waits
-
-	return held_of(row, header) === undefined ? phase_lead(row) : BUDGET_ICON
 }
 
 // A running row turns the spinner in the first column of its indent where the header has one, so its
@@ -179,13 +154,18 @@ function slot_text(row: BoardRow, usage: UsageSlot, header: BoardHeader): string
 	return slot === undefined ? slot : run_board_fresh.since(slot, ended, header)
 }
 
+// A parked row has no usage and no finish time — a decision park drawn 🙋 among them.
+function is_parked(row: BoardRow): boolean {
+	return row.status?.state === 'parked'
+}
+
 // A row's usage column where the frame draws one, padded to one width on every row so every tail
-// starts in one column. A plan row the run has not touched draws blanks in its place; a parked row has
-// no usage and no finish time, so draws none and its reason follows its time.
+// starts in one column. A plan row the run has not touched draws blanks in its place; a parked row
+// draws none, and its reason follows its time.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	const { usage, slot_width } = frame
 
-	if (usage === undefined || slot_width === 0 || row.state === 'parked') return undefined
+	if (usage === undefined || slot_width === 0 || is_parked(row)) return undefined
 	if (row.status === undefined) return ' '.repeat(slot_width)
 
 	return cell_of(slot_text(row, usage, frame.header), slot_width)
@@ -227,16 +207,19 @@ function row_text(row: BoardRow, frame: RowFrame): string {
 }
 
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
-function row_line(prefix: string, row: BoardRow, frame: RowFrame): PlanLine {
+function row_line(prefix: string, row: BoardRow, frame: RowFrame, stage?: YieldStage): PlanLine {
 	const indent = indent_of(prefix, row, frame.header)
 	const text = fitted(
 		row,
 		frame.columns,
 		(cut) => `${indent}${row_text(row, { ...frame, ...cut })}`,
-		run_board_render_waits.held_of(row, frame.header) !== undefined,
+		{
+			is_held: run_board_render_waits.held_of(row, frame.header) !== undefined,
+			lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
+		},
 	)
 
-	return { text, row: run_board_row_yield.yield_of(row) }
+	return { text, row: run_board_row_yield.yield_of(row, stage) }
 }
 
 function bare(text: string): PlanLine {
@@ -265,18 +248,12 @@ function rows_section(
 	heading: string | undefined,
 	rows: ReadonlyArray<BoardRow>,
 	frame: RowFrame,
+	stage?: YieldStage,
 ): Array<PlanSection> {
 	return plan_section(
 		heading,
-		rows.map((row) => row_line(INDENT, row, frame)),
+		rows.map((row) => row_line(INDENT, row, frame, stage)),
 	)
-}
-
-// The time column's width: the widest time any active row draws in this frame.
-function time_width(header: BoardHeader): number {
-	const times = (header.layout?.active ?? []).map((row) => time_of(row, header.now_ms) ?? '')
-
-	return Math.max(0, ...times.map((time) => time.length))
 }
 
 // Whether every row's usage column still fits one terminal line — measured as the deepest, an epic's
@@ -299,6 +276,7 @@ function is_usage_fitting(
 function frame_of(
 	header: BoardHeader,
 	layout: BoardLayout,
+	notes: ReadonlyArray<BoardNote>,
 	size: TerminalSize | undefined,
 ): RowFrame {
 	const rows = run_board_layout.rows_of(layout)
@@ -310,44 +288,64 @@ function frame_of(
 		slot_width: usage === undefined ? 0 : column_width(rows, usage, header.now_ms),
 		...WHOLE,
 		columns: size?.columns,
+		filed: run_board_notes.filed_numbers(notes),
 	}
 
 	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usage: undefined }
 }
 
-function plan_sections(header: BoardHeader, size: TerminalSize | undefined): Array<PlanSection> {
-	const { layout } = header
-
-	if (layout === undefined) return []
-
-	const frame = frame_of(header, layout, size)
-	const waves = layout.waves.flatMap((wave, index) =>
+function wave_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+	return layout.waves.flatMap((wave, index) =>
 		plan_section(
 			String(index + 1),
 			wave.flatMap((entry) => entry_lines(entry, frame)),
 		),
 	)
+}
 
+// The rows above the findings: the run's own, then the ones waiting on a person's decision — a child
+// parked on one and an untouched plan row alike (joshuafolkken/kit#4099).
+function active_sections(
+	layout: BoardLayout,
+	frame: RowFrame,
+	done: ReadonlyArray<BoardRow>,
+): Array<PlanSection> {
+	const people = run_board_layout.people_of(layout)
+	const lead = layout.active.filter((row) => !done.includes(row) && !people.includes(row))
+	const decision = `${STATE_ICONS.human} ${WORDS.decision}`
+
+	return [...rows_section(undefined, lead, frame), ...rows_section(decision, people, frame)]
+}
+
+// The plan's rest under the findings, the 🔗 waiting rows giving way before them.
+function plan_parts(
+	header: BoardHeader,
+	notes: ReadonlyArray<BoardNote>,
+	size: TerminalSize | undefined,
+): Pick<FrameParts, 'below' | 'plan'> {
+	const { layout } = header
+
+	if (layout === undefined) return { plan: [] }
+
+	const frame = frame_of(header, layout, notes, size)
 	const done = layout.active.filter((row) => run_board_layout.is_finished(row.state))
+	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
 
-	return [
-		...rows_section(
-			undefined,
-			layout.active.filter((row) => !done.includes(row)),
-			frame,
-		),
-		...waves,
-		...rows_section(STATE_ICONS.human, layout.people, frame),
-		...rows_section(`${WAITS_ICON} ${WORDS.waiting}`, layout.unreached, frame),
-		...done_section(done, (row) => row_line(INDENT, row, frame)),
-	]
+	return {
+		plan: active_sections(layout, frame, done),
+		below: [
+			...wave_sections(layout, frame),
+			...rows_section(waiting, layout.unreached, frame, 'waiting'),
+			...done_section(done, (row) => row_line(INDENT, row, frame)),
+		],
+	}
 }
 
 // The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
 // many more there are, so the section never pushes the plan off the screen.
 function notes_part(notes: ReadonlyArray<BoardNote>, header: BoardHeader): NotesPart {
 	const body = run_board_render_notes.note_lines(notes, header)
-	const label = header.layout === undefined ? WORDS.notes : NOTES_ICON
+	const label = header.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
 
 	return { head: heading_lines(label), ...body }
 }
@@ -398,7 +396,7 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
-		plan: plan_sections(header, view.size),
+		...plan_parts(header, notes, view.size),
 		notes: notes_part(notes, header),
 		thanks: thanks_part(view),
 		legend: legend_lines(header, notes),

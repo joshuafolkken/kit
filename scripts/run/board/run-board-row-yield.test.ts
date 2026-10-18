@@ -17,7 +17,7 @@ describe('run_board_row_yield.yield_of', () => {
 		['merged', 'finished'],
 		['done', 'finished'],
 		['waiting', 'pending'],
-		['human', 'pending'],
+		['human', 'decision'],
 		['parked', 'parked'],
 		['stopped', 'parked'],
 		['running', 'running'],
@@ -37,6 +37,13 @@ describe('run_board_row_yield.yield_of', () => {
 
 		expect(run_board_row_yield.yield_of(row('merged', ended)).at_ms).toBe(ENDED)
 		expect(run_board_row_yield.yield_of(row('merged', unended)).at_ms).toBe(STARTED)
+	})
+
+	it('gives way in the stage its section names over its state’s, keeping its age', () => {
+		const status: ItemStatus = { state: 'waiting', started_ms: STARTED }
+		const shown = run_board_row_yield.yield_of(row('waiting', status), 'waiting')
+
+		expect(shown).toStrictEqual({ stage: 'waiting', at_ms: STARTED })
 	})
 
 	it('has no age for a row with no status', () => {

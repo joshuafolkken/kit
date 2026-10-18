@@ -209,6 +209,15 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		expect(now_of(board)).toBe('1″  🔭 watching — 1 waiting on a person')
 	})
 
+	// joshuafolkken/kit#4099: a child parked on a decision waits on a person as an untouched one does.
+	it('draws a plan left to a child parked on a decision as waiting on a person', () => {
+		const asked: BoardLayout = { ...PEOPLE, active: [row(1, 'human')] }
+		const board = planned(asked, merged(SECOND))
+
+		expect(title_of(board)).toMatch(/^✋ backlogrun/u)
+		expect(now_of(board)).toBe('1″  🔭 watching — 2 waiting on a person')
+	})
+
 	it('draws a run at a stage as working, though all its plan has left waits on a person', () => {
 		const board = planned(PEOPLE, standing(STAGE.SESSION))
 

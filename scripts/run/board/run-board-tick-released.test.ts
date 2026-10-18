@@ -75,10 +75,11 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 		expect(lines[0]).toContain('💤 0')
 	})
 
-	it('keeps a child still carrying needs-decision parked and counted', async () => {
+	// joshuafolkken/kit#4099: drawn 🙋 and counted as remaining, as it still waits on a decision.
+	it('keeps a child still carrying needs-decision on a decision and counted as remaining', async () => {
 		const lines = await frame_with([...RELEASED_LABELS, 'needs-decision'])
 
-		expect(row_of(lines)).toContain(`💤 ${String(ISSUE)}`)
-		expect(lines[0]).toContain('💤 1')
+		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
+		expect(lines[0]).toContain('⏳ 1  💤 0')
 	})
 })

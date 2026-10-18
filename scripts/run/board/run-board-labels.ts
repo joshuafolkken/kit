@@ -70,7 +70,7 @@ const WORDS = {
 	followup: 'followup',
 	report: 'report',
 	failed: 'failed',
-	notes: 'findings and decisions',
+	notes: 'findings',
 	more: 'more',
 	filed: 'filed',
 	filed_run: 'filed this run',
@@ -171,6 +171,9 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 // phase and state icon, so the legend names them and a row needs no word. 🆕 is a filed issue whose
 // kind is none of `FILED_KIND_ICONS`.
 const NOTES_ICON = '📌'
+// A plan row the run filed leads its title with it, in place of a findings line naming it again
+// (joshuafolkken/kit#4099).
+const FILED_RUN_MARK = '✚'
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
@@ -349,6 +352,7 @@ function spinner_of(now_ms: number): string {
 
 const run_board_labels = {
 	FILED_KIND_ICONS,
+	FILED_RUN_MARK,
 	GAUGE_SHADES,
 	HEADER_ICONS,
 	KIND_BLANK,
