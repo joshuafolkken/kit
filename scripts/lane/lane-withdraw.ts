@@ -16,7 +16,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 //
 // **The `withdraw` event is written first, before anything is stopped.** Killing the child alone would
 // let `lane:await` book it stopped and `run:merge` classify it from GitHub — an open issue resumed as an
-// `outage` or parked `needs-decision`. `run:merge` reads the event stream before GitHub, so a child whose
+// `outage` or parked `run:stalled`. `run:merge` reads the event stream before GitHub, so a child whose
 // newest launch-or-withdraw event is a withdraw is booked `withdrawn` whatever the Issue's state reads
 // at that moment, and the race between the kill and the close cannot book it as anything else.
 //

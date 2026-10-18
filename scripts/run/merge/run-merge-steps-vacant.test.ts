@@ -1,5 +1,6 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -73,6 +74,7 @@ beforeEach(() => {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
 	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'missing' })
 })
 
 describe('run_merge_steps — a child that ended without a merge', () => {

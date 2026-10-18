@@ -170,7 +170,7 @@ describe('run_merge_cli.run — a failed child', () => {
 		expect(do_failed_mock).toHaveBeenCalledOnce()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
-		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (run:stalled)`)
 	})
 
 	it('stops when the failure guard trips', async () => {
@@ -224,7 +224,7 @@ describe('run_merge_cli.run — a child that ended on a cut', () => {
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
-		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (run:stalled)`)
 	})
 
 	it('still parks a child that stopped without a cut', async () => {

@@ -1,5 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { EPIC_LABEL, has_label_name, has_parked_label } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -52,12 +52,12 @@ function budget_offer(
 }
 
 // The outcome a named issue has already reached without this run dispatching it: closed is merged, and
-// a `needs-decision` park waits on a person, so re-dispatching it only repeats the stop it parked on.
-// Either is booked done rather than offered.
+// a park (`PARKED_LABELS`) waits on a person, so re-dispatching it only repeats the stop it parked on.
+// Either is booked done rather than offered — the same reading `run:merge` gives a parked child.
 function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined {
 	if (state.state.toUpperCase() === 'CLOSED') return 'merged'
 
-	return has_label_name(state.labels, NEEDS_DECISION_LABEL) ? 'parked' : undefined
+	return has_parked_label(state.labels) ? 'parked' : undefined
 }
 
 async function classify(

@@ -15,6 +15,11 @@ const PLANNED_LABEL = 'run:planned'
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
 // forever.
 const NEEDS_DECISION_LABEL = 'needs-decision'
+// Parks a child the `backlogrun` driver could not finish mechanically — its session ended unfinished, or
+// its ship hit the relaunch cap. **Not `needs-decision`**: nothing is asked of a person beyond fixing the
+// cause and removing it, so the board and the idle report keep it out of the decisions they list. Parked
+// all the same, so a child failing on one cause is not handed straight back until the cause is fixed.
+const RUN_STALLED_LABEL = 'run:stalled'
 // Marks an issue whose defect reaches the verification path, so it runs with nothing beside it.
 // A run applies it from the verification-path enumeration in `backlogrun-lanes.md`;
 // `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
@@ -75,16 +80,27 @@ const RELEASE_LABEL = 'release'
 const DEFERRED_LABEL = 'deferred'
 // A copy of the body's start-time declaration while that time is still ahead (`issue-not-before.ts`), so a
 // listing tells an issue that waits on the clock from one that can start. The body stays the source:
-// `issue-not-before-label.ts` applies and removes it, and nothing reads it as a reason to wait.
+// `issue-not-before-label.ts` applies and removes it. Only `run:merge` reads it as a reason to wait,
+// and only where the body itself could not be read (`run-merge-steps.ts`).
 const NOT_BEFORE_LABEL = 'not-before'
 // Applied to an Issue whose second review round was skipped, so the condition stays auditable
 // (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not").
 const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 
-// The four labels that mean an open issue must not be handed to a run as it stands: an `epic`
+// The labels that park an open issue: a run never starts or restarts it, and only a person lifts
+// them — `needs-decision` waits for an answer, `run:stalled` for a mechanical cause to be fixed, and
+// `already-done` for the close. The run that applied any of them committed nothing, so the checkout
+// is clean. Held once because the merge, the board, the pool, the classification and the liveness
+// read all ask "is this child parked", and a copy that missed a label would answer differently.
+const PARKED_LABELS: ReadonlySet<string> = new Set([
+	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
+	ALREADY_DONE_LABEL,
+])
+
+// The labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
-// a running workflow, `needs-decision` was parked precisely because it cannot advance without a
-// person, and `already-done` names work that is already merged. Held here rather than in either
+// a running workflow, and a parked issue (`PARKED_LABELS`) waits on a person. Held here rather than in either
 // caller because both the next-issues display and the `auto-ok` pickup ask the same question, and
 // two copies would answer it differently the first time one of them gained another label.
 //
@@ -95,8 +111,7 @@ const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
-	NEEDS_DECISION_LABEL,
-	ALREADY_DONE_LABEL,
+	...PARKED_LABELS,
 ])
 
 // Filing-route labels, applied at filing time so the backlog's composition — a review-cap
@@ -259,6 +274,12 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Parked: needs a decision before it can run',
 	},
 	{
+		name: RUN_STALLED_LABEL,
+		color: 'e99d42',
+		description:
+			'Parked: the driver could not finish it mechanically — no decision; fix the cause and remove',
+	},
+	{
 		name: NEEDS_HUMAN_REVIEW_LABEL,
 		color: 'd93f0b',
 		description: 'Implement and verify, but stop before committing so a person can look',
@@ -359,6 +380,11 @@ function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean 
 	return label_name_of(labels, wanted) !== undefined
 }
 
+// Whether label names carry any park label (`PARKED_LABELS`), compared as `has_label_name` does.
+function has_parked_label(labels: ReadonlyArray<string>): boolean {
+	return [...PARKED_LABELS].some((label) => has_label_name(labels, label))
+}
+
 // The depth recorded on one listing row, or `undefined` where none is — the reading every share
 // measurement makes. Lowercased through the same comparison as every other membership test above,
 // because GitHub keeps the casing a label was created with and `Depth:0` is the same label.
@@ -381,6 +407,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	IN_PROGRESS_LABEL,
 	PLANNED_LABEL,
 	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
@@ -428,6 +455,7 @@ export {
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	has_label_name,
+	has_parked_label,
 	IGNORE_FOR_RELEASE_LABEL,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
@@ -437,6 +465,7 @@ export {
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
+	PARKED_LABELS,
 	PLANNED_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
@@ -447,6 +476,7 @@ export {
 	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
+	RUN_STALLED_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 	WORKFLOW_LABELS,

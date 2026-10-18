@@ -10,6 +10,7 @@ import { run_merge } from './run-merge'
 
 const CLOSED = 'CLOSED'
 const NEEDS_DECISION = 'needs-decision'
+const RUN_STALLED = 'run:stalled'
 const ALREADY_DONE = 'already-done'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
 const IN_PROGRESS = 'in-progress'
@@ -45,13 +46,12 @@ describe('classify_child', () => {
 		expect(run_merge.classify_child(open)).toBe(HUMAN_REVIEW)
 	})
 
-	it('reads an OPEN needs-decision child as parked', () => {
-		expect(run_merge.classify_child(issue_state_of({ labels: [NEEDS_DECISION] }))).toBe(PARKED)
-	})
-
-	it('reads an OPEN already-done child as parked', () => {
-		expect(run_merge.classify_child(issue_state_of({ labels: [ALREADY_DONE] }))).toBe(PARKED)
-	})
+	it.each([NEEDS_DECISION, RUN_STALLED, ALREADY_DONE])(
+		'reads an OPEN %s child as parked',
+		(label) => {
+			expect(run_merge.classify_child(issue_state_of({ labels: [label] }))).toBe(PARKED)
+		},
+	)
 
 	it('reads an OPEN child with neither label as failed', () => {
 		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }))).toBe('failed')
@@ -200,7 +200,8 @@ describe('park_comment', () => {
 			output: 'lane.jsonl',
 		})
 
-		expect(comment).toContain(NEEDS_DECISION)
+		expect(comment).toContain(RUN_STALLED)
+		expect(comment).not.toContain(NEEDS_DECISION)
 		expect(comment).toContain('- Why: the session ended unfinished.')
 		expect(comment).toContain('no merged pull request')
 		expect(comment).toContain('Consecutive failures: 2 of 3')

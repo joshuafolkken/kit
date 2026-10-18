@@ -33,7 +33,7 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
 2. **Classify and act in one call** — `pnpm josh run:merge <N> --output <path>` (`--epic <E> --repo
    <owner/repo> --owner "$PPID"` for a named epic), **the same composite a returned child takes**. It
    tells an `outage` (re-dispatched with its session resumed, uncounted, bounded by
-   `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `needs-decision` and counted), and drops
+   `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `run:stalled` and counted), and drops
    the stale `in-progress` itself.
 3. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
 

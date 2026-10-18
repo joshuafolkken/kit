@@ -86,7 +86,7 @@ describe('run_ship_relaunch_cap.park', () => {
 	it('labels, comments, records the park and warns', async () => {
 		expect(await run_ship_relaunch_cap.park(ISSUE, 'round-2')).toBe(true)
 
-		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, 'needs-decision')
+		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, 'run:stalled')
 		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(`pnpm josh ship --log ${ISSUE}`)
 		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (ship-stop cap)`)
 		expect(warn_mock).toHaveBeenCalledWith(

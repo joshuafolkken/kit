@@ -31,6 +31,7 @@ describe('run_board_released.without_released', () => {
 			PARKED_MS + 1,
 			new Map([[ISSUE, ['needs-decision']]]),
 		],
+		['it still carries run:stalled', PARKED, PARKED_MS + 1, new Map([[ISSUE, ['run:stalled']]])],
 		['it carries already-done', PARKED, PARKED_MS + 1, new Map([[ISSUE, ['already-done']]])],
 		['it is not parked', { ...PARKED, state: 'stopped' }, PARKED_MS + 1, UNDECIDED],
 	])('keeps the child when %s', (_label, status, read_ms, labels) => {

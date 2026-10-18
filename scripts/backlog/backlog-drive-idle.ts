@@ -1,6 +1,7 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { has_any_label, NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -18,9 +19,11 @@ import type { DrivePorts, DriveState, OfferRead, PassResult } from './backlog-dr
 
 const WATCH_VERDICT = 'watch'
 const BLOCKED_ANSWER = 'blocked'
-const DECISION_LABEL = 'needs-decision'
+const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
+const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
-const IDLE_RECOVERY = 'Decide the parked issues, or start the next run with `backlogrun`.'
+const IDLE_RECOVERY =
+	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
 
 interface IdlePorts {
 	read_issues: () => Promise<ReadonlyArray<OpenIssueData> | undefined>
@@ -59,8 +62,12 @@ function cited(issue: OpenIssueData, suffix = ''): string {
 	return `- ${issue_cite.plain(issue.number)} ${issue.title}${suffix}`
 }
 
-function is_parked(issue: OpenIssueData): boolean {
-	return issue.labels?.some((label) => label.name === DECISION_LABEL) === true
+// The cited issues carrying one park label. `needs-decision` and `run:stalled` are listed apart: one asks
+// a person for a judgement, the other for a mechanical fix (`issue-labels.ts`).
+function labelled_lines(issues: ReadonlyArray<OpenIssueData>, label: string): Array<string> {
+	return issues
+		.filter((issue) => has_any_label(issue.labels, new Set([label])))
+		.map((issue) => cited(issue))
 }
 
 function dated_lines(issues: ReadonlyArray<OpenIssueData>, now_ms: number): Array<string> {
@@ -82,12 +89,9 @@ function section(heading: string, lines: ReadonlyArray<string>): Array<string> {
 function remaining_lines(reading: IdleReading): Array<string> {
 	if (reading.issues === undefined) return ['Remaining issues: unreadable']
 
-	const parked = reading.issues.filter((issue) => is_parked(issue))
 	const lines = [
-		...section(
-			'Waiting on a decision (needs-decision):',
-			parked.map((issue) => cited(issue)),
-		),
+		...section(DECISION_HEADING, labelled_lines(reading.issues, NEEDS_DECISION_LABEL)),
+		...section(STALLED_HEADING, labelled_lines(reading.issues, RUN_STALLED_LABEL)),
 		...section('Waiting on a date:', dated_lines(reading.issues, reading.now_ms)),
 	]
 

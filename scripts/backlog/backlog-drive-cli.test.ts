@@ -2,8 +2,9 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_merge_cli } from '#scripts/run/merge/run-merge-cli'
-import { describe, expect, it, vi } from 'vitest'
+import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
+import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_cli } from './backlog-drive-cli'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -102,18 +103,39 @@ describe('backlog_drive_cli.offer_argv', () => {
 	})
 })
 
+// joshuafolkken/kit#4102: each merge runs `run:merge --driver` as its own process, so a fix merged
+// after the loop started is the code that decides the child.
+const MERGED: MergeResult = { token: '2600', code: 0, outcome: 'merged', is_offer: true }
+
+function arrange_merge(out: string, code = 0): MockInstance<typeof josh_command.josh_run> {
+	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
+
+	return vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code, out })
+}
+
 describe('backlog_drive_cli.merge', () => {
-	it('merges without a hand-off threshold, so the supervisor is never handed back over', async () => {
-		vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
-		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
-		vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
-		const merge_child = vi
-			.spyOn(run_merge_cli, 'merge_child')
-			.mockResolvedValue({ token: '2600', code: 0, outcome: 'merged', is_offer: true })
+	it('runs run:merge --driver as a child process and reads its printed result', async () => {
+		const run = arrange_merge(`progress\n${run_merge_driver.print(MERGED)}`)
 
-		await backlog_drive_cli.merge('2500', '4242')
+		await expect(backlog_drive_cli.merge('2500', '4242')).resolves.toStrictEqual(MERGED)
+		expect(run).toHaveBeenCalledWith(
+			['run:merge', '2500', '--owner', '4242', '--driver'],
+			expect.any(Boolean),
+		)
+		vi.restoreAllMocks()
+	})
 
-		expect(merge_child).toHaveBeenCalledWith(expect.objectContaining({ over: undefined }))
+	it('answers no token when the child process printed no result', async () => {
+		arrange_merge('crashed', 1)
+
+		await expect(backlog_drive_cli.merge('2500', '4242')).resolves.toStrictEqual({
+			token: '',
+			code: 1,
+			is_offer: true,
+			outcome: 'unresolved',
+		})
 		vi.restoreAllMocks()
 	})
 })
