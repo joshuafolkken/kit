@@ -58,7 +58,7 @@
 
 ### PR 本文の受け入れ条件の対応表
 
-`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）:
+`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）。`pnpm josh ship --body-file` の経路では、同じ識別子つきの `未記入` 行を `pnpm josh run:prep` / `pnpm josh run:step` の ship 事前要求が出す（`scripts/run/ship/run-ship-preflight.ts`）:
 
 ```md
 - `ac-1a2b3c4d` <条件> — 満たした: <テスト名・`file:line`・実行出力のいずれか>

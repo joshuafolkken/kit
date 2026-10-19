@@ -4,12 +4,14 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Unmet } from '#scripts/git/git-preflight'
 import { report_format_reference } from '#scripts/report/report-format-reference'
+import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<Unmet>>>())
 const paths_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
+const issue_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const scoped_mock = vi.hoisted(() => vi.fn())
 const classification_mock = vi.hoisted(() => vi.fn<() => Promise<void>>())
 const lock_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
@@ -23,7 +25,9 @@ vi.mock('#scripts/git/git-preflight', () => ({
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: paths_mock },
 }))
-vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { pr_get_body: pr_body_mock } }))
+vi.mock('#scripts/gh/git-gh-command', () => ({
+	git_gh_command: { pr_get_body: pr_body_mock, issue_get_body: issue_body_mock },
+}))
 vi.mock('#scripts/gh/git-pr', () => ({
 	git_pr: { release_classification: classification_mock },
 }))
@@ -61,6 +65,7 @@ const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-preflight-'))
 const MISSING_BODY = path.join(TEMPORARY, 'missing.md')
 const TWO_PROBLEMS = '2 pull-request precondition(s)'
 const GIT_FAILURE = 'git status failed'
+const OPEN_PR_BODY = '## Summary\n'
 
 function body_file(text: string): string {
 	const target = path.join(TEMPORARY, `${randomUUID()}.md`)
@@ -78,6 +83,7 @@ beforeEach(() => {
 	classification_mock.mockReset().mockResolvedValue()
 	lock_mock.mockReset().mockResolvedValue([])
 	acceptance_mock.mockReset().mockResolvedValue(undefined)
+	issue_body_mock.mockReset().mockResolvedValue(undefined)
 })
 
 // joshuafolkken/kit#3954: the body this ship delivers maps every acceptance criterion before the review
@@ -255,7 +261,7 @@ describe('run_ship_preflight.ahead — the ship refusals asked early', () => {
 
 	it('reports the missing evidence of an open PR body that lacks it', async () => {
 		paths_mock.mockResolvedValue(RUNTIME_PATHS)
-		pr_body_mock.mockResolvedValue('## Summary\n')
+		pr_body_mock.mockResolvedValue(OPEN_PR_BODY)
 
 		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([
 			run_ship_preflight.EVIDENCE_PROBLEM,
@@ -264,6 +270,44 @@ describe('run_ship_preflight.ahead — the ship refusals asked early', () => {
 
 	it('finds nothing for a docs-only change with a classification', async () => {
 		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4244: the acceptance-map refusal asked early hands over the rows to write, so a
+// `--body-file` carries the identifiers before the ship refuses on them.
+describe('run_ship_preflight.ahead — the acceptance-map skeleton', () => {
+	const issue_body = '## 受け入れ条件\n\n- [ ] the first criterion\n- [ ] the second criterion\n'
+
+	it('returns the skeleton from the issue body for an unmapped criterion', async () => {
+		acceptance_mock.mockResolvedValue(UNMAPPED)
+		issue_body_mock.mockResolvedValue(issue_body)
+
+		const skeleton = acceptance_map.skeleton(issue_body) ?? ''
+
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([
+			`${run_ship_preflight.ACCEPTANCE_PENDING}\n${skeleton}`,
+		])
+		expect(skeleton).toContain(acceptance_map.criterion_id('the first criterion'))
+		expect(acceptance_mock).toHaveBeenCalledWith(ISSUE, undefined)
+	})
+
+	it('keeps the refusal when no skeleton can be built', async () => {
+		acceptance_mock.mockResolvedValue(UNMAPPED)
+
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([UNMAPPED])
+	})
+
+	it('keeps the refusal naming the missing rows for an open PR body', async () => {
+		acceptance_mock.mockResolvedValue(UNMAPPED)
+		issue_body_mock.mockResolvedValue(issue_body)
+		pr_body_mock.mockResolvedValue(OPEN_PR_BODY)
+
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([UNMAPPED])
+	})
+
+	it('reads no issue body when every criterion is mapped', async () => {
+		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([])
+		expect(issue_body_mock).not.toHaveBeenCalled()
 	})
 })
 
