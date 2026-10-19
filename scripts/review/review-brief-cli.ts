@@ -21,6 +21,7 @@ import { review_code_tree } from './review-code-tree'
 import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
 import { review_level, type ReviewLevel } from './review-level'
+import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -132,7 +133,12 @@ function record_round_one(
 			return false
 		}
 
-		review_stamps.round_one_stamp.write(tree, target, base)
+		review_stamps.round_one_stamp.write(
+			tree,
+			target,
+			base,
+			review_round_one_blobs.capture(Object.keys(tree)),
+		)
 
 		return true
 	} catch {
