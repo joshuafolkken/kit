@@ -3,7 +3,7 @@ import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import type { ProcessRoots } from './run-board-process-groups'
 
-// The run's own processes the 🖥 section names: the supervisor from its wake stamp and the parent
+// The run's own processes the 💻 section names: the supervisor from its wake stamp and the parent
 // session from the run's record. A pid whose start no longer matches is another process now, so it is
 // dropped; one recorded without a start is kept.
 

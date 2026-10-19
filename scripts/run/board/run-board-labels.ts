@@ -212,6 +212,8 @@ const HEADER_ICONS = {
 	loading: '⏳',
 	elapsed: '⏰',
 	heartbeat: '💓',
+	// A failed plan read: ❗ rather than ⚠, a text symbol drawn two columns wide over the blank after it.
+	warning: '❗',
 	// The estimated finish: a done row's own mark, as the run's end is what it estimates.
 	estimate: STATE_ICONS.done,
 } as const

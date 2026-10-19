@@ -7,7 +7,7 @@ import {
 	type PlanLine,
 } from './run-board-fit'
 
-// joshuafolkken/kit#4171: the 🖥 section's parts give way after the rows under the notes and before any
+// joshuafolkken/kit#4171: the 💻 section's parts give way after the rows under the notes and before any
 // note, its groups kept.
 
 const { fit, whole } = run_board_fit
@@ -19,7 +19,7 @@ const PROCESSES: DetailPart = {
 	lines: [
 		{ text: '  ▶ run', is_detail: false },
 		{ text: '    🧭 supervisor', is_detail: true },
-		{ text: '    🛤 lanes', is_detail: true },
+		{ text: '    🧵 lanes', is_detail: true },
 		{ text: '  🌐 apps', is_detail: false },
 		{ text: '    Chrome', is_detail: true },
 	],
