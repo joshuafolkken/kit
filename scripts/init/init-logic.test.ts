@@ -131,7 +131,18 @@ describe('get_ai_copy_files - AI and community files', () => {
 		expect(result).toContain('.github/workflows/pr-classification.yml')
 		expect(result).toContain('.github/pull_request_template.md')
 		expect(result).toContain('.github/release.yml')
-		expect(result).toContain('.github/dependabot.yml')
+	})
+
+	// kit's own `.github/dependabot.yml` groups its github-actions bumps; consumers receive the
+	// ungrouped template instead (joshuafolkken/kit#4148).
+	it('distributes dependabot.yml from its template, not as a byte-copy of kit file', () => {
+		const destination = '.github/dependabot.yml'
+
+		expect(init_logic.get_ai_copy_files()).not.toContain(destination)
+		expect(init_logic.get_ai_copy_file_mappings()).toContainEqual({
+			src: 'templates/dependabot.yml',
+			dest: destination,
+		})
 	})
 })
 
