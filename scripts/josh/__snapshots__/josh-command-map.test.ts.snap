@@ -682,6 +682,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "latest:if-required": [
+      "",
+      "automation",
+      [
+        "files",
+        "network",
+        "processes",
+      ],
+    ],
     "latest:scope": [
       "[--record] [--json]",
       "automation",

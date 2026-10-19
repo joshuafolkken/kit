@@ -129,9 +129,10 @@ second round. It is an approximation, biased both ways:
 - Too high: a round 2 is skipped when every path round 1 fixed is inert — documentation, a prompt,
   or a comment-only edit. Such a fix still moves the head and wastes the CI run on the pre-review head,
   but adds no `round-2` entry.
-- Too low: a round 2 runs with no fix when round 1 recorded no snapshot or the base moved since,
-  and runs again when new work is pushed after it, while round 1 records once — one lane can add two
-  `round-2` runs against one `review` run, and the ratio can fall below zero.
+- Too low: a round 2 runs with no fix when round 1 recorded no snapshot, or the base moved since
+  and round 1's tree could not be carried onto it, and runs again when new work is pushed after it,
+  while round 1 records once — one lane can add two `round-2` runs against one `review` run, and the
+  ratio can fall below zero.
 
 Read it as a direction, not a figure: a ratio far from the break-even point decides the question, one
 near it does not.

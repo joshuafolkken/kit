@@ -160,6 +160,14 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'latest:if-required': {
+		script: 'scripts/version/latest-if-required-cli.ts',
+		description: 'Run josh latest only when latest:scope answers required, stashing around it',
+		category: 'Maintenance',
+		reference: ['', 'automation', ['files', 'network', 'processes']],
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		usage: { examples: [{ arguments: '', note: 'stash, update, pop on required' }] },
+	},
 	'latest:guard': {
 		script: 'scripts/version/latest-lane-guard.ts',
 		description: 'Refuse josh latest inside a lane (the update stamp is keyed to the project root)',
