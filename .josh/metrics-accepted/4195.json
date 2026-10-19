@@ -1,0 +1,7 @@
+{
+	"reason": "rule:value reads one run at a time: a per-run generator and a lazy run count replace the materialized corpus (#4195)",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}
