@@ -101,7 +101,7 @@ Ranking: after the defect priority, this repository's runnable numbers are sorte
 
 ## `josh backlog:plan` in detail
 
-- `--waves` — print the order the run takes instead of the sections. It assumes each wave merges before the next one starts, leaves out issues a run already has, and plans only this repository. Wave 1 is what `backlog:next` prints for an idle repository; each later wave marks the earlier ones closed and applies the same classification and `run:solo` gate again. A wave of several issues is marked `(parallel)`. Issues no wave reaches are listed last with their reason. Read-only, and refused with named issues or `--only`.
+- `--waves` — print the order the run takes instead of the sections. It assumes each wave merges before the next one starts, leaves out issues a run already has, and plans only this repository. A running issue of this repository counts as merged before wave 1, so an issue behind it reaches a wave rather than the unreached list; a parked one, or one in another repository, does not. Wave 1 is what `backlog:next` prints for an idle repository, or, when that is nothing, the issues the running ones release; each later wave marks the earlier ones closed and applies the same classification and `run:solo` gate again. A wave of several issues is marked `(parallel)`. Issues no wave reaches are listed last with their reason. Read-only, and refused with named issues or `--only`.
 
 ## `josh backlog:stalled` in detail
 

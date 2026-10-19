@@ -123,6 +123,22 @@ describe('run_board_plan.read_plan', () => {
 	})
 })
 
+// joshuafolkken/kit#4222: a running issue sits in no wave, yet the joined plan still holds it once.
+describe('run_board_plan.read_plan running issues', () => {
+	it('joins the running issues of the named plan and the pool, never holding one twice', async () => {
+		const running = child(SINGLE)
+
+		vi.mocked(backlog_waves.build).mockImplementation((result) => ({
+			waves: [result.waiting],
+			unreached: [],
+			running: [running],
+		}))
+		const plan = await run_board_plan.read_plan({ issues: [EPIC], only: false }, ports())
+
+		expect(plan?.waves.running).toStrictEqual([running])
+	})
+})
+
 // joshuafolkken/kit#3750: the paths each body declares, which a waiting row is checked against.
 describe('run_board_plan.read_plan declared paths', () => {
 	const NAMED_PATHS = new Set(['named.ts'])

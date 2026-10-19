@@ -204,6 +204,68 @@ describe('backlog_waves.build — issues that declare the same file', () => {
 	})
 })
 
+describe('backlog_waves.build — a running issue', () => {
+	const running = child(RUNNING, { labels: [IN_PROGRESS_LABEL] })
+
+	it('leaves a running issue out of the plan, and plans the issues behind it after it', () => {
+		const behind = child(SECOND, { blocked_by: [RUNNING] })
+		const input = result([child(FIRST)], [running, behind, child(THIRD, { blocked_by: [SECOND] })])
+
+		expect(waves_of(input)).toStrictEqual([[FIRST], [SECOND], [THIRD]])
+		expect(unreached_of(input)).toStrictEqual([])
+	})
+
+	it('carries the running issue beside the waves, so the run still holds it', () => {
+		const input = result([], [running, child(SECOND, { blocked_by: [RUNNING] })])
+		const plan = backlog_waves.build(input, REPO)
+
+		expect(plan.running?.map((item) => item.number)).toStrictEqual([RUNNING])
+	})
+
+	it('plans the issue behind a running one when nothing else may start', () => {
+		const input = result([], [running, child(SECOND, { blocked_by: [RUNNING] })])
+
+		expect(waves_of(input)).toStrictEqual([[SECOND]])
+		expect(unreached_of(input)).toStrictEqual([])
+	})
+
+	it('keeps an issue behind a blocker this run will not finish unreached beside a running one', () => {
+		const input = result([], [running], [child(THIRD, { blocked_by: [PARKED] })])
+
+		expect(waves_of(input)).toStrictEqual([])
+		expect(unreached_of(input)).toStrictEqual([THIRD])
+	})
+
+	it('keeps a parked issue that is still in progress, and the issue behind it, unreached', () => {
+		const parked = child(PARKED, { labels: [IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL] })
+		const input = result([], [], [parked, child(SECOND, { blocked_by: [PARKED] })])
+
+		expect(waves_of(input)).toStrictEqual([])
+		expect(unreached_of(input)).toStrictEqual([PARKED, SECOND])
+	})
+})
+
+describe('backlog_waves.build — another repository’s running issue', () => {
+	it('keeps the issue behind it unreached, and holds no lane for it', () => {
+		const resolve = epic_cross_repo.resolve_cross_repo
+
+		// Released as the version already out would answer, were the running issue counted closed.
+		vi.spyOn(epic_cross_repo, 'resolve_cross_repo').mockImplementation((blocker, blocked) =>
+			blocker.state === 'CLOSED' && blocker.repo !== blocked.repo
+				? 'resolved'
+				: resolve(blocker, blocked),
+		)
+		const elsewhere = child(RUNNING, { labels: [IN_PROGRESS_LABEL], repo: OTHER_REPO })
+		const blocker: IssueReference = { repo: OTHER_REPO, number: RUNNING, state: 'OPEN' }
+		const behind: EpicChild = { ...child(SECOND), blocked_by: [blocker] }
+		const input = result([], [elsewhere, behind])
+
+		expect(waves_of(input)).toStrictEqual([])
+		expect(unreached_of(input)).toStrictEqual([SECOND])
+		expect(backlog_waves.build(input, REPO).running).toStrictEqual([])
+	})
+})
+
 describe('backlog_waves.build — issues no wave reaches', () => {
 	it('leaves a parked issue and the issue behind it unreached', () => {
 		const parked = child(PARKED, { labels: [NEEDS_DECISION_LABEL] })
@@ -211,14 +273,6 @@ describe('backlog_waves.build — issues no wave reaches', () => {
 
 		expect(waves_of(input)).toStrictEqual([[FIRST]])
 		expect(unreached_of(input)).toStrictEqual([PARKED, SECOND])
-	})
-
-	it('leaves a running issue out of the waves, and the issue behind it waiting on it', () => {
-		const running = child(RUNNING, { labels: [IN_PROGRESS_LABEL] })
-		const input = result([child(FIRST)], [running, child(SECOND, { blocked_by: [RUNNING] })])
-
-		expect(waves_of(input)).toStrictEqual([[FIRST]])
-		expect(unreached_of(input)).toStrictEqual([RUNNING, SECOND])
 	})
 
 	it('keeps an issue behind a closed but unpublished blocker in another repository waiting', () => {
