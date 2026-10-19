@@ -66,27 +66,119 @@ describe('rule_value_cli.row — the three readings a row can carry', () => {
 	})
 })
 
+// The two readers are spied on the real namespace, so the rest of the module — the roots and paths
+// its transitive importers need — stays intact. The returned list records each file as it is read.
+function spy_readers(): Array<SessionFile> {
+	const read: Array<SessionFile> = []
+
+	vi.spyOn(cost_transcript, 'owning_session_id').mockImplementation(
+		(file) => (file as unknown as FakeFile).owner,
+	)
+	vi.spyOn(cost_transcript, 'read_optional').mockImplementation((file) => {
+		read.push(file)
+
+		return (file as unknown as FakeFile).text
+	})
+
+	return read
+}
+
+function sample_files(): Array<SessionFile> {
+	return [
+		fake_file('parent', 'run1'),
+		fake_file('unit', 'run1'),
+		fake_file(undefined, 'run1'),
+		fake_file('other', 'run2'),
+		fake_file(undefined, 'run3'),
+	]
+}
+
 describe('rule_value_cli.group_by_run — a run owns every transcript that shares its id', () => {
-	it('groups a session and its delegated unit under the one run, skipping unreadable files', () => {
-		// The two readers are spied on the real namespace, so the rest of the module — the roots and
-		// paths its transitive importers need — stays intact.
-		vi.spyOn(cost_transcript, 'read_optional').mockImplementation(
-			(file) => (file as unknown as FakeFile).text,
-		)
-		vi.spyOn(cost_transcript, 'owning_session_id').mockImplementation(
-			(file) => (file as unknown as FakeFile).owner,
-		)
-		const files = [
-			fake_file('parent', 'run1'),
-			fake_file('unit', 'run1'),
-			fake_file(undefined, 'run1'),
-			fake_file('other', 'run2'),
+	it('groups a session and its delegated unit under the one run without reading any text', () => {
+		const read = spy_readers()
+		const parent = fake_file('parent', 'run1')
+		const unit = fake_file('unit', 'run1')
+		const unreadable = fake_file(undefined, 'run1')
+		const other = fake_file('other', 'run2')
+
+		try {
+			const runs = rule_value_cli.group_by_run([parent, unit, unreadable, other])
+
+			expect([...runs]).toStrictEqual([
+				['run1', [parent, unit, unreadable]],
+				['run2', [other]],
+			])
+			expect(read).toHaveLength(0)
+		} finally {
+			vi.restoreAllMocks()
+		}
+	})
+})
+
+describe('rule_value_cli.runs_of — one run read at a time', () => {
+	it('reads the next run only when it is asked for', () => {
+		const read = spy_readers()
+		const files = sample_files()
+
+		try {
+			const runs = rule_value_cli.runs_of(rule_value_cli.group_by_run(files).values())
+
+			expect(runs.next().value).toStrictEqual(['parent', 'unit'])
+			expect(read).toStrictEqual(files.slice(0, 3))
+			expect(runs.next().value).toStrictEqual(['other'])
+			expect(read).toStrictEqual(files.slice(0, 4))
+		} finally {
+			vi.restoreAllMocks()
+		}
+	})
+
+	it('skips unreadable files and never yields a run with no readable text', () => {
+		spy_readers()
+
+		try {
+			const runs = [...rule_value_cli.runs_of(rule_value_cli.group_by_run(sample_files()).values())]
+
+			expect(runs).toStrictEqual([['parent', 'unit'], ['other']])
+		} finally {
+			vi.restoreAllMocks()
+		}
+	})
+})
+
+describe('rule_value_cli.render — a lazy source reads as the materialized one', () => {
+	it('renders the same table as the materialized runs it replaces', () => {
+		spy_readers()
+		const comments = fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1')
+		const body = fake_file(rule_value_fixture.session(BODY_READ, FILING), 'run1')
+		const lone = fake_file(rule_value_fixture.session(FILING), 'run2')
+		const materialized = [
+			[rule_value_fixture.session(COMMENTS_READ), rule_value_fixture.session(BODY_READ, FILING)],
+			[rule_value_fixture.session(FILING)],
 		]
 
-		const runs = rule_value_cli.group_by_run(files)
+		try {
+			const lazy = rule_value_cli.runs_of(
+				rule_value_cli.group_by_run([comments, body, lone]).values(),
+			)
 
-		expect(runs.get('run1')).toStrictEqual(['parent', 'unit'])
-		expect(runs.get('run2')).toStrictEqual(['other'])
+			expect(rule_value_cli.render(lazy)).toBe(rule_value_cli.render(materialized))
+		} finally {
+			vi.restoreAllMocks()
+		}
+	})
+
+	it('renders the no-targets sentence when every file is unreadable', () => {
+		spy_readers()
+
+		try {
+			const runs = rule_value_cli.runs_of(
+				rule_value_cli.group_by_run([fake_file(undefined, 'run1')]).values(),
+			)
+
+			expect(rule_value_cli.render(runs)).toBe(rule_value_cli.NO_TARGETS)
+		} finally {
+			vi.restoreAllMocks()
+		}
 	})
 })
 
