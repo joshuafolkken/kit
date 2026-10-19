@@ -83,7 +83,7 @@ describe('lane_paused.is_lane_paused over one process snapshot', () => {
 	const ZOMBIE_PID = 70_003
 	const command = `claude -p fullrun #${ISSUE}`
 
-	const usage = { time: '0:00.00', rss_kb: 0 }
+	const usage = { time: '0:00.00', rss_kb: 0, start: 'Tue Oct 20 08:39:04 2026' }
 
 	function snapshot(subprocess_stat: string): PausedProbes {
 		return lane_process_table.probes_of([

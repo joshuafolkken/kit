@@ -5,6 +5,7 @@ import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_paused, type PausedProbes } from '#scripts/lane/lane-paused'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from '#scripts/run/run-headless'
@@ -31,6 +32,8 @@ interface LaneUse {
 // The lanes that hold a place under the limit, read once for every count drawn from them.
 interface LaneRoom {
 	occupied: ReadonlyArray<LaneInfo>
+	// The open lanes no child is working in, read from the same snapshot.
+	idle: ReadonlyArray<string>
 	use: LaneUse
 }
 
@@ -49,19 +52,25 @@ function is_paused_in(issue: string, probes: PausedProbes | undefined): boolean 
 	return probes !== undefined && lane_paused.is_lane_paused(issue, probes)
 }
 
-// The lanes that hold a place under the limit (`backlog-occupied.ts`). Every lane's paused reading is
-// drawn from one asynchronous process snapshot, so the count never blocks its caller's event loop
-// (joshuafolkken/kit#4241); `run:board` passes the snapshot its redraw already read (#4246).
-async function occupied_lanes(
-	lanes: ReadonlyArray<LaneInfo> | undefined,
+// The lanes that hold a place under the limit (`backlog-occupied.ts`), and the idle ones. Every lane's
+// paused and idle readings are drawn from one asynchronous process snapshot, so the count never blocks
+// its caller's event loop (joshuafolkken/kit#4241, #4245); `run:board` passes the snapshot its redraw
+// already read (#4246).
+async function occupancy_of(
+	open: ReadonlyArray<LaneInfo>,
 	table: TableRead,
-): Promise<Array<LaneInfo>> {
-	const open = lanes ?? (await lane_registry.list_lanes())
-	const probes = await lane_process_table.probes_from(table)
-
-	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes, (issue) =>
-		is_paused_in(issue, probes),
+): Promise<Omit<LaneRoom, 'use'>> {
+	const rows = await table()
+	const probes = rows === undefined ? undefined : lane_process_table.probes_of(rows)
+	const issues = open.map((lane) => lane.issue)
+	const trace = { process_trace: await lane_snapshot_trace.traces_of(issues, rows) }
+	const occupied = backlog_occupied.occupied_lanes(
+		open,
+		(live) => lane_spent.idle_lanes(live, trace),
+		(issue) => is_paused_in(issue, probes),
 	)
+
+	return { occupied, idle: lane_spent.idle_lanes(open, trace) }
 }
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
@@ -71,10 +80,10 @@ async function lane_room(
 	table: TableRead = lane_process_table.read_table,
 ): Promise<LaneRoom> {
 	const open = lanes ?? (await lane_registry.list_lanes())
-	const occupied = await occupied_lanes(open, table)
+	const occupancy = await occupancy_of(open, table)
 	const seated = open.filter((lane) => !lane.is_stranded).length
 
-	return { occupied, use: { occupied: occupied.length, seated } }
+	return { ...occupancy, use: { occupied: occupancy.occupied.length, seated } }
 }
 
 async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {
