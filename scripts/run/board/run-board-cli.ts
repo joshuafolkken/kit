@@ -11,6 +11,8 @@ import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
+import { run_board_fold } from './run-board-fold'
+import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_read } from './run-board-read'
@@ -65,6 +67,20 @@ const LIVE_PORTS: BoardPorts = {
 	// Read on every redraw, so a resized pane is fitted on the next one.
 	size: () => ({ rows: process.stdout.rows, columns: process.stdout.columns }),
 	form: 'screen',
+	keys: {
+		is_tty: process.stdin.isTTY,
+		raw: (is_raw) => {
+			process.stdin.setRawMode(is_raw)
+		},
+		listen: (on_data) => {
+			process.stdin.setEncoding('utf8').on('data', on_data).resume()
+		},
+		// Stops reading, so stdin no longer holds the process open.
+		close: () => {
+			process.stdin.pause()
+		},
+		interrupt: () => process.exit(SIGINT_EXIT_CODE),
+	},
 	mark: async () => {
 		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
 	},
@@ -81,10 +97,13 @@ const LIVE_PORTS: BoardPorts = {
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
 // close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
 // so a frame that fills the pane never scrolls the header off the top.
+// The keys are named under it where a person can type them.
 function framed(ports: BoardPorts, screen: Screen): BoardPorts {
+	const keys = ports.folded === undefined ? [] : [run_board_fold.KEYS_LINE]
+
 	return {
 		...ports,
-		footer: ['', styleText('dim', WORDS.keeps_running)],
+		footer: ['', ...[WORDS.keeps_running, ...keys].map((line) => styleText('dim', line))],
 		write: (frame) => {
 			ports.write(`${screen.frame}${frame.replace(TRAILING_NEWLINE, '')}`)
 		},
@@ -92,13 +111,15 @@ function framed(ports: BoardPorts, screen: Screen): BoardPorts {
 }
 
 // Leaves the alternate screen once, whichever path gets there first: a second leave would restore the
-// cursor saved on entering and draw over whatever was printed after the first.
-function leaver(ports: BoardPorts, screen: Screen): () => void {
+// cursor saved on entering and draw over whatever was printed after the first. The terminal leaves raw
+// mode with it.
+function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void {
 	let has_left = false
 
 	return () => {
 		if (has_left) return
 		has_left = true
+		keys.stop?.()
 		ports.write(screen.leave)
 	}
 }
@@ -122,13 +143,14 @@ async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> 
 // lands on the normal screen rather than vanishing with the alternate one.
 async function watch(ports: BoardPorts): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
-	const leave = leaver(ports, screen)
+	const keys = run_board_keys.read_keys(ports.keys)
+	const leave = leaver(ports, screen, keys)
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
 
 	try {
-		await redraw_forever(ports, screen)
+		await redraw_forever({ ...ports, folded: keys.folded }, screen)
 	} finally {
 		leave()
 	}

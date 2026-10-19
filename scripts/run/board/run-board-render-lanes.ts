@@ -117,12 +117,14 @@ function lanes_section(
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	if (cells === undefined) return [{ head: [''], lines }]
+	const section = { lines, label: LANES_LABEL, key: 'lanes' as const }
+
+	if (cells === undefined) return [{ head: [''], ...section }]
 
 	const first = width_of(NUMBER_START) + cells.number_width + CELL_GAP.length
 	const rule = columns_rule(LANES_LABEL, label_columns(first, cells.gauge))
 
-	return [{ head: ['', rule], lines }]
+	return [{ head: ['', rule], ...section }]
 }
 
 const run_board_render_lanes = {

@@ -1,6 +1,7 @@
 import { lane_await } from '#scripts/lane/lane-await'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { ClosedIssue } from './run-board-closed'
+import type { FrameBounds } from './run-board-fold'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_idle } from './run-board-idle'
@@ -13,7 +14,7 @@ import { run_board_paused } from './run-board-paused'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
-import { run_board_render, type FrameBounds } from './run-board-render'
+import { run_board_render } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type ItemStatus, type RunActivity } from './run-board-status'
@@ -232,7 +233,7 @@ function header_of(
 
 // The pane a live frame is kept within and the footer it ends on, read at every redraw.
 function bounds_of(ports: BoardPorts): FrameBounds {
-	return { size: ports.size?.(), footer: ports.footer }
+	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
 // The frame with its spinners drawn at this moment's frame, and where they are on screen.

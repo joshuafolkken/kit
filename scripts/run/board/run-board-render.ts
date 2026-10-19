@@ -6,6 +6,7 @@ import {
 	type TerminalSize,
 	type YieldStage,
 } from './run-board-fit'
+import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -53,14 +54,8 @@ const INDENT = '  '
 const FILED_LEAD = `${run_board_labels.FILED_RUN_MARK} `
 const BRANCH = '     ├ '
 const LAST_BRANCH = '     └ '
-const { done_section, plan_section } = run_board_render_section
-
-// The live terminal a frame is kept within, and the footer the frame ends on and gives way first;
-// neither for a frame that is not redrawn in place.
-interface FrameBounds {
-	size?: TerminalSize | undefined
-	footer?: ReadonlyArray<string> | undefined
-}
+const { done_section, keyed, plan_section } = run_board_render_section
+const { bounded } = run_board_fold
 
 interface BoardView extends FrameBounds {
 	header: BoardHeader
@@ -346,8 +341,8 @@ function plan_parts(
 	return {
 		plan: active_sections(layout, frame, done),
 		below: [
-			...queued_section(layout, frame),
-			...rows_section(waiting, layout.unreached, frame, 'waiting'),
+			...keyed('queued', queued_section(layout, frame)),
+			...keyed('waiting', rows_section(waiting, layout.unreached, frame, 'waiting')),
 			...done_section(done, (row) => row_line(INDENT, row, frame)),
 		],
 	}
@@ -387,13 +382,6 @@ function thanks_part(view: BoardView): Array<string> {
 	return run_board_render_thanks.thanks_lines(view.thanks ?? [], link, view.size?.columns)
 }
 
-// A live frame is kept within its terminal; any other is drawn whole.
-function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
-	const { size } = bounds
-
-	return size === undefined ? run_board_fit.whole(parts) : run_board_fit.fit(parts, size)
-}
-
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
@@ -425,4 +413,4 @@ const run_board_render = {
 }
 
 export { run_board_render }
-export type { BoardView, FrameBounds }
+export type { BoardView }

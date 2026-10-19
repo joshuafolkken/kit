@@ -135,3 +135,16 @@ describe('run_board_render_processes.processes_part off a terminal', () => {
 		])
 	})
 })
+
+describe('run_board_render_processes.processes_part summary', () => {
+	it('labels the section and sums each group for its folded heading', () => {
+		const part = part_of({ backlogrun: BACKLOGRUN, apps: APPS, leftover: LEFTOVER }, SPINNER)
+
+		expect(part?.label).toBe('💻 processes')
+		expect(part?.summary).toBe('▶ 49.0%/4.0G/3.3G ── 🌐 31.0%/18.8G/12.4G ── 👻 4.0%/0.3G/0.1G')
+	})
+
+	it('sums the groups alone where no run left anything behind', () => {
+		expect(part_of({})?.summary).toBe('▶ 0.0%/0.0G/0.0G ── 🌐 0.0%/0.0G/0.0G')
+	})
+})
