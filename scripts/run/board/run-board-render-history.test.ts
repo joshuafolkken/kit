@@ -14,7 +14,7 @@ const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_boa
 const { minute_of } = run_board_labels
 // Each figure right-aligned in a column as wide as its label, the first after the number padded so the
 // lanes rule leaves the CPU label room over it.
-const CELLS = '     0.5     0.5G       0.0G'
+const CELLS = '     5.0      0.5        0.0'
 const NUMBER_PAD = ' '.repeat(8)
 const TITLE_WIDTH = 48
 

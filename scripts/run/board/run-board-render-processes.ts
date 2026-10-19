@@ -4,7 +4,7 @@ import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
-import type { UsageFigure } from './run-board-usage'
+import type { UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
 // What is loading the machine, by who started it: the backlogrun's own processes — its supervisor, the
@@ -124,27 +124,29 @@ function screen_part(usage: BoardUsage): DetailPart {
 }
 
 function plain_group(
+	scale: UsageScale,
 	label: string,
 	figure: UsageFigure,
 	parts: ReadonlyArray<NamedFigure>,
 ): string {
-	const group = `${label} ${plain_of(figure)}`
-	const named_parts = parts.map((part) => `${named(part).label} ${plain_of(part.figure)}`)
+	const group = `${label} ${plain_of(figure, scale)}`
+	const named_parts = parts.map((part) => `${named(part).label} ${plain_of(part.figure, scale)}`)
 
 	return named_parts.length === 0 ? group : `${group}: ${named_parts.join(', ')}`
 }
 
-// The groups on one line: `▶ backlogrun 4.9/4.0G/3.3G · 🌐 apps 3.1/18.8G/12.4G: Chrome …`.
+// The groups on one line: `▶ backlogrun 44.5%/4.0G/3.3G · 🌐 apps 28.2%/18.8G/12.4G: Chrome …`.
 function plain_part(usage: BoardUsage): DetailPart {
-	const { backlogrun, apps, leftover } = usage.processes
+	const { processes, scale } = usage
+	const { backlogrun, apps, leftover } = processes
 	const groups = [
-		plain_group(LABELS.backlogrun, backlogrun.total, []),
-		plain_group(LABELS.apps, apps.total, apps.top),
+		plain_group(scale, LABELS.backlogrun, backlogrun.total, []),
+		plain_group(scale, LABELS.apps, apps.total, apps.top),
 	]
 	const left =
 		leftover.entries.length === 0
 			? []
-			: [plain_group(LABELS.leftover, leftover.total, leftover.entries)]
+			: [plain_group(scale, LABELS.leftover, leftover.total, leftover.entries)]
 	const text = `${INDENT}${[...groups, ...left].join(PART_GAP)}`
 
 	return { head: heading_lines(LABEL), lines: [{ text, is_detail: false }] }

@@ -1,0 +1,7 @@
+{
+	"reason": "run:board CPU cells gain the machine-wide percentage conversion, its 100 cap, and the units the one-line form now carries (#4220)",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}
