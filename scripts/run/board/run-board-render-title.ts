@@ -68,11 +68,21 @@ function overrun_of(text: string, is_kept: boolean, columns: number | undefined)
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
 
-// How a row is fitted: whether it keeps a held check, and the columns its title cell leads its title
-// with, a ✚ on a row the run filed.
+// How a row is fitted: whether it keeps a held check, the columns its title cell leads its title
+// with, a ✚ on a row the run filed, and its head as drawn, kept on one line where the row's head is
+// too wide to assume it fits — a lane row's, with its cells (joshuafolkken/kit#3769).
 interface RowFit {
 	is_held?: boolean
 	lead?: number
+	head?: (cut: RowCut) => string
+	is_head_kept?: boolean
+}
+
+// The columns a row's head runs past the pane at its whole title; none where it is not kept.
+function head_overrun(fit: RowFit, columns: number | undefined): number {
+	if (fit.head === undefined || fit.is_head_kept !== true) return 0
+
+	return overrun_of(fit.head(WHOLE), true, columns)
 }
 
 // The columns the row's title cell takes as drawn: a waiting row's title is not padded, every other
@@ -103,8 +113,8 @@ function reason_fitted(
 }
 
 // A row's line as `draw` draws it: whole, or — where that line would run past the pane and the row has
-// a reason, or a held check (joshuafolkken/kit#4052), to keep — with its title narrowed first and its
-// reason cut after.
+// a reason, or a held check (joshuafolkken/kit#4052), to keep, or where its kept head would — with its
+// title narrowed first and its reason cut after.
 function fitted(
 	row: BoardRow,
 	columns: number | undefined,
@@ -112,7 +122,8 @@ function fitted(
 	fit: RowFit = {},
 ): string {
 	const text = draw(WHOLE)
-	const overrun = overrun_of(text, fit.is_held === true || row.reason !== undefined, columns)
+	const line = overrun_of(text, fit.is_held === true || row.reason !== undefined, columns)
+	const overrun = Math.max(line, head_overrun(fit, columns))
 	const limit = narrowed_limit(row, overrun, fit.lead ?? 0)
 
 	return overrun === 0 ? text : reason_fitted(row, columns, limit, draw)

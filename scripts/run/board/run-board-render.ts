@@ -1,7 +1,6 @@
 import {
 	run_board_fit,
 	type FrameParts,
-	type NotesPart,
 	type PlanLine,
 	type PlanSection,
 	type TerminalSize,
@@ -20,10 +19,12 @@ import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_render_drawn } from './run-board-render-drawn'
 import { run_board_render_icon } from './run-board-render-icon'
+import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_notes } from './run-board-render-notes'
+import { run_board_render_processes } from './run-board-render-processes'
 import { run_board_render_section } from './run-board-render-section'
-import { run_board_render_slot, type UsageSlot } from './run-board-render-slot'
+import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_thanks } from './run-board-render-thanks'
 import { run_board_render_time } from './run-board-render-time'
@@ -39,13 +40,12 @@ import type { Thanks } from './run-board-thanks-csv'
 // at the foot names the symbols, so a row carries only what differs between rows. Every word is
 // English whatever the session language: one set of words reads the same on every board.
 
-const { FILED_KIND_ICONS, KIND_BLANK, NOTES_ICON, STATE_ICONS, WAITS_ICON, WORDS } =
-	run_board_labels
-const { clock_of } = run_board_labels
+const { FILED_KIND_ICONS, KIND_BLANK, STATE_ICONS, WAITS_ICON, WORDS, clock_of } = run_board_labels
 const { time_of, time_width } = run_board_render_time
 const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
-const { cell_of, column_width, slot_of, usage_slot } = run_board_render_slot
+const { cell_of, column_width, slot_of } = run_board_render_slot
+const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
 const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of } = run_board_render_title
 const { padded } = run_board_fresh
 const GAP = '  '
@@ -53,7 +53,7 @@ const INDENT = '  '
 const FILED_LEAD = `${run_board_labels.FILED_RUN_MARK} `
 const BRANCH = '     ├ '
 const LAST_BRANCH = '     └ '
-const { done_section, heading_lines, plan_section } = run_board_render_section
+const { done_section, plan_section } = run_board_render_section
 
 // The live terminal a frame is kept within, and the footer the frame ends on and gives way first;
 // neither for a frame that is not redrawn in place.
@@ -73,13 +73,13 @@ interface BoardView extends FrameBounds {
 }
 
 // What every row of one frame is drawn with: the header, how wide the time column is, so a
-// `2°05′30″` and a `42″` end in the same column, and each lane's usage where its column is drawn, with
-// the column's width.
+// `2°05′30″` and a `42″` end in the same column, the finish-time column's width — 0 where it is not
+// drawn — and the lane cells after a row's number where its section draws them.
 interface RowFrame {
 	header: BoardHeader
 	time_width: number
-	usage: UsageSlot | undefined
 	slot_width: number
+	cells?: LaneCells | undefined
 	// The columns a row's title is cut to: the title column's, or fewer where a row gives some up.
 	title_limit: number
 	// The columns cut off the end of a row's reason, where its title alone could not give up enough.
@@ -146,41 +146,41 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
-// A row's usage column as drawn: a settled row's finish time emphasized while it is fresh.
-function slot_text(row: BoardRow, usage: UsageSlot, header: BoardHeader): string | undefined {
-	const slot = slot_of(row, usage, header.now_ms)
-	const ended = row.state === 'running' ? undefined : row.status?.ended_ms
+// A row's finish-time column as drawn: a settled row's finish time emphasized while it is fresh.
+function slot_text(row: BoardRow, header: BoardHeader): string | undefined {
+	const slot = slot_of(row, header.now_ms)
 
-	return slot === undefined ? slot : run_board_fresh.since(slot, ended, header)
+	return slot === undefined ? slot : run_board_fresh.since(slot, row.status?.ended_ms, header)
 }
 
-// A parked row has no usage and no finish time — a decision park drawn 🙋 among them.
+// A parked row has no finish time — a decision park drawn 🙋 among them.
 function is_parked(row: BoardRow): boolean {
 	return row.status?.state === 'parked'
 }
 
-// A row's usage column where the frame draws one, padded to one width on every row so every tail
+// A row's finish-time column where the frame draws one, padded to one width on every row so every tail
 // starts in one column. A plan row the run has not touched draws blanks in its place; a parked row
 // draws none, and its reason follows its time.
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
-	const { usage, slot_width } = frame
+	const { slot_width } = frame
 
-	if (usage === undefined || slot_width === 0 || is_parked(row)) return undefined
+	if (slot_width === 0 || is_parked(row)) return undefined
 	if (row.status === undefined) return ' '.repeat(slot_width)
 
-	return cell_of(slot_text(row, usage, frame.header), slot_width)
+	return cell_of(slot_text(row, frame.header), slot_width)
 }
 
 function joined(parts: ReadonlyArray<string | undefined>): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
-// The release kind's icon between the number and the title, one space either side; a row with no title
-// ends at its icon, so what follows keeps its usual gap.
-function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
+// The release kind's icon between the number — and its lane cells, where drawn — and the title, one
+// space either side; a row with no title ends at its icon, so what follows keeps its usual gap.
+function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
+	const { header } = frame
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
 	const icon = running_fresh(row, state_icon(row, header), row.status?.phase_ms, header)
-	const lead = `${icon} ${header.link(String(row.number))} ${kind}`
+	const lead = `${icon} ${number_text(row, frame.cells, header.link)} ${kind}`
 
 	return title === '' ? lead : `${lead} ${title}`
 }
@@ -189,7 +189,7 @@ function lead_of(row: BoardRow, header: BoardHeader, title: string): string {
 // no time and no usage to line up, so it ends at its title and what it waits on follows two blanks on.
 function head_text(row: BoardRow, frame: RowFrame): string {
 	const [title = '', time] = timed_parts(row, frame)
-	const lead = lead_of(row, frame.header, title)
+	const lead = lead_of(row, frame, title)
 
 	if (row.state === 'waiting') return lead
 
@@ -207,6 +207,8 @@ function row_text(row: BoardRow, frame: RowFrame): string {
 }
 
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
+// A row drawn with lane cells keeps its head on one line: `is_usage_fitting` measures no cells, so its
+// title gives up their columns where the pane is narrow.
 function row_line(prefix: string, row: BoardRow, frame: RowFrame, stage?: YieldStage): PlanLine {
 	const indent = indent_of(prefix, row, frame.header)
 	const text = fitted(
@@ -216,6 +218,8 @@ function row_line(prefix: string, row: BoardRow, frame: RowFrame, stage?: YieldS
 		{
 			is_held: run_board_render_waits.held_of(row, frame.header) !== undefined,
 			lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
+			head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
+			is_head_kept: frame.cells !== undefined,
 		},
 	)
 
@@ -283,18 +287,16 @@ function frame_of(
 	size: TerminalSize | undefined,
 ): RowFrame {
 	const rows = run_board_layout.rows_of(layout)
-	const usage = header.usages === undefined ? undefined : usage_slot(rows, header.usages)
 	const frame = {
 		header,
 		time_width: time_width(header),
-		usage,
-		slot_width: usage === undefined ? 0 : column_width(rows, usage, header.now_ms),
+		slot_width: header.usages === undefined ? 0 : column_width(rows, header.now_ms),
 		...WHOLE,
 		columns: size?.columns,
 		filed: run_board_notes.filed_numbers(notes),
 	}
 
-	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, usage: undefined }
+	return is_usage_fitting(rows, frame, size) ? frame : { ...frame, slot_width: 0 }
 }
 
 // The rows not yet started under one heading, in the order they are offered: a running batch starts
@@ -316,8 +318,13 @@ function active_sections(
 	const people = run_board_layout.people_of(layout)
 	const lead = layout.active.filter((row) => !done.includes(row) && !people.includes(row))
 	const decision = `${STATE_ICONS.human} ${WORDS.decision}`
+	const cells = lane_cells_of(frame.header, lead)
+	const lanes = lanes_section(
+		lead.map((row) => row_line(INDENT, row, { ...frame, cells })),
+		cells,
+	)
 
-	return [...rows_section(undefined, lead, frame), ...rows_section(decision, people, frame)]
+	return [...lanes, ...rows_section(decision, people, frame)]
 }
 
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
@@ -342,15 +349,6 @@ function plan_parts(
 			...done_section(done, (row) => row_line(INDENT, row, frame)),
 		],
 	}
-}
-
-// The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
-// many more there are, so the section never pushes the plan off the screen.
-function notes_part(notes: ReadonlyArray<BoardNote>, header: BoardHeader): NotesPart {
-	const body = run_board_render_notes.note_lines(notes, header)
-	const label = header.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
-
-	return { head: heading_lines(label), ...body }
 }
 
 // The command that resumes a stopped run's session, under the header where the person looks first.
@@ -400,7 +398,8 @@ function render(view: BoardView): Array<string> {
 	const parts = {
 		above,
 		...plan_parts(header, notes, view.size),
-		notes: notes_part(notes, header),
+		processes: run_board_render_processes.processes_part(header),
+		notes: run_board_render_notes.notes_part(notes, header),
 		thanks: thanks_part(view),
 		legend: legend_lines(header, notes),
 		footer: view.footer ?? [],
