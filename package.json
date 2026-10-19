@@ -19,7 +19,7 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.13.0+sha512.1e55719bf26e809dce5c5084fdebaa64efb3da9038ae5d68a9f8a68311f1a45841c8c3b76a37298c3b66f6bcc80409a9b7f33c78a7168a3e90fb65a5d8235ae4",
+	"packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
@@ -222,7 +222,7 @@
 		"@types/semver": "^7.8.0",
 		"cspell": "^10.4.0",
 		"esbuild": "^0.28.2",
-		"eslint": "^10.12.0",
+		"eslint": "^10.13.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import-x": "^4.17.1",
@@ -240,13 +240,13 @@
 		"secretlint": "^13.0.7",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.71.2",
-		"vitest": "^5.0.4"
+		"vitest": "^5.0.5"
 	},
 	"dependencies": {
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
 		"execa": "^10.1.1",
-		"js-yaml": "^5.4.3",
+		"js-yaml": "^5.5.0",
 		"jsonc-parser": "^3.3.1",
 		"ora": "^9.4.1",
 		"semver": "^7.8.5",
@@ -258,7 +258,7 @@
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.13.0+sha512.1e55719bf26e809dce5c5084fdebaa64efb3da9038ae5d68a9f8a68311f1a45841c8c3b76a37298c3b66f6bcc80409a9b7f33c78a7168a3e90fb65a5d8235ae4",
+			"version": "12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
 			"onFail": "download"
 		}
 	}

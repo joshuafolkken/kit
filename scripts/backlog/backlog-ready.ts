@@ -2,7 +2,8 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
-import { lane_paused } from '#scripts/lane/lane-paused'
+import { lane_paused, type PausedProbes } from '#scripts/lane/lane-paused'
+import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -43,11 +44,21 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-// The lanes that hold a place under the limit (`backlog-occupied.ts`).
+// A snapshot that could not be read leaves every lane unpaused, so the limit errs toward fewer free lanes.
+function is_paused_in(issue: string, probes: PausedProbes | undefined): boolean {
+	return probes !== undefined && lane_paused.is_lane_paused(issue, probes)
+}
+
+// The lanes that hold a place under the limit (`backlog-occupied.ts`). Every lane's paused reading is
+// drawn from one asynchronous process snapshot, so the count never blocks its caller's event loop
+// (joshuafolkken/kit#4241).
 async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<LaneInfo>> {
 	const open = lanes ?? (await lane_registry.list_lanes())
+	const probes = await lane_process_table.read()
 
-	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes, lane_paused.is_lane_paused)
+	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes, (issue) =>
+		is_paused_in(issue, probes),
+	)
 }
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
