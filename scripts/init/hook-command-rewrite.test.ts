@@ -161,7 +161,7 @@ describe('installed hook from a project subdirectory', () => {
 })
 
 describe('installed hook with Git located elsewhere', () => {
-	// Only a named root outranks a leaked `GIT_WORK_TREE`; with none, git's answer is the root.
+	// A named root outranks a leaked `GIT_WORK_TREE`; without one, git is asked with it unset.
 	it('runs the hook bundle when Git points to another work tree under Claude Code', () => {
 		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
 		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
