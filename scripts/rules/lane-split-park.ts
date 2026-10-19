@@ -112,6 +112,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_candidate),
 	reason: LANE_SPLIT_PARK_REASON,
 	decide,
+	about: {
+		title: 'A split is not a park',
+		topic: '`.claude/skills/workflow-commands/backlogrun-park.md` → "Splitting a child mid-run"',
+		fires:
+			'a lane child that promoted its Issue to an epic this run parking it (`needs-decision`, `confirmation` notify). Every occurrence',
+		quiet: 'no promotion this run',
+	},
 }
 
 const lane_split_park = {

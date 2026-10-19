@@ -109,6 +109,12 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_carry_conflict),
 	reason: LANE_CARRY_CONFLICT_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Lane child carry commands',
+		topic: '`.claude/skills/workflow-commands/backlogrun-lanes.md`',
+		fires: 'a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence',
+		quiet: 'not a lane child — the parent owns the run budget',
+	},
 }
 
 const lane_carry_conflict = {

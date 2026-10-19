@@ -164,6 +164,14 @@ const ROW = {
 	rewrite_note: COMMENTS_NOTE,
 	// The opening the reason carried before it led with the command.
 	former_reasons: ["⛔ an Issue's comments are part of the Issue: read them before implementing"],
+	about: {
+		title: 'Reading Issue comments',
+		topic: '`issue-comments.md`',
+		fires:
+			'a `Bash` that reads only the Issue body (`gh issue view <N>`, or a GET ending in `…/issues/<N>`). Refused until it is re-read with the comments',
+		quiet:
+			'no Issue read, or a read with `--comments` / `--json comments` / `…/comments` from the start',
+	},
 }
 
 const issue_comments = {

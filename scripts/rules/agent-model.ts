@@ -52,6 +52,14 @@ const ROW = {
 	decide: (): boolean => true,
 	keeps: keeps_model,
 	reaches: is_general_purpose,
+	about: {
+		title: 'Subagent model named',
+		topic:
+			'`.claude/skills/workflow-commands/delegation.md` → "A `general-purpose` subagent names its model"',
+		fires:
+			'an `Agent` / `Task` call of the `general-purpose` type with no `model`. Every occurrence',
+		quiet: 'a named agent type, or a `model` set',
+	},
 }
 
 const agent_model = { AGENT_MODEL_REASON, ROW, is_unnamed_model }

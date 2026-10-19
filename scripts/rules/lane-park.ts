@@ -142,6 +142,12 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_unparked_stop),
 	reason: LANE_PARK_REASON,
 	keeps: bash_triggers.on_bash_command(records_the_park),
+	about: {
+		title: 'Lane child park',
+		topic: '`.claude/skills/workflow-commands/pre-gate-cut.md`',
+		fires: 'a dispatched lane child issuing `pnpm josh notify --task-type confirmation`',
+		quiet: 'not a lane child, or not a stop notification',
+	},
 }
 
 const lane_park = {

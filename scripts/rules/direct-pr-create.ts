@@ -147,6 +147,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_direct_pr_create),
 	reason: DIRECT_PR_CREATE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Direct PR creation',
+		topic: '`CLAUDE.md` → Git Rules',
+		fires:
+			'`gh pr create`, or a `gh api` write to `repos/<o>/<r>/pulls`; it points at `pnpm josh pr`. Every occurrence',
+		quiet: '`pnpm josh pr`, or reading a PR — the path that writes `closes #N`',
+	},
 }
 
 const direct_pr_create = {

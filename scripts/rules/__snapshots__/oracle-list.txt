@@ -1,0 +1,206 @@
+decision oracles:
+  delegate
+    decision  Whether a run step may be delegated to a cheaper execution tier
+    command   pnpm josh delegate <step>
+    answers   delegate | keep
+    no firing the act it governs is a phase of a run, not a single shell call a trigger can anchor on
+    source    .claude/skills/workflow-commands/delegation.md
+  review:level
+    decision  The code-review level for the changed paths
+    command   pnpm josh review:brief --level-only
+    answers   low | medium | high | max
+    no firing it answers a status question and governs no action of its own to gate before
+    source    prompts/review.md
+  review:round2
+    decision  Whether the second /code-review round is due
+    command   pnpm josh review:round2 [--round-1-closed]
+    answers   required | skip
+    no firing it answers a status question and governs no action of its own to gate before
+    source    .claude/skills/workflow-commands/chain-rule.md
+  disposition
+    decision  Whether a review finding reaches a runtime path, so it may be filed
+    command   pnpm josh disposition <path...>
+    answers   runtime | non-runtime
+    no firing it answers a status question and governs no action of its own to gate before
+    source    prompts/review.md → Three-way disposition after the cap
+  review:attest
+    decision  Whether a /code-review attested the briefed checkout
+    command   pnpm josh review:attest --check
+    answers   ok | missing | mismatch | not-required
+    no firing it answers a status question and governs no action of its own to gate before
+    source    .claude/skills/workflow-commands/chain-rule.md
+  latest:scope
+    decision  Whether this run has to update dependencies first
+    command   pnpm josh latest:scope
+    answers   required | skip
+    no firing the run it governs (`pnpm josh latest`) is already gated at its point of use by the latest-gate; a firing here would double-gate it
+    source    .claude/skills/workflow-commands/latest-gate.md
+  run:hold
+    decision  Whether this working tree is free for a run to claim
+    command   pnpm josh run:hold [<N>]
+    answers   hold | busy | unknown
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    .claude/skills/workflow-commands/working-tree-hold.md
+  cost:cut
+    decision  Whether the session cost exceeds the hand-off threshold
+    command   pnpm josh cost --cut
+    answers   over | under
+    no firing it answers a status question and governs no action of its own to gate before
+    source    .claude/skills/workflow-commands/backlogrun-progress.md
+  release:scope
+    decision  Whether a release is owed after this merge
+    command   pnpm josh release:scope
+    answers   required | skip | unknown
+    no firing it reads the release owed *after* `pnpm josh followup` has merged (`git_followup_pending`), so it trails the merge rather than gating it; a firing on `followup` would gate a check that must run once the merge is done, reading a pre-merge state that has not yet arrived
+    source    .claude/skills/workflow-commands/followup.md
+  epic:bundle
+    decision  Which epic a newly filed issue belongs to
+    command   pnpm josh epic:bundle <N>
+    answers   add_to_epic | create_epic | ask | nothing_to_bundle
+    no firing `pnpm josh issue:file` runs it as one of its filing steps, and a direct filing is refused by the `direct-filing` delivered rule; there is no separate call left to gate
+    source    .claude/skills/workflow-commands/issue-scout.md
+  issue:scout
+    decision  Whether a matching open issue already exists before filing
+    command   pnpm josh issue:scout <title>
+    answers   Duplicates: | Epic:
+    no firing `pnpm josh issue:file` runs it as one of its filing steps, and a direct filing is refused by the `direct-filing` delivered rule; there is no separate call left to gate
+    source    .claude/skills/workflow-commands/issue-scout.md
+  issue:fold
+    decision  Whether findings filed from one session fold into one issue or stay separate
+    command   pnpm josh issue:fold <title...>
+    answers   fold | separate | no-fold-needed | undetermined
+    no firing `issue:file` asks the fold question itself on the second filing it governs
+    source    .claude/skills/workflow-commands/split-assessment.md → The question
+  pkg:scout
+    decision  Whether the top package candidate is clearly best (Tier A) or a near-tie (Tier B)
+    command   pnpm josh pkg:scout <keywords>
+    answers   clear | close
+    fires on  a package-add command (`pnpm add …`, `npm install <pkg>`)
+    source    CLAUDE.md → Package-First Development
+  issue:lint
+    decision  Whether a behavior-change issue declares a deliverable firing point and a re-runnable baseline
+    command   pnpm josh issue:lint <path>
+    answers   ok | ✖ missing heading | ✖ firing point | ✖ baseline
+    no firing `pnpm josh issue:file` runs it as one of its filing steps, and a direct filing is refused by the `direct-filing` delivered rule; there is no separate call left to gate
+    source    prompts/collaboration-workflow/issue-template.md
+  cases
+    decision  Each boundary a change crosses (network, process, fs, time) and the abnormal cases it owes
+    command   pnpm josh cases <path...>
+    answers   network | process | fs | time | none
+    no firing it answers a status question and governs no action of its own to gate before
+    source    prompts/collaboration-workflow/report-format.md → 変更とテスト
+  issue:state
+    decision  An issue's state, labels, and human-review flag
+    command   pnpm josh issue:state <N>
+    answers   human_review: yes | human_review: no
+    no firing it answers a status question and governs no action of its own to gate before
+    source    .claude/skills/workflow-commands/needs-human-review.md
+  run:cut:resume
+    decision  Whether a lane child is resuming prior work or starting fresh
+    command   pnpm josh run:cut --resume <N>
+    answers   fresh | resume | not-a-lane
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    .claude/skills/workflow-commands/pre-gate-cut.md
+  run:cut:gate
+    decision  Whether a lane child should take its pre-gate cut now
+    command   pnpm josh run:cut <N>
+    answers   cut | not-a-lane
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    .claude/skills/workflow-commands/pre-gate-cut.md
+  backlog:budget
+    decision  Whether a backlogrun may start more work, keep watching, or finish
+    command   pnpm josh backlog:budget
+    answers   run | watch | stop
+    no firing it answers a status question and governs no action of its own to gate before
+    source    docs/josh-commands-backlog.md → `josh backlog:budget`
+  run:liveness
+    decision  Whether a delegated unit is still working or has stopped without reporting
+    command   pnpm josh run:liveness <N> --output <path>
+    answers   alive | stopped | settled | undetermined
+    no firing it answers a status question and governs no action of its own to gate before
+    source    docs/josh-commands-run.md → `josh run:liveness`
+  stash:push
+    decision  Whether the working tree had anything outside the observation ledger to set aside
+    command   pnpm josh stash:push <message>
+    answers   stashed | clean
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    docs/josh-commands-backlog.md → `josh stash:push`
+  stash:pop
+    decision  Whether a named stash entry exists and can be applied
+    command   pnpm josh stash:pop <message>
+    answers   popped | conflicted | no-match | ambiguous
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    .claude/skills/workflow-commands/prerequisite.md
+  backlog:next
+    decision  Which issue the backlog offers next, or whether to wait or stop
+    command   pnpm josh backlog:next [--exclude <n>...]
+    answers   wait | stop | retry | error | none
+    no firing it answers a status question and governs no action of its own to gate before
+    source    .claude/skills/workflow-commands/backlogrun.md
+  auto-ok:next
+    decision  The next opted-in issue outside any epic, or none
+    command   pnpm josh auto-ok:next [--exclude <n>...]
+    answers   none
+    no firing it answers a status question and governs no action of its own to gate before
+    source    docs/josh-commands-backlog.md → `josh auto-ok:next`
+  epic:next
+    decision  The next runnable child of an epic, or the epic's status
+    command   pnpm josh epic:next <epic>
+    answers   wait | stop | complete
+    no firing it answers a status question and governs no action of its own to gate before
+    source    docs/josh-commands-backlog.md → `josh epic:next`
+  run:merge
+    decision  The post-merge batch step: confirm child, advance, or report a stop condition
+    command   pnpm josh run:merge <N>
+    answers   over | human-review | stop | retry | busy
+    no firing the act it governs is a phase of a run, not a single shell call a trigger can anchor on
+    source    docs/josh-commands-run.md → `josh run:merge`
+  run:step
+    decision  The run’s next single action, computed from the event stream, carry and issue state
+    command   pnpm josh run:step [<N>]
+    answers   implement | human-review | update-deps | already-done | keep-work | wait | stop | unknown
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    .claude/skills/workflow-commands/backlogrun.md
+  refactor:scan
+    decision  Whether the refactoring scope still holds high- or medium-priority candidates
+    command   pnpm josh refactor:scan
+    answers   clear | candidates | error
+    no firing the act it governs is a phase of a run, not a single shell call a trigger can anchor on
+    source    prompts/refactoring.md
+  split:assess
+    decision  Whether a change size clears the split guide (the split assessment size question)
+    command   pnpm josh split:assess [--json]
+    answers   split | single
+    no firing the act it governs is a phase of a run, not a single shell call a trigger can anchor on
+    source    .claude/skills/workflow-commands/split-assessment.md → The question
+  sonar:hotspots
+    decision  The Step B disposition for each SonarCloud hotspot on a pull request
+    command   pnpm josh sonar:hotspots <PR>
+    answers   excluded | local | fix | defer | unreadable
+    no firing it answers a status question and governs no action of its own to gate before
+    source    prompts/sonar-hotspot-handling.md
+  clone:scan
+    decision  Whether cross-file or cross-repository code duplication exists
+    command   pnpm josh clone:scan
+    answers   clean | clones:
+    no firing the act it governs is a phase of a run, not a single shell call a trigger can anchor on
+    source    prompts/collaboration-workflow/principles.md → no-clones
+  epic:reconcile
+    decision  Whether an epic's declaration matches its recorded relations, and the repair when it does not
+    command   pnpm josh epic --reconcile <E>
+    answers   reconciled | nothing to reconcile
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    docs/josh-commands-backlog.md → `josh epic --reconcile`
+  lane:list
+    decision  Whether each in-progress issue holds a live lane, and the two-directional difference
+    command   pnpm josh lane:list
+    answers   live | stopped | unknown
+    no firing it answers a status question and governs no action of its own to gate before
+    source    docs/josh-commands-run.md → The `in-progress` / lane difference
+  run:entry
+    decision  Where a run on an issue starts, and whether the typed command has already been reached
+    command   pnpm josh run:entry <N> [--to kickoff|halfrun|prrun|fullrun]
+    answers   plan | implement | gate | followup | reached
+    no firing the command is itself the governed act; there is no earlier call to gate before it
+    source    docs/how-to/run-issues.md
+automate first: a command > a hook that runs it > a refusal guard > a document — a lower rung states why the higher cannot hold (`principles.md` → "automate-first"; a guard's `why` is `scripts/rules/guard-remedy.ts`)
