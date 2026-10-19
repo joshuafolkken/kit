@@ -155,7 +155,7 @@ function notes_part(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesPart
 	const body = note_lines(notes, view)
 	const label = view.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
 
-	return { head: run_board_render_section.heading_lines(label), ...body }
+	return { head: run_board_render_section.heading_lines(label), label, ...body }
 }
 
 function same(reference: string): string {

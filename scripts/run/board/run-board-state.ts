@@ -3,9 +3,10 @@ import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
-import type { TerminalSize } from './run-board-fit'
+import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { BoardForm, BoardUsage } from './run-board-header'
 import { run_board_idle, type IdleSince } from './run-board-idle'
+import type { KeyInput } from './run-board-keys'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
@@ -39,6 +40,10 @@ interface BoardPorts {
 	size?: (() => TerminalSize) | undefined
 	// The lines a live frame ends on, the first to give way to a short pane.
 	footer?: ReadonlyArray<string> | undefined
+	// The keyboard a live board folds its sections from (`run-board-keys.ts`); none where nobody types.
+	keys?: KeyInput | undefined
+	// The sections a person folded, read at every redraw; none where the frame folds nothing.
+	folded?: (() => ReadonlySet<SectionKey>) | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here.
