@@ -2,7 +2,7 @@
 
 The commands a run and its lanes call to hold, step, cut and ship, plus the session-budget and document-reading commands a run uses. Where each command came from: `docs/maintainers/josh-commands-run-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` (`scripts/josh/josh-commands-*.ts`), the rest from `scripts/josh/josh-usage-run.ts` and `scripts/josh/josh-usage-session.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
 
 ## Run lifecycle
 

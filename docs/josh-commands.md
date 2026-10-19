@@ -10,7 +10,7 @@ See also:
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal, and `pnpm josh help <command>` for one command's usage. How the dispatcher runs a command in kit's own checkout, and the shape a new script keeps: `docs/maintainers/josh-commands-rationale.md` → "How a command runs".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` (`scripts/josh/josh-commands-*.ts`), the rest from `scripts/josh/josh-usage-developer.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
 
 ## Development
 
