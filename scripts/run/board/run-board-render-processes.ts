@@ -12,7 +12,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // one row each with gauges under a rule whose labels stand over them, the parts of each group indented
 // under it so a short pane can drop them first; anywhere else one line of figures.
 
-const { column_cells, label_columns, lead_width } = run_board_render_lanes
+const { LANES_LABEL, column_cells, label_columns, lead_width } = run_board_render_lanes
 const { columns_rule, heading_lines } = run_board_render_section
 const { title_of } = run_board_render_title
 const { plain_of } = run_board_usage_text
@@ -21,13 +21,15 @@ const CELL_GAP = ' '
 const INDENT = '  '
 const DETAIL = '  '
 const NAME_LIMIT = 24
-const LABEL = '🖥 processes'
+// Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a terminal
+// draws them: 🖥 and 🎛, text symbols drawn as emoji, overlapped the blank after them.
+const LABEL = '💻 processes'
 const PART_GAP = ' · '
 const LABELS = {
 	backlogrun: '▶ backlogrun',
 	supervisor: '🧭 supervisor',
-	parent: '🎛 parent',
-	lanes: '🛤 lanes',
+	parent: '🎬 parent',
+	lanes: LANES_LABEL,
 	apps: '🌐 apps',
 	leftover: '👻 leftover',
 }

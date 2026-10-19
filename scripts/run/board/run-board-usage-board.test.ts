@@ -4,7 +4,7 @@ import { run_board_state } from './run-board-state'
 import type { UsageMark } from './run-board-usage'
 import { run_board_usage_board } from './run-board-usage-board'
 
-// joshuafolkken/kit#4171: one reading draws both each lane's cells and the 🖥 section's groups.
+// joshuafolkken/kit#4171: one reading draws both each lane's cells and the 💻 section's groups.
 
 const { board_usage_of, read_usages } = run_board_usage_board
 const { LOCAL, harness } = run_board_fixture

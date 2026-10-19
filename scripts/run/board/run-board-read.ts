@@ -61,7 +61,7 @@ interface LocalRead {
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
-	// The run's supervisor and parent session, named in the 🖥 section (`run-board-roots.ts`).
+	// The run's supervisor and parent session, named in the 💻 section (`run-board-roots.ts`).
 	roots?: ProcessRoots | undefined
 }
 

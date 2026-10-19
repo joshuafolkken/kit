@@ -8,7 +8,8 @@ import type { UsageFigure } from './run-board-usage'
 // joshuafolkken/kit#4171: each lane row draws its CPU, MEM and CMPRS cells after its number, under a
 // rule whose labels stand over them.
 
-const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
+const { COLUMN_LABELS, LANES_LABEL, lane_cells_of, lanes_section, number_text } =
+	run_board_render_lanes
 const { GB, board_usage, header } = run_board_render_fixture
 const LANE = 42
 const SCREEN_GAUGE = 5
@@ -18,10 +19,10 @@ const CELLS: LaneCells = {
 	usages: new Map([[LANE, FIGURE]]),
 	scale: { cores: 10, total_bytes: 16 * GB },
 	gauge: 0,
-	number_width: 7,
+	number_width: 8,
 }
-// Where the lanes rule leaves the CPU label room over the first cell: `── 🛤 lanes ─ `.
-const LEAD_ROOM = 7
+// Where the lanes rule leaves the CPU label room over the first cell: `── 🧵 lanes ─ `.
+const LEAD_ROOM = 8
 const LONG_LANE = 123_456_789
 
 function row_of(number: number, state: BoardRow['state']): BoardRow {
@@ -39,7 +40,7 @@ function bracketed(text: string): string {
 describe('run_board_render_lanes.number_text', () => {
 	it('pads the number and draws the running row its figures, each right-aligned in its column', () => {
 		expect(number_text(row_of(LANE, 'running'), CELLS, plain)).toBe(
-			'42           1.8     0.7G      0.6G',
+			'42            1.8     0.7G       0.6G',
 		)
 	})
 
@@ -71,8 +72,15 @@ describe('run_board_render_lanes.lanes_section', () => {
 		const cpu = run_board_fit.width_of('  🔄 ') + CELLS.number_width + 1
 		const before_cpu = rule.slice(0, rule.indexOf('💪 CPU'))
 
-		expect(rule.startsWith('── 🛤 lanes ')).toBe(true)
+		expect(rule.startsWith('── 🧵 lanes ')).toBe(true)
 		expect(run_board_fit.width_of(before_cpu)).toBe(cpu)
+	})
+
+	// joshuafolkken/kit#4223: a text-default icon is counted one column wide but drawn two.
+	it('marks the rule and its columns with icons two columns wide', () => {
+		const icons = [LANES_LABEL, ...COLUMN_LABELS].map((label) => label.split(' ', 1)[0] ?? '')
+
+		expect(icons.map((icon) => run_board_fit.width_of(icon))).toStrictEqual([2, 2, 2, 2])
 	})
 })
 

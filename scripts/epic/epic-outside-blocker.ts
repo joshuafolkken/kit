@@ -24,6 +24,10 @@ type DependencyVerdict = 'resolved' | 'time' | 'human' | 'inherit'
 // a closed blocker is a finished one.
 type ResolveDependency = (blocker: EpicChild, blocked: EpicChild) => DependencyVerdict
 
+// A notice's mark on `run:board`: ❗ rather than ⚠, a text symbol drawn two columns wide over the
+// blank after it.
+const NOTICE_ICON = '❗'
+
 type OutsideCategory = 'time' | 'human'
 
 // A line to announce once per invocation, keyed so the classifier's de-duplication can drop repeats.
@@ -62,7 +66,7 @@ function unread_answer(child: EpicChild, reference: IssueReference): OutsideAnsw
 		category: 'time',
 		notice: {
 			key: `unread:${epic_graph.key_of(child)}:${blocker}`,
-			message: `⚠ ${name_of(child)} is blocked by ${blocker}, whose state could not be read — it waits rather than runs`,
+			message: `${NOTICE_ICON} ${name_of(child)} is blocked by ${blocker}, whose state could not be read — it waits rather than runs`,
 		},
 	}
 }
@@ -80,7 +84,7 @@ function open_answer(
 		category: 'human',
 		notice: {
 			key: `outside:${epic_graph.key_of(child)}:${blocker}`,
-			message: `⚠ ${name_of(child)} waits on ${blocker}, which this run will not finish — withheld for a person`,
+			message: `${NOTICE_ICON} ${name_of(child)} waits on ${blocker}, which this run will not finish — withheld for a person`,
 		},
 	}
 }

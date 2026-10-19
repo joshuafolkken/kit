@@ -128,7 +128,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 	it('says a plan read failed on the first line, not after the stage', () => {
 		const board = header({ plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(/ {2}⚠ /u)
+		expect(title_of(board)).toMatch(/ {2}❗ /u)
 		expect(now_of(board)).toBe('⠋   0″  🚀 starting session')
 	})
 })

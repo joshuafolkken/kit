@@ -7,7 +7,7 @@ import {
 	type UsageMark,
 } from './run-board-usage'
 
-// Which part of the machine each process's usage is put under on `run:board`'s 🖥 processes section:
+// Which part of the machine each process's usage is put under on `run:board`'s 💻 processes section:
 // the backlogrun itself — its supervisor, the session that holds the run, its lanes — the apps outside
 // it, or what a closed lane left running (joshuafolkken/kit#4171).
 // **A lane's processes are found by working directory, the rest by ancestry.** A process under
