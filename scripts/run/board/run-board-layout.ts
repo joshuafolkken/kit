@@ -332,9 +332,11 @@ function local_layout_of(
 	}
 }
 
-// The run's scope a lane is checked against.
+// The run's scope a lane is checked against — its running issues too, which no wave holds.
 function numbers_of(plan: BoardPlan): ReadonlySet<number> {
-	return new Set(children_of(plan).map((child) => child.number))
+	const running = plan.waves.running ?? []
+
+	return new Set([...children_of(plan), ...running].map((child) => child.number))
 }
 
 // Every row the layout draws, an epic's children among them — what the header counts and the legend reads.

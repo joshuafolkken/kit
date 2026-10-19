@@ -89,6 +89,7 @@ function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
 		waves: {
 			waves: [...lead.waves.waves, ...pool.waves.waves.map((wave) => not_held(wave, held))],
 			unreached: [...lead.waves.unreached, ...not_held(pool.waves.unreached, held)],
+			running: [...(lead.waves.running ?? []), ...not_held(pool.waves.running ?? [], held)],
 		},
 		tracked: new Map([...pool.tracked, ...lead.tracked]),
 		context: pool.context,
