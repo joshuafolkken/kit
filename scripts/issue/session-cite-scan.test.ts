@@ -35,6 +35,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// GitHub renders it: a commit message, a PR or Issue title or body, a comment, a search query.
 	['epic/epic-audit-orphans.ts', 1],
 	['epic/epic-body.ts', 1],
+	['epic/epic-bundle-apply.ts', 1],
 	['epic/epic-close-comment.ts', 2],
 	['followup/git-followup-flush.ts', 1],
 	['gh/git-pr.ts', 2],
@@ -96,7 +97,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/ship/run-ship-stop-text.ts', 1],
 	// Printed through `session_cite.text` or `issue_citation.linkify` by the caller that prints it.
 	['epic/epic-audit-checks.ts', 1],
-	['epic/epic-bundle-cli.ts', 1],
+	['epic/epic-bundle-format.ts', 1],
 	['epic/epic-bundle-evidence.ts', 2],
 	['epic/epic-bundle.ts', 3],
 	['epic/epic-next-views.ts', 1],

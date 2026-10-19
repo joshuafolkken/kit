@@ -334,7 +334,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "epic:bundle": [
-      "<issue>",
+      "<issue> [--apply]",
       "automation",
       [
         "network",

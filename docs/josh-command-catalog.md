@@ -138,7 +138,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
 | `josh epic` | `<title> <issue...> [--ordered]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
-| `josh epic:bundle` | `<issue>` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
+| `josh epic:bundle` | `<issue> [--apply]` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
 | `josh epic:check` | `<epic>` | automation | network | Check an epic issue against the tracking requirements |
 | `josh epic:next` | `<epic>... [--repo <owner/repo>] [--lanes]` | automation | network | List an epic's runnable children, bundled per repository |
 | `josh eval` · `josh ev` · **kit only** | `[scenario...]` | maintainer | processes, network | Run the agent rule-compliance scenarios (real Claude sessions) |

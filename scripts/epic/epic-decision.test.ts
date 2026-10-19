@@ -74,6 +74,25 @@ describe('epic_decision.append_decision', () => {
 	})
 })
 
+describe('epic_decision.has_decision', () => {
+	it('finds a record append_decision wrote', () => {
+		const body = epic_decision.append_decision(WITH_SECTION, RECORD)
+
+		expect(epic_decision.has_decision(body, RECORD)).toBe(true)
+	})
+
+	it('does not find a record the section does not carry', () => {
+		expect(epic_decision.has_decision(WITH_SECTION, RECORD)).toBe(false)
+		expect(epic_decision.has_decision(undefined, RECORD)).toBe(false)
+	})
+
+	it('does not count the record quoted outside ## Decisions', () => {
+		const body = [PROGRESS_HEADING, BLANK, RECORD, BLANK].join('\n')
+
+		expect(epic_decision.has_decision(body, RECORD)).toBe(false)
+	})
+})
+
 describe('epic_decision.find_decision_error', () => {
 	const CHAIN_RECORD = ['- 経緯: なし', CHAIN_LINE].join('\n')
 
