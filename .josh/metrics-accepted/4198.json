@@ -1,0 +1,7 @@
+{
+	"reason": "lane:pause / lane:resume commands, run:board paused state from the ps sample, SIGKILL fallback for stopped lanes in lane-reap, and keeping the last usage reading across a failed read",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 227
+	}
+}

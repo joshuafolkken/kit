@@ -11,7 +11,7 @@ const { lane_of, parse_lsof, parse_ps, sample, usage_reader } = run_board_usage_
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/3423`
-const PARENT_AND_CHILD = '1 7 0:01 4 node\n2 1 0:01 4 eslint'
+const PARENT_AND_CHILD = '1 7 0:01 4 S node\n2 1 0:01 4 S eslint'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -20,10 +20,10 @@ afterEach(() => {
 describe('run_board_usage_read.parse_ps', () => {
 	it('reads every process’s parent, CPU time, resident memory and command, and skips a line that is not one', () => {
 		const output = [
-			'  PID PPID TIME RSS COMM',
-			'  12 1 1-02:03:04 2048 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-			'13 12 12:34.50 100 node',
-			' 14 12 0:00.01 4 eslint_d - /tmp',
+			'  PID PPID TIME RSS STAT COMM',
+			'  12 1 1-02:03:04 2048 S /Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+			'13 12 12:34.50 100 S node',
+			' 14 12 0:00.01 4 S eslint_d - /tmp',
 			'15 12 0:00.01 4',
 		].join('\n')
 		const listings = parse_ps(output)
@@ -34,6 +34,7 @@ describe('run_board_usage_read.parse_ps', () => {
 			command: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 			cpu_ms: 93_784_000,
 			rss_bytes: 2048 * KB,
+			stat: 'S',
 		})
 		expect(listings.get(13)?.cpu_ms).toBe(754_500)
 		expect(listings.get(14)?.command).toBe('eslint_d - /tmp')
@@ -100,7 +101,7 @@ describe('run_board_usage_read.sample', () => {
 			[2, '/tmp'],
 			[3, `${LANE}/src`],
 		])
-		const listings = ['1 0 0:01 4 a\n2 0 0:01 4 b', '1 0 0:02 4 a\n3 1 0:01 4 c']
+		const listings = ['1 0 0:01 4 S a\n2 0 0:01 4 S b', '1 0 0:02 4 S a\n3 1 0:01 4 S c']
 		const ports = ports_of(listings, directories)
 		const first = await sample(undefined, ports)
 		const second = await sample(first, ports)
@@ -122,7 +123,7 @@ describe('run_board_usage_read.sample', () => {
 	})
 
 	it('runs no lookup when every process was seen before', async () => {
-		const ports = ports_of(['1 0 0:01 4 a', '1 0 0:02 4 a'], new Map([[1, LANE]]))
+		const ports = ports_of(['1 0 0:01 4 S a', '1 0 0:02 4 S a'], new Map([[1, LANE]]))
 
 		await sample(await sample(undefined, ports), ports)
 
@@ -157,7 +158,7 @@ describe('run_board_usage_read.sample memory', () => {
 			[1, { memory_bytes: 64 * KB, compressed_bytes: 32 * KB }],
 			[2, { memory_bytes: 16 * KB, compressed_bytes: 12 * KB }],
 		])
-		const listings = ['1 7 0:01 4 a\n2 1 0:01 4 b\n3 1 0:01 4 c']
+		const listings = ['1 7 0:01 4 S a\n2 1 0:01 4 S b\n3 1 0:01 4 S c']
 		const mark = await sample(undefined, ports_of(listings, new Map(), { rusage, top }))
 
 		expect(mark.processes.get(1)).toMatchObject({ memory_bytes: 8 * KB, compressed_bytes: 32 * KB })
@@ -185,7 +186,7 @@ describe('run_board_usage_read.sample with reaped children', () => {
 		// The child's one read holds a minute of its reaped children's time; its next read fails.
 		const child_reads = [60_000]
 		const rusage = cpu_reader((pid) => (pid === 2 ? child_reads.shift() : 1000))
-		const listings = [PARENT_AND_CHILD, '1 7 0:01 4 node\n2 1 0:02 4 eslint']
+		const listings = [PARENT_AND_CHILD, '1 7 0:01 4 S node\n2 1 0:02 4 S eslint']
 		const ports = ports_of(listings, new Map(), { rusage })
 		const second = await sample(await sample(undefined, ports), ports)
 
@@ -194,7 +195,7 @@ describe('run_board_usage_read.sample with reaped children', () => {
 	})
 
 	it('keeps ps’s own time and folds nothing where there is no reader', async () => {
-		const mark = await sample(undefined, ports_of(['1 7 0:01 4 a'], new Map([[1, LANE]])))
+		const mark = await sample(undefined, ports_of(['1 7 0:01 4 S a'], new Map([[1, LANE]])))
 
 		expect(mark.processes.get(1)?.cpu_ms).toBe(1000)
 		expect(mark.folded.size).toBe(0)

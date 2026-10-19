@@ -58,6 +58,7 @@ const SETTLED_STATES: LeadWords = [
 	]),
 	[NOT_BEFORE_ICON, 'not_before'],
 	...states_of([
+		['paused', 'paused'],
 		['stopped', 'stopped'],
 		['human', 'decision'],
 		['merged', 'merged'],

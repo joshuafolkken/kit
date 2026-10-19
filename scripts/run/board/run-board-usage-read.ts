@@ -4,6 +4,7 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
+import { run_board_paused, type StatedProcess } from './run-board-paused'
 import type { ProcessReading, UsageMark } from './run-board-usage'
 import {
 	run_board_usage_rusage,
@@ -30,12 +31,12 @@ import { run_board_usage_top, type TopReading, type TopReadings } from './run-bo
 // where it can, else `top`'s last reading (`run-board-usage-top.ts`, at most once every 30 s), else
 // `ps`'s resident set; compressed memory only `top` has, so it is 0 until `top` has answered.
 
-const PS_ARGUMENTS = ['-A', '-o', 'pid=,ppid=,time=,rss=,comm=']
+const PS_ARGUMENTS = ['-A', '-o', 'pid=,ppid=,time=,rss=,stat=,comm=']
 const LSOF_ARGUMENTS = ['-a', '-d', 'cwd', '-Fn', '-p']
 const PID_SEPARATOR = ','
 const COMMAND_SEPARATOR = ' '
-// `pid ppid time rss` before the command, which may itself hold spaces.
-const PS_FIELDS = 4
+// `pid ppid time rss stat` before the command, which may itself hold spaces.
+const PS_FIELDS = 5
 const DAY_SEPARATOR = '-'
 const CLOCK_SEPARATOR = ':'
 const SECONDS_PER_DAY = 86_400
@@ -47,9 +48,10 @@ const LSOF_PROCESS = /^(?=p)/mu
 const LSOF_NAME = 'n'
 const { load_builtin, rusage_reader } = run_board_usage_rusage
 const { list_top, top_reader } = run_board_usage_top
+const { paused_lanes, paused_since } = run_board_paused
 
-// One process's line of `ps`'s listing: its own CPU time and resident set.
-interface ProcessListing {
+// One process's line of `ps`'s listing: its own CPU time, resident set and state.
+interface ProcessListing extends StatedProcess {
 	parent: number
 	command: string
 	cpu_ms: number
@@ -82,9 +84,9 @@ function cpu_ms_of(text: string): number {
 
 function listing_of(line: string): [number, ProcessListing] | undefined {
 	const fields = line.trim().split(/\s+/u)
-	const [pid, parent, time = '', rss] = fields
+	const [pid, parent, time = '', rss, stat = ''] = fields
 	const command = fields.slice(PS_FIELDS).join(COMMAND_SEPARATOR)
-	const listing = { parent: Number(parent), command, cpu_ms: cpu_ms_of(time) }
+	const listing = { parent: Number(parent), command, cpu_ms: cpu_ms_of(time), stat }
 	const rss_bytes = Number(rss) * BYTES_PER_KB
 
 	if (command === '' || Number.isNaN(listing.cpu_ms + rss_bytes + listing.parent)) return undefined
@@ -204,14 +206,24 @@ async function lanes_for(
 	return new Map([...kept, ...found])
 }
 
+function paused_of(
+	before: UsageMark | undefined,
+	paused: ReadonlySet<string>,
+	at_ms: number,
+): Map<string, number> {
+	return paused_since(before?.paused, paused, at_ms)
+}
+
 async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise<UsageMark> {
 	const at_ms = ports.now()
 	const [listings, top] = await Promise.all([ports.list(), ports.top()])
 	const earlier = before?.processes ?? new Map()
-	const readings = readings_of(parse_ps(listings), { rusage: ports.rusage, top, earlier })
+	const listed = parse_ps(listings)
+	const readings = readings_of(listed, { rusage: ports.rusage, top, earlier })
 	const lanes = await lanes_for(before?.lanes ?? new Map(), readings.processes, ports)
+	const paused = paused_of(before, paused_lanes(listed, lanes), at_ms)
 
-	return { at_ms, ...readings, lanes, cores: cpus().length, total_bytes: totalmem() }
+	return { at_ms, ...readings, lanes, paused, cores: cpus().length, total_bytes: totalmem() }
 }
 
 async function darwin_directories(
