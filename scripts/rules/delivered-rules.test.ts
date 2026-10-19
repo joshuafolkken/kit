@@ -5,7 +5,8 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import {
@@ -18,7 +19,6 @@ import {
 	FILING_COMMAND,
 	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
-import { delivered_rules_harness } from './delivered-rules-harness'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#1524: a rule that left residency has to *fire*, or the relocation deleted it. The

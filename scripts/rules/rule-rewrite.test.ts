@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { hook_context_line } from './hook-context-line'

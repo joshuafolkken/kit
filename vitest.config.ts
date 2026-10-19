@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config'
-import { unit_projects } from './scripts/test/unit-projects.ts'
+import { unit_projects } from './tools/test/unit-projects.ts'
 
 // The unit suite runs as two projects — `pure` (isolate:false) and `isolated` (default per-file
-// isolation) — defined and partitioned in `scripts/test/unit-projects.ts`. `globalSetup` and
+// isolation) — defined and partitioned in `tools/test/unit-projects.ts`. `globalSetup` and
 // `coverage` stay at the root because Vitest reads them once for the whole run rather than per
 // project; `include`, `exclude`, `isolate` and `env` are each project's own.
 export default defineConfig({

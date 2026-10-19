@@ -172,8 +172,8 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 		expect(run_ship_pre_detach.GUARD_TEST_TARGETS).toStrictEqual(
 			expect.arrayContaining([
 				'scripts/issue/session-cite-scan.test.ts',
-				'scripts/test/untested-sources.test.ts',
-				'scripts/test/pure-files.test.ts',
+				'tools/test/untested-sources.test.ts',
+				'tools/test/pure-files.test.ts',
 			]),
 		)
 	})

@@ -1,6 +1,6 @@
+import { read_script } from '#tools/josh/josh-script-reader'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
-import { read_script } from './josh-script-reader'
 
 // The argument synopsis is the half of the reference metadata nothing else can check. A description
 // is prose nobody can contradict, but a synopsis is a claim about a parser, and the parser is in the

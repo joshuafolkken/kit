@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { CATALOG_FILE, generate_catalog } from '#tools/document/generate-catalog'
 import { describe, expect, it } from 'vitest'
 import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
-import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 
 // Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker
 // suite used to pin a handful of command names by hand; this checks all of them at once, and a

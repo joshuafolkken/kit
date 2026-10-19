@@ -1,4 +1,4 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { FILING_COMMAND, filings_tail } from './delivered-rules-fixture'
 import { filing_cap } from './filing-cap'

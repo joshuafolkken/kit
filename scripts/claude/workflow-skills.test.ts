@@ -8,9 +8,9 @@ import {
 } from '#scripts/document/ai-document-fixture'
 import { resident_budget } from '#scripts/document/resident-budget'
 import { init_logic } from '#scripts/init/init-logic'
+import { skill_meta } from '#tools/claude/skill-meta'
 import { describe, expect, it } from 'vitest'
 import { package_file, read_skill_file, SKILL_ROOT } from './skill-fixture'
-import { skill_meta } from './skill-meta'
 
 // joshuafolkken/kit#854: the three AI documents are read in full on every turn, and roughly half of
 // each was procedure for a workflow most turns never enter. Those sections now live in skills the

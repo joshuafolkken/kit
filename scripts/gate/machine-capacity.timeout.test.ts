@@ -1,5 +1,5 @@
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { machine_capacity } from './machine-capacity'
 
@@ -7,7 +7,7 @@ import { machine_capacity } from './machine-capacity'
 // once a second under `run:board`, so a `sysctl` or `getconf` that never answered held both open.
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })

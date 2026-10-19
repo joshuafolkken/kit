@@ -40,7 +40,7 @@ const PERCENT = 100
 // **A refusal is an errored result, which is what separates it from a read of the file it is written
 // in.** Every signature exists verbatim in the module its rule is written in — the six delivered
 // rules in `scripts/rules/delivered-rules.ts`, the batching row's in
-// `scripts/time/time-batch-guard.ts` — so a session that
+// `tools/time/time-batch-guard.ts` — so a session that
 // merely opened that file carries the text too — and did so in a result whose `is_error` is false.
 //
 // **That fact is read off the parsed block, never off the raw line**. The

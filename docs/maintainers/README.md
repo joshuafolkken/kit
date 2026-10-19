@@ -104,7 +104,7 @@ from the page it explains.
 
 ## Directories that are never published
 
-`scripts/cost`, `scripts/time`, `scripts/retrospective` and `scripts/eval` are excluded by
+`tools/cost`, `tools/time`, `tools/retrospective` and `tools/eval` are excluded by
 `package.json` `files` because they run only in this repository; a `*-runtime` sibling
 (`scripts/cost-runtime`, `scripts/time-runtime`) holds the part the published `josh` commands import,
 so a split is a publish boundary, not a topic one.

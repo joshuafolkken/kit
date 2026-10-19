@@ -10,7 +10,7 @@ import { git_spawn } from './git-spawn'
 // **This table is the single list of what is resolved that way** — a file a person writes never
 // belongs in it, because regenerating would discard that person's side of the merge. A conflict on any
 // path not listed here still stops as `conflict`. A file belongs here only once its committed content
-// is exactly what its command writes: `scripts/test/pure-files.ts` is not, so regenerating it would
+// is exactly what its command writes: `tools/test/pure-files.ts` is not, so regenerating it would
 // rewrite far more than the conflict.
 
 interface RegeneratedFile {
@@ -21,7 +21,7 @@ interface RegeneratedFile {
 const REGENERATED_FILES: ReadonlyArray<RegeneratedFile> = [
 	{
 		path: 'docs/josh-command-catalog.md',
-		command: ['pnpm', 'exec', 'tsx', 'scripts/document/generate-catalog.ts'],
+		command: ['pnpm', 'exec', 'tsx', 'tools/document/generate-catalog.ts'],
 	},
 ]
 

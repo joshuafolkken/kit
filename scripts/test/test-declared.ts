@@ -27,7 +27,7 @@ const ARGV_OFFSET = 2
 const NO_DECLARATIONS =
 	'no Test: declarations parsed from stdin — pipe the Step 0 work summary in, e.g. `pnpm josh test:declared --match < summary.md`'
 
-// **An unknown flag is a refusal, not a default** — `scripts/time/time-cli.ts` states the same
+// **An unknown flag is a refusal, not a default** — `tools/time/time-cli.ts` states the same
 // convention. Ignoring `--foo` and re-printing the verdict is what sent a
 // reader off to read the source by hand, so a misspelled or retired flag stops here with the usage.
 const PARSE_ARGS_OPTIONS = {

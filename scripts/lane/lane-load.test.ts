@@ -1,5 +1,5 @@
 import type { machine_capacity } from '#scripts/gate/machine-capacity'
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_load } from './lane-load'
 import { lane_process_load } from './lane-process-load'
@@ -10,7 +10,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // zero on macOS, and a second swap parser measured a different figure for the same machine.
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })

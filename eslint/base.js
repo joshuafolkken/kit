@@ -34,7 +34,7 @@ import { unicorn_rules, unicorn_test_rules } from './rules/unicorn.js'
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
 	typescript: ['**/*.ts', '**/*.tsx'],
-	scripts: ['scripts/**/*.ts', 'scripts/**/*.js'],
+	scripts: ['scripts/**/*.ts', 'scripts/**/*.js', 'tools/**/*.ts', 'tools/**/*.js'],
 	// joshuafolkken/kit#1414: `**/*.spec.ts` is deliberately absent. The same config bans that name
 	// outright, so handing it the test relaxation (`max-lines-per-function` 35 and the rest) is the
 	// config contradicting itself, and it is what makes `*.spec.ts` read as supported. A banned file

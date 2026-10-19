@@ -1,10 +1,10 @@
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_admission, type LedgerEntry } from './core-admission'
 import { machine_capacity, type MachineReading, type MemoryReading } from './machine-capacity'
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })

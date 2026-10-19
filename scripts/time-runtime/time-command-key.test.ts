@@ -1,4 +1,4 @@
-import { time_span_fixture } from '#scripts/time/time-span-fixture'
+import { time_span_fixture } from '#tools/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_command_key } from './time-command-key'
 import { time_shell } from './time-shell'

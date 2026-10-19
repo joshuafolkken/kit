@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
-import { test_network_guard } from '#scripts/test/test-network-guard'
+import { test_network_guard } from '#tools/test/test-network-guard'
 import { execaSync } from 'execa'
 
 // Real repositories for the working-tree reads, built with the real binary and a cleared environment

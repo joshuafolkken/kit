@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config'
-import { unit_projects } from './scripts/test/unit-projects.ts'
+import { unit_projects } from './tools/test/unit-projects.ts'
 
 // The integration harness's slow suites — exactly the files `MAIN_EXCLUDE` keeps out of the unit
 // gate (joshuafolkken/kit#2447). Named on the command line under the main config, such a file is

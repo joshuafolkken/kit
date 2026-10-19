@@ -88,7 +88,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['(--cut | --over <tokens-per-request>) [--path <dir>]', 'automation', ['none']],
 	},
 	'cost:audit': {
-		script: 'scripts/cost-audit/cost-audit-cli.ts',
+		script: 'tools/cost-audit/cost-audit-cli.ts',
 		description:
 			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
 		category: 'AI tools',
@@ -99,12 +99,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	},
 	...DOCUMENT_COMMANDS,
 	time: {
-		script: 'scripts/time/time-cli.ts',
+		script: 'tools/time/time-cli.ts',
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
 		category: 'AI tools',
 		reference: ['[options]', 'maintainer', ['none']],
 		// Kit-only: it measures kit's own development runs and its report modules live under the
-		// undistributed `scripts/time/`, so it means nothing in a consumer project and is dropped from a
+		// undistributed `tools/time/`, so it means nothing in a consumer project and is dropped from a
 		// consumer's help. The runtime analysis hooks and guards rely on stays
 		// distributed under `scripts/time-runtime/`.
 		is_kit_only: true,
@@ -113,14 +113,14 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	// recent lane sessions. Kit-only for the same reason `time` is: it reads
 	// kit's own lane transcripts and means nothing in a consumer project.
 	'time:density': {
-		script: 'scripts/time/time-density-cli.ts',
+		script: 'tools/time/time-density-cli.ts',
 		description: 'Report tool calls per round trip across the recent lane sessions',
 		category: 'AI tools',
 		reference: ['[--lanes <n>] [--path <dir>]', 'maintainer', ['none']],
 		is_kit_only: true,
 	},
 	retrospective: {
-		script: 'scripts/retrospective/retrospective-cli.ts',
+		script: 'tools/retrospective/retrospective-cli.ts',
 		description:
 			"Aggregate a finished run's cost, review findings, observation ledger and events into one digest",
 		category: 'AI tools',
@@ -259,7 +259,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['none']],
 	},
 	eval: {
-		script: 'scripts/eval/eval-run.ts',
+		script: 'tools/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
 		category: 'AI tools',
 		reference: ['[scenario...]', 'maintainer', ['processes', 'network']],

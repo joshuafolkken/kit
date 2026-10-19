@@ -1,4 +1,4 @@
-import { time_phase_fixture } from '#scripts/time/time-phase-fixture'
+import { time_phase_fixture } from '#tools/time/time-phase-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_background } from './time-background'
 import { GATE_PHASE } from './time-phase-names'

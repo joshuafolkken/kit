@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { project_checks } from '#scripts/gate/project-checks'
 import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
-import type { NamespaceMember } from './namespace-members'
+import type { NamespaceMember } from '#tools/exports/namespace-members'
 
 const CHECK = 'exports'
 const FAIL_EXIT_CODE = 1
@@ -39,7 +39,7 @@ async function run_unused_members(root: string): Promise<number> {
 	// Loaded only past the skip: the scanner pulls in `typescript`, an optional peer a basic-profile
 	// consumer may not have, and this check runs in every consumer's gate. For the same reason the
 	// scanner is left out of the published package (`package.json` `files`); only this entry ships.
-	const { unused_members } = await import('./unused-members')
+	const { unused_members } = await import('#tools/exports/unused-members')
 	const members = unused_members.find_unused_members(root)
 	const output = report(root, members)
 

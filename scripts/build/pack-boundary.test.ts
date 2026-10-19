@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
@@ -9,25 +9,27 @@ import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
 // The pack boundary (joshuafolkken/kit#1997): the published npm package and the `kit` plugin must
 // carry what a consumer runs — every distributed command's entry script and its static import
-// closure — and none of what only measures kit's own development: the report modules under `time/`
-// and `cost/`, the `eval` suite and `docs/maintainers/eval.md`. The list is read from an
-// actual `pnpm pack --dry-run`, so an exclusion pattern that stops matching is caught here rather
-// than shipping. `--config.ignore-scripts=true` skips the prepack build and its network range check;
-// neither changes which files the `files` field selects.
+// closure — and none of what only serves kit's own development: everything under `tools/`, the
+// `evals/` data and `docs/maintainers/eval.md`. The list is read from an actual `pnpm pack --dry-run`,
+// so a boundary that stops holding is caught here rather than shipping. `--config.ignore-scripts=true`
+// skips the prepack build and its network range check; neither changes which files the `files` field
+// selects.
+//
+// The boundary is a directory (joshuafolkken/kit#4149): kit-only code lives in `tools/`, so `files`
+// names `scripts` whole and never excludes a file under it one by one.
 
 const REPO_ROOT = path.dirname(SCRIPTS_DIR)
 
 // Kit-only code and data: nothing under these may reach the published package.
-const EXCLUDED_PREFIXES = [
-	'scripts/eval/',
-	'scripts/time/',
-	'scripts/cost/',
-	'scripts/cost-audit/',
-	'scripts/retrospective/',
-	'scripts/dogfood/',
-	'evals/',
-]
+const EXCLUDED_PREFIXES = ['tools/', 'evals/']
 const EXCLUDED_FILES = new Set(['docs/maintainers/eval.md'])
+// A per-file exclusion under `scripts/` — what the directory boundary replaces. The generic
+// test-support patterns (`!**/*.test.ts` and the rest) are not under it.
+const SCRIPTS_EXCLUSION_PREFIX = '!scripts/'
+
+interface PackageManifest {
+	files?: Array<string>
+}
 
 // Runtime entries a consumer reaches by file path rather than by a static import
 // (joshuafolkken/kit#2899): `init` writes `fix-gh-packages.ts` into the consumer's `prepare`, and the lane
@@ -40,7 +42,7 @@ const PATH_LAUNCHED_ENTRIES = [
 
 // Shipped although no consumer entry reaches them: kit's own build and release entries, which run
 // from kit's checkout (`pnpm build`, CI workflows). Every other unreachable module is kit-internal
-// and must be excluded by the `files` field.
+// and belongs in `tools/`, so a kit-only file placed under `scripts/` fails the reachability test.
 const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-bin.ts',
 	'scripts/build/build-claude-md.ts',
@@ -188,6 +190,17 @@ describe('the published package carries nothing kit-internal', () => {
 		)
 
 		expect(unreachable).toEqual([])
+	})
+
+	it('excludes nothing under scripts/ one file at a time — kit-only code lives in tools/', () => {
+		const manifest = JSON.parse(
+			readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'),
+		) as PackageManifest
+		const per_file = (manifest.files ?? []).filter((entry) =>
+			entry.startsWith(SCRIPTS_EXCLUSION_PREFIX),
+		)
+
+		expect(per_file).toEqual([])
 	})
 
 	it('ships no test snapshot or golden transcript', () => {

@@ -6,7 +6,7 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delegation_policy } from './delegation-policy'
 import {

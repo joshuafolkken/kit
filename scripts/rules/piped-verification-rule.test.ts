@@ -18,7 +18,7 @@ import { rule_list } from './rule-list'
 // alternatives were measured and rejected — rewriting the procedure documents' examples, when a
 // survey of every document, prompt and skill found exactly one piped verification example and it was
 // the repository's own explanation of this bug; and stating a calling convention, which
-// `scripts/time/time-reported-failure.ts` had already rejected in writing. So what is asserted here is
+// `tools/time/time-reported-failure.ts` had already rejected in writing. So what is asserted here is
 // that the refusal carries the whole rule, that the reasoning stays at the topic file, and that the
 // boundary holds: a read-only listing must never be caught by it.
 const TOPIC_FILE = 'output-bounds.md'

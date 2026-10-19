@@ -1,6 +1,6 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_usage_read } from './run-board-usage-read'
 
@@ -8,7 +8,7 @@ import { run_board_usage_read } from './run-board-usage-read'
 // froze the usage column's reader instead of leaving the column blank for that sample.
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })
