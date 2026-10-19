@@ -1,3 +1,5 @@
+import { lane_process_table } from '#scripts/lane/lane-process-table'
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { hanging_execa } from '#tools/test/hanging-execa'
@@ -29,10 +31,13 @@ describe('run_board_usage_read.usage_reader against a top that never answers', (
 	// joshuafolkken/kit#4171: `top` is the slow reader; a hung one costs the first sample its own
 	// budget and leaves memory on the resident set, never the board's reader.
 	it('reads the sample on ps’s figures once the top budget is spent', async () => {
-		hanging_execa.answer_with('ps', PARENT_AND_CHILD)
+		hanging_execa.answer_with(lane_reap.PS_COMMAND, PARENT_AND_CHILD)
 		hanging_execa.answer_with('lsof', '')
 
-		const pending = run_board_usage_read.usage_reader('darwin')(undefined)
+		const pending = run_board_usage_read.usage_reader('darwin')(
+			undefined,
+			lane_process_table.read_table,
+		)
 
 		await vi.advanceTimersByTimeAsync(TOP_TIMEOUT_MS)
 
@@ -54,7 +59,10 @@ describe('run_board_usage_read.usage_reader against a probe that never answers',
 	})
 
 	it('reads nothing once the ps budget is spent', async () => {
-		const pending = run_board_usage_read.usage_reader('darwin')(undefined)
+		const pending = run_board_usage_read.usage_reader('darwin')(
+			undefined,
+			lane_process_table.read_table,
+		)
 
 		await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS)
 
@@ -65,9 +73,12 @@ describe('run_board_usage_read.usage_reader against a probe that never answers',
 	// A mark that read the listed processes as being in no lane would keep them there for as long as
 	// they live — a lane is asked for once per process — so the sample fails and the next one asks again.
 	it('reads nothing once the lsof budget is spent', async () => {
-		hanging_execa.answer_with('ps', PARENT_AND_CHILD)
+		hanging_execa.answer_with(lane_reap.PS_COMMAND, PARENT_AND_CHILD)
 
-		const pending = run_board_usage_read.usage_reader('darwin')(undefined)
+		const pending = run_board_usage_read.usage_reader('darwin')(
+			undefined,
+			lane_process_table.read_table,
+		)
 
 		await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS)
 

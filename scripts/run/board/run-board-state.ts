@@ -1,6 +1,7 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
@@ -20,13 +21,16 @@ import type { UsageMark } from './run-board-usage'
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
+	// Every process on the machine, one `ps` (`lane-process-table.ts`); a redraw reads it at most once
+	// and hands it to both readers below, so the lane count and the usage columns read one instant.
+	read_table: TableRead
 	// `undefined` when no run has started here.
-	read_local: () => Promise<LocalRead | undefined>
+	read_local: (table: TableRead) => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
 	// The claims waiting in the core budget, read on the machine's second; none where it is not given.
 	read_waits?: (() => Array<BudgetWait>) | undefined
 	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
-	read_usage: (before: UsageMark | undefined) => Promise<UsageMark | undefined>
+	read_usage: (before: UsageMark | undefined, table: TableRead) => Promise<UsageMark | undefined>
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	now: () => number
