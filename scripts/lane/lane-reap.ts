@@ -168,7 +168,6 @@ const lane_reap = {
 	parse_pids,
 	PS_COMMAND,
 	reap_child,
-	run_probe,
 	SYSTEM_PROBES,
 }
 
