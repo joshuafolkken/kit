@@ -6,7 +6,7 @@ import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
-import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
@@ -63,9 +63,17 @@ interface LocalRead {
 	is_memory_held?: boolean | undefined
 	// The run's supervisor and parent session, named in the 💻 section (`run-board-roots.ts`).
 	roots?: ProcessRoots | undefined
+	// The run's record, whose declared order holds a queued row (`backlog-drive-named.ts`).
+	carry?: RunCarry | undefined
 }
 
-const NO_SPAN: SpanHere = { span: undefined, resume: undefined, transcript: undefined, roots: {} }
+const NO_SPAN: SpanHere = {
+	span: undefined,
+	resume: undefined,
+	transcript: undefined,
+	roots: {},
+	carry: undefined,
+}
 
 interface SpanHere {
 	span: BoardSpan | undefined
@@ -73,6 +81,7 @@ interface SpanHere {
 	// The parent session's transcript, where the run's record names one.
 	transcript: string | undefined
 	roots: ProcessRoots
+	carry: RunCarry | undefined
 }
 
 function span_here(repository: string): SpanHere {
@@ -85,6 +94,7 @@ function span_here(repository: string): SpanHere {
 		resume: run_board_span.resume_of(read, ended, launch),
 		transcript: read.kind === 'carried' ? read.carry.owner_transcript : undefined,
 		roots: run_board_roots.roots_of(repository, read),
+		carry: read.kind === 'carried' ? read.carry : undefined,
 	}
 }
 
@@ -148,7 +158,7 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 // `undefined` when no run has started here.
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const { span, resume, transcript, roots } =
+	const { span, resume, transcript, roots, carry } =
 		repository === undefined ? NO_SPAN : span_here(repository)
 
 	if (repository === undefined || span === undefined) return undefined
@@ -165,6 +175,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		lanes: lanes.map((lane) => lane.issue),
 		resume,
 		roots,
+		carry,
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		idle_lanes: lane_spent.idle_lanes(lanes),
