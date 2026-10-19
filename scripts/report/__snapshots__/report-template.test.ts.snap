@@ -1,0 +1,79 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`report_template.build — the skeleton shapes > done in en 1`] = `
+"**■ Completion report**
+
+- **Cause**: <…>
+- **Fix**: <…>
+- **Result**: <…> (v<version>)
+
+**Details**
+
+- Changed files: <…>
+- Test results: <…>
+- Execution evidence: <…>
+- Caught by: <…>
+- Remaining: <…>"
+`;
+
+exports[`report_template.build — the skeleton shapes > done in ja 1`] = `
+"**■ 完了報告**
+
+- **原因**: <…>
+- **対応**: <…>
+- **結果**: <…> (v<version>)
+
+**技術詳細**
+
+- 変更ファイル: <…>
+- テスト結果: <…>
+- 実行証跡: <…>
+- 捕まえられた検証: <…>
+- 残課題: <…>"
+`;
+
+exports[`report_template.build — the skeleton shapes > summary in en 1`] = `
+"**■ Overview**
+
+- **Now**: <…>
+- **Change**: <…>
+- **Check**: <…>
+
+**Details**
+
+- Target: <…>
+- Approach: <…>
+- Side effects / out of scope: <…>
+
+**Changes and tests**
+
+1. \`<…>\`: <…> — Test: <Unit|E2E> — <…> — <…>
+   - Cases: normal / empty / one / many / boundary / invalid input / duplicate / order / null
+   - If it breaks:
+     1. <…>
+     2. <…>
+     3. <…>"
+`;
+
+exports[`report_template.build — the skeleton shapes > summary in ja 1`] = `
+"**■ 概要**
+
+- **今こうなっている**: <…>
+- **こう直す**: <…>
+- **確かめ方**: <…>
+
+**技術詳細**
+
+- 対象: <…>
+- 方針: <…>
+- 副作用 / スコープ外: <…>
+
+**変更とテスト**
+
+1. \`<…>\`: <…> — Test: <Unit|E2E> — <…> — <…>
+   - ケース: 正常 / 空・0件 / 1件 / 多数 / 境界 / 不正入力 / 重複 / 順序 / null
+   - 壊れるとしたら:
+     1. <…>
+     2. <…>
+     3. <…>"
+`;

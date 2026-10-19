@@ -24,7 +24,12 @@ function resolve_session_lang(): Resolution {
 	return { lang: DEFAULT_SESSION_LANG, is_default: true }
 }
 
-const session_language = { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang }
+// `ja` and any regional form of it (`ja-JP`) is Japanese; every other language is the English fallback.
+function is_japanese(lang: string): boolean {
+	return lang.toLowerCase().startsWith(DEFAULT_SESSION_LANG)
+}
+
+const session_language = { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang, is_japanese }
 
 export type { Resolution }
 export { session_language }

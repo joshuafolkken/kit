@@ -204,7 +204,7 @@ describe('the split lost nothing', () => {
 	// still holds — the CI-failure report — replaced it.
 	it.each([
 		'9. 検証ゲート（`CLAUDE.md` の Completion gate）を実行する',
-		'**(1) ラベルはセッション言語に訳す。**',
+		'ラベルに注釈を付けない。',
 		'**完了コメントに失敗を隠してはならない**',
 	])('keeps %j in a topic file, not only in the index', (marker) => {
 		expect(topics).toContain(marker)

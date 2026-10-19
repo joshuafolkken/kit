@@ -24,6 +24,13 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['(reads stdin)', 'automation', ['none']],
 	},
+	'report:template': {
+		script: 'scripts/report/report-template-cli.ts',
+		description:
+			'Print the work summary or completion report skeleton in the session language: summary | done',
+		category: 'AI tools',
+		reference: ['summary|done [<path>...]', 'automation', ['files']],
+	},
 	cases: {
 		script: 'scripts/cases/cases-cli.ts',
 		description:
