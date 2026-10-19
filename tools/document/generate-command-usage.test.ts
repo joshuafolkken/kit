@@ -42,8 +42,16 @@ describe('generate command usage', () => {
 		const filled = generate_command_usage.fill_usage_blocks(STALE_PAGE)
 
 		expect(filled).toBe(
-			`### \`josh lint\`\n\n<!-- usage: lint -->\n\n${command_usage.format_usage('lint') ?? ''}\n\n<!-- /usage -->\n\nprose\n`,
+			`### \`josh lint\`\n\n<!-- usage: lint -->\n\n${COMMAND_MAP['lint']?.description ?? ''}.\n\n${command_usage.format_usage('lint') ?? ''}\n\n<!-- /usage -->\n\nprose\n`,
 		)
+	})
+
+	it('ends a summary with a period when it has no closing punctuation', () => {
+		expect(generate_command_usage.as_sentence('Run lint')).toBe('Run lint.')
+	})
+
+	it.each(['Done.', 'Is it held?'])('keeps the closing punctuation of %j', (text) => {
+		expect(generate_command_usage.as_sentence(text)).toBe(text)
 	})
 
 	it('refuses a span naming a command with no registered usage', () => {
@@ -131,6 +139,44 @@ describe('the section headings match the usage spans', () => {
 			expect(sorted(heading_commands(text))).toEqual(
 				sorted(generate_command_usage.usage_spans(text)),
 			)
+		},
+	)
+})
+
+// The summary under a heading is the generated span's description; prose written between the heading
+// and its first span is a hand-written restatement of it (#4162).
+function is_command_heading(line: string): boolean {
+	return heading_commands(line).length > 0
+}
+
+function next_content_line(lines: ReadonlyArray<string>, index: number): string {
+	return lines.slice(index + 1).find((line) => line.trim() !== '') ?? ''
+}
+
+function headings_with_prose(text: string): Array<string> {
+	const lines = text.split('\n')
+
+	return lines.filter(
+		(line, index) =>
+			is_command_heading(line) && !next_content_line(lines, index).startsWith('<!-- usage: '),
+	)
+}
+
+describe('a section opens with its generated summary', () => {
+	it('reports a heading followed by prose before its span', () => {
+		const text = '### `josh gate`\n\nRun the checks.\n\n<!-- usage: gate -->\n<!-- /usage -->'
+
+		expect(headings_with_prose(text)).toEqual(['### `josh gate`'])
+	})
+
+	it('accepts a heading followed directly by its span', () => {
+		expect(headings_with_prose('### `josh gate`\n\n<!-- usage: gate -->')).toEqual([])
+	})
+
+	it.each(generate_command_usage.USAGE_PAGES)(
+		'%s carries no hand-written summary between a heading and its span',
+		(page) => {
+			expect(headings_with_prose(page_text(page))).toEqual([])
 		},
 	)
 })
