@@ -359,6 +359,9 @@ function is_own_process(pid: number | undefined, recorded_start: string | undefi
 }
 
 const process_identity = {
+	PROBE_ENVIRONMENT,
+	START_PROBES,
+	START_TIME_FORMAT,
 	close_beacon,
 	is_live_beacon,
 	is_live_pid,

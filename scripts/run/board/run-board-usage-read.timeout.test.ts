@@ -18,7 +18,8 @@ vi.mock('execa', async () => {
 
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
-const PARENT_AND_CHILD = '1 7 0:01 4 S node\n2 1 0:01 4 S eslint'
+const START = 'Tue Oct 20 08:39:04 2026'
+const PARENT_AND_CHILD = `1 7 0:01 4 S ${START} node\n2 1 0:01 4 S ${START} eslint`
 const { TOP_TIMEOUT_MS } = run_board_usage_top
 
 beforeEach(() => {

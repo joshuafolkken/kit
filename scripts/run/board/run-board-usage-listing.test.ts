@@ -11,6 +11,7 @@ const KB = 1024
 const ABSENT = '/kit-absent-4246'
 const CHROME = `${ABSENT}/Applications/Google Chrome.app/Contents/MacOS`
 const CODE = `${ABSENT}/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS`
+const START = 'Tue Oct 20 08:39:04 2026'
 
 describe('run_board_usage_listing.executable_of', () => {
 	it('reads a relative command as its first word', () => {
@@ -47,9 +48,9 @@ describe('run_board_usage_listing.listings_of', () => {
 	it('reads each row’s parent, CPU time, resident memory, state and executable', () => {
 		const table = lane_process_table.parse(
 			[
-				`12 1 1-02:03:04 2048 S ${CHROME} --type=gpu`,
-				'13 12 12:34.50 100 TN+ node',
-				'14 12 0:00.01 4 S eslint_d - /tmp',
+				`12 1 1-02:03:04 2048 S ${START} ${CHROME} --type=gpu`,
+				`13 12 12:34.50 100 TN+ ${START} node`,
+				`14 12 0:00.01 4 S ${START} eslint_d - /tmp`,
 			].join('\n'),
 		)
 		const listings = listings_of(table)
@@ -66,7 +67,9 @@ describe('run_board_usage_listing.listings_of', () => {
 	})
 
 	it('leaves out a row whose CPU time does not read', () => {
-		const table = lane_process_table.parse('12 1 never 4 S node\n13 1 0:01 4 S node')
+		const table = lane_process_table.parse(
+			`12 1 never 4 S ${START} node\n13 1 0:01 4 S ${START} node`,
+		)
 
 		expect([...listings_of(table).keys()]).toStrictEqual([13])
 	})

@@ -9,8 +9,9 @@ import { run_board_usage_read, type UsagePorts } from './run-board-usage-read'
 const { sample } = run_board_usage_read
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = '4198'
-const PAUSED = '1 0 0:01 4 T node\n2 1 0:01 4 T+ sh\n3 0 0:01 4 S other'
-const RESUMED = '1 0 0:01 4 S node\n2 1 0:01 4 R+ sh\n3 0 0:01 4 S other'
+const START = 'Tue Oct 20 08:39:04 2026'
+const PAUSED = `1 0 0:01 4 T ${START} node\n2 1 0:01 4 T+ ${START} sh\n3 0 0:01 4 S ${START} other`
+const RESUMED = `1 0 0:01 4 S ${START} node\n2 1 0:01 4 R+ ${START} sh\n3 0 0:01 4 S ${START} other`
 const FIRST_SEEN = 1000
 const STEP = 1000
 

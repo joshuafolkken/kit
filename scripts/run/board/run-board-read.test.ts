@@ -292,7 +292,8 @@ describe('run_board_read.read_local idle lanes', () => {
 		const idle_lanes = vi.mocked(lane_spent.idle_lanes).mockReturnValue(['3432'])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ idle_lanes: ['3432'] })
-		expect(idle_lanes).toHaveBeenCalledWith([lane('3432')])
+		// joshuafolkken/kit#4245: traced from the board's one process snapshot, not a pgrep per lane.
+		expect(idle_lanes.mock.calls.map(([lanes]) => lanes)).toContainEqual([lane('3432')])
 	})
 })
 

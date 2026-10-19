@@ -1,3 +1,4 @@
+import { process_identity } from '#scripts/josh/process-identity'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_process_table, type ProcessRow } from './lane-process-table'
 import { lane_reap } from './lane-reap'
@@ -11,15 +12,17 @@ const run_ps = vi.hoisted(() => vi.fn<() => Promise<{ stdout: string }>>())
 vi.mock('execa', () => ({ execa: run_ps }))
 
 const LANE_PATTERN = 'fullrun #4241$'
+const START = 'Tue Oct 20 08:39:04 2026'
+const EARLY_START = 'Tue Sep  8 08:39:04 2026'
 const LISTING = [
-	'    1     0 1-02:03:04  2048 Ss   /sbin/launchd',
-	'  500     1   0:01.50   100 S    claude -p fullrun #4241',
-	'  501   500   0:00.01     4 TN   node  gate  --fast',
-	'  502   500   0:00.00     0 Z    <defunct>',
+	`    1     0 1-02:03:04  2048 Ss   ${EARLY_START} /sbin/launchd`,
+	`  500     1   0:01.50   100 S    ${START} claude -p fullrun #4241`,
+	`  501   500   0:00.01     4 TN   ${START} node  gate  --fast`,
+	`  502   500   0:00.00     0 Z    ${START} <defunct>`,
 	'not a process row',
-	'  503   x     0:00.00     4 S    broken parent',
-	'  505   1     0:00.00     x S    broken resident set',
-	'  504   1     0:00.00     4 S',
+	`  503   x     0:00.00     4 S    ${START} broken parent`,
+	`  505   1     0:00.00     x S    ${START} broken resident set`,
+	`  504   1     0:00.00     4 S    ${START}`,
 	'',
 ].join('\n')
 
@@ -29,18 +32,29 @@ const GATE = 501
 const ZOMBIE = 502
 const UNLISTED = 999
 
-function row(pid: number, parent: number, rest: Omit<ProcessRow, 'pid' | 'parent'>): ProcessRow {
-	return { pid, parent, ...rest }
+function row(
+	pid: number,
+	parent: number,
+	rest: Omit<ProcessRow, 'pid' | 'parent' | 'start'>,
+	start = START,
+): ProcessRow {
+	return { pid, parent, start, ...rest }
 }
 
 afterEach(() => {
+	vi.restoreAllMocks()
 	vi.clearAllMocks()
 })
 
 describe('lane_process_table.parse', () => {
-	it('reads each row with its time and resident set, keeping a command with spaces and dropping a broken line', () => {
+	it('reads each row with its time, resident set and start, keeping a command with spaces and dropping a broken line', () => {
 		expect(lane_process_table.parse(LISTING)).toEqual([
-			row(LAUNCHD, 0, { time: '1-02:03:04', rss_kb: 2048, stat: 'Ss', command: '/sbin/launchd' }),
+			row(
+				LAUNCHD,
+				0,
+				{ time: '1-02:03:04', rss_kb: 2048, stat: 'Ss', command: '/sbin/launchd' },
+				EARLY_START,
+			),
 			row(LANE, LAUNCHD, {
 				time: '0:01.50',
 				rss_kb: 100,
@@ -124,6 +138,27 @@ describe('lane_process_table.probes_from', () => {
 
 	it('answers undefined where the snapshot could not be read', async () => {
 		await expect(lane_process_table.probes_from(async () => undefined)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4245: a ship record's start time is compared against these rows, not another `ps`.
+describe('lane_process_table.start_reader', () => {
+	it('answers a listed process’s start as `ps -o lstart=` prints it, the day’s padding kept', () => {
+		vi.spyOn(process_identity.START_PROBES, 'read_proc_start').mockReturnValue(undefined)
+		const own_ps = vi.spyOn(process_identity.START_PROBES, 'read_ps_start')
+		const read = lane_process_table.start_reader(lane_process_table.parse(LISTING))
+
+		expect(read(LAUNCHD)).toBe(EARLY_START)
+		expect(read(LANE)).toBe(START)
+		expect(read(UNLISTED)).toBeUndefined()
+		expect(own_ps).not.toHaveBeenCalled()
+	})
+
+	it('answers `/proc` first, as `process_identity.read_start` does', () => {
+		vi.spyOn(process_identity.START_PROBES, 'read_proc_start').mockReturnValue('proc:42')
+		const read = lane_process_table.start_reader(lane_process_table.parse(LISTING))
+
+		expect(read(LANE)).toBe('proc:42')
 	})
 })
 

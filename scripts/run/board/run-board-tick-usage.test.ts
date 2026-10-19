@@ -74,7 +74,15 @@ describe('run_board_tick.tick usage', () => {
 	})
 })
 
-const ROW = { pid: 1, parent: 0, time: '0:01', rss_kb: 4, stat: 'S', command: 'node' }
+const ROW = {
+	pid: 1,
+	parent: 0,
+	time: '0:01',
+	rss_kb: 4,
+	stat: 'S',
+	start: 'Tue Oct 20 08:39:04 2026',
+	command: 'node',
+}
 const TABLE: ProcessTable = [ROW]
 
 // joshuafolkken/kit#4246: the lane count and the usage columns read one `ps` snapshot per redraw.

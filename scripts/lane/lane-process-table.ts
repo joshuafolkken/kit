@@ -1,3 +1,4 @@
+import { process_identity } from '#scripts/josh/process-identity'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import type { PausedProbes } from './lane-paused'
@@ -18,11 +19,22 @@ import { process_tools } from './process-tools'
 // the snapshot only answers the questions they ask. `matching` reads the full command line the way
 // `pgrep -f` does, and `-ww` keeps `ps` from cutting it at a terminal width. The command is the full
 // line rather than `comm`: `ps` cuts any column but the last, so the two cannot share one listing.
+//
+// **The start time is `process_identity`'s own reading.** A detached ship's record names its process by
+// start time (`run-ship-detach.ts`), and the `lstart` column under `process_identity`'s environment
+// prints it exactly as that module's own `ps` does, so a ship is told alive from these rows without
+// starting another `ps` (joshuafolkken/kit#4245).
 
-const PS_ARGUMENTS = ['-A', '-ww', '-o', 'pid=,ppid=,time=,rss=,stat=,command=']
-// `ps` labels nothing locale-dependent here, but the C locale keeps its columns stable.
-const PS_ENVIRONMENT = { LC_ALL: 'C' }
+const COLUMNS = ['pid=', 'ppid=', 'time=', 'rss=', 'stat=', process_identity.START_TIME_FORMAT]
+const PS_ARGUMENTS = ['-A', '-ww', '-o', [...COLUMNS, 'command='].join(',')]
+// `ps` labels nothing locale-dependent here, and the C locale keeps its columns stable; the time zone
+// fixes how the start time prints.
+const PS_ENVIRONMENT = process_identity.PROBE_ENVIRONMENT
 const FIELD_SEPARATOR = /\s+/u
+// `lstart` prints `Tue Sep  8 08:39:04 2026`: five fields, the day of the month padded to two places.
+const START_FIELDS = 5
+const DAY_FIELD = 2
+const DAY_WIDTH = 2
 
 interface ProcessRow {
 	pid: number
@@ -31,6 +43,8 @@ interface ProcessRow {
 	time: string
 	rss_kb: number
 	stat: string
+	// The start time as `process_identity`'s `ps` prints it.
+	start: string
 	command: string
 }
 
@@ -45,11 +59,19 @@ function is_row(row: ProcessRow): boolean {
 	return Number.isSafeInteger(pid + parent) && Number.isFinite(rss_kb) && command !== ''
 }
 
+// The split fields put back with the day's padding the split dropped.
+function start_of(fields: ReadonlyArray<string>): string {
+	return fields
+		.map((field, index) => (index === DAY_FIELD ? field.padStart(DAY_WIDTH) : field))
+		.join(' ')
+}
+
 // The command's own runs of white space read as one space, which no lane pattern tells apart.
 function row_of(line: string): ProcessRow | undefined {
-	const [pid, parent, time = '', rss, stat = '', ...command] = line.trim().split(FIELD_SEPARATOR)
+	const [pid, parent, time = '', rss, stat = '', ...rest] = line.trim().split(FIELD_SEPARATOR)
 	const numbers = { pid: Number(pid), parent: Number(parent), rss_kb: Number(rss) }
-	const row = { ...numbers, time, stat, command: command.join(' ') }
+	const start = start_of(rest.slice(0, START_FIELDS))
+	const row = { ...numbers, time, stat, start, command: rest.slice(START_FIELDS).join(' ') }
 
 	return is_row(row) ? row : undefined
 }
@@ -96,6 +118,17 @@ function probes_of(rows: ProcessTable): PausedProbes {
 	}
 }
 
+/** `process_identity.read_start` with its `ps` answered from `rows`: `/proc` first, as there. */
+function start_reader(rows: ProcessTable): (pid: number) => string | undefined {
+	const starts = new Map(rows.map((row) => [row.pid, row.start]))
+	const probes = {
+		...process_identity.START_PROBES,
+		read_ps_start: (pid: number) => starts.get(pid),
+	}
+
+	return (pid) => process_identity.read_start(pid, probes)
+}
+
 /** The snapshot, `undefined` where `ps` did not answer; a missing `ps` is refused by name. */
 async function read_table(): Promise<ProcessTable | undefined> {
 	try {
@@ -130,7 +163,15 @@ function shared(read: TableRead): TableRead {
 	}
 }
 
-const lane_process_table = { PS_ARGUMENTS, parse, probes_from, probes_of, read_table, shared }
+const lane_process_table = {
+	PS_ARGUMENTS,
+	parse,
+	probes_from,
+	probes_of,
+	read_table,
+	shared,
+	start_reader,
+}
 
 export { lane_process_table }
 export type { ProcessRow, ProcessTable, TableRead }

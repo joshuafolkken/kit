@@ -12,7 +12,12 @@ const { lane_of, parse_lsof, sample, usage_reader } = run_board_usage_read
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/3423`
-const PARENT_AND_CHILD = '1 7 0:01 4 S node\n2 1 0:01 4 S eslint'
+const START = 'Tue Oct 20 08:39:04 2026'
+const PARENT_AND_CHILD = `1 7 0:01 4 S ${START} node\n2 1 0:01 4 S ${START} eslint`
+const SEEN_THEN_GONE = [
+	`1 0 0:01 4 S ${START} a\n2 0 0:01 4 S ${START} b`,
+	`1 0 0:02 4 S ${START} a\n3 1 0:01 4 S ${START} c`,
+]
 const NO_TABLE = vi.fn(async () => undefined)
 
 afterEach(() => {
@@ -79,8 +84,7 @@ describe('run_board_usage_read.sample', () => {
 			[2, '/tmp'],
 			[3, `${LANE}/src`],
 		])
-		const listings = ['1 0 0:01 4 S a\n2 0 0:01 4 S b', '1 0 0:02 4 S a\n3 1 0:01 4 S c']
-		const ports = ports_of(listings, directories)
+		const ports = ports_of([...SEEN_THEN_GONE], directories)
 		const first = await sample(undefined, ports)
 		const second = await sample(first, ports)
 
@@ -101,7 +105,10 @@ describe('run_board_usage_read.sample', () => {
 	})
 
 	it('runs no lookup when every process was seen before', async () => {
-		const ports = ports_of(['1 0 0:01 4 S a', '1 0 0:02 4 S a'], new Map([[1, LANE]]))
+		const ports = ports_of(
+			[`1 0 0:01 4 S ${START} a`, `1 0 0:02 4 S ${START} a`],
+			new Map([[1, LANE]]),
+		)
 
 		await sample(await sample(undefined, ports), ports)
 
@@ -136,7 +143,7 @@ describe('run_board_usage_read.sample memory', () => {
 			[1, { memory_bytes: 64 * KB, compressed_bytes: 32 * KB }],
 			[2, { memory_bytes: 16 * KB, compressed_bytes: 12 * KB }],
 		])
-		const listings = ['1 7 0:01 4 S a\n2 1 0:01 4 S b\n3 1 0:01 4 S c']
+		const listings = [`1 7 0:01 4 S ${START} a\n2 1 0:01 4 S ${START} b\n3 1 0:01 4 S ${START} c`]
 		const mark = await sample(undefined, ports_of(listings, new Map(), { rusage, top }))
 
 		expect(mark.processes.get(1)).toMatchObject({ memory_bytes: 8 * KB, compressed_bytes: 32 * KB })
@@ -164,7 +171,7 @@ describe('run_board_usage_read.sample with reaped children', () => {
 		// The child's one read holds a minute of its reaped children's time; its next read fails.
 		const child_reads = [60_000]
 		const rusage = cpu_reader((pid) => (pid === 2 ? child_reads.shift() : 1000))
-		const listings = [PARENT_AND_CHILD, '1 7 0:01 4 S node\n2 1 0:02 4 S eslint']
+		const listings = [PARENT_AND_CHILD, `1 7 0:01 4 S ${START} node\n2 1 0:02 4 S ${START} eslint`]
 		const ports = ports_of(listings, new Map(), { rusage })
 		const second = await sample(await sample(undefined, ports), ports)
 
@@ -173,7 +180,10 @@ describe('run_board_usage_read.sample with reaped children', () => {
 	})
 
 	it('keeps ps’s own time and folds nothing where there is no reader', async () => {
-		const mark = await sample(undefined, ports_of(['1 7 0:01 4 S a'], new Map([[1, LANE]])))
+		const mark = await sample(
+			undefined,
+			ports_of([`1 7 0:01 4 S ${START} a`], new Map([[1, LANE]])),
+		)
 
 		expect(mark.processes.get(1)?.cpu_ms).toBe(1000)
 		expect(mark.folded.size).toBe(0)
