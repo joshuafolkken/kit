@@ -174,6 +174,18 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 })
 
 // joshuafolkken/kit#3995: a free lane the driver left empty is recorded with why.
+// joshuafolkken/kit#4166: a preflight stop keeps the kinds of the preconditions it found unmet.
+describe('lane_ledger.record_stop — the unmet preconditions', () => {
+	it('keeps the unmet preconditions of a preflight stop', async () => {
+		const target = ledger('stop-preconditions')
+		const stop = { issue: 7, reason: 'preflight', cause: 'check', preconditions: ['lock', 'issue'] }
+
+		await lane_ledger.record_stop(stop, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'stop', ...stop }])
+	})
+})
+
 describe('lane_ledger.record_held', () => {
 	it('records a dispatch hold naming its reason', async () => {
 		const target = ledger('held')

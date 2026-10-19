@@ -2,11 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { Unmet } from '#scripts/git/git-preflight'
 import { report_format_reference } from '#scripts/report/report-format-reference'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
+const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<Unmet>>>())
 const paths_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const scoped_mock = vi.hoisted(() => vi.fn())
@@ -50,6 +51,9 @@ const READY = { code: OK, out: 'ready' }
 const SCOPED_RED = { code: FAILED, out: 'lint:related red' }
 const DOCS_PATHS = ['docs/josh-commands.md']
 const CLASSIFICATION = 'Choose one release classification before opening the PR'
+const CLASSIFICATION_UNMET = { kind: 'classification', problem: CLASSIFICATION }
+const UNMAPPED = '`ac-12345678` has no row'
+const LOCK_DRIFT = 'pnpm-lock.yaml does not match its inputs'
 const ISSUE = '3154'
 const EVIDENCE_BODY =
 	'## 実機証跡\n\n`pnpm josh ship --log 2946`\n\n```\nstopped at: === preflight ===\n```\n'
@@ -80,13 +84,13 @@ beforeEach(() => {
 // starts, not only at the merge.
 describe('run_ship_preflight.stage — the acceptance map', () => {
 	it('stops on an unmapped criterion, asking the body file of the branch issue', async () => {
-		acceptance_mock.mockResolvedValue('`ac-12345678` has no row')
+		acceptance_mock.mockResolvedValue(UNMAPPED)
 		const body = body_file(EVIDENCE_BODY)
 
 		const result = await run_ship_preflight.stage({ title: TITLE, body_path: body })
 
 		expect(result.code).toBe(FAILED)
-		expect(result.out).toContain('  - `ac-12345678` has no row')
+		expect(result.out).toContain(`  - ${UNMAPPED}`)
 		expect(acceptance_mock).toHaveBeenCalledWith('2946', EVIDENCE_BODY)
 	})
 })
@@ -94,12 +98,12 @@ describe('run_ship_preflight.stage — the acceptance map', () => {
 // joshuafolkken/kit#3307: a drifted lock stops the ship before the gate, with its reason.
 describe('run_ship_preflight.stage — the lock file', () => {
 	it('stops before the scoped pair on a drifted lock, naming it', async () => {
-		lock_mock.mockResolvedValue(['pnpm-lock.yaml does not match its inputs'])
+		lock_mock.mockResolvedValue([LOCK_DRIFT])
 
 		const result = await run_ship_preflight.stage(NO_BODY)
 
 		expect(result.code).toBe(FAILED)
-		expect(result.out).toContain('  - pnpm-lock.yaml does not match its inputs')
+		expect(result.out).toContain(`  - ${LOCK_DRIFT}`)
 		expect(scoped_mock).not.toHaveBeenCalled()
 	})
 })
@@ -110,7 +114,7 @@ afterAll(() => {
 
 describe('run_ship_preflight.stage — every pull-request precondition at once', () => {
 	it('reports the classification and the missing evidence together, before the scoped pair', async () => {
-		problems_mock.mockResolvedValue([CLASSIFICATION])
+		problems_mock.mockResolvedValue([CLASSIFICATION_UNMET])
 		paths_mock.mockResolvedValue(RUNTIME_PATHS)
 
 		const result = await run_ship_preflight.stage(NO_BODY)
@@ -164,7 +168,7 @@ describe('run_ship_preflight.stage — a precondition that cannot be read', () =
 	})
 
 	it('still reports the git preflight problems when the --body-file cannot be read', async () => {
-		problems_mock.mockResolvedValue([CLASSIFICATION])
+		problems_mock.mockResolvedValue([CLASSIFICATION_UNMET])
 		const result = await run_ship_preflight.stage({ title: TITLE, body_path: MISSING_BODY })
 
 		expect(result.code).toBe(FAILED)
@@ -192,10 +196,42 @@ describe('run_ship_preflight.stage — the scoped pair once the preconditions ho
 		expect(result).toStrictEqual(READY)
 	})
 
-	it('stops on a red scoped check, its output forwarded', async () => {
+	it('stops on a red scoped check, its output forwarded and the scoped pair named', async () => {
 		scoped_mock.mockResolvedValue(SCOPED_RED)
 
-		expect(await run_ship_preflight.stage(NO_BODY)).toStrictEqual(SCOPED_RED)
+		expect(await run_ship_preflight.stage(NO_BODY)).toStrictEqual({
+			...SCOPED_RED,
+			preconditions: ['scoped'],
+		})
+	})
+})
+
+// joshuafolkken/kit#4166: a stop names the kinds of the preconditions it found unmet, each once.
+describe('run_ship_preflight.stage — the kinds of the unmet preconditions', () => {
+	it('names every kind it stopped on, in the order they were asked', async () => {
+		problems_mock.mockResolvedValue([CLASSIFICATION_UNMET, CLASSIFICATION_UNMET])
+		paths_mock.mockResolvedValue(RUNTIME_PATHS)
+		lock_mock.mockResolvedValue([LOCK_DRIFT])
+
+		const result = await run_ship_preflight.stage(NO_BODY)
+
+		expect(result.preconditions).toStrictEqual(['classification', 'live-evidence', 'lock'])
+	})
+
+	it('names an acceptance-map stop and an unreadable body', async () => {
+		acceptance_mock.mockResolvedValue(UNMAPPED)
+
+		const mapped = await run_ship_preflight.stage({ title: TITLE, body_path: body_file('') })
+		const unreadable = await run_ship_preflight.stage({ title: TITLE, body_path: MISSING_BODY })
+
+		expect(mapped.preconditions).toStrictEqual(['acceptance-map'])
+		expect(unreadable.preconditions).toStrictEqual(['unreadable'])
+	})
+
+	it('names no precondition on a stage that passed', async () => {
+		const result = await run_ship_preflight.stage(NO_BODY)
+
+		expect(result.preconditions).toBeUndefined()
 	})
 })
 

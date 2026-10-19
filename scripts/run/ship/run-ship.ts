@@ -10,6 +10,7 @@
 // composite ends at the failure, and the report names the step that failed so the run reads only it.
 
 import { run_section, type Section } from '#scripts/run/run-section'
+import type { StepResult } from './run-ship-sync'
 
 const PREFLIGHT_HEADER = '=== preflight ==='
 const PRE_DETACH_HEADER = '=== pre-detach checks ==='
@@ -28,6 +29,21 @@ const SKIPPED_BODY = 'skipped — already done'
 type ShipSection = Section & {
 	// The paths a stopped merge left unmerged, handed to the stop prompt.
 	conflicts?: ReadonlyArray<string>
+	// The kinds of the preconditions a stopped preflight found unmet, recorded with the stop.
+	preconditions?: ReadonlyArray<string>
+}
+
+// A stage's result under its header, carrying the conflicts and the preconditions only where it has them.
+function section_of(header: string, result: StepResult): ShipSection {
+	const { conflicts, preconditions } = result
+
+	return {
+		header,
+		body: result.out,
+		code: result.code,
+		...(conflicts !== undefined && { conflicts }),
+		...(preconditions !== undefined && { preconditions }),
+	}
 }
 
 // The step that stopped the ship, or `undefined` when every executed step was green. Because the
@@ -64,6 +80,7 @@ const run_ship = {
 	exit_code: run_section.exit_code_of,
 	failed_section,
 	format_report,
+	section_of,
 }
 
 export type { ShipSection }

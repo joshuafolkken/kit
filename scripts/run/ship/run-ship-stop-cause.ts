@@ -1,4 +1,5 @@
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
+import type { StopRecord } from '#scripts/lane/lane-ledger'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 
 // Why a `josh ship` stage stopped, beside the stage it stopped at: a review that found something, a
@@ -48,7 +49,33 @@ function cause_of(stage: Stage, output: string, conflicts?: ReadonlyArray<string
 	return INFRA_STAGES.has(stage) && is_infra(output) ? CAUSE.INFRA : CAUSE.CHECK
 }
 
-const run_ship_stop_cause = { CAUSE, cause_of }
+// What a stopped stage handed back: its output, the paths a stopped merge left unmerged, and the kinds
+// of the preconditions a stopped preflight found unmet.
+interface StoppedOutput {
+	body: string
+	conflicts?: ReadonlyArray<string>
+	preconditions?: ReadonlyArray<string>
+}
+
+const NO_OUTPUT: StoppedOutput = { body: '' }
+
+// The lane ledger's record of one stop — the stage, its cause and, for a preflight, which
+// preconditions were unmet, so `lane:stats` counts the one worth meeting before a ship
+// (joshuafolkken/kit#4166).
+function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPUT): StopRecord {
+	const { body, conflicts, preconditions } = failed
+	const reason = run_ship_stage.stop_reason(stage, conflicts)
+	const cause = cause_of(stage, body, conflicts)
+
+	return {
+		issue,
+		reason,
+		cause,
+		...(preconditions !== undefined && { preconditions: [...preconditions] }),
+	}
+}
+
+const run_ship_stop_cause = { CAUSE, cause_of, record_of }
 
 export type { Cause }
 export { run_ship_stop_cause }
