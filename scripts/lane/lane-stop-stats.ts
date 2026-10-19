@@ -43,9 +43,10 @@ const PARKED_ISSUE = /#([1-9]\d*)\b/u
 const UNRECORDED_CAUSE = 'unrecorded'
 const NO_CAUSES = '-'
 
+// `causes` is a preflight stop's unmet preconditions, every one of them, else the stop's one cause.
 interface StopWait {
 	reason: string
-	cause: string
+	causes: ReadonlyArray<string>
 	wait_ms: number | undefined
 }
 
@@ -93,13 +94,20 @@ function wait_ms(stop: StopEntry, ends: ReadonlyArray<IssueAt>): number | undefi
 	return later.length === 0 ? undefined : Math.min(...later)
 }
 
+// A stop recorded before it named its preconditions (joshuafolkken/kit#4166) counts under its cause.
+function causes_of(stop: StopEntry): ReadonlyArray<string> {
+	const { preconditions = [] } = stop
+
+	return preconditions.length > 0 ? preconditions : [stop.cause ?? UNRECORDED_CAUSE]
+}
+
 function waits_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	ends: ReadonlyArray<IssueAt>,
 ): Array<StopWait> {
 	return entries.filter(is_stop).map((stop) => ({
 		reason: stop.reason,
-		cause: stop.cause ?? UNRECORDED_CAUSE,
+		causes: causes_of(stop),
 		wait_ms: wait_ms(stop, ends),
 	}))
 }
@@ -108,12 +116,13 @@ function total(values: ReadonlyArray<number>): number | undefined {
 	return values.length === 0 ? undefined : values.reduce((sum, value) => sum + value, 0)
 }
 
-// `infra 2, check 1` — how many of one reason's stops each cause took, the most frequent first.
+// `infra 2, check 1` — how many of one reason's stops each cause took, the most frequent first. A stop
+// with two unmet preconditions counts once under each.
 function causes_cell(waits: ReadonlyArray<StopWait>): string {
-	const causes = [...new Set(waits.map((wait) => wait.cause))]
-	const counted = causes.map((cause) => ({
+	const all = waits.flatMap((wait) => wait.causes)
+	const counted = [...new Set(all)].map((cause) => ({
 		cause,
-		count: waits.filter((wait) => wait.cause === cause).length,
+		count: all.filter((each) => each === cause).length,
 	}))
 	const ranked = counted.toSorted((left, right) => right.count - left.count)
 

@@ -52,3 +52,28 @@ describe('run_ship_stop_cause.cause_of — every stop that is not the infrastruc
 		expect(cause_of('sync', 'merge failed', [])).toBe(CAUSE.CHECK)
 	})
 })
+
+// joshuafolkken/kit#4166: a preflight stop records which preconditions it found unmet.
+describe('run_ship_stop_cause.record_of — the ledger record of a stop', () => {
+	it('carries every unmet precondition of a preflight stop beside its cause', () => {
+		const preconditions = ['live-evidence', 'classification']
+
+		expect(
+			run_ship_stop_cause.record_of(7, 'preflight', { body: '2 unmet', preconditions }),
+		).toStrictEqual({ issue: 7, reason: 'preflight', cause: CAUSE.CHECK, preconditions })
+	})
+
+	it('names no preconditions for a stop that carried none', () => {
+		expect(
+			run_ship_stop_cause.record_of(7, 'sync', { body: '', conflicts: ['a.ts'] }),
+		).toStrictEqual({ issue: 7, reason: 'conflict', cause: CAUSE.CONFLICT })
+	})
+
+	it('records a stop that handed back no section as a check', () => {
+		expect(run_ship_stop_cause.record_of(7, 'gate')).toStrictEqual({
+			issue: 7,
+			reason: 'gate',
+			cause: CAUSE.CHECK,
+		})
+	})
+})

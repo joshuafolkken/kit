@@ -194,9 +194,8 @@ async function run_once(step: Step, args: ShipArguments, state: ShipState): Prom
 	const elapsed_ms = performance.now() - started_ms
 
 	if (result.is_skipped !== true) await record_timed(step, args.number, elapsed_ms)
-	const section = { header: step.header, body: result.out, code: result.code }
 
-	return result.conflicts === undefined ? section : { ...section, conflicts: result.conflicts }
+	return run_ship.section_of(step.header, result)
 }
 
 // A stage that stopped on the infrastructure runs again in place before it stops the ship. A retry
@@ -290,10 +289,7 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 // Every stop goes to the lane ledger — supervised, in an agent's own turn, or a lane child's preflight
 // before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason.
 async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
-	const reason = run_ship_stage.stop_reason(stage, failed?.conflicts)
-	const cause = run_ship_stop_cause.cause_of(stage, failed?.body ?? '', failed?.conflicts)
-
-	await lane_ledger.record_stop({ issue: Number(args.number), reason, cause })
+	await lane_ledger.record_stop(run_ship_stop_cause.record_of(Number(args.number), stage, failed))
 }
 
 // A detached supervisor hands the stopped stage back (`run-ship-return.ts`); a

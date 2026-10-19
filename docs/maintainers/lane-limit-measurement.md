@@ -173,6 +173,15 @@ Only `sync`, `commit`, `followup` and `report` can read as `infra`. `josh ship` 
 stage up to twice, a minute apart, before it stops (`run-ship-infra-retry.ts`). A stop recorded
 before causes existed reads as `unrecorded`.
 
+A `preflight` stop is counted under each precondition it found unmet instead (`run-ship-preflight.ts`),
+once under each when it found two:
+
+- `issue`, `branch`, `classification`, `live-evidence`, `acceptance-map`, `lock`
+- `scoped` — the scoped pair went red
+- `unreadable` — a precondition could not be read
+
+A preflight stop recorded before the preconditions were kept reads under its cause.
+
 **The decision the table is for**: which stop reason to remove next — the reason with the largest
 `wait total (min)` costs the lanes the most time.
 

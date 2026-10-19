@@ -15,6 +15,8 @@ const ISSUE = 3789
 const OTHER_ISSUE = 3790
 const REVIEW = 'review'
 const GATE = 'gate'
+const PREFLIGHT = 'preflight'
+const LIVE_EVIDENCE = 'live-evidence'
 const NOT_MEASURED = 'not measured'
 const UNENDED = [NOT_MEASURED, NOT_MEASURED, NOT_MEASURED, '0']
 
@@ -189,5 +191,32 @@ describe('lane_stop_stats.table — the causes', () => {
 
 	it('prints a dash for a reason nothing stopped at', () => {
 		expect(causes_of([], GATE)).toBe('-')
+	})
+})
+
+// joshuafolkken/kit#4166: a preflight stop counts under each precondition it found unmet, so the one
+// worth meeting before a ship is a number; an older stop still counts under its cause.
+describe('lane_stop_stats.table — the unmet preconditions', () => {
+	it('counts a preflight stop under every precondition it named', () => {
+		const entries = [
+			{
+				...stop(PREFLIGHT, 30),
+				cause: 'check',
+				preconditions: [LIVE_EVIDENCE, 'classification'],
+			},
+			{ ...stop(PREFLIGHT, 20), cause: 'check', preconditions: [LIVE_EVIDENCE] },
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('live-evidence 2, classification 1')
+	})
+
+	it('counts an older preflight stop beside them under its cause, or as unrecorded', () => {
+		const entries = [
+			{ ...stop(PREFLIGHT, 30), cause: 'check', preconditions: ['lock'] },
+			{ ...stop(PREFLIGHT, 20), cause: 'check' },
+			stop(PREFLIGHT, 10),
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('lock 1, check 1, unrecorded 1')
 	})
 })
