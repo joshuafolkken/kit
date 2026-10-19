@@ -54,7 +54,7 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
   the filing, the `-u` stash and the epic:bundle branch.
 - **An observation** — `observation-filing.md` (ask first if interactive).
 
-**Automatic filing is capped at 10 Issues per run.** On reaching it, stop and report.
+**The per-run filing cap is `prerequisite.md`'s** (the `filing-cap` row); on its refusal, stop and report.
 
 **The `into <target>` suffix** (a `new` entry) inserts the artifact into a named epic —
 `into-target.md`, read when the suffix is typed.

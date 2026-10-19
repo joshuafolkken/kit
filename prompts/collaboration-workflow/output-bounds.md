@@ -27,14 +27,9 @@
 
 ## 検証コマンドをパイプに繋がない（joshuafolkken/kit#1556）
 
-**パイプラインの終了コードは最後のコマンドのものである。** `pnpm josh gate 2>&1 | tail -40` は赤いゲートを成功として返す。**これは `josh gate` の欠陥ではない。** 直すのは呼び出し方である。
+**パイプラインの終了コードは最後のコマンドのものである。** `pnpm josh gate 2>&1 | tail -40` は赤いゲートを成功として返す。**これは `josh gate` の欠陥ではない。** **既定はパイプなしで実行する。** 避けられないなら `set -o pipefail` を前置する。どの形でも、印字された判定行を読む。`piped-verification` 行（`rule-delivery.md`）が強制する。
 
-- **既定はパイプなしで実行する。** 判定行は末尾に出るので、省略されても残る
-- 絞るなら、ファイルへ落として範囲で読む（`pnpm josh gate > /tmp/gate.log 2>&1; tail -40 /tmp/gate.log`）
-- パイプが避けられないなら `set -o pipefail` を前置する
-- どの形でも、印字された判定行を読む。終了コードだけを答えにしない
-
-対象は結果が合否を意味するコマンドだけ — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。`pnpm josh pretool:guard` は、後段が `tail` ／全行読みの `grep` だけの検証パイプラインを `(set -o pipefail; …)` で包み、他のパイプは拒否する（`rule-delivery.md`）。
+対象は結果が合否を意味するコマンドだけ — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。
 
 ## 検査
 

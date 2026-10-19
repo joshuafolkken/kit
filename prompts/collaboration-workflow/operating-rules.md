@@ -38,7 +38,7 @@
   3. 「別パッケージ起因の問題は割り込み Issue で対応する」
   4. `backlogrun` が epic の子を始める前の preflight（`pnpm josh run:hold <N>` が `reclaim` と答えたときの回収 — joshuafolkken/kit#926, joshuafolkken/kit#1965）
 
-  1〜3 は直後に `pnpm josh stash:pop "<メッセージ>"` で復元する。stash は全 work tree が共有する 1 本のスタックなので、位置指定や引数なしの `git stash pop` は使わない（joshuafolkken/kit#2050）。4 は復元しない — 代わりに stash を子の Issue にコメントで記録する（`prerequisite.md` の stash と同じく、記録だけが後で pop させる手がかり）
+  1〜3 は直後に `pnpm josh stash:pop "<メッセージ>"` で復元する（位置指定の pop は `worktree-mutation` 行が拒否する）。4 は復元しない — 代わりに stash を子の Issue にコメントで記録する（`prerequisite.md` の stash と同じく、記録だけが後で pop させる手がかり）
 
 - **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**
   - 計画には復元手順としてこの 1 行だけを書く。`git stash apply` / `git stash pop` も「drop しない」という条件も書かない
@@ -52,7 +52,7 @@
 `CLAUDE.md` → "Decision autonomy" の境界の細則。
 
 - **A と B の判定**: 確認するのは「差が僅差 かつ 後戻りしにくい／アーキテクチャに長く影響する」ときだけ。明確に優位な選択肢は自動で選び、僅差でも安価に巻き戻せる選択は決めて記録して進む
-- 起票した Issue の所属先は、候補が複数の epic に散っていても Tier B ではない（joshuafolkken/kit#1339）。1 つを選び、採用・却下・理由・決定日を Issue と epic の両方に記録する。止まるのは 2 つが本当に甲乙つけがたいときだけ
+- 起票した Issue の所属先は、候補が複数の epic に散っていても Tier A（`.claude/skills/epic-commands/epic-bundle.md`）
 - 自己修正（自分が公開した成果物の事実誤りの訂正、同じセッションで自分が特定した自分の作業の抜けの穴埋め）は Tier A。承認済みの作業の完了・修復に限り、目標の表明や問いで動いてよい意味ではない（→ `principles.md` → "consult-vs-execute"）
 - **Tier C との境界**: マージ・ブランチ削除・force push・スコープ外の変更は、自分が招いた問題でも Tier C。確認を外しても監査証跡は外さない
 - **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行も提案もしない。既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり戻せない）。`josh bump` が版を変えたら、変わった挙動の `docs/` をコミット前に更新する

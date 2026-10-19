@@ -29,7 +29,7 @@ PR コメントも `pnpm josh issue:comment <N> --body-file <path>` で投稿す
 
 ### コメント投稿は `pnpm josh issue:comment` の 1 綴りだけ（joshuafolkken/kit#2304）
 
-`gh api` の `-f body=@<path>` ／ `--raw-field body=@<path>` は `@<path>` というリテラルを黙って投稿する。**Issue／PR コメントの投稿は `pnpm josh issue:comment <N> --body-file <path>` ただ 1 綴りに寄せる。** `-f body=@…` は `pnpm josh rule:guard` が実行前に拒否する（`raw-field-body` 行、`scripts/rules/raw-field-body.ts`）。Issue body 書き換えの `-X PATCH ... --field body=@<path>` は `-F` 側で安全なのでそのまま使う。
+`-f body=@<path>` は `@<path>` というリテラルを投稿するので、`raw-field-body` 行が拒否する。Issue body 書き換えの `--field body=@<path>` は安全なのでそのまま使う。
 
 `--body-file` / `--notify-message-file` は `-` で標準入力を読む（実装は `scripts/josh/cli-body.ts`）。`--body` と `--body-file` の同時指定は拒否される。
 
@@ -37,4 +37,4 @@ PR コメントも `pnpm josh issue:comment <N> --body-file <path>` で投稿す
 
 ### 引き金つき配送
 
-`pnpm josh rule:guard` は、二重引用符の本文値にバッククォートか `$` を含む `Bash` 呼び出しを拒否する。拒否されたら本文をファイルに移して出し直す。**引き金が見えない綴り（`-b`・`-f title=` など）でも、フックが走らないエージェントでも規則は同じく拘束する。**
+`shell-body` 行が強制する。引き金が見えない綴り（`-b`・`-f title=` など）でも規則は同じく拘束する。

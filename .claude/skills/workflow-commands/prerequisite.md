@@ -66,8 +66,8 @@ later steps name its number. **Its duplicate scan is read exactly as it is for a
   always includes a new, untracked `*.test.ts`; the command takes it and leaves the observation ledger
   (`docs/josh-commands-backlog.md` → `josh stash:push`).
 - **The Issue comment is what gets the stash popped, not the Telegram.** The run that picks the Issue up
-  reads it and pops before implementing — **by message, `pnpm josh stash:pop "<the stash:push message>"`, never
-  a positional `git stash pop`** (the stack is shared by every lane). Say it in the Telegram too.
+  reads it and pops before implementing with `pnpm josh stash:pop "<the stash:push message>"`. Say it in
+  the Telegram too.
 
 **Automatic filing is capped at 10 Issues per run** at every entry point; `pnpm josh rule:guard`
 refuses the eleventh filing (`prompts/collaboration-workflow/rule-delivery.md`). On reaching it, stop
