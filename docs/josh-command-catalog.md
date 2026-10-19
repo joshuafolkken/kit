@@ -201,7 +201,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh run:prep` | `<issue>` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
-| `josh run:report` | — | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
+| `josh run:report` | `[--handoff]` | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
 | `josh run:review` | `[--join]` | automation | processes, files | Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict) |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |

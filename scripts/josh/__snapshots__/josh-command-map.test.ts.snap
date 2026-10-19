@@ -1150,7 +1150,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:report": [
-      "",
+      "[--handoff]",
       "automation",
       [
         "files",

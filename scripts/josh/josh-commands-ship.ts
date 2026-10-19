@@ -146,12 +146,20 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:report': {
 		script: 'scripts/run/run-report-cli.ts',
+		// `.env` rather than the ambient environment: `--handoff` sends the hand-off confirmation.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
 		category: 'AI tools',
-		reference: ['', 'automation', ['files', 'network']],
+		reference: ['[--handoff]', 'automation', ['files', 'network']],
 		usage: {
-			examples: [{ arguments: '', note: 'print the report; the same text josh notify sends' }],
+			examples: [
+				{ arguments: '', note: 'print the report; the same text josh notify sends' },
+				{
+					arguments: '--handoff',
+					note: 'print the backlogrun hand-off report and send it as the confirmation',
+				},
+			],
 		},
 	},
 }

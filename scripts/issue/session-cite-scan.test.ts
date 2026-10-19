@@ -104,6 +104,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['epic/epic-solo-stale.ts', 1],
 	['epic/epic-solo.ts', 2],
 	['epic/epic-triage.ts', 1],
+	// The hand-off report body, which `run-report-cli.ts` links before printing and sending.
+	['run/run-report-handoff.ts', 1],
 	['run/run-stage.ts', 2],
 ]
 
