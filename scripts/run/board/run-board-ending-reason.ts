@@ -1,4 +1,6 @@
+import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 
 // Why a child's park or withdraw ended it, in the ending event's own words — the reason its board row
 // draws and its park note carries.
@@ -25,10 +27,20 @@ function withdraw_reason(event: RunEvent): string {
 	return rest === event.text ? '' : rest.trim()
 }
 
+// A `run:stalled` park reads as its cause and the action that resumes it (`run-stalled.ts`); any other
+// park as its reason.
+function park_row_reason(event: RunEvent): string {
+	const reason = park_reason(event)
+	const cause = run_stalled.cause_of(reason)
+	const issue = run_event_scope.issue_named(event)
+
+	return cause === undefined || issue === undefined ? reason : run_stalled.row_text(issue, cause)
+}
+
 // The reason an ending event gives, `undefined` for an event that is neither a park nor a withdraw or
 // that gives none.
 function reason_of(event: RunEvent): string | undefined {
-	if (event.kind === KIND.PARK) return park_reason(event) || undefined
+	if (event.kind === KIND.PARK) return park_row_reason(event) || undefined
 
 	return event.kind === KIND.WITHDRAW ? withdraw_reason(event) || undefined : undefined
 }

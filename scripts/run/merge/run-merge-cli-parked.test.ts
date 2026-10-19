@@ -118,6 +118,26 @@ describe('run_merge_cli.merge_child — a child waiting on an open blocker', () 
 	})
 })
 
+// joshuafolkken/kit#4215: the park event carries the cause, so the board row can name it.
+describe('run_merge_cli.merge_child — a park that gave no cause', () => {
+	it('names a session that ended unfinished', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
+		do_failed_mock.mockResolvedValue({
+			carry: undefined,
+			is_parked: true,
+			is_refused: false,
+			waits: [],
+		})
+
+		await run_merge_cli.merge_child(context())
+
+		expect(emit_mock).toHaveBeenCalledWith(
+			'park',
+			`#${CHILD} parked (run:stalled: session unfinished)`,
+		)
+	})
+})
+
 describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 	it.each([NEEDS_DECISION, 'already-done'])(
 		'drops in-progress from a child parked with %s',

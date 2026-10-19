@@ -11,6 +11,7 @@ import {
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
 
@@ -38,7 +39,6 @@ const HEADING_ASSUMPTION =
 const UNREACHED_HEADING = 'Not reached — each names what it is waiting on:'
 const PARALLEL_NOTE = '(parallel)'
 const NEEDS_DECISION_NOTE = `waiting on a person (\`${NEEDS_DECISION_LABEL}\`)`
-const RUN_STALLED_NOTE = `stalled mechanically — fix the cause, then remove \`${RUN_STALLED_LABEL}\``
 const NOT_REACHED_NOTE = 'not reached by the waves above'
 const WAVE_GAP_WIDTH = 2
 const PARALLEL_GAP_WIDTH = 3
@@ -146,12 +146,17 @@ function build(result: EpicNextResult, repo: string, scope: GateScope = EMPTY_SC
 	return { waves, unreached, running }
 }
 
+// A stalled issue's note ends on the one next action its park comment names (`run-stalled.ts`).
+function run_stalled_note(child: number): string {
+	return `stalled mechanically — ${run_stalled.next_step(child)}`
+}
+
 // The plan's own "waiting on" wording is reused, so an unreached issue names its blocker the way the
 // plan's waiting section does. Its "past the offer" fallback means nothing across waves, so it reads
 // as not reached instead.
 function unreached_note(child: EpicChild, context: PlanContext): string {
 	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return NEEDS_DECISION_NOTE
-	if (has_label_name(child.labels, RUN_STALLED_LABEL)) return RUN_STALLED_NOTE
+	if (has_label_name(child.labels, RUN_STALLED_LABEL)) return run_stalled_note(child.number)
 	const note = backlog_plan.waiting_note(child, context)
 
 	return note === backlog_plan.PAST_OFFER_NOTE ? NOT_REACHED_NOTE : note
@@ -194,7 +199,7 @@ const backlog_waves = {
 	HEADING_ASSUMPTION,
 	NEEDS_DECISION_NOTE,
 	PARALLEL_NOTE,
-	RUN_STALLED_NOTE,
+	run_stalled_note,
 	UNREACHED_HEADING,
 	build,
 	format_waves,

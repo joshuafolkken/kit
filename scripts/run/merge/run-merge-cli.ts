@@ -11,6 +11,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
@@ -251,9 +252,11 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 		return emit(MERGE_TOKEN.STOP, FAILURE_EXIT_CODE)
 	}
 
+	const cause = result.cause ?? run_stalled.SESSION_UNFINISHED.short
+
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} parked (${RUN_STALLED_LABEL})`,
+		run_stalled.park_event(ctx.child, cause),
 	)
 
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
@@ -263,7 +266,7 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 	return await offered(ctx)
 }
 
-async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdict> {
+async function on_failed(ctx: MergeContext, cause?: StallCause): Promise<MergeVerdict> {
 	const result = await run_merge_steps.do_failed(ctx, cause)
 
 	if (result.is_refused) return report_count_refused(result.carry)
@@ -304,7 +307,7 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 	if (refused !== undefined) return report_count_refused(refused)
 
 	if (!(await run_merge_steps.resume_cut(ctx.child))) {
-		return await on_failed(ctx, run_merge_steps.CUT_RELAUNCH_CAUSE)
+		return await on_failed(ctx, run_stalled.CUT_NOT_RELAUNCHED)
 	}
 
 	await run_event_stream_emit.emit(
