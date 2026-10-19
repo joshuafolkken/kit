@@ -1,3 +1,4 @@
+import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -40,10 +41,10 @@ function lane_of(issue: string): LaneInfo {
 const LANES = [lane_of(PAUSED), lane_of(RUNNING)]
 
 const LISTING = [
-	`${String(process.pid)} 1 S node run-board`,
-	`${String(STOPPED_PID)} 1 TN claude -p fullrun #${PAUSED}`,
-	`${String(STOPPED_PID + 2)} ${String(STOPPED_PID)} T node gate`,
-	`${String(RUNNING_PID)} 1 S claude -p fullrun #${RUNNING}`,
+	`${String(process.pid)} 1 0:00.01 4 S node run-board`,
+	`${String(STOPPED_PID)} 1 0:00.01 4 TN claude -p fullrun #${PAUSED}`,
+	`${String(STOPPED_PID + 2)} ${String(STOPPED_PID)} 0:00.01 4 T node gate`,
+	`${String(RUNNING_PID)} 1 0:00.01 4 S claude -p fullrun #${RUNNING}`,
 ].join('\n')
 
 afterEach(() => {
@@ -64,6 +65,16 @@ describe('backlog_ready.lane_room', () => {
 		expect(sync_spawn.execFileSync).not.toHaveBeenCalled()
 		expect(sync_spawn.execSync).not.toHaveBeenCalled()
 		expect(sync_spawn.spawnSync).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4246: `run:board` hands over the snapshot its redraw already read.
+	it('reads the snapshot it is given rather than a `ps` of its own', async () => {
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
+
+		const room = await backlog_ready.lane_room(LANES, async () => lane_process_table.parse(LISTING))
+
+		expect(room.occupied.map((lane) => lane.issue)).toEqual([RUNNING])
+		expect(run_ps).not.toHaveBeenCalled()
 	})
 
 	it('counts every lane when the snapshot could not be read', async () => {

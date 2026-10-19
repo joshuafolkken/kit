@@ -1,0 +1,7 @@
+{
+	"reason": "run:board shares one ps snapshot per redraw: the usage listing moves into its own module (executable cut from the full command line), the table is threaded through tick, local read and usage read, and a read after the idle confirmation wait or the off-terminal prime takes a fresh snapshot (#4246)",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 88
+	}
+}

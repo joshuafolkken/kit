@@ -1,3 +1,4 @@
+import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_usage_read, type UsagePorts } from './run-board-usage-read'
@@ -7,38 +8,15 @@ import type { TopReadings } from './run-board-usage-top'
 // joshuafolkken/kit#3489: how the board reads each process and its lane — `ps` every second, the
 // working directory only for a process not seen before, and nothing where the platform has no way to it.
 
-const { lane_of, parse_lsof, parse_ps, sample, usage_reader } = run_board_usage_read
+const { lane_of, parse_lsof, sample, usage_reader } = run_board_usage_read
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/3423`
 const PARENT_AND_CHILD = '1 7 0:01 4 S node\n2 1 0:01 4 S eslint'
+const NO_TABLE = vi.fn(async () => undefined)
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-describe('run_board_usage_read.parse_ps', () => {
-	it('reads every process’s parent, CPU time, resident memory and command, and skips a line that is not one', () => {
-		const output = [
-			'  PID PPID TIME RSS STAT COMM',
-			'  12 1 1-02:03:04 2048 S /Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-			'13 12 12:34.50 100 S node',
-			' 14 12 0:00.01 4 S eslint_d - /tmp',
-			'15 12 0:00.01 4',
-		].join('\n')
-		const listings = parse_ps(output)
-
-		expect([...listings.keys()]).toStrictEqual([12, 13, 14])
-		expect(listings.get(12)).toStrictEqual({
-			parent: 1,
-			command: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-			cpu_ms: 93_784_000,
-			rss_bytes: 2048 * KB,
-			stat: 'S',
-		})
-		expect(listings.get(13)?.cpu_ms).toBe(754_500)
-		expect(listings.get(14)?.command).toBe('eslint_d - /tmp')
-	})
 })
 
 describe('run_board_usage_read.parse_lsof', () => {
@@ -77,7 +55,7 @@ function ports_of(
 	options: PortsOptions = {},
 ): UsagePorts {
 	return {
-		list: vi.fn(async () => listings.shift() ?? ''),
+		list: vi.fn(async () => lane_process_table.parse(listings.shift() ?? '')),
 		rusage: options.rusage,
 		top: vi.fn(async () => options.top ?? new Map()),
 		directories: vi.fn(async (_pids: ReadonlyArray<number>) => directories),
@@ -204,11 +182,11 @@ describe('run_board_usage_read.sample with reaped children', () => {
 
 describe('run_board_usage_read.usage_reader', () => {
 	it('reads nothing on a platform with no way to a process’s working directory', async () => {
-		await expect(usage_reader('win32')(undefined)).resolves.toBeUndefined()
+		await expect(usage_reader('win32')(undefined, NO_TABLE)).resolves.toBeUndefined()
 	})
 
 	it('reads nothing on Linux, whose ps counts CPU time in whole seconds', async () => {
-		await expect(usage_reader('linux')(undefined)).resolves.toBeUndefined()
+		await expect(usage_reader('linux')(undefined, NO_TABLE)).resolves.toBeUndefined()
 	})
 
 	it('resolves the board’s lanes root once, and reads nothing outside a repository', async () => {
@@ -217,8 +195,8 @@ describe('run_board_usage_read.usage_reader', () => {
 			.mockRejectedValue(new Error('none'))
 		const read = usage_reader('darwin')
 
-		await expect(read(undefined)).resolves.toBeUndefined()
-		await expect(read(undefined)).resolves.toBeUndefined()
+		await expect(read(undefined, NO_TABLE)).resolves.toBeUndefined()
+		await expect(read(undefined, NO_TABLE)).resolves.toBeUndefined()
 
 		expect(root).toHaveBeenCalledTimes(1)
 	})

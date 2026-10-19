@@ -3,7 +3,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_paused, type PausedProbes } from '#scripts/lane/lane-paused'
-import { lane_process_table } from '#scripts/lane/lane-process-table'
+import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -51,10 +51,13 @@ function is_paused_in(issue: string, probes: PausedProbes | undefined): boolean 
 
 // The lanes that hold a place under the limit (`backlog-occupied.ts`). Every lane's paused reading is
 // drawn from one asynchronous process snapshot, so the count never blocks its caller's event loop
-// (joshuafolkken/kit#4241).
-async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<LaneInfo>> {
+// (joshuafolkken/kit#4241); `run:board` passes the snapshot its redraw already read (#4246).
+async function occupied_lanes(
+	lanes: ReadonlyArray<LaneInfo> | undefined,
+	table: TableRead,
+): Promise<Array<LaneInfo>> {
 	const open = lanes ?? (await lane_registry.list_lanes())
-	const probes = await lane_process_table.read()
+	const probes = await lane_process_table.probes_from(table)
 
 	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes, (issue) =>
 		is_paused_in(issue, probes),
@@ -63,9 +66,12 @@ async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<La
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
 // open one, since an uncounted lane still holds its port seat.
-async function lane_room(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneRoom> {
+async function lane_room(
+	lanes?: ReadonlyArray<LaneInfo>,
+	table: TableRead = lane_process_table.read_table,
+): Promise<LaneRoom> {
 	const open = lanes ?? (await lane_registry.list_lanes())
-	const occupied = await occupied_lanes(open)
+	const occupied = await occupied_lanes(open, table)
 	const seated = open.filter((lane) => !lane.is_stranded).length
 
 	return { occupied, use: { occupied: occupied.length, seated } }
