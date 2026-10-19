@@ -639,14 +639,15 @@ Below the header: a row per touched child (phase icon, elapsed time, CPU and mem
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped, with no elapsed time; a probe that does not answer leaves it running. A single frame that finds an idle lane waits out the window and reads again.
 
-A waiting row (`⏳`) ends with why it waits, in English whatever the session language, after its `🔗` blockers — which are drawn as before, so a row with both shows both:
+A waiting row (`⏳`) ends with why it waits, in English whatever the session language, after its `🔗` blockers, so a row with both shows both:
 
 - `untriaged` — the issue carries neither `run:lane` nor `run:solo`. It is the one reason drawn beside a `🔗`, since judging it is what a person can do meanwhile.
-- `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local `YYYY-MM-DD HH:MM`; `backlog:next` keeps the UTC spelling. It comes before every reason below.
-- `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
-- `after <N> · <file>` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
-- `next free lane (<used>/<limit>)` — nothing else keeps it waiting and the open lanes have reached the lane limit (the free count `lane:limit` prints, read at the board's last local read): `next free lane (4/4)`. Every lane `lane:limit` counts is counted, even one an earlier run left that no row shows. An unread limit leaves `next free lane` alone.
-- `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads under critical and 🧠 and 💾 are under yellow. The ledger records the hold as `memory`, its own `lane:stats` row. An unread figure is left out.
+- `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local `YYYY-MM-DD HH:MM`; `backlog:next` keeps the UTC spelling. First of the reasons below.
+- `after <N> · named order` — a named run's declared issue is in flight ahead of it; `<N>` is the one declared before it. Never on a `run:add` issue; first of the reasons below.
+- `held by triage` — judged and unblocked, but an unblocked untriaged issue withholds the whole pool.
+- `after <N> · <file>` — a path its body declares overlaps one the running issue `<N>` declares; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `next free lane (<used>/<limit>)` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read: `next free lane (4/4)`. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves `next free lane` alone.
+- `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows its stage, such as `opening lane 5″`.
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.

@@ -108,7 +108,7 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 	it('warns as for a failed read when the read rejects', async () => {
 		const [, landed] = await across_landing(rejecting)
 
-		expect(title_of(landed)).toContain(`⚠ ${WORDS.plan}`)
+		expect(title_of(landed)).toContain(`❗ ${WORDS.plan}`)
 		expect(title_of(landed)).not.toMatch(SPINNING)
 	})
 })

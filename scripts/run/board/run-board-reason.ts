@@ -1,7 +1,9 @@
+import { backlog_drive_named } from '#scripts/backlog/backlog-drive-named'
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_labels } from './run-board-labels'
@@ -12,7 +14,7 @@ import type { ItemStatus } from './run-board-status'
 
 // Why each waiting row waits — pure, so the words are tested apart from the screen. A row whose lane is
 // being opened says the stage that lane is at; any other says what `backlog:next` would answer for it,
-// read off the same rules: `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
+// read off the same rules: the driver's declared order for a named run's issue, `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
 // running issue holds, the lane limit for a full pool. A start time the body declares and the clock has
 // not reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers
 // the row until then; it reads in the local time every other time on the board does (#4017). A blocker stays the row's `🔗`; only a row that nobody has judged says so beside
@@ -29,6 +31,7 @@ const WORDS = {
 	no_lane: 'next free lane',
 	no_memory: 'no memory headroom',
 	after: 'after',
+	named: 'named order',
 } as const
 
 const FIGURE_SEPARATOR = ' · '
@@ -53,6 +56,8 @@ interface ReasonRead extends Overlay {
 	is_memory_held?: boolean | undefined
 	// The machine's latest gauges, the figures a memory hold names.
 	gauges?: MachineGauges | undefined
+	// The run's record, whose declared order holds the issues declared after one in flight.
+	carry?: RunCarry | undefined
 	// A stopped run opens no lane, so a stage its stream ends on is not one any lane is at.
 	is_stopped: boolean
 }
@@ -150,9 +155,25 @@ function room_wait(read: ReasonRead): string | undefined {
 	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
 }
 
-// A candidate nothing blocks, in the order `backlog:next` answers: the pool held for a judgment, then
-// a path a running issue declares, then a pool with no lane left, then a machine with no memory.
+// `after 4198 · named order`: the declared issue a named run starts this one after — the driver's own
+// reading (`backlog-drive-named.ts`), asked before it offers anything.
+function named_of(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
+	if (read.carry === undefined) return undefined
+	const in_flight = pool.running.map(String)
+	const holder = backlog_drive_named.held_after(read.carry, in_flight, child.number)
+
+	return holder === undefined
+		? undefined
+		: `${WORDS.after} ${String(holder)}${FIGURE_SEPARATOR}${WORDS.named}`
+}
+
+// A candidate nothing blocks, in the order the driver answers: the declared order, then what
+// `backlog:next` answers — the pool held for a judgment, then a path a running issue declares, then a
+// pool with no lane left, then a machine with no memory.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
+	const named = named_of(child, read, pool)
+
+	if (named !== undefined) return named
 	if (pool.is_held) return WORDS.held
 
 	return overlap_of(child, read, pool) ?? room_wait(read)

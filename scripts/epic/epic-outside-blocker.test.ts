@@ -53,7 +53,7 @@ describe('epic_outside_blocker.outside_category — an unread blocker', () => {
 			category: 'time',
 			notice: {
 				key: `unread:${CHILD_KEY}:${BLOCKER_KEY}`,
-				message: `⚠ ${session_cite.issue(CHILD_NUMBER, undefined, REPO)} is blocked by ${BLOCKER_KEY}, whose state could not be read — it waits rather than runs`,
+				message: `❗ ${session_cite.issue(CHILD_NUMBER, undefined, REPO)} is blocked by ${BLOCKER_KEY}, whose state could not be read — it waits rather than runs`,
 			},
 		})
 	})
@@ -92,7 +92,7 @@ describe('epic_outside_blocker.outside_category — an open blocker', () => {
 			category: 'human',
 			notice: {
 				key: `outside:${CHILD_KEY}:${BLOCKER_KEY}`,
-				message: `⚠ ${session_cite.issue(CHILD_NUMBER, undefined, REPO)} waits on ${BLOCKER_KEY}, which this run will not finish — withheld for a person`,
+				message: `❗ ${session_cite.issue(CHILD_NUMBER, undefined, REPO)} waits on ${BLOCKER_KEY}, which this run will not finish — withheld for a person`,
 			},
 		})
 	})
