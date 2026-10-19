@@ -28,7 +28,7 @@ Log auto-decisions: an Issue comment in an Issue workflow, else a one-line "Auto
 
 ## Critical Conventions (non-standard — always apply)
 
-Naming, exports, file names and content rules are enforced by `eslint/rules/`; their single source is `prompts/coding-standards.md` → "Conventions". `function` syntax, not arrows (named SvelteKit route handlers may use typed-const arrows); lint does not check it.
+Naming, exports, file names and content rules are enforced by `eslint/rules/`; their single source is `prompts/coding-standards.md` → "Conventions". `function` syntax, not arrows (named SvelteKit route handlers may use typed-const arrows), `func-style`.
 
 ### Quality limits
 
