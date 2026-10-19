@@ -61,7 +61,7 @@ interface ReadTally {
 }
 
 // The run's own instructions are not the Issue's subject and cannot be delegated, so they never count.
-// Matched relative to the repository root, so `scripts/eval/prompts/x.ts` stays subject code.
+// Matched relative to the repository root, so `tools/eval/prompts/x.ts` stays subject code.
 const INSTRUCTION_PATHS: ReadonlyArray<string> = ['prompts', '.claude/skills']
 const INSTRUCTION_FILES: ReadonlySet<string> = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'])
 const REPOSITORY_ROOT = process.cwd()

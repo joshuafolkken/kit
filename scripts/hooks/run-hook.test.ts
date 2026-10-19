@@ -67,7 +67,7 @@ function create_package(package_root: string, has_bundles = true): void {
 
 	mkdirSync(path.dirname(launcher_path), { recursive: true })
 	copyFileSync(RUN_HOOK_SOURCE, launcher_path)
-	write_file(path.join(package_root, 'scripts/hooks/hook-bundle-ready.ts'), GATE_STUB)
+	write_file(path.join(package_root, 'tools/hooks/hook-bundle-ready.ts'), GATE_STUB)
 	write_file(path.join(package_root, 'dist/josh.js'), DISPATCHER_STUB)
 	if (has_bundles) write_file(path.join(package_root, 'dist/hooks/demo-hook.js'), BUNDLE_STUB)
 }

@@ -1,10 +1,10 @@
-import { josh_harness, type JoshEnvironment } from '#scripts/test/josh-harness'
-import { josh_harness_fixture } from '#scripts/test/josh-harness-fixture'
+import { josh_harness, type JoshEnvironment } from '#tools/test/josh-harness'
+import { josh_harness_fixture } from '#tools/test/josh-harness-fixture'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 // Smoke test: pack the real tarball, install in a temp consumer project, and run the published
 // CLI through the bin entry. The assembly is the integration harness's packed environment
-// (`scripts/test/josh-harness-environment.ts`). Excluded from the unit gate (slow — ~60 s setup);
+// (`tools/test/josh-harness-environment.ts`). Excluded from the unit gate (slow — ~60 s setup);
 // run before release with: pnpm vitest run --config vitest.harness.config.ts
 
 const SETUP_TIMEOUT_MS = 120_000

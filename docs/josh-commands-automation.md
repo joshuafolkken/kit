@@ -2,7 +2,7 @@
 
 The commands a person rarely types: the ones Claude Code hooks, git hooks, the issue-driven workflow runs (`fullrun`, `backlogrun`, …) and lanes call, plus the `maintainer` commands kit's own maintainers run. Where each command came from: `docs/maintainers/josh-commands-automation-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-automation.ts`, `scripts/josh/josh-usage-workflow.ts` and `scripts/josh/josh-usage-hooks.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-automation.ts`, `scripts/josh/josh-usage-workflow.ts` and `scripts/josh/josh-usage-hooks.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
 
 ## Development
 
@@ -80,7 +80,7 @@ Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/in
 
 - **`<project-root prefix>`** — `cd`s to `git rev-parse --show-toplevel` (with the git location variables a git hook exports cleared first), so a hook fired from a subdirectory still finds its relative paths. It is the same prefix the consumer rewrite applies, written out in full in the real file.
 - **The launcher** (`scripts/hooks/run-hook.sh <name>`) hands the hook to the ready gate, falling back to `pnpm josh <command>`.
-- **The ready gate** (`scripts/hooks/hook-bundle-ready.ts`) runs the bundle when its recorded digest matches the source, and rebuilds it in-process when stale.
+- **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its recorded digest matches the source, and rebuilds it in-process when stale.
 - A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on the installed `dist/hooks/` — the published bundles have no source beside them to go stale against — and whose fallback is the `dist/josh.js` dispatcher.
 
 - The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's, not this one's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.

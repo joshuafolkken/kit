@@ -10,7 +10,7 @@
 # - The pre-built bundle `dist/hooks/<name>.js` runs once its gate passes; otherwise the live source
 #   runs through josh, whose command is the name with its first `-` turned into `:`
 #   (`pretool-guard` → `pretool:guard`).
-# - In kit's own checkout the gate is `hook-bundle-ready.ts`, which rebuilds stale bundles
+# - In kit's own checkout the gate is the kit-only `tools/hooks/hook-bundle-ready.ts`, which rebuilds stale bundles
 #   (joshuafolkken/kit#2984) and then runs the bundle — or the josh fallback — itself, so a hook call
 #   starts node once (joshuafolkken/kit#3327). In an installed package it is a presence check: the
 #   published bundles cannot be stale against a source the consumer never edits, and Node strips no
@@ -35,6 +35,6 @@ case $0 in
 	if [ -d "$package_dir/dist/hooks" ]; then exec node "$bundle" "$@"; else exec node "$package_dir/dist/josh.js" "$josh_command" "$@"; fi
 	;;
 *)
-	exec node --disable-warning=ExperimentalWarning "$hooks_dir/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
+	exec node --disable-warning=ExperimentalWarning "$package_dir/tools/hooks/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
 	;;
 esac

@@ -23,7 +23,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		],
 	},
 	'dogfood:commit': {
-		script: 'scripts/dogfood/dogfood-commit-cli.ts',
+		script: 'tools/dogfood/dogfood-commit-cli.ts',
 		description: "Make the first commit of a dogfood run's own kit-test-* project",
 		category: 'Project',
 		reference: ['<dir>', 'automation', ['files', 'git']],

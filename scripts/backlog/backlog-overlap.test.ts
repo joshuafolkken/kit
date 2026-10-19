@@ -23,11 +23,11 @@ const LINES_DIRECTORY = 'scripts/lines/'
 
 // The paths joshuafolkken/kit#3582 and joshuafolkken/kit#3586 declared, abridged.
 const LIMITS_BODY = [
-	'- `scripts/lines/effective-limit.ts` と `scripts/metrics/metrics-ratchet.ts` を直す',
+	'- `scripts/lines/effective-limit.ts` と `tools/metrics/metrics-ratchet.ts` を直す',
 	'- 対象は `scripts/` の外に出ない（`joshuafolkken/kit#N`）',
 ].join('\n')
 const LINT_BODY =
-	'- `scripts/lines/**`、`scripts/metrics/**`、`scripts/lint/**` を `scripts/` の中で直す'
+	'- `scripts/lines/**`、`tools/metrics/**`、`scripts/lint/**` を `scripts/` の中で直す'
 // joshuafolkken/kit#3583 and joshuafolkken/kit#3584 each declared directories of their own.
 const RUN_BODY = '- `scripts/run/**` を直す（`scripts/`、`joshuafolkken/kit#N`）'
 const BACKLOG_BODY = '- `scripts/backlog/**` と `scripts/epic/**` を直す（`scripts/`）'
@@ -79,10 +79,10 @@ describe('backlog_overlap.declared_paths', () => {
 	})
 
 	it('reads a directory glob as the directory it names', () => {
-		const body = '`scripts/lines/**`, `scripts/metrics/*.ts` and `.github/workflows/`'
+		const body = '`scripts/lines/**`, `tools/metrics/*.ts` and `.github/workflows/`'
 
 		expect(backlog_overlap.declared_paths(body)).toStrictEqual(
-			new Set([LINES_DIRECTORY, 'scripts/metrics/', '.github/workflows/']),
+			new Set([LINES_DIRECTORY, 'tools/metrics/', '.github/workflows/']),
 		)
 	})
 

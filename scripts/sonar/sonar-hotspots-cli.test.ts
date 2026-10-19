@@ -1,4 +1,4 @@
-import { http_fault_injection } from '#scripts/test/http-fault-injection'
+import { http_fault_injection } from '#tools/test/http-fault-injection'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sonar_hotspots_cli } from './sonar-hotspots-cli'
 

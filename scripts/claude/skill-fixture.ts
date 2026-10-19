@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { skill_meta } from './skill-meta'
+import { skill_meta } from '#tools/claude/skill-meta'
 
 // Every skill this package distributes is asserted the same way — it ships as a directory, its entry
 // file opens with frontmatter Claude Code can read, and that frontmatter carries the description

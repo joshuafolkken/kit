@@ -2,8 +2,8 @@ import { lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { codex_hooks, type HookConfig } from '#scripts/agent/codex-hooks'
-import { prompt_hooks } from '#scripts/hooks/prompt-hooks'
 import { init_logic } from '#scripts/init/init-logic'
+import { prompt_hooks } from '#tools/hooks/prompt-hooks'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')

@@ -1,4 +1,4 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_batch_guard } from './time-batch-guard'
 import {
@@ -305,9 +305,9 @@ describe('time_batch_guard.should_block — the re-fire cadence', () => {
 
 describe('time_batch_guard.should_block — the target veto with a quoted pattern', () => {
 	// joshuafolkken/kit#1611. The dependency veto is the one thing `targets` decides here, so narrowing
-	// what a line names moves it. A quoted search pattern names nothing: `grep -rn "scripts/time"
+	// what a line names moves it. A quoted search pattern names nothing: `grep -rn "tools/time"
 	// scripts/fresh.ts` looks for that text *inside* `scripts/fresh.ts` and does not need whatever earlier
-	// call read `scripts/time`. While `bash_facts` tokenized the quotes, the pair shared a word and the
+	// call read `tools/time`. While `bash_facts` tokenized the quotes, the pair shared a word and the
 	// veto let this call through; now it is refused, which is the answer the sequence had all along.
 	it('refuses a call whose only shared word was a quoted search pattern', () => {
 		const text = transcript(

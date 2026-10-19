@@ -1,5 +1,5 @@
 import { read_repo_file, routing_documents } from '#scripts/document/ai-document-fixture'
-import { single_source, type SingleSourceRule } from '#scripts/document/single-source'
+import { single_source, type SingleSourceRule } from '#tools/document/single-source'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2189. The simple workflow entries (`kickoff` / `fullrun` / `halfrun` and the

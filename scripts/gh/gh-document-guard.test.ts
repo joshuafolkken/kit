@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
 // **This is deliberately not an extension of `gh-subcommand-guard.ts`.** That guard walks a
 // TypeScript syntax tree to find a spawn; this one reads markdown. They share no logic, and the
 // module that guards code loads the TypeScript compiler, which every document suite would then pay
-// for. The two were kept independent on purpose (`scripts/gh/gh-subcommand-guard.ts` says so from its
+// for. The two were kept independent on purpose (`tools/gh/gh-subcommand-guard.ts` says so from its
 // own side), and the `api` literal below is the only fact they have in common.
 //
 // **The scan is scoped to fenced code blocks, and that scope is the whole design.** A prose matcher

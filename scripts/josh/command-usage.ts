@@ -11,7 +11,7 @@ import { SESSION_USAGE } from './josh-usage-session'
 import { WORKFLOW_USAGE } from './josh-usage-workflow'
 
 // The single renderer of a command's usage. `josh help <command>` prints it and
-// `scripts/document/generate-command-usage.ts` writes it between a reference page's usage markers,
+// `tools/document/generate-command-usage.ts` writes it between a reference page's usage markers,
 // so the terminal and the page are one text (#3932).
 
 type UsageTable = Readonly<Record<string, CommandUsage>>

@@ -3,7 +3,7 @@ import { stamp_file } from './stamp-file'
 
 // A stamp whose payload is "when this was taken, and the digest of every file it covers".
 //
-// `scripts/eval/eval-stamp.ts` was the only holder of this shape. `josh review:brief` needs two more
+// `tools/eval/eval-stamp.ts` was the only holder of this shape. `josh review:brief` needs two more
 // records of exactly the same kind — the gate's result, and the snapshot round 1 takes so round 2
 // can name the fix delta — and copying the payload type, its validation, the guarded read and the
 // comparison into a second module is the clone `CLAUDE.md` prohibits. What genuinely differs between

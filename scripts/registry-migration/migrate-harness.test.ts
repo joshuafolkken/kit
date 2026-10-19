@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { josh_harness, type EnvironmentKind } from '#scripts/test/josh-harness'
-import { josh_harness_fixture } from '#scripts/test/josh-harness-fixture'
+import { josh_harness, type EnvironmentKind } from '#tools/test/josh-harness'
+import { josh_harness_fixture } from '#tools/test/josh-harness-fixture'
 import { expect, it } from 'vitest'
 
 const KINDS: ReadonlyArray<Exclude<EnvironmentKind, 'packed'>> = ['kit', 'consumer', 'lane']

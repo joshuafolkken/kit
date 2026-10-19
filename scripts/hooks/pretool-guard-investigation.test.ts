@@ -6,7 +6,7 @@ import { refusal_path, SWITCH_ENV_KEY } from '#scripts/delegation/investigation-
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 

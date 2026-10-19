@@ -1,4 +1,4 @@
-import { time_span_fixture } from '#scripts/time/time-span-fixture'
+import { time_span_fixture } from '#tools/time/time-span-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_bundles } from './time-bundles'
 import { time_spans, type Span } from './time-spans'

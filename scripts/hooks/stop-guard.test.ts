@@ -21,7 +21,7 @@ import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
 

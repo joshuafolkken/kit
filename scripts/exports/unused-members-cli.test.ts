@@ -2,9 +2,9 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { NOTHING_TO_CHECK_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { unused_members_fixture } from '#tools/exports/unused-members-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { unused_members_cli } from './unused-members-cli'
-import { unused_members_fixture } from './unused-members-fixture'
 
 const { create_project, with_reader, READ_KEPT } = unused_members_fixture
 const PASS_EXIT_CODE = 0

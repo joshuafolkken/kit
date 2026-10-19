@@ -1,4 +1,4 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 
 // Command and transcript-tail fixtures shared by the delivery suites — `delivered-rules.test.ts`,
 // `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts` and `filing-cap.test.ts`.

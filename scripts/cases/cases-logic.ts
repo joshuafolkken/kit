@@ -3,7 +3,7 @@ import { file_reader } from '#scripts/lib/read-file'
 // `josh cases <path...>`: read the changed paths and answer which I/O
 // boundaries the code crosses — network, process start, filesystem — then name the abnormal cases
 // that boundary always owes. The unit suite blocks network by construction
-// (`scripts/test/test-network-guard.ts`), so a boundary's abnormal cases never run there; this makes
+// (`tools/test/test-network-guard.ts`), so a boundary's abnormal cases never run there; this makes
 // the declaration side name them instead, read off the diff rather than off judgement.
 // `prompts/collaboration-workflow/report-format.md` is the single source of where the answer goes —
 // the second tier of the case-based test declaration ("if it breaks").

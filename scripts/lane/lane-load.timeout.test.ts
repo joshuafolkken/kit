@@ -1,5 +1,5 @@
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_load } from './lane-load'
 import { lane_registry } from './lane-registry'
@@ -10,7 +10,7 @@ import { lane_registry } from './lane-registry'
 // joshuafolkken/kit#3874: the `ps` listing is read beside the memory under the same budget.
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })

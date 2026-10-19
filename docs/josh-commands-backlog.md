@@ -2,7 +2,7 @@
 
 The commands the issue-driven workflow calls to read and file issues, track epics, pick and plan a backlog, brief and attest a review, and decide what a run delegates. Where each command came from: `docs/maintainers/josh-commands-backlog-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-issue.ts`, `scripts/josh/josh-usage-backlog.ts` and `scripts/josh/josh-usage-review.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-issue.ts`, `scripts/josh/josh-usage-backlog.ts` and `scripts/josh/josh-usage-review.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
 
 ## Issues
 

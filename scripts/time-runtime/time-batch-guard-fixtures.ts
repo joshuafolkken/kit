@@ -8,7 +8,7 @@ import type { GuardedCall } from './time-batch-guard'
 const NEVER_REFUSED = 0
 const FRESH_PATH = 'scripts/fresh.ts'
 // A path-shaped word that appears only inside quotes (joshuafolkken/kit#1611).
-const QUOTED_PATTERN = 'scripts/time'
+const QUOTED_PATTERN = 'tools/time'
 const FRESH_CALL: GuardedCall = { name: 'Read', input: { file_path: FRESH_PATH } }
 // The two calls both predicate tables name, and their labels, so neither the fixture nor the wording is
 // written twice.
