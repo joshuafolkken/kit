@@ -7,10 +7,10 @@ import type { ItemState } from './run-board-status'
 
 // joshuafolkken/kit#3480: the states the rows draw, in English.
 // joshuafolkken/kit#3544: the legend is drawn apart from the rows, which tell it the icons they draw.
-// joshuafolkken/kit#4047: only what the frame draws — in progress, waiting and done on one line, the
-// kinds and the rest on the next.
+// joshuafolkken/kit#4047: only what the frame draws. joshuafolkken/kit#4173: on one line, and never an
+// icon the frame draws beside its own word.
 
-const { STATE_ICONS } = run_board_labels
+const { NOT_BEFORE_ICON, STATE_ICONS } = run_board_labels
 // joshuafolkken/kit#3767: the third line's kind is named among what is in progress.
 const OPERATION = '🔧 operation'
 const CODERABBIT = '🐰 CodeRabbit'
@@ -45,13 +45,11 @@ describe('run_board_render_legend.legend_of phases', () => {
 	it('names only the phases the frame draws, in the order a run passes them', () => {
 		const icons = new Set(['🚢', '🔨', '⚓'])
 
-		expect(legend_of([row(1)], { icons })).toStrictEqual([
-			'🔨 implement  🚢 ship  ⚓ followup  ⏳ queued',
-		])
+		expect(legend_of([row(1)], { icons })).toStrictEqual(['🔨 implement  🚢 ship  ⚓ followup'])
 	})
 
 	it('names no phase where the frame draws none', () => {
-		expect(legend_of([row(1)])).toStrictEqual(['⏳ queued'])
+		expect(legend_of([row(1, { state: 'parked' })])).toStrictEqual(['💤 parked'])
 	})
 
 	it('names 🔄 only while a row leads with it, not for a row led by its phase', () => {
@@ -64,30 +62,30 @@ describe('run_board_render_legend.legend_of phases', () => {
 })
 
 describe('run_board_render_legend.legend_of order', () => {
-	it('names in progress, then waiting, then done, on one line', () => {
-		const rows = rows_in(['withdrawn', 'merged', 'waiting', 'parked', 'human', 'stopped', 'done'])
+	it('names in progress, then what has settled, then the kinds and the rest, on one line', () => {
+		const rows = [...rows_in(['withdrawn', 'parked', 'stopped', 'done']), row(5, { kind: 'bug' })]
 		const leads = new Set([...rows.map((entry) => STATE_ICONS[entry.state]), '🔨'])
 
 		expect(legend_of(rows, { leads, icons: leads, named: [OPERATION] })).toStrictEqual([
-			`🔨 implement  ${OPERATION}  💤 parked  ⏳ queued  🛑 stopped  🙋 decision  ✅ merged  🏁 done  🚫 withdrawn`,
+			`🔨 implement  ${OPERATION}  💤 parked  🛑 stopped  🏁 done  🚫 withdrawn  🐛 fix`,
 		])
 	})
 
 	// joshuafolkken/kit#3577: by their release category, in the release notes' order.
-	it('names the kinds the rows draw on the next line, in the release notes’ order', () => {
+	it('names the kinds the rows draw, in the release notes’ order', () => {
 		const kinds = [row(1, { kind: 'bug' }), row(2, { kind: 'breaking-change' }), row(3)]
 		const every = [...kinds, row(4, { kind: 'enhancement' })]
 
-		expect(legend_of(kinds)).toStrictEqual(['⏳ queued', '🧨 breaking  🐛 fix'])
-		expect(legend_of(every).at(-1)).toBe('🧨 breaking  ✨ feature  🐛 fix')
+		expect(legend_of(kinds)).toStrictEqual(['🧨 breaking  🐛 fix'])
+		expect(legend_of(every)).toStrictEqual(['🧨 breaking  ✨ feature  🐛 fix'])
 	})
 
 	it('names 🔗 and the checks after the kinds', () => {
 		const rows = [row(1, { kind: 'enhancement', waits: ['2'] })]
 
-		expect(legend_of(rows, { checks: [CODERABBIT] }).at(-1)).toBe(
+		expect(legend_of(rows, { checks: [CODERABBIT] })).toStrictEqual([
 			`✨ feature  🔗 waits on  ${CODERABBIT}`,
-		)
+		])
 		expect(legend_of([row(1)]).join('\n')).not.toContain('🔗')
 	})
 
@@ -96,9 +94,9 @@ describe('run_board_render_legend.legend_of order', () => {
 		const rows = [row(1, { waits: ['2'] })]
 		const held = ['🚧 held check', '💪 cores']
 
-		expect(legend_of(rows, { held, checks: [CODERABBIT] }).at(-1)).toBe(
+		expect(legend_of(rows, { held, checks: [CODERABBIT] })).toStrictEqual([
 			`🔗 waits on  🚧 held check  💪 cores  ${CODERABBIT}`,
-		)
+		])
 		expect(legend_of(rows).join('\n')).not.toContain('🚧')
 	})
 
@@ -107,15 +105,24 @@ describe('run_board_render_legend.legend_of order', () => {
 	})
 })
 
+// joshuafolkken/kit#4173: ⏳ under `⏳ queued`, 🙋 under `🙋 decision`, ✅ under `✅ done` and 📅
+// before `not before <time>` carry their own word.
+describe('run_board_render_legend.legend_of icons drawn with their own word', () => {
+	it('names none of ⏳, 📅, 🙋 and ✅, and draws nothing where they are all the frame draws', () => {
+		const rows = rows_in(['waiting', 'human', 'merged'])
+		const leads = new Set([...rows.map((entry) => STATE_ICONS[entry.state]), NOT_BEFORE_ICON])
+
+		expect(legend_of(rows, { leads, icons: leads })).toStrictEqual([])
+	})
+})
+
 describe('run_board_render_legend.legend_of with the third line’s kind', () => {
 	it('names the kind after the phases where the line’s own words do not name it', () => {
-		expect(legend_of([row(1)], { named: [OPERATION] })).toStrictEqual([`${OPERATION}  ⏳ queued`])
+		expect(legend_of([row(1)], { named: [OPERATION] })).toStrictEqual([OPERATION])
 	})
 
 	// joshuafolkken/kit#3769: the header and a row's tail can both draw 🔧, named once.
 	it('names a kind the header and a row both draw once', () => {
-		expect(legend_of([row(1)], { named: [OPERATION, OPERATION] })).toStrictEqual([
-			`${OPERATION}  ⏳ queued`,
-		])
+		expect(legend_of([row(1)], { named: [OPERATION, OPERATION] })).toStrictEqual([OPERATION])
 	})
 })
