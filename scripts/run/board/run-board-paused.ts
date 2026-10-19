@@ -1,3 +1,4 @@
+import { lane_paused } from '#scripts/lane/lane-paused'
 import type { ItemStatus } from './run-board-status'
 
 // joshuafolkken/kit#4198: a lane whose processes are all suspended — by `lane:pause` or a hand-sent
@@ -7,13 +8,10 @@ import type { ItemStatus } from './run-board-status'
 // the one listing the usage columns already take, and each process's lane is the one that listing
 // already found, so a paused lane costs no `pgrep` or `ps` of its own.
 //
-// **A lane is paused when it has a process and every one is stopped (`T`).** A zombie (`Z`) has
-// already exited and stops nothing, so it is left out either way; one process still running keeps the
-// lane running. **The time a lane was first seen paused is kept** across samples, so the row's elapsed
-// time stops there rather than counting on.
+// **What paused means is `lane_paused.is_paused`'s** — the one reading the lane limit counts on too.
+// **The time a lane was first seen paused is kept** across samples, so the row's elapsed time stops
+// there rather than counting on.
 
-const STOPPED_STATE = 'T'
-const ZOMBIE_STATE = 'Z'
 const PAUSED_STATE = 'paused'
 const RUNNING_STATE = 'running'
 
@@ -22,11 +20,7 @@ interface StatedProcess {
 	stat: string
 }
 
-function is_live(stat: string): boolean {
-	return !stat.startsWith(ZOMBIE_STATE)
-}
-
-// Each lane's live processes' states.
+// Each lane's processes' states.
 function lane_states(
 	listed: ReadonlyMap<number, StatedProcess>,
 	lanes: ReadonlyMap<number, string | undefined>,
@@ -36,7 +30,7 @@ function lane_states(
 	for (const [pid, { stat }] of listed) {
 		const lane = lanes.get(pid)
 
-		if (lane !== undefined && is_live(stat)) states.set(lane, [...(states.get(lane) ?? []), stat])
+		if (lane !== undefined) states.set(lane, [...(states.get(lane) ?? []), stat])
 	}
 
 	return states
@@ -48,7 +42,7 @@ function paused_lanes(
 	lanes: ReadonlyMap<number, string | undefined>,
 ): Set<string> {
 	const states = [...lane_states(listed, lanes)]
-	const paused = states.filter(([, stats]) => stats.every((stat) => stat.startsWith(STOPPED_STATE)))
+	const paused = states.filter(([, stats]) => lane_paused.is_paused(stats))
 
 	return new Set(paused.map(([lane]) => lane))
 }
