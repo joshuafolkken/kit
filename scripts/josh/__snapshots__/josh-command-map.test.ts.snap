@@ -1137,6 +1137,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "run:pause": [
+      "<issue> --for <prerequisite>",
+      "automation",
+      [
+        "git",
+        "network",
+        "files",
+      ],
+    ],
     "run:prep": [
       "<issue>",
       "automation",

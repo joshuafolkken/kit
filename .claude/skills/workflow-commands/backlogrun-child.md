@@ -15,7 +15,8 @@ or a split found mid-run does **not** stop it:
 
 1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
    confirmation.
-2. **Stash and remove `in-progress`**, as steps 2 and 4 of "A prerequisite discovered mid-run" do:
+2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
+   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
    `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**

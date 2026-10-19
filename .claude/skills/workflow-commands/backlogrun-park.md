@@ -116,21 +116,11 @@ Something else in **this** repository has to land first: not a split, not an ups
 
 1. File the prerequisite `<N>` with `route:tier-a` (Tier A, first-party, no confirmation) — **first**,
    because the next step names it.
-2. **Stash the work in progress**:
-
-   ```bash
-   pnpm josh stash:push "backlogrun: paused #<M> for prerequisite #<N>"
-   pnpm josh issue:comment <M> --body-file <path>   # what was stashed, and that #<N> must land first
-   ```
-
-   Pop it with `pnpm josh stash:pop "backlogrun: paused #<M> for prerequisite #<N>"` when `epic:next`
-   offers `<M>` again, after its `pnpm josh ms`; expect conflicts.
-3. `pnpm josh epic --add <E> <N> --before <M>` — row, declaration and `blocked-by` in one command;
-   never a hand edit. **With no epic**, record `<M>` blocked by `<N>` alone with the `gh api
-   …/dependencies/blocked_by` call in
-   `prompts/collaboration-workflow/issue-template.md` → "複数 Issue に分割するときの epic Issue", step 4.
-4. **Remove `in-progress` from `<M>`** — `pnpm josh run:release <M>`; a labelled child is never offered again.
-5. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
+2. **`pnpm josh run:pause <M> --for <N>`** — the stash, the comment naming its `stash:pop`, `<M>`
+   blocked by `<N>` (the epic's row and declaration too) and `run:release <M>` in one call
+   (`prerequisite.md`). Pop the stash the comment names when `epic:next` offers `<M>` again, after its
+   `pnpm josh ms`; expect conflicts.
+3. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
 
 **A stop a dependency can express is never parked**, including a defect in this repository's own gate
 or run tooling — `prerequisite.md`.
