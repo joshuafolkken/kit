@@ -60,6 +60,7 @@ const SETTLED_STATES: LeadWords = [
 	...states_of([
 		['paused', 'paused'],
 		['stopped', 'stopped'],
+		['earlier', 'earlier'],
 		['human', 'decision'],
 		['merged', 'merged'],
 		['done', 'done'],

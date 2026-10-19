@@ -45,6 +45,9 @@ interface LocalRead {
 	// The open lanes that last took a child before the run started — an earlier run's, until this run
 	// dispatches into one again.
 	earlier_lanes?: ReadonlyArray<string> | undefined
+	// The earlier run's lanes that still hold a place under the limit — counted in `occupied_count`, so
+	// the lanes section draws them beside this run's own.
+	earlier_occupied?: ReadonlyArray<string> | undefined
 	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
 	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
@@ -108,17 +111,26 @@ function earlier_lanes(lanes: ReadonlyArray<LaneInfo>, started_ms: number): Arra
 		.map((lane) => lane.issue)
 }
 
-type LaneRoomRead = Pick<LocalRead, 'free_lanes' | 'lane_limit' | 'occupied_count'>
+type LaneRoomRead = Pick<
+	LocalRead,
+	'free_lanes' | 'lane_limit' | 'occupied_count' | 'earlier_occupied'
+>
 
-// The lanes against the limit, read once so the free count and the lanes it counts agree.
-async function lane_room_of(lanes: ReadonlyArray<LaneInfo>): Promise<LaneRoomRead> {
+// The lanes against the limit, read once so the free count, the lanes it counts and the earlier run's
+// among them agree.
+async function lane_room_of(
+	lanes: ReadonlyArray<LaneInfo>,
+	earlier: ReadonlyArray<string>,
+): Promise<LaneRoomRead> {
 	const room = await backlog_ready.lane_room(lanes)
 	const count = await backlog_ready.count_in(room)
+	const occupied = room.occupied.map((lane) => lane.issue)
 
 	return {
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
-		occupied_count: room.occupied.length,
+		occupied_count: occupied.length,
+		earlier_occupied: occupied.filter((issue) => earlier.includes(issue)),
 	}
 }
 
@@ -143,6 +155,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes()
+	const earlier = earlier_lanes(lanes, span.started_ms)
 
 	return {
 		started_ms: span.started_ms,
@@ -155,8 +168,8 @@ async function read_local(): Promise<LocalRead | undefined> {
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		idle_lanes: lane_spent.idle_lanes(lanes),
-		earlier_lanes: earlier_lanes(lanes, span.started_ms),
-		...(await lane_room_of(lanes)),
+		earlier_lanes: earlier,
+		...(await lane_room_of(lanes, earlier)),
 		...ledger_here(repository),
 	}
 }

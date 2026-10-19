@@ -15,6 +15,7 @@ const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
 	human: 'decision',
 	parked: 'parked',
 	stopped: 'parked',
+	earlier: 'parked',
 	running: 'running',
 	paused: 'running',
 }

@@ -73,6 +73,9 @@ interface BoardLayout {
 	queued: ReadonlyArray<QueuedEntry>
 	people: ReadonlyArray<BoardRow>
 	unreached: ReadonlyArray<BoardRow>
+	// The earlier run's lanes that still hold a place under the limit — drawn after the run's own lanes,
+	// and no row the header counts.
+	earlier?: ReadonlyArray<BoardRow> | undefined
 }
 
 // What an active row is named and classified by — each issue's title and labels.
@@ -274,19 +277,40 @@ function waiting_children(overlay: Overlay): Array<EpicChild> {
 	)
 }
 
+// An earlier run's lane holding a place, unless this run has touched its issue since.
+function earlier_rows(
+	earlier: ReadonlyArray<string>,
+	statuses: ReadonlyMap<number, ItemStatus>,
+	read: RowRead,
+): Array<BoardRow> {
+	const numbers = earlier.map(Number).filter((number) => !statuses.has(number))
+
+	return numbers.map((number) => ({
+		number,
+		title: read.titles.get(number),
+		kind: run_board_kind.kind_of(read.labels.get(number)),
+		state: 'earlier',
+		status: undefined,
+		waits: [],
+	}))
+}
+
 function layout_of(
 	plan: BoardPlan,
 	statuses: ReadonlyMap<number, ItemStatus>,
 	reason_of?: ReasonOf,
+	earlier: ReadonlyArray<string> = [],
 ): BoardLayout {
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
+	const read = { titles: plan.context.titles, labels: plan.labels }
 
 	return {
-		active: active_rows(statuses, { titles: plan.context.titles, labels: plan.labels }),
+		active: active_rows(statuses, read),
 		queued: queued_entries(queue, overlay),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
+		earlier: earlier_rows(earlier, statuses, read),
 	}
 }
 
@@ -295,10 +319,16 @@ const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreache
 // The run's own children before the plan is read: the stream and the lanes are local and read at
 // once, so the rows, their states and how long each has run are drawn while GitHub answers; the titles
 // and every issue the run has not touched wait for the plan.
-function local_layout_of(statuses: ReadonlyMap<number, ItemStatus>): BoardLayout {
+function local_layout_of(
+	statuses: ReadonlyMap<number, ItemStatus>,
+	earlier: ReadonlyArray<string> = [],
+): BoardLayout {
+	const read = { titles: new Map(), labels: new Map() }
+
 	return {
 		...EMPTY_LAYOUT,
-		active: active_rows(statuses, { titles: new Map(), labels: new Map() }),
+		active: active_rows(statuses, read),
+		earlier: earlier_rows(earlier, statuses, read),
 	}
 }
 
@@ -312,6 +342,19 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 	const queued = layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
 
 	return [...layout.active, ...queued, ...layout.people, ...layout.unreached]
+}
+
+// Every row the frame draws — the counted ones and the earlier run's lanes — what the legend reads.
+function drawn_rows(layout: BoardLayout): Array<BoardRow> {
+	return [...rows_of(layout), ...(layout.earlier ?? [])]
+}
+
+// The lanes section's rows: the run's own that `apart` does not draw elsewhere, then the earlier run's
+// lanes still holding a place.
+function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<BoardRow> {
+	const own = layout.active.filter((row) => !apart.includes(row))
+
+	return [...own, ...(layout.earlier ?? [])]
 }
 
 // Every row waiting on a person's decision: the touched children parked on one, then the untouched
@@ -333,10 +376,12 @@ function listed_parks(layout: BoardLayout): ReadonlySet<number> {
 
 const run_board_layout = {
 	EMPTY_LAYOUT,
+	drawn_rows,
 	is_blocked,
 	is_decision,
 	is_finished,
 	is_settled,
+	lane_rows,
 	layout_of,
 	listed_parks,
 	local_layout_of,
