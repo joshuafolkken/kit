@@ -20,6 +20,7 @@ const ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/4135'
 const PR_URL = 'https://github.com/joshuafolkken/kit/pull/4200'
 const HALFRUN_RECOMMENDED = 'Verify by hand, then prrun #4135'
 const FULLRUN = 'fullrun #4135'
+const NEXT_LINE = 'Next: prrun #4135 | fullrun #4135'
 const RECOMMENDATION_TITLE = 'keeps the recommendation and the alternative the skill text named'
 const FACTS = { issue: ISSUE, title: TITLE, issue_url: ISSUE_URL }
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-stop-notify-test-'))
@@ -60,7 +61,7 @@ describe('halfrun_values', () => {
 		expect(values.body).toBe(
 			[
 				'halfrun ready for manual verification',
-				'Next: prrun #4135 | fullrun #4135',
+				NEXT_LINE,
 				`Without an agent: pnpm josh git -y ${QUOTED_TITLE} && pnpm josh followup ${QUOTED_TITLE}`,
 			].join('\n'),
 		)
@@ -84,6 +85,39 @@ describe('halfrun_values', () => {
 
 		expect(values.body).toContain(String.raw`pnpm josh followup 'Don'\''t $(break) #4135'`)
 		expect(values).not.toHaveProperty('issue-url')
+	})
+})
+
+describe('human_review_values', () => {
+	const LANE = '/lanes/4135'
+
+	it('leads with halfrun’s Next line and names the lane holding the uncommitted work', () => {
+		const values = run_stop_notify.human_review_values(FACTS, LANE)
+
+		expect(values.body).toBe(
+			[
+				'needs-human-review: implemented and gated, stopped before the commit',
+				NEXT_LINE,
+				`Working tree: ${LANE}`,
+			].join('\n'),
+		)
+		expect(values['issue-url']).toBe(ISSUE_URL)
+	})
+
+	it(RECOMMENDATION_TITLE, () => {
+		const values = run_stop_notify.human_review_values(FACTS, LANE)
+
+		expect(values['task-type']).toBe('confirmation')
+		expect(values.recommended).toBe('Review the working tree, then prrun #4135')
+		expect(values.alternative).toEqual([FULLRUN])
+	})
+
+	it('sends it with the repository root as the lane', async () => {
+		vi.spyOn(git_command, 'repository_root').mockResolvedValue(LANE)
+
+		await run_stop_notify.send_human_review(TARGET, ISSUE)
+
+		expect(JSON.stringify(sent_values())).toContain(`Working tree: ${LANE}`)
 	})
 })
 

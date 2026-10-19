@@ -18,9 +18,9 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    source; a cross-repository target resolves its checkout from `pnpm josh doctor` first
    (`target-repository.md`).
 2. **`in-progress` rides on the hold** — for a `#N`, `run:entry` applies it once the tree is held and
-   the budget allows the run; a `new` entry applies it right after filing (`fullrun-steps.md`). Every
-   stop that leaves the tree clean ends with `pnpm josh run:release <N>`, which removes the label with
-   the record (a `new` entry's bare release does not — `working-tree-hold.md`).
+   the budget allows the run; a `new` entry runs `pnpm josh run:hold --adopt <N>` right after filing,
+   which re-keys the hold and applies it (`fullrun-steps.md`). Every stop that leaves the tree clean
+   ends with `pnpm josh run:release <N>`, which removes the label with the record.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
    continues; `over` (or unanswerable) stops before the title — `run:entry` sends the `confirmation`
    Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`. **Skip it when

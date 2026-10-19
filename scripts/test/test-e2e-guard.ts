@@ -4,7 +4,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { environment_flags } from '@joshuafolkken/kit/env'
 import { core_budget } from '#scripts/gate/core-budget'
+import { gate_tree } from '#scripts/gate/gate-tree'
 import { execa } from 'execa'
+import { test_e2e_stamp } from './test-e2e-stamp'
 
 const PNPM = 'pnpm'
 // `--workers`, `--workers=<n>` and Playwright's `-j` short form.
@@ -93,9 +95,30 @@ async function run_guarded_e2e(
 	return 0
 }
 
+// A filter (`--grep`, a file, `--project`) answers for part of the suite, so only a run whose every
+// argument is a worker count answers for the whole of it.
+function is_whole_suite(extra_arguments: ReadonlyArray<string>): boolean {
+	return extra_arguments.every((argument) => WORKER_FLAGS.test(argument))
+}
+
+// A green answer — a pass or a printed skip — is recorded against the tree it ran on, which is what a
+// stop before commit asks (`test-e2e-stamp.ts`). The tree is read before the run, so an edit made while
+// the suite ran leaves a record that matches nothing.
+async function run_and_record(
+	project_directory: string,
+	extra_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	const tree = await gate_tree.read_gate_tree()
+	const exit_code = await run_guarded_e2e(project_directory, extra_arguments)
+
+	if (exit_code === 0 && is_whole_suite(extra_arguments)) test_e2e_stamp.record(tree)
+
+	return exit_code
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const extra_arguments = process.argv.slice(ARGV_START)
-	const exit_code = await run_guarded_e2e(process.cwd(), extra_arguments)
+	const exit_code = await run_and_record(process.cwd(), extra_arguments)
 
 	process.exit(exit_code)
 }
@@ -104,6 +127,7 @@ const test_e2e_guard = {
 	resolve_guard_action,
 	is_playwright_installed,
 	has_e2e_tests,
+	is_whole_suite,
 	run_guarded_e2e,
 }
 

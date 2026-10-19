@@ -14,9 +14,13 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: RUN_HOLD_SCRIPT,
 		description: 'Claim this working tree for a run, or say which run already holds it',
 		category: 'AI tools',
-		// A `--halfrun-stop` / `--prrun-stop` sends the stop confirmation.
+		// A `--halfrun-stop` / `--human-review-stop` / `--prrun-stop` sends the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		reference: ['[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]', 'automation', ['files']],
+		reference: [
+			'[<issue> [--fullrun | --halfrun-stop | --human-review-stop | --prrun-stop]] | --adopt <issue>',
+			'automation',
+			['files'],
+		],
 	},
 	'run:release': {
 		script: RUN_HOLD_SCRIPT,

@@ -23,6 +23,11 @@ vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn(
 // A numbered release strips the issue's `in-progress` on GitHub; `run-hold-cli-release.test.ts` pins it.
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
+// A stop before commit asks the e2e record first; `run-hold-cli-stop.test.ts` pins the refusal.
+vi.mock('#scripts/test/test-e2e-stamp', () => ({
+	test_e2e_stamp: { is_current_tree: vi.fn(async () => true) },
+}))
+
 const git_directories = vi.mocked(git_command.git_directories)
 const git_status = vi.mocked(git_command.status)
 const preflight_check = vi.mocked(run_preflight.check)
@@ -87,6 +92,8 @@ describe('parse_request', () => {
 		[[ISSUE, '--fullrun'], 'claim'],
 		[[ISSUE, HALFRUN_STOP_FLAG], 'halfrun-stop'],
 		[[ISSUE, '--prrun-stop'], 'prrun-stop'],
+		[[ISSUE, '--human-review-stop'], 'human-review-stop'],
+		[['--adopt', ISSUE], 'adopt'],
 		[['--release'], 'release'],
 		[['--release', ISSUE], 'release'],
 		[['--release', '--force'], 'force-release'],
@@ -100,6 +107,9 @@ describe('parse_request', () => {
 		[[ISSUE, '12']],
 		[['0']],
 		[['--fullrun']],
+		[['--adopt']],
+		[['--adopt', NOT_A_NUMBER]],
+		[['--adopt', ISSUE, OTHER_ISSUE]],
 	])('refuses %j', (argv) => {
 		expect(run_hold_cli.parse_request(argv)).toBeUndefined()
 	})

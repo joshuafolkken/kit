@@ -15,12 +15,15 @@ Guard a working tree so only one run holds it at a time — `run:hold` claims it
 ```bash
 pnpm josh run:hold 1091             # claim for issue 1091
 pnpm josh run:hold 1091 --fullrun   # claim as `fullrun #1091` (what `run:entry` runs)
+pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it filed
 ```
 
 **Options:**
 
 - `--fullrun` — marks the record as `fullrun #N`'s.
-- `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram.
+- `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
+- `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
+- `--human-review-stop` — marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
 <!-- /usage -->

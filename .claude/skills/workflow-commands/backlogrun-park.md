@@ -28,11 +28,12 @@ parks, re-dispatches or files.
 ## `needs-human-review` — the one stop that is not a park
 
 A child carrying **`needs-human-review`** stops `halfrun`-shaped and **the whole run ends there**:
-implementation and the gate run, nothing is committed, the tree is left dirty and unstashed, a
-`confirmation` Telegram carries the resume command, and the remaining children are not started.
+implementation and the gate run, nothing is committed, the tree is left dirty and unstashed,
+`pnpm josh run:hold <N> --human-review-stop` sends the `confirmation` Telegram with the resume command
+and the lane directory, and the remaining children are not started.
 
 **The child goes on holding its repository**, and **its lane is left open and untouched**. **Name the
-lane directory in the stop report and in the Telegram.** Lanes in flight finish; no new lane opens.
+lane directory in the stop report.** Lanes in flight finish; no new lane opens.
 
 **Never apply or remove the label** — a person's alone (`needs-human-review.md`, the single source).
 

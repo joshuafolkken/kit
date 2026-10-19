@@ -59,6 +59,22 @@ describe('test_e2e_guard.resolve_guard_action', () => {
 	})
 })
 
+describe('test_e2e_guard.is_whole_suite', () => {
+	it.each([[[]], [[LOCAL_WORKERS]], [['-j2']]])(
+		'answers for the whole suite with %j',
+		(argv: Array<string>) => {
+			expect(test_e2e_guard.is_whole_suite(argv)).toBe(true)
+		},
+	)
+
+	it.each([[['--grep', 'login']], [[E2E_FILE]], [[LOCAL_WORKERS, '--project=chromium']]])(
+		'answers for part of the suite with %j',
+		(argv: Array<string>) => {
+			expect(test_e2e_guard.is_whole_suite(argv)).toBe(false)
+		},
+	)
+})
+
 describe('test_e2e_guard.is_playwright_installed', () => {
 	it('returns false when @playwright/test is absent', () => {
 		expect(test_e2e_guard.is_playwright_installed(ctx.project_directory)).toBe(false)
