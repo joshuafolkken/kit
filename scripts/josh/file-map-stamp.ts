@@ -48,6 +48,10 @@ interface FileMapStamp {
 	// reads it and the two `josh review:brief` records, which assert a completed past fact by
 	// existing at all, neither write nor read it.
 	completed_at?: string
+	// The git blob of each mapped path as it was read — written only by the round-1 review snapshot
+	// (`review-round-one-blobs.ts`). When `base` moves, round 2 carries these onto the new base and
+	// measures the fix delta from there; a record without them falls back to the moved-base refusal.
+	blobs?: Record<string, string>
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -64,28 +68,28 @@ function is_file_map(value: unknown): value is Record<string, string> {
 // reader treats an absent field as the safe answer — "not running" for a `pid`, "cannot be reused"
 // for a `base`. Spread rather than assigned, because `exactOptionalPropertyTypes` makes an explicit
 // `undefined` a different thing from an absent key.
-function optional_fields(
-	pid: unknown,
-	base: unknown,
-	completed_at: unknown,
-	process_start: unknown,
-): Partial<FileMapStamp> {
+function identity_fields({ pid, process_start }: Partial<FileMapStamp>): Partial<FileMapStamp> {
 	return {
 		...(typeof pid === 'number' && { pid }),
-		...(typeof base === 'string' && { base }),
-		...(typeof completed_at === 'string' && { completed_at }),
 		...(typeof process_start === 'string' && { process_start }),
 	}
 }
 
+function tree_fields({ base, completed_at, blobs }: Partial<FileMapStamp>): Partial<FileMapStamp> {
+	return {
+		...(typeof base === 'string' && { base }),
+		...(typeof completed_at === 'string' && { completed_at }),
+		...(is_file_map(blobs) && { blobs }),
+	}
+}
+
 function parse_stamp(raw: string): FileMapStamp | undefined {
-	const { taken_at, files, pid, base, completed_at, process_start } = JSON.parse(
-		raw,
-	) as Partial<FileMapStamp>
+	const parsed = JSON.parse(raw) as Partial<FileMapStamp>
+	const { taken_at, files } = parsed
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
 
-	return { taken_at, files, ...optional_fields(pid, base, completed_at, process_start) }
+	return { taken_at, files, ...identity_fields(parsed), ...tree_fields(parsed) }
 }
 
 // Whether the process that wrote this record is still running. It takes the
@@ -152,8 +156,13 @@ function changed_since(stamp: FileMapStamp, tree: Record<string, string>): Reado
 interface FileMapStampAccess {
 	stamp_path: () => string
 	// `base` is written by the one record that is acted on rather than merely reported — the
-	// green-gate reuse. The others omit it and are unaffected.
-	write: (files: Record<string, string>, target?: string, base?: string) => string
+	// green-gate reuse. The others omit it and are unaffected. `blobs` is the round-1 snapshot's alone.
+	write: (
+		files: Record<string, string>,
+		target?: string,
+		base?: string,
+		blobs?: Record<string, string>,
+	) => string
 	// Marks an existing record as belonging to a run that finished. It
 	// amends rather than rewrites, and answers `undefined` where there is no record to amend: a run
 	// whose record never got written has nothing to assert a completion about, and inventing one here
@@ -229,12 +238,13 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 		// `base` goes into the payload undefined and all — `JSON.stringify` drops an undefined value,
 		// so a caller that has no base writes exactly the record it wrote before this field existed.
 		// `own_fields` is what writes the pid, and the writing process's start time beside it — assembled in one place so no record can carry half an identity.
-		write: (files, target = resolve(), base?: string) =>
+		write: (files, target = resolve(), base?: string, blobs?: Record<string, string>) =>
 			stamp_file.write_stamp(target, {
 				taken_at: new Date().toISOString(),
 				files,
 				...process_identity.own_fields(),
 				base,
+				blobs,
 			}),
 		complete: (target = resolve()) => complete_at(target),
 		read: (source = resolve()) => read_at(source),

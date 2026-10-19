@@ -75,6 +75,14 @@ describe('review_code_tree.comment_only — the paths whose code the fixes left 
 		expect(review_code_tree.comment_only(stamp_of(before), after, BASE)).toStrictEqual([SOURCE])
 	})
 
+	it('names, on a moved base, only the file the move left alone (joshuafolkken/kit#4165)', () => {
+		const files = { [SOURCE]: 'digest', [OTHER_SOURCE]: 'digest' }
+
+		expect(review_code_tree.comment_only(stamp_of(files), files, 'other', [SOURCE])).toStrictEqual([
+			SOURCE,
+		])
+	})
+
 	it('names nothing against a record taken on another base, or with none', () => {
 		const files = { [SOURCE]: 'digest' }
 
