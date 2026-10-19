@@ -43,7 +43,7 @@
 
 ### 変更対象はまとめて読んでから編集する（joshuafolkken/kit#2202）
 
-**「変更とテスト」が変更対象ファイルを列挙したら、1 回の `pnpm josh read:files <path> [<path> ...]` で読み、続く独立した編集は 1 回の `pnpm josh edit:files -` で送る**（個別の `Edit` は依存する編集・1 件だけの編集・`Write` のとき）。詳細は [`turn-batching.md`](turn-batching.md) →「実装中の独立編集に効く合成コマンド」。
+`pnpm josh read:files` / `edit:files` で畳む — [`turn-batching.md`](turn-batching.md) →「実装中の独立編集に効く合成コマンド」。
 
 ### 完了報告（セッション向け）
 

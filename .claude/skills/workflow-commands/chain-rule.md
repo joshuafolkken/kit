@@ -19,8 +19,8 @@ Review results and successful pushes are never turn boundaries.
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), run the final scoped lint/test pair and
    `pnpm josh run:review`: it starts `pnpm josh gate` in the background and prints the `/code-review`
    brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
-   agent type with that brief and the alias of its `model=` id (`claude-opus-5-5` → `opus`) (every
-   tool, so `--fix` applies; never a guessed type name).
+   agent type with that brief and its `model` (`delegation.md`) (every tool, so `--fix` applies;
+   never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check

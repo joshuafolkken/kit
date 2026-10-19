@@ -28,8 +28,7 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
 
 1. **Stash the half-finished work** — `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` — and
-   record it on the Issue; it is popped by message, `pnpm josh stash:pop "backlogrun: stopped unit for
-   #<N>"`, never positionally.
+   record it on the Issue; it is popped with `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`.
 2. **Classify and act in one call** — `pnpm josh run:merge <N> --output <path>` (`--epic <E> --repo
    <owner/repo> --owner "$PPID"` for a named epic), **the same composite a returned child takes**. It
    tells an `outage` (re-dispatched with its session resumed, uncounted, bounded by

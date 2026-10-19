@@ -53,7 +53,7 @@ child"); `pnpm josh lane:prune`; `pnpm josh run:tidy`.
 **The rewritten lock file reaches a pull request through the first lane.** Only if the update rewrote
 anything: `pnpm josh stash:push "backlogrun: josh latest before lanes"` in the primary checkout, and
 record it on the first child's Issue. **The first lane's `pnpm josh lane:launch "$n" --stash
-"backlogrun: josh latest before lanes"` pops it by message** — never a positional `stash pop`. **Under
+"backlogrun: josh latest before lanes"` pops it by message.** **Under
 `backlog:drive` the driver passes `--stash`, never you**; the push stays the parent's.
 
 ### Opening one lane and dispatching its child
