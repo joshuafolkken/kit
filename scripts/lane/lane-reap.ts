@@ -166,7 +166,9 @@ const lane_reap = {
 	lane_tree,
 	own_ancestry,
 	parse_pids,
+	PS_COMMAND,
 	reap_child,
+	run_probe,
 	SYSTEM_PROBES,
 }
 

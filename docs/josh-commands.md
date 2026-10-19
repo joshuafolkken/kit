@@ -903,6 +903,7 @@ The run keeps the environment it started with, so this writes an override onto t
 - The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes within a minute to fill the freed lanes.
 - Lowering it stops no running child; a lane that finishes is not refilled.
 - The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A lane with no child in it is not counted — its tree, branch and port seat stay, and when its issue is picked up again the driver starts it ahead of a fresh launch, inside the free lanes.
+- A lane whose child and every process under it are stopped (`lane:pause`, `kill -STOP`) is not counted either; `lane:resume` continues it in place, and it is counted again.
 - `run:board` prints `next free lane (<used>/<limit>)`; the waiting row counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
 - The limit counts lanes, not memory: the driver opens no lane under memory pressure, and `run:board` prints `no memory headroom`.
 - A limit above the nine port seats is counted at the seats, as `JOSH_LANE_LIMIT` is; a value that is not a positive integer is refused.
