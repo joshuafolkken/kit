@@ -80,7 +80,7 @@ from — read at that trigger, never restated here.
 | A `new` entry typed with an `into <target>` suffix | Insert the artifact into the named epic with `pnpm josh epic --add <E> <N>` | `into-target.md` |
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
 | Before implementing (every implementing entry) | `pnpm josh run:prep <N>` (`run:entry` bundles it; `kickoff` reads `pnpm josh issue:read <N>`) — the body and the comments; the later of a body and a comment wins | `issue-comments.md` |
-| `run:prep` answers `human_review: yes` | Implement and gate, then stop before the commit; the label is applied only by a person | `needs-human-review.md` |
+| `run:prep` answers `human_review: yes` | Implement and gate, run `pnpm josh test:e2e`, then stop before the commit with `pnpm josh run:hold <N> --human-review-stop`; the label is applied only by a person | `needs-human-review.md` |
 | `run:prep` answers `latest: required` | Read the doc and run `josh latest`, then load the `dependency-update` skill | `latest-gate.md` (read whole, only on `required`) |
 | Before delegating any run step | `pnpm josh delegate <step>` decides eligibility, never you | `delegation.md` |
 | The pre-implementation reading reaches 3 unedited files | Delegate the unread investigation; a file this run will edit is read in the main line | `delegation.md` → "The pre-implementation reading" |

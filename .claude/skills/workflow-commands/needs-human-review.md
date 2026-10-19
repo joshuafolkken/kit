@@ -8,18 +8,18 @@ point reached it — `fullrun` or `backlogrun` — and the label may be applied 
 - **Implementation and the verification gate run normally** — refactor, `pnpm josh gate`,
   `/code-review`, exactly as for any other child.
 - **Run `pnpm josh test:e2e` yourself before stopping.** With no pull request there is no CI E2E job,
-  and `pnpm josh followup` is never reached. This is `halfrun`'s situation exactly: you run it and read
-  what it prints. A printed skip is the answer for a project with no E2E suite; a skip nobody saw
-  printed is not.
+  and `pnpm josh followup` is never reached. A printed skip is the answer for a project with no E2E
+  suite.
 - **Nothing is committed, pushed, opened as a pull request or merged.** `pnpm josh bump`,
   `pnpm josh git` and `pnpm josh followup` are never reached.
 - **The working tree is left uncommitted, and nothing is stashed.**
-- **Send a `confirmation` Telegram and stop the whole run.** The remaining children are not started —
-  inside a `backlogrun` this is the one thing that is *not* park-and-continue.
-- The Telegram body carries the **resume command**, in the same form `halfrun`'s own stop uses.
+- **Mark the stop: `pnpm josh run:hold <N> --human-review-stop`, then stop the whole run.** It keeps
+  the hold, marks it as `halfrun`'s stop, and sends the `confirmation` Telegram with the resume command
+  and the lane directory — never compose one. It answers `e2e-owed` until `test:e2e` answered green on
+  this tree. The remaining children are not started — inside a `backlogrun` this is the one thing that
+  is *not* park-and-continue.
 - **Resuming is `halfrun`'s stop exactly**: a person looks at the working tree and, if it is right,
-  carries on from the commit themselves. The stop report carries that resume command too, not only the
-  Telegram.
+  carries on from the commit themselves. The stop report carries the resume command too.
 
 **Stopping is the specification, not a failure.**
 

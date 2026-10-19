@@ -9,6 +9,8 @@ import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-
 // The scoped stamps claim less than the gate stamp (changed files, two checks), so they stay separate.
 const LINT_RELATED_PREFIX = 'josh-lint-related-stamp-'
 const TEST_RELATED_PREFIX = 'josh-test-related-stamp-'
+// `josh test:e2e` answered green — a run or a printed skip — on this tree (`test-e2e-stamp.ts`).
+const E2E_PREFIX = 'josh-e2e-stamp-'
 
 const GATE_PREFIX = 'josh-gate-stamp-'
 const IN_FLIGHT_PREFIX = 'josh-gate-running-'
@@ -34,6 +36,7 @@ const test_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	TEST_RELATED_PREFIX,
 	PROJECT_ROOT,
 )
+const e2e_stamp: FileMapStampAccess = file_map_stamp.create(E2E_PREFIX, PROJECT_ROOT)
 
 // Swallowed: a code record left behind only ever sits beside an older snapshot, which the next
 // round-1 brief replaces together with it.
@@ -61,6 +64,7 @@ const review_stamps = {
 	briefed_stamp,
 	clear_round_one,
 	clear_round_one_code,
+	e2e_stamp,
 	GATE_PREFIX,
 	gate_stamp,
 	IN_FLIGHT_PREFIX,
