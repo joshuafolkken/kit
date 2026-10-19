@@ -44,6 +44,12 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(posts_at_path_literally),
 	reason: RAW_FIELD_BODY_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Posting `@path` literally',
+		topic: '`shell-body.md`',
+		fires: 'a raw field (`-f` / `--raw-field`) passing `body=@<path>`. Every occurrence',
+		quiet: '`-F` / `--field body=@`, a body without `@`, or `pnpm josh issue:comment`',
+	},
 }
 
 const raw_field_body = { RAW_FIELD_BODY_REASON, ROW, posts_at_path_literally }

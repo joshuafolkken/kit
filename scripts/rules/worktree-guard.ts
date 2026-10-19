@@ -137,6 +137,14 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_unauthorized_worktree_change),
 	reason: WORKTREE_MUTATION_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Unauthorized work-tree mutation',
+		topic: '`operating-rules.md`',
+		fires:
+			'`git checkout -- <path>` / `git restore <path>` / forced `git clean -f` / an unauthorized `git stash` (bare, push without a message, positional pop). Every occurrence',
+		quiet:
+			'`git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`',
+	},
 }
 
 const worktree_guard = {

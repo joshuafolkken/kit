@@ -117,6 +117,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(bash_triggers.is_issue_filing),
 	reason: FILING_CAP_REASON,
 	decide,
+	about: {
+		title: 'The 10-Issue filing cap per run',
+		topic: '`.claude/skills/workflow-commands/prerequisite.md`, `observation-filing.md`',
+		fires:
+			'the 11th `pnpm josh issue:file` in a run that already has 10 filings not refused; failed calls do not count. Every occurrence',
+		quiet: 'fewer than 10 filings not refused',
+	},
 }
 
 const filing_cap = {

@@ -1,0 +1,150 @@
+# Trigger-delivered rules — rendered by `pnpm josh rule:list` from `scripts/rules/delivered-rules.ts`
+
+- **Third-party write** (`third-party-write`, `upstream-interrupt.md`)
+  - fires: `pnpm josh rule:guard` — a `gh api` write (field flag or a write method) to a repository whose owner is not this session. Every occurrence
+  - silent: a read, or a first-party owner (`pnpm josh repo:party`)
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Direct filing** (`direct-filing`, `docs/josh-commands-backlog.md` → `josh issue:file`)
+  - fires: `pnpm josh rule:guard` — a `Bash` that creates an Issue outside `josh issue:file` (`gh issue create`, or a POST with `title` to `…/issues`); the refusal hands over the `pnpm josh issue:file` form. Every occurrence
+  - silent: filing through `pnpm josh issue:file` — the duplicate scan, the body check and `epic:bundle` all run
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **The 10-Issue filing cap per run** (`filing-cap`, `.claude/skills/workflow-commands/prerequisite.md`, `observation-filing.md`)
+  - fires: `pnpm josh rule:guard` — the 11th `pnpm josh issue:file` in a run that already has 10 filings not refused; failed calls do not count. Every occurrence
+  - silent: fewer than 10 filings not refused
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Reading Issue comments** (`issue-comments`, `issue-comments.md`)
+  - fires: `pnpm josh rule:guard` — a `Bash` that reads only the Issue body (`gh issue view <N>`, or a GET ending in `…/issues/<N>`). Refused until it is re-read with the comments
+  - silent: no Issue read, or a read with `--comments` / `--json comments` / `…/comments` from the start
+  - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
+- **No body on the shell** (`shell-body`, `shell-body.md`)
+  - fires: `pnpm josh rule:guard` — a double-quoted body value (`-f body="…"` / `-f "body=…"` / `--body "…"` / `--notify-message "…"`) carrying a backtick or `$`
+  - silent: the shell does not evaluate the body
+  - not automated: which part of the body the shell was meant to expand is the author's, not the hook's
+- **Posting `@path` literally** (`raw-field-body`, `shell-body.md`)
+  - fires: `pnpm josh rule:guard` — a raw field (`-f` / `--raw-field`) passing `body=@<path>`. Every occurrence
+  - silent: `-F` / `--field body=@`, a body without `@`, or `pnpm josh issue:comment`
+  - not automated: the body moves to a file the call does not name
+- **Piped verification** (`piped-verification`, `output-bounds.md`)
+  - fires: `pnpm josh rule:guard` — a pass/fail josh check (`gate` / `check` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise
+  - silent: the exit code reaches the caller — a failure reads as a failure
+  - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
+- **Early progress report** (`early-heartbeat`, `.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet")
+  - fires: `pnpm josh rule:guard` — a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence
+  - silent: no hand-made wait timer — `run:progress` holds the one clock
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Test declaration** (`test-declared`, `CLAUDE.md` → Code Change Rules)
+  - fires: `pnpm josh rule:guard` — `pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`
+  - silent: `exempt` (non-runtime only) or `satisfied` (tests included)
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Lane child background push** (`lane-background`, `.claude/skills/workflow-commands/background-commands.md`)
+  - fires: `pnpm josh rule:guard` — a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`. Every occurrence
+  - silent: not a lane child, or the foreground `ship --detach`
+  - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
+- **Idle run tail** (`run-tail`, `.claude/skills/workflow-commands/background-commands.md`)
+  - fires: `pnpm josh rule:guard` — `pnpm josh git -y` (`josh g`, `--yes` alike) issued in the **foreground**. Every occurrence
+  - silent: issued in the background — its completion resumes the run
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **The cut before the gate** (`pre-gate-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md`)
+  - fires: `pnpm josh rule:guard` — `pnpm josh gate` (`josh ga`) in a lane work tree whose `JOSH_LANE_CHILD` names the Issue and has no cut record
+  - silent: outside a lane, no marker (a person in the lane), or already cut
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **A split is not a park** (`lane-split-park`, `.claude/skills/workflow-commands/backlogrun-park.md` → "Splitting a child mid-run")
+  - fires: `pnpm josh rule:guard` — a lane child that promoted its Issue to an epic this run parking it (`needs-decision`, `confirmation` notify). Every occurrence
+  - silent: no promotion this run
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Lane child park** (`lane-park`, `.claude/skills/workflow-commands/pre-gate-cut.md`)
+  - fires: `pnpm josh rule:guard` — a dispatched lane child issuing `pnpm josh notify --task-type confirmation`
+  - silent: not a lane child, or not a stop notification
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Lane child interactive ask** (`lane-interactive-ask`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "The interactive ask is refused one call earlier")
+  - fires: `pnpm josh rule:guard` — a dispatched lane child's `AskUserQuestion`; it hands over the park procedure. Every occurrence
+  - silent: not a lane child, or not an interactive tool
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Subagent model named** (`agent-model`, `.claude/skills/workflow-commands/delegation.md` → "A `general-purpose` subagent names its model")
+  - fires: `pnpm josh rule:guard` — an `Agent` / `Task` call of the `general-purpose` type with no `model`. Every occurrence
+  - silent: a named agent type, or a `model` set
+  - not automated: which model fits the unit is the author's call
+- **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
+  - fires: `pnpm josh rule:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
+  - silent: not a lane child — the parent owns the run budget
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Lane child on `git switch main`** (`lane-switch-main`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
+  - fires: `pnpm josh rule:guard` — a dispatched lane child switching to the default branch or running `josh main:sync`. Every occurrence
+  - silent: not a lane child — `pnpm josh main:merge` brings the default in at the gate
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Bare `pnpm josh git`** (`josh-git-bare`, `CLAUDE.md` → Git Rules)
+  - fires: `pnpm josh rule:guard` — `pnpm josh git` without `-y`, whose staging prompt cancels with no TTY. Every occurrence
+  - silent: `pnpm josh git -y`
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Force push / branch delete** (`git-force`, `operating-rules.md`)
+  - fires: `pnpm josh rule:guard` — a `git push` / `git branch` read as force (`--force` / `-f` / `-uf` …) or delete (`--delete` / `-d` / `-D` / `:branch`) in any spelling. Every occurrence
+  - silent: a plain `git push` / `git branch`
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Unauthorized work-tree mutation** (`worktree-mutation`, `operating-rules.md`)
+  - fires: `pnpm josh rule:guard` — `git checkout -- <path>` / `git restore <path>` / forced `git clean -f` / an unauthorized `git stash` (bare, push without a message, positional pop). Every occurrence
+  - silent: `git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **No file body on the shell** (`file-body`, `file-edits.md`)
+  - fires: `pnpm josh rule:guard` — a heredoc write to an existing file, a writing `node -e` / interpreter heredoc, or `perl -0pi -e`. Every occurrence
+  - silent: a new file, a read-only heredoc, or a short `sed -i`
+  - not automated: the right form is another tool, which `updatedInput` cannot switch to
+- **Index mutation** (`index-mutation`, `operating-rules.md`)
+  - fires: `pnpm josh rule:guard` — `git add` / `commit` / `reset` / `rm` / `mv` / `restore --staged` in any spelling. Every occurrence
+  - silent: `pnpm josh git` — the approved commit flow
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Destructive command** (`destructive-command`, `operating-rules.md`)
+  - fires: `pnpm josh rule:guard` — `rm -rf` (any spelling), `gh repo delete` / `archive`, `gh pr close`, `gh api -X DELETE`. Every occurrence
+  - silent: `gh issue close` or removing an Issue label — the workflow's own steps
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Protected file** (`protected-file`, `operating-rules.md`)
+  - fires: `pnpm josh rule:guard` — a `Read` of `.env`, or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence
+  - silent: kit itself, or the user's `~/.claude/settings.json`
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Direct PR creation** (`direct-pr-create`, `CLAUDE.md` → Git Rules)
+  - fires: `pnpm josh rule:guard` — `gh pr create`, or a `gh api` write to `repos/<o>/<r>/pulls`; it points at `pnpm josh pr`. Every occurrence
+  - silent: `pnpm josh pr`, or reading a PR — the path that writes `closes #N`
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Direct PR merge** (`pr-merge`, `CLAUDE.md` → Git Rules)
+  - fires: `pnpm josh rule:guard` — `gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a `mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file. Every occurrence
+  - silent: `pnpm josh followup` and `pnpm josh observations:flush`, which merge in their own process
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
+  - fires: `pnpm josh rule:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process. Every occurrence
+  - silent: the command started with `run_in_background` — its exit ends the wait
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **The implementation-phase cut** (`implementation-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold")
+  - fires: `pnpm josh rule:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing
+  - silent: not a lane child, a non-editing tool, already cut, or under the threshold
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Question 0 and the ordering question before writing a rule into prose** (`rule-body`, `residency.md`)
+  - fires: `pnpm josh rule:guard` — an `Edit` / `Write` to `CLAUDE.md` / `prompts/**/*.md` / `.claude/skills/**/*.md` appending at least the threshold. Refused until both `pnpm josh oracle:list` and `pnpm josh run:step` ran
+  - silent: not a rule document, an append under the threshold (typo, link swap, deletion), or both commands ran
+  - not automated: a trigger-plus-pointer line is written, not derived
+- **An act its oracle was not asked about** (`oracle-consulted:pkg:scout`, `decision-oracle.ts`)
+  - fires: `pnpm josh rule:guard` — a `Bash` governed by an oracle that declared a firing point (`pkg:scout` governs `pnpm add`), issued without that `pnpm josh <command>`. Refused until it ran
+  - silent: no governed act, or the oracle already ran
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Turn batching** (`batching`, `turn-batching.md`)
+  - fires: `pnpm josh batch:guard` — the `Bash` / `Edit` / `Read` after three single-call turns in a row; fires **again** every three more such turns
+  - silent: calls per round trip above the floor
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Investigation delegation threshold** (`investigation`, `delegation.md`)
+  - fires: `pnpm josh investigation:guard` — the `Read` / `Bash` that makes the third read of a file the run will not edit; fires **again** once reads pile up to the threshold again
+  - silent: reads under the threshold — nothing to delegate yet
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Stop notification** (`stop-notify`, `CLAUDE.md` → "Mid-workflow stop notification")
+  - fires: `pnpm josh stop:guard` — a stop with the work tree held and no `confirmation` notify that turn. Sends the notify itself; blocks only when the send fails
+  - silent: no hold, a `confirmation` notify on the tail, or a pre-gate cut taken
+  - not automated: the hook sends the notify itself; it blocks only when the send fails
+- **Hold release** (`hold-release`, `.claude/skills/workflow-commands/working-tree-hold.md`)
+  - fires: `pnpm josh stop:guard` — a stop on a clean tree with the `run:hold` record still in place. Releases the hold itself; blocks only when that fails
+  - silent: a dirty tree (a `halfrun` stop before the commit, a `needs-human-review` stop) or already released
+  - not automated: the hook releases the hold itself; it blocks only when that release fails
+- **Issue citation format** (`issue-citation`, `prompts/collaboration-workflow/issue-citation.md`)
+  - fires: `pnpm josh stop:guard` — a bare `#N` in the prose of the last reply. Prints the citation lines itself; blocks only when a number cannot be cited
+  - silent: link form, inside code or a quote, `#N` right after `PR`, or a GitHub-facing artifact
+  - not automated: the hook prints the citation lines itself; it blocks only on a number it cannot cite
+- **Offer to file** (`filing-offer`, `.claude/skills/workflow-commands/observation-filing.md`)
+  - fires: `pnpm josh stop:guard` — an unattended run (a kit-launched headless session, a lane child, a `backlogrun` parent) whose last reply offers to file without filing. Blocks the stop
+  - silent: an interactive session, already filed, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner
+  - not automated: the filing needs a title and a body only the model can write

@@ -10,14 +10,15 @@ import type { ItemState } from './run-board-status'
 
 // The legend at the foot of `run:board`: the symbols the frame draws, named once, so a row carries
 // only what differs between rows. Drawn apart from the rows, which tell it the icons they draw.
-// joshuafolkken/kit#4047: what is in progress, waiting and done on one line, the kinds and the rest
-// on the next, each naming only what the frame draws.
+// joshuafolkken/kit#4047: each naming only what the frame draws, on one line. An icon the frame draws
+// beside its own word is not named — ⏳ under `⏳ queued`, 🙋 under `🙋 decision`, ✅ under `✅ done`,
+// 📌 on `📌 findings` and 📅 before `not before <time>` — so the legend names only an icon drawn with
+// no word beside it.
 
 const {
 	FILED_KIND_ICONS,
 	FILED_RUN_MARK,
 	KIND_WORDS,
-	NOT_BEFORE_ICON,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	STATE_ICONS,
@@ -48,23 +49,16 @@ function states_of(states: ReadonlyArray<readonly [ItemState, keyof Words]>): Le
 	return states.map(([state, word]) => [STATE_ICONS[state], word] as const)
 }
 
-// The row leads the legend can name, each with its word: in progress first, then waiting, then done.
-// 📅 sits beside ⏳: both are a waiting row, one on the clock and the other on the pool.
+// The row leads the legend can name, each with its word: in progress first, then the settled ones.
 const PROGRESS_STATES: LeadWords = states_of([['running', 'in_progress']])
-const SETTLED_STATES: LeadWords = [
-	...states_of([
-		['parked', 'parked'],
-		['waiting', 'queued'],
-	]),
-	[NOT_BEFORE_ICON, 'not_before'],
-	...states_of([
-		['stopped', 'stopped'],
-		['human', 'decision'],
-		['merged', 'merged'],
-		['done', 'done'],
-		['withdrawn', 'withdrawn'],
-	]),
-]
+const SETTLED_STATES: LeadWords = states_of([
+	['parked', 'parked'],
+	['paused', 'paused'],
+	['stopped', 'stopped'],
+	['earlier', 'earlier'],
+	['done', 'done'],
+	['withdrawn', 'withdrawn'],
+])
 
 function state_legend(states: LeadWords, leads: ReadonlySet<string>): Array<string> {
 	return states.filter(([icon]) => leads.has(icon)).map(([icon, word]) => `${icon} ${WORDS[word]}`)
@@ -98,7 +92,7 @@ function filed_legend(
 	return rows.some((row) => filed.has(row.number)) ? [`${FILED_RUN_MARK} ${WORDS.filed_run}`] : []
 }
 
-// What is in progress, waiting and done.
+// What is in progress, then what has settled.
 function states_line(drawn: LegendDrawn): Array<string> {
 	return [
 		...state_legend(PROGRESS_STATES, drawn.leads),
@@ -130,15 +124,15 @@ function others_line(
 	]
 }
 
-// Each line drawn only when it names something.
+// One line, drawn only when it names something.
 function legend_of(
 	rows: ReadonlyArray<BoardRow>,
 	drawn: LegendDrawn,
 	notes: ReadonlyArray<BoardNote>,
 ): Array<string> {
-	const lines = [states_line(drawn), others_line(rows, drawn, notes)]
+	const entries = [...states_line(drawn), ...others_line(rows, drawn, notes)]
 
-	return lines.filter((line) => line.length > 0).map((line) => styleText('dim', line.join(GAP)))
+	return entries.length === 0 ? [] : [styleText('dim', entries.join(GAP))]
 }
 
 const run_board_render_legend = {

@@ -16,7 +16,7 @@ const KIND = run_event_stream.EVENT_KIND
 const REPO = 'joshuafolkken/kit'
 const GUARD = 'Stop the guard'
 const TITLES = new Map([[4091, GUARD]])
-const NOTES_LEGEND = '📌 findings'
+const NOTES_HEADING = '📌 findings'
 
 function event(kind: string, text: string): RunEvent {
 	return { pos: 1, at: new Date(NOW).toISOString(), kind, text }
@@ -70,7 +70,7 @@ describe('run_board_render.render a full findings section', () => {
 	)
 	const lines = lines_of(listing([4100]), [listed, ...seen, park, filed])
 	const drawn = lines
-		.slice(lines.indexOf(rule(NOTES_LEGEND)) + 1)
+		.slice(lines.indexOf(rule(NOTES_HEADING)) + 1)
 		.filter((line) => line.startsWith('  ') && !line.startsWith('  more'))
 
 	it('keeps 💤, then a filed Issue with no row, then notes, and draws no line for a filed row', () => {
@@ -87,6 +87,6 @@ describe('run_board_render.render a full findings section', () => {
 	})
 
 	it('names ✚ for the filed row, and in the findings only the kinds drawn', () => {
-		expect(lines.at(-1)).toBe(`✚ filed this run  ${NOTES_LEGEND}  🆕 filed  💤 parked  💬 note`)
+		expect(lines.at(-1)).toBe('✚ filed this run  🆕 filed  💤 parked  💬 note')
 	})
 })

@@ -102,6 +102,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_poll_loop),
 	reason: POLL_LOOP_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Output poll loop',
+		topic: '`.claude/skills/workflow-commands/background-commands.md`',
+		fires:
+			"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process. Every occurrence",
+		quiet: 'the command started with `run_in_background` — its exit ends the wait',
+	},
 }
 
 const poll_loop = {

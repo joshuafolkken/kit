@@ -108,6 +108,14 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_pr_merge),
 	reason: PR_MERGE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Direct PR merge',
+		topic: '`CLAUDE.md` → Git Rules',
+		fires:
+			'`gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a `mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file. Every occurrence',
+		quiet:
+			'`pnpm josh followup` and `pnpm josh observations:flush`, which merge in their own process',
+	},
 }
 
 const pr_merge = { PR_MERGE_REASON, ROW, is_pr_merge }

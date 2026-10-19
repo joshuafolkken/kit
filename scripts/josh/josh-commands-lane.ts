@@ -14,6 +14,13 @@ const MEASURE_ARGUMENTS = {
 	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 } as const
 
+const PAUSE_ARGUMENTS = {
+	script: 'scripts/lane/lane-pause-cli.ts',
+	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+	category: 'AI tools',
+	reference: ['<issue> | --all', 'developer', ['processes']],
+} satisfies Partial<CommandEntry>
+
 /* eslint-disable @typescript-eslint/naming-convention */
 const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:open': {
@@ -91,6 +98,18 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			'Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure',
 		category: 'AI tools',
 		reference: ['<issue> --reason <text>', 'developer', ['files', 'git', 'processes', 'network']],
+	},
+	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so `--all` finds the lanes.
+	'lane:pause': {
+		...PAUSE_ARGUMENTS,
+		description:
+			'Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched',
+		default_script_arguments: ['pause'],
+	},
+	'lane:resume': {
+		...PAUSE_ARGUMENTS,
+		description: 'Let a paused lane child carry on from where it stopped (SIGCONT)',
+		default_script_arguments: ['resume'],
 	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.

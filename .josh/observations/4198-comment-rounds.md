@@ -1,0 +1,2 @@
+- rf:project-conventions | low | .josh/metrics-accepted/4198.json:2 | 2026-10-19 | #4198
+- rf:tests | low | scripts/lane/lane-reap-paused.test.ts:40 | 2026-10-19 | #4198

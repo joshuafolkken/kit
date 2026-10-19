@@ -4,6 +4,7 @@ import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_idle } from './run-board-idle'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_paused } from './run-board-paused'
 import type { LocalRead } from './run-board-read'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type ItemStatus } from './run-board-status'
@@ -88,8 +89,9 @@ function statuses_for(
 ): ReadonlyMap<number, ItemStatus> {
 	const in_run = lanes_in_run(plan, local)
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
+	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
 
-	return run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
+	return run_board_paused.paused_over(statuses, state.usage?.paused)
 }
 
 // The children the run touched that the open listing no longer holds and the board has not read yet.

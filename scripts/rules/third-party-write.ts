@@ -117,6 +117,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command((command: string) => writes_third_party(command)),
 	reason: THIRD_PARTY_WRITE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Third-party write',
+		topic: '`upstream-interrupt.md`',
+		fires:
+			'a `gh api` write (field flag or a write method) to a repository whose owner is not this session. Every occurrence',
+		quiet: 'a read, or a first-party owner (`pnpm josh repo:party`)',
+	},
 }
 
 const third_party_write = {

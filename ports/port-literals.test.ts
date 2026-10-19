@@ -43,9 +43,19 @@ function scanned_files(): Array<string> {
 	return [...nested, ...root].filter((file) => file !== DEFINITION_FILE)
 }
 
+// #4197: a literal preceded by `#` is an issue or PR reference (`kit#4173`), and one inside a
+// longer run of digits is a different number, so neither is a port.
+function contains_port_literal(text: string, literal: string): boolean {
+	return new RegExp(String.raw`(?<![#\d])${literal}(?!\d)`, 'u').test(text)
+}
+
+function counts_as_port(text: string): boolean {
+	return PORT_LITERALS.some((literal) => contains_port_literal(text, literal))
+}
+
 function offenders(literal: string): Array<string> {
 	return scanned_files()
-		.filter((file) => readFileSync(file, 'utf8').includes(literal))
+		.filter((file) => contains_port_literal(readFileSync(file, 'utf8'), literal))
 		.map((file) => path.relative(REPO_ROOT, file))
 }
 
@@ -54,6 +64,20 @@ describe('port literals', () => {
 		expect(scanned_files().length).toBeGreaterThan(0)
 		expect(scanned_files()).not.toContain(DEFINITION_FILE)
 	})
+
+	it.each(['joshuafolkken/kit#4173', 'see #5173', '41730', '154173'])(
+		'does not count %s as a port literal',
+		(text) => {
+			expect(counts_as_port(text)).toBe(false)
+		},
+	)
+
+	it.each(['4173', 'localhost:5173', 'port 4173.', "'5173'"])(
+		'counts %s as a port literal',
+		(text) => {
+			expect(counts_as_port(text)).toBe(true)
+		},
+	)
 
 	it.each(PORT_LITERALS)('has no %s outside ports/index.js', (literal) => {
 		expect(offenders(literal)).toStrictEqual([])

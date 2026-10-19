@@ -192,12 +192,6 @@ describe('machine_capacity.pressured_available — memory under compression and 
 		expect(machine_capacity.pressured_available(CALM, CALM)).toBe(AVAILABLE_MB)
 	})
 
-	it('answers no free memory while the kernel reports pressure', () => {
-		const after = { ...CALM, pressure_level: WARNING }
-
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(0)
-	})
-
 	it('answers no free memory when swap traffic across the window passes the threshold', () => {
 		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB + 1 }
 
@@ -231,9 +225,24 @@ describe('machine_capacity.pressured_available — memory under compression and 
 
 		expect(machine_capacity.pressured_available(unread, unread)).toBeUndefined()
 	})
+})
+
+describe('machine_capacity.pressured_available — the kernel verdict', () => {
+	const CRITICAL = { ...CALM, pressure_level: machine_capacity.PRESSURE_HOLD }
+
+	it('answers no free memory while the kernel reports critical pressure', () => {
+		expect(machine_capacity.pressured_available(CALM, CRITICAL)).toBe(0)
+	})
+
+	// joshuafolkken/kit#4199: macOS keeps the warning long after the pressure passed.
+	it('answers the available memory under the kernel warning alone', () => {
+		const after = { ...CALM, pressure_level: WARNING }
+
+		expect(machine_capacity.pressured_available(CALM, after)).toBe(AVAILABLE_MB)
+	})
 
 	it('holds a heavy claim back under pressure and admits it when there is none', () => {
-		expect(admits_second_claim({ ...CALM, pressure_level: WARNING })).toBe(false)
+		expect(admits_second_claim(CRITICAL)).toBe(false)
 		expect(admits_second_claim(CALM)).toBe(true)
 	})
 })

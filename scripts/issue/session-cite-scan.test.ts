@@ -63,6 +63,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['issue/issue-file-cli.ts', 1],
 	['lane/lane-child-invocation.ts', 6],
 	['lane/lane-dispatch.ts', 2],
+	['lane/lane-pause-cli.ts', 1],
 	['lane/lane-phase.ts', 1],
 	['lane/lane-restart.ts', 1],
 	['run/board/run-board-layout.ts', 1],
