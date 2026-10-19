@@ -15,6 +15,7 @@ const SECOND_MS = 1000
 const HALF_SECOND_MS = 500
 const PRESSURE_NORMAL = 1
 const PRESSURE_WARNING = 2
+const PRESSURE_CRITICAL = 4
 const RED_SWAP_MB = 10
 const THREE_PASSES = { ...CONFIG, window_ms: POLL_MS * 3 }
 
@@ -25,6 +26,10 @@ interface Reading {
 
 function used(percent: number, at_ms = 0): Reading {
 	return { at_ms, memory: { available_mb: TOTAL_MB - percent } }
+}
+
+function warned(reading: Reading): Reading {
+	return { ...reading, memory: { ...reading.memory, pressure_level: PRESSURE_WARNING } }
 }
 
 const UNREAD: MemoryReading = {
@@ -71,14 +76,25 @@ describe('backlog_drive_memory.gauge', () => {
 		expect(answers).toStrictEqual([false, true, true, false])
 	})
 
-	it('holds while the kernel reads pressure, and resumes once it reads normal', async () => {
-		const pressured = {
+	it('holds while the kernel reads critical, and resumes once it reads normal', async () => {
+		const critical = {
 			at_ms: 0,
-			memory: { available_mb: TOTAL_MB, pressure_level: PRESSURE_WARNING },
+			memory: { available_mb: TOTAL_MB, pressure_level: PRESSURE_CRITICAL },
 		}
 		const normal = { at_ms: 0, memory: { available_mb: TOTAL_MB, pressure_level: PRESSURE_NORMAL } }
 
-		await expect(holds_over([pressured, normal])).resolves.toStrictEqual([true, false])
+		await expect(holds_over([critical, critical, normal])).resolves.toStrictEqual([
+			true,
+			true,
+			false,
+		])
+	})
+
+	// joshuafolkken/kit#4199: macOS keeps the warning long after the pressure passed.
+	it('resumes a held gauge under a lingering kernel warning once 🧠 and 💾 are green', async () => {
+		const readings = [warned(used(85)), warned(used(59))]
+
+		await expect(holds_over(readings)).resolves.toStrictEqual([true, false])
 	})
 
 	it('never holds on readings it could not take', async () => {

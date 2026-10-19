@@ -62,7 +62,10 @@ const PAGE_SIZE_NAME = 'hw.pagesize'
 // The kernel's memory-pressure verdict — 1 normal, 2 warning, 4 critical — the one Activity Monitor
 // colors its "memory pressure" graph by.
 const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
-const PRESSURE_WARNING = 2
+// **Only critical holds; warning is sticky** (joshuafolkken/kit#4199). On macOS the verdict can stay at
+// warning for hours after the pressure passed, so a hold on warning never lifts. What is pressured right
+// now shows in the free figure and the swap and compressor traffic; the verdict adds only critical.
+const PRESSURE_HOLD = 4
 // The swap traffic across one window that reads as pressure — 64 MB a second paged to disk. A machine
 // that swapped once still pages a few megabytes back in as old pages are touched.
 const SWAP_PRESSURE_MB = 16
@@ -287,7 +290,7 @@ function moved_over(from: number | undefined, to: number | undefined, limit: num
 
 function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
 	return (
-		(after.pressure_level ?? 0) >= PRESSURE_WARNING ||
+		(after.pressure_level ?? 0) >= PRESSURE_HOLD ||
 		moved_over(before.swapped_mb, after.swapped_mb, SWAP_PRESSURE_MB) ||
 		moved_over(before.compressed_mb, after.compressed_mb, COMPRESSION_PRESSURE_MB)
 	)
@@ -296,7 +299,7 @@ function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
 // **Memory under compression and swap pressure has nothing free to admit against.** The level counts
 // compressible pages as available, so on 2026-10-16 it read 5.4 GB free while the compressor held
 // 5.9 GB and compressed and decompressed about 3.3 GB every three seconds, and 5.2 GB of reservations
-// were admitted on top. A reading the kernel calls pressured, or one with swap or compressor traffic
+// were admitted on top. A reading the kernel calls critical, or one with swap or compressor traffic
 // across the window, answers no free memory: what the ledger holds keeps running and a heavy claim waits
 // for the pressure to pass.
 function pressured_available(before: MemoryReading, after: MemoryReading): number | undefined {
@@ -360,6 +363,7 @@ const machine_capacity = {
 	parse_darwin_memory,
 	parse_linux_available,
 	parse_linux_swapped,
+	PRESSURE_HOLD,
 	pressured_available,
 	read_machine,
 	read_memory,
