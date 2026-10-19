@@ -102,3 +102,13 @@ describe('lane_session_action.answer', () => {
 		expect(reason_of(answer)).toBe('the broker failed: spawn EACCES')
 	})
 })
+
+// joshuafolkken/kit#4221: a stale review rides on the stop, so the strict schema must take it.
+describe('lane_session_action.action_schema — a relaunch stop', () => {
+	it('takes a stale review', () => {
+		const stop = { ...RELAUNCH.stop, is_review_stale: true }
+		const parsed = lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop })
+
+		expect(parsed.success).toBe(true)
+	})
+})

@@ -5,6 +5,7 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-b
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { direct_filing } from './direct-filing'
+import { direct_issue_comment } from './direct-issue-comment'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
@@ -113,6 +114,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
 	// question are `issue:file`'s own steps, so no row gates them.
 	direct_filing.ROW,
+	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
+	// points at takes the body by path, so the body rows have nothing left to say.
+	direct_issue_comment.ROW,
 	filing_cap.ROW,
 	issue_comments.ROW,
 	{

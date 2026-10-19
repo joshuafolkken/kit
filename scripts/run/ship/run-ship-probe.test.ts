@@ -10,8 +10,10 @@ const git = vi.hoisted(() => ({
 const ls_remote_branch = vi.hoisted(() => vi.fn())
 const is_tree_dirty = vi.hoisted(() => vi.fn())
 const read_pr_state = vi.hoisted(() => vi.fn())
+const review_refusal_here = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: git }))
+vi.mock('#scripts/issue/issue-watch-gate', () => ({ issue_watch_gate: { review_refusal_here } }))
 vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { ls_remote_branch } }))
 vi.mock('#scripts/run/hold/run-hold', () => ({ run_hold: { is_tree_dirty } }))
 vi.mock('#scripts/run/run-preflight', () => ({
@@ -36,6 +38,22 @@ beforeEach(() => {
 	is_tree_dirty.mockResolvedValue(false)
 	ls_remote_branch.mockResolvedValue(`${HEAD}\trefs/heads/2426-lane`)
 	read_pr_state.mockResolvedValue('merged')
+	review_refusal_here.mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4221: the issue changed after the recorded review's brief — the refusal `josh
+// followup` would make — reads as a stale review, so the resumed ship reviews again.
+describe('run_ship_probe — a stale review', () => {
+	it('reads a review refusal as stale', async () => {
+		review_refusal_here.mockResolvedValue('the issue changed after the review was briefed')
+
+		expect(await run_ship_probe.read_state()).toMatchObject({ is_review_stale: true })
+		expect(await run_ship_probe.read_review_stale()).toBe(true)
+	})
+
+	it('reads no refusal as fresh', async () => {
+		expect(await run_ship_probe.read_review_stale()).toBe(false)
+	})
 })
 
 describe('run_ship_probe.read_state — committed', () => {
@@ -93,11 +111,13 @@ describe('run_ship_probe — unreadable answers read as not done', () => {
 		ls_remote_branch.mockRejectedValue(new Error('offline'))
 		read_pr_state.mockRejectedValue(new Error('rate limited'))
 		git.commit_count_beyond.mockRejectedValue(new Error('no base'))
+		review_refusal_here.mockRejectedValue(new Error('offline'))
 
 		expect(await run_ship_probe.read_state()).toStrictEqual({
 			is_committed: false,
 			is_pushed: false,
 			is_merged: false,
+			is_review_stale: false,
 		})
 	})
 

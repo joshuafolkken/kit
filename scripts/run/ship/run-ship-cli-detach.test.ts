@@ -22,6 +22,7 @@ vi.mock('./run-ship-probe', () => ({
 			is_pushed: false,
 			is_merged: false,
 		}),
+		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
 	},

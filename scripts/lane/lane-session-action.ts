@@ -29,6 +29,7 @@ const stop_schema = z
 		flags: z.array(z.string()).readonly(),
 		is_review: z.boolean(),
 		conflicts: z.array(z.string()).readonly().default([]),
+		is_review_stale: z.boolean().exactOptional(),
 		context: run_ship_stop_context.stop_context_schema.exactOptional(),
 	})
 	.strict()

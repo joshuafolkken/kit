@@ -20,6 +20,7 @@ vi.mock('./run-ship-probe', () => ({
 			is_pushed: false,
 			is_merged: false,
 		}),
+		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
 	},
@@ -305,7 +306,7 @@ describe('run_ship_cli.run — a failed step stops the ship', () => {
 describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/kit#2427)', () => {
 	it('reviews before the gate, then ships the clean path without an agent turn', async () => {
 		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
-		expect(review_mock).toHaveBeenCalledWith(NUMBER)
+		expect(review_mock).toHaveBeenCalledWith(NUMBER, false)
 		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
 		expect(info_lines[0]).toMatch(
 			/^=== preflight ===\nready\n\n=== review ===\nreview clean\n\n=== sync origin\/main ===\nmain brings nothing in\n\n=== gate ===/u,
