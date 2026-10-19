@@ -12,11 +12,11 @@ import { run_board_render_waits } from './run-board-render-waits'
 // The end of a running row (joshuafolkken/kit#3769, #4043): the icon of the phase its row leads with
 // and how long the child has stood at it, then two spaces — the gap between the row's other fields
 // (#4224) — and the kind and the age of the newest thing it did, both the board's own length
-// (`1°01′05″`). Each time is right-aligned to the widest its column
-// draws on any running row, so a `2°05′30″` and a `40″` end in one column and every icon stands in
-// one column whichever row it is on. The event that entered the phase is not drawn again after the
-// phase's own time. A settled or a waiting row draws neither. A lane held in the core budget draws its
-// wait in the newest activity's place, in the same columns (#4052).
+// (`1°01′05″`). Each time is right-aligned to the widest its column draws on any running row, so
+// a `2°05′30″` and a `40″` end in one column and every icon stands in one column whichever row it
+// is on. The event that entered the phase is not drawn again after the phase's own time. A settled
+// or a waiting row draws neither. A lane held in the core budget draws its wait in the newest
+// activity's place, in the same columns (#4052).
 
 const { KIND_BLANK, PHASE_ICONS, span_of } = run_board_labels
 const { held_of, held_text } = run_board_render_waits
