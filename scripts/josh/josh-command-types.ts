@@ -56,7 +56,8 @@ interface CommandFlag {
 }
 
 // What `josh help <command>` prints and what the reference pages render between their usage
-// markers — one source for both, so the page and the terminal cannot disagree (#3932).
+// markers — one source for both, so the page and the terminal cannot disagree (#3932). Each command's
+// entry carries its own, so a command cannot be registered without one (#4185).
 interface CommandUsage {
 	examples: ReadonlyArray<CommandExample>
 	flags?: ReadonlyArray<CommandFlag>
@@ -68,6 +69,7 @@ interface CommandEntry {
 	description: string
 	category: CommandCategory
 	reference: CommandReference
+	usage: CommandUsage
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this

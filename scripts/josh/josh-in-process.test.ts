@@ -23,6 +23,7 @@ const SCRIPT_ENTRY: CommandEntry = {
 	description: 'Lint the changed files',
 	category: 'Development',
 	reference: ['', 'developer', ['processes']],
+	usage: { examples: [] },
 }
 
 const ORIGINAL_ARGV = process.argv
@@ -77,6 +78,7 @@ describe('josh_in_process.in_process_target', () => {
 			description: 'Check formatting',
 			category: 'Development',
 			reference: ['', 'developer', ['processes']],
+			usage: { examples: [] },
 		}
 
 		expect(target_of(entry, TYPESCRIPT_DISPATCHER_URL)).toBeUndefined()

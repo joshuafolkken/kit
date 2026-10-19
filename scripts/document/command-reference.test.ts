@@ -88,6 +88,7 @@ describe('the command catalog is up to date', () => {
 			category: 'Development',
 			description: 'Run the checks',
 			reference: ['[--a|--b]', 'developer', ['none']],
+			usage: { examples: [] },
 			script: 'gate.ts',
 		})
 
