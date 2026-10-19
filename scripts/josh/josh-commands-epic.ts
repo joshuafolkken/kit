@@ -28,6 +28,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--reconcile 2184',
 					note: 'rewrite the body to match the recorded blocked-by, and record any order the body declared',
 				},
+				{ arguments: '--decide 893 894 --decision-file why.md' },
 			],
 			flags: [
 				{
@@ -104,8 +105,10 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/epic/epic-bundle-cli.ts',
 		description: 'Say whether a newly filed issue belongs with ones already in the backlog',
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
-		usage: { examples: [{ arguments: '874' }] },
+		reference: ['<issue> [--apply]', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '874' }, { arguments: '874 --apply', note: 'write it' }],
+		},
 	},
 	'epic:audit': {
 		script: 'scripts/epic/epic-audit-cli.ts',

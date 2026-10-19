@@ -452,6 +452,7 @@ pnpm josh epic --add 893 894 --before 891                          # #894 must f
 pnpm josh epic --add 893 894 --after 890                           # #894 starts once #890 is done
 pnpm josh epic --add 893 894 --decision-file why.md                # …and record why, in one call
 pnpm josh epic --reconcile 2184                                    # rewrite the body to match the recorded blocked-by, and record any order the body declared
+pnpm josh epic --decide 893 894 --decision-file why.md
 ```
 
 **Options:**
@@ -539,11 +540,12 @@ Say whether a newly filed issue belongs with ones already in the backlog.
 
 ```bash
 pnpm josh epic:bundle 874
+pnpm josh epic:bundle 874 --apply   # write it
 ```
 
 <!-- /usage -->
 
-It recommends and writes nothing; [`josh issue:file`](#josh-issuefile) runs it on the issue it creates as its last filing step.
+It writes nothing without `--apply`; [`josh issue:file`](#josh-issuefile) runs it on the issue it creates as its last filing step.
 
 Only two things count as a signal: one issue naming the other in its acceptance criteria (`## 受け入れ条件` / `## Acceptance criteria`) or its `parent: #N` / `親: #N` line, or an already-recorded `blocked-by`. A reference in any other section, or a similar title, does not.
 

@@ -138,13 +138,12 @@ Branch 2 only:
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
      (`docs/josh-commands-backlog.md` → `josh issue:file`). `epic:bundle` reads open issues only, so
      after the parent closes it answers `none` permanently.
-  2. Act on the printed `epic:bundle` answer by running the write command yourself — `epic:bundle`
-     writes nothing, and a hand edit of the epic body leaves the task list and `blocked-by` relations
-     disagreeing (`epic:next` returns `error`). Tier A, no confirmation:
-     - `add_to_epic` → `pnpm josh epic --add <E> <new>`, with `--before <M>` / `--after <M>` when the
-       relation carries an order.
-     - `create_epic` → `pnpm josh epic "<title>" <new> <other> [--ordered]`.
-     - `ask` (candidates across two or more epics) → place it in the recommended epic
+  2. Act on the printed `epic:bundle` answer with `pnpm josh epic:bundle <new> --apply` — never a
+     hand edit of the epic body, which leaves the task list and `blocked-by` relations disagreeing
+     (`epic:next` returns `error`). Tier A, no confirmation:
+     - `add_to_epic` / `create_epic` → `--apply` writes it, with any recorded order.
+     - `ask` (candidates across two or more epics) → `--apply` writes nothing; place it in the
+       recommended epic with `pnpm josh epic --add <E> <new> --decision-file <path>`
        (`.claude/skills/epic-commands/epic-bundle.md`).
      - `none` → nothing.
      - Non-zero exit, or any ⚠ warning above `Nothing to bundle.` → stop and report what it said; a
