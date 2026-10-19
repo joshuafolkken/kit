@@ -44,8 +44,8 @@ const filed: BoardNote = {
 	text: 'Lead',
 }
 const park: BoardNote = { ...filed, kind: 'park' }
-const NOTES_LEGEND = '📌 findings'
-const NOTES_RULE = rule(NOTES_LEGEND)
+const NOTES_HEADING = '📌 findings'
+const NOTES_RULE = rule(NOTES_HEADING)
 
 // joshuafolkken/kit#3478: the findings are named by icons the legend names, and by words where none is drawn.
 describe('run_board_render.render findings icons', () => {
@@ -66,8 +66,9 @@ describe('run_board_render.render findings icons', () => {
 		}
 	})
 
-	it('names the findings icons in the legend only while a finding is on screen', () => {
-		expect(lines_of(header(), [filed]).at(-1)).toBe(`${NOTES_LEGEND}  🆕 filed`)
+	// joshuafolkken/kit#4173: 📌 is named by its own rule, never by the legend.
+	it('names the findings icons in the legend only while a finding is on screen, and never 📌', () => {
+		expect(lines_of(header(), [filed]).at(-1)).toBe('🆕 filed')
 		expect(lines_of(header()).join('\n')).not.toContain('📌')
 	})
 
@@ -91,8 +92,8 @@ describe('run_board_render.render findings legend', () => {
 	it('names 💤 and 💬 only while a drawn finding leads with them', () => {
 		const every = lines_of(header(), [filed, park, note(NOW, 'seen')]).at(-1)
 
-		expect(every).toBe(`${NOTES_LEGEND}  🆕 filed  💤 parked  💬 note`)
-		expect(lines_of(header(), [note(NOW, 'seen')]).at(-1)).toBe(`${NOTES_LEGEND}  💬 note`)
+		expect(every).toBe('🆕 filed  💤 parked  💬 note')
+		expect(lines_of(header(), [note(NOW, 'seen')]).at(-1)).toBe('💬 note')
 	})
 
 	it('does not name 💤 again where a parked row already names it', () => {
@@ -106,17 +107,14 @@ describe('run_board_render.render findings legend', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [parked] }
 
-		expect(lines_of(header({ layout }), [park]).slice(-2)).toStrictEqual([
-			'💤 parked',
-			NOTES_LEGEND,
-		])
+		expect(lines_of(header({ layout }), [park]).slice(-2)).toStrictEqual(['', '💤 parked'])
 	})
 
 	it('does not name a kind whose findings are past the limit and not drawn', () => {
 		const shown = Array.from({ length: run_board_render.NOTE_LIMIT }, () => filed)
 		const legend = lines_of(header(), [...shown, note(NOW, 'hidden')]).at(-1)
 
-		expect(legend).toBe(`${NOTES_LEGEND}  🆕 filed`)
+		expect(legend).toBe('🆕 filed')
 	})
 })
 
@@ -139,10 +137,8 @@ describe('run_board_render.render filed kinds', () => {
 	it('names only the kinds drawn, in the legend’s order', () => {
 		const every = lines_of(header(), [filed, enhancement, bug, breaking]).at(-1)
 
-		expect(every).toBe(`${NOTES_LEGEND}  🧨 breaking  ✨ feature  🐛 fix  🆕 filed`)
-		expect(lines_of(header(), [bug, enhancement]).at(-1)).toBe(
-			`${NOTES_LEGEND}  ✨ feature  🐛 fix`,
-		)
+		expect(every).toBe('🧨 breaking  ✨ feature  🐛 fix  🆕 filed')
+		expect(lines_of(header(), [bug, enhancement]).at(-1)).toBe('✨ feature  🐛 fix')
 	})
 })
 
@@ -162,9 +158,7 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 		}
 		const layout = { ...EMPTY_LAYOUT, active: [row] }
 
-		expect(lines_of(header({ layout }), [bug, enhancement]).at(-1)).toBe(
-			`🐛 fix  ${NOTES_LEGEND}  ✨ feature`,
-		)
+		expect(lines_of(header({ layout }), [bug, enhancement]).at(-1)).toBe('🐛 fix  ✨ feature')
 	})
 
 	it('keeps the kind word filed where no legend is drawn', () => {

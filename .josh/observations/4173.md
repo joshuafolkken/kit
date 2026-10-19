@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/run/board/run-board-render-legend.ts:54 | 2026-10-19 | #4173
+- rf:comments | low | scripts/run/board/run-board-render.test.ts:118 | 2026-10-19 | #4173

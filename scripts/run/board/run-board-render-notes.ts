@@ -162,8 +162,8 @@ function same(reference: string): string {
 	return reference
 }
 
-// 📌 while the section is on screen, then each kind a drawn line leads with — one the rows' legend
-// already names (`named`) is not named twice.
+// Each kind a drawn line leads with — one the rows' legend already names (`named`) is not named twice.
+// 📌 is left to the section's own `📌 findings` heading.
 function notes_legend(
 	notes: ReadonlyArray<BoardNote>,
 	named: ReadonlySet<string>,
@@ -172,14 +172,11 @@ function notes_legend(
 	const view = { listed: listed_of(rows), has_legend: true, link: same, repo: undefined }
 	const shown = items_of(notes, view).slice(0, NOTE_LIMIT)
 
-	if (shown.length === 0) return []
-
 	const drawn = new Set(shown.map((item) => item.icon))
-	const kinds = NOTE_LEGEND.filter(([icon]) => drawn.has(icon) && !named.has(icon)).map(
+
+	return NOTE_LEGEND.filter(([icon]) => drawn.has(icon) && !named.has(icon)).map(
 		([icon, word]) => `${icon} ${WORDS[word]}`,
 	)
-
-	return [`${NOTES_ICON} ${WORDS.notes}`, ...kinds]
 }
 
 const run_board_render_notes = { NOTE_LIMIT, notes_legend, notes_part }
