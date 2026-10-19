@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { issue_backlinks } from '#scripts/issue/issue-backlinks'
 import { issue_lint } from '#scripts/issue/issue-lint'
 import { report_format_reference } from '#scripts/report/report-format-reference'
+import { report_labels } from '#scripts/report/report-labels'
 import { report_lint } from '#scripts/report/report-lint'
 import { describe, expect, it } from 'vitest'
 
@@ -18,26 +19,33 @@ function read_repo_file(relative_path: string): string {
 const REPORT_FORMAT = report_format_reference.REPORT_FORMAT_PATH
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
 const OBSERVATION_LEDGER = '.claude/skills/workflow-commands/observation-ledger.md'
+const JA = report_labels.JAPANESE_LABELS
 
 describe('report:lint agrees with report-format.md', () => {
 	const document = read_repo_file(REPORT_FORMAT)
-
-	it.each(report_lint.REQUIRED_LABELS)('the document defines the label %s', (label) => {
-		expect(document).toContain(label)
-	})
 
 	it('routes the mechanical half to the command', () => {
 		expect(document).toContain('josh report:lint')
 	})
 
-	it.each(report_lint.CASE_VOCABULARY)('defines the first-tier case %s', (token) => {
-		expect(document).toContain(token)
+	// joshuafolkken/kit#4157: the label table lives in `report-labels.ts` alone; the document names
+	// the command that prints the skeletons, and a copy of either template would drift from it.
+	it('routes both skeletons to report:template', () => {
+		expect(document).toContain('josh report:template summary')
+		expect(document).toContain('josh report:template done')
 	})
 
-	it('defines the two case-tier markers and the never-breaks escape', () => {
-		expect(document).toContain(report_lint.CASE_LABEL)
-		expect(document).toContain(report_lint.BREAK_LABEL)
-		expect(document).toContain(report_lint.NO_BREAK_ESCAPE)
+	it.each([JA.now, JA.change, JA.check, JA.changed_files])(
+		'keeps no template line for the label %s',
+		(label) => {
+			expect(document).not.toContain(`- **${label}**: <`)
+			expect(document).not.toContain(`- ${label}: <`)
+		},
+	)
+
+	it('names the two case-tier markers and the never-breaks escape it explains', () => {
+		expect(document).toContain(JA.not_applicable)
+		expect(document).toContain(JA.never_breaks)
 	})
 
 	it('requires the second tier to hold the declared number of conditions', () => {

@@ -1395,6 +1395,16 @@ Check a two-layer work summary on stdin against its mechanical format rules
 
 ---
 
+### `josh report:template`
+
+> **Audience:** automation · **Side effects:** files
+
+`summary|done [<path>...]`
+
+Print the work summary or completion report skeleton in the session language: summary | done
+
+---
+
 ### `josh retrospective` · `josh rtr`
 
 > **Audience:** maintainer · **Side effects:** none · **kit only**

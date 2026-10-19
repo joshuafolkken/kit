@@ -937,6 +937,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "report:template": [
+      "summary|done [<path>...]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
     "reserved-run": [
       "<weight> -- <command...>",
       "automation",

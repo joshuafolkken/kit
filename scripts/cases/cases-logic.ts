@@ -1,3 +1,4 @@
+import { session_language } from '#scripts/josh/session-language'
 import { file_reader } from '#scripts/lib/read-file'
 
 // `josh cases <path...>`: read the changed paths and answer which I/O
@@ -17,6 +18,8 @@ interface BoundaryDefinition {
 	pattern: RegExp
 	// The abnormal cases this boundary always owes, so they land in the second tier.
 	cases: ReadonlyArray<string>
+	// The same cases for an English session, in the same order.
+	english_cases: ReadonlyArray<string>
 }
 
 const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
@@ -27,6 +30,14 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		// would fire `network` on every markdown edit and defeat the oracle.
 		pattern: /\b(?:fetch|axios|undici|node:https?|XMLHttpRequest)\b/u,
 		cases: ['非200', 'タイムアウト', '接続断', '空レスポンス', '不正JSON', 'レート制限'],
+		english_cases: [
+			'non-200',
+			'timeout',
+			'connection drop',
+			'empty response',
+			'invalid JSON',
+			'rate limit',
+		],
 	},
 	{
 		boundary: 'process',
@@ -36,6 +47,7 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		pattern:
 			/\b(?:child_process|execSync|execFileSync|spawnSync)\b|\b(?:exec|execFile|spawn)\s*\(/u,
 		cases: ['非ゼロ終了', 'タイムアウト', '標準エラー出力', '実行ファイル不在'],
+		english_cases: ['non-zero exit', 'timeout', 'stderr output', 'missing executable'],
 	},
 	{
 		boundary: 'fs',
@@ -45,6 +57,13 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		pattern:
 			/\b(?:node:fs|fs\/promises|readFileSync|writeFileSync)\b|\b(?:readFile|writeFile|mkdir|unlink|readdir|rm)\s*\(/u,
 		cases: ['ファイル不在', '権限エラー', '空ファイル', '不正な内容', '並行書き込み'],
+		english_cases: [
+			'missing file',
+			'permission error',
+			'empty file',
+			'invalid content',
+			'concurrent write',
+		],
 	},
 	{
 		boundary: 'time',
@@ -57,6 +76,12 @@ const BOUNDARIES: ReadonlyArray<BoundaryDefinition> = [
 		pattern:
 			/\b(?:setInterval|setTimeout|setImmediate|schedule|reschedule|retry)\s*\(|\b(?:cron|crontab|heartbeat|watchdog|liveness)\b/u,
 		cases: ['期待した事象が到来しない', '期限超過', '重複発火', '再試行が尽きる'],
+		english_cases: [
+			'awaited event never arrives',
+			'deadline exceeded',
+			'duplicate firing',
+			'retries exhausted',
+		],
 	},
 ]
 
@@ -76,10 +101,15 @@ function boundaries_in(paths: ReadonlyArray<string>): ReadonlyArray<Boundary> {
 	)
 }
 
-// The abnormal cases owed by the given boundaries, in the fixed boundary order.
-function cases_for(boundaries: ReadonlyArray<Boundary>): ReadonlyArray<string> {
+// The abnormal cases owed by the given boundaries, in the fixed boundary order and in `lang`.
+function cases_for(
+	boundaries: ReadonlyArray<Boundary>,
+	lang: string = session_language.DEFAULT_SESSION_LANG,
+): ReadonlyArray<string> {
+	const is_japanese = session_language.is_japanese(lang)
+
 	return BOUNDARIES.filter((definition) => boundaries.includes(definition.boundary)).flatMap(
-		(definition) => definition.cases,
+		(definition) => (is_japanese ? definition.cases : definition.english_cases),
 	)
 }
 
