@@ -52,6 +52,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'raw-field-body': judgment('the body moves to a file the call does not name'),
 	'rule-body': judgment('a trigger-plus-pointer line is written, not derived'),
 	'direct-filing': judgment(ANOTHER_COMMAND),
+	'direct-issue-comment': judgment(ANOTHER_COMMAND),
 	'direct-pr-create': judgment(ANOTHER_COMMAND),
 	'pr-merge': judgment(ANOTHER_COMMAND),
 	'josh-git-bare': judgment(ANOTHER_COMMAND),

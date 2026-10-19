@@ -247,11 +247,13 @@ function skipped(out: string): StepResult {
 // **A recorded round 1 is not run again**. A ship relaunched with `--review`
 // after a round-1 stop would otherwise review the whole change a second time as round 1 — a new Medium
 // there stops it again, and round 2 after the commit makes a third. The fix delta is round 2's to
-// verify, and `round_two_stage` asks whether it is due after the commit.
-async function review_stage(issue: string): Promise<StepResult> {
+// verify, and `round_two_stage` asks whether it is due after the commit — unless the issue changed after
+// that round's brief: the recorded round then never read it, and `josh followup` refuses the merge on it
+// (joshuafolkken/kit#4221).
+async function review_stage(issue: string, is_stale = false): Promise<StepResult> {
 	const recorded = await review_record.check(Number(issue))
 
-	if (recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
+	if (!is_stale && recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
 
 	return await run_phases([
 		scoped_pair,

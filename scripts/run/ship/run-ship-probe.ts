@@ -1,5 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { error_text } from '#scripts/lib/error-message'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_preflight } from '#scripts/run/run-preflight'
@@ -60,16 +61,23 @@ async function read_merged(branch_name: string): Promise<boolean> {
 	return (await git_command.commit_count_beyond(base, HEAD_REFERENCE)) === 0
 }
 
+// The issue changed after the recorded review was briefed — the refusal `josh followup` would make
+// (joshuafolkken/kit#4221) — so the review stage re-runs instead of the followup failing again.
+async function read_review_stale(): Promise<boolean> {
+	return await or_false(async () => (await issue_watch_gate.review_refusal_here()) !== undefined)
+}
+
 const NOTHING_DONE: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
 
 async function read_branch_state(branch_name: string): Promise<ShipState> {
-	const [is_committed, is_pushed, is_merged] = await Promise.all([
+	const [is_committed, is_pushed, is_merged, is_review_stale] = await Promise.all([
 		or_false(read_committed),
 		or_false(async () => await read_pushed(branch_name)),
 		or_false(async () => await read_merged(branch_name)),
+		read_review_stale(),
 	])
 
-	return { is_committed, is_pushed, is_merged }
+	return { is_committed, is_pushed, is_merged, is_review_stale }
 }
 
 // A branch that cannot be named leaves nothing to ask about, so it reads as nothing done.
@@ -101,6 +109,6 @@ async function record_target(issue: string): Promise<string | undefined> {
 	return repository === undefined ? undefined : run_ship_stage.record_path(repository, issue)
 }
 
-const run_ship_probe = { read_state, record_target, repository_directory }
+const run_ship_probe = { read_review_stale, read_state, record_target, repository_directory }
 
 export { run_ship_probe }

@@ -11,7 +11,8 @@ Review results and successful pushes are never turn boundaries.
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing) and (Anthropic lane) the re-detach to run after
    the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
-   round 2, which is final (`scripts/run/ship/run-ship-next.ts`); the supervisor skips a recorded round 1.
+   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`); the
+   supervisor skips a recorded round 1 unless it went stale.
    `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
    rather than refused.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
