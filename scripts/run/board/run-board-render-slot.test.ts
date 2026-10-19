@@ -6,7 +6,7 @@ import { run_board_render_slot } from './run-board-render-slot'
 
 // joshuafolkken/kit#3554: the column between a row's time and its tail — a finished row's finish
 // time, blanks on any other — one width on every row. joshuafolkken/kit#4171: a running row's usage
-// moved to its lane cells, so the column draws nothing on it.
+// moved to its lane cells, so the column draws nothing on it; joshuafolkken/kit#4217: nor blanks.
 
 const { cell_of, column_width, slot_of } = run_board_render_slot
 const { MINUTE, NOW } = run_board_render_fixture
