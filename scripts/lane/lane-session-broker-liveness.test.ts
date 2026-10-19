@@ -55,6 +55,9 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: vi.fn().mockResolvedValue(false) } }))
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const state = { directory: '' }
 

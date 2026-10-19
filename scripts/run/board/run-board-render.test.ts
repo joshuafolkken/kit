@@ -119,20 +119,23 @@ describe('run_board_render.render release kinds', () => {
 	it('names the drawn kinds in the legend', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(1, { kind: 'bug' }), row(2)] }
 
-		expect(lines_of(header({ layout })).slice(-2)).toStrictEqual(['⏳ queued', '🐛 fix'])
+		expect(lines_of(header({ layout })).slice(-2)).toStrictEqual(['', '🐛 fix'])
 	})
 })
 
 // joshuafolkken/kit#4079: a row waiting on its declared start time leads with 📅, a blocked one ⏳.
 describe('run_board_render.render a row waiting on its start time', () => {
-	it('leads the row with 📅 and names it in the legend beside ⏳', () => {
+	// joshuafolkken/kit#4173: neither is named in the legend — 📅 is followed by `not before <time>`
+	// and ⏳ sits under `⏳ queued`.
+	it('leads the row with 📅 and names neither it nor ⏳ in the legend', () => {
 		const dated = row(14, { reason: { text: 'not before 2999-01-01 09:00', not_before_ms: 0 } })
 		const blocked = row(15, { waits: ['3'] })
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [dated, blocked] } }))
 
 		expect(lines.some((line) => line.startsWith('  📅 14'))).toBe(true)
 		expect(lines.some((line) => line.startsWith('  ⏳ 15'))).toBe(true)
-		expect(lines.at(-2)).toBe('⏳ queued  📅 not before')
+		expect(lines.find((line) => line.startsWith('  📅 14'))).toContain('not before 2999-01-01')
+		expect(lines.at(-1)).toBe('🔗 waits on')
 	})
 })
 
@@ -146,7 +149,7 @@ describe('run_board_render.render sections', () => {
 		const lines = lines_of(header({ layout }))
 		const queued_rule = rule('⏳ queued')
 
-		expect(lines.slice(lines.indexOf(queued_rule), -3)).toStrictEqual([
+		expect(lines.slice(lines.indexOf(queued_rule), -2)).toStrictEqual([
 			queued_rule,
 			'  📁 10  Epic ten',
 			'     ├ ⏳ 11    Issue 11',
@@ -163,15 +166,16 @@ describe('run_board_render.render sections', () => {
 		expect(lines_of(header({ layout }))).toContain(`  ⏳ 7    ${title}`)
 	})
 
-	it('draws a decision row under the decision rule and the legend at the foot', () => {
+	// joshuafolkken/kit#4173: the rule names 🙋, so no legend is drawn for it.
+	it('draws a decision row under the decision rule, which names 🙋 in place of the legend', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
-		const decision = '🙋 decision'
-		const decision_rule = rule(decision)
+		const decision_rule = rule('🙋 decision')
+		const decision_row = '  🙋 6    Issue 6'
 		const start = lines.indexOf(decision_rule)
 
-		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, '  🙋 6    Issue 6'])
-		expect(lines.at(-1)).toBe(decision)
+		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
+		expect(lines.at(-1)).toBe(decision_row)
 	})
 })
 
@@ -191,7 +195,9 @@ describe('run_board_render.render chat', () => {
 		const lines = lines_of(header({ layout, usages, form: 'chat' }), notes)
 
 		expect(lines).toStrictEqual(screen)
-		expect(lines.join('\n')).toMatch(/── 📌 findings [^]*\n.*x… {2}.*🔚 .*\n[^]*✅ merged/u)
+		expect(lines.join('\n')).toMatch(
+			/── 📌 findings [^]*\n.*x… {2}.*🔚 .*\n\n👀 review {2}💬 note$/u,
+		)
 	})
 })
 

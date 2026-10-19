@@ -186,6 +186,13 @@ const ROW = {
 	is_trigger: (call: GuardedCall): boolean => is_background_long_run(call),
 	reason: LANE_BACKGROUND_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Lane child background push',
+		topic: '`.claude/skills/workflow-commands/background-commands.md`',
+		fires:
+			'a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`. Every occurrence',
+		quiet: 'not a lane child, or the foreground `ship --detach`',
+	},
 }
 
 const lane_background = {

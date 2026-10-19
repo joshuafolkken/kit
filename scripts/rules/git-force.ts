@@ -90,6 +90,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_force_or_delete),
 	reason: GIT_FORCE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Force push / branch delete',
+		topic: '`operating-rules.md`',
+		fires:
+			'a `git push` / `git branch` read as force (`--force` / `-f` / `-uf` …) or delete (`--delete` / `-d` / `-D` / `:branch`) in any spelling. Every occurrence',
+		quiet: 'a plain `git push` / `git branch`',
+	},
 }
 
 const git_force = {

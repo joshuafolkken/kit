@@ -8,6 +8,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { ShipSection } from './run-ship'
 import { run_ship_next, type ShipResume } from './run-ship-next'
+import { run_ship_probe } from './run-ship-probe'
 import { run_ship_relaunch_cap } from './run-ship-relaunch-cap'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
@@ -127,13 +128,15 @@ async function return_control(
 }
 
 // The stopped ship's arguments and its failed section, as `return_control` takes them: the section's
-// conflicts ride on the resume, its body is the output the prompt carries.
+// conflicts ride on the resume, its body is the output the prompt carries. A stale review rides on it
+// too, so the relaunched child re-detaches with `--review` (joshuafolkken/kit#4221).
 async function hand_back(
 	args: ShipArguments,
 	stage: Stage,
 	failed: Pick<ShipSection, 'body' | 'conflicts'> | undefined,
 ): Promise<ReturnOutcome> {
-	const resume = run_ship_next.resume_of(args)
+	const is_review_stale = await run_ship_probe.read_review_stale()
+	const resume = { ...run_ship_next.resume_of(args), is_review_stale }
 	const conflicts = failed?.conflicts
 	const stopped = conflicts === undefined ? resume : { ...resume, conflicts }
 

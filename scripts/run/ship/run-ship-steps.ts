@@ -102,7 +102,8 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
-	run: async (args) => await run_ship_review_steps.review_stage(args.number),
+	run: async (args, state) =>
+		await run_ship_review_steps.review_stage(args.number, state.is_review_stale === true),
 }
 const ROUND_TWO_STEP: Step = {
 	stage: STAGE.ROUND_TWO,

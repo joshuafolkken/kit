@@ -22,7 +22,7 @@ interface RuleColumn {
 	start: number
 }
 
-// A rule whose column labels stand over their cells: `── 🛤 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
+// A rule whose column labels stand over their cells: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
 // its column's start where the rule before it leaves room, and one rule character after the label
 // before it where it does not.
 function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {

@@ -3,8 +3,11 @@ import { mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync 
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 import { lane_broker_server, type BrokerServer } from './lane-broker-server'
 import type { LaneInfo } from './lane-registry'
@@ -33,6 +36,12 @@ const REQUEST_LIMIT_MS = REQUEST_LIMIT_MINUTES * MINUTE_MS
 const request_schema = z
 	.object({ session: z.uuid(), nonce: z.uuid(), action: lane_session_action.action_schema })
 	.strict()
+// **A request this broker cannot read is still answered**: the supervisor keeps the code it started
+// with while a lane's ship runs a newer main, so a field the ship added made the request unreadable and
+// the ship waited out the whole limit on a server that had dropped it (joshuafolkken/kit#4230).
+const envelope_schema = z.looseObject({ session: z.uuid(), nonce: z.uuid() })
+const UNREADABLE_REASON =
+	"the broker could not read the request — the supervisor runs older code than the lane's ship"
 const response_schema = z
 	.object({
 		session: z.uuid(),
@@ -44,7 +53,7 @@ const response_schema = z
 // **A failure's reason sits beside the response, never in it**: a ship branched before the reason parses
 // the response strictly, so a new field would read as no server (joshuafolkken/kit#3974).
 const reason_schema = z.object({ nonce: z.string(), reason: z.string() }).strict()
-type BrokerRequest = z.infer<typeof request_schema>
+type BrokerEnvelope = z.infer<typeof envelope_schema>
 type BrokerResponse = z.infer<typeof response_schema>
 
 const { failure } = lane_session_action
@@ -79,13 +88,21 @@ function write_record(target: string, body: BrokerResponse | z.infer<typeof reas
 	renameSync(temporary, target)
 }
 
+async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
+	const parsed = request_schema.safeParse(received)
+
+	return parsed.success
+		? await lane_session_action.answer(lane, parsed.data.action)
+		: failure(UNREADABLE_REASON)
+}
+
 async function process_request(
 	lane: LaneInfo,
 	response: string,
-	received: BrokerRequest,
+	received: BrokerEnvelope,
 	state: { current: BrokerResponse },
 ): Promise<void> {
-	const answer = await lane_session_action.answer(lane, received.action)
+	const answer = await answer_request(lane, received)
 	const { session, nonce } = received
 
 	if (!answer.is_success) write_record(reason_path(response), { nonce, reason: answer.reason })
@@ -103,7 +120,7 @@ async function serve(
 	const target = request_path(lane.directory, lane.issue)
 
 	while (state.is_running) {
-		const received = read_record(target, request_schema)
+		const received = read_record(target, envelope_schema)
 
 		if (received?.session === session && received.nonce !== last_nonce) {
 			last_nonce = received.nonce
@@ -270,11 +287,17 @@ function withdraw(pending: string, nonce: string): void {
 	if (read_record(pending, request_schema)?.nonce === nonce) stamp_file.remove_stamp(pending)
 }
 
-async function request(
-	directory: string,
-	issue: string,
-	action: BrokerAction,
-): Promise<BrokerAnswer> {
+// A failure is put on the run's stream as well as the ship's output, so a broker that cannot serve the
+// lane is seen from `run:board` rather than only from the ship log (joshuafolkken/kit#4230).
+async function record_failure(issue: string, answer: BrokerAnswer): Promise<void> {
+	if (answer.is_success) return
+
+	const text = `${issue_cite.plain(issue)} lane broker: ${answer.reason}`
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.NOTE, text)
+}
+
+async function send(directory: string, issue: string, action: BrokerAction): Promise<BrokerAnswer> {
 	const target = response_path(directory, issue)
 	const response = target === undefined ? undefined : live_response(target)
 
@@ -288,6 +311,18 @@ async function request(
 	const answer = await wait_response(target, response.session, nonce)
 
 	withdraw(pending, nonce)
+
+	return answer
+}
+
+async function request(
+	directory: string,
+	issue: string,
+	action: BrokerAction,
+): Promise<BrokerAnswer> {
+	const answer = await send(directory, issue, action)
+
+	await record_failure(issue, answer)
 
 	return answer
 }

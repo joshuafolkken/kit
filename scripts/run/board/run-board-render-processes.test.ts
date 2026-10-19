@@ -5,13 +5,13 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_processes } from './run-board-render-processes'
 import type { UsageFigure } from './run-board-usage'
 
-// joshuafolkken/kit#4171: the 🖥 section draws what is loading the machine by who started it — the
+// joshuafolkken/kit#4171: the 💻 section draws what is loading the machine by who started it — the
 // backlogrun's own processes, the apps outside it and whatever a run left behind.
 
 const { processes_part } = run_board_render_processes
 const { GB, board_usage, header } = run_board_render_fixture
 const SPINNER = '⠋'
-const RULE_START = '── 🖥 processes '
+const RULE_START = '── 💻 processes '
 
 function figure(cpu_cores: number, memory_gb: number, compressed_gb: number): UsageFigure {
 	return { cpu_cores, memory_bytes: memory_gb * GB, compressed_bytes: compressed_gb * GB }
@@ -71,8 +71,8 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 		expect(lines.map((line) => [label_of(line.text), line.is_detail])).toStrictEqual([
 			['▶ backlogrun', false],
 			['🧭 supervisor', true],
-			['🎛 parent', true],
-			['🛤 lanes ×3', true],
+			['🎬 parent', true],
+			['🧵 lanes ×3', true],
 			['🌐 apps', false],
 			['Google Chrome ×2', true],
 			['WindowServer', true],
@@ -83,6 +83,23 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 		const lines = texts(part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER))
 
 		expect(new Set(lines.map((line) => cells_start(line))).size).toBe(1)
+	})
+})
+
+function icon_of(text: string): string {
+	return text.trim().split(' ', 1)[0] ?? ''
+}
+
+// joshuafolkken/kit#4223: a text-default icon is counted one column wide but drawn two, so it
+// overlapped the blank after it and the cells after it stood a column off on screen.
+describe('run_board_render_processes.processes_part icons', () => {
+	it('marks the heading and the backlogrun parts with icons two columns wide', () => {
+		const part = part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER)
+		const rule = (part?.head[1] ?? '').replace(/^─+/u, '')
+		const parts = (part?.lines.slice(1, 4) ?? []).map((line) => line.text)
+		const icons = [rule, ...parts].map((text) => icon_of(text))
+
+		expect(icons.map((icon) => run_board_fit.width_of(icon))).toStrictEqual([2, 2, 2, 2])
 	})
 })
 

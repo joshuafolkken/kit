@@ -8,6 +8,7 @@ const serving_mock = vi.hoisted(() => vi.fn())
 const request_mock = vi.hoisted(() => vi.fn())
 const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
+const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
@@ -27,6 +28,7 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
 }))
 
+vi.mock('./run-ship-probe', () => ({ run_ship_probe: { read_review_stale: stale_mock } }))
 vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
 }))
@@ -53,6 +55,7 @@ beforeEach(() => {
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	is_over_mock.mockReset().mockResolvedValue(false)
 	park_mock.mockReset().mockResolvedValue(true)
+	stale_mock.mockReset().mockResolvedValue(false)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
@@ -218,5 +221,13 @@ describe('run_ship_return — the stop context in the relaunched prompt', () => 
 	it('relaunches with no excerpt when no section failed', async () => {
 		expect(await run_ship_return.hand_back(args, 'gate', undefined)).toBe('relaunched')
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(`pnpm josh ship --log ${ISSUE}`)
+	})
+
+	// joshuafolkken/kit#4221: a followup refused on a stale review relaunches into a second review.
+	it('carries a stale review onto the relaunch', async () => {
+		stale_mock.mockResolvedValue(true)
+
+		expect(await run_ship_return.hand_back(args, 'followup', undefined)).toBe('relaunched')
+		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain('pnpm josh ship --detach --review')
 	})
 })

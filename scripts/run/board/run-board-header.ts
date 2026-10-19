@@ -271,7 +271,7 @@ function plan_warning(header: BoardHeader): string | undefined {
 
 	if (failed === undefined) return undefined
 
-	return styleText('yellow', `⚠ ${WORDS.plan} ${minute_of(failed)}`)
+	return styleText('yellow', `${HEADER_ICONS.warning} ${WORDS.plan} ${minute_of(failed)}`)
 }
 
 // A plan read in flight turns the spinner after ⏳ and says nothing more; a

@@ -5,7 +5,7 @@ import type { LocalRead } from './run-board-read'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_usage, type UsageMark } from './run-board-usage'
 
-// What a reading draws: each lane's CPU/MEM/CMPRS and the 🖥 section's groups, both from the same
+// What a reading draws: each lane's CPU/MEM/CMPRS and the 💻 section's groups, both from the same
 // differences between this reading and the last. A frame drawn once has no last reading, so it reads
 // twice a second apart; otherwise its CPU would be blank.
 

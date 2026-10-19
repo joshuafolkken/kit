@@ -27,6 +27,14 @@ const ROW = {
 	decide: (): boolean => true,
 	keeps: bash_triggers.on_bash_command(bash_triggers.is_issue_filing),
 	reaches: bash_triggers.on_bash_command(is_any_filing),
+	about: {
+		title: 'Direct filing',
+		topic: '`docs/josh-commands-backlog.md` → `josh issue:file`',
+		fires:
+			'a `Bash` that creates an Issue outside `josh issue:file` (`gh issue create`, or a POST with `title` to `…/issues`); the refusal hands over the `pnpm josh issue:file` form. Every occurrence',
+		quiet:
+			'filing through `pnpm josh issue:file` — the duplicate scan, the body check and `epic:bundle` all run',
+	},
 }
 
 const direct_filing = { DIRECT_FILING_REASON, ROW }

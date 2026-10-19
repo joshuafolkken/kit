@@ -224,6 +224,14 @@ const ROW = {
 		'⛔ implementation-phase cut: this checkout is a lane dispatched',
 		"⛔ implementation-phase cut: this run's context crossed the",
 	],
+	about: {
+		title: 'The implementation-phase cut',
+		topic:
+			'`.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold"',
+		fires:
+			'an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing',
+		quiet: 'not a lane child, a non-editing tool, already cut, or under the threshold',
+	},
 }
 
 const implementation_cut = {

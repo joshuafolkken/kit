@@ -1,0 +1,7 @@
+{
+	"reason": "#4230: the broker answers a request it cannot parse (envelope read + failure answer) and records broker failures on the run stream",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}
