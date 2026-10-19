@@ -11,6 +11,7 @@ const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const parked_mock = vi.hoisted(() => vi.fn())
+const emit_mock = vi.hoisted(() => vi.fn())
 const ISSUE = '2654'
 const MISSING_RESPONSE = 'response path is missing'
 const ROUND_ONE = { kind: 'review', round: '1' } as const
@@ -54,6 +55,9 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: parked_mock } }))
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit: emit_mock },
+}))
 
 const state = { directory: '' }
 
@@ -69,6 +73,7 @@ beforeEach(() => {
 	})
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
 	parked_mock.mockReset().mockResolvedValue(false)
+	emit_mock.mockReset().mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -251,6 +256,36 @@ describe('lane_session_broker — a failed action names its reason', () => {
 		expect(reason_of(await request_relaunch(CLAUDE_LANE))).toContain(
 			'the broker answered a failure: the broker failed',
 		)
+	})
+})
+
+// joshuafolkken/kit#4230: a supervisor started before main added a stop field dropped the newer ship's
+// request unread, and the ship waited out the 30-minute limit on a server that was still alive.
+describe('lane_session_broker — a request the broker cannot read', () => {
+	const NEWER = { ...RELAUNCH, stop: { ...RELAUNCH.stop, is_from_newer_main: true } }
+	const UNREADABLE =
+		"the broker answered a failure: the broker could not read the request — the supervisor runs older code than the lane's ship"
+
+	it('answers the unreadable request at once, naming why, and starts nothing', async () => {
+		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
+
+		expect(await request_review(CLAUDE_LANE, NEWER)).toStrictEqual({
+			is_success: false,
+			reason: UNREADABLE,
+		})
+		expect(relaunch).not.toHaveBeenCalled()
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it("puts the failure on the run's stream under the lane's issue", async () => {
+		await request_review(CLAUDE_LANE, NEWER)
+
+		expect(emit_mock).toHaveBeenCalledWith('note', `#${ISSUE} lane broker: ${UNREADABLE}`)
+	})
+
+	it('puts nothing on the stream for an answered request', async () => {
+		expect(await request_review(LANE, ROUND_ONE)).toStrictEqual(SUCCESS)
+		expect(emit_mock).not.toHaveBeenCalled()
 	})
 })
 
