@@ -24,22 +24,33 @@ function aliases_for(command_name: string): ReadonlyArray<string> {
 		.toSorted((x, y) => x.localeCompare(y))
 }
 
-function format_alias_heading(name: string, aliases: ReadonlyArray<string>): string {
-	if (aliases.length === 0) return `### \`josh ${name}\``
-	const alias_spans = aliases.map((al) => `\`josh ${al}\``).join(' · ')
+// One row per command (#4162): a `|` inside a cell, code span included, would end the cell.
+const TABLE_HEAD = [
+	'| Command | Arguments | Audience | Side effects | Description |',
+	'| --- | --- | --- | --- | --- |',
+].join('\n')
 
-	return `### \`josh ${name}\` · ${alias_spans}`
+function table_cell(text: string): string {
+	return text.replaceAll('|', String.raw`\|`)
+}
+
+function format_command_cell(name: string, entry: CommandEntry): string {
+	const spans = [name, ...aliases_for(name)].map((spelling) => `\`josh ${spelling}\``).join(' · ')
+
+	return entry.is_kit_only === true ? `${spans} · **kit only**` : spans
 }
 
 function format_command_entry(name: string, entry: CommandEntry): string {
 	const [synopsis, audience, side_effects] = entry.reference
-	const aliases = aliases_for(name)
-	const kit_note = entry.is_kit_only === true ? ' · **kit only**' : ''
-	const heading = format_alias_heading(name, aliases)
-	const meta = `> **Audience:** ${audience} · **Side effects:** ${side_effects.join(', ')}${kit_note}`
-	const synopsis_line = synopsis ? `\`${synopsis}\`` : '_No arguments._'
+	const cells = [
+		format_command_cell(name, entry),
+		synopsis ? `\`${synopsis}\`` : '—',
+		audience,
+		side_effects.join(', '),
+		entry.description,
+	]
 
-	return [heading, '', meta, '', synopsis_line, '', entry.description].join('\n')
+	return `| ${cells.map((cell) => table_cell(cell)).join(' | ')} |`
 }
 
 function entries_for_category(category: CommandCategory): Array<[string, CommandEntry]> {
@@ -51,9 +62,9 @@ function entries_for_category(category: CommandCategory): Array<[string, Command
 function generate_category_section(category: CommandCategory): string {
 	const entries = entries_for_category(category)
 	if (entries.length === 0) return ''
-	const command_blocks = entries.map(([name, entry]) => format_command_entry(name, entry))
+	const rows = entries.map(([name, entry]) => format_command_entry(name, entry))
 
-	return `## ${category}\n\n${command_blocks.join('\n\n---\n\n')}\n\n`
+	return `## ${category}\n\n${TABLE_HEAD}\n${rows.join('\n')}\n\n`
 }
 
 function generate_catalog(): string {
@@ -66,4 +77,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	writeFileSync(CATALOG_FILE, generate_catalog())
 }
 
-export { CATALOG_FILE, generate_catalog }
+export { CATALOG_FILE, format_command_entry, generate_catalog }
