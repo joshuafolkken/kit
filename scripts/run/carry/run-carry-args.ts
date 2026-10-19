@@ -13,7 +13,6 @@ const ONE_MERGE = 1
 // The four request groups below are mutually exclusive, so more than one of them named in a single
 // invocation is a usage error rather than an order to guess.
 const ONE_GROUP = 1
-const COUNT_PATTERN = /^\d+$/u
 const EMPTY_INVOCATION = ''
 // A pid below this addresses a process group rather than a process, which `process-identity.ts`
 // rejects on the read side. Refused here too, so a record never records an owner nothing can be.
@@ -87,7 +86,7 @@ function to_count(value: OptionValue): number | undefined {
 
 	if (text === undefined) return NO_INCREMENT
 
-	return COUNT_PATTERN.test(text) ? Number(text) : undefined
+	return cli_flags.to_count(text)
 }
 
 // **`--done` and `--merged` name an issue, so each is checked as one and not as a count.** The shape
@@ -105,7 +104,7 @@ function to_issue(value: OptionValue): { issue?: number } | undefined {
 	const issue = Number(text)
 
 	// The pattern is anchored on digits and bounds nothing, so the magnitude check is separate — the
-	// same shape `backlog_budget_cli.to_count` ends with. A number past the safe range would be
+	// same shape `cli_flags.to_count` ends with. A number past the safe range would be
 	// recorded as a different number and never match anything in `remaining`.
 	return Number.isSafeInteger(issue) ? { issue } : undefined
 }
@@ -196,11 +195,9 @@ function to_owner(value: OptionValue): CarryOwner | undefined {
 
 	if (text === undefined) return run_carry.NO_OWNER
 
-	if (!COUNT_PATTERN.test(text)) return undefined
+	const pid = cli_flags.to_count(text)
 
-	const pid = Number(text)
-
-	return pid < MIN_PID ? undefined : marked(run_carry.owner_of(pid))
+	return pid === undefined || pid < MIN_PID ? undefined : marked(run_carry.owner_of(pid))
 }
 
 // A non-empty `--summary`, or nothing. An empty string is nothing here, so it reads as absent and the

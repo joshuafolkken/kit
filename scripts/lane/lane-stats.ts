@@ -1,4 +1,5 @@
 import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
 import { lane_sampler } from './lane-sampler'
 
@@ -21,7 +22,6 @@ import { lane_sampler } from './lane-sampler'
 // **Swap is a rate, not a level.** A sample carries `machine_capacity`'s counter — every page swapped
 // since boot — so the swap columns are what was swapped between consecutive samples, per hour.
 
-const MS_PER_MINUTE = 60_000
 const MS_PER_HOUR = 3_600_000
 // A busy lane pool finishes a gate well within this; a longer silence is time nobody was running work.
 const ACTIVE_GAP_MS = MS_PER_HOUR

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -37,10 +38,8 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const ONE_GROUP = 1
-const MS_PER_SECOND = 1000
-// Whole and positive. A zero interval is a busy loop against the temp directory, not a faster
-// supervisor.
-const INTERVAL_PATTERN = /^[1-9]\d*$/u
+// The interval is whole and positive (`cli_flags.to_positive`): a zero interval is a busy loop against
+// the temp directory, not a faster supervisor.
 // **Bounded above as well as below, and for the same reason.** `setTimeout` clamps any delay past
 // 2^31−1 ms to *one millisecond*, so a number large enough to look like "poll rarely" produces exactly
 // the busy loop the lower bound exists to prevent. An hour is far past any useful polling interval and
@@ -121,11 +120,11 @@ function note_to_stderr(note: string): void {
 
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
 	if (typeof value !== 'string') return backlog_budget.OFFER_INTERVAL_MS
-	if (!INTERVAL_PATTERN.test(value)) return undefined
+	const seconds = cli_flags.to_positive(value)
 
-	const seconds = Number(value)
-
-	return seconds > MAX_INTERVAL_SECONDS ? undefined : seconds * MS_PER_SECOND
+	return seconds === undefined || seconds > MAX_INTERVAL_SECONDS
+		? undefined
+		: seconds * MS_PER_SECOND
 }
 
 // Exactly one verb, never a guessed order between two.

@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { BoardHeader, BoardUsage } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout } from './run-board-layout'
@@ -12,7 +12,7 @@ import type { LaneUsages, UsageFigure } from './run-board-usage'
 // board's lines with the color escapes stripped, so an assertion reads the screen as a person does.
 
 const { WORDS } = run_board_labels
-const MINUTE = backlog_budget.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 // The run has gone 130 minutes, so a row past an hour reads as `2°05′30″` and the header as `2°10′00″`.
 const RUN_MINUTES = 130

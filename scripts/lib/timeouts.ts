@@ -3,6 +3,12 @@
 // limit stays stuck where it stopped and never comes back, so every such
 // call takes one of these, and a value used in more than one place is named once here.
 
+// The unit conversions every duration is read and printed through. They sit beside the limits because a
+// limit is the most common thing they convert; a second copy in a caller is a clone of these two lines.
+const MS_PER_SECOND = 1000
+const SECONDS_PER_MINUTE = 60
+const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
+
 // A probe that only asks the local machine (`ps`, `lsof`, `git config`) on a path something else is
 // waiting on. Failing answers "cannot tell", which every caller handles, so anything slower is a fault.
 const PROBE_TIMEOUT_MS = 2000
@@ -41,6 +47,9 @@ export {
 	HOOK_PROCESS_TIMEOUT_MS,
 	INSTALL_TIMEOUT_MS,
 	LINT_TIMEOUT_MS,
+	MS_PER_MINUTE,
+	MS_PER_SECOND,
 	PROBE_TIMEOUT_MS,
+	SECONDS_PER_MINUTE,
 	SUITE_TIMEOUT_MS,
 }

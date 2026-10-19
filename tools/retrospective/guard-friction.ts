@@ -1,6 +1,6 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
+import { figure_format } from '#scripts/lib/figure-format'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import {
 	time_transcript_line,
@@ -146,7 +146,7 @@ function sum_of(rows: ReadonlyArray<GuardRow>, field: 'refusals' | 'stops' | 'us
 }
 
 function row_line(row: GuardRow): string {
-	return `  ${row.guard}: ${String(row.refusals)} refused, ${String(row.stops)} stopped, ${cost_format.format_usd(row.usd)}`
+	return `  ${row.guard}: ${String(row.refusals)} refused, ${String(row.stops)} stopped, ${figure_format.format_usd(row.usd)}`
 }
 
 function report_lines(rows: ReadonlyArray<GuardRow>): Array<string> {
@@ -154,7 +154,7 @@ function report_lines(rows: ReadonlyArray<GuardRow>): Array<string> {
 
 	const refusals = String(sum_of(rows, 'refusals'))
 	const stops = String(sum_of(rows, 'stops'))
-	const usd = cost_format.format_usd(sum_of(rows, 'usd'))
+	const usd = figure_format.format_usd(sum_of(rows, 'usd'))
 	const head = `Guard friction: ${refusals} refusal(s), ${stops} Stop re-entry(ies), ${usd} in round trips`
 
 	return [head, ...rows.map((row) => row_line(row))]

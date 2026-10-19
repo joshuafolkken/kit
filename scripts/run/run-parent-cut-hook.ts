@@ -1,9 +1,9 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
+import { figure_format } from '#scripts/lib/figure-format'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_headless } from './run-headless'
@@ -50,7 +50,7 @@ function current_state(): ParentCutState {
 	}
 }
 
-const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
+const THRESHOLD_TEXT = `${figure_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
 
 const PARENT_CUT_REASON =
 	'⛔ backlogrun parent hand-off: this session drives a `backlogrun` and its recent-context cost ' +

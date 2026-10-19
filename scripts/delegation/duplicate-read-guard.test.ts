@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -43,8 +44,6 @@ const BEFORE_READ_MS = ms(1)
 const AFTER_READ_MS = ms(3)
 const NOW_MS = ms(59)
 const EARLIER_REFUSAL_MS = ms(5)
-// `utimesSync` takes seconds.
-const MS_PER_SECOND = 1000
 const READ_TOOL = 'Read'
 const UNSET = ''
 

@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { path_decision } from '#scripts/josh/path-decision'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import {
 	backlog_budget,
 	type BacklogAnswer,
@@ -54,19 +55,6 @@ function to_time_ms(raw: string | undefined): number | undefined {
 	return Number.isNaN(parsed) ? undefined : parsed
 }
 
-// Digits and nothing else. `Number('')`, `Number(' ')` and `Number('0x10')` are all safe integers, so
-// a check that only asked `Number.isSafeInteger` would read an unset shell variable — `--max
-// "$max_issues"` — as a maximum of zero and finish the run having done nothing.
-const COUNT_PATTERN = /^\d+$/u
-
-function to_count(raw: string | undefined): number | undefined {
-	if (raw === undefined || !COUNT_PATTERN.test(raw)) return undefined
-
-	const parsed = Number(raw)
-
-	return Number.isSafeInteger(parsed) ? parsed : undefined
-}
-
 // A flag that was given but could not be read makes the whole invocation unreadable. Falling back to
 // the default instead would answer a question nobody asked — a mistyped `--idle 0` would read as the
 // default watch and hold a run open that was asked to finish at its first empty backlog.
@@ -80,10 +68,10 @@ type Counts = Record<(typeof COUNT_NAMES)[number], number | undefined>
 
 function counts_of(values: ParsedValues): Counts {
 	return {
-		idle: to_count(cli_flags.string_of(values.idle)),
-		max: to_count(cli_flags.string_of(values.max)),
-		merged: to_count(cli_flags.string_of(values.merged)),
-		running: to_count(cli_flags.string_of(values.running)),
+		idle: cli_flags.to_count(cli_flags.string_of(values.idle)),
+		max: cli_flags.to_count(cli_flags.string_of(values.max)),
+		merged: cli_flags.to_count(cli_flags.string_of(values.merged)),
+		running: cli_flags.to_count(cli_flags.string_of(values.running)),
 	}
 }
 
@@ -102,7 +90,7 @@ function to_idle_ms(idle_minutes: number | undefined): number | undefined {
 	if (idle_minutes === undefined) return backlog_budget.DEFAULT_IDLE_MS
 	if (idle_minutes === NO_IDLE_MINUTES) return undefined
 
-	return idle_minutes * backlog_budget.MS_PER_MINUTE
+	return idle_minutes * MS_PER_MINUTE
 }
 
 // An idle watch measured from the run's start is not the watch that was asked for. A run already
@@ -117,7 +105,7 @@ function to_idle_ms(idle_minutes: number | undefined): number | undefined {
 // lands on the very first ask, before the run has started anything, and the fix is one flag the loop
 // already holds: it always knows when it last had work.
 function is_watch_readable(values: ParsedValues): boolean {
-	if (to_idle_ms(to_count(cli_flags.string_of(values.idle))) === undefined) return true
+	if (to_idle_ms(cli_flags.to_count(cli_flags.string_of(values.idle))) === undefined) return true
 
 	return cli_flags.string_of(values.active) !== undefined
 }
@@ -214,7 +202,6 @@ const backlog_budget_cli = {
 	read_arguments,
 	run,
 	to_answer,
-	to_count,
 	to_time_ms,
 }
 

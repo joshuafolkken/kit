@@ -1,6 +1,7 @@
 import { GIT_BINARY_KEY } from '#scripts/git/constants'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { poll } from '#scripts/lib/poll'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { execa } from 'execa'
 import { josh_harness_environment, type JoshEnvironment } from './josh-harness-environment'
@@ -36,7 +37,6 @@ interface LiveProcess {
 
 const DEFAULT_TIMEOUT_MS = 60_000
 const POLL_INTERVAL_MS = 50
-const MS_PER_SECOND = 1000
 const KILL_SIGNAL = 'SIGKILL'
 // Signal 0 delivers nothing and runs every check, so it answers whether the group still has a member.
 const PROBE_SIGNAL = 0

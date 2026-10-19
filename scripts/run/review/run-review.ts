@@ -11,6 +11,8 @@
 // - **how far the gate and the review overlapped** — the measurement the parallel start exists to
 //   produce, computed from the four timestamps `run-review-steps.ts` records.
 
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+
 const ADOPT = 'adopt'
 const BLOCKED = 'blocked'
 
@@ -46,7 +48,6 @@ function is_gate_settled(state: GateState): boolean {
 	return state !== GATE_RUNNING
 }
 
-const MS_PER_SECOND = 1000
 const SECONDS_DECIMALS = 1
 const NO_OVERLAP = 0
 

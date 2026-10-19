@@ -1,6 +1,7 @@
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
@@ -11,7 +12,6 @@ import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_owner } from './backlog-drive-owner'
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
-const MS_PER_MINUTE = 60_000
 const WINDOW_MINUTES = 9
 
 const CARRY: RunCarry = {

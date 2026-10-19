@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_paused, type PausedProbes } from './lane-paused'
-import { lane_reap } from './lane-reap'
+import { lane_process_table } from './lane-process-table'
 
 // joshuafolkken/kit#4201: the lane limit leaves a paused lane uncounted, read the way `run:board`
 // draws one `paused` (#4198).
@@ -76,22 +76,35 @@ describe('lane_paused.is_lane_paused', () => {
 	})
 })
 
-describe('lane_paused.states_of', () => {
-	it('asks one `ps` for every pid and reads each trimmed state', () => {
-		const run_probe = vi.spyOn(lane_reap, 'run_probe').mockReturnValue(' TN\nTNs \n\n')
+describe('lane_paused.is_lane_paused over one process snapshot', () => {
+	const OWN_PARENT = 1
+	const LANE_PID = 70_001
+	const SUBPROCESS_PID = 70_002
+	const ZOMBIE_PID = 70_003
+	const command = `claude -p fullrun #${ISSUE}`
 
-		expect(lane_paused.states_of(PIDS)).toEqual(['TN', 'TNs'])
-		expect(run_probe).toHaveBeenCalledWith(lane_reap.PS_COMMAND, [
-			'-o',
-			'stat=',
-			'-p',
-			PIDS.join(','),
+	const usage = { time: '0:00.00', rss_kb: 0 }
+
+	function snapshot(subprocess_stat: string): PausedProbes {
+		return lane_process_table.probes_of([
+			{ ...usage, pid: process.pid, parent: OWN_PARENT, stat: 'S', command },
+			{ ...usage, pid: LANE_PID, parent: OWN_PARENT, stat: 'T', command },
+			{
+				...usage,
+				pid: SUBPROCESS_PID,
+				parent: LANE_PID,
+				stat: subprocess_stat,
+				command: 'node gate',
+			},
+			{ ...usage, pid: ZOMBIE_PID, parent: LANE_PID, stat: 'Z', command: '<defunct>' },
 		])
+	}
+
+	it('reads every live process stopped as paused, the zombie and its own ancestry left out', () => {
+		expect(lane_paused.is_lane_paused(ISSUE, snapshot('TN'))).toBe(true)
 	})
 
-	it('reads a failed `ps` as no states', () => {
-		vi.spyOn(lane_reap, 'run_probe').mockReturnValue('')
-
-		expect(lane_paused.states_of(PIDS)).toEqual([])
+	it('reads one running subprocess as not paused', () => {
+		expect(lane_paused.is_lane_paused(ISSUE, snapshot('R'))).toBe(false)
 	})
 })

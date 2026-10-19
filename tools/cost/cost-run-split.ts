@@ -1,4 +1,4 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
+import { figure_format } from '#scripts/lib/figure-format'
 import { cost_run_nodes, type RunNode, type RunRole } from './cost-run-nodes'
 import { cost_run_roles, type RoleTotals } from './cost-run-roles'
 
@@ -12,8 +12,6 @@ import { cost_run_roles, type RoleTotals } from './cost-run-roles'
 // unpriced rather than counted as a zero.
 
 const NONE = 0
-const MS_PER_MINUTE = 60_000
-const MINUTE_DIGITS = 1
 const DENSITY_DIGITS = 1
 const ROLE_PAD = 8
 const NO_VALUE = '—'
@@ -54,9 +52,9 @@ function build(nodes: ReadonlyArray<RunNode>, at_ms: number): RunSplit {
 }
 
 function side_line(label: string, side: SplitSide): string {
-	const minutes = (side.total_elapsed_ms / MS_PER_MINUTE).toFixed(MINUTE_DIGITS)
+	const minutes = figure_format.format_minutes(side.total_elapsed_ms)
 
-	return `  ${label.padEnd(ROLE_PAD)} ${String(side.session_count)} session(s) · ${minutes} min · ${cost_format.format_usd(side.total_usd)}`
+	return `  ${label.padEnd(ROLE_PAD)} ${String(side.session_count)} session(s) · ${minutes} · ${figure_format.format_usd(side.total_usd)}`
 }
 
 function role_of(side: SplitSide, role: RunRole): RoleTotals | undefined {
@@ -66,13 +64,13 @@ function role_of(side: SplitSide, role: RunRole): RoleTotals | undefined {
 function time_share(totals: RoleTotals | undefined, side: SplitSide): string {
 	if (totals === undefined) return NO_VALUE
 
-	return cost_format.format_share(totals.elapsed_ms, side.total_elapsed_ms)
+	return figure_format.format_share(totals.elapsed_ms, side.total_elapsed_ms)
 }
 
 function cost_share(totals: RoleTotals | undefined, side: SplitSide): string {
 	if (totals === undefined) return NO_VALUE
 
-	return cost_format.format_share(totals.cost_usd, side.total_usd)
+	return figure_format.format_share(totals.cost_usd, side.total_usd)
 }
 
 // Requests per session — the density the polling inflated: a wake that polls spends its requests

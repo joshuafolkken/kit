@@ -1,3 +1,4 @@
+import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_usage_read, type UsagePorts } from './run-board-usage-read'
 
@@ -5,7 +6,7 @@ import { run_board_usage_read, type UsagePorts } from './run-board-usage-read'
 // column read beside the rest — so a lane `lane:pause` stopped reads paused, and reads running again
 // once `lane:resume` let it go, with no `ps` of its own.
 
-const { parse_ps, sample } = run_board_usage_read
+const { sample } = run_board_usage_read
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = '4198'
 const PAUSED = '1 0 0:01 4 T node\n2 1 0:01 4 T+ sh\n3 0 0:01 4 S other'
@@ -17,7 +18,7 @@ function ports_of(listings: Array<string>): UsagePorts {
 	const clock = { now: FIRST_SEEN - STEP }
 
 	return {
-		list: vi.fn(async () => listings.shift() ?? ''),
+		list: vi.fn(async () => lane_process_table.parse(listings.shift() ?? '')),
 		rusage: undefined,
 		top: vi.fn(async () => new Map()),
 		directories: vi.fn(
@@ -31,15 +32,6 @@ function ports_of(listings: Array<string>): UsagePorts {
 		root: ROOT,
 	}
 }
-
-describe('run_board_usage_read.parse_ps — the state column', () => {
-	it('keeps each process’s stat, the command after it', () => {
-		const listings = parse_ps(' 12 1 0:00.01 4 TN+ eslint_d - /tmp')
-
-		expect(listings.get(12)?.stat).toBe('TN+')
-		expect(listings.get(12)?.command).toBe('eslint_d - /tmp')
-	})
-})
 
 describe('run_board_usage_read.sample — paused lanes', () => {
 	it('reads a lane paused while all its processes are stopped, and running once resumed', async () => {

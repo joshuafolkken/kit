@@ -10,15 +10,17 @@ import { run_board_render_tail } from './run-board-render-tail'
 import type { UsualTimes } from './run-board-usual'
 
 // joshuafolkken/kit#3769, #4043: a running row ends on its phase's icon and how long it has stood at
-// it — colored against the phase's usual time — then ` · ` and the kind and the age of its newest
-// activity, each time right-aligned in one column on every row; the event that entered the phase is
-// not drawn twice.
+// it — colored against the phase's usual time — then two spaces (#4224) and the kind and the age of
+// its newest activity, each time right-aligned in one column on every row; the event that entered the
+// phase is not drawn twice.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const PHASE_TIME = '10′00″'
 const PHASE_PART = `👀 ${PHASE_TIME}`
 // The blanks an icon's two columns take.
 const ICON_BLANK = '  '
+// The gap between the phase time and the activity, as between the row's other fields (#4224).
+const GAP = '  '
 const SECOND = MINUTE / 60
 const SECONDS_40 = 40 * SECOND
 const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
@@ -128,22 +130,22 @@ describe('run_board_render_tail.tail_of phase time', () => {
 })
 
 describe('run_board_render_tail.tail_of activity', () => {
-	it('draws ` · `, the newest event’s phase icon and its age after the phase time', () => {
-		expect(tail(running(1))).toStrictEqual([`${PHASE_PART} · 👀 3′00″`])
+	it('draws two spaces, the newest event’s phase icon and its age after the phase time', () => {
+		expect(tail(running(1))).toStrictEqual([`${PHASE_PART}${GAP}👀 3′00″`])
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {
 		expect(quiet_tail(running(1), { operations: operations(1, NOW - MINUTE) })).toBe(
-			`${PHASE_PART} · 🔧 1′00″`,
+			`${PHASE_PART}${GAP}🔧 1′00″`,
 		)
 	})
 
 	it('ages the activity as the 💓 is: plain, yellow past 15 minutes, red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(operated_activity(5)).toBe(`${PHASE_PART} · 🔧 5′00″`)
-		expect(operated_activity(20)).toBe(`${PHASE_PART} · ${styleText('yellow', '🔧 20′00″')}`)
-		expect(operated_activity(40)).toBe(`${PHASE_PART} · ${styleText('red', '🔧 40′00″')}`)
+		expect(operated_activity(5)).toBe(`${PHASE_PART}${GAP}🔧 5′00″`)
+		expect(operated_activity(20)).toBe(`${PHASE_PART}${GAP}${styleText('yellow', '🔧 20′00″')}`)
+		expect(operated_activity(40)).toBe(`${PHASE_PART}${GAP}${styleText('red', '🔧 40′00″')}`)
 	})
 
 	it('draws no activity where the newest is the event that entered the phase', () => {
@@ -157,7 +159,7 @@ describe('run_board_render_tail.tail_of activity', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running(1), running(2)] }
 		const extra = { layout, operations: operations(2, NOW - MINUTES_61_SECONDS_5) }
 
-		expect(quiet_tail(running(1), extra)).toBe(`${PHASE_PART} · 👀    3′00″`)
+		expect(quiet_tail(running(1), extra)).toBe(`${PHASE_PART}${GAP}👀    3′00″`)
 	})
 
 	it('draws nothing after a settled or a waiting row', () => {
@@ -184,14 +186,14 @@ describe('run_board_render_tail.tail_of held check', () => {
 	it('draws the wait in the activity’s place, right-aligned to the widest age', () => {
 		const extra = { layout, budget_waits: [held] }
 
-		expect(quiet_tail(running(2), extra)).toBe(`${PHASE_PART} · 🧠    9″ lint`)
-		expect(quiet_tail(running(1), extra)).toBe(`${PHASE_PART} · 👀 3′00″`)
+		expect(quiet_tail(running(2), extra)).toBe(`${PHASE_PART}${GAP}🧠    9″ lint`)
+		expect(quiet_tail(running(1), extra)).toBe(`${PHASE_PART}${GAP}👀 3′00″`)
 	})
 
 	it('draws the newest activity again once the wait is gone', () => {
 		const extra = { layout, operations: operations(2, NOW - MINUTE) }
 
-		expect(quiet_tail(running(2), extra)).toBe(`${PHASE_PART} · 🔧 1′00″`)
+		expect(quiet_tail(running(2), extra)).toBe(`${PHASE_PART}${GAP}🔧 1′00″`)
 	})
 
 	it('names the phase but no activity icon for the legend while held', () => {
@@ -248,7 +250,8 @@ describe('run_board_render.render tail column', () => {
 		])
 		const lines = lines_of(board({ layout, activity: { ...board().activity, lane_events } }))
 
-		expect(column_of(lines, 'Long', ' · ')).toBe(column_of(lines, 'Short', ' · '))
+		expect(column_of(lines, 'Long', '👀 3′00″')).toBe(column_of(lines, 'Short', '👀 3′00″'))
+		expect(lines.find((line) => line.includes('Long'))).toMatch(/2°05′00″ {2}👀 3′00″$/u)
 		expect(column_of(lines, 'Long', '2°05′00″')).toBe(column_of(lines, 'Short', PHASE_TIME) - 2)
 	})
 

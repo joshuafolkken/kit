@@ -1,4 +1,4 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
+import { figure_format } from '#scripts/lib/figure-format'
 import type { Audit, AuditRow } from './cost-audit'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
@@ -25,7 +25,7 @@ function change(row: AuditRow): string {
 }
 
 function row_line(row: AuditRow): string {
-	const figures = `${cost_format.format_usd(row.current)} (prev ${cost_format.format_usd(row.previous)}, ${change(row)})`
+	const figures = `${figure_format.format_usd(row.current)} (prev ${figure_format.format_usd(row.previous)}, ${change(row)})`
 
 	return `  ${row.key}: ${figures}${row.is_regression ? REGRESSION_MARK : ''}`
 }
@@ -84,11 +84,11 @@ function report_lines(audit: Audit): Array<string> {
 }
 
 function summary_line(audit: Audit): string {
-	const total = `${cost_format.format_usd(audit.total.current)} (${change(audit.total)})`
+	const total = `${figure_format.format_usd(audit.total.current)} (${change(audit.total)})`
 	const merge =
 		audit.per_merge === undefined
 			? ''
-			: `, ${cost_format.format_usd(audit.per_merge.current)} per merge`
+			: `, ${figure_format.format_usd(audit.per_merge.current)} per merge`
 
 	return `Cost audit (${String(audit.days)}d): ${total}${merge}; regressions: ${regression_text(audit)}`
 }

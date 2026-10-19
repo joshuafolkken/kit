@@ -1,4 +1,5 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 
@@ -10,7 +11,6 @@ const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
 const CLOCK_START = 1000
 const FIRST_LAP_MS = 2500
 const SECOND_LAP_MS = 500
-const MS_PER_SECOND = 1000
 
 function drive_clock(...offsets: ReadonlyArray<number>): void {
 	let index = 0

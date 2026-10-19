@@ -1,3 +1,4 @@
+import type { ProcessTable } from '#scripts/lane/lane-process-table'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import type { BoardState } from './run-board-state'
@@ -43,7 +44,7 @@ describe('run_board_tick.tick usage', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		const next = await tick(state, ports)
 
-		expect(read_usage.mock.calls).toStrictEqual([[undefined], [first]])
+		expect(read_usage.mock.calls.map(([before]) => before)).toStrictEqual([undefined, first])
 		expect(lane_cores(state)).toBeUndefined()
 		expect(lane_cores(next)).toBe(HALF_CORE)
 		expect(next.usages?.scale).toStrictEqual({ cores: 1, total_bytes: 1000 })
@@ -67,8 +68,77 @@ describe('run_board_tick.tick usage', () => {
 		read_usage.mockResolvedValueOnce(first).mockResolvedValueOnce(reading(PRIME_MS, 500))
 		const state = await tick(FRESH_STATE, { ...ports, is_tty: false, sleep })
 
-		expect(read_usage.mock.calls).toStrictEqual([[undefined], [first]])
+		expect(read_usage.mock.calls.map(([before]) => before)).toStrictEqual([undefined, first])
 		expect(sleep).toHaveBeenCalledWith(PRIME_MS)
 		expect(lane_cores(state)).toBe(HALF_CORE)
+	})
+})
+
+const ROW = { pid: 1, parent: 0, time: '0:01', rss_kb: 4, stat: 'S', command: 'node' }
+const TABLE: ProcessTable = [ROW]
+
+// joshuafolkken/kit#4246: the lane count and the usage columns read one `ps` snapshot per redraw.
+describe('run_board_tick.tick process snapshot', () => {
+	it('reads one snapshot and hands it to both the lane read and the sample', async () => {
+		const { ports, read_table, read_local, read_usage } = harness(LOCAL, [plan_titled('a')])
+		const seen: Array<ProcessTable | undefined> = []
+
+		read_table.mockResolvedValue(TABLE)
+		read_local.mockImplementation(async (table) => {
+			seen.push(await table())
+
+			return LOCAL
+		})
+		read_usage.mockImplementation(async (_before, table) => {
+			seen.push(await table())
+
+			return reading(0, 0)
+		})
+		await tick(FRESH_STATE, ports)
+
+		expect(read_table).toHaveBeenCalledOnce()
+		expect(seen).toStrictEqual([TABLE, TABLE])
+	})
+})
+
+// A snapshot taken before a wait is not read after it.
+describe('run_board_tick.tick process snapshot after a wait', () => {
+	it('reads a snapshot of its own after the idle confirmation wait, for the lanes and the sample', async () => {
+		const { ports, read_table, read_local, read_usage } = harness(LOCAL, [plan_titled('a')])
+		const later: ProcessTable = [{ ...ROW, stat: 'T' }]
+		const seen: Array<ProcessTable | undefined> = []
+		const sleep = vi.fn<(ms: number) => Promise<void>>().mockResolvedValue()
+
+		read_table.mockResolvedValueOnce(TABLE).mockResolvedValueOnce(later)
+		read_local.mockImplementation(async (table) => {
+			seen.push(await table())
+
+			return { ...LOCAL, idle_lanes: [String(LANE)] }
+		})
+		read_usage.mockImplementation(async (_before, table) => {
+			seen.push(await table())
+
+			return reading(0, 0)
+		})
+		await tick(FRESH_STATE, { ...ports, sleep })
+
+		expect(read_table).toHaveBeenCalledTimes(2)
+		expect(seen).toStrictEqual([TABLE, later, later])
+	})
+
+	it('reads its own snapshot for each reading of a frame off a terminal', async () => {
+		const { ports, read_table, read_usage } = harness(LOCAL, [plan_titled('a')])
+		const sleep = vi.fn<(ms: number) => Promise<void>>().mockResolvedValue()
+		const tables: Array<unknown> = []
+
+		read_table.mockResolvedValue(TABLE)
+		read_usage.mockImplementation(async (_before, table) => {
+			tables.push(table)
+
+			return reading(0, 0)
+		})
+		await tick(FRESH_STATE, { ...ports, is_tty: false, sleep })
+
+		expect(tables).toStrictEqual([ports.read_table, ports.read_table])
 	})
 })

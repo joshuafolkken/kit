@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { yaml_document } from '#scripts/lib/yaml-document'
 import semver from 'semver'
 import { z } from 'zod'
@@ -20,7 +21,6 @@ const workspace_age_schema = z.object({ minimumReleaseAge: z.number().int().nonn
 // A version → ISO publish date map, the shape both the registry and the GitHub Packages API are
 // reduced to before the aged-version selection runs.
 const release_times_schema = z.record(z.string(), z.string())
-const MS_PER_MINUTE = 60_000
 
 function parse_workspace(workspace_content: string): unknown {
 	try {

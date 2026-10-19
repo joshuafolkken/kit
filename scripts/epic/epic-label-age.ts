@@ -1,6 +1,7 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 
 // How long each lane holder has carried `in-progress`. The stale-label rule
 // in `backlogrun-progress.md` is applied by age, and until this read the age was a hand-written
@@ -12,7 +13,6 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 
 // Matches the `Stale \`in-progress\`` row of the table in `backlogrun-progress.md`.
 const STALE_MINUTES = 90
-const MS_PER_MINUTE = 60_000
 const TIMELINE_PAGE = 100
 
 const LABELED_FILTER = `.[] | select(.event == "labeled" and (.label.name | ascii_downcase) == "${IN_PROGRESS_LABEL}") | .created_at`

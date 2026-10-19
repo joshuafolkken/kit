@@ -4,9 +4,8 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_await } from '#scripts/lane/lane-await'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
+import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import {
-	MS_PER_MINUTE,
-	MS_PER_SECOND,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,
@@ -29,10 +28,6 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
 	'Usage: josh run:liveness <issue-number> --output <path> [--process alive|none] [--window <minutes>] [--gap <seconds>] [--repo <owner/repo>]'
-// Whole and positive, both of them. A zero window would call any unit not writing at that instant
-// frozen, and a zero gap would take both samples back-to-back — together they book a live unit as
-// stopped, which is the one error direction this command is built to avoid.
-const DURATION_PATTERN = /^[1-9]\d*$/u
 
 const PROCESS_TRACES: ReadonlyArray<ProcessTrace> = [PROCESS_ALIVE, PROCESS_NONE, PROCESS_UNKNOWN]
 
@@ -69,9 +64,12 @@ function to_ms(raw: string | undefined, unit_ms: number): number | undefined {
 }
 
 // A malformed duration is refused rather than silently replaced by the default: a caller that meant
-// to widen the window and mistyped it would otherwise be answered against the 30-minute one.
+// to widen the window and mistyped it would otherwise be answered against the 30-minute one. Whole and
+// positive, both of them: a zero window would call any unit not writing at that instant frozen, and a
+// zero gap would take both samples back-to-back — together they book a live unit as stopped, which is
+// the one error direction this command is built to avoid.
 function is_valid_duration(raw: string | undefined): boolean {
-	return raw === undefined || DURATION_PATTERN.test(raw)
+	return raw === undefined || cli_flags.to_positive(raw) !== undefined
 }
 
 const OPTIONS = {

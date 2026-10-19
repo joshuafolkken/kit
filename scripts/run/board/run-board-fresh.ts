@@ -1,5 +1,5 @@
 import { styleText } from 'node:util'
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 
 // **The one place a freshly updated part of `run:board` is emphasized** — the header's `💓` and third
 // line, an issue row's phase, start and end (joshuafolkken/kit#3784). The emphasis fades in three
@@ -17,7 +17,7 @@ interface FreshFrame {
 	spinner: string | undefined
 }
 
-const STAGE_MS = run_progress.MS_PER_SECOND
+const STAGE_MS = MS_PER_SECOND
 const FADING: ReadonlyArray<FreshStage> = ['inverse', 'bold-color', 'bold']
 const FORMATS: Readonly<Record<Exclude<FreshStage, 'none'>, TextFormat>> = {
 	inverse: 'inverse',

@@ -1,4 +1,5 @@
 import { issue_cite, type IssueCiter } from '#scripts/issue/issue-cite'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 
 // `josh run:progress` — the one line an unattended run prints when it has gone quiet, and the clock
 // that decides when that is.
@@ -45,8 +46,6 @@ const DEFAULT_INTERVAL_MINUTES = 20
 // The one name for the setting, so the watcher and the guard read the same variable rather than two
 // spellings of it.
 const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
-const MS_PER_MINUTE = 60_000
-const MS_PER_SECOND = 1000
 const DEFAULT_INTERVAL_MS = DEFAULT_INTERVAL_MINUTES * MS_PER_MINUTE
 // The switch that silences every progress report — the watcher's and `run:board --every`'s alike.
 const DISABLED_KEY = 'JOSH_PROGRESS'
@@ -351,8 +350,6 @@ const run_progress = {
 	DISABLED_KEY,
 	DISABLED_VALUE,
 	INTERVAL_KEY,
-	MS_PER_MINUTE,
-	MS_PER_SECOND,
 	NO_CHILD_YET,
 	NO_NEXT,
 	format_child,

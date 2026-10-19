@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import semver from 'semver'
 import { release_age } from './release-age'
 
@@ -18,7 +19,6 @@ import { release_age } from './release-age'
 // which is why this explanation is attached there and nowhere else.
 
 const MINUTES_PER_HOUR = 60
-const MS_PER_MINUTE = 60_000
 const HOLD_LABEL = 'Held:'
 
 // Whether `latest` is itself inside the window — the precondition for a hold existing at all. Without

@@ -1,0 +1,7 @@
+{
+	"reason": "New lane-process-table module replaces per-process sync spawns with one async ps snapshot (#4241)",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 57
+	}
+}

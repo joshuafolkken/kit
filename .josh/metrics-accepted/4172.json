@@ -1,0 +1,7 @@
+{
+	"reason": "New feature: single-key fold/unfold of run:board sections (#4172) adds a key reader, fold logic and folded headings",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 186
+	}
+}
