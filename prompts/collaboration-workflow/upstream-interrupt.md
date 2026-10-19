@@ -28,9 +28,19 @@
 4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と何が止まっているかを書く（→ `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"）
 5. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
 
+### first-party の Issue・PR への書き込みは確認不要
+
+`pnpm josh repo:party` が `first-party` と答えたリポジトリの Issue・PR への書き込みは Tier A で、ユーザーに確認しない。起票、コメント、ラベル、本文の編集、`@dependabot rebase` などの Dependabot へのコマンドコメントを含む。
+
+- 頼まれていない観察の起票はこの節で許可しない: この節が外すのは書き込み先の確認だけ。起票するかは `.claude/skills/workflow-commands/observation-filing.md` に従う
+- `unknown` はこの節の対象外: first-party と判定できないので、書き込む前にユーザーに確認する
+
+- **「外部への書き込み」は third-party への書き込みだけを指す**。first-party への書き込みをそう呼ばない
+- マージ・ブランチ削除などの共有状態の操作は書き込みに含まれず、Tier C のまま（`CLAUDE.md` → "Git Rules"）
+
 ### 第三者リポジトリへの書き込みは Tier C（明示指示が必要）
 
-「起票は確認なし」は first-party だけに成り立つ。
+「起票は確認なし」も「書き込みは確認不要」も first-party だけに成り立つ。
 
 - **判定は `pnpm josh repo:party [<owner/repo>]` が答える**: `first-party` / `third-party` / `unknown`（unknown は third-party 扱いしない）。fork や contribute しているだけの org リポジトリも third-party
 - **third-party への書き込みは種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビュー、既存 Issue のクローズ・編集も、その turn のユーザーの明示指示なしに行わない。正しい診断も許可ではない

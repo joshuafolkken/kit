@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/test/test-e2e-guard.ts:114 | 2026-10-19 | #4156
+- rf:bug-risks | low | scripts/test/test-e2e-guard.ts:101 | 2026-10-19 | #4156
