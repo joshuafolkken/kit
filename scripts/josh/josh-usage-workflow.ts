@@ -194,6 +194,9 @@ const WORKFLOW_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ names: [JSON_FLAG], description: 'emit the verdict and its reason as JSON.' },
 		],
 	},
+	'latest:if-required': {
+		examples: [{ arguments: '', note: 'stash, update, pop on required' }],
+	},
 	'latest:guard': { examples: [{ arguments: '', note: 'refuses inside a lane' }] },
 	'prevent-main-commit': { examples: [{ arguments: '', note: 'run by the pre-commit hook' }] },
 	'check-commit-message': {

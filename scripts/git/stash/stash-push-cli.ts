@@ -38,12 +38,22 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
-async function answer(request: Request): Promise<number> {
-	if (!(await git_stash.has_stashable_changes(request.dir))) {
-		return report(CLEAN_VERDICT, 'Nothing to stash.')
-	}
+type PushVerdict = typeof STASHED_VERDICT | typeof CLEAN_VERDICT
+
+// The decision and the push without the printing, so a caller that chains a pop on `stashed`
+// (`josh latest:if-required`) reads the verdict instead of parsing stdout.
+async function set_aside(request: Request): Promise<PushVerdict> {
+	if (!(await git_stash.has_stashable_changes(request.dir))) return CLEAN_VERDICT
 
 	await git_stash.push(request.message, request.dir, git_stash.STASHABLE_PATHSPEC)
+
+	return STASHED_VERDICT
+}
+
+async function answer(request: Request): Promise<number> {
+	if ((await set_aside(request)) === CLEAN_VERDICT) {
+		return report(CLEAN_VERDICT, 'Nothing to stash.')
+	}
 
 	return report(STASHED_VERDICT, `Stashed as "${request.message}".`)
 }
@@ -67,7 +77,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const stash_push_cli = { CLEAN_VERDICT, STASHED_VERDICT, run }
+const stash_push_cli = { CLEAN_VERDICT, STASHED_VERDICT, run, set_aside }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
