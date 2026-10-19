@@ -49,9 +49,9 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
   separately-mergeable deliverables over one gate: file the children (each `route:split`) and the epic,
   then **STOP** with "Please run `backlogrun #<E> --only` to execute this epic." Typing the command
   approved **one** Issue, never a batch.
-- **A prerequisite** — file it (`route:tier-a`), stash, record the dependency, and **STOP** with
-  "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single source of
-  the filing, the `-u` stash and the epic:bundle branch.
+- **A prerequisite** — file it (`route:tier-a`), `pnpm josh run:pause <M> --for <N>`, and **STOP**
+  with "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single
+  source of the filing, the pause and the epic:bundle branch.
 - **An observation** — `observation-filing.md` (ask first if interactive).
 
 **The per-run filing cap is `prerequisite.md`'s** (the `filing-cap` row); on its refusal, stop and report.

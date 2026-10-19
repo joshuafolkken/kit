@@ -49,6 +49,24 @@ The unit is the working tree, so two lanes of one repository key differently.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:hold` / `josh run:release` in detail".
 
+### `josh run:pause`
+
+<!-- usage: run:pause -->
+
+Set a run aside while its prerequisite lands first.
+
+```bash
+pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
+```
+
+**Options:**
+
+- `--for <prerequisite>` — the issue that has to land first; `<issue>` is recorded blocked by it.
+
+<!-- /usage -->
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` in detail".
+
 ### `josh run:tidy`
 
 <!-- usage: run:tidy -->

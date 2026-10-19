@@ -1,4 +1,5 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { PAUSE_COMMANDS } from './josh-commands-pause'
 import { PROGRESS_COMMANDS } from './josh-commands-progress'
 
 const OWNER = '--owner <pid>'
@@ -79,6 +80,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	...PAUSE_COMMANDS,
 	'run:tidy': {
 		script: 'scripts/run/tidy/run-tidy-cli.ts',
 		description: 'Close merged lanes and drop stashes whose issues are all merged',
