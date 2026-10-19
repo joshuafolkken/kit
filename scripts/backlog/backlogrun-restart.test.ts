@@ -39,7 +39,7 @@ const KEPT_LINES = [
 	'backlogrun: stopped the supervisor (process 4242)',
 	'backlogrun: stopped the parent session (process 42)',
 	KEPT_LINE,
-	'backlogrun: 1 lane(s) still running, not stopped: #3437',
+	'backlogrun: 1 lane(s) still running, not stopped: #3437 — suspend them in place with `josh lane:pause --all`',
 ]
 
 const PROFILE: AgentProfile = {

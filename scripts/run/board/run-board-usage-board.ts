@@ -39,12 +39,13 @@ async function primed(state: BoardState, ports: BoardPorts): Promise<UsageMark |
 	return first
 }
 
-// Read on the machine's second; a reading that failed draws no usage.
+// Read on the machine's second; a reading that failed draws no usage but keeps the last reading, so a
+// paused lane stays paused through a `ps` timed out under load and the next reading spans the gap.
 async function read_usages(state: BoardState, ports: BoardPorts): Promise<UsageRead> {
 	const before = await primed(state, ports)
 	const usage = await ports.read_usage(before)
 
-	if (usage === undefined) return { usage, usages: undefined }
+	if (usage === undefined) return { usage: before, usages: undefined }
 
 	return { usage, usages: board_usage_of(before, usage, state.local) }
 }

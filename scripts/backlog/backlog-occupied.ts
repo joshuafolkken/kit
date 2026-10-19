@@ -9,22 +9,35 @@ import type { LaneInfo } from '#scripts/lane/lane-registry'
 // #4028). Its tree, branch and port seat stay; when its issue is picked up again the drive seats it
 // ahead of a fresh launch, inside the free lanes (`backlog-drive-seats.ts`).
 //
+// **A paused lane holds no place either** (joshuafolkken/kit#4201): a child whose every process is
+// suspended (`lane:pause`, `kill -STOP`) puts no load on the machine until it is resumed. Its memory
+// stays held, which the free-memory check reads as measured (`backlog-drive-memory.ts`); `lane:prune`
+// still keeps it, since a child is there (`lane-spent.ts`).
+//
 // **A lane whose probe did not answer keeps its place, so the count errs toward fewer free lanes**:
-// only pgrep's own "no match" (`PROCESS_NONE`, `lane_spent.idle_lanes`) clears one. A stranded lane
-// has no tree to work in and holds no place either. The read stays local — no issue label is read —
-// because the count gates the network read behind it (`backlog-ready.ts`).
+// only pgrep's own "no match" (`PROCESS_NONE`, `lane_spent.idle_lanes`) clears one, and only states
+// read as all stopped (`lane_paused.is_lane_paused`) clear a paused one. A stranded lane has no tree
+// to work in and holds no place either. The read stays local — no issue label is read — because the
+// count gates the network read behind it (`backlog-ready.ts`).
 
 // The issues whose lane has no child working in it (`lane_spent.idle_lanes`).
 type IdleRead = (lanes: ReadonlyArray<LaneInfo>) => ReadonlyArray<string>
 
-function occupied_lanes(lanes: ReadonlyArray<LaneInfo>, idle: IdleRead): Array<LaneInfo> {
+// Whether the lane child for an issue is paused (`lane_paused.is_lane_paused`).
+type PausedRead = (issue: string) => boolean
+
+function occupied_lanes(
+	lanes: ReadonlyArray<LaneInfo>,
+	idle: IdleRead,
+	is_paused: PausedRead,
+): Array<LaneInfo> {
 	const live = lanes.filter((lane) => !lane.is_stranded)
 	const idle_issues = new Set(idle(live))
 
-	return live.filter((lane) => !idle_issues.has(lane.issue))
+	return live.filter((lane) => !idle_issues.has(lane.issue) && !is_paused(lane.issue))
 }
 
 const backlog_occupied = { occupied_lanes }
 
 export { backlog_occupied }
-export type { IdleRead }
+export type { IdleRead, PausedRead }

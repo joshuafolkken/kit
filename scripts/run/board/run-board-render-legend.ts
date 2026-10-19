@@ -53,7 +53,9 @@ function states_of(states: ReadonlyArray<readonly [ItemState, keyof Words]>): Le
 const PROGRESS_STATES: LeadWords = states_of([['running', 'in_progress']])
 const SETTLED_STATES: LeadWords = states_of([
 	['parked', 'parked'],
+	['paused', 'paused'],
 	['stopped', 'stopped'],
+	['earlier', 'earlier'],
 	['done', 'done'],
 	['withdrawn', 'withdrawn'],
 ])

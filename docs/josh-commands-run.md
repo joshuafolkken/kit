@@ -633,7 +633,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), then `🧳` an earlier run's lane holding a place, the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the reason at a row's end is what it waits on. An epic's children stay gathered under the epic.
 
@@ -646,7 +646,7 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 - `held by triage` — the issue is judged and nothing blocks it, but an untriaged issue nothing blocks withholds the whole pool.
 - `after <N> · <file>` — a path its body declares overlaps one the running issue `<N>` declares: the state `backlog:next` answers with "waits: its `<file>` overlaps …".
 - `next free lane (<used>/<limit>)` — nothing else keeps it waiting and the open lanes have reached the lane limit (the free count `lane:limit` prints, read at the board's last local read): `next free lane (4/4)`. Every lane `lane:limit` counts is counted, even one an earlier run left that no row shows. An unread limit leaves `next free lane` alone.
-- `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads normal and 🧠 is under yellow. The ledger records the hold as `memory`, its own `lane:stats` row. An unread figure is left out.
+- `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads under critical and 🧠 and 💾 are under yellow. The ledger records the hold as `memory`, its own `lane:stats` row. An unread figure is left out.
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows its stage, such as `opening lane 5″`.
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.

@@ -94,8 +94,13 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-// The one lane against the limit, as `lane:limit` counts it.
-const LANE_ROOM = { free_lanes: FREE_LANES, lane_limit: LANE_LIMIT, occupied_count: 1 }
+// The one lane against the limit, as `lane:limit` counts it — this run's, no earlier run's among them.
+const LANE_ROOM = {
+	free_lanes: FREE_LANES,
+	lane_limit: LANE_LIMIT,
+	occupied_count: 1,
+	earlier_occupied: [],
+}
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
 const UNRECORDED = { resume: undefined, roots: { supervisor: undefined, parent: undefined } }
 
@@ -291,5 +296,38 @@ describe('run_board_read.read_local earlier lanes', () => {
 		])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ earlier_lanes: ['3431'] })
+	})
+})
+
+// joshuafolkken/kit#4200: an earlier run's lane that holds a place was counted but never drawn.
+describe('run_board_read.read_local earlier lanes holding a place', () => {
+	const started_ms = Date.parse(STARTED_AT)
+
+	function arrange_earlier(idle: Array<string>): void {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
+			{ ...lane('3430'), dispatched_ms: started_ms - MINUTE_MS },
+			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
+			{ ...lane('3432'), dispatched_ms: started_ms + MINUTE_MS },
+		])
+		vi.mocked(lane_spent.idle_lanes).mockReturnValue(idle)
+	}
+
+	it('names the earlier run’s lanes the limit counts, beside the count itself', async () => {
+		arrange_earlier([])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({
+			earlier_occupied: ['3430', '3431'],
+			occupied_count: 3,
+		})
+	})
+
+	it('leaves out an earlier run’s lane no child is working in', async () => {
+		arrange_earlier(['3430'])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({
+			earlier_occupied: ['3431'],
+			occupied_count: 2,
+		})
 	})
 })

@@ -61,13 +61,24 @@ describe('run_board_render_legend.legend_of phases', () => {
 	})
 })
 
+const EVERY_STATE: Array<ItemState> = [
+	'withdrawn',
+	'merged',
+	'waiting',
+	'parked',
+	'human',
+	'paused',
+	'stopped',
+	'done',
+]
+
 describe('run_board_render_legend.legend_of order', () => {
 	it('names in progress, then what has settled, then the kinds and the rest, on one line', () => {
-		const rows = [...rows_in(['withdrawn', 'parked', 'stopped', 'done']), row(5, { kind: 'bug' })]
+		const rows = [...rows_in(EVERY_STATE), row(9, { kind: 'bug' })]
 		const leads = new Set([...rows.map((entry) => STATE_ICONS[entry.state]), '🔨'])
 
 		expect(legend_of(rows, { leads, icons: leads, named: [OPERATION] })).toStrictEqual([
-			`🔨 implement  ${OPERATION}  💤 parked  🛑 stopped  🏁 done  🚫 withdrawn  🐛 fix`,
+			`🔨 implement  ${OPERATION}  💤 parked  🧊 paused  🛑 stopped  🏁 done  🚫 withdrawn  🐛 fix`,
 		])
 	})
 

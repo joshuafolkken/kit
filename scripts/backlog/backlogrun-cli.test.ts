@@ -42,7 +42,7 @@ const SUPERVISED_LINE = 'backlogrun: supervisor started (pid 4343)'
 const STOPPED_LINES = [
 	'backlogrun: stopped the supervisor (process 4242)',
 	"backlogrun: ended the run's record",
-	'backlogrun: 1 lane(s) still running, not stopped: #3701',
+	'backlogrun: 1 lane(s) still running, not stopped: #3701 — suspend them in place with `josh lane:pause --all`',
 ]
 
 function harness(

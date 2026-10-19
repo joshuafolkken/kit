@@ -22,6 +22,7 @@ import { backlogrun_launch } from './backlogrun-launch'
 // after a `run:wake --stop` or a supervisor that gave up, and the session it woke outlives both.
 //
 // **Lanes are counted, never stopped**: a child killed mid-change leaves a tree nobody can resume.
+// `josh lane:pause --all` is the way to suspend them without discarding anything.
 //
 // **`--restart` stops the same processes and keeps the record** (`stop_keeping_record`), so the run's
 // budget, counters and named list carry over to the supervisor started after it.
@@ -220,7 +221,9 @@ function lane_lines(lanes: ReadonlyArray<string>): Array<string> {
 
 	const issues = lanes.map((issue) => `${ISSUE_PREFIX}${issue}`).join(' ')
 
-	return [`${PREFIX} ${String(lanes.length)} lane(s) still running, not stopped: ${issues}`]
+	return [
+		`${PREFIX} ${String(lanes.length)} lane(s) still running, not stopped: ${issues} — suspend them in place with \`josh lane:pause --all\``,
+	]
 }
 
 // What a person reads back: one line per thing done, or the one line that says nothing was running.

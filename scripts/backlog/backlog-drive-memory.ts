@@ -13,14 +13,16 @@ import type { DrivePorts, DriveState, PassResult } from './backlog-drive'
 // sees beside the waiting row, and the thresholds are the gauges' red and yellow.
 //
 // **Stopping is looser than resuming, so a machine near one threshold does not open and stop in turn.**
-// A lane stops being opened when the kernel calls the memory pressured, 🧠 turns red or 💾 swaps at a
-// red rate. It resumes only once the kernel reads normal and 🧠 and 💾 are both back under yellow.
+// A lane stops being opened when the kernel calls the memory critical, 🧠 turns red or 💾 swaps at a
+// red rate. It resumes only once the kernel reads under critical and 🧠 and 💾 are both back under
+// yellow. The kernel's warning is no hold (joshuafolkken/kit#4199): macOS keeps it long after the
+// pressure passed, so a run held on it never resumed.
 //
 // **A figure that could not be read is no limit**, as in the gate's core budget: a machine without
 // `sysctl` dispatches as it did before memory was read.
 
-const { MEMORY_RED, MEMORY_YELLOW, PRESSURE_WARNING, SWAP_RED_MB_PER_S, SWAP_YELLOW_MB_PER_S } =
-	run_board_machine
+const { MEMORY_RED, MEMORY_YELLOW, SWAP_RED_MB_PER_S, SWAP_YELLOW_MB_PER_S } = run_board_machine
+const { PRESSURE_HOLD } = machine_capacity
 // Two readings closer than this give no swap rate: a page swapped in a few milliseconds is no rate.
 const MIN_RATE_MS = 1000
 // The `hold` reason a pass held by memory records, read back by `run:board` and `lane:stats`.
@@ -29,7 +31,7 @@ const HOLD_REASON = 'memory'
 type MemoryGauges = Pick<MachineGauges, 'memory_percent' | 'swap_mb_per_s' | 'memory_pressure'>
 
 function is_kernel_pressured(gauges: MemoryGauges): boolean {
-	return (gauges.memory_pressure ?? 0) >= PRESSURE_WARNING
+	return (gauges.memory_pressure ?? 0) >= PRESSURE_HOLD
 }
 
 function is_stop(gauges: MemoryGauges): boolean {

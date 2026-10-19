@@ -30,6 +30,12 @@ describe('run_board_render_time.time_of', () => {
 		expect(time_of(merged, NOW)).toBe('1°30′00″')
 	})
 
+	it('times a paused row up to when it was first seen paused, not to now (#4198)', () => {
+		const paused = row('paused', { started_ms: NOW - HOUR, ended_ms: NOW - HOUR + MINUTE })
+
+		expect(time_of(paused, NOW)).toBe('1′00″')
+	})
+
 	it('has no time for a row with no start, or a settled one with no end', () => {
 		expect(time_of(row('waiting'), NOW)).toBeUndefined()
 		expect(time_of(row('merged', { started_ms: STARTED }), NOW)).toBeUndefined()

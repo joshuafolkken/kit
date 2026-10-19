@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
+import { lane_paused } from '#scripts/lane/lane-paused'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -46,7 +47,7 @@ interface ReadyPorts {
 async function occupied_lanes(lanes?: ReadonlyArray<LaneInfo>): Promise<Array<LaneInfo>> {
 	const open = lanes ?? (await lane_registry.list_lanes())
 
-	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes)
+	return backlog_occupied.occupied_lanes(open, lane_spent.idle_lanes, lane_paused.is_lane_paused)
 }
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
