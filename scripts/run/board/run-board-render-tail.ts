@@ -10,16 +10,17 @@ import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_waits } from './run-board-render-waits'
 
 // The end of a running row (joshuafolkken/kit#3769, #4043): the icon of the phase its row leads with
-// and how long the child has stood at it, then ` · ` and the kind and the age of the newest thing it
-// did, both the board's own length (`1°01′05″`). Each time is right-aligned to the widest its column
-// draws on any running row, so a `2°05′30″` and a `40″` end in one column and every icon stands in
-// one column whichever row it is on. The event that entered the phase is not drawn again after the
-// phase's own time. A settled or a waiting row draws neither. A lane held in the core budget draws its
-// wait in the newest activity's place, in the same columns (#4052).
+// and how long the child has stood at it, then two spaces — the gap between the row's other fields
+// (#4224) — and the kind and the age of the newest thing it did, both the board's own length
+// (`1°01′05″`). Each time is right-aligned to the widest its column draws on any running row, so
+// a `2°05′30″` and a `40″` end in one column and every icon stands in one column whichever row it
+// is on. The event that entered the phase is not drawn again after the phase's own time. A settled
+// or a waiting row draws neither. A lane held in the core budget draws its wait in the newest
+// activity's place, in the same columns (#4052).
 
 const { KIND_BLANK, PHASE_ICONS, span_of } = run_board_labels
 const { held_of, held_text } = run_board_render_waits
-const ACTIVITY_SEPARATOR = ' · '
+const GAP = '  '
 // A phase past twice its usual time is drawn as long, past three times as alarming.
 const LONG_FACTOR = 2
 const ALARM_FACTOR = 3
@@ -157,13 +158,13 @@ function activity_age(row: BoardRow, header: BoardHeader): number | undefined {
 	return newest === undefined ? undefined : header.now_ms - newest.since_ms
 }
 
-// ` · ` and the newest activity as its kind's icon and its age, aged as the `💓` is, or a held lane's
+// The gap and the newest activity as its kind's icon and its age, aged as the `💓` is, or a held lane's
 // wait; nothing where the row draws neither.
 function activity_part(row: BoardRow, header: BoardHeader): string {
 	const width = column_width(header, (other) => activity_age(other, header))
 	const held = held_of(row, header)
 
-	if (held !== undefined) return `${ACTIVITY_SEPARATOR}${held_text(held, width)}`
+	if (held !== undefined) return `${GAP}${held_text(held, width)}`
 
 	const newest = drawn_activity(row, header)
 
@@ -172,7 +173,7 @@ function activity_part(row: BoardRow, header: BoardHeader): string {
 	const age = header.now_ms - newest.since_ms
 	const text = `${newest.icon} ${span_of(age).padStart(width)}`
 
-	return `${ACTIVITY_SEPARATOR}${run_board_header.aged(text, age)}`
+	return `${GAP}${run_board_header.aged(text, age)}`
 }
 
 // A running row's end, nothing for any other; a followup row's checks follow its phase part as a part
