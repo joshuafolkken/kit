@@ -1,3 +1,4 @@
+import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -35,6 +36,7 @@ const DISPATCHED_KIND = 'dispatched'
 const NO_LANE_KIND = 'no-lane'
 const NOT_RUNNING_KIND = 'not-running'
 const UNCLAIMED_KIND = 'unclaimed'
+const CONFLICTED_KIND = 'conflicted'
 
 type Unsaved = Extract<KeptWork, { kind: 'unsaved' }>
 
@@ -48,6 +50,7 @@ type Refused =
 	| { kind: typeof NO_LANE_KIND }
 	| { kind: typeof NOT_RUNNING_KIND }
 	| { kind: typeof UNCLAIMED_KIND; reason: string }
+	| { kind: typeof CONFLICTED_KIND; directory: string }
 type RestartOutcome = Restarted | Unsaved | Refused
 
 // A cut the stopped child carried would hand its successor the old session's hand-off at
@@ -91,6 +94,8 @@ async function stop_and_relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 	return await relaunch(lane)
 }
 
+// A tree with unresolved conflicts (a sync's merge stopped mid-way) cannot be stashed, so it is refused
+// before the stop — stopping first would strand the lane with no child and nothing re-dispatched.
 /** Stop the running child of `#<N>`'s lane and re-dispatch the issue there in a fresh session. */
 async function restart(issue: string): Promise<RestartOutcome> {
 	issue_number_shape.require_issue_number(issue)
@@ -98,6 +103,11 @@ async function restart(issue: string): Promise<RestartOutcome> {
 
 	if (lane === undefined) return { kind: NO_LANE_KIND }
 	if (!lane_reap.is_child_running(issue)) return { kind: NOT_RUNNING_KIND }
+
+	if (await git_stash.has_conflict(lane.directory)) {
+		return { kind: CONFLICTED_KIND, directory: lane.directory }
+	}
+
 	const claim = await lane_dispatch.claim_marker(issue)
 
 	if (!claim.is_applied) return { kind: UNCLAIMED_KIND, reason: claim.reason }
@@ -131,6 +141,10 @@ function refused_text(outcome: Refused, issue: string): string {
 
 	if (outcome.kind === NO_LANE_KIND) {
 		return `No lane is open for ${cited}, so there is no child to restart.`
+	}
+
+	if (outcome.kind === CONFLICTED_KIND) {
+		return `The lane for ${cited} has unresolved conflicts, which \`git stash\` cannot keep, so the running child was left as it is — nothing was stopped or re-dispatched. Resolve them, or run \`git -C ${outcome.directory} merge --abort\`, then run \`pnpm josh lane:restart ${issue}\` again.`
 	}
 
 	if (outcome.kind === UNCLAIMED_KIND) {
