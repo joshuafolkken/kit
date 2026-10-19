@@ -8,7 +8,10 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
-const ACTION = 'pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024'
+// The step is found by the action name, never by its pin, so a Dependabot bump of the SHA alone
+// keeps the suite green and auto-merges (joshuafolkken/kit#4147).
+const ACTION = 'pnpm/setup@'
+const SHA_PINNED_ACTION = /^pnpm\/setup@[\da-f]{40}$/u
 const VERSION_INPUT = '${{ steps.pnpm-version.outputs.version }}'
 const RESOLVER_ID = 'pnpm-version'
 const E2E_JOB = 'e2e'
@@ -60,6 +63,10 @@ function required_steps(workflow_path: string, job_name: string): Steps {
 	return steps
 }
 
+function is_pnpm_setup(step: WorkflowStep): boolean {
+	return step.uses?.startsWith(ACTION) === true
+}
+
 function action_call(workflow_path: string, job_name: string): WorkflowStep | undefined {
 	return required_steps(workflow_path, job_name).find(
 		(step) => step.uses === ci_yml_fixture.SETUP_PNPM_USES,
@@ -88,14 +95,12 @@ function run_resolver(steps: Steps, manifest: unknown): string {
 }
 
 function expect_pnpm_before_use(steps: Steps): void {
-	const setup_index = steps.findIndex((step) => step.uses === ACTION)
+	const setup_index = steps.findIndex((step) => is_pnpm_setup(step))
 	const resolve_index = steps.findIndex((step) => step.id === RESOLVER_ID)
 	const first_use = steps.findIndex((step) => step.run?.includes('pnpm '))
 
-	expect(steps[setup_index]).toMatchObject({
-		uses: ACTION,
-		with: { install: false, version: VERSION_INPUT },
-	})
+	expect(steps[setup_index]?.uses).toMatch(SHA_PINNED_ACTION)
+	expect(steps[setup_index]?.with).toMatchObject({ install: false, version: VERSION_INPUT })
 	expect(steps[resolve_index]?.run).toContain('m.packageManager?.match(/^pnpm@([^+]+)/)')
 	expect(resolve_index).toBeGreaterThanOrEqual(0)
 	expect(setup_index).toBeGreaterThan(resolve_index)
@@ -112,7 +117,7 @@ describe('the setup-pnpm composite action', () => {
 		const install = ACTION_STEPS.findIndex((step) => step.run === INSTALL_COMMAND)
 
 		expect_pnpm_before_use(ACTION_STEPS)
-		expect(safe_chain).toBeGreaterThan(ACTION_STEPS.findIndex((step) => step.uses === ACTION))
+		expect(safe_chain).toBeGreaterThan(ACTION_STEPS.findIndex((step) => is_pnpm_setup(step)))
 		expect(install).toBeGreaterThan(safe_chain)
 	})
 
@@ -147,7 +152,7 @@ describe.each(ACTION_CALLERS)('pnpm setup in $path', ({ path: workflow_path, job
 
 		expect(call_index).toBeGreaterThanOrEqual(0)
 		expect(first_use).toBeGreaterThan(call_index)
-		expect(steps.some((step) => step.id === RESOLVER_ID || step.uses === ACTION)).toBe(false)
+		expect(steps.some((step) => step.id === RESOLVER_ID || is_pnpm_setup(step))).toBe(false)
 	})
 })
 
@@ -213,7 +218,7 @@ describe('Node compatibility job', () => {
 	})
 
 	it('installs on the matrix runtime through the composite action', () => {
-		const setup = ACTION_STEPS.find((step) => step.uses === ACTION)
+		const setup = ACTION_STEPS.find((step) => is_pnpm_setup(step))
 
 		expect(action_call(ci_yml_fixture.RUNTIME_CI_YML, NODE_COMPAT_JOB)?.with).toEqual({
 			runtime: NODE_COMPAT_RUNTIME,
