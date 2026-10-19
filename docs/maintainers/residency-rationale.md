@@ -268,7 +268,7 @@ rejected" prose that travels with them, piling up in documents read at run time 
 references) cited 328 issue numbers. Cutting them alone does not last: nothing stopped the next PR
 adding them back, the same pattern the byte budget answered for size.
 
-**The rule is computable, so a check answers it (question 0).** `scripts/document/issue-citation-budget.ts`
+**The rule is computable, so a check answers it (question 0).** `tools/document/issue-citation-budget.ts`
 records each document's count, and its suite fails `pnpm josh gate` on growth and on a reduction left
 unrecorded. `residency.md` carries one line pointing at it, beside the other budget rules.
 

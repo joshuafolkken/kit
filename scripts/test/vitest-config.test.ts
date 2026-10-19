@@ -1,15 +1,15 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { unit_projects } from '#tools/test/unit-projects'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { unit_projects } from './unit-projects'
 
 // Vitest 5 removed `poolOptions.forks.isolate`; the option is now top-level. Setting it the old way
 // is accepted silently and ignored, so the pure project would start one worker per file and save
 // nothing (joshuafolkken/kit#2170). The paths are resolved from the working directory, which is the
 // repository root under every vitest config.
-const UNIT_PROJECTS_PATH = 'scripts/test/unit-projects.ts'
+const UNIT_PROJECTS_PATH = 'tools/test/unit-projects.ts'
 const MAIN_CONFIG = 'vitest.config.ts'
 const HARNESS_CONFIG = 'vitest.harness.config.ts'
 const ROOT_CONFIGS: ReadonlyArray<string> = [MAIN_CONFIG, HARNESS_CONFIG]

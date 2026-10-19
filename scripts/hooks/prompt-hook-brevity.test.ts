@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { prompt_hooks } from '#tools/hooks/prompt-hooks'
 import { describe, expect, it } from 'vitest'
-import { prompt_hooks } from './prompt-hooks'
 import { step_zero_notice } from './step-zero-notice'
 
 // The `UserPromptSubmit` hooks are injected into the conversation on **every user turn**, and what

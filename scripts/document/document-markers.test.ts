@@ -1,7 +1,7 @@
+import { RETIRED_PHRASES } from '#tools/document/retired-phrases'
 import { describe, expect, it } from 'vitest'
 import { all_documents, read_document } from './ai-document-fixture'
 import { document_section } from './document-section'
-import { RETIRED_PHRASES } from './retired-phrases'
 
 // The two tables that replaced the ~140 per-phrase marker suites (joshuafolkken/kit#1923).
 //

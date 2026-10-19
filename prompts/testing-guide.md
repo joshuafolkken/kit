@@ -122,7 +122,7 @@ When tests leave persistent state behind:
 
 ### A josh command that writes state runs through the integration harness (kit only)
 
-- A new or changed state-writing josh command needs a test in all three environments of `scripts/test/josh-harness.ts` — kit, a consumer without `docs/`, a lane worktree (joshuafolkken/kit#2402). Packed suite: `vitest.harness.config.ts`
+- A new or changed state-writing josh command needs a test in all three environments of `tools/test/josh-harness.ts` — kit, a consumer without `docs/`, a lane worktree (joshuafolkken/kit#2402). Packed suite: `vitest.harness.config.ts`
 
 ---
 

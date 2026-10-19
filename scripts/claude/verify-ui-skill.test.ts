@@ -1,8 +1,8 @@
 import { AI_DOCS, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { init_logic } from '#scripts/init/init-logic'
+import { skill_meta } from '#tools/claude/skill-meta'
 import { describe, expect, it } from 'vitest'
 import { read_skill_file } from './skill-fixture'
-import { skill_meta } from './skill-meta'
 
 // #853: the completion gate named a `/verify` skill that this package did not ship, so the UI
 // verification step pointed at nothing. The skill is distributed under `verify-ui` rather than

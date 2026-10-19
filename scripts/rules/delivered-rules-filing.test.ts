@@ -1,3 +1,4 @@
+import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import {
@@ -7,7 +8,6 @@ import {
 	FILING_COMMAND,
 	filings_tail,
 } from './delivered-rules-fixture'
-import { delivered_rules_harness } from './delivered-rules-harness'
 import { filing_cap } from './filing-cap'
 import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 

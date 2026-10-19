@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {

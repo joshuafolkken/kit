@@ -1,7 +1,7 @@
 # josh CLI — Command Catalog
 
 Auto-generated — do not edit.
-Run `tsx scripts/document/generate-catalog.ts` to regenerate.
+Run `tsx tools/document/generate-catalog.ts` to regenerate.
 
 ## Development
 

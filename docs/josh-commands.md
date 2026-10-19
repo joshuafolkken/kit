@@ -10,7 +10,7 @@ See also:
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal, and `pnpm josh help <command>` for one command's usage. How the dispatcher runs a command in kit's own checkout, and the shape a new script keeps: `docs/maintainers/josh-commands-rationale.md` → "How a command runs".
 
-A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-developer.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-developer.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
 
 ## Development
 
@@ -223,7 +223,7 @@ pnpm josh test:unit
 - `vitest` with **no** `*.{test,spec}.{ts,js}` file fails; `basic` projects skip.
 - Guards (kit's own checkout): a unit test that reaches the network or writes into the suite's repository fails; the fix is in the test (mock the read, clear git location env, carry identity on `-c`).
 - **The suite runs as two Vitest projects** (`vitest.config.ts`): `pure` with `isolate:false` and `isolated` — the same files and green condition, the pure ones faster.
-- **A setup file silences the real streams for each test body** (`scripts/test/test-stdout-guard.ts`), so a fixture that drives a CLI `main` cannot leak its `process.stdout` lines into the suite's output; `console.*` is untouched and the streams are restored after each test.
+- **A setup file silences the real streams for each test body** (`tools/test/test-stdout-guard.ts`), so a fixture that drives a CLI `main` cannot leak its `process.stdout` lines into the suite's output; `console.*` is untouched and the streams are restored after each test.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:unit` in detail".
 

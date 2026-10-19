@@ -47,7 +47,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 	},
 	metrics: {
-		script: 'scripts/metrics/metrics-command.ts',
+		script: 'tools/metrics/metrics-command.ts',
 		description:
 			'Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline',
 		category: 'Development',

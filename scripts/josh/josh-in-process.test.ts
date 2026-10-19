@@ -1,11 +1,11 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { read_script } from '#tools/josh/josh-script-reader'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
 import type { CommandEntry } from './josh-command-types'
 import { FAILURE_EXIT_CODE, josh_in_process } from './josh-in-process'
-import { read_script } from './josh-script-reader'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const JOSH_DIR = path.join(PACKAGE_DIR, 'scripts', 'josh')

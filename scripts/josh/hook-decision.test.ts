@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { hook_decision, type TranscriptGuard } from './hook-decision'
 

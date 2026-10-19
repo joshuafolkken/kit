@@ -190,9 +190,9 @@ describe('related_scope.resolve_scope — the whole-suite fallbacks', () => {
 		'package.json',
 		'pnpm-lock.yaml',
 		'vitest.config.ts',
-		path.join('scripts', 'test', 'unit-projects.ts'),
-		path.join('scripts', 'test', 'test-read-recorder.ts'),
-		path.join('scripts', 'test', 'test-read-capture.ts'),
+		path.join('tools', 'test', 'unit-projects.ts'),
+		path.join('tools', 'test', 'test-read-recorder.ts'),
+		path.join('tools', 'test', 'test-read-capture.ts'),
 	])('falls back when %j changed, which every test depends on', (file) => {
 		const scope = related_scope.resolve_scope(request([SOURCE_FILE, file]))
 

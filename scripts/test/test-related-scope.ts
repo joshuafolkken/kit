@@ -63,12 +63,12 @@ const WHOLE_SUITE_FILES: ReadonlySet<string> = new Set([
 	'tsconfig.json',
 	'vitest.config.ts',
 	'vitest.harness.config.ts',
-	path.join('scripts', 'test', 'unit-projects.ts'),
+	path.join('tools', 'test', 'unit-projects.ts'),
 	path.join('scripts', 'test', 'unit-setup-files.ts'),
-	path.join('scripts', 'test', 'pure-files.ts'),
-	path.join('scripts', 'test', 'vitest-include-globs.ts'),
+	path.join('tools', 'test', 'pure-files.ts'),
+	path.join('tools', 'test', 'vitest-include-globs.ts'),
 	// What the read recorder runs in every worker, which no test imports through the setup file.
-	path.join('scripts', 'test', 'test-read-capture.ts'),
+	path.join('tools', 'test', 'test-read-capture.ts'),
 	path.join('scripts', 'test', 'test-read-trace.ts'),
 	...SETUP_FILES,
 ])

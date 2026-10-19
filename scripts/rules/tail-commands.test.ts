@@ -1,5 +1,5 @@
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { pre_gate_cut } from './pre-gate-cut'
 import { tail_commands } from './tail-commands'

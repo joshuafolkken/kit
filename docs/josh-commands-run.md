@@ -2,7 +2,7 @@
 
 The commands a run and its lanes call to hold, step, cut and ship, plus the session-budget and document-reading commands a run uses. Where each command came from: `docs/maintainers/josh-commands-run-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-run.ts` and `scripts/josh/josh-usage-session.ts` by `tsx scripts/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated from `scripts/josh/josh-usage-run.ts` and `scripts/josh/josh-usage-session.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
 
 ## Run lifecycle
 
@@ -1050,7 +1050,7 @@ pnpm josh edit:files - <<'EDITS'   # plan from stdin, then EDITS
 
 ### `josh time`
 
-**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `scripts/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
+**Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `tools/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
 
 Report where a run's wall clock went, read from the same transcripts `josh cost` prices and, for the part no transcript records (CI, merge), from GitHub.
 
@@ -1118,7 +1118,7 @@ pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
 
 <!-- /usage -->
 
-It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`scripts/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
+It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`tools/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
 
 It exits `0` on a report, and `1` with the usage on a `--period` that is not a positive whole number of days.
 

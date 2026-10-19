@@ -31,7 +31,7 @@ import { json_value } from '#scripts/lib/json-value'
 // again. Once an mtime is older than the window any later write moves it, so only settled inputs are
 // remembered; a launch inside the window simply hashes.
 //
-// This module is loaded by plain `node` on every hook launch (`scripts/hooks/hook-bundle-ready.ts`),
+// This module is loaded by plain `node` on every hook launch (`tools/hooks/hook-bundle-ready.ts`),
 // so it imports `node:` built-ins and `#scripts/*` subpaths alone — nothing slow to load.
 
 const STAMP_NAME = 'inputs.json'

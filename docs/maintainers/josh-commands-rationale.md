@@ -71,7 +71,7 @@ Performance is a goal no change may worsen (`prompts/collaboration-workflow/prin
 
 ## `josh test:unit` in detail
 
-- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`scripts/test/pure-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set — and the rest run `isolated` with the default. They partition the suite exactly, so the same files run and the green condition is unchanged; only the pure ones run faster. The state guard is scoped to `pure`.
+- **The suite runs as two Vitest projects** (`vitest.config.ts`): the classifier's isolation-free files (`tools/test/pure-files.ts`) run `pure` with `isolate:false` — each shared module evaluated once per worker, not once per file, a measured 57% cut on that set — and the rest run `isolated` with the default. They partition the suite exactly, so the same files run and the green condition is unchanged; only the pure ones run faster. The state guard is scoped to `pure`.
 
 ## `josh test:declared` in detail
 

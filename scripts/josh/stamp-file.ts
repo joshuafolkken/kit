@@ -6,7 +6,7 @@ import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // A small record one josh command writes and another reads, kept per checkout in the temp directory.
 //
-// Extracted from `scripts/eval/eval-stamp.ts` when `josh latest:scope` needed the same handoff.
+// Extracted from `tools/eval/eval-stamp.ts` when `josh latest:scope` needed the same handoff.
 // The mechanics below are not boilerplate — the symlink defense on the
 // write, the ownership check on the read, and the deterministic per-checkout path are each load
 // bearing — so a second copy of them is the clone `CLAUDE.md` prohibits. What differs between the

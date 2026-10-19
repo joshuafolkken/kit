@@ -4,7 +4,7 @@ import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
 	batch_outcome,

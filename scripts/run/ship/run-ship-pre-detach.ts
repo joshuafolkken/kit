@@ -40,8 +40,8 @@ const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
 	'scripts/rules',
 	'scripts/josh/josh-command-map.test.ts',
 	'scripts/issue/session-cite-scan.test.ts',
-	'scripts/test/untested-sources.test.ts',
-	'scripts/test/pure-files.test.ts',
+	'tools/test/untested-sources.test.ts',
+	'tools/test/pure-files.test.ts',
 ]
 // A present directory need not hold a test the project's Vitest includes — a consumer's own
 // `scripts/claude` of shell helpers, say — and a filter that matches nothing would stop every ship.

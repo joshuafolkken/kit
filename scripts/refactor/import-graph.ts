@@ -12,10 +12,12 @@ import { file_reader } from '#scripts/lib/read-file'
 const FROM_PATTERN = /\bfrom[ \t]*['"]([^'"\n]+)['"]/gu
 // A side-effect import carries no `from`: `import './register'`.
 const BARE_IMPORT_PATTERN = /^[ \t]*import[ \t]+['"]([^'"\n]+)['"]/gmu
-// The subpath import this package uses for cross-directory `scripts/` imports; `#scripts/x` resolves
-// to `scripts/x`. Relative specifiers resolve against the importer's directory.
-const SUBPATH_PREFIX = '#scripts/'
-const SCRIPTS_DIR = 'scripts'
+// The subpath imports this package uses for cross-directory imports; `#scripts/x` resolves to
+// `scripts/x` and `#tools/x` to `tools/x`. Relative specifiers resolve against the importer's directory.
+const SUBPATH_DIRECTORIES: ReadonlyArray<readonly [string, string]> = [
+	['#scripts/', 'scripts'],
+	['#tools/', 'tools'],
+]
 const RELATIVE_PREFIX = '.'
 // A specifier omits its extension, so a resolved base is tried against the real files these suffixes
 // would produce — a sibling module or a directory's index, in the order a resolver would.
@@ -38,9 +40,9 @@ function parse_imports(source: string): ReadonlyArray<string> {
 // Where a local specifier points before extension resolution, or `undefined` for a package import
 // this graph does not follow.
 function specifier_base(spec: string, importer: string, root: string): string | undefined {
-	if (spec.startsWith(SUBPATH_PREFIX)) {
-		return path.resolve(root, SCRIPTS_DIR, spec.slice(SUBPATH_PREFIX.length))
-	}
+	const subpath = SUBPATH_DIRECTORIES.find(([prefix]) => spec.startsWith(prefix))
+
+	if (subpath !== undefined) return path.resolve(root, subpath[1], spec.slice(subpath[0].length))
 
 	if (spec.startsWith(RELATIVE_PREFIX)) return path.resolve(path.dirname(importer), spec)
 
