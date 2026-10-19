@@ -11,6 +11,7 @@ const CLONE_COMMANDS: Record<string, CommandEntry> = {
 			'Count code duplication across files and first-party repositories, printing each clone as file:line pairs',
 		category: 'AI tools',
 		reference: ['', 'automation', ['files']],
+		usage: { examples: [{ arguments: '' }] },
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

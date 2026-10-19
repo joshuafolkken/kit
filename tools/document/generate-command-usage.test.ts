@@ -70,33 +70,9 @@ describe('generate command usage', () => {
 	)
 })
 
-// The spans are the reference's sections: every command has one, on the page its usage table is tied
-// to, so a command with no span or a table rendered on the wrong page fails here (#3981).
+// The spans are the reference's sections: every command has one, on exactly one page, and a page
+// decides which commands it renders — the developer page holding the developer audience (#3981, #4185).
 describe('the usage spans cover the command map', () => {
-	it('reports a command of the page tables that has no span', () => {
-		const text = '<!-- usage: lint -->\n<!-- /usage -->'
-
-		expect(generate_command_usage.span_mismatch(DEVELOPER_PAGE, text).missing).toContain('gate')
-	})
-
-	it('reports a span on a page whose tables do not hold that command', () => {
-		const text = '<!-- usage: followup -->\n<!-- /usage -->'
-
-		expect(generate_command_usage.span_mismatch(DEVELOPER_PAGE, text).misplaced).toEqual([
-			'followup',
-		])
-	})
-
-	it.each(generate_command_usage.USAGE_PAGES)(
-		'%s carries a span for exactly the commands of its tables',
-		(page) => {
-			expect(generate_command_usage.span_mismatch(page, page_text(page))).toEqual({
-				missing: [],
-				misplaced: [],
-			})
-		},
-	)
-
 	it('gives every command map entry a span on exactly one page', () => {
 		const spans = generate_command_usage.USAGE_PAGES.flatMap((page) =>
 			generate_command_usage.usage_spans(page_text(page)),
@@ -106,9 +82,31 @@ describe('the usage spans cover the command map', () => {
 	})
 
 	it('renders exactly the developer-audience commands on the developer page', () => {
-		expect(sorted(command_usage.page_commands(DEVELOPER_PAGE))).toEqual(
-			sorted(developer_commands()),
-		)
+		const spans = generate_command_usage.usage_spans(page_text(DEVELOPER_PAGE))
+
+		expect(sorted(spans)).toEqual(sorted(developer_commands()))
+	})
+})
+
+function rendered_span(name: string, usage: string): string {
+	const summary = generate_command_usage.as_sentence(COMMAND_MAP[name]?.description ?? '')
+
+	return `<!-- usage: ${name} -->\n\n${summary}\n\n${usage}\n\n<!-- /usage -->`
+}
+
+function all_pages_text(): string {
+	return generate_command_usage.USAGE_PAGES.map((page) => page_text(page)).join('\n')
+}
+
+// `josh help <command>` and the page's span end in one usage block, read from the command's entry.
+describe('josh help and the page render one usage', () => {
+	const pages = all_pages_text()
+
+	it.each(Object.keys(COMMAND_MAP))('%s', (name) => {
+		const usage = command_usage.format_usage(name) ?? ''
+
+		expect(command_usage.format_command_help(name)?.endsWith(`\n\n${usage}`)).toBe(true)
+		expect(pages).toContain(rendered_span(name, usage))
 	})
 })
 

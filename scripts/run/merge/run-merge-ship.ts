@@ -3,8 +3,10 @@ import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { StallCause } from '#scripts/run/park/run-stalled'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
 
 // Why `run:merge` parks a child whose detached ship has already ended (joshuafolkken/kit#3808).
 //
@@ -35,7 +37,18 @@ function since_ship_launch(events: Events, child: string): Events | undefined {
 	return launched_at === -1 ? undefined : own.slice(launched_at + 1)
 }
 
-function cause_of(ending: ShipEnding, events: Events, child: string): string | undefined {
+// The stopped stage names the cause's short form (`review failed`); a stop text in no known shape is
+// still a ship stop.
+function stop_cause(stop: RunEvent): StallCause {
+	const stage = run_ship_stop_text.reason_of(stop.text)
+
+	return {
+		short: stage === undefined ? 'ship stopped' : `${stage} failed`,
+		why: `its detached ship stopped and was not fixed: ${stop.text}.`,
+	}
+}
+
+function cause_of(ending: ShipEnding, events: Events, child: string): StallCause | undefined {
 	if (ending === undefined || !ENDED_RESULTS.has(ending.result)) return undefined
 
 	const attempt = since_ship_launch(events, child)
@@ -43,14 +56,17 @@ function cause_of(ending: ShipEnding, events: Events, child: string): string | u
 
 	const stop = attempt.findLast((event) => event.kind === run_event_stream.EVENT_KIND.SHIP_STOP)
 
-	if (stop !== undefined) return `its detached ship stopped and was not fixed: ${stop.text}.`
+	if (stop !== undefined) return stop_cause(stop)
 
-	return `its detached ship ended ${ending.result} before recording a stopped stage — pnpm josh ship --log ${child}.`
+	return {
+		short: `ship ${ending.result}`,
+		why: `its detached ship ended ${ending.result} before recording a stopped stage — pnpm josh ship --log ${child}.`,
+	}
 }
 
 // The ship's cause for `child`'s park, read from the record and the stream this checkout's repository
 // keys on, or `undefined` when the child handed nothing to a ship or its ship succeeded.
-function cause(child: string, directory: string = process.cwd()): string | undefined {
+function cause(child: string, directory: string = process.cwd()): StallCause | undefined {
 	const repository = git_common_directory.repository(directory)
 	if (repository === undefined) return undefined
 

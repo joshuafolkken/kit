@@ -84,10 +84,11 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/event/run-event-setup.ts', 3],
 	// The halfrun / prrun stop confirmation: copy-out commands.
 	['run/hold/run-stop-notify.ts', 1],
-	['run/merge/run-merge-cli.ts', 7],
-	['run/merge/run-merge.ts', 1],
+	['run/merge/run-merge-cli.ts', 6],
+	// The `run:stalled` park event, and the resume command a park comment and a board row name.
+	['run/park/run-stalled.ts', 2],
 	['run/ship/run-ship-detach.ts', 1],
-	// The park event and its Telegram warning.
+	// The ship-stop cap's Telegram warning.
 	['run/ship/run-ship-relaunch-cap.ts', 1],
 	// The reviewer child's prompt, which an agent reads.
 	['run/ship/run-ship-review.ts', 1],

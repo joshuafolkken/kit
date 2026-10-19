@@ -340,6 +340,9 @@ describe('backlog_waves.format_waves — a run:stalled issue', () => {
 		const stalled = child(PARKED, { labels: [RUN_STALLED_LABEL, RUN_LANE_LABEL] })
 		const text = backlog_waves.format_waves(result([child(FIRST)], [], [stalled]), CONTEXT)
 
-		expect(text).toContain(`${backlog_fixture.cite(PARKED)}  — ${backlog_waves.RUN_STALLED_NOTE}`)
+		const note = backlog_waves.run_stalled_note(PARKED)
+
+		expect(text).toContain(`${backlog_fixture.cite(PARKED)}  — ${note}`)
+		expect(note).toContain(`\`fullrun #${String(PARKED)}\``)
 	})
 })
