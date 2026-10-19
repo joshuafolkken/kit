@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 const SKILL_DIR = '.claude/skills/workflow-commands'
 const BACKGROUND = read_repo_file(`${SKILL_DIR}/background-commands.md`)
 const LEDGER = read_repo_file(`${SKILL_DIR}/observation-ledger.md`)
-const FOLLOWUP_FOREGROUND = 'Keep `pnpm josh followup` in the foreground'
+const FOLLOWUP_FOREGROUND = '`pnpm josh followup` stays in the foreground'
 const RECORD_RULE = 'Record before the CI wait ends, never after the merge'
 
 describe('background-commands.md — recording beside the CI wait', () => {
@@ -25,10 +25,12 @@ describe('background-commands.md — recording beside the CI wait', () => {
 		const section_start = BACKGROUND.indexOf('## Background the gate and push')
 		const next_section = BACKGROUND.indexOf('\n## ', section_start + 1)
 		const rule = BACKGROUND.indexOf(RECORD_RULE)
+		const foreground = BACKGROUND.indexOf(FOLLOWUP_FOREGROUND)
 
 		expect(rule).toBeGreaterThan(section_start)
 		expect(rule).toBeLessThan(next_section)
-		expect(BACKGROUND.indexOf(FOLLOWUP_FOREGROUND)).toBeLessThan(rule)
+		expect(foreground).toBeGreaterThan(section_start)
+		expect(foreground).toBeLessThan(rule)
 	})
 })
 

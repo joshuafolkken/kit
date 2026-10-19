@@ -10,9 +10,11 @@ const RUSAGE_INFO_V2_BYTES = 160
 const TIMEBASE = { numer: 125, denom: 3 }
 const LIVE_PID = 42
 const FAILED = -1
+const FOOTPRINT_BYTES = 734_003_200
 
-// 70,000,000 ticks of 125 / 3 ns across the four times.
+// 70,000,000 ticks of 125 / 3 ns across the four times, and the footprint.
 function write_times(buffer: Buffer): void {
+	buffer.writeBigUInt64LE(BigInt(FOOTPRINT_BYTES), 72)
 	buffer.writeBigUInt64LE(24_000_000n, 16)
 	buffer.writeBigUInt64LE(6_000_000n, 24)
 	buffer.writeBigUInt64LE(39_597_667n, 96)
@@ -78,7 +80,10 @@ describe('run_board_usage_rusage.rusage_reader', () => {
 	it('reads a process through proc_pid_rusage, and nothing where the call fails', () => {
 		const read = rusage_reader('darwin', fake_ffi)
 
-		expect(read?.(LIVE_PID)).toBeCloseTo(2916.667)
+		const reading = read?.(LIVE_PID)
+
+		expect(reading?.cpu_ms).toBeCloseTo(2916.667)
+		expect(reading).toMatchObject({ footprint_bytes: FOOTPRINT_BYTES })
 		expect(read?.(LIVE_PID + 1)).toBeUndefined()
 	})
 })

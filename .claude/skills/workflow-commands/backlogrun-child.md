@@ -44,7 +44,7 @@ or a split found mid-run does **not** stop it:
 5. **Do not stop.** Continue into the loop against `#<E>`.
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
-- **Every guard applies unchanged** — 30 children, 10 Issues filed, 3 consecutive failures.
+- **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a
   split mid-run stops the run"). `josh epic:next` still refuses an Issue with no task list.
 - **A bare Issue named beside an epic is a mistyped command.** Named alone, the refusal is the answer;
@@ -100,7 +100,7 @@ pnpm josh latest:scope   # → required | skip ; the reason on stderr
 pnpm josh stash:push "backlogrun: josh latest #<N>"        # `clean` when nothing changed — never conditional on the answer
 pnpm josh ms
 pnpm josh latest         # on `required` only
-pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only after `stashed` above — by message, not a positional pop
+pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only after `stashed` above
 ```
 
 On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed

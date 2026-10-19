@@ -4,12 +4,11 @@ import { run_board_fit } from './run-board-fit'
 import type { BoardRow, RowReason } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
-import type { LaneUsages } from './run-board-usage'
 
 // joshuafolkken/kit#3750: a waiting row says why it waits after its blockers, a lane being opened says
 // its stage and how long it has stood there, and a narrow pane cuts the title rather than the reason.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header } = run_board_render_fixture
 const SECOND = 1000
 const ISSUE = 3720
 const BLOCKER = '3409'
@@ -169,7 +168,7 @@ const ENDED = { started_ms: STARTED + MINUTE, ended_ms: NOW - MINUTE }
 const WORDY: RowReason = {
 	text: `the sandbox approach breaks pnpm store access; ${'x'.repeat(NARROW)}`,
 }
-const NO_USAGE: LaneUsages = new Map()
+const NO_USAGE = board_usage(new Map())
 const parked: BoardRow = {
 	...waiting({ reason: UNTRIAGED }),
 	state: 'parked',

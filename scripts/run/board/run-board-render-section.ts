@@ -1,4 +1,4 @@
-import type { PlanLine, PlanSection } from './run-board-fit'
+import { run_board_fit, type PlanLine, type PlanSection } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
@@ -14,6 +14,32 @@ const RULE_WIDTH = 50
 
 function rule_of(label: string): string {
 	return `${RULE_LEAD} ${label} `.padEnd(RULE_WIDTH, RULE)
+}
+
+// A column's label and the terminal column its cells start at.
+interface RuleColumn {
+	label: string
+	start: number
+}
+
+// A rule whose column labels stand over their cells: `── 🛤 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
+// its column's start where the rule before it leaves room, and one rule character after the label
+// before it where it does not.
+function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {
+	let rule = `${RULE_LEAD} ${label} `
+
+	for (const column of columns) {
+		const fill = Math.max(1, column.start - run_board_fit.width_of(rule) - 1)
+
+		rule += `${RULE.repeat(fill)} ${column.label} `
+	}
+
+	return `${rule}${RULE.repeat(Math.max(RULE_LEAD.length, RULE_WIDTH - run_board_fit.width_of(rule)))}`
+}
+
+// The column a rule labeled `label` lets its first column's label start at.
+function label_room(label: string): number {
+	return run_board_fit.width_of(`${RULE_LEAD} ${label} ${RULE} `)
 }
 
 function heading_lines(heading: string | undefined): Array<string> {
@@ -52,6 +78,13 @@ function done_section(
 	return plan_section(heading, lines).map((section) => ({ ...section, fold: done_fold(withdrawn) }))
 }
 
-const run_board_render_section = { done_section, heading_lines, plan_section }
+const run_board_render_section = {
+	columns_rule,
+	done_section,
+	heading_lines,
+	label_room,
+	plan_section,
+}
 
 export { run_board_render_section }
+export type { RuleColumn }

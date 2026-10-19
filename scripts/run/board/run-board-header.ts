@@ -9,9 +9,10 @@ import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-l
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
+import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_slot } from './run-board-render-slot'
 import type { RunActivity } from './run-board-status'
-import type { LaneUsages } from './run-board-usage'
+import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
@@ -49,6 +50,14 @@ const RUN_NAME = 'backlogrun'
 // means nothing.
 type BoardForm = 'screen' | 'chat'
 
+// What the lane cells and the processes section are drawn from, and the machine a gauge's width
+// stands for.
+interface BoardUsage {
+	lanes: LaneUsages
+	processes: ProcessGroups
+	scale: UsageScale
+}
+
 interface BoardHeader {
 	now_ms: number
 	started_ms: number
@@ -66,8 +75,8 @@ interface BoardHeader {
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
-	// Each running lane's CPU and memory, `undefined` where none could be read.
-	usages?: LaneUsages | undefined
+	// Each running lane's and each process group's usage, `undefined` where none could be read.
+	usages?: BoardUsage | undefined
 	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
@@ -433,4 +442,4 @@ const run_board_header = {
 }
 
 export { run_board_header }
-export type { BoardCounts, BoardForm, BoardHeader }
+export type { BoardCounts, BoardForm, BoardHeader, BoardUsage }

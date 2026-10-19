@@ -16,6 +16,8 @@ import {
 	type OperationSources,
 	type SessionOperations,
 } from './run-board-operation-read'
+import type { ProcessRoots } from './run-board-process-groups'
+import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
@@ -56,15 +58,18 @@ interface LocalRead {
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
+	// The run's supervisor and parent session, named in the 🖥 section (`run-board-roots.ts`).
+	roots?: ProcessRoots | undefined
 }
 
-const NO_SPAN: SpanHere = { span: undefined, resume: undefined, transcript: undefined }
+const NO_SPAN: SpanHere = { span: undefined, resume: undefined, transcript: undefined, roots: {} }
 
 interface SpanHere {
 	span: BoardSpan | undefined
 	resume: string | undefined
 	// The parent session's transcript, where the run's record names one.
 	transcript: string | undefined
+	roots: ProcessRoots
 }
 
 function span_here(repository: string): SpanHere {
@@ -76,6 +81,7 @@ function span_here(repository: string): SpanHere {
 		span: run_board_span.span_of(read, ended, launch),
 		resume: run_board_span.resume_of(read, ended, launch),
 		transcript: read.kind === 'carried' ? read.carry.owner_transcript : undefined,
+		roots: run_board_roots.roots_of(repository, read),
 	}
 }
 
@@ -130,7 +136,8 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 // `undefined` when no run has started here.
 async function read_local(): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const { span, resume, transcript } = repository === undefined ? NO_SPAN : span_here(repository)
+	const { span, resume, transcript, roots } =
+		repository === undefined ? NO_SPAN : span_here(repository)
 
 	if (repository === undefined || span === undefined) return undefined
 
@@ -144,6 +151,7 @@ async function read_local(): Promise<LocalRead | undefined> {
 		events: run_board_span.events_of(events, span),
 		lanes: lanes.map((lane) => lane.issue),
 		resume,
+		roots,
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		idle_lanes: lane_spent.idle_lanes(lanes),

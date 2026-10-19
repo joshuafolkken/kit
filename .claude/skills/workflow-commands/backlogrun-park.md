@@ -123,9 +123,8 @@ Something else in **this** repository has to land first: not a split, not an ups
    pnpm josh issue:comment <M> --body-file <path>   # what was stashed, and that #<N> must land first
    ```
 
-   **`-u` is not optional** (new test files are untracked). **Pop it by message, never by position** —
-   `pnpm josh stash:pop "backlogrun: paused #<M> for prerequisite #<N>"` — when `epic:next` offers `<M>`
-   again, after its `pnpm josh ms`; expect conflicts.
+   Pop it with `pnpm josh stash:pop "backlogrun: paused #<M> for prerequisite #<N>"` when `epic:next`
+   offers `<M>` again, after its `pnpm josh ms`; expect conflicts.
 3. `pnpm josh epic --add <E> <N> --before <M>` — row, declaration and `blocked-by` in one command;
    never a hand edit. **With no epic**, record `<M>` blocked by `<N>` alone with the `gh api
    …/dependencies/blocked_by` call in

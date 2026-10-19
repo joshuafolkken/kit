@@ -6,22 +6,20 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
-import type { LaneUsages } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
 // joshuafolkken/kit#3784: an issue row's part that just changed — the phase it entered, the time it
 // started counting, the finish time it ended at — is emphasized for about three seconds, as the
 // header's are, and nothing else on the row is.
 
-const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, GB, NOW, board_usage, header } = run_board_render_fixture
 const { PHASE_ICONS, STATE_ICONS, span_of } = run_board_labels
 const { paint } = run_board_fresh
 const SECOND = 1000
-const GB = 1024 * 1024 * 1024
 const ENDED = NOW - 2 * SECOND
 // A settled row that started inside the fresh window, so only the running-row guard keeps its time plain.
 const SETTLED_START = ENDED - SECOND / 2
-const usages: LaneUsages = new Map([[1, { cpu_percent: 20, memory_bytes: GB, memory_percent: 5 }]])
+const usages = board_usage(new Map([[1, { cpu_cores: 2, memory_bytes: GB, compressed_bytes: 0 }]]))
 
 function row(number: number, state: BoardRow['state'], status: BoardRow['status']): BoardRow {
 	return { number, title: `Issue ${String(number)}`, kind: undefined, state, status, waits: [] }

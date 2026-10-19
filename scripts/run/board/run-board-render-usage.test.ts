@@ -6,22 +6,22 @@ import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
-import type { LaneUsages } from './run-board-usage'
 
 // joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row, on no row where the pane is too narrow for it on any.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
-const GB = 1024 * 1024 * 1024
-const USAGE = '💪 20% 🧠1.6G'
+const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_board_render_fixture
+const USAGE = /🔨 1 +2\.0 +1\.6G +0\.2G +Issue 1/u
 const WIDE = 200
 const NARROW = 80
 // Wide enough for a running row up to its usage, not for its tail and what it waits on after it too.
 const FITTING = 100
 
-const usages: LaneUsages = new Map([
-	[1, { cpu_percent: 20, memory_bytes: 1.6 * GB, memory_percent: 9 }],
-	[2, { cpu_percent: 1, memory_bytes: GB, memory_percent: 5 }],
-])
+const usages = board_usage(
+	new Map([
+		[1, { cpu_cores: 2, memory_bytes: 1.6 * GB, compressed_bytes: 0.2 * GB }],
+		[2, { cpu_cores: 0.1, memory_bytes: GB, compressed_bytes: 0 }],
+	]),
+)
 
 const running: BoardRow = {
 	number: 1,
@@ -61,29 +61,43 @@ function sized(columns: number): Array<string> {
 		.map((line) => stripVTControlCharacters(line))
 }
 
-describe('run_board_render.render usage column', () => {
-	// joshuafolkken/kit#3769: the usage before the tail, both before what the row waits on.
-	it('draws a running row’s usage before its tail, and both before what it waits on', () => {
+// The columns before `marker` on a line, as the terminal counts them.
+function column_of(line: string, marker: string): number {
+	return run_board_fit.width_of(line.slice(0, line.indexOf(marker)))
+}
+
+// joshuafolkken/kit#4171: the cells after the row's number, before its title; none at the row's end.
+describe('run_board_render.render usage cells', () => {
+	it('draws a running row’s CPU, MEM and CMPRS before its title, and nothing at its end', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}💪 20% 🧠1\.6G {2}🔨 0″ {2}🔗 3$/u)
-		expect(row_line(lines, 'Issue 2')).not.toContain('💪')
+		expect(row_line(lines, 'Issue 1')).toMatch(USAGE)
+		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}🔨 0″ {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 1')).not.toContain('🧠')
 	})
 
-	it('draws the usage in a chat as on a screen', () => {
+	it('blanks the cells on a row that is not running, so every title starts in one column', () => {
+		const lines = lines_of(board())
+
+		expect(row_line(lines, 'Issue 2')).not.toContain('1.0G')
+		expect(column_of(row_line(lines, 'Issue 2'), 'Issue 2')).toBe(
+			column_of(row_line(lines, 'Issue 1'), 'Issue 1'),
+		)
+	})
+
+	it('draws the cells in a chat as on a screen', () => {
 		const lines = lines_of(board({ form: 'chat' }))
 
-		expect(row_line(lines, 'Issue 1')).toContain(USAGE)
+		expect(row_line(lines, 'Issue 1')).toMatch(USAGE)
 	})
 
-	it('drops the column from every row where a running row would wrap with it', () => {
-		expect(row_line(sized(WIDE), 'Issue 1')).toContain(USAGE)
-		expect(row_line(sized(NARROW), 'Issue 1')).not.toContain('💪')
-		expect(row_line(sized(NARROW), 'Issue 1')).toContain('Issue 1')
+	it('keeps the cells before the title however narrow the pane', () => {
+		expect(row_line(sized(WIDE), 'Issue 1')).toMatch(USAGE)
+		expect(row_line(sized(NARROW), 'Issue 1')).toMatch(USAGE)
 	})
 
 	// joshuafolkken/kit#3769: only the tail and what a row waits on may wrap, never the columns before them.
-	it('keeps the column on every row where only the tail and what a row waits on would wrap', () => {
+	it('keeps the cells on every row where only the tail and what a row waits on would wrap', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [running, waiting] }
 		const lines = run_board_render.render({
 			header: header({ layout, usages }),
@@ -91,7 +105,21 @@ describe('run_board_render.render usage column', () => {
 			size: { columns: FITTING, rows: 50 },
 		})
 
-		expect(stripVTControlCharacters(row_line(lines, 'Issue 1'))).toContain(USAGE)
+		expect(stripVTControlCharacters(row_line(lines, 'Issue 1'))).toMatch(USAGE)
+	})
+})
+
+// A running row's tail, after the head its cells are drawn in.
+const TAIL = '  🔨 0″'
+
+// joshuafolkken/kit#3769: a row with cells narrows its title, so its head stays on one line.
+describe('run_board_render.render usage cells in a narrow pane', () => {
+	it('narrows a running row’s title so its head, cells and all, stays on one line', () => {
+		const line = row_line(sized(NARROW), 'Issue 1')
+		const head = line.slice(0, line.indexOf(TAIL))
+
+		expect(line).toMatch(USAGE)
+		expect(run_board_fit.height_of(head, NARROW)).toBe(1)
 	})
 })
 
@@ -122,10 +150,12 @@ const mixed: ReadonlyArray<BoardRow> = [
 	tracked(7, 'merged'),
 	tracked(8, 'stopped', NOW - MINUTE),
 ]
-const mixed_usages: LaneUsages = new Map([
-	[1, { cpu_percent: 20, memory_bytes: 1.6 * GB, memory_percent: 9 }],
-	[4, { cpu_percent: undefined, memory_bytes: GB, memory_percent: 5 }],
-])
+const mixed_usages = board_usage(
+	new Map([
+		[1, { cpu_cores: 2, memory_bytes: 1.6 * GB, compressed_bytes: 0.2 * GB }],
+		[4, { cpu_cores: undefined, memory_bytes: GB, compressed_bytes: 0 }],
+	]),
+)
 
 function mixed_lines(extra: Partial<BoardHeader> = {}, columns = WIDE): Array<string> {
 	const layout = { ...EMPTY_LAYOUT, active: mixed }
@@ -135,11 +165,6 @@ function mixed_lines(extra: Partial<BoardHeader> = {}, columns = WIDE): Array<st
 		.render({ header: header({ layout, usages: mixed_usages, ...extra }), notes: [], size })
 		.map((line) => stripVTControlCharacters(line))
 		.filter((line) => line.includes('Issue'))
-}
-
-// The columns before `marker` on a line, as the terminal counts them.
-function column_of(line: string, marker: string): number {
-	return run_board_fit.width_of(line.slice(0, line.indexOf(marker)))
 }
 
 describe('run_board_render.render usage column on every row', () => {
@@ -169,11 +194,11 @@ describe('run_board_render.render usage column on every row', () => {
 		expect(row_line(lines, 'Issue 8')).not.toContain('🔚')
 	})
 
-	it('drops the finish time with the usage where the column does not fit', () => {
-		const lines = mixed_lines({}, NARROW)
+	it('draws no usage on a finished row', () => {
+		const lines = mixed_lines()
 
-		expect(lines.join('\n')).not.toMatch(/[🔚💪]/u)
-		expect(row_line(lines, 'Issue 3')).toMatch(/\d″$/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/^ {2}✅ 3 {4}Issue 3/u)
+		expect(row_line(lines, 'Issue 5')).not.toContain('G ')
 	})
 
 	it('draws both in a chat as on a screen', () => {
@@ -181,6 +206,18 @@ describe('run_board_render.render usage column on every row', () => {
 
 		expect(lines).toStrictEqual(mixed_lines())
 		expect(row_line(lines, 'Issue 3')).toMatch(FINISH)
+	})
+})
+
+// Too narrow for a settled row with its finish time, wide enough for the row without it.
+const FINISH_NARROW = 70
+
+describe('run_board_render.render finish column on a narrow pane', () => {
+	it('drops the finish time from every row where the column does not fit', () => {
+		const lines = mixed_lines({}, FINISH_NARROW)
+
+		expect(lines.join('\n')).not.toContain('🔚')
+		expect(row_line(lines, 'Issue 3')).toMatch(/\d″$/u)
 	})
 })
 

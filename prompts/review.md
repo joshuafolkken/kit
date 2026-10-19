@@ -144,9 +144,8 @@ Branch 2 only:
      - `add_to_epic` → `pnpm josh epic --add <E> <new>`, with `--before <M>` / `--after <M>` when the
        relation carries an order.
      - `create_epic` → `pnpm josh epic "<title>" <new> <other> [--ordered]`.
-     - `ask` (candidates across two or more epics) → run the recommended epic's write command and record
-       what was taken, what was rejected and why on the new Issue and that epic's `## Decisions`. Stop
-       only where the two epics are genuinely too close to separate.
+     - `ask` (candidates across two or more epics) → place it in the recommended epic
+       (`.claude/skills/epic-commands/epic-bundle.md`).
      - `none` → nothing.
      - Non-zero exit, or any ⚠ warning above `Nothing to bundle.` → stop and report what it said; a
        `none` after such a warning is not "nothing to bundle".

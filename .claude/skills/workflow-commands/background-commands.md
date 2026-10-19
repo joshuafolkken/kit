@@ -7,7 +7,7 @@
 - Background `pnpm josh gate` beside the review; join it before commit.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
-- Keep `pnpm josh followup` in the foreground — nearly every following step reads its result.
+- `pnpm josh followup` stays in the foreground (`followup.md`).
 - **Record before the CI wait ends, never after the merge**: the commit
   carries the observation ledger lines recorded so far, and while CI runs the run makes the records
   that need no CI result — observation Issues, the completion report draft.

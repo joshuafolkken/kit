@@ -37,7 +37,7 @@ mirror `fullrun new` (1)–(8): derive an English title (or use the provided one
 `kickoff.md` → "Words typed after `new`" maps, body per
 `prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:hold --adopt <N>` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `pnpm josh stash:push "halfrun new: pre-existing changes"`, popped
-after `stashed` by message with `pnpm josh stash:pop "halfrun new: pre-existing changes"`, never a positional `git stash pop` →
+after `stashed` with `pnpm josh stash:pop "halfrun new: pre-existing changes"` →
 `pnpm josh ms` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
 → **stop**.

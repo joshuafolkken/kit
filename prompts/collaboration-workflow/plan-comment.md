@@ -24,7 +24,7 @@
    pnpm josh ms
    ```
 6. `pnpm josh latest:scope` が `required` と答えたときだけ `pnpm josh latest` を実行し、`dependency-update` スキルに従う（`.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
-   ステップ 4 が `stashed` と答えたら、ここでメッセージ指定で復元する（位置指定や引数なしの `git stash pop` は使わない — joshuafolkken/kit#2050）:
+   ステップ 4 が `stashed` と答えたら、ここで復元する（`operating-rules.md` → "no-self-staging"）:
    ```bash
    pnpm josh stash:pop "plan: pre-existing changes"
    ```

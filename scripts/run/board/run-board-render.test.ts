@@ -8,7 +8,7 @@ import type { ItemStatus } from './run-board-status'
 // joshuafolkken/kit#3430: the board as a person reads it. joshuafolkken/kit#3444: a row carries its
 // number, title, elapsed span; sections are rules, symbols a legend.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of, note, rule } =
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header, lines_of, note, rule } =
 	run_board_render_fixture
 const SECOND = 1000
 
@@ -186,8 +186,9 @@ describe('run_board_render.render chat', () => {
 		})
 		const layout = { ...EMPTY_LAYOUT, active: [merged, running(2, NOW - MINUTE, 'review')] }
 		const notes = [note(NOW, 'seen')]
-		const screen = lines_of(header({ layout, usages: new Map() }), notes)
-		const lines = lines_of(header({ layout, usages: new Map(), form: 'chat' }), notes)
+		const usages = board_usage(new Map())
+		const screen = lines_of(header({ layout, usages }), notes)
+		const lines = lines_of(header({ layout, usages, form: 'chat' }), notes)
 
 		expect(lines).toStrictEqual(screen)
 		expect(lines.join('\n')).toMatch(/── 📌 findings [^]*\n.*x… {2}.*🔚 .*\n[^]*✅ merged/u)

@@ -125,7 +125,7 @@ when that step printed `⚠`. **It recommends; it writes nothing.**
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
 | Spread across an epic and its **own parent** | Add to the inner epic — the parent already contains it | A |
-| Spread across **different** epics | **Choose the one you recommend, add to it, and record why** | **A** |
+| Spread across **different** epics | **Choose the one you recommend** (`epic-bundle.md`) | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
 | **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |
