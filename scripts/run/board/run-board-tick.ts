@@ -9,6 +9,7 @@ import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-
 import { run_board_link } from './run-board-link'
 import { run_board_machine } from './run-board-machine'
 import { run_board_notes, type Titles } from './run-board-notes'
+import { run_board_paused } from './run-board-paused'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
@@ -159,9 +160,10 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
 
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
+	const statuses = run_board_status.statuses_of(local.events, local.lanes, new Set(), stopped)
 
 	return run_board_layout.local_layout_of(
-		run_board_status.statuses_of(local.events, local.lanes, new Set(), stopped),
+		run_board_paused.paused_over(statuses, state.usage?.paused),
 	)
 }
 

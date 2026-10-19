@@ -292,7 +292,7 @@ describe('backlogrun_stop.lines_of', () => {
 		const report = { ...NOTHING, record: { kind: 'ended' as const }, lanes: ['3701', '3702'] }
 
 		expect(backlogrun_stop.lines_of(report).at(-1)).toBe(
-			'backlogrun: 2 lane(s) still running, not stopped: #3701 #3702',
+			'backlogrun: 2 lane(s) still running, not stopped: #3701 #3702 — suspend them in place with `josh lane:pause --all`',
 		)
 	})
 })

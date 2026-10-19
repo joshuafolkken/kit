@@ -16,6 +16,7 @@ const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
 	parked: 'parked',
 	stopped: 'parked',
 	running: 'running',
+	paused: 'running',
 }
 
 // A running row is as old as its start; a settled one as its end, or its start where it has none.

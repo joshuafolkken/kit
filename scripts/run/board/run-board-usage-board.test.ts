@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_state } from './run-board-state'
 import type { UsageMark } from './run-board-usage'
 import { run_board_usage_board } from './run-board-usage-board'
 
 // joshuafolkken/kit#4171: one reading draws both each lane's cells and the 🖥 section's groups.
 
-const { board_usage_of } = run_board_usage_board
-const { LOCAL } = run_board_fixture
+const { board_usage_of, read_usages } = run_board_usage_board
+const { LOCAL, harness } = run_board_fixture
+const { FRESH_STATE } = run_board_state
 const SUPERVISOR = 10
 const CHILD = 20
 const LEFT = 30
@@ -33,6 +35,7 @@ function mark(at_ms: number, cpu_ms: number): UsageMark {
 		]),
 		parents: new Map(),
 		folded: new Set(),
+		paused: new Map(),
 		cores: CORES,
 		total_bytes: TOTAL_BYTES,
 	}
@@ -65,5 +68,18 @@ describe('run_board_usage_board.board_usage_of', () => {
 		const usage = board_usage_of(undefined, mark(SECOND_MS, 0), undefined)
 
 		expect(usage.lanes.get(LANE)?.cpu_cores).toBeUndefined()
+	})
+})
+
+describe('run_board_usage_board.read_usages', () => {
+	it('keeps the last reading, and with it a paused lane, when a reading fails', async () => {
+		const { ports, read_usage } = harness(LOCAL, [])
+		const last = { ...mark(0, 0), paused: new Map([[String(LANE), 0]]) }
+
+		read_usage.mockResolvedValueOnce(undefined)
+
+		const read = await read_usages({ ...FRESH_STATE, usage: last }, ports)
+
+		expect(read).toStrictEqual({ usage: last, usages: undefined })
 	})
 })

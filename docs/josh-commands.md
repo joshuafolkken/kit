@@ -875,7 +875,7 @@ The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent
   - What was stopped and what was started are printed, one line each, before the board. A run owned by a session of your own is not replaced: the owner's pid is printed and the exit code is 1.
 - Closing the board (Ctrl+C) leaves the run going. When the run stops for a person, the board prints the `claude --resume <session-id>` that reopens it.
 - `--stop` stops the run's supervisor, sessions and record, so the next `pnpm josh backlogrun` starts a new one.
-  - Lanes still running are **not** stopped; their count and Issue numbers are printed, and each child finishes or is closed with `pnpm josh lane:close <N>`.
+  - Lanes still running are **not** stopped; their count and Issue numbers are printed, and each child finishes or is closed with `pnpm josh lane:close <N>`. To halt them without discarding anything, `pnpm josh lane:pause --all`.
   - A run typed into a session of your own is owned by it, and `--stop` does not signal it: the owner's pid is printed, the record is kept and the exit code is 1. End it from that session.
   - No Telegram is sent.
 - `--restart` stops what `--stop` stops but keeps the record, so a new supervisor continues the run.
@@ -943,6 +943,35 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 - The event comes first: `run:merge` books the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
 
 **Output / exit codes:** every explanation on stderr; exit 0 once the Issue is closed. A closed issue, no open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the Issue open and the lane in place, exit 1.
+
+### `josh lane:pause` / `josh lane:resume`
+
+<!-- usage: lane:pause -->
+
+Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched.
+
+```bash
+pnpm josh lane:pause 4198
+pnpm josh lane:pause --all   # every open lane
+```
+
+<!-- /usage -->
+
+<!-- usage: lane:resume -->
+
+Let a paused lane child carry on from where it stopped (SIGCONT).
+
+```bash
+pnpm josh lane:resume 4198
+pnpm josh lane:resume --all   # every open lane
+```
+
+<!-- /usage -->
+
+- Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch, Issue and event stream are untouched; the child keeps its memory.
+- `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
+
+**Output / exit codes:** one line per lane, exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
 
 ### `josh rule:value`
 

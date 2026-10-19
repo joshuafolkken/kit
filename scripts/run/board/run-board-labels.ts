@@ -51,6 +51,7 @@ const WORDS = {
 	withdrawn: 'withdrawn',
 	in_progress: 'running',
 	stopped: 'stopped',
+	paused: 'paused',
 	waiting: 'waiting',
 	queued: 'queued',
 	not_before: 'not before',
@@ -124,6 +125,7 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	waiting: '⏳',
 	human: '🙋',
 	stopped: '🛑',
+	paused: '🧊',
 	withdrawn: '🚫',
 }
 

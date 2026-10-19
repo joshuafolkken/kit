@@ -26,13 +26,18 @@ const CHILDREN_OF_FLAG = '-P'
 const PS_COMMAND = '/bin/ps'
 const PARENT_FORMAT = ['-o', 'ppid=', '-p']
 const TERMINATE_SIGNAL = 'SIGTERM'
+const CONTINUE_SIGNAL = 'SIGCONT'
 // `0` addresses the caller's own process group and `1` is init — neither is ever a lane child.
 const LOWEST_CHILD_PID = 2
 
-interface ReapProbes {
+// What collecting a lane's process tree reads — shared with `lane:pause` (`lane-pause.ts`).
+interface TreeProbes {
 	matching: (pattern: string) => Array<number>
 	children_of: (pid: number) => Array<number>
 	parent_of: (pid: number) => number | undefined
+}
+
+interface ReapProbes extends TreeProbes {
 	terminate: (pid: number) => boolean
 }
 
@@ -64,14 +69,24 @@ function parent_of(pid: number): number | undefined {
 	return parse_pids(run_probe(PS_COMMAND, [...PARENT_FORMAT, String(pid)]))[0]
 }
 
-function terminate(pid: number): boolean {
+function send(pid: number, name: NodeJS.Signals): boolean {
 	try {
-		process.kill(pid, TERMINATE_SIGNAL)
+		process.kill(pid, name)
 
 		return true
 	} catch {
 		return false
 	}
+}
+
+// A stopped process (`lane:pause`) holds a SIGTERM it handles pending until it is continued, so the
+// terminate is followed by a SIGCONT; a running process ignores it.
+function terminate(pid: number): boolean {
+	if (!send(pid, TERMINATE_SIGNAL)) return false
+
+	send(pid, CONTINUE_SIGNAL)
+
+	return true
 }
 
 const SYSTEM_PROBES: ReapProbes = {
@@ -81,7 +96,7 @@ const SYSTEM_PROBES: ReapProbes = {
 	terminate,
 }
 
-function ancestry_of(pid: number, probes: ReapProbes): Set<number> {
+function ancestry_of(pid: number, probes: TreeProbes): Set<number> {
 	const ancestry = new Set<number>([pid])
 	let current = probes.parent_of(pid)
 
@@ -95,11 +110,11 @@ function ancestry_of(pid: number, probes: ReapProbes): Set<number> {
 
 // This process and every process above it. The Stop hook reads it to tell whether the session that
 // declared a carry record's `--owner "$PPID"` is the one it runs under.
-function own_ancestry(probes: ReapProbes = SYSTEM_PROBES): Set<number> {
+function own_ancestry(probes: TreeProbes = SYSTEM_PROBES): Set<number> {
 	return ancestry_of(process.pid, probes)
 }
 
-function tree_of(roots: ReadonlyArray<number>, probes: ReapProbes): Array<number> {
+function tree_of(roots: ReadonlyArray<number>, probes: TreeProbes): Array<number> {
 	const tree: Array<number> = []
 	const pending = [...roots]
 	let next = pending.shift()
@@ -116,10 +131,20 @@ function tree_of(roots: ReadonlyArray<number>, probes: ReapProbes): Array<number
 	return tree
 }
 
-function roots_of(issue: string, own: Set<number>, probes: ReapProbes): Array<number> {
+function roots_of(issue: string, own: Set<number>, probes: TreeProbes): Array<number> {
 	const pattern = lane_child_invocation.process_pattern(issue)
 
 	return probes.matching(pattern).filter((pid) => !own.has(pid))
+}
+
+/**
+ * Every process of the lane child for `issue` and everything under it, collected before anything is
+ * signalled, the caller's own ancestry left out.
+ */
+function lane_tree(issue: string, probes: TreeProbes = SYSTEM_PROBES): Array<number> {
+	const own = own_ancestry(probes)
+
+	return tree_of(roots_of(issue, own, probes), probes).filter((pid) => !own.has(pid))
 }
 
 /**
@@ -128,23 +153,22 @@ function roots_of(issue: string, own: Set<number>, probes: ReapProbes): Array<nu
  * that had already ended by itself.
  */
 function reap_child(issue: string, probes: ReapProbes = SYSTEM_PROBES): Array<number> {
-	const own = own_ancestry(probes)
-	const doomed = tree_of(roots_of(issue, own, probes), probes).filter((pid) => !own.has(pid))
-
-	return doomed.filter((pid) => probes.terminate(pid))
+	return lane_tree(issue, probes).filter((pid) => probes.terminate(pid))
 }
 
 /** Whether a lane child for `issue` is running, by the same match `reap_child` would end. */
-function is_child_running(issue: string, probes: ReapProbes = SYSTEM_PROBES): boolean {
+function is_child_running(issue: string, probes: TreeProbes = SYSTEM_PROBES): boolean {
 	return roots_of(issue, own_ancestry(probes), probes).length > 0
 }
 
 const lane_reap = {
 	is_child_running,
+	lane_tree,
 	own_ancestry,
 	parse_pids,
 	reap_child,
+	SYSTEM_PROBES,
 }
 
-export type { ReapProbes }
+export type { ReapProbes, TreeProbes }
 export { lane_reap }

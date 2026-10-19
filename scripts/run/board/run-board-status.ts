@@ -20,7 +20,15 @@ import { run_board_setup, type SetupRead } from './run-board-setup'
 // answers when read closed.
 
 type ItemState =
-	'running' | 'merged' | 'parked' | 'done' | 'waiting' | 'human' | 'stopped' | 'withdrawn'
+	| 'running'
+	| 'paused'
+	| 'merged'
+	| 'parked'
+	| 'done'
+	| 'waiting'
+	| 'human'
+	| 'stopped'
+	| 'withdrawn'
 
 interface ItemStatus {
 	state: ItemState
@@ -80,7 +88,7 @@ const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
 const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTART])
 // What the GitHub read may still settle: a running child, and one whose lane has no child left in it —
 // a child that merged and then died is drawn merged, not stopped.
-const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'stopped'])
+const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'paused', 'stopped'])
 // A parked child waits on a person, who may close its issue after the park; only a closed read settles
 // it again, so one still open stays parked whatever its labels say (joshuafolkken/kit#3958).
 const PARKED_STATE: ItemState = 'parked'

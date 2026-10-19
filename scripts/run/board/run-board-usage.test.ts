@@ -38,7 +38,17 @@ function mark(at_ms: number, rows: ReadonlyArray<Row>): UsageMark {
 	const folded = new Set(parented.filter((row) => row[5] === undefined).map((row) => row[0]))
 	const names = new Map(rows.map((row) => [row[0], 'node']))
 
-	return { at_ms, processes, lanes, names, parents, folded, cores: CORES, total_bytes: TOTAL_BYTES }
+	return {
+		at_ms,
+		processes,
+		lanes,
+		names,
+		parents,
+		folded,
+		paused: new Map(),
+		cores: CORES,
+		total_bytes: TOTAL_BYTES,
+	}
 }
 
 function lanes_of(before: UsageMark | undefined, after: UsageMark): LaneUsages {

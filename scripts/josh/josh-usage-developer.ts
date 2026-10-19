@@ -7,6 +7,11 @@ import type { CommandUsage } from './josh-command-types'
 // The unseeded ports are read from `ports/index.js`, their one definition (#818).
 const UNSEEDED: Readonly<Record<string, string | undefined>> = {}
 const NARROWED = { arguments: 'scripts/thing.ts', note: 'narrow by the given files instead' }
+// `lane:pause` and `lane:resume` take the same target.
+const LANE_SIGNAL_EXAMPLES = [
+	{ arguments: '4198' },
+	{ arguments: '--all', note: 'every open lane' },
+]
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEVELOPER_USAGE: Readonly<Record<string, CommandUsage>> = {
@@ -186,6 +191,8 @@ const DEVELOPER_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ arguments: '--reset', note: 'clear the override; JOSH_LANE_LIMIT applies again' },
 		],
 	},
+	'lane:pause': { examples: LANE_SIGNAL_EXAMPLES },
+	'lane:resume': { examples: LANE_SIGNAL_EXAMPLES },
 	'lane:withdraw': {
 		examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 	},
