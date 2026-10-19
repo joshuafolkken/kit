@@ -7,9 +7,10 @@ import { run_board_usage_listing } from './run-board-usage-listing'
 
 const { executable_of, listings_of } = run_board_usage_listing
 const KB = 1024
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS'
-const CODE =
-	'/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS'
+// Rooted where nothing exists, so the cut falls to the text rather than to an installed app.
+const ABSENT = '/kit-absent-4246'
+const CHROME = `${ABSENT}/Applications/Google Chrome.app/Contents/MacOS`
+const CODE = `${ABSENT}/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS`
 
 describe('run_board_usage_listing.executable_of', () => {
 	it('reads a relative command as its first word', () => {
@@ -22,8 +23,15 @@ describe('run_board_usage_listing.executable_of', () => {
 		expect(executable_of('/usr/local/bin/node script.js')).toBe('/usr/local/bin/node')
 	})
 
+	it('ends an existing absolute executable before a relative path argument', () => {
+		const node = process.execPath
+
+		expect(executable_of(`${node} scripts/foo.ts`)).toBe(node)
+		expect(executable_of(`${node} scripts/foo.ts lib/bar`)).toBe(node)
+	})
+
 	it('keeps the spaces of a directory the path runs through', () => {
-		const support = '/Users/me/Library/Application Support/app/bin/helper'
+		const support = `${ABSENT}/Library/Application Support/app/bin/helper`
 
 		expect(executable_of(`${support} serve`)).toBe(support)
 	})

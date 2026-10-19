@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { ProcessRow, ProcessTable } from '#scripts/lane/lane-process-table'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
@@ -7,8 +8,10 @@ import type { StatedProcess } from './run-board-paused'
 // count reads, so no second `ps` is spawned (joshuafolkken/kit#4246).
 // **The executable is cut from the command line**, since the snapshot carries the full line rather than
 // `comm`: an absolute path runs on across its spaces — `Application Support/`, `Visual Studio Code.app/`
-// — up to the last word holding a directory before the first option or absolute path. A file name
-// with a space of its own is cut at it, which leaves the bundle that names an app whole.
+// — to the shortest run of words that names an existing file, since the text alone cannot tell a spaced
+// directory from a relative argument (`node scripts/foo.ts`). When no run exists, the path ends at the
+// last word holding a directory before the first option or absolute path; a file name with a space of
+// its own is then cut at it, which leaves the bundle that names an app whole.
 
 const DAY_SEPARATOR = '-'
 const CLOCK_SEPARATOR = ':'
@@ -42,6 +45,14 @@ function opens_argument(word: string): boolean {
 	return word.startsWith(path.sep) || word.startsWith(OPTION_PREFIX)
 }
 
+// The absolute path's possible ends, shortest first: the first word, then each later word joined on.
+function path_candidates(first: string, words: Array<string>): Array<string> {
+	return [
+		first,
+		...words.map((_, index) => [first, ...words.slice(0, index + 1)].join(WORD_SEPARATOR)),
+	]
+}
+
 /** The executable a command line runs: its first word, or an absolute path with its spaces kept. */
 function executable_of(command: string): string {
 	const [first = '', ...rest] = command.split(WORD_SEPARATOR)
@@ -50,6 +61,10 @@ function executable_of(command: string): string {
 
 	const opened = rest.findIndex((word) => opens_argument(word))
 	const words = opened === -1 ? rest : rest.slice(0, opened)
+	const existing = path_candidates(first, words).find((candidate) => existsSync(candidate))
+
+	if (existing !== undefined) return existing
+
 	const last_directory = words.findLastIndex((word) => word.includes(path.sep))
 
 	return [first, ...words.slice(0, last_directory + 1)].join(WORD_SEPARATOR)
