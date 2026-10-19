@@ -75,7 +75,7 @@ Req N: ...
 
 ### Constants
 
-- Magic numbers/strings except `0`, `1`, `-1` → `UPPER_SNAKE_CASE` constants after the imports
+- Magic numbers → `no-magic-numbers` (`eslint/rules/typescript.js`), off in tests (`eslint/base.js`)
 
 ### Imports
 
@@ -129,8 +129,8 @@ When tests leave persistent state behind:
 ## 3. Checklist
 
 - [ ] `pnpm josh gate`, then E2E per § 6: the CI E2E job where a pull request is open; where there is none, run `pnpm josh test:e2e` with `CI` unset (DEV: `pnpm run dev` on the port `playwright.config.ts` derives from `PORT_SEED`); no `pnpm build` or `CI=true` unless asked. Playwright cannot run here → report the E2E result missing and the gate not closed
-- [ ] `read_lints`: 0 errors on touched files; Playwright: no failures and no flaky runs
-- [ ] § 2 holds: constants, `.js` imports, `data-testid` selectors, correct `async`/`await`, no `any`, ≤10 statements, `String()` / no needless `?? ''`
+- [ ] `pnpm josh lint:related`: 0 errors on touched files; Playwright: no failures and no flaky runs
+- [ ] § 2 holds: `.js` imports, `data-testid` selectors, correct `async`/`await`, no `any`, ≤10 statements, `String()` / no needless `?? ''`
 
 ---
 

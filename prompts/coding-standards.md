@@ -1,6 +1,6 @@
 # コーディング指針 — lint では表せない書き方
 
-関数の構文・品質上限・型安全・早期 return・マジックナンバーは `CLAUDE.md` → "Critical Conventions (non-standard — always apply)"、lint・型検査の実行は `CLAUDE.md` → "Code Change Rules"（`pnpm josh gate`、実装中は `pnpm josh lint:related` / `pnpm josh test:related`）に従う。ここにない命名の細目（クラスのプロパティ・メソッドの `snake_case` など）は `eslint/rules/naming-convention.js` が持つ。**`function` 構文（アロー関数を使わない）と早期 return の 1 行形式は lint が検査しない**ので、書き手とレビューが確かめる。
+関数の構文・品質上限・型安全・早期 return・マジックナンバーは `CLAUDE.md` → "Critical Conventions (non-standard — always apply)"、lint・型検査の実行は `CLAUDE.md` → "Code Change Rules"（`pnpm josh gate`、実装中は `pnpm josh lint:related` / `pnpm josh test:related`）に従う。ここにない命名の細目（クラスのプロパティ・メソッドの `snake_case` など）は `eslint/rules/naming-convention.js` が持つ。`function` 構文と早期 return の 1 行形式は lint が検査する。
 
 ## Conventions
 

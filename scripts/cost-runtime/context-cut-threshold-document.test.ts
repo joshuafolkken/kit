@@ -30,12 +30,21 @@ const CONTEXT_CUT_DOCS = [
 	'.claude/skills/workflow-commands/backlogrun-progress.md',
 	'.claude/skills/workflow-commands/entry-sequence.md',
 	'.claude/skills/workflow-commands/pre-gate-cut.md',
+	'.claude/skills/workflow-commands/retrospective.md',
 	'docs/josh-commands-run.md',
 ]
+
+// joshuafolkken/kit#4155: `retrospective.md` stated a 150,000-token session budget beside the
+// 135,000 everywhere else — the Bash output cap's figure, not the threshold's.
+const STALE_SESSION_BUDGET = '150,000-token'
 
 describe.each(CONTEXT_CUT_DOCS)('%s states the context-cut threshold', (path) => {
 	it('contains the current threshold value', () => {
 		expect(contains_threshold(read_repo_file(path))).toBe(true)
+	})
+
+	it('does not state the stale session budget', () => {
+		expect(read_repo_file(path)).not.toContain(STALE_SESSION_BUDGET)
 	})
 })
 
