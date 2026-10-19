@@ -158,13 +158,14 @@ function is_parked(row: BoardRow): boolean {
 	return row.status?.state === 'parked'
 }
 
-// A row's finish-time column where the frame draws one, padded to one width on every row so every tail
-// starts in one column. A plan row the run has not touched draws blanks in its place; a parked row
-// draws none, and its reason follows its time.
+// A row's finish-time column where the frame draws one, padded to one width so every finish time and
+// what follows it start in one column. A plan row the run has not touched draws blanks in its place; a
+// parked row draws none, and its reason follows its time; a row that ends on a tail draws none either,
+// its tail following its time (joshuafolkken/kit#4217).
 function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
 	const { slot_width } = frame
 
-	if (slot_width === 0 || is_parked(row)) return undefined
+	if (slot_width === 0 || is_parked(row) || run_board_render_tail.is_tailed(row)) return undefined
 	if (row.status === undefined) return ' '.repeat(slot_width)
 
 	return cell_of(slot_text(row, frame.header), slot_width)

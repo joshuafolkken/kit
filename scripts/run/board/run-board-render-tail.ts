@@ -176,10 +176,15 @@ function activity_part(row: BoardRow, header: BoardHeader): string {
 	return `${GAP}${run_board_header.aged(text, age)}`
 }
 
+// Whether a row ends on a tail: a running row only.
+function is_tailed(row: BoardRow): boolean {
+	return row.state === 'running'
+}
+
 // A running row's end, nothing for any other; a followup row's checks follow its phase part as a part
 // of their own.
 function tail_of(row: BoardRow, header: BoardHeader): Array<string | undefined> {
-	if (row.state !== 'running') return []
+	if (!is_tailed(row)) return []
 
 	const checks = checks_of(row, header)
 	const phase = phase_part(row, header)
@@ -195,6 +200,6 @@ function activity_icon(row: BoardRow, header: BoardHeader): string | undefined {
 	return drawn_activity(row, header)?.icon
 }
 
-const run_board_render_tail = { activity_icon, checks_of, phase_icon, tail_of }
+const run_board_render_tail = { activity_icon, checks_of, is_tailed, phase_icon, tail_of }
 
 export { run_board_render_tail }
