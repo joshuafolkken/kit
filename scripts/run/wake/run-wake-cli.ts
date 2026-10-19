@@ -317,8 +317,12 @@ function start_for_launch(git_directory: string, provider: AgentProvider): Launc
 	return launch_supervisor(context_of(git_directory), undefined, resolved.profile)
 }
 
-function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
-	const result = launch_supervisor(context, interval, run_wake_session.scheduler_profile())
+function spawn_supervisor(
+	context: WakeContext,
+	interval: string | undefined,
+	profile: AgentProfile | undefined,
+): number {
+	const result = launch_supervisor(context, interval, profile)
 
 	if (result.kind === 'failed') {
 		console.error(`Could not start the supervisor: ${result.note}`)
@@ -346,7 +350,15 @@ function start(context: WakeContext, interval: string | undefined): number {
 		return report(RUNNING_VERDICT)
 	}
 
-	return spawn_supervisor(context, interval)
+	return spawn_supervisor(context, interval, run_wake_session.scheduler_profile())
+}
+
+// The supervisor `josh backlogrun --restart` starts in place of the one it stopped, on that one's
+// profile, so the shell the restart was typed in does not choose it; the shell's where none was running.
+function restart_supervisor(git_directory: string, profile: AgentProfile | undefined): number {
+	const chosen = profile ?? run_wake_session.scheduler_profile()
+
+	return spawn_supervisor(context_of(git_directory), undefined, chosen)
 }
 
 // **The loop removes its record on the way out, and only its own.** A loop that ended after its record
@@ -452,6 +464,7 @@ const run_wake_cli = {
 	finish,
 	ports_for,
 	record_failure,
+	restart_supervisor,
 	run,
 	start_for_launch,
 	stop_body,

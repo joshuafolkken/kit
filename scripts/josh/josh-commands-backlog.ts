@@ -11,10 +11,10 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 	backlogrun: {
 		script: 'scripts/backlog/backlogrun-cli.ts',
 		description:
-			'Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it',
+			'Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record',
 		category: 'AI tools',
 		reference: [
-			'[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop',
+			'[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop | --restart',
 			'developer',
 			['files', 'network', 'processes'],
 		],

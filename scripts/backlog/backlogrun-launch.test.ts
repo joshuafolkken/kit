@@ -259,3 +259,20 @@ describe('backlogrun_launch.stop_parent', () => {
 		expect(stamp_file.remove_stamp).toHaveBeenCalledOnce()
 	})
 })
+
+// joshuafolkken/kit#4154: `--restart` reads the launched parent before it stops anything.
+describe('backlogrun_launch.running_parent', () => {
+	it('names the live launched parent without signalling it or forgetting the launch', () => {
+		stage_stop(true)
+
+		expect(backlogrun_launch.running_parent(GIT_DIRECTORY)).toBe(LAUNCHED_PID)
+		expect(process.kill).not.toHaveBeenCalled()
+		expect(stamp_file.remove_stamp).not.toHaveBeenCalled()
+	})
+
+	it('names nobody once the launched pid is another process', () => {
+		stage_stop(false)
+
+		expect(backlogrun_launch.running_parent(GIT_DIRECTORY)).toBeUndefined()
+	})
+})

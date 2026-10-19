@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { lane_background } from '#scripts/rules/lane-background'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -60,7 +61,11 @@ async function stop_stdout(transcript_path: string): Promise<string> {
 
 beforeAll(async () => {
 	mkdirSync(lane, { recursive: true })
-	await execa('git', ['init', '--quiet'], { cwd: lane })
+	// Run from the pre-push hook, the inherited `GIT_DIR` would point `git init` at this checkout.
+	await execa('git', ['init', '--quiet'], {
+		cwd: lane,
+		env: git_location_environment.location_free_environment(),
+	})
 	await build_hooks()
 }, BUILD_TIMEOUT_MS)
 

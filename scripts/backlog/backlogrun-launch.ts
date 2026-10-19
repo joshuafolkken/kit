@@ -180,6 +180,11 @@ function signal_parent(pid: number): void {
 	}
 }
 
+// The pid `stop_parent` would stop, read without stopping it.
+function running_parent(git_directory: string): number | undefined {
+	return live_launch(git_directory)?.pid
+}
+
 // Stops the parent this launcher started and forgets its launch — the pid stopped, `undefined` where
 // no launched parent was live. **Only the process the record names, and only while it is still that
 // process**: a session a person typed `backlogrun` into has no launch record and is never signalled.
@@ -244,6 +249,7 @@ const backlogrun_launch = {
 	chosen_environment,
 	is_running,
 	pending_launch,
+	running_parent,
 	start,
 	started_for,
 	stop_parent,

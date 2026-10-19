@@ -1,0 +1,9 @@
+{
+	"reason": "New josh backlogrun --restart subcommand (#4154): the restart module and its tests, the pre-stop owner check and the stopped supervisor's profile carried to the new one, the standing-row option in backlogrun-steps.md, and its rationale entry",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 140,
+		"ai_cost.on_demand_bytes": 3,
+		"prose.long_paragraphs": 1
+	}
+}

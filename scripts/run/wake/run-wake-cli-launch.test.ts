@@ -164,6 +164,24 @@ describe('run_wake_cli.start_for_launch', () => {
 	})
 })
 
+// joshuafolkken/kit#4154: `josh backlogrun --restart` starts the new supervisor on the stopped one's
+// profile, not on the shell the restart was typed in.
+describe('run_wake_cli.restart_supervisor', () => {
+	it('starts it on the stopped supervisor’s profile', () => {
+		const codex = { ...PROFILE, provider: 'openai' } as const
+
+		expect(run_wake_cli.restart_supervisor(REPOSITORY, codex)).toBe(0)
+		expect(spawned_environment()).toMatchObject({ [CODEX_KEY]: SUPERVISOR_SESSION })
+	})
+
+	it('starts it on the shell’s profile where no supervisor was running', () => {
+		vi.stubEnv(CODEX_KEY, '')
+
+		expect(run_wake_cli.restart_supervisor(REPOSITORY, undefined)).toBe(0)
+		expect(spawned.mock.calls).toHaveLength(1)
+	})
+})
+
 describe('run_wake_await.claim_run beside a launched parent', () => {
 	it('claims first, so the parent’s --start answers running rather than starting another', async () => {
 		const verdicts: Array<number> = []
