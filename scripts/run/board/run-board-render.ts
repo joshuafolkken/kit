@@ -308,15 +308,16 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	)
 }
 
-// The rows above the findings: the run's own, then the ones waiting on a person's decision — a child
-// parked on one and an untouched plan row alike (joshuafolkken/kit#4099).
+// The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
+// ones waiting on a person's decision — a child parked on one and an untouched plan row alike
+// (joshuafolkken/kit#4099).
 function active_sections(
 	layout: BoardLayout,
 	frame: RowFrame,
 	done: ReadonlyArray<BoardRow>,
 ): Array<PlanSection> {
 	const people = run_board_layout.people_of(layout)
-	const lead = layout.active.filter((row) => !done.includes(row) && !people.includes(row))
+	const lead = run_board_layout.lane_rows(layout, [...done, ...people])
 	const decision = `${STATE_ICONS.human} ${WORDS.decision}`
 	const cells = lane_cells_of(frame.header, lead)
 	const lanes = lanes_section(
@@ -364,7 +365,7 @@ function legend_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<
 
 	if (layout === undefined) return []
 
-	const rows = run_board_layout.rows_of(layout)
+	const rows = run_board_layout.drawn_rows(layout)
 	const leads = new Set(rows.map((row) => state_icon(row, header)))
 	const drawn = run_board_render_drawn.drawn_of(header, rows, leads)
 

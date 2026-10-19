@@ -29,6 +29,8 @@ type ItemState =
 	| 'human'
 	| 'stopped'
 	| 'withdrawn'
+	// An earlier run's lane that still holds a place under the limit — drawn, never counted as this run's.
+	| 'earlier'
 
 interface ItemStatus {
 	state: ItemState

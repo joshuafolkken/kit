@@ -16,7 +16,7 @@ import { run_board_released } from './run-board-released'
 import { run_board_render, type FrameBounds } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
-import { run_board_status, type RunActivity } from './run-board-status'
+import { run_board_status, type ItemStatus, type RunActivity } from './run-board-status'
 import { run_board_thanks } from './run-board-thanks'
 import { run_board_usage_board } from './run-board-usage-board'
 
@@ -130,19 +130,28 @@ function room_of(state: BoardState, local: LocalRead): RoomRead {
 	}
 }
 
-// The plan laid under its statuses, each waiting row saying why it waits.
-function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
-	const { closed } = state
+// The run's statuses over the plan, a child read closed settled and one a person released left out.
+function planned_statuses(
+	state: BoardState,
+	plan: BoardPlan,
+	local: LocalRead,
+): ReadonlyMap<number, ItemStatus> {
 	const read = {
 		open_numbers: plan.context.open_numbers,
 		read_ms: state.fetched_ms,
-		closed,
+		closed: state.closed,
 		labels: plan.labels,
 	}
-	const statuses = run_board_released.without_released(
+
+	return run_board_released.without_released(
 		run_board_status.settle_closed(statuses_for(state, plan, local), read),
 		read,
 	)
+}
+
+// The plan laid under its statuses, each waiting row saying why it waits.
+function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
+	const statuses = planned_statuses(state, plan, local)
 	const reason_of = run_board_reason.reader({
 		plan,
 		statuses,
@@ -151,7 +160,12 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		is_stopped: activity_here(local).is_stopped,
 	})
 
-	return run_board_layout.layout_of(with_closed(plan, closed), statuses, reason_of)
+	return run_board_layout.layout_of(
+		with_closed(plan, state.closed),
+		statuses,
+		reason_of,
+		local.earlier_occupied,
+	)
 }
 
 // The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
@@ -164,6 +178,7 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 
 	return run_board_layout.local_layout_of(
 		run_board_paused.paused_over(statuses, state.usage?.paused),
+		local.earlier_occupied,
 	)
 }
 
