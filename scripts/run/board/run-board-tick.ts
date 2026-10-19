@@ -1,5 +1,5 @@
 import { lane_await } from '#scripts/lane/lane-await'
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -31,9 +31,9 @@ import { run_board_usage_board } from './run-board-usage-board'
 // and its gauges are the differences between consecutive samples.
 
 const { REDRAW_MS, SPOT } = run_board_spin
-const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
+const MACHINE_SAMPLE_MS = MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
-const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
+const LOCAL_READ_MS = LOCAL_READ_SECONDS * MS_PER_SECOND
 const { FRESH_STATE, is_due } = run_board_state
 const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
 const { gather_thanks } = run_board_thanks

@@ -2,6 +2,7 @@
 import { setInterval as every } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
@@ -27,7 +28,6 @@ import { lane_stop_stats } from './lane-stop-stats'
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const MS_PER_SECOND = 1000
 const SAMPLE_VERB = 'sample'
 const STATS_VERB = 'stats'
 const USAGE = [

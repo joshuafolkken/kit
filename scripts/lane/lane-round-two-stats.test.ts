@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_round_two_stats } from './lane-round-two-stats'
@@ -8,7 +9,6 @@ import { lane_stats } from './lane-stats'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
-const MS_PER_MINUTE = 60_000
 const OUTSIDE_MINUTES = 2 * 24 * 60
 
 function decision(verdict: string, code: string, minutes_before = 10): LedgerEntry {

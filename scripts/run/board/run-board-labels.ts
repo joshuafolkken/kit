@@ -1,5 +1,7 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
+import { figure_format } from '#scripts/lib/figure-format'
+import { MS_PER_MINUTE, MS_PER_SECOND, SECONDS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import cli_spinners from 'cli-spinners'
@@ -12,14 +14,9 @@ import type { ItemState } from './run-board-status'
 // heartbeat has run — is degree-minute-second style (`1°15′57″`), so `:` is a time of day alone and
 // the board never reads a length as a moment.
 
-const CLOCK_WIDTH = 2
-const CLOCK_PAD = '0'
-const MS_PER_SECOND = 1000
-const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 // A length's units — hours, minutes and seconds — so a length never shares the clock's `:`.
 const SPAN_UNITS = { hours: '°', minutes: '′', seconds: '″' } as const
-const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE
 // The seconds a length rounded to its minute draws, which `minute_span_of` leaves off.
 const ZERO_SECONDS = `00${SPAN_UNITS.seconds}`
 // Every gauge is this wide — the plan, the machine and a row's phase.
@@ -245,26 +242,7 @@ const GAUGE_SHADES = {
 	red: { rgb: '255;69;58', named: 'red' },
 } as const satisfies Readonly<Record<string, Shade>>
 
-function two_digits(value: number): string {
-	return String(value).padStart(CLOCK_WIDTH, CLOCK_PAD)
-}
-
-// The local wall-clock `HH:MM:SS` of a moment.
-function clock_of(ms: number): string {
-	const date = new Date(ms)
-
-	return [date.getHours(), date.getMinutes(), date.getSeconds()]
-		.map((value) => two_digits(value))
-		.join(':')
-}
-
-// The local wall-clock `HH:MM` of a moment, for one a person reads to the minute — when a run ended, or
-// when a finding was filed.
-function minute_of(ms: number): string {
-	const date = new Date(ms)
-
-	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
-}
+const { two_digits, clock_of, minute_of } = figure_format
 
 // The local `YYYY-MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
 // start.

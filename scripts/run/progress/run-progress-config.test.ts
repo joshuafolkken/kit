@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { run_progress } from './run-progress'
 import { run_progress_config } from './run-progress-config'
@@ -13,7 +14,7 @@ import { run_progress_config } from './run-progress-config'
 // rather than ending an unattended run, and that the guard and the watcher cannot read different
 // answers from different directories of one repository.
 
-const MINUTE = run_progress.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const DEFAULT_MINUTES = 20
 const COMMITTED = 15
 const PERSONAL = 25

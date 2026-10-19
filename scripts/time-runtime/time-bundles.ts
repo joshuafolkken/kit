@@ -1,3 +1,4 @@
+import { figure_format } from '#scripts/lib/figure-format'
 import { time_agent_bundles } from './time-agent-bundles'
 import { time_format } from './time-format'
 import { time_round_trips } from './time-round-trips'
@@ -422,7 +423,7 @@ interface TripPrice {
 }
 
 function recoverable_suffix(totals: BundleTotals, round_trip_count: number): string {
-	const share = time_format.format_share(totals.recoverable_round_trips, round_trip_count)
+	const share = figure_format.format_share(totals.recoverable_round_trips, round_trip_count)
 
 	return `${share} of ${String(round_trip_count)} round trip(s)`
 }

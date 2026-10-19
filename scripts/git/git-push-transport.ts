@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { git_utilities } from './constants'
 import {
@@ -7,8 +8,6 @@ import {
 	TIMEOUT_EXIT_CODE,
 } from './git-execa-error'
 import { git_ssh_keepalive } from './git-ssh-keepalive'
-
-const MS_PER_SECOND = 1000
 
 // The budget for one `git push`, and the reason a push can no longer wait without end.
 // Measured on PR #1244: the commit itself took 0.6 seconds and the push

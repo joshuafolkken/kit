@@ -1,5 +1,6 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { DriveState } from './backlog-drive'
 
 // The `josh backlog:drive` flags — read into a `DriveContext`, and written back as the `resume:` line —
@@ -7,9 +8,7 @@ import type { DriveState } from './backlog-drive'
 // `backlog_drive_cli` re-exports `parse` and `resume_line` under the names they always had, so the move
 // changed no call site and no suite that reads them through `backlog_drive_cli`.
 
-const MS_PER_MINUTE = 60_000
 const LIST_SEPARATOR = ','
-const COUNT_PATTERN = /^\d+$/u
 const USAGE =
 	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
 
@@ -57,7 +56,7 @@ function to_issues(raw: string | undefined): ReadonlyArray<string> | undefined {
 function forwarded_of(values: Values): ReadonlyArray<string> | undefined {
 	const pairs = (['max', 'idle'] as const).filter((name) => values[name] !== undefined)
 
-	if (pairs.some((name) => !COUNT_PATTERN.test(values[name] ?? ''))) return undefined
+	if (pairs.some((name) => cli_flags.to_count(values[name]) === undefined)) return undefined
 
 	return pairs.flatMap((name) => [`--${name}`, values[name] ?? ''])
 }
@@ -68,7 +67,7 @@ function window_of(raw: string | undefined): number | undefined {
 }
 
 function is_valid_window(raw: string | undefined): boolean {
-	return raw === undefined || COUNT_PATTERN.test(raw)
+	return raw === undefined || cli_flags.to_count(raw) !== undefined
 }
 
 function is_valid_single(values: Values): boolean {
@@ -81,7 +80,7 @@ function is_valid_single(values: Values): boolean {
 function owner_of(values: Values | undefined): string | undefined {
 	const owner = values?.owner
 
-	return owner !== undefined && COUNT_PATTERN.test(owner) ? owner : undefined
+	return cli_flags.to_count(owner) === undefined ? undefined : owner
 }
 
 function to_context(values: Values, owner: string): DriveContext | undefined {

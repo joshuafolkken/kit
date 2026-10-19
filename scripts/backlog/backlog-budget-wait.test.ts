@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import { backlog_budget, type BacklogAnswer, type BudgetInput } from './backlog-budget'
 
@@ -5,7 +6,7 @@ import { backlog_budget, type BacklogAnswer, type BudgetInput } from './backlog-
 // time bound a run has, and only a bound a person typed ends a run ahead of it.
 
 const NOW_MS = Date.parse('2026-10-12T03:33:00Z')
-const MINUTE_MS = backlog_budget.MS_PER_MINUTE
+const MINUTE_MS = MS_PER_MINUTE
 const MINUTES_PER_HOUR = 60
 const IDLE_MS = backlog_budget.DEFAULT_IDLE_MS
 const HALF_IDLE_MS = IDLE_MS / 2

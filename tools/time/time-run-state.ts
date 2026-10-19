@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import type { RunWake } from '#scripts/run/wake/run-wake'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
@@ -16,7 +17,6 @@ import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 // record through `run:carry --end`, which removes the file — so a record still sitting here is a run
 // that never completed, and that is what `is_unfinished` reads.
 
-const MS_PER_MINUTE = 60_000
 // The window past which a run with no transcript activity is treated as idle rather than working —
 // the same 30 minutes `run:liveness` uses for its own silent window, so the two agree on "stalled".
 const SILENT_MINUTES = 30

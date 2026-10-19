@@ -1,4 +1,6 @@
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { cli_flags, type PositiveSetting } from '#scripts/lib/cli-flags'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { Verdict } from './eval-judge'
 import type { Scenario } from './eval-scenario'
 
@@ -7,7 +9,6 @@ import type { Scenario } from './eval-scenario'
 // reach any of this while it lived there, which is why the run loop was the one part of the harness
 // with no test at all.
 
-const MS_PER_SECOND = 1000
 // An inconclusive verdict means the session did not produce a measurement, and a retried scenario is
 // announced rather than quietly replaced. One attempt, because a second buys nothing: neither an
 // extra attempt nor a longer wait was measured to recover a single scenario, and two attempts roughly
@@ -60,27 +61,14 @@ const UNREACHABLE_LIMIT = 2
 // watch for is #1001's, an inconclusive scenario whose `?` line names ConnectionRefused.
 const DEFAULT_CONCURRENCY = 5
 const CONCURRENCY_ENV_KEY = 'JOSH_EVAL_CONCURRENCY'
-const CONCURRENCY_PATTERN = /^[1-9]\d*$/u
-
-type ConcurrencyChoice = { kind: 'limit'; limit: number } | { kind: 'problem'; problem: string }
+type ConcurrencyChoice = PositiveSetting
 
 // A misspelled width is refused rather than silently replaced by the default. The number decides how
 // the suite spends its sessions, so a run that quietly ignored `JOSH_EVAL_CONCURRENCY=2` would report
 // a measurement of something the caller did not ask for — and the caller's next act is to compare it
 // against another run.
 function read_concurrency(raw: string | undefined): ConcurrencyChoice {
-	if (raw === undefined || raw.trim() === '') return { kind: 'limit', limit: DEFAULT_CONCURRENCY }
-
-	const trimmed = raw.trim()
-
-	if (!CONCURRENCY_PATTERN.test(trimmed)) {
-		return {
-			kind: 'problem',
-			problem: `${CONCURRENCY_ENV_KEY} must be a positive integer, not "${raw}"`,
-		}
-	}
-
-	return { kind: 'limit', limit: Number(trimmed) }
+	return cli_flags.read_positive_setting(raw, CONCURRENCY_ENV_KEY, DEFAULT_CONCURRENCY)
 }
 
 // The session run, the reporting and the waiting are handed in rather than imported: a test of the

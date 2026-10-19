@@ -34,8 +34,6 @@ const FIRST = 0
 const MIN_PID = 1
 const { MERGE_TOKEN } = run_merge_token
 const PARK_FAILURE_NOTE = `The failed child could not be parked with ${RUN_STALLED_LABEL}; stopping.`
-// The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
-const DIGITS = /^\d+$/u
 // A GitHub `owner/repo` slug: an owner and a repository name around a single slash, each starting with
 // an alphanumeric so neither half can begin with `-`. `epic` and `repo` flow into `pnpm josh`
 // subprocess arguments, so a value shaped like an option (`--foo`, or `--evil/x`) would be read as a
@@ -67,11 +65,10 @@ interface ParsedArguments {
 function to_owner(raw: string | undefined): CarryOwner | undefined {
 	if (raw === undefined) return run_carry.NO_OWNER
 
-	if (!DIGITS.test(raw)) return undefined
+	// The same count shape `run-carry-args.ts` reads an owner pid under.
+	const pid = cli_flags.to_count(raw)
 
-	const pid = Number(raw)
-
-	return pid < MIN_PID ? undefined : run_carry.owner_of(pid)
+	return pid === undefined || pid < MIN_PID ? undefined : run_carry.owner_of(pid)
 }
 
 // The epic form needs a repository (`epic:next --lanes` refuses without one), so an epic named with
@@ -120,7 +117,7 @@ function has_invalid_offer(values: ParsedArguments['values']): boolean {
 function has_invalid_legacy_over(raw: string | undefined): boolean {
 	if (raw === undefined) return false
 
-	return !DIGITS.test(raw) || !Number.isSafeInteger(Number(raw))
+	return cli_flags.to_count(raw) === undefined
 }
 
 function valid_child(parsed: ParsedArguments): string | undefined {

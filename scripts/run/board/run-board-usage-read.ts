@@ -2,7 +2,7 @@ import { cpus, totalmem } from 'node:os'
 import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { lane_registry } from '#scripts/lane/lane-registry'
-import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { run_board_paused, type StatedProcess } from './run-board-paused'
 import type { ProcessReading, UsageMark } from './run-board-usage'
@@ -41,7 +41,6 @@ const DAY_SEPARATOR = '-'
 const CLOCK_SEPARATOR = ':'
 const SECONDS_PER_DAY = 86_400
 const SECONDS_PER_CLOCK_PART = 60
-const MS_PER_SECOND = 1000
 const BYTES_PER_KB = 1024
 // `lsof -F`'s field lines: `p<pid>` opens a process, `n<path>` names its directory.
 const LSOF_PROCESS = /^(?=p)/mu

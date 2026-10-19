@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import string_width from 'string-width'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
@@ -14,7 +14,7 @@ import type { BoardPorts } from './run-board-state'
 
 // A private-use character one column wide, as a spinner frame is, so the frame is fitted the same.
 const SPOT = '\u{E000}'
-const REDRAW_MS = run_progress.MS_PER_SECOND
+const REDRAW_MS = MS_PER_SECOND
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
 // eslint-disable-next-line no-control-regex -- the color escapes a spot keeps are control characters

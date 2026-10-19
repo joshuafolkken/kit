@@ -8,6 +8,7 @@ import { has_parked_label } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state } from '#scripts/issue/issue-state'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_hold } from '#scripts/run/hold/run-hold'
 
 // `josh run:liveness <N>` — whether the delegated unit running child `<N>` is still working, or
@@ -58,8 +59,6 @@ const DEFAULT_SILENT_MINUTES = 30
 // Two samples, a few seconds apart. The gap is what turns "this file has an old timestamp" into
 // "this file is not being written", and five seconds is long enough for a unit mid-turn to append.
 const DEFAULT_GAP_SECONDS = 5
-const MS_PER_MINUTE = 60_000
-const MS_PER_SECOND = 1000
 const OPEN_STATE = 'OPEN'
 const STATE_FIELDS = 'state,labels'
 
@@ -394,8 +393,6 @@ export {
 	ALIVE_VERDICT,
 	DEFAULT_GAP_SECONDS,
 	DEFAULT_SILENT_MINUTES,
-	MS_PER_MINUTE,
-	MS_PER_SECOND,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,

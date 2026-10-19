@@ -44,7 +44,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/ci/composite-actions.ts',
 	'tools/claude/skill-meta.ts',
 	'scripts/claude/workflow-destination.ts',
-	'scripts/cost-runtime/cost-format.ts',
 	'scripts/cost-runtime/transcript-cwd.ts',
 	'scripts/delegation/delegation-cli.ts',
 	'scripts/delegation/fanout-cli.ts',

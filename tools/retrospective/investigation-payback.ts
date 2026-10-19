@@ -1,7 +1,7 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import { cost_usage } from '#scripts/cost-runtime/cost-usage'
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
+import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
 import {
 	time_transcript_line,
@@ -149,12 +149,12 @@ function groups(sessions: ReadonlyArray<SessionTranscript>): {
 }
 
 function tokens(count: number): string {
-	return cost_format.format_tokens(Math.round(count))
+	return figure_format.format_tokens(Math.round(count))
 }
 
 function group_line(name: string, group: PaybackGroup): string {
 	const context = `mean context ${tokens(group.mean_context)}, mean peak ${tokens(group.mean_peak_context)}`
-	const cost = `${String(group.refusals)} refusal(s), guard cost ${cost_format.format_usd(group.guard_usd)}`
+	const cost = `${String(group.refusals)} refusal(s), guard cost ${figure_format.format_usd(group.guard_usd)}`
 
 	return `  ${name}: ${String(group.sessions)} session(s), ${context}, ${cost}`
 }

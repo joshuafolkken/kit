@@ -2,6 +2,7 @@ import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { status_icons } from '#scripts/lib/status-icons'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { NOT_USED_MARKER, NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_log } from './gate-log'
@@ -147,7 +148,6 @@ function should_print_body(result: GateStepResult, is_verbose: boolean): boolean
 // Seconds to one decimal, which is the resolution the answer is read at: the question a gate's
 // timing answers is "which of the four is the long pole", and no check is ever separated from
 // another by less than a tenth of a second.
-const MS_PER_SECOND = 1000
 const SECONDS_DECIMALS = 1
 
 function format_seconds(elapsed_ms: number): string {

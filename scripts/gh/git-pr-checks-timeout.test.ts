@@ -1,4 +1,5 @@
 import { ci_yml_fixture, type WorkflowJob } from '#scripts/ci/ci-yml-fixture'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import {
 	CHECK_WAIT_INTERVAL_MS,
@@ -11,7 +12,6 @@ import {
 // round number. Deriving it here keeps the two from drifting — raising a declared budget past this
 // wait fails the suite instead of silently re-creating the timeout the default exists to prevent.
 const SECONDS_PER_MINUTE = 60
-const MS_PER_SECOND = 1000
 // Runner queueing happens before a job's own clock starts, so no declared cap covers it.
 const QUEUE_HEADROOM_SECONDS = 300
 // Every workflow this package distributes that produces a check the wait blocks on. The SonarQube
