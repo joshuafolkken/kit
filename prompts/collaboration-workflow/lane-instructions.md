@@ -5,8 +5,6 @@ headless のレーン子とレビューセッションは、`CLAUDE.md` を読�
 - 起動プロンプトがそのまま明示の起動。応答する人はいないので、確認は求めない。
 - `CLAUDE.md` を開き直さない。ここに無い規則は、対話セッションでしか効かない。
 
-<!-- include: CLAUDE.md → "Project" -->
-
 ## Communication
 
 <!-- include: CLAUDE.md → "Fix root causes, not symptoms." -->
