@@ -92,6 +92,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh latest` · `josh u` | — | developer | files, network, processes | Update dependencies, run security audit, then update pnpm |
 | `josh latest:corepack` · `josh lc` | — | developer | files, network | Update pnpm on the current major while preserving the integrity pin |
 | `josh latest:guard` | — | automation | files | Refuse josh latest inside a lane (the update stamp is keyed to the project root) |
+| `josh latest:if-required` | — | automation | files, network, processes | Run josh latest only when latest:scope answers required, stashing around it |
 | `josh latest:scope` | `[--record] [--json]` | automation | files | Say whether this run has to update dependencies, from when josh latest last finished (--record notes a run) |
 | `josh latest:update` · `josh lu` | — | developer | files, network | Update all dependencies to latest |
 | `josh lockfile:policy` · **kit only** | — | automation | network | Verify the lockfile against pnpm's supply-chain policy (minimumReleaseAge) when it or the policy moved from the merge-base |

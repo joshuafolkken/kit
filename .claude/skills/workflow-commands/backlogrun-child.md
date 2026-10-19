@@ -93,14 +93,13 @@ creates the epic. Errors stop the run; warnings are read and passed. Fixing a fi
 
 ## `josh latest` runs once per session, not once per child
 
-Ask once, the first time the loop hands back a child number, before implementing it:
+Run once, the first time the loop hands back a child number, before implementing it:
 
 ```bash
-pnpm josh latest:scope   # → required | skip ; the reason on stderr
-pnpm josh stash:push "backlogrun: josh latest #<N>"        # `clean` when nothing changed — never conditional on the answer
+pnpm josh stash:push "backlogrun: ms #<N>"   # `clean` when nothing changed
 pnpm josh ms
-pnpm josh latest         # on `required` only
-pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only after `stashed` above
+pnpm josh stash:pop "backlogrun: ms #<N>"    # only after `stashed` above
+pnpm josh latest:if-required                 # stash → josh latest → pop; nothing on `skip`
 ```
 
 On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed

@@ -844,11 +844,21 @@ pnpm josh latest:scope --json     # the verdict and the reason as JSON
 
 <!-- /usage -->
 
-The update itself — [`josh latest`](josh-commands.md#josh-latest) — is a command you type.
-
-Read it with `$(pnpm josh latest:scope)`. A completion record younger than **12 hours** (`JOSH_LATEST_MAX_AGE_HOURS`) answers `skip`.
+A completion record younger than **12 hours** (`JOSH_LATEST_MAX_AGE_HOURS`) answers `skip`.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh latest:scope` in detail".
+
+### `josh latest:if-required`
+
+<!-- usage: latest:if-required -->
+
+Run josh latest only when latest:scope answers required, stashing around it.
+
+```bash
+pnpm josh latest:if-required   # stash, update, pop on required
+```
+
+<!-- /usage -->
 
 ### `josh latest:guard`
 
