@@ -1,9 +1,5 @@
 # Claude Code Instructions
 
-## Project
-
-Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS · Drizzle · better-auth · Paraglide · MCP
-
 ## Communication
 
 - **Answer opinion-seeking questions from a neutral standpoint.** A leading question is not a cue to agree — recommend the option you genuinely judge best.
