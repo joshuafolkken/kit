@@ -204,7 +204,6 @@ const run_board_machine = {
 	MEMORY_RED,
 	MEMORY_YELLOW,
 	PERCENT_WIDTH,
-	PRESSURE_WARNING,
 	SWAP_RED_MB_PER_S,
 	SWAP_YELLOW_MB_PER_S,
 	gauges_of,
