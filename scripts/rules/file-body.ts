@@ -184,6 +184,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command((command: string) => carries_a_file_body(command)),
 	reason: FILE_BODY_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'No file body on the shell',
+		topic: '`file-edits.md`',
+		fires:
+			'a heredoc write to an existing file, a writing `node -e` / interpreter heredoc, or `perl -0pi -e`. Every occurrence',
+		quiet: 'a new file, a read-only heredoc, or a short `sed -i`',
+	},
 }
 
 const file_body = {

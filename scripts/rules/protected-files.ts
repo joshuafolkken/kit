@@ -150,6 +150,13 @@ const ROW = {
 	decide: (): boolean => true,
 	// The opening the reason carried before it was cut to the action and the next command.
 	former_reasons: ['⛔ protected file: `.env` holds the Telegram bot token'],
+	about: {
+		title: 'Protected file',
+		topic: '`operating-rules.md`',
+		fires:
+			'a `Read` of `.env`, or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence',
+		quiet: "kit itself, or the user's `~/.claude/settings.json`",
+	},
 }
 
 const protected_files = { ROW, is_protected_file_call }

@@ -61,6 +61,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_index_mutation),
 	reason: INDEX_MUTATION_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Index mutation',
+		topic: '`operating-rules.md`',
+		fires:
+			'`git add` / `commit` / `reset` / `rm` / `mv` / `restore --staged` in any spelling. Every occurrence',
+		quiet: '`pnpm josh git` — the approved commit flow',
+	},
 }
 
 const index_guard = { INDEX_MUTATION_REASON, ROW, is_index_mutation }

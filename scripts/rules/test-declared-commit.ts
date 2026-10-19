@@ -38,7 +38,17 @@ const REASON =
 // The enumeration row itself, so `delivered-rules.ts` spreads one entry rather than restating the
 // trigger and reason it already single-sources here. Once per run (the default delivery) for the
 // reason above.
-const ROW = { id: 'test-declared', is_trigger: is_untested_commit, reason: REASON }
+const ROW = {
+	id: 'test-declared',
+	is_trigger: is_untested_commit,
+	reason: REASON,
+	about: {
+		title: 'Test declaration',
+		topic: '`CLAUDE.md` → Code Change Rules',
+		fires: '`pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`',
+		quiet: '`exempt` (non-runtime only) or `satisfied` (tests included)',
+	},
+}
 
 const test_declared_commit = { REASON, ROW }
 

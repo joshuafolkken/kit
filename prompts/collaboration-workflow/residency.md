@@ -24,7 +24,7 @@
 
 > **その規則が効き始める瞬間を、1 件のツール呼び出しとして名指しできるか。**
 
-できるなら、規則本文を常駐から出し、配送ガードの行に `scripts/rules/rule-registry.ts` の項目を添え、[`rule-delivery.md`](./rule-delivery.md) が指す `pnpm josh rule:list` の一覧に載せる（joshuafolkken/kit#1524）。**規則ごとのトリガ行は常駐に残さない** — `CLAUDE.md` には一覧への導線 1 行だけを置く。フックが走らないセッションは一覧を自己点検に使う（`principles.md` →「Claude Code 以外のエージェントでの読み替え」）。
+できるなら、規則本文を常駐から出し、配送ガードの行に説明（`about`）を持たせ、[`rule-delivery.md`](./rule-delivery.md) が指す `pnpm josh rule:list` の一覧に載せる（joshuafolkken/kit#1524）。**規則ごとのトリガ行は常駐に残さない** — `CLAUDE.md` には一覧への導線 1 行だけを置く。フックが走らないセッションは一覧を自己点検に使う（`principles.md` →「Claude Code 以外のエージェントでの読み替え」）。
 
 ### 第 2 問 — skill なしのターンでも効く必要があるか
 

@@ -1,24 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_list } from './rule-list'
-import { rule_registry } from './rule-registry'
+import { stop_rule_rows, type StopRule } from './stop-rule-rows'
 
 // joshuafolkken/kit#3399: the delivered-rule list is rendered from `delivered-rules.ts`, so a row added
-// there reaches the list without a document edit. These pin both directions of the id join.
+// there reaches the list without a document edit. joshuafolkken/kit#4184: each row carries its own
+// description, so the type rules out a row without one; these pin that every field is filled.
 
-describe('rule_list.render — every delivered row is listed', () => {
+const ROWS: ReadonlyArray<StopRule> = [...delivered_rules.MEASURED_RULES, ...stop_rule_rows.ROWS]
+
+describe('rule_list.render — every row is listed', () => {
 	const rendered = rule_list.render()
 
-	it.each(delivered_rules.MEASURED_RULES.map((rule) => rule.id))('lists %s', (id) => {
+	it.each(ROWS.map((rule) => rule.id))('lists %s', (id) => {
 		expect(rendered).toContain(`\`${id}\``)
-	})
-
-	it.each(rule_registry.STOP_ROWS.map((rule) => rule.id))('lists the stop row %s', (id) => {
-		expect(rendered).toContain(`\`${id}\``)
-	})
-
-	it('has a registry entry for every row', () => {
-		expect(rendered).not.toContain(rule_list.MISSING)
 	})
 
 	it('prints why each row is not automated, with none missing', () => {
@@ -33,8 +28,16 @@ describe('rule_list.render — every delivered row is listed', () => {
 	})
 })
 
-describe('rule_list.orphans — no registry entry outlives its row', () => {
-	it('finds none', () => {
-		expect(rule_list.orphans()).toStrictEqual([])
+describe('the rule table — one filled row per id', () => {
+	it.each(ROWS.map((rule) => [rule.id, rule] as const))('%s fills every field', (_id, rule) => {
+		const { title, topic, fires, quiet } = rule.about
+
+		for (const field of [title, topic, fires, quiet]) expect(field.trim()).not.toBe('')
+	})
+
+	it('has no duplicate id', () => {
+		const ids = ROWS.map((rule) => rule.id)
+
+		expect(new Set(ids).size).toBe(ids.length)
 	})
 })

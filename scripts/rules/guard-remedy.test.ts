@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { guard_remedy } from './guard-remedy'
-import { rule_registry } from './rule-registry'
+import { stop_rule_rows } from './stop-rule-rows'
 
 // The guards composed outside the enumeration, which the table classes all the same.
 const COMPOSED_GUARDS = ['duplicate-read', 'run-watcher', 'parent-cut', 'issue-watch']
@@ -11,7 +11,7 @@ const FOREGROUND_REWRITE = 'lane-background'
 const ORACLE_ROW = 'oracle-consulted:pkg:scout'
 
 const GUARD_IDS = [...delivered_rules.MEASURED_RULES.map((rule) => rule.id), ...COMPOSED_GUARDS]
-const STOP_IDS = rule_registry.STOP_ROWS.map((rule) => rule.id)
+const STOP_IDS = stop_rule_rows.ROWS.map((rule) => rule.id)
 const FAMILIES = new Set([...GUARD_IDS, ...STOP_IDS].map((id) => id.split(':', 1)[0]))
 const REWRITE_IDS = new Set(
 	delivered_rules.DELIVERED_RULES.filter((rule) => rule.rewrite !== undefined).map(

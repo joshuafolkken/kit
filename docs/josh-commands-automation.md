@@ -208,7 +208,7 @@ pnpm josh rule:list   # print every trigger-delivered rule
 
 <!-- /usage -->
 
-The rules `rule-delivery.md` points at: one item per guard row of `scripts/rules/delivered-rules.ts`, then the `Stop` hook's rows. The prose comes from `scripts/rules/rule-registry.ts`, joined by `id`; a row with no entry prints as missing and fails `rule-list.test.ts`. A hookless agent reads it as its checklist.
+The rules `rule-delivery.md` points at: one item per guard row of `scripts/rules/delivered-rules.ts`, then the `Stop` hook's rows. The prose is each row's own `about` field (the `Stop` rows' in `scripts/rules/stop-rule-rows.ts`), so a row cannot be added without it. A hookless agent reads it as its checklist.
 
 ### `josh pretool:guard`
 
