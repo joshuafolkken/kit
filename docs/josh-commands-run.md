@@ -309,7 +309,7 @@ pnpm josh run:prep <N>
 
 <!-- /usage -->
 
-Its `=== ship preconditions ===` section asks, ahead of the ship, the two refusals `josh ship` would otherwise meet at the run's largest context: a missing release classification in the Issue body, and a runtime change whose open PR body has no `## 実機証跡` section. `met` when neither applies; `unmet` lists each, so they are fixed before the gate. The ship and `followup` still refuse on both.
+Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `josh ship` would otherwise meet late: a missing release classification, a runtime change whose PR body lacks `## 実機証跡`, and an unmapped acceptance criterion — printed with the `未記入` rows to copy. `met` when none applies; `unmet` lists each to fix before the gate. The ship and `followup` refuse on all.
 
 ### `josh run:entry`
 
