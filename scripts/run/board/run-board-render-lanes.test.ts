@@ -39,7 +39,7 @@ function bracketed(text: string): string {
 describe('run_board_render_lanes.number_text', () => {
 	it('pads the number and draws the running row its figures, each right-aligned in its column', () => {
 		expect(number_text(row_of(LANE, 'running'), CELLS, plain)).toBe(
-			'42           1.8     0.7G      0.6G',
+			'42          18.0      0.7       0.6',
 		)
 	})
 

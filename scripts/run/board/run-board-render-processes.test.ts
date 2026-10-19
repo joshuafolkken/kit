@@ -107,14 +107,14 @@ describe('run_board_render_processes.processes_part off a terminal', () => {
 
 		expect(part?.head[1]?.startsWith(RULE_START)).toBe(true)
 		expect(texts(part)).toStrictEqual([
-			'  ▶ backlogrun 4.9/4.0G/3.3G · 🌐 apps 3.1/18.8G/12.4G: Google Chrome ×2 0.2/8.9G/8.1G, ' +
-				'WindowServer 0.5/0.6G/0.2G · 👻 leftover 0.4/0.3G/0.1G: node ×2 0.4/0.3G/0.1G',
+			'  ▶ backlogrun 49.0%/4.0G/3.3G · 🌐 apps 31.0%/18.8G/12.4G: Google Chrome ×2 2.0%/8.9G/8.1G, ' +
+				'WindowServer 5.0%/0.6G/0.2G · 👻 leftover 4.0%/0.3G/0.1G: node ×2 4.0%/0.3G/0.1G',
 		])
 	})
 
 	it('draws a group with no parts as its figures alone', () => {
 		expect(texts(part_of({}))).toStrictEqual([
-			'  ▶ backlogrun 0.0/0.0G/0.0G · 🌐 apps 0.0/0.0G/0.0G',
+			'  ▶ backlogrun 0.0%/0.0G/0.0G · 🌐 apps 0.0%/0.0G/0.0G',
 		])
 	})
 })

@@ -3,9 +3,9 @@
 // processes are read is `run-board-usage-read.ts`'s, how they are grouped `run-board-process-groups.ts`'s;
 // this file turns two readings into each process's figures and each lane's sum.
 //
-// CPU is a process's CPU time between two samples in cores — the header's 💪 scale over the machine's
-// cores, never Activity Monitor's one-core-is-100% — and memory what `top`'s MEM and CMPRS count, so
-// the figures read the same in the lane rows and the processes section.
+// CPU is a process's CPU time between two samples in cores, drawn as a percentage of the machine's
+// cores — the header's 💪 unit, never Activity Monitor's one-core-is-100% — and memory what `top`'s
+// MEM and CMPRS count, so the figures read the same in the lane rows and the processes section.
 
 interface ProcessReading {
 	cpu_ms: number

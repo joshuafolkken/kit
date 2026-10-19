@@ -10,7 +10,8 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 // joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row, on no row where the pane is too narrow for it on any.
 
 const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_board_render_fixture
-const USAGE = /🔨 1 +2\.0 +1\.6G +0\.2G +Issue 1/u
+const USAGE = /🔨 1 +20\.0 +1\.6 +0\.2 +Issue 1/u
+const FIGURE = /\d\.\d/u
 const WIDE = 200
 const NARROW = 80
 // Wide enough for a running row up to its usage, not for its tail and what it waits on after it too.
@@ -79,7 +80,7 @@ describe('run_board_render.render usage cells', () => {
 	it('blanks the cells on a row that is not running, so every title starts in one column', () => {
 		const lines = lines_of(board())
 
-		expect(row_line(lines, 'Issue 2')).not.toContain('1.0G')
+		expect(row_line(lines, 'Issue 2')).not.toMatch(FIGURE)
 		expect(column_of(row_line(lines, 'Issue 2'), 'Issue 2')).toBe(
 			column_of(row_line(lines, 'Issue 1'), 'Issue 1'),
 		)
@@ -198,7 +199,7 @@ describe('run_board_render.render usage column on every row', () => {
 		const lines = mixed_lines()
 
 		expect(row_line(lines, 'Issue 3')).toMatch(/^ {2}✅ 3 {4}Issue 3/u)
-		expect(row_line(lines, 'Issue 5')).not.toContain('G ')
+		expect(row_line(lines, 'Issue 5')).not.toMatch(FIGURE)
 	})
 
 	it('draws both in a chat as on a screen', () => {
