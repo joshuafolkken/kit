@@ -538,7 +538,8 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in de
 Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends.
 
 ```bash
-pnpm josh run:report   # print the report; the same text josh notify sends
+pnpm josh run:report             # print the report; the same text josh notify sends
+pnpm josh run:report --handoff   # print the backlogrun hand-off report and send it as the confirmation
 ```
 
 <!-- /usage -->

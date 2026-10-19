@@ -8,7 +8,7 @@ Only these load `.env` themselves, and only when it exists:
 - **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`, and `josh issue:already-done`, which releases the hold.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:pause`, `josh lane:resume`, `josh lane:sample`, `josh lane:stats`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:if-required`, `josh latest:update`, `josh port`, `josh session:lang`.
-- **Reports** — `josh report:template` and `josh report:lint`, whose labels follow `JOSH_SESSION_LANG`.
+- **Reports** — `josh report:template`, `josh report:lint` and `josh run:report`, whose labels follow `JOSH_SESSION_LANG`; `run:report --handoff` also sends its report to Telegram.
 - **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
 - `playwright.config.ts`.
 
