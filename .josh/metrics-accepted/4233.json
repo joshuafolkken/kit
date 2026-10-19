@@ -1,0 +1,7 @@
+{
+	"reason": "lane:restart refuses a lane with unresolved conflicts before stopping its child (#4233): one guard, one refusal kind and its text",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}
