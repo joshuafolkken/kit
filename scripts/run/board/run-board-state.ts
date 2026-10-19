@@ -84,7 +84,7 @@ interface BoardState {
 	sampled_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
-	// The last process reading, which the next one is compared against, and the lanes' and the 🖥
+	// The last process reading, which the next one is compared against, and the lanes' and the 💻
 	// section's usage drawn from them.
 	usage: UsageMark | undefined
 	usages: BoardUsage | undefined

@@ -157,6 +157,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		statuses,
 		events: local.events,
 		...room_of(state, local),
+		carry: local.carry,
 		is_stopped: activity_here(local).is_stopped,
 	})
 

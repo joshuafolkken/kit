@@ -138,7 +138,7 @@ describe('run_board_tick.tick reads', () => {
 
 		expect(second.plan?.context.titles.get(1)).toBe('kept')
 		expect(second.fetched_ms).toBe(START)
-		expect(frames.at(-1)).toContain(`⚠ ${WORDS.plan}`)
+		expect(frames.at(-1)).toContain(`❗ ${WORDS.plan}`)
 	})
 
 	it('draws no run and reads nothing from GitHub when no run has started', async () => {

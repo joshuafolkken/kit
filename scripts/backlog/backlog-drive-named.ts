@@ -23,18 +23,36 @@ function is_declared(carry: RunCarry, issue: string): boolean {
 // An issue `run:add` put in that is already in flight holds nothing up: it was
 // asked for on its own, so the declared item behind it — an epic whose children fill the free lanes —
 // is offered beside it. A declared issue in flight still holds the ones declared after it.
-function is_held(carry: RunCarry, state: DriveState, issue: number): boolean {
-	return !state.in_flight.includes(String(issue)) || is_declared(carry, String(issue))
+function is_held(carry: RunCarry, in_flight: ReadonlyArray<string>, issue: number): boolean {
+	return !in_flight.includes(String(issue)) || is_declared(carry, String(issue))
 }
 
-function next_of(carry: RunCarry, state: DriveState): number | undefined {
+function next_of(carry: RunCarry, in_flight: ReadonlyArray<string>): number | undefined {
 	const remaining = run_carry.remaining_of(carry) ?? []
 
-	return remaining.find((issue) => is_held(carry, state, issue)) ?? remaining[FIRST]
+	return remaining.find((issue) => is_held(carry, in_flight, issue)) ?? remaining[FIRST]
+}
+
+// The declared issue `issue` starts after while the declared order holds it: the one declared just
+// before it, once `next_of` — what `offer` waits on — is in flight ahead of it. `run:board` names it on
+// the queued row; an issue `run:add` put in is held by nothing.
+function held_after(
+	carry: RunCarry,
+	in_flight: ReadonlyArray<string>,
+	issue: number,
+): number | undefined {
+	const next = next_of(carry, in_flight)
+	if (next === undefined || !in_flight.includes(String(next))) return undefined
+	const declared = (run_carry.remaining_of(carry) ?? []).filter((number) =>
+		is_declared(carry, String(number)),
+	)
+	const index = declared.indexOf(issue)
+
+	return index > declared.indexOf(next) ? declared[index - 1] : undefined
 }
 
 function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead | undefined {
-	const next = next_of(carry, state)
+	const next = next_of(carry, state.in_flight)
 
 	if (next !== undefined) {
 		const issue = String(next)
@@ -129,4 +147,4 @@ async function reconcile(
 	}
 }
 
-export const backlog_drive_named = { offer, mark_done, reconcile }
+export const backlog_drive_named = { offer, held_after, mark_done, reconcile }
