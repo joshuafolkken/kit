@@ -40,20 +40,26 @@ describe('run_merge_ship.cause_of', () => {
 	it('names the ship-stop line written since the last launch', () => {
 		const cause = run_merge_ship.cause_of(ending(FAILED), [LAUNCH, STOP, OTHER_STOP], CHILD)
 
-		expect(cause).toBe(`its detached ship stopped and was not fixed: ${STOP_TEXT}.`)
+		expect(cause).toStrictEqual({
+			short: 'review failed',
+			why: `its detached ship stopped and was not fixed: ${STOP_TEXT}.`,
+		})
 	})
 
 	it('reads an abnormal ending the same way — a stop the relaunched session left unfixed', () => {
-		expect(run_merge_ship.cause_of(ending(ABNORMAL), [LAUNCH, STOP], CHILD)).toContain(STOP_TEXT)
+		const cause = run_merge_ship.cause_of(ending(ABNORMAL), [LAUNCH, STOP], CHILD)
+
+		expect(cause?.why).toContain(STOP_TEXT)
 	})
 
 	it('never blames a stop from before the newest launch', () => {
 		const earlier = event(0, run_event_stream.EVENT_KIND.SHIP_STOP, OLD_STOP_TEXT)
 		const cause = run_merge_ship.cause_of(ending(ABNORMAL), [earlier, LAUNCH], CHILD)
 
-		expect(cause).toBe(
-			`its detached ship ended abnormal ${NO_STOP} — pnpm josh ship --log ${CHILD}.`,
-		)
+		expect(cause).toStrictEqual({
+			short: 'ship abnormal',
+			why: `its detached ship ended abnormal ${NO_STOP} — pnpm josh ship --log ${CHILD}.`,
+		})
 	})
 
 	it('never blames a ship from an earlier dispatch of the child', () => {
@@ -64,16 +70,29 @@ describe('run_merge_ship.cause_of', () => {
 		).toBeUndefined()
 	})
 
-	it('ignores a stop that names another issue sharing the number prefix', () => {
-		expect(run_merge_ship.cause_of(ending(FAILED), [LAUNCH, OTHER_STOP], CHILD)).toContain(NO_STOP)
-	})
-
 	it.each(['running', 'success'] as const)('leaves a %s ship to the generic cause', (result) => {
 		expect(run_merge_ship.cause_of(ending(result), [LAUNCH, STOP], CHILD)).toBeUndefined()
 	})
 
 	it('leaves a child that handed nothing to a ship to the generic cause', () => {
 		expect(run_merge_ship.cause_of(undefined, [LAUNCH, STOP], CHILD)).toBeUndefined()
+	})
+})
+
+describe('run_merge_ship.cause_of — the stop it names', () => {
+	it('ignores a stop that names another issue sharing the number prefix', () => {
+		const cause = run_merge_ship.cause_of(ending(FAILED), [LAUNCH, OTHER_STOP], CHILD)
+
+		expect(cause?.why).toContain(NO_STOP)
+	})
+
+	// joshuafolkken/kit#4215: the short cause the park event and the board row carry.
+	it('names a stop text in no known shape a ship stop', () => {
+		const odd = event(2, run_event_stream.EVENT_KIND.SHIP_STOP, '#12 stopped')
+
+		expect(run_merge_ship.cause_of(ending(FAILED), [LAUNCH, odd], CHILD)?.short).toBe(
+			'ship stopped',
+		)
 	})
 })
 
@@ -108,7 +127,7 @@ describe('run_merge_ship.cause', () => {
 
 		vi.spyOn(run_event_stream, 'read_events').mockReturnValue([LAUNCH, STOP])
 
-		expect(run_merge_ship.cause(CHILD, WORKTREE)).toContain(STOP_TEXT)
+		expect(run_merge_ship.cause(CHILD, WORKTREE)?.why).toContain(STOP_TEXT)
 		expect(repository).toHaveBeenCalledWith(WORKTREE)
 		expect(record).toHaveBeenCalledWith(REPOSITORY, CHILD)
 	})

@@ -5,6 +5,7 @@ import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 
 // How many times a stopped ship relaunches its lane child before the issue goes to a person. A child
 // that keeps stopping — the same red check, a finding it cannot close — would otherwise relaunch
@@ -41,7 +42,7 @@ function park_comment(issue: string, reason: string): string {
 	return [
 		`Parked by the \`josh ship\` supervisor: the ship stopped at \`${reason}\` after ${String(MAX_SHIP_STOP_RELAUNCHES)} relaunches of the lane child since its dispatch.`,
 		'',
-		`Read the stop with \`pnpm josh ship --log ${issue}\`, then fix the cause and remove \`${RUN_STALLED_LABEL}\` to offer it again.`,
+		`Read the stop with \`pnpm josh ship --log ${issue}\`, then ${run_stalled.next_step(issue)}.`,
 	].join('\n')
 }
 
@@ -54,7 +55,7 @@ async function park(issue: string, reason: string): Promise<boolean> {
 
 	const cite = issue_cite.plain(issue)
 
-	await run_event_stream_emit.emit(PARK, `${cite} parked (${PARK_CAUSE})`)
+	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, PARK_CAUSE))
 	await telegram_notify.warn({
 		issue_title: `Ship stop cap reached ${cite}`,
 		body: `The lane child stopped at ${reason} more than ${String(MAX_SHIP_STOP_RELAUNCHES)} times since its dispatch, so it was not relaunched and the issue is parked.`,

@@ -21,6 +21,17 @@ describe('run_board_ending_reason.reason_of', () => {
 		).toStrictEqual(['ship-stop cap', 'waiting on #7', undefined])
 	})
 
+	// joshuafolkken/kit#4215: a stalled row names its cause and the action that resumes it.
+	it('reads a run:stalled park as its cause and the resume action', () => {
+		expect(
+			reasons(KIND.PARK, [
+				'#13 parked (run:stalled: review failed)',
+				'#13 parked (run:stalled: ship-stop cap)',
+				'#13 parked (run:stalled)',
+			]),
+		).toStrictEqual(['review failed → fullrun #13', 'ship-stop cap → fullrun #13', 'fullrun #13'])
+	})
+
 	it('reads a withdraw reason after its prefix, and none where it gives none', () => {
 		expect(
 			reasons(KIND.WITHDRAW, [
