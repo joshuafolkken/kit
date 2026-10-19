@@ -67,12 +67,17 @@ function lane(issue: string): LaneInfo {
 	}
 }
 
-function arrange(read: CarryRead, ended: EndedRun | undefined): void {
-	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+// The run's records, each keyed on the repository and read off the machine: never a real one from a test.
+function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_carry, 'read_carry').mockReturnValue(read)
 	vi.spyOn(run_carry_ended, 'read_ended').mockReturnValue(ended)
-	// The launch record is keyed on the repository and read off the machine: never a real one from a test.
 	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
+	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
+}
+
+function arrange(read: CarryRead, ended: EndedRun | undefined): void {
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+	arrange_records(read, ended)
 	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, AFTER])
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane('3432')])
 	// The limit is read off the environment and a live run's override: never a real one from a test.
@@ -91,6 +96,8 @@ afterEach(() => {
 
 // The one lane against the limit, as `lane:limit` counts it.
 const LANE_ROOM = { free_lanes: FREE_LANES, lane_limit: LANE_LIMIT, occupied_count: 1 }
+// An ended run with no record to resume from and no wake stamp: no session and no process named.
+const UNRECORDED = { resume: undefined, roots: { supervisor: undefined, parent: undefined } }
 
 describe('run_board_read.read_local', () => {
 	it('reads the ended run with its end, its scope and only the events inside it', async () => {
@@ -102,7 +109,7 @@ describe('run_board_read.read_local', () => {
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
 			lanes: ['3432'],
-			resume: undefined,
+			...UNRECORDED,
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			idle_lanes: [],

@@ -4,7 +4,7 @@ import type { MachineSample } from '#scripts/gate/machine-capacity'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { TerminalSize } from './run-board-fit'
-import type { BoardForm } from './run-board-header'
+import type { BoardForm, BoardUsage } from './run-board-header'
 import { run_board_idle, type IdleSince } from './run-board-idle'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
@@ -12,7 +12,7 @@ import type { MachineGauges, MachineMark } from './run-board-machine'
 import type { LocalRead } from './run-board-read'
 import type { Spot } from './run-board-spin'
 import type { Thanks } from './run-board-thanks-csv'
-import type { LaneUsages, UsageMark } from './run-board-usage'
+import type { UsageMark } from './run-board-usage'
 
 // What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
@@ -84,10 +84,10 @@ interface BoardState {
 	sampled_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
-	// The last process reading, which the next one is compared against, and each lane's usage drawn from
-	// them.
+	// The last process reading, which the next one is compared against, and the lanes' and the 🖥
+	// section's usage drawn from them.
 	usage: UsageMark | undefined
-	usages: LaneUsages | undefined
+	usages: BoardUsage | undefined
 	budget_waits: ReadonlyArray<BudgetWait>
 	// The reviewers drawn above the legend, the read of them in flight, and when it was last launched.
 	thanks: Thanks

@@ -17,7 +17,7 @@ import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type RunActivity } from './run-board-status'
 import { run_board_thanks } from './run-board-thanks'
-import { run_board_usage } from './run-board-usage'
+import { run_board_usage_board } from './run-board-usage-board'
 
 // One `run:board` redraw. **Three speeds**: the frame is redrawn once a second, on the second, so
 // every elapsed time moves by one, its spinners turned between redraws by `run-board-spin.ts`; the
@@ -63,17 +63,6 @@ async function reread(state: BoardState, ports: BoardPorts, pace: Pace): Promise
 	return await read_at(read, ports, ports.now())
 }
 
-// Each lane's usage, read on the machine's second; a reading that failed draws no column.
-async function read_usages(
-	state: BoardState,
-	ports: BoardPorts,
-): Promise<Pick<BoardState, 'usage' | 'usages'>> {
-	const usage = await ports.read_usage(state.usage)
-	const usages = usage === undefined ? undefined : run_board_usage.usage_of(state.usage, usage)
-
-	return { usage, usages }
-}
-
 // The sample is timed when it is taken, not when the tick began: a plan read between the two would put
 // its seconds on the wrong side of the rate's interval. It is due by the tick's clock, so a sample
 // taken a few milliseconds into its tick does not slip to the redraw after the second.
@@ -84,7 +73,7 @@ async function resample(state: BoardState, ports: BoardPorts, now_ms: number): P
 	const machine = { sample: await ports.read_machine(), at_ms }
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
 	const budget_waits = ports.read_waits?.() ?? []
-	const usages = await read_usages(state, ports)
+	const usages = await run_board_usage_board.read_usages(state, ports)
 
 	return { ...state, ...usages, machine, gauges, budget_waits, sampled_ms: now_ms }
 }

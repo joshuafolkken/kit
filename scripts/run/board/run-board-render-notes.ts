@@ -1,8 +1,10 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import type { NotesPart } from './run-board-fit'
 import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
+import { run_board_render_section } from './run-board-render-section'
 
 // The findings section of `run:board`, under the 🙋 decision rows, and the part of the legend that
 // names its symbols. A finding is read to the minute, and the legend names only the kinds the section
@@ -147,6 +149,15 @@ function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody
 	return { lines, hidden: items.length - lines.length }
 }
 
+// The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
+// many more there are, so the section never pushes the plan off the screen.
+function notes_part(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesPart {
+	const body = note_lines(notes, view)
+	const label = view.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
+
+	return { head: run_board_render_section.heading_lines(label), ...body }
+}
+
 function same(reference: string): string {
 	return reference
 }
@@ -171,6 +182,6 @@ function notes_legend(
 	return [`${NOTES_ICON} ${WORDS.notes}`, ...kinds]
 }
 
-const run_board_render_notes = { NOTE_LIMIT, note_lines, notes_legend }
+const run_board_render_notes = { NOTE_LIMIT, notes_legend, notes_part }
 
 export { run_board_render_notes, type NotesView }

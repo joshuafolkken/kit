@@ -198,6 +198,7 @@ function line_of(gauges: MachineGauges | undefined, width = 0): string | undefin
 }
 
 const run_board_machine = {
+	CPU_RED,
 	CPU_YELLOW,
 	GAP,
 	MEMORY_RED,

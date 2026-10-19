@@ -52,11 +52,18 @@ interface NotesPart {
 	hidden: number
 }
 
+// A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once.
+interface DetailPart {
+	head: ReadonlyArray<string>
+	lines: ReadonlyArray<{ text: string; is_detail: boolean }>
+}
+
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around
-// the notes: `plan` above them, `below` under them.
+// the notes: `plan` above them, `below` under them; `processes` between the plan and the notes.
 interface FrameParts {
 	above: ReadonlyArray<string>
 	plan: ReadonlyArray<PlanSection>
+	processes?: DetailPart | undefined
 	notes: NotesPart
 	below?: ReadonlyArray<PlanSection> | undefined
 	// The reviewers thanked, drawn right above the legend; none where nobody is.
@@ -65,18 +72,27 @@ interface FrameParts {
 	footer: ReadonlyArray<string>
 }
 
-// One thing that gives way: a part as a whole, one note (the oldest shown), or one issue row.
-type Yielder = 'thanks' | 'footer' | 'legend' | 'note' | PlanLine
+// One thing that gives way: a part as a whole, the processes' details, one note (the oldest shown),
+// or one issue row.
+type Yielder = 'thanks' | 'footer' | 'legend' | 'details' | 'note' | PlanLine
 
 interface Cut {
 	thanks: boolean
 	footer: boolean
 	legend: boolean
+	details: boolean
 	notes: number
 	rows: ReadonlySet<PlanLine>
 }
 
-const NO_CUT: Cut = { thanks: false, footer: false, legend: false, notes: 0, rows: new Set() }
+const NO_CUT: Cut = {
+	thanks: false,
+	footer: false,
+	legend: false,
+	details: false,
+	notes: 0,
+	rows: new Set(),
+}
 
 // The columns a line takes on screen: its color escapes take none, an emoji two.
 function width_of(line: string): number {
@@ -150,14 +166,23 @@ function sections_lines(
 	return sections.flatMap((section) => section_lines(section, cut))
 }
 
+// The processes under their heading, the groups alone once their details are cut.
+function detail_lines(part: DetailPart | undefined, is_cut: boolean): Array<string> {
+	if (part === undefined) return []
+
+	const kept = part.lines.filter((line) => !is_cut || !line.is_detail)
+
+	return [...part.head, ...kept.map((line) => line.text)]
+}
+
 // The plan's sections around the notes, its cut rows counted on one line after its last drawn section —
-// under `below` while any of it is drawn, else above the notes, never under the notes' own `more` — and
-// under a blank when no section is left above it.
+// under `below` while any of it is drawn, else above the processes and the notes, never under the
+// notes' own `more` — and under a blank when no section is left above it.
 function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	const below = parts.below ?? []
 	const [plan, notes, under] = [
 		sections_lines(parts.plan, cut.rows),
-		notes_lines(parts.notes, cut.notes),
+		[...detail_lines(parts.processes, cut.details), ...notes_lines(parts.notes, cut.notes)],
 		sections_lines(below, cut.rows),
 	]
 	const more = more_lines(unfolded([...parts.plan, ...below], cut.rows))
@@ -225,7 +250,7 @@ function rows_yielding(sections: ReadonlyArray<PlanSection>): Array<PlanLine> {
 }
 
 // Everything that gives way, in the order it does: the rows drawn under the notes before them, the
-// rows above them after the thanks.
+// processes' details before the notes, the rows above them after the thanks.
 function order_of(parts: FrameParts): Array<Yielder> {
 	const notes = parts.notes.lines.map((): Yielder => 'note')
 
@@ -233,6 +258,7 @@ function order_of(parts: FrameParts): Array<Yielder> {
 		'footer',
 		'legend',
 		...rows_yielding(parts.below ?? []),
+		'details',
 		...notes,
 		'thanks',
 		...rows_yielding(parts.plan),
@@ -251,6 +277,7 @@ function cut_of(order: ReadonlyArray<Yielder>, count: number): Cut {
 		thanks: gone.includes('thanks'),
 		footer: gone.includes('footer'),
 		legend: gone.includes('legend'),
+		details: gone.includes('details'),
 		notes: gone.filter((item) => item === 'note').length,
 		rows: new Set(gone.filter((item) => is_line(item))),
 	}
@@ -290,4 +317,13 @@ function fit(parts: FrameParts, size: TerminalSize): Array<string> {
 const run_board_fit = { fit, height_of, whole, width_of }
 
 export { run_board_fit }
-export type { FrameParts, NotesPart, PlanLine, PlanSection, RowYield, TerminalSize, YieldStage }
+export type {
+	DetailPart,
+	FrameParts,
+	NotesPart,
+	PlanLine,
+	PlanSection,
+	RowYield,
+	TerminalSize,
+	YieldStage,
+}

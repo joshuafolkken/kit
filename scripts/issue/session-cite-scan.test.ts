@@ -70,6 +70,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The run board's frame, which a person watches in a terminal or on Telegram; `run:board --chat`
 	// answers with it inside one code block, where nothing is linked.
 	['run/board/run-board-now.ts', 1],
+	['run/board/run-board-process-groups.ts', 1],
 	['run/board/run-board-render-notes.ts', 1],
 	['run/cut/run-cut-cli.ts', 2],
 	['run/cut/run-cut-report.ts', 1],

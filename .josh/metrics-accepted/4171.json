@@ -1,0 +1,7 @@
+{
+	"reason": "Review fix: lane rows with usage cells narrow their title so the head stays on one line (#3769), plus its test",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 644
+	}
+}
