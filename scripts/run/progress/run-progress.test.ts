@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_progress, type Observations } from './run-progress'
@@ -6,7 +7,7 @@ import { run_progress, type Observations } from './run-progress'
 // joshuafolkken/kit#1520. The two properties that make this a progress report rather than a timer:
 // it fires on silence measured from the last report, and the line carries observations that move.
 
-const MINUTE = run_progress.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const NOW = 10 * 60 * MINUTE
 const DAY = 24 * 60 * MINUTE
 const IN_PROGRESS = 'in-progress'

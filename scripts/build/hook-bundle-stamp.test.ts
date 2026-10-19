@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { hook_bundle_stamp, type HookSources } from './hook-bundle-stamp'
 
@@ -124,7 +125,6 @@ describe('is_fresh against the recorded build', () => {
 // would not survive the round trip. The settled one is long past; the current second is still inside
 // the timestamp granularity window.
 const SETTLED_TIME = new Date('2026-01-01T00:00:00Z')
-const MS_PER_SECOND = 1000
 
 function current_second(): Date {
 	return new Date(Math.floor(Date.now() / MS_PER_SECOND) * MS_PER_SECOND)

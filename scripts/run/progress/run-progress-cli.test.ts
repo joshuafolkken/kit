@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // joshuafolkken/kit#1520. The command's surface: the interval is configurable and disable-able, a
 // real report is recorded with `--mark`, and a repository with nothing in flight is told apart from
@@ -48,7 +49,6 @@ const { gh_spawn } = await import('#scripts/gh/gh-spawn')
 const { lane_child_marker } = await import('#scripts/lane/lane-child-marker')
 const { run_progress_read } = await import('./run-progress-read')
 const { run_progress_clock } = await import('./run-progress-clock')
-const { run_progress } = await import('./run-progress')
 const { run_progress_cli } = await import('./run-progress-cli')
 
 const repo_name = vi.mocked(gh_spawn.get_repo_name_with_owner_within)
@@ -68,7 +68,7 @@ const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-cli-'))
 const STAMP = path.join(TEMPORARY, 'stamp.json')
 const LIFE_STAMP = path.join(TEMPORARY, 'life.json')
 const TRANSCRIPT = path.join(TEMPORARY, 'unit.jsonl')
-const MINUTE = run_progress.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const HOUR = 3_600_000
 const IN_PROGRESS = 'in-progress'
 const SPAWN_FAILURE = 'spawn git EAGAIN'

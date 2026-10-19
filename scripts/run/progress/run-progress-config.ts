@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { z } from 'zod'
 import { run_progress } from './run-progress'
 
@@ -55,7 +56,7 @@ function read_package_minutes(start: string): number | undefined {
 }
 
 function to_ms(minutes: number | undefined): number | undefined {
-	return minutes === undefined ? undefined : minutes * run_progress.MS_PER_MINUTE
+	return minutes === undefined ? undefined : minutes * MS_PER_MINUTE
 }
 
 /**

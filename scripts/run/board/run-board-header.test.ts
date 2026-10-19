@@ -1,5 +1,5 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -24,7 +24,7 @@ const NOW_BLANK = ''
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const STALE_BEAT = '💓 40′00″'
 const EMPTY_BAR = '─'.repeat(10)
-const MINUTE = backlog_budget.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }

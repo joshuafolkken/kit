@@ -1,5 +1,5 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -18,7 +18,7 @@ const SPINNER = '⠋'
 const { STAGE } = run_event_setup
 const OPENING = run_event_setup.opening_lane('278')
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
-const STALE_MS = 40 * backlog_budget.MS_PER_MINUTE
+const STALE_MS = 40 * MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
 // The third line's blank under the run's mark and name, then the gap before its words.
 const NOW_INDENT = ' '.repeat('▶ backlogrun'.length + 2)
@@ -156,7 +156,7 @@ describe('run_board_header.header_lines beside the stage', () => {
 	})
 
 	it('writes the hours once the stage has stood for one', () => {
-		const hour = 60 * backlog_budget.MS_PER_MINUTE
+		const hour = 60 * MS_PER_MINUTE
 		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, hour + STAGE_AGE_MS))
 
 		expect(now_of(board)).toBe('⠋  1°02′31″  🤔 waiting on judgment — 1 waiting')

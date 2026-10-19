@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { hook_launch } from '#scripts/init/hook-launch'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { HOOK_PROCESS_TIMEOUT_MS, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { security_audit_provision_logic } from '#scripts/security/security-audit-provision-logic'
 import { describe, expect, it } from 'vitest'
 import {
@@ -41,7 +41,6 @@ const STOP_GUARD_HOOK_COMMAND = hook_launch.hook_launch_command('stop-guard')
 // restart each carry a second route behind the daemon that is tried when it fails to start.
 const FORMATTER_RUNS = 5
 const STARTUP_ALLOWANCE_SECONDS = 10
-const MS_PER_SECOND = 1000
 const MINIMUM_HOOK_TIMEOUT_SECONDS =
 	(HOOK_PROCESS_TIMEOUT_MS / MS_PER_SECOND) * FORMATTER_RUNS + STARTUP_ALLOWANCE_SECONDS
 // The guard starts no formatter, so its budget only has to cover one script start and a

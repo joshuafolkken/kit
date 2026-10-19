@@ -1,6 +1,6 @@
 import { styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import type { BudgetWait } from '#scripts/gate/core-wait'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
@@ -40,7 +40,7 @@ const { GAP, PERCENT_WIDTH } = run_board_machine
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
 const STALE_MINUTES = 15
-const STALE_MS = STALE_MINUTES * backlog_budget.MS_PER_MINUTE
+const STALE_MS = STALE_MINUTES * MS_PER_MINUTE
 const ALARM_FACTOR = 2
 const ALARM_MS = STALE_MS * ALARM_FACTOR
 const RUN_NAME = 'backlogrun'

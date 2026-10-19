@@ -1,6 +1,6 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { session_cite } from '#scripts/issue/session-cite'
+import { figure_format } from '#scripts/lib/figure-format'
 import { cost_run_issues, type IssueTotals } from './cost-run-issues'
 import type { RunNode } from './cost-run-nodes'
 import { cost_run_roles, type RoleTotals, type SessionRow } from './cost-run-roles'
@@ -18,14 +18,9 @@ const FAILURE_EXIT_CODE = 1
 const OK_EXIT_CODE = 0
 const JSON_INDENT = 2
 const NOT_MEASURED = 'not measured'
-const MS_PER_MINUTE = 60_000
-const MINUTE_DIGITS = 1
 const ROLE_PAD = 8
 const ISSUE_PAD = 6
-
-function format_minutes(ms: number): string {
-	return `${(ms / MS_PER_MINUTE).toFixed(MINUTE_DIGITS)} min`
-}
+const { format_minutes, format_share, format_tokens, format_usd } = figure_format
 
 interface RunCostReport {
 	scope: string
@@ -85,15 +80,15 @@ function count_or_missing(count: number | undefined): string {
 
 function header_lines(report: RunCostReport): Array<string> {
 	return [
-		`run tree — ${String(report.session_count)} session(s), ${format_minutes(report.total_elapsed_ms)} active, ${cost_format.format_usd(report.total_usd)}`,
+		`run tree — ${String(report.session_count)} session(s), ${format_minutes(report.total_elapsed_ms)} active, ${format_usd(report.total_usd)}`,
 		`runs in store: ${String(report.run_count)} · merges: ${count_or_missing(report.merged)} · transcripts outside this run: ${String(report.unattributed_count)} · unreadable: ${String(report.unreadable_count)}`,
 	]
 }
 
 function role_line(role: RoleTotals, report: RunCostReport): string {
-	const spent = `${cost_format.format_usd(role.cost_usd)} ${cost_format.format_share(role.cost_usd, report.total_usd)}`
-	const time = `${format_minutes(role.elapsed_ms)} ${cost_format.format_share(role.elapsed_ms, report.total_elapsed_ms)}`
-	const counts = `${String(role.session_count)} session(s) · ${String(role.request_count)} req · preamble ${cost_format.format_tokens(role.preamble_tokens)}`
+	const spent = `${format_usd(role.cost_usd)} ${format_share(role.cost_usd, report.total_usd)}`
+	const time = `${format_minutes(role.elapsed_ms)} ${format_share(role.elapsed_ms, report.total_elapsed_ms)}`
+	const counts = `${String(role.session_count)} session(s) · ${String(role.request_count)} req · preamble ${format_tokens(role.preamble_tokens)}`
 
 	return `  ${role.role.padEnd(ROLE_PAD)} ${spent}  ${time}  ${counts}`
 }
@@ -120,8 +115,8 @@ function session_line(row: SessionRow): string {
 
 	if (!row.is_measured) return `${identity}  ${NOT_MEASURED}${session_parent(row.parent_id)}`
 
-	const usage = `${String(row.request_count)} req · output ${cost_format.format_tokens(row.output_tokens)}`
-	const spent = `${cost_format.format_usd(row.cost_usd)} · ${format_minutes(row.elapsed_ms)} · ${usage} · preamble ${cost_format.format_tokens(row.preamble_tokens)}`
+	const usage = `${String(row.request_count)} req · output ${format_tokens(row.output_tokens)}`
+	const spent = `${format_usd(row.cost_usd)} · ${format_minutes(row.elapsed_ms)} · ${usage} · preamble ${format_tokens(row.preamble_tokens)}`
 
 	return `${identity}  ${spent}${session_parent(row.parent_id)}`
 }

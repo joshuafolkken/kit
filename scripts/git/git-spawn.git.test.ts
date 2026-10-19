@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GIT_BINARY_KEY } from './constants'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
@@ -17,7 +18,6 @@ const UPSTREAM = 'upstream'
 const PID_FILE = 'ssh-pids'
 const BUDGET_MS = 1000
 const HANG_SECONDS = 60
-const MS_PER_SECOND = 1000
 // Room for git to start and for execa to reap it after the kill — far under the hang, which is what
 // the elapsed-time assertion has to tell apart.
 const REAP_ALLOWANCE_MS = 10_000

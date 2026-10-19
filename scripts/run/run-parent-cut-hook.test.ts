@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { figure_format } from '#scripts/lib/figure-format'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_headless } from './run-headless'
@@ -193,7 +193,7 @@ describe('run_parent_cut_hook.PARENT_CUT_REASON', () => {
 
 	it('builds the threshold from the shared constant rather than spelling it', () => {
 		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain(
-			cost_format.format_tokens(CONTEXT_CUT_THRESHOLD),
+			figure_format.format_tokens(CONTEXT_CUT_THRESHOLD),
 		)
 	})
 })

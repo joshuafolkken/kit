@@ -1,4 +1,4 @@
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { BoardUsage } from './run-board-header'
 import { run_board_process_groups } from './run-board-process-groups'
 import type { LocalRead } from './run-board-read'
@@ -9,7 +9,7 @@ import { run_board_usage, type UsageMark } from './run-board-usage'
 // differences between this reading and the last. A frame drawn once has no last reading, so it reads
 // twice a second apart; otherwise its CPU would be blank.
 
-const PRIME_MS = run_progress.MS_PER_SECOND
+const PRIME_MS = MS_PER_SECOND
 
 type UsageRead = Pick<BoardState, 'usage' | 'usages'>
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { styleText } from 'node:util'
 import { core_budget } from '#scripts/gate/core-budget'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
@@ -162,7 +163,7 @@ async function push_every(minutes: string | undefined, ports: BoardPorts): Promi
 		return SUCCESS_EXIT_CODE
 	}
 
-	await run_board_every.push_until_ended(ports, interval * run_progress.MS_PER_MINUTE)
+	await run_board_every.push_until_ended(ports, interval * MS_PER_MINUTE)
 
 	return SUCCESS_EXIT_CODE
 }

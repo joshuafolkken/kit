@@ -1,5 +1,6 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
 // When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks.
@@ -13,7 +14,6 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 // counts is `backlog-stalled-detect.ts`; this file only decides.
 
 const STALL_THRESHOLD_MINUTES = 10
-const MS_PER_MINUTE = 60_000
 const STALL_THRESHOLD_MS = STALL_THRESHOLD_MINUTES * MS_PER_MINUTE
 const NONE = 0
 

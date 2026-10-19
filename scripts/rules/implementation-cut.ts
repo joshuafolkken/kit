@@ -1,11 +1,11 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
-import { cost_format } from '#scripts/cost-runtime/cost-format'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { figure_format } from '#scripts/lib/figure-format'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
@@ -170,8 +170,8 @@ function is_over_threshold_edit(
 
 // **The threshold in the refusal text is assembled from the constant, never spelled**.
 // A spelled literal is left behind when the shared threshold moves, telling agents the wrong number;
-// building it from `CONTEXT_CUT_THRESHOLD` keeps the two from drifting. `cost_format.format_tokens` renders it the way every cost report does.
-const THRESHOLD_TEXT = `${cost_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
+// building it from `CONTEXT_CUT_THRESHOLD` keeps the two from drifting. `figure_format.format_tokens` renders it the way every cost report does.
+const THRESHOLD_TEXT = `${figure_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
 
 // The instruction in the shape a refusal can carry: the handoff in the format the parser reads, the
 // cut, and the one verdict that ends the turn — `cut` is the only one, so a run told merely to "take

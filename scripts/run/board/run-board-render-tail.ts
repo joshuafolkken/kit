@@ -1,5 +1,5 @@
 import { styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels, type TextColor } from './run-board-labels'
@@ -26,7 +26,7 @@ const ALARM_FACTOR = 3
 // The least a usual time counts as: the ledger's median for a stage of seconds (preflight, sync,
 // report) is near zero, and scaled as it is it would draw a healthy few-second stage as alarming.
 const USUAL_FLOOR_MINUTES = 2
-const USUAL_FLOOR_MS = USUAL_FLOOR_MINUTES * backlog_budget.MS_PER_MINUTE
+const USUAL_FLOOR_MS = USUAL_FLOOR_MINUTES * MS_PER_MINUTE
 
 interface TimedActivity {
 	icon: string
