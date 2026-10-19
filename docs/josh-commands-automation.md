@@ -78,8 +78,8 @@ pnpm josh batch:guard   # run inside pretool:guard, not wired on its own
 
 Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/init/hook-launch.ts`):
 
-- **`<project-root prefix>`** — `cd`s to `git rev-parse --show-toplevel` (with the git location variables a git hook exports cleared first), so a hook fired from a subdirectory still finds its relative paths. It is the same prefix the consumer rewrite applies, written out in full in the real file.
-- **The launcher** (`scripts/hooks/run-hook.sh <name>`) hands the hook to the ready gate, falling back to `pnpm josh <command>`.
+- **`<project-root prefix>`** — `cd`s to `CLAUDE_PROJECT_DIR`, or to `git rev-parse --show-toplevel` where it is unset (Codex) — asked first without the git location variables a git hook leaks — so a hook fired from a subdirectory still finds its relative paths. It is the same prefix the consumer rewrite applies, written out in full in the real file.
+- **The launcher** (`scripts/hooks/run-hook.sh <name>`) clears the git location variables a git hook exports when git resolves without them, then hands the hook to the ready gate, falling back to `pnpm josh <command>`.
 - **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its recorded digest matches the source, and rebuilds it in-process when stale.
 - A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on the installed `dist/hooks/` — the published bundles have no source beside them to go stale against — and whose fallback is the `dist/josh.js` dispatcher.
 

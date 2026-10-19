@@ -66,8 +66,8 @@ describe('distributed CLAUDE.md path resolvability (joshuafolkken/kit#1878)', ()
 	})
 })
 
-// joshuafolkken/kit#2829: a basic project initialized before the rename imports
-// `dist/CLAUDE.static.md` until `josh init` is re-run and migrates that import.
+// joshuafolkken/kit#2829: a basic project initialized before the rename imported
+// `dist/CLAUDE.static.md`, so kit still ships it under that name.
 describe('basic profile rules under both names', () => {
 	it('ships the basic rules as CLAUDE.basic.md and as the pre-rename CLAUDE.static.md', () => {
 		build_claude_md()

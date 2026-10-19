@@ -8,7 +8,7 @@ A `basic` project has grown npm dependencies and you want the `full` toolchain �
 
 1. See the current profile and why it was chosen with [`josh profile`](../josh-commands.md#josh-profile).
 2. Re-run `josh init` with its profile option set to the one you want ([`josh init`](../josh-commands.md#josh-init)). The choice is recorded in `package.json`, and a later `josh init` keeps it.
-3. Moving from `basic` to `full`: `josh init` skips AI files that already exist, so run [`josh sync`](../sync.md) to replace them with the `full` set, then delete two lines from `CLAUDE.md` — the basic-profile bootstrap note ("If kit is not installed, run pnpm install first.") and the `@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md` import (`CLAUDE.static.md` in a project set up before the rename). Sync adds the `full` import but leaves your lines alone.
+3. Moving from `basic` to `full`: `josh init` skips AI files that already exist, so run [`josh sync`](../sync.md) to replace them with the `full` set, then delete two lines from `CLAUDE.md` — the basic-profile bootstrap note ("If kit is not installed, run pnpm install first.") and the `@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md` import. Sync adds the `full` import but leaves your lines alone.
 4. Run `josh gate`. `josh init` already ran `pnpm install` and `josh format`.
 
 [Project profiles](../init.md#project-profiles) has the rules that pick a profile when none is recorded, and what each one sets up.

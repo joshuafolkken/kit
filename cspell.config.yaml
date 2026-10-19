@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # `git rm --ignore-unmatch`, with which a release prunes the merged metrics approvals (#4187).
+  - unmatch
   # macOS's process-policy command, named where lanes deliberately avoid efficiency-core confinement
   # (#3947).
   - taskpolicy
