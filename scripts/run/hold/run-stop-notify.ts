@@ -9,8 +9,8 @@ import type { CliValues } from '#scripts/notify/telegram-test-logic'
 import { run_stage } from '#scripts/run/run-stage'
 import { run_hold_session } from './run-hold-session'
 
-// The `confirmation` a `halfrun` or `prrun` stop sends from `josh run:hold --halfrun-stop` /
-// `--prrun-stop` (joshuafolkken/kit#4135): every line is fixed once the Issue, its title and the pull
+// The `confirmation` a `halfrun`, `needs-human-review` or `prrun` stop sends from `josh run:hold
+// --halfrun-stop` / `--human-review-stop` / `--prrun-stop` (joshuafolkken/kit#4135, #4156): every line is fixed once the Issue, its title and the pull
 // request are known, so it is composed here rather than copied from prose. The send goes through
 // `josh notify`'s own call and is stamped on the hold, so the `Stop` hook's own confirmation
 // (`stop-actions.ts`) finds the pause announced and does not send it again.
@@ -69,6 +69,24 @@ function halfrun_values(facts: StopFacts): CliValues {
 		'task-type': 'confirmation',
 		body,
 		recommended: `Verify by hand, then prrun ${reference_of(facts)}`,
+		alternative: [`fullrun ${reference_of(facts)}`],
+	}
+
+	return with_urls(values, facts)
+}
+
+// A `needs-human-review` stop resumes as `halfrun`'s does, so its next line is `halfrun`'s; the lane
+// directory is named because the uncommitted work a person must look at lives only there.
+function human_review_values(facts: StopFacts, directory: string): CliValues {
+	const body = [
+		'needs-human-review: implemented and gated, stopped before the commit',
+		run_stage.next_line(HALFRUN, facts.issue),
+		`Working tree: ${directory}`,
+	].join('\n')
+	const values: CliValues = {
+		'task-type': 'confirmation',
+		body,
+		recommended: `Review the working tree, then prrun ${reference_of(facts)}`,
 		alternative: [`fullrun ${reference_of(facts)}`],
 	}
 
@@ -144,6 +162,22 @@ async function send_prrun(target: string, issue: string): Promise<void> {
 	})
 }
 
-const run_stop_notify = { halfrun_values, prrun_values, send_halfrun, send_prrun }
+async function send_human_review(target: string, issue: string): Promise<void> {
+	await send(target, async () => {
+		const facts = await issue_facts(issue)
+		const directory = await git_command.repository_root()
+
+		return { values: human_review_values(facts, directory), title: facts.title }
+	})
+}
+
+const run_stop_notify = {
+	halfrun_values,
+	human_review_values,
+	prrun_values,
+	send_halfrun,
+	send_human_review,
+	send_prrun,
+}
 
 export { run_stop_notify }

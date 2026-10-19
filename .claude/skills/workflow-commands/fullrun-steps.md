@@ -45,8 +45,8 @@ completion notification, then merges; if blockers are found it exits non-zero �
 with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
-`<N>`. (3) Add `in-progress` (the bare hold named no issue):
-`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Record the agreed plan
+`<N>`. (3) `pnpm josh run:hold --adopt <N>` — re-keys the bare hold to `<N>` and applies `in-progress`;
+every later stop releases with `run:release <N>`. (4) Record the agreed plan
 in the session language: `pnpm josh issue:plan <N> --body-file <path>`. (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
 `pnpm josh run:prep <N>`; on `latest: required` run `josh latest` and load the `dependency-update` skill; on
 `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,

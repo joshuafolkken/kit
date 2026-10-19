@@ -348,7 +348,22 @@ pnpm josh report:lint < summary.md
 
 <!-- /usage -->
 
-Prints `ok` (exit 0), or the violations one per line followed by one line naming the template's section in `report-format.md` (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it.
+Prints `ok` (exit 0), or the violations one per line followed by one line naming the template's section in `report-format.md` (exit 1). The judgement half — whether the overview names a concrete subject — is left to the writer, because a machine cannot answer it. The labels follow `JOSH_SESSION_LANG` (`ja`, else English), from the same table `josh report:template` prints.
+
+### `josh report:template`
+
+Print the work summary or the completion report skeleton in the session language, from the one label table `josh report:lint` checks — so a printed skeleton passes the lint in any language.
+
+<!-- usage: report:template -->
+
+```bash
+pnpm josh report:template summary scripts/report/report-lint.ts
+pnpm josh report:template done
+```
+
+<!-- /usage -->
+
+Each path fills the target or changed-file line and, for `summary`, its own change block whose "if it breaks" tier opens with the abnormal cases `josh cases` owes for that path. Only the `<…>` placeholders are left to write. Any other kind prints the usage and exits 1.
 
 ### `josh stash:push`
 

@@ -215,6 +215,9 @@ const ISSUE_USAGE: Readonly<Record<string, CommandUsage>> = {
 	},
 	'issue:backlinks': { examples: [{ arguments: '2123' }] },
 	'report:lint': { examples: [{ arguments: '< summary.md' }] },
+	'report:template': {
+		examples: [{ arguments: 'summary scripts/report/report-lint.ts' }, { arguments: 'done' }],
+	},
 	'stash:push': {
 		examples: [{ arguments: '"backlogrun: josh latest before lanes"' }],
 		flags: [

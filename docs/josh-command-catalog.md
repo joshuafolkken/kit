@@ -1395,6 +1395,16 @@ Check a two-layer work summary on stdin against its mechanical format rules
 
 ---
 
+### `josh report:template`
+
+> **Audience:** automation · **Side effects:** files
+
+`summary|done [<path>...]`
+
+Print the work summary or completion report skeleton in the session language: summary | done
+
+---
+
 ### `josh retrospective` · `josh rtr`
 
 > **Audience:** maintainer · **Side effects:** none · **kit only**
@@ -1539,7 +1549,7 @@ Append to, read or watch the run’s append-only event stream (--append <kind> <
 
 > **Audience:** automation · **Side effects:** files
 
-`[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]`
+`[<issue> [--fullrun | --halfrun-stop | --human-review-stop | --prrun-stop]] | --adopt <issue>`
 
 Claim this working tree for a run, or say which run already holds it
 

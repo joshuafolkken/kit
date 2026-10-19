@@ -15,13 +15,24 @@ const RUN_USAGE: Readonly<Record<string, CommandUsage>> = {
 		examples: [
 			{ arguments: '1091', note: 'claim for issue 1091' },
 			{ arguments: '1091 --fullrun', note: 'claim as `fullrun #1091` (what `run:entry` runs)' },
+			{ arguments: '--adopt 1091', note: "hand a `new` run's hold to the issue it filed" },
 		],
 		flags: [
 			{ names: ['--fullrun'], description: "marks the record as `fullrun #N`'s." },
 			{
+				names: ['--adopt <issue>'],
+				description:
+					"re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.",
+			},
+			{
 				names: ['--halfrun-stop'],
 				description:
-					'marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram.',
+					'marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.',
+			},
+			{
+				names: ['--human-review-stop'],
+				description:
+					'marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.',
 			},
 			{
 				names: ['--prrun-stop'],
