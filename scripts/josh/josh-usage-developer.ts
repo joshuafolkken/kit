@@ -176,6 +176,7 @@ const DEVELOPER_USAGE: Readonly<Record<string, CommandUsage>> = {
 			{ arguments: '3437 --only', note: 'the arguments go to backlogrun as typed' },
 			{ arguments: '--agent codex', note: 'start in Codex' },
 			{ arguments: '--stop', note: 'stop the run in this repository' },
+			{ arguments: '--restart', note: "replace the run's processes, keeping its record" },
 		],
 	},
 	'lane:limit': {

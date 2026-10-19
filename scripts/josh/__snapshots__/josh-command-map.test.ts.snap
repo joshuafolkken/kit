@@ -154,7 +154,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "backlogrun": [
-      "[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop",
+      "[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop | --restart",
       "developer",
       [
         "files",

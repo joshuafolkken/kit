@@ -66,7 +66,7 @@ record is the parent loop's; a lane never touches it**. Count with `--merged <N>
 | `resumed` | Take the budget from `--json`, report the plan again, read `backlogrun-progress.md` → "Resuming after a cut" |
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
-| `standing` | **Stop; do not open a lane**: report `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` and `pnpm josh run:carry --end` for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
+| `standing` | **Stop; do not open a lane**: report `pnpm josh backlogrun --restart` (continue the run) and `pnpm josh run:carry --end` (discard it) for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
 **End the record when the run ends** — `pnpm josh run:report`, then `pnpm josh run:carry --end`, **never
 batched with it**, and `pnpm josh run:wake --stop` in the same turn. **A run that ends by _stopping_**
 (a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:carry --end --stopped

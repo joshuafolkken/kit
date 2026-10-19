@@ -815,12 +815,13 @@ pnpm josh backlogrun                 # start in Claude, then show the board
 pnpm josh backlogrun 3437 --only     # the arguments go to backlogrun as typed
 pnpm josh backlogrun --agent codex   # start in Codex
 pnpm josh backlogrun --stop          # stop the run in this repository
+pnpm josh backlogrun --restart       # replace the run's processes, keeping its record
 ```
 
 <!-- /usage -->
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number in the named list is read as `#<n>`, since an unquoted `#` starts a shell comment.
-- `--agent claude|codex` picks the agent; the default is `claude`. The start command is built by `scripts/agent/agent-argv.ts`, the same builder that starts lane children, and the choice is handed to the run as `JOSH_AGENT_PROVIDER`.
+- `--agent claude|codex` picks the agent; the default is `claude`.
 - A run already going in this repository is never joined by a second one: nothing is started, the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
 - An idle run is replaced by a different invocation, so `--stop` need not be typed first. The run going is stopped as `--stop` stops it and the typed one is started when all of these hold:
   - the typed invocation differs from the one the run was started with — the same invocation, a bare `pnpm josh backlogrun` over a bare one included, only shows the board, so reopening the board never rebuilds a run;
@@ -834,8 +835,9 @@ pnpm josh backlogrun --stop          # stop the run in this repository
   - Lanes still running are **not** stopped; their count and Issue numbers are printed, and each child finishes or is closed with `pnpm josh lane:close <N>`.
   - A run typed into a session of your own is owned by that session, which `--stop` does not signal: the owner's pid is printed, the record is kept and the exit code is 1. End that run from its session.
   - No Telegram is sent: the person who typed the stop is at the terminal.
+- `--restart` stops what `--stop` stops but keeps the record, so a new supervisor continues the run.
 
-**Output / exit codes:** prints the started pid, session and log path, then the board's exit code. Bad arguments, or an agent that cannot start, exit 1. `--stop` prints what it stopped and exits 0.
+**Output / exit codes:** prints the started pid, session and log path, then the board's exit code; bad arguments or an agent that cannot start exit 1. `--stop` prints what it stopped and exits 0; a `--restart` it cannot make exits 1.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh backlogrun` in detail".
 
