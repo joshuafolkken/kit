@@ -2,9 +2,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { styleText } from 'node:util'
-import { core_budget } from '#scripts/gate/core-budget'
-import { machine_capacity } from '#scripts/gate/machine-capacity'
-import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
@@ -13,16 +10,17 @@ import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
 import { run_board_fold } from './run-board-fold'
+import { run_board_gather } from './run-board-gather'
+import { run_board_gather_live } from './run-board-gather-live'
+import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
-import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_tick } from './run-board-tick'
-import { run_board_usage_read } from './run-board-usage-read'
 
 // `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
 // spinners turned between redraws, for a person to keep open beside the run. What one redraw reads,
@@ -52,13 +50,8 @@ function on_exit(leave: () => void): void {
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
 }
 
-const LIVE_PORTS: BoardPorts = {
+const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
-	read_table: lane_process_table.read_table,
-	read_local: run_board_read.read_local,
-	read_machine: machine_capacity.read_sample,
-	read_waits: () => core_budget.budget_waits(),
-	read_usage: run_board_usage_read.usage_reader(),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
 	now: () => Date.now(),
@@ -93,6 +86,16 @@ const LIVE_PORTS: BoardPorts = {
 	sleep: async (ms) => {
 		await sleep(ms)
 	},
+}
+
+// A live board reads on its worker thread, so no read stops its spinner; a single frame has no spinner
+// to stop, and reads where it draws.
+function live_ports(is_live: boolean): BoardPorts {
+	const gather = is_live
+		? run_board_gather_thread.worker_gatherer()
+		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
+
+	return { ...LIVE_PORTS, gather }
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
@@ -192,20 +195,30 @@ async function push_every(minutes: string | undefined, ports: BoardPorts): Promi
 	return SUCCESS_EXIT_CODE
 }
 
-async function draw(flag: string, ports: BoardPorts): Promise<void> {
+// The ports a test hands in, else the live ones.
+function ports_for(ports: BoardPorts | undefined, is_live: boolean): BoardPorts {
+	return ports ?? live_ports(is_live)
+}
+
+async function draw(flag: string, ports: BoardPorts | undefined): Promise<void> {
 	if (flag === CHAT_FLAG) {
-		await answer(ports)
+		await answer(ports_for(ports, false))
 
 		return
 	}
 
-	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once: flag === ONCE_FLAG })
+	const { is_tty } = ports ?? LIVE_PORTS
+	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
+
+	if (mode === 'live') {
+		await watch(ports_for(ports, true))
+
+		return
+	}
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 	// spinner frame frozen mid-turn.
-	const once_ports = { ...ports, is_tty: false, size: undefined }
-
-	await (mode === 'live' ? watch(ports) : tick(FRESH_STATE, once_ports))
+	await tick(FRESH_STATE, { ...ports_for(ports, false), is_tty: false, size: undefined })
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -216,10 +229,10 @@ function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
 	return rest.length > 0 || !FLAGS.has(flag)
 }
 
-async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS): Promise<number> {
+async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
 	const [flag = '', ...rest] = argv
 
-	if (is_every(flag, rest)) return await push_every(rest[0], ports)
+	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
 	await draw(flag, ports)

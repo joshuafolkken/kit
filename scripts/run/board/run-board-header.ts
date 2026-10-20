@@ -71,6 +71,8 @@ interface BoardHeader {
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
 	plan_failed_ms: number | undefined
+	// When the reads off this machine last failed (`run-board-gather-thread.ts`); none once they answer.
+	read_failed_ms?: number | undefined
 	// Whether a plan read is in flight.
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
@@ -265,13 +267,11 @@ function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined
 	]
 }
 
-// A plan fetch is said only when it failed — the board otherwise keeps quiet about a routine read.
-function plan_warning(header: BoardHeader): string | undefined {
-	const failed = header.plan_failed_ms
-
+// A read is said only when it failed — the board otherwise keeps quiet about a routine read.
+function warning_of(word: string, failed: number | undefined): string | undefined {
 	if (failed === undefined) return undefined
 
-	return styleText('yellow', `${HEADER_ICONS.warning} ${WORDS.plan} ${minute_of(failed)}`)
+	return styleText('yellow', `${HEADER_ICONS.warning} ${word} ${minute_of(failed)}`)
 }
 
 // A plan read in flight turns the spinner after ⏳ and says nothing more; a
@@ -342,9 +342,14 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string 
 	]
 }
 
-// The run's progress, then what its plan read is doing.
+// The run's progress, then what its reads are doing.
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
-	const parts = [...progress_parts(counts, header), loading_part(header), plan_warning(header)]
+	const parts = [
+		...progress_parts(counts, header),
+		loading_part(header),
+		warning_of(WORDS.plan, header.plan_failed_ms),
+		warning_of(WORDS.read, header.read_failed_ms),
+	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
 }
@@ -439,6 +444,7 @@ const run_board_header = {
 	is_plan_read,
 	now_icon,
 	now_legend,
+	warning_of,
 }
 
 export { run_board_header }

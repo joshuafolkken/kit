@@ -14,10 +14,11 @@ const WAITS: Array<BudgetWait> = [
 
 describe('run_board_tick.tick budget waits', () => {
 	it('reads the waiting claims with the machine sample and draws them', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames, gathering } = harness(LOCAL, [plan_titled('a')])
 		const read_waits = vi.fn(() => WAITS)
 
-		const state = await tick(FRESH_STATE, { ...ports, read_waits })
+		gathering.read_waits = read_waits
+		const state = await tick(FRESH_STATE, ports)
 
 		expect(read_waits).toHaveBeenCalledOnce()
 		expect(state.budget_waits).toStrictEqual(WAITS)

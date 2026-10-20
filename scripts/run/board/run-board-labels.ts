@@ -42,6 +42,8 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 const WORDS = {
 	no_run: 'no run',
 	plan: 'plan',
+	// The reads off this machine — the run's stream, its lanes and the gauges — that last failed.
+	read: 'read',
 	merged: 'merged',
 	parked: 'parked',
 	done: 'done',
