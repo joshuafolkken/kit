@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url'
 import { error_text } from '#scripts/lib/error-message'
 import { git_stash } from './git-stash'
 import { stash_args, type Request } from './stash-args'
@@ -18,7 +17,6 @@ const AMBIGUOUS_VERDICT = 'ambiguous'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 
 function report(verdict: string, detail: string, code: number): number {
 	console.info(verdict)
@@ -90,10 +88,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const stash_pop_cli = {
 	AMBIGUOUS_VERDICT,
 	CONFLICTED_VERDICT,
@@ -101,7 +95,5 @@ const stash_pop_cli = {
 	POPPED_VERDICT,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { stash_pop_cli }

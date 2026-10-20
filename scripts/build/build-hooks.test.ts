@@ -139,7 +139,7 @@ describe('build_hooks', () => {
 	})
 
 	it('emits the session language identically to the source', async () => {
-		await expect_parity('scripts/josh/session-language-cli.ts', 'dist/hooks/session-lang.js', '')
+		await expect_parity('scripts/josh/session-language-main.ts', 'dist/hooks/session-lang.js', '')
 	})
 
 	it('reaches the same guard decision as the source', async () => {

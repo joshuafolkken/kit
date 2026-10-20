@@ -1,7 +1,5 @@
-#!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
@@ -180,10 +178,6 @@ async function run_related_tests(command_arguments: ReadonlyArray<string>): Prom
 	})
 
 	return exit_code
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run_related_tests(process.argv.slice(changed_file_scope.ARGV_START))
 }
 
 const test_related = { reaches_tests, run_related_tests }

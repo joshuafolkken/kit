@@ -35,7 +35,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'stash:push': {
-		script: 'scripts/git/stash/stash-push-cli.ts',
+		script: 'scripts/git/stash/stash-push-main.ts',
 		description: 'Stash the working tree, untracked files included, leaving the observation ledger',
 		category: 'AI tools',
 		reference: ['<message>', 'automation', ['git']],
@@ -50,7 +50,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'stash:pop': {
-		script: 'scripts/git/stash/stash-pop-cli.ts',
+		script: 'scripts/git/stash/stash-pop-main.ts',
 		description: 'Pop the stash matching this message, not whichever a shared stack has on top',
 		category: 'AI tools',
 		reference: ['<message>', 'automation', ['git']],
@@ -98,7 +98,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'cost:audit': {
-		script: 'tools/cost-audit/cost-audit-cli.ts',
+		script: 'tools/cost-audit/cost-audit-main.ts',
 		description:
 			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
 		category: 'AI tools',

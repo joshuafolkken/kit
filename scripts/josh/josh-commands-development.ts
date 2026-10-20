@@ -183,7 +183,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:related': {
-		script: 'scripts/test/test-related.ts',
+		script: 'scripts/test/test-related-main.ts',
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],

@@ -55,7 +55,7 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/pretool-guard-cli.ts', out: 'pretool-guard' },
 	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
 	{ source: 'scripts/hooks/format-edited-cli.ts', out: 'format-edited' },
-	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },
+	{ source: 'scripts/josh/session-language-main.ts', out: 'session-lang' },
 	{ source: 'scripts/security/security-audit-provision-main.ts', out: 'audit-provision' },
 ]
 
