@@ -1,0 +1,7 @@
+{
+	"reason": "A --only run adopts only the carried lanes it names (#4282): own_carried and the shared named_issues helper",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}

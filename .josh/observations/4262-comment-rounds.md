@@ -1,0 +1,3 @@
+- rf:bug-risks | low | tools/test/vitest-config-workers.ts:26 | 2026-10-20 | #4262
+- rf:tests | low | scripts/test/vitest-config.test.ts:109 | 2026-10-20 | #4262
+- rf:comments | low | scripts/test/vitest-config.test.ts:102 | 2026-10-20 | #4262
