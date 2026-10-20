@@ -391,14 +391,14 @@ function should_detach(args: ShipArguments): boolean {
 // hand-off — a stop it finds is fixed by the same session instead of relaunching one from the
 // supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The fast
 // checks (`run-ship-pre-detach.ts`) follow it here for the same reason; they are not a stage, so the
-// supervisor's gate runs them again rather than passing over them.
+// supervisor's gate runs them again rather than passing over them. They run even when the preflight
+// refused, so one ship reports every failure there is to fix (joshuafolkken/kit#4305); the preflight's
+// refusal still comes before its own scoped pair, the one heavy check here.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
 
 	if (preflight.code !== SUCCESS_EXIT_CODE) {
 		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, preflight)
-
-		return [preflight]
 	}
 
 	const result = await run_ship_pre_detach.checks()
