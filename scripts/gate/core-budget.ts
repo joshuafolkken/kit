@@ -95,12 +95,15 @@ const MEMORY_MB = {
 // `memory_mb` and `admitted_at` are optional so a marker an older `josh` wrote still reads: it holds no
 // declared memory, and it counts as load from outside the ledger until it is gone.
 // `command`, `checkout`, `lane`, `lanes_root` and `wait_reason` name a waiting claim on `run:board`
-// (`core-wait.ts`).
+// (`core-wait.ts`). `is_unit` marks a unit suite's claim, which may be admitted narrowed to `granted`
+// past the wait cap (`core_admission.narrowed_weight`).
 const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
 	claimed_at: z.number(),
 	memory_mb: z.number().optional(),
 	admitted_at: z.number().optional(),
+	is_unit: z.boolean().optional(),
+	granted: z.number().optional(),
 	command: z.string().optional(),
 	checkout: z.string().optional(),
 	lane: z.string().optional(),
@@ -121,6 +124,8 @@ interface ReserveOptions {
 	memory_mb?: number | undefined
 	// What the claim is for, named on the waiting line and on `run:board`.
 	command?: string | undefined
+	// A unit suite's claim, whose weight is its worker count.
+	is_unit?: boolean | undefined
 	report?: (line: string) => void
 	read_machine?: () => Promise<MachineReading>
 	wait_cap_ms?: number
@@ -266,10 +271,10 @@ async function current_budget(
 // The claim is admitted: its marker records when, which moves its load from "load outside the ledger"
 // to "load the ledger holds" for every later reader — its cores at once, its memory once its tool has
 // had time to ramp up.
-function admit(context: WaitContext, overflow?: Overflow): Admission {
-	write_reservation(context.target, { ...context.fields, admitted_at: context.now() })
+function admit(context: WaitContext, overflow?: Overflow, granted?: number): Admission {
+	write_reservation(context.target, { ...context.fields, admitted_at: context.now(), granted })
 
-	return { overflow }
+	return { overflow, granted }
 }
 
 function overflow_of(
@@ -303,8 +308,12 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 
 	if (core_admission.is_admitted(context.key, reservations, budget)) return admit(context)
 
+	// Past the wait cap a unit claim is admitted at the room left rather than at full width.
 	if (context.now() >= context.deadline) {
-		return admit(context, overflow_of(context, reservations, budget))
+		const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
+		const held = core_admission.with_grant(context.key, reservations, granted)
+
+		return admit(context, overflow_of(context, held, budget), granted)
 	}
 
 	mark_waiting(context, core_wait.wait_reason(context.key, reservations, budget))
@@ -343,9 +352,9 @@ function claim_fields(
 	claimed_at: number,
 	options: ReserveOptions,
 ): ReservationFields {
-	const { memory_mb, command } = options
+	const { memory_mb, command, is_unit } = options
 
-	return { weight, claimed_at, memory_mb, command, ...core_wait.where_of(process.cwd()) }
+	return { weight, claimed_at, memory_mb, command, is_unit, ...core_wait.where_of(process.cwd()) }
 }
 
 async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
@@ -421,6 +430,18 @@ async function with_command_reservation<T>(
 	)
 }
 
+// The unit claim the parent command holds for this process (`with_command_reservation`), or
+// `undefined` where none does. A held claim that is not a unit suite's says nothing about workers.
+function held_unit_claim(directory: string = PLATFORM_TEMP_ROOT): Reservation | undefined {
+	const key = held_mark.held_reservation()
+
+	if (key === undefined) return undefined
+
+	const held = live_reservations(directory).find((entry) => entry.key === key)
+
+	return held?.reservation.is_unit === true ? held.reservation : undefined
+}
+
 const core_budget = {
 	CORE_WEIGHTS,
 	HELD_KEY: held_mark.HELD_KEY,
@@ -431,6 +452,7 @@ const core_budget = {
 	admitted_load: core_admission.admitted_load,
 	budget_waits,
 	describe_overflow: core_admission.describe_overflow,
+	held_unit_claim,
 	is_held: held_mark.is_held,
 	live_reservations,
 	release,

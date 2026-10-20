@@ -95,6 +95,8 @@ interface CommandEntry {
 	// The memory the command's tools hold, claimed with its cores; read like
 	// `core_weight`, and none declared is none waited for.
 	memory_mb?: number | (() => number)
+	// A unit suite's claim, whose weight is its worker count (`gate_plan.DIRECT_UNIT_CLAIM`).
+	is_unit_claim?: boolean
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a

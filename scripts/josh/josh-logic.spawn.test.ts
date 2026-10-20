@@ -199,6 +199,21 @@ describe('josh_logic.run_command — the memory a command claims', () => {
 			command: 'lint',
 		})
 	})
+
+	// joshuafolkken/kit#4235: a unit suite's claim is marked so it can be narrowed past the wait cap.
+	it.each([
+		['test:unit', true],
+		['lint', undefined],
+	])('marks a unit suite claim on %s', async (command, is_unit) => {
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockResolvedValue(SPAWN_SUCCESS.exitCode)
+
+		await josh_logic.run_command(command, [])
+
+		expect(reservation.mock.calls[0]?.[2]?.is_unit).toBe(is_unit)
+	})
 })
 
 describe('josh_logic.run_shell_command — spawn error', () => {

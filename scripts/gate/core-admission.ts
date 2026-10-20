@@ -12,14 +12,20 @@ import type { LedgerLoad, MachineBudget } from './machine-capacity'
 // tool partway up is then counted twice, which costs a slower admission, never a swap. Its cores are in
 // the reading from the start, so the window does not apply to them.
 const RAMP_UP_MS = 30_000
+// A narrowed unit claim still runs one worker: zero would run no test and report the suite green.
+const MIN_GRANT = 1
 
 // What admission reads from a marker. `memory_mb` and `admitted_at` are optional because a marker an
 // older `josh` wrote has neither: it declares no memory, and it counts as load from outside the ledger.
+// `granted` is the narrower weight a unit claim was admitted at past the wait cap; once set, it is the
+// load the claim holds.
 interface LedgerReservation {
 	weight: number
 	claimed_at: number
 	memory_mb?: number | undefined
 	admitted_at?: number | undefined
+	granted?: number | undefined
+	is_unit?: boolean | undefined
 }
 
 interface LedgerEntry {
@@ -37,8 +43,10 @@ interface Overflow {
 	budget: MachineBudget
 }
 
+// `granted` is set only when a unit claim was narrowed to the room left at the wait cap.
 interface Admission {
 	overflow: Overflow | undefined
+	granted?: number | undefined
 }
 
 // Claim order, with the filename as the tiebreak so every reader agrees on the same ledger order
@@ -50,7 +58,7 @@ function compare_claim(left: LedgerEntry, right: LedgerEntry): number {
 }
 
 function add_load(totals: LedgerLoad, reservation: LedgerReservation): void {
-	totals.cores += reservation.weight
+	totals.cores += reservation.granted ?? reservation.weight
 	totals.memory_mb += reservation.memory_mb ?? 0
 }
 
@@ -120,6 +128,41 @@ function total_weight(reservations: ReadonlyArray<LedgerEntry>): number {
 	return sum_load(reservations).cores
 }
 
+// **The weight a unit claim admitted past the wait cap may take: the cores the admitted claims leave
+// free, never below one worker and never above what it asked for.** Admitting it at full width put the
+// ledger past the machine (joshuafolkken/kit#4235); a unit suite is the one tool whose width follows a
+// number, so it narrows instead. `undefined` for any other claim, and for one that fits as asked.
+function narrowed_weight(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: number,
+): number | undefined {
+	const own = reservations.find((entry) => entry.key === key)?.reservation
+
+	if (own?.is_unit !== true) return undefined
+
+	const others = reservations.filter(
+		(entry) => entry.key !== key && entry.reservation.admitted_at !== undefined,
+	)
+	const room = Math.max(MIN_GRANT, Math.floor(budget - total_weight(others)))
+
+	return room >= own.weight ? undefined : room
+}
+
+// The ledger as it stands once `key` is admitted at `granted`, so the overflow it reports counts the
+// narrowed weight rather than the one the claim asked for.
+function with_grant<T extends LedgerEntry>(
+	key: string,
+	reservations: ReadonlyArray<T>,
+	granted: number | undefined,
+): Array<T> {
+	if (granted === undefined) return [...reservations]
+
+	return reservations.map((entry) =>
+		entry.key === key ? { ...entry, reservation: { ...entry.reservation, granted } } : entry,
+	)
+}
+
 // The weight actually running at once — what the reproduction test asserts stays within the budget.
 function admitted_load(reservations: ReadonlyArray<LedgerEntry>, budget: number): number {
 	const admitted = admitted_keys(reservations, budget)
@@ -155,7 +198,9 @@ const core_admission = {
 	describe_overflow,
 	is_admitted,
 	ledger_load,
+	narrowed_weight,
 	sum_load,
+	with_grant,
 }
 
 export type { Admission, LedgerEntry, Overflow }

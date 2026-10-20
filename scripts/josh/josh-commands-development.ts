@@ -179,8 +179,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests)',
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
-		core_weight: gate_plan.direct_unit_weight,
-		memory_mb: gate_plan.direct_unit_memory,
+		...gate_plan.DIRECT_UNIT_CLAIM,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:related': {
@@ -188,8 +187,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		core_weight: gate_plan.direct_unit_weight,
-		memory_mb: gate_plan.direct_unit_memory,
+		...gate_plan.DIRECT_UNIT_CLAIM,
 		usage: {
 			examples: [
 				{ arguments: '' },
