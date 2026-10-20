@@ -14,7 +14,18 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
-const PIPED_ANSWER_COMMANDS = ['epic-next.ts', 'epic-bundle-cli.ts', 'epic-audit-cli.ts'] as const
+// The exit code is set in the entries, where the main guard is (joshuafolkken/kit#4186); a
+// `process.exit()` in the modules they call would cut the pipe all the same, so those are read too.
+const PIPED_ANSWER_COMMANDS = [
+	'epic-next-main.ts',
+	'epic-bundle-main.ts',
+	'epic-audit-cli.ts',
+] as const
+const PIPED_ANSWER_SOURCES = [
+	...PIPED_ANSWER_COMMANDS,
+	'epic-next.ts',
+	'epic-bundle-cli.ts',
+] as const
 
 // Comment lines are dropped before the check: every one of these files explains *why* it avoids
 // `process.exit()`, and a search over the prose would match the explanation rather than a call.
@@ -30,7 +41,7 @@ describe('the epic commands whose answer is read from a pipe', () => {
 		expect(code_of(file)).toContain('process.exitCode =')
 	})
 
-	it.each(PIPED_ANSWER_COMMANDS)('%s never calls process.exit()', (file) => {
+	it.each(PIPED_ANSWER_SOURCES)('%s never calls process.exit()', (file) => {
 		expect(code_of(file)).not.toContain('process.exit(')
 	})
 })

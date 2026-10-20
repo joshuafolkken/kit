@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
 import { styleText } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -28,7 +26,6 @@ import { run_board_tick } from './run-board-tick'
 // terminal around it. A run that ended stays on screen until the next one starts; with no run in this
 // checkout it reads nothing from GitHub and waits.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
@@ -241,9 +238,5 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 }
 
 const run_board_cli = { DISABLED_NOTICE, USAGE, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
-}
 
 export { run_board_cli }

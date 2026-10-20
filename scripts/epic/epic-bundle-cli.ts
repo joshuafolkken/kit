@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
@@ -28,7 +26,6 @@ import type { IssueReference } from './epic-reference'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 // The open backlog was 13 issues when this was written. Scanning all of them is instant, so there is
 // no index and no cache; add one when the number makes it necessary, not before.
 const BACKLOG_LIMIT = 200
@@ -380,14 +377,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await report_for(issue_number, repo, undefined, argv.includes(APPLY_FLAG))
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
-// a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
-// command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const epic_bundle_cli = {
 	USAGE,
 	BACKLOG_LIMIT,
@@ -401,9 +390,6 @@ const epic_bundle_cli = {
 	widen_with_referenced,
 	warn_about_gaps,
 	run,
-	main,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { epic_bundle_cli }

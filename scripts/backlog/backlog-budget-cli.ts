@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { path_decision } from '#scripts/josh/path-decision'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -14,7 +12,6 @@ import {
 // command line, hand it to the pure decision, print the verdict on stdout and the reason on stderr
 // through the printer every mechanically-decided command in this repository already shares.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'budget'
@@ -185,27 +182,17 @@ function run(argv: ReadonlyArray<string>, now_ms: number = Date.now()): number {
 	return SUCCESS_EXIT_CODE
 }
 
-// `process.exitCode` rather than `process.exit()`, for the reason `backlog:next` records: the whole
-// contract is `answer=$(pnpm josh backlog:budget …)`, and exiting outright can cut the pipe before it
-// has drained.
-function main(argv: ReadonlyArray<string>): void {
-	process.exitCode = run(argv)
-}
-
 const backlog_budget_cli = {
 	JSON_KEY,
 	OPTIONS,
 	SUCCESS_EXIT_CODE,
 	USAGE,
 	build_input,
-	main,
 	read_arguments,
 	run,
 	to_answer,
 	to_time_ms,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_budget_cli }
 export type { ParsedValues }

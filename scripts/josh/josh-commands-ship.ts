@@ -11,7 +11,7 @@ const ISSUE_WITH_OPTIONS = '<issue> [options]'
 /* eslint-disable @typescript-eslint/naming-convention */
 const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:merge': {
-		script: 'scripts/run/merge/run-merge-cli.ts',
+		script: 'scripts/run/merge/run-merge-main.ts',
 		description:
 			'Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child',
 		category: 'AI tools',
