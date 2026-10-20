@@ -5,8 +5,8 @@ import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
-// The fast checks a detached `josh ship` runs in the agent's own turn, after the preflight and before
-// the hand-off: a type error in a file the related-only checks never touched, an export nothing reads,
+// The fast checks a detached `josh ship` runs in the agent's own turn, after the preflight (whatever it
+// answered) and before the hand-off:a type error in a file the related-only checks never touched, an export nothing reads,
 // an unknown word, or a guard test (a SKILL.md pointer, a byte budget, the command list, a source with
 // no colocated test, a bare issue citation) that only the full suite runs, would otherwise first
 // surface after the detach and cost a relaunched session. They answer in seconds, so the same session

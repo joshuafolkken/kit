@@ -192,7 +192,20 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
 		expect(detach_mock).not.toHaveBeenCalled()
-		expect(pre_detach_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4305: a lane shipped seven times to see one failure at a time.
+describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
+	it('reports the preflight refusal and the pre-detach failures together', async () => {
+		const type_error = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
+
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: type_error })
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+		expect(info_lines.join('\n')).toContain(PREFLIGHT_REFUSAL)
+		expect(info_lines.join('\n')).toContain(type_error)
 	})
 
 	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
