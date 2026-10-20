@@ -23,7 +23,7 @@
    ```bash
    pnpm josh ms
    ```
-6. `pnpm josh latest:scope` が `required` と答えたときだけ `pnpm josh latest` を実行し、`dependency-update` スキルに従う（`.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
+6. `run:prep` の `latest:` が `required` のときだけ `pnpm josh latest:if-required` を実行し、`dependency-update` スキルに従う（`.claude/skills/workflow-commands/latest-gate.md`）。脆弱性への override は `pnpm-workspace.yaml` の `overrides` に書く（pnpm 11/12 は `package.json` の `pnpm.overrides` を無視する）。
    ステップ 4 が `stashed` と答えたら、ここで復元する（`operating-rules.md` → "no-self-staging"）:
    ```bash
    pnpm josh stash:pop "plan: pre-existing changes"

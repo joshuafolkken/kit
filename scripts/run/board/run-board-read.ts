@@ -4,8 +4,8 @@ import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { lane_spent } from '#scripts/lane/lane-spent'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -123,16 +123,17 @@ function earlier_lanes(lanes: ReadonlyArray<LaneInfo>, started_ms: number): Arra
 
 type LaneRoomRead = Pick<
 	LocalRead,
-	'free_lanes' | 'lane_limit' | 'occupied_count' | 'earlier_occupied'
+	'free_lanes' | 'lane_limit' | 'occupied_count' | 'earlier_occupied' | 'idle_lanes'
 >
 
-// The lanes against the limit, read once so the free count, the lanes it counts and the earlier run's
-// among them agree.
+// The lanes against the limit, read once so the free count, the lanes it counts, the earlier run's
+// among them and the idle ones agree.
 async function lane_room_of(
 	lanes: ReadonlyArray<LaneInfo>,
 	earlier: ReadonlyArray<string>,
+	table: TableRead | undefined,
 ): Promise<LaneRoomRead> {
-	const room = await backlog_ready.lane_room(lanes)
+	const room = await backlog_ready.lane_room(lanes, table)
 	const count = await backlog_ready.count_in(room)
 	const occupied = room.occupied.map((lane) => lane.issue)
 
@@ -141,6 +142,7 @@ async function lane_room_of(
 		lane_limit: count?.limit,
 		occupied_count: occupied.length,
 		earlier_occupied: occupied.filter((issue) => earlier.includes(issue)),
+		idle_lanes: room.idle,
 	}
 }
 
@@ -155,8 +157,9 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 	}
 }
 
-// `undefined` when no run has started here.
-async function read_local(): Promise<LocalRead | undefined> {
+// `undefined` when no run has started here. The lane count reads `table`, the redraw's process
+// snapshot, so it agrees with the usage columns' paused lanes.
+async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
 	const { span, resume, transcript, roots, carry } =
 		repository === undefined ? NO_SPAN : span_here(repository)
@@ -178,9 +181,8 @@ async function read_local(): Promise<LocalRead | undefined> {
 		carry,
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-		idle_lanes: lane_spent.idle_lanes(lanes),
 		earlier_lanes: earlier,
-		...(await lane_room_of(lanes, earlier)),
+		...(await lane_room_of(lanes, earlier, table)),
 		...ledger_here(repository),
 	}
 }

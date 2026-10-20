@@ -29,6 +29,12 @@ const UNMEASURABLE_VERDICT = 'unmeasurable'
 
 type CostVerdict = ReturnType<typeof cost_verdict.classify> | typeof UNMEASURABLE_VERDICT
 
+interface SessionFigures {
+	verdict: CostVerdict
+	cost: number | undefined
+	threshold: number
+}
+
 interface Options {
 	over?: number
 	// The target project whose transcripts to read, or absent for this process's own working
@@ -243,6 +249,28 @@ function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
 	return cost_verdict.classify(measurement, CONTEXT_CUT_THRESHOLD)
 }
 
+// The verdict with the figures it was decided on — the newest request's billed input and the shared
+// threshold — so a report that cites the verdict quotes the same numbers rather than re-measuring.
+// An unmeasurable session has no cost to quote, which is `undefined`, never `0`.
+function figures_of(measurement: OverMeasurement | undefined): SessionFigures {
+	const verdict = verdict_of(measurement)
+	const is_priced = measurement !== undefined && verdict !== UNMEASURABLE_VERDICT
+	const cost = is_priced ? cost_verdict.per_request_cost(measurement) : undefined
+
+	return { verdict, cost, threshold: CONTEXT_CUT_THRESHOLD }
+}
+
+// The `--cut` verdict and its figures as a value, printing nothing. `run:report --handoff` quotes the
+// figures in the hand-off report; `session_verdict` reads the verdict alone.
+function session_figures(
+	cwd: string = process.cwd(),
+	environment: Environment = process.env,
+): SessionFigures {
+	const provider = provider_of(environment)
+
+	return figures_of(provider === undefined ? undefined : measure(cwd, provider, environment))
+}
+
 // The `--cut` verdict as a value, printing nothing. `run:status` bundles
 // this beside the issue state and the carry record, so it needs the token rather than the exit code
 // `run` returns. `unmeasurable` is the read-only counterpart of `report_empty` / the empty-session
@@ -252,10 +280,7 @@ function session_verdict(
 	cwd: string = process.cwd(),
 	environment: Environment = process.env,
 ): CostVerdict {
-	const provider = provider_of(environment)
-	if (provider === undefined) return UNMEASURABLE_VERDICT
-
-	return verdict_of(measure(cwd, provider, environment))
+	return session_figures(cwd, environment).verdict
 }
 
 function run_context(
@@ -304,10 +329,11 @@ const cost_cli = {
 	parse_options,
 	to_threshold,
 	run,
+	session_figures,
 	session_verdict,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
-export type { CostVerdict, Options }
+export type { CostVerdict, Options, SessionFigures }
 export { cost_cli }

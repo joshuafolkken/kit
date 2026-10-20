@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import type { BoardRow, RowReason } from './run-board-layout'
@@ -214,5 +215,32 @@ describe('run_board_render.render — a parked row’s reason, and a reason cut 
 		expect(line_of({ ...withdrawn, number: ISSUE })).toMatch(
 			new RegExp(`${'x'.repeat(NARROW)}$`, 'u'),
 		)
+	})
+})
+
+// joshuafolkken/kit#4215: a stalled row names its cause and the action that resumes it, which a narrow
+// pane keeps by cutting the title first.
+describe('run_board_render.render — a stalled row’s cause and resume action', () => {
+	const STALLED: RowReason = { text: run_stalled.row_text(ISSUE, 'review failed') }
+	const stalled: BoardRow = {
+		...waiting({ title: LONG_TITLE, reason: STALLED }),
+		state: 'stopped',
+		status: { state: 'stopped', ...ENDED },
+	}
+
+	it('cuts the title first to keep the cause and the action whole', () => {
+		const line = line_of(stalled, NARROW * 2)
+
+		expect(line).toContain(TITLE_START)
+		expect(line).toMatch(/… {2}.* {2}review failed → fullrun #3720$/u)
+		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW * 2)
+	})
+
+	it('cuts the reason to an ellipsis once the title is at the floor', () => {
+		const line = line_of(stalled, NARROW)
+
+		expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
+		expect(line.endsWith('…')).toBe(true)
+		expect(run_board_fit.width_of(line)).toBe(NARROW)
 	})
 })

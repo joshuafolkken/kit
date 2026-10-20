@@ -6,6 +6,7 @@ const FALLBACK_ENTRY = {
 	description: '',
 	category: 'AI tools',
 	reference: ['', 'automation', ['none']],
+	usage: { examples: [] },
 } as const
 
 // The kit-only flag is what a consumer's help and dispatch read to drop a command that only runs in

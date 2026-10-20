@@ -3,6 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { InsertKind, InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
+import { epic_cli_decide } from './epic-cli-decide'
 import { epic_cli_remove } from './epic-cli-remove'
 import { epic_parse, type ExternalChild } from './epic-parse'
 
@@ -64,17 +65,6 @@ interface PromoteArguments {
 	origin?: string | undefined
 }
 
-// Deduplicated because a repeated number would render a duplicate task-list row, and with
-// `--ordered` would ask GitHub to make an issue block itself.
-function to_child_numbers(raw_children: ReadonlyArray<string>): Array<number> {
-	const numbers = raw_children
-		.filter((raw) => issue_number_shape.is_issue_number(raw))
-		.map(Number)
-		.filter((value) => Number.isSafeInteger(value))
-
-	return [...new Set(numbers)]
-}
-
 // The flags a creation and a promotion share, read the same way for both.
 function read_batch_flags(
 	parsed: EpicArgv,
@@ -90,7 +80,7 @@ function to_create_arguments(parsed: EpicArgv): CreateArguments | undefined {
 	const [title, ...raw_children] = parsed.positionals
 	if (title === undefined || title.length === 0) return undefined
 
-	const children = to_child_numbers(raw_children)
+	const children = epic_cli_argv.to_child_numbers(raw_children)
 	if (children.length === 0) return undefined
 
 	return { title, children, ...read_batch_flags(parsed) }
@@ -134,17 +124,9 @@ function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArgume
 // positional is a child. Refused when the epic would also be listed as its own child, which would
 // have it block itself under `--ordered`.
 function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
-	const [raw_epic, ...raw_children] = parsed.positionals
+	const subject = epic_cli_argv.read_epic_children(parsed)
 
-	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
-		return undefined
-	}
-
-	const epic_number = Number(raw_epic)
-	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
-	if (children.length === 0) return undefined
-
-	return { epic_number, children, ...read_batch_flags(parsed) }
+	return subject === undefined ? undefined : { ...subject, ...read_batch_flags(parsed) }
 }
 
 function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
@@ -250,23 +232,8 @@ function is_decision_path_unusable(argv: ReadonlyArray<string>): boolean {
 	return is_value_unusable(argv, DECISION_FLAG)
 }
 
-function read_add_subject(
-	parsed: EpicArgv,
-): { epic_number: number; children: Array<number> } | undefined {
-	const [raw_epic, ...raw_children] = parsed.positionals
-
-	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
-		return undefined
-	}
-
-	const epic_number = Number(raw_epic)
-	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
-
-	return children.length === 0 ? undefined : { epic_number, children }
-}
-
 function to_add_arguments(parsed: EpicArgv): AddArguments | undefined {
-	const subject = read_add_subject(parsed)
+	const subject = epic_cli_argv.read_epic_children(parsed)
 	if (subject === undefined) return undefined
 	const outcome = parse_position(parsed)
 	if (outcome.is_refused) return undefined
@@ -394,6 +361,7 @@ const epic_cli = {
 	is_addition,
 	is_reconciliation,
 	...epic_cli_remove,
+	...epic_cli_decide,
 	find_cross_repo_add_target,
 	is_decision_path_unusable,
 	resolve_local_add,

@@ -6,10 +6,12 @@ import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import {
 	has_label_name,
+	has_parked_label,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
 
@@ -33,11 +35,10 @@ const CLOSED = 'CLOSED'
 const EMPTY_SCOPE: GateScope = { standalone: new Set(), declared: new Map() }
 
 const HEADING_ASSUMPTION =
-	'Assumes every issue in a wave merges before the next wave starts. Issues a run already has are left out, and only issues of this repository are planned.'
+	'Assumes every issue in a wave merges before the next wave starts. Issues a run already has are left out and count as merged first, and only issues of this repository are planned.'
 const UNREACHED_HEADING = 'Not reached — each names what it is waiting on:'
 const PARALLEL_NOTE = '(parallel)'
 const NEEDS_DECISION_NOTE = `waiting on a person (\`${NEEDS_DECISION_LABEL}\`)`
-const RUN_STALLED_NOTE = `stalled mechanically — fix the cause, then remove \`${RUN_STALLED_LABEL}\``
 const NOT_REACHED_NOTE = 'not reached by the waves above'
 const WAVE_GAP_WIDTH = 2
 const PARALLEL_GAP_WIDTH = 3
@@ -47,18 +48,23 @@ const PARALLEL_GAP = ' '.repeat(PARALLEL_GAP_WIDTH)
 interface WavePlan {
 	waves: ReadonlyArray<ReadonlyArray<EpicChild>>
 	unreached: ReadonlyArray<EpicChild>
+	// This repository's running issues, which count as merged before wave 1 and so sit in neither list
+	// above; still the run's own, so `run:board` holds their lanes (kit#3969).
+	running?: ReadonlyArray<EpicChild>
 }
 
+// A park leaves `in-progress` on (`epic-busy.ts`), and a parked issue waits on a person rather than
+// finishing first.
 function is_running(child: EpicChild): boolean {
-	return has_label_name(child.labels, IN_PROGRESS_LABEL)
+	return has_label_name(child.labels, IN_PROGRESS_LABEL) && !has_parked_label(child.labels)
 }
 
 function as_closed(child: EpicChild, done: ReadonlySet<string>): EpicChild {
 	return done.has(epic_graph.key_of(child)) ? { ...child, state: CLOSED } : child
 }
 
-// The pool a wave is chosen from. A running issue is left out of it but kept in `running`, so a child
-// behind it waits on it rather than being handed to a person.
+// The pool a wave is chosen from. `running` is every issue this run may finish, so a child behind one
+// waits on it rather than being handed to a person.
 interface WavePool {
 	children: ReadonlyArray<EpicChild>
 	running: ReadonlySet<string>
@@ -69,12 +75,7 @@ interface WavePool {
 function pool_of(result: EpicNextResult, repo: string, scope: GateScope): WavePool {
 	const all = backlog_rank.everything_in(result)
 
-	return {
-		children: all.filter((child) => !is_running(child)),
-		running: epic_outside_blocker.running_keys(all),
-		repo,
-		scope,
-	}
+	return { children: all, running: epic_outside_blocker.running_keys(all), repo, scope }
 }
 
 function offer(
@@ -109,15 +110,31 @@ function next_wave(pool: WavePool, done: ReadonlySet<string>): ReadonlyArray<Epi
 	)
 }
 
+// `backlog:next` offers nothing behind a running issue, so an empty first wave still asks for the
+// issues the running ones release.
+function opening_wave(
+	result: EpicNextResult,
+	pool: WavePool,
+	done: ReadonlySet<string>,
+): ReadonlyArray<EpicChild> {
+	const wave = first_wave(result, pool)
+
+	return wave.length > 0 ? wave : next_wave(pool, done)
+}
+
 // Each wave is closed before the next is asked for; a wave that offers nothing ends the plan, which
 // the pool's size bounds because every wave closes at least one child. `scope` names the rows the
 // offer's cap bounds and the paths each issue declares; left empty, no wave is capped or separated.
 function build(result: EpicNextResult, repo: string, scope: GateScope = EMPTY_SCOPE): WavePlan {
 	const pool = pool_of(result, repo, scope)
-	const done = new Set<string>()
+	const running = pool.children.filter((child) => child.repo === repo && is_running(child))
+	// A running issue finishes first, before any wave: it starts closed, so it is never offered and the
+	// issues behind it reach a later wave instead of waiting past the plan. Another repository's is not
+	// this run's to finish, and closing it would answer its release from the version already out.
+	const done = new Set(running.map((child) => epic_graph.key_of(child)))
 	const waves: Array<ReadonlyArray<EpicChild>> = []
 
-	for (let wave = first_wave(result, pool); wave.length > 0; wave = next_wave(pool, done)) {
+	for (let wave = opening_wave(result, pool, done); wave.length > 0; wave = next_wave(pool, done)) {
 		waves.push(wave)
 		for (const child of wave) done.add(epic_graph.key_of(child))
 	}
@@ -126,7 +143,12 @@ function build(result: EpicNextResult, repo: string, scope: GateScope = EMPTY_SC
 		.everything_in(result)
 		.filter((child) => child.repo === repo && !done.has(epic_graph.key_of(child)))
 
-	return { waves, unreached }
+	return { waves, unreached, running }
+}
+
+// A stalled issue's note ends on the one next action its park comment names (`run-stalled.ts`).
+function run_stalled_note(child: number): string {
+	return `stalled mechanically — ${run_stalled.next_step(child)}`
 }
 
 // The plan's own "waiting on" wording is reused, so an unreached issue names its blocker the way the
@@ -134,7 +156,7 @@ function build(result: EpicNextResult, repo: string, scope: GateScope = EMPTY_SC
 // as not reached instead.
 function unreached_note(child: EpicChild, context: PlanContext): string {
 	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return NEEDS_DECISION_NOTE
-	if (has_label_name(child.labels, RUN_STALLED_LABEL)) return RUN_STALLED_NOTE
+	if (has_label_name(child.labels, RUN_STALLED_LABEL)) return run_stalled_note(child.number)
 	const note = backlog_plan.waiting_note(child, context)
 
 	return note === backlog_plan.PAST_OFFER_NOTE ? NOT_REACHED_NOTE : note
@@ -177,7 +199,7 @@ const backlog_waves = {
 	HEADING_ASSUMPTION,
 	NEEDS_DECISION_NOTE,
 	PARALLEL_NOTE,
-	RUN_STALLED_NOTE,
+	run_stalled_note,
 	UNREACHED_HEADING,
 	build,
 	format_waves,

@@ -334,7 +334,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "epic:bundle": [
-      "<issue>",
+      "<issue> [--apply]",
       "automation",
       [
         "network",
@@ -680,6 +680,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "files",
+      ],
+    ],
+    "latest:if-required": [
+      "",
+      "automation",
+      [
+        "files",
+        "network",
+        "processes",
       ],
     ],
     "latest:scope": [
@@ -1055,14 +1064,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:carry": [
-      "[options]",
+      "<operation> [arguments...]",
       "automation",
       [
         "files",
       ],
     ],
     "run:cut": [
-      "[--resume] <issue> [--impl] [--handoff <path>] [--json] [--end]",
+      "[--resume] <issue> [--impl] [--handoff <path>]",
       "automation",
       [
         "files",
@@ -1128,6 +1137,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "run:pause": [
+      "<issue> --for <prerequisite>",
+      "automation",
+      [
+        "git",
+        "network",
+        "files",
+      ],
+    ],
     "run:prep": [
       "<issue>",
       "automation",
@@ -1150,7 +1168,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:report": [
-      "",
+      "[--handoff]",
       "automation",
       [
         "files",

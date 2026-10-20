@@ -26,6 +26,7 @@ import {
 } from '#scripts/run/carry/run-carry'
 import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
+import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge } from './run-merge'
 import { run_merge_ship } from './run-merge-ship'
@@ -55,10 +56,6 @@ const MERGE_CLOSER = 'pnpm josh run:merge'
 const SINGLE_READ = { attempts: 1, interval_ms: 0 }
 const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
-// What the driver judged when it parks a child, stated on the issue.
-const FAILED_CAUSE = 'the child’s session ended with its issue still open and unfinished.'
-const CUT_RELAUNCH_CAUSE =
-	'its lane held a declared cut, but no successor could be relaunched from it (or it already was once).'
 
 // One returned child's context, gathered from the command line by the CLI.
 interface MergeContext {
@@ -89,6 +86,8 @@ interface FailedResult {
 	// What the child was released to wait on — its open `blocked-by` blockers, cited, and a start date
 	// still ahead — empty for a child that was parked (or refused) instead.
 	waits: ReadonlyArray<string>
+	// The short name of why a parked child was parked, which its park event carries.
+	cause?: string | undefined
 }
 
 const NO_WAITS: ReadonlyArray<string> = []
@@ -358,7 +357,7 @@ async function do_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Prom
 // so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the carry record
 // rejected the count. A park is always explained on the issue — `cause` says what was judged, and the
 // comment what was read and what a person does next.
-async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResult> {
+async function park_failed(ctx: MergeContext, cause: StallCause): Promise<FailedResult> {
 	const result = await apply_carry(ctx, run_merge.change_of('failed'))
 
 	if (result.kind === 'refused') return refused_result(result.carry)
@@ -366,22 +365,30 @@ async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResu
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
 	await release_child(ctx.child)
-	const reason = { child: ctx.child, cause, carry, output: ctx.output }
+	const reason = { child: ctx.child, cause: cause.why, carry, output: ctx.output }
 	const park = await issue_park.apply(ctx.child, RUN_STALLED_LABEL, run_merge.park_comment(reason))
 
-	return { carry, is_parked: park.is_labelled, is_refused: false, waits: NO_WAITS }
+	return {
+		carry,
+		is_parked: park.is_labelled,
+		is_refused: false,
+		waits: NO_WAITS,
+		cause: cause.short,
+	}
 }
 
 // A child that ended unfinished: waiting when it records an open blocker or a start date still ahead
 // (`do_waiting`), parked otherwise (`park_failed`) — a recorded order or date is never a decision for a
 // person. Without a cause of the caller's, a child whose detached ship ended is parked for the ship's
 // stop.
-async function do_failed(ctx: MergeContext, cause?: string): Promise<FailedResult> {
+async function do_failed(ctx: MergeContext, cause?: StallCause): Promise<FailedResult> {
 	const waits = [...(await open_blockers(ctx.child)), ...(await start_date_wait(ctx))]
 
 	if (waits.length > 0) return await do_waiting(ctx, waits)
 
-	return await park_failed(ctx, cause ?? run_merge_ship.cause(ctx.child) ?? FAILED_CAUSE)
+	const judged = cause ?? run_merge_ship.cause(ctx.child) ?? run_stalled.SESSION_UNFINISHED
+
+	return await park_failed(ctx, judged)
 }
 
 // The outcome of counting an outage: the record to read the streak against, and whether the count was
@@ -487,7 +494,6 @@ async function ask_next(ctx: MergeContext): Promise<string> {
 }
 
 const run_merge_steps = {
-	CUT_RELAUNCH_CAUSE,
 	ask_next,
 	close_split_lane,
 	release_child,

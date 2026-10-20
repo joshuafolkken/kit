@@ -29,6 +29,51 @@ interface ReportLabels {
 	evidence: string
 	caught_by: string
 	remaining: string
+	handoff: HandoffLabels
+}
+
+// The hand-off report's labels (`run:report --handoff`) — a fourth kind of stop, so it carries none of
+// the completion report's `cause` / `fix` / `result`.
+interface HandoffLabels {
+	title: string
+	done: string
+	remaining: string
+	why_stopped: string
+	next_command: string
+	measurement: string
+	handover: string
+	handover_text: string
+	parked: string
+	pool: string
+	none: string
+}
+
+const JAPANESE_HANDOFF_LABELS: HandoffLabels = {
+	title: '■ 区切り',
+	done: '終わったこと',
+	remaining: '残っていること',
+	why_stopped: '止めた理由',
+	next_command: '次に打つコマンド',
+	measurement: '計測',
+	handover: '引き継ぎ',
+	handover_text: '状態は GitHub とラン記録にあり、会話には何も無い',
+	parked: 'park 済み',
+	pool: '残りの auto-ok プール',
+	none: 'なし',
+}
+
+const ENGLISH_HANDOFF_LABELS: HandoffLabels = {
+	title: '■ Hand-off',
+	done: 'Done',
+	remaining: 'Remaining',
+	why_stopped: 'Why it stopped',
+	next_command: 'Next command',
+	measurement: 'Measurement',
+	handover: 'Handover',
+	handover_text: 'The state is on GitHub and in the run record; nothing is in the conversation',
+	parked: 'parked',
+	pool: 'the rest of the auto-ok pool',
+	none: 'none',
 }
 
 const JAPANESE_LABELS: ReportLabels = {
@@ -55,6 +100,7 @@ const JAPANESE_LABELS: ReportLabels = {
 	evidence: '実行証跡',
 	caught_by: '捕まえられた検証',
 	remaining: '残課題',
+	handoff: JAPANESE_HANDOFF_LABELS,
 }
 
 const ENGLISH_LABELS: ReportLabels = {
@@ -92,6 +138,7 @@ const ENGLISH_LABELS: ReportLabels = {
 	evidence: 'Execution evidence',
 	caught_by: 'Caught by',
 	remaining: 'Remaining',
+	handoff: ENGLISH_HANDOFF_LABELS,
 }
 
 function labels_for(lang: string): ReportLabels {
@@ -104,5 +151,5 @@ function session_labels(): ReportLabels {
 
 const report_labels = { ENGLISH_LABELS, JAPANESE_LABELS, labels_for, session_labels }
 
-export type { ReportLabels }
+export type { HandoffLabels, ReportLabels }
 export { report_labels }

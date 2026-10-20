@@ -7,6 +7,8 @@ import { git_issue } from '#scripts/git/git-issue'
 import { git_preflight, type Unmet } from '#scripts/git/git-preflight'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { report_format_reference } from '#scripts/report/report-format-reference'
+import { acceptance_map } from '#scripts/review/acceptance-map'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { run_ship_lock } from './run-ship-lock'
@@ -37,6 +39,7 @@ const PRECONDITION = {
 } as const
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the PR body has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
 const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section to a file and hand it to josh ship with --body-file <path>, or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
+const ACCEPTANCE_PENDING = `Put this ${acceptance_map.MAP_HEADING} section into the --body-file josh ship is handed, replacing each pending row's ending with what met or deferred it (format: ${report_format_reference.pointer(report_format_reference.ACCEPTANCE_MAP_HEADING)}), or the ship refuses:`
 
 interface PreflightRequest {
 	title: string
@@ -153,23 +156,55 @@ async function classification_problems(issue_number: string): Promise<Array<Unme
 	return []
 }
 
-// **The same two refusals, asked before the ship rather than by it**: a missing
-// classification or missing evidence is known long before the ship, yet refused there at the run's
-// largest context. `run:prep` (and so `run:entry`)
-// and `run:step` print this, so the Issue body and the evidence are met while they are cheap. Nothing
-// here replaces `stage`: the ship and `followup` still refuse on both. Before the PR exists the evidence
-// can only live in the file the ship will be handed, so it is asked for as that file, not reported as a
-// body that already failed.
-async function ahead(issue_number: string): Promise<Array<string>> {
-	const [classification, evidence] = await Promise.all([
-		caught(classification_problems(issue_number)),
-		caught(evidence_problems(undefined, EVIDENCE_PENDING)),
-	])
+// Only a body still to be written is handed every row as pending: an open PR's body keeps the refusal,
+// which names just the rows missing, stale or deferred to an issue that does not exist.
+async function pending_map(
+	issue_number: string,
+	pr_body: string | undefined,
+): Promise<string | undefined> {
+	if (pr_body !== undefined) return undefined
 
-	return [...classification, ...evidence].map(({ problem }) => problem)
+	return acceptance_map.skeleton(await git_gh_command.issue_get_body(issue_number))
 }
 
-const run_ship_preflight = { EVIDENCE_PENDING, EVIDENCE_PROBLEM, ahead, stage }
+// The acceptance-map refusal asked early carries the rows to write, identifiers included, built by
+// `acceptance_map.skeleton` — the one builder `josh pr` uses too (joshuafolkken/kit#4244). An Issue
+// with no criteria to build rows from keeps the refusal's own wording.
+async function acceptance_pending(issue_number: string): Promise<Array<Unmet>> {
+	const pr_body = await body_text(undefined)
+	const problem = await acceptance_map_check.body_refusal(issue_number, pr_body)
+
+	if (problem === undefined) return []
+	const map = await pending_map(issue_number, pr_body)
+	const pending = map === undefined ? problem : `${ACCEPTANCE_PENDING}\n${map}`
+
+	return of_kind(PRECONDITION.ACCEPTANCE_MAP, [pending])
+}
+
+// **The same refusals, asked before the ship rather than by it**: a missing classification, missing
+// evidence or an unmapped acceptance criterion is known long before the ship, yet refused there at the
+// run's largest context. `run:prep` (and so `run:entry`)
+// and `run:step` print this, so the Issue body and the PR body are met while they are cheap. Nothing
+// here replaces `stage`: the ship and `followup` still refuse on all of them. Before the PR exists the
+// evidence can only live in the file the ship will be handed, so it is asked for as that file, not
+// reported as a body that already failed.
+async function ahead(issue_number: string): Promise<Array<string>> {
+	const [classification, evidence, acceptance] = await Promise.all([
+		caught(classification_problems(issue_number)),
+		caught(evidence_problems(undefined, EVIDENCE_PENDING)),
+		caught(acceptance_pending(issue_number)),
+	])
+
+	return [...classification, ...evidence, ...acceptance].map(({ problem }) => problem)
+}
+
+const run_ship_preflight = {
+	ACCEPTANCE_PENDING,
+	EVIDENCE_PENDING,
+	EVIDENCE_PROBLEM,
+	ahead,
+	stage,
+}
 
 export type { PreflightRequest, PreflightResult }
 export { run_ship_preflight }

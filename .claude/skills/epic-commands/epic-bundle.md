@@ -39,6 +39,8 @@ Could not confirm which epic already tracks these — do not place this issue in
 It prints no children or order. What survives the cut is a membership that *was* found (the table's
 first row).
 
+**`pnpm josh epic:bundle <N> --apply` writes `add_to_epic` / `create_epic`**; `ask` is placed below.
+
 **Placing an issue is not merging epics.** Choosing between two candidate epics is Tier A: take the one
 you recommend and write the decision (taken, rejected, why, date) on **both** the issue and the epic's
 `## Decisions`. **Merging two epics is a different action, and nothing here proposes it.**
@@ -56,7 +58,7 @@ written:
   order in backticks or a fenced block.
 - **An empty record, or `--decision-file` with no usable path.**
 
-For children the epic already tracks: `SKILL.md` → "Recording a decision".
+Children already tracked: `pnpm josh epic --decide` (`SKILL.md` → "Recording a decision").
 
 **Its sibling runs before the filing: `pnpm josh issue:scout "<title>"`** — the same epic question for
 an issue not yet filed, plus whether the work is already filed. **Both run**: `pnpm josh issue:file`

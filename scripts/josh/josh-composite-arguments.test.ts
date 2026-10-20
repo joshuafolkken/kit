@@ -11,6 +11,7 @@ const COMPOSITE_ENTRY: CommandEntry = {
 	description: 'Run unit and E2E tests',
 	category: 'Development',
 	reference: ['', 'developer', ['processes']],
+	usage: { examples: [] },
 	argument_targets: ['test:unit', 'test:e2e'],
 }
 
@@ -19,6 +20,7 @@ const NO_TARGET_ENTRY: CommandEntry = {
 	description: 'Checkout default branch and pull latest',
 	category: 'Workflow',
 	reference: ['', 'developer', ['git', 'network']],
+	usage: { examples: [] },
 }
 
 const DIRECT_ENTRY: CommandEntry = {
@@ -26,6 +28,7 @@ const DIRECT_ENTRY: CommandEntry = {
 	description: 'Check formatting with prettier',
 	category: 'Development',
 	reference: ['', 'developer', ['processes']],
+	usage: { examples: [] },
 }
 
 const SCRIPT_ENTRY: CommandEntry = {
@@ -33,6 +36,7 @@ const SCRIPT_ENTRY: CommandEntry = {
 	description: 'Run E2E tests with Playwright',
 	category: 'Development',
 	reference: ['', 'developer', ['processes']],
+	usage: { examples: [] },
 }
 
 describe('composite_arguments.is_composite_shell', () => {

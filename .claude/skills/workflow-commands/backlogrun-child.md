@@ -15,7 +15,8 @@ or a split found mid-run does **not** stop it:
 
 1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
    confirmation.
-2. **Stash and remove `in-progress`**, as steps 2 and 4 of "A prerequisite discovered mid-run" do:
+2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
+   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
    `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
@@ -93,14 +94,13 @@ creates the epic. Errors stop the run; warnings are read and passed. Fixing a fi
 
 ## `josh latest` runs once per session, not once per child
 
-Ask once, the first time the loop hands back a child number, before implementing it:
+Run once, the first time the loop hands back a child number, before implementing it:
 
 ```bash
-pnpm josh latest:scope   # → required | skip ; the reason on stderr
-pnpm josh stash:push "backlogrun: josh latest #<N>"        # `clean` when nothing changed — never conditional on the answer
+pnpm josh stash:push "backlogrun: ms #<N>"   # `clean` when nothing changed
 pnpm josh ms
-pnpm josh latest         # on `required` only
-pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only after `stashed` above
+pnpm josh stash:pop "backlogrun: ms #<N>"    # only after `stashed` above
+pnpm josh latest:if-required                 # stash → josh latest → pop; nothing on `skip`
 ```
 
 On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed
