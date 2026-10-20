@@ -2,6 +2,7 @@ import { lane_await } from '#scripts/lane/lane-await'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -174,6 +175,16 @@ function planned_statuses(
 	)
 }
 
+// The earlier run's lanes still holding a place, a paused one drawn paused as this run's own is.
+function earlier_here(state: BoardState, local: LocalRead): EarlierLanes {
+	const statuses = local.earlier_statuses ?? new Map<number, ItemStatus>()
+
+	return {
+		lanes: local.earlier_occupied ?? [],
+		statuses: run_board_paused.paused_over(statuses, state.usage?.paused),
+	}
+}
+
 // The plan laid under its statuses, each waiting row saying why it waits.
 function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
 	const statuses = planned_statuses(state, plan, local)
@@ -190,7 +201,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		with_closed(plan, state.closed),
 		statuses,
 		reason_of,
-		local.earlier_occupied,
+		earlier_here(state, local),
 	)
 }
 
@@ -201,10 +212,11 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
 	const statuses = run_board_status.statuses_of(local.events, local.lanes, new Set(), stopped)
+	const own = run_board_earlier.own_statuses(statuses, local.earlier_lanes)
 
 	return run_board_layout.local_layout_of(
-		run_board_paused.paused_over(statuses, state.usage?.paused),
-		local.earlier_occupied,
+		run_board_paused.paused_over(own, state.usage?.paused),
+		earlier_here(state, local),
 	)
 }
 

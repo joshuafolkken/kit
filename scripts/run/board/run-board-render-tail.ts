@@ -1,9 +1,10 @@
 import { styleText } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels, type TextColor } from './run-board-labels'
-import type { BoardRow } from './run-board-layout'
+import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_now, type TimedLine } from './run-board-now'
 import type { Phase } from './run-board-phase'
 import { run_board_render_checks } from './run-board-render-checks'
@@ -19,6 +20,7 @@ import { run_board_render_waits } from './run-board-render-waits'
 // activity's place, in the same columns (#4052).
 
 const { KIND_BLANK, PHASE_ICONS, span_of } = run_board_labels
+const { is_live } = run_board_earlier
 const { held_of, held_text } = run_board_render_waits
 const GAP = '  '
 // A phase past twice its usual time is drawn as long, past three times as alarming.
@@ -55,11 +57,12 @@ function current_of(row: BoardRow): { phase: Phase; since_ms: number } | undefin
 	return phase === undefined || phase_ms === undefined ? undefined : { phase, since_ms: phase_ms }
 }
 
-// A column's width: the widest span `age_of` gives any running row in this frame, and `0″`'s at the
-// least, so a row with none still blanks a column's width.
+// A column's width: the widest span `age_of` gives any running row or earlier run's lane in this
+// frame, and `0″`'s at the least, so a row with none still blanks a column's width.
 function column_width(header: BoardHeader, age_of: (row: BoardRow) => number | undefined): number {
-	const spans = (header.layout?.active ?? []).map((row) => {
-		const age = row.state === 'running' ? age_of(row) : undefined
+	const rows = run_board_layout.lane_rows(header.layout ?? run_board_layout.EMPTY_LAYOUT, [])
+	const spans = rows.map((row) => {
+		const age = is_live(row) ? age_of(row) : undefined
 
 		return age === undefined ? 0 : span_of(age).length
 	})
@@ -92,7 +95,7 @@ function phase_part(row: BoardRow, header: BoardHeader): string {
 // The icon of the phase a running row's end draws, `undefined` where it draws blanks — named by the
 // legend, since a held row leads with 🚧 instead.
 function phase_icon(row: BoardRow): string | undefined {
-	const current = row.state === 'running' ? current_of(row) : undefined
+	const current = is_live(row) ? current_of(row) : undefined
 
 	return current === undefined ? undefined : PHASE_ICONS[current.phase]
 }
@@ -119,7 +122,7 @@ function newest_timed(row: BoardRow, header: BoardHeader): TimedActivity | undef
 
 // A running row whose lane no core-budget wait holds.
 function is_free(row: BoardRow, header: BoardHeader): boolean {
-	return row.state === 'running' && held_of(row, header) === undefined
+	return is_live(row) && held_of(row, header) === undefined
 }
 
 // A row in followup with its pull request's checks on the stream (joshuafolkken/kit#3770), whose end
@@ -176,9 +179,9 @@ function activity_part(row: BoardRow, header: BoardHeader): string {
 	return `${GAP}${run_board_header.aged(text, age)}`
 }
 
-// Whether a row ends on a tail: a running row only.
+// Whether a row ends on a tail: a running row and an earlier run's lane only.
 function is_tailed(row: BoardRow): boolean {
-	return row.state === 'running'
+	return is_live(row)
 }
 
 // A running row's end, nothing for any other; a followup row's checks follow its phase part as a part
