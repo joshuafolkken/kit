@@ -1,13 +1,19 @@
 import path from 'node:path'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
+import { test_related } from '#scripts/test/test-related'
 import { gate_plan } from './gate-plan'
 import { toolchain_config } from './toolchain-config'
 
 // Which paths each gate check reads, so a gate re-run reuses a check none of whose inputs moved
 // (`check-reuse.ts`). **A check with no scope here always runs**: `cspell` reads every
-// text file, the unit suite reads documents and fixtures as well as code, and `behavior` reads a
-// transcript outside the tree. Naming a scope for any of them would be a guess, and a wrong guess is a
-// check reported green without having run.
+// text file and `behavior` reads a transcript outside the tree. Naming a scope for either would be a
+// guess, and a wrong guess is a check reported green without having run.
+//
+// **The unit step's scope is the test-read map's, not a guess** (joshuafolkken/kit#4314): it is
+// reusable only when `josh test:related` would run no test for what moved — every moved file one no
+// recorded test reads. No map, or one recorded on a tree git can no longer diff against, reaches every
+// test, so the step runs.
 //
 // `metrics` reads the scripts it counts, the approvals under `.josh/metrics-accepted/` (JSON) and the
 // Markdown it measures (`metrics-command.ts`), so its inputs are the sources plus every `.md` — a
@@ -91,25 +97,37 @@ const SCOPES: ReadonlyMap<string, InputTest> = new Map([
 ])
 
 function is_scoped(label: string): boolean {
-	return SCOPES.has(label)
+	return SCOPES.has(label) || label === gate_plan.UNIT_LABEL
+}
+
+async function touches_scope(
+	is_input: InputTest,
+	paths: ReadonlyArray<string>,
+	is_ignored: PrettierIgnored,
+): Promise<boolean> {
+	const answers = await Promise.all(
+		paths.map(async (relative) => await is_input(relative, is_ignored)),
+	)
+
+	return answers.includes(true)
 }
 
 // Whether any of `paths` (repository-root relative) is an input of the check `label`. An unscoped
-// check answers `true` for every set of paths, so the only way to reuse it is never.
+// check answers `true` for every set of paths, so the only way to reuse it is never. The unit step's
+// inputs are a property of the whole set rather than of each path, so `josh test:related` answers
+// them with the decision it narrows by.
 async function touches_inputs(
 	label: string,
 	paths: ReadonlyArray<string>,
 	is_ignored: PrettierIgnored,
+	root: string = PROJECT_ROOT,
 ): Promise<boolean> {
+	if (toolchain_config.has_config(paths)) return true
+	if (label === gate_plan.UNIT_LABEL) return await test_related.reaches_tests(root, paths)
+
 	const scope = SCOPES.get(label)
 
-	if (scope === undefined || toolchain_config.has_config(paths)) return true
-
-	const answers = await Promise.all(
-		paths.map(async (relative) => await scope(relative, is_ignored)),
-	)
-
-	return answers.includes(true)
+	return scope === undefined || (await touches_scope(scope, paths, is_ignored))
 }
 
 const check_inputs = { is_scoped, prettier_ignored, touches_inputs }

@@ -1,5 +1,6 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { describe, expect, it } from 'vitest'
+import { test_related } from '#scripts/test/test-related'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_inputs } from './check-inputs'
 import { gate_plan } from './gate-plan'
 
@@ -9,6 +10,7 @@ import { gate_plan } from './gate-plan'
 const { EXPORTS_LABEL, LINT_LABEL, METRICS_LABEL, TYPE_CHECK_LABEL } = gate_plan
 const SKILL_DOC = '.claude/skills/x/SKILL.md'
 const SOURCE = 'scripts/gate/check-inputs.ts'
+const LOCK_FILE = 'pnpm-lock.yaml'
 
 async function never_ignored(): Promise<boolean> {
 	return false
@@ -47,7 +49,7 @@ describe('check_inputs.touches_inputs', () => {
 
 	it('reads a lock file as an input of every scoped check', async () => {
 		await expect(
-			check_inputs.touches_inputs(TYPE_CHECK_LABEL, ['pnpm-lock.yaml'], always_ignored),
+			check_inputs.touches_inputs(TYPE_CHECK_LABEL, [LOCK_FILE], always_ignored),
 		).resolves.toBe(true)
 	})
 
@@ -76,6 +78,34 @@ describe('check_inputs.touches_inputs for metrics', () => {
 				never_ignored,
 			),
 		).resolves.toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4314: the unit step's inputs are what `josh test:related` would run tests for.
+describe('check_inputs.touches_inputs for the unit step', () => {
+	const { UNIT_LABEL } = gate_plan
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('is scoped, and asks test:related whether the moved set reaches a test', async () => {
+		const reaches = vi.spyOn(test_related, 'reaches_tests').mockResolvedValue(false)
+
+		expect(check_inputs.is_scoped(UNIT_LABEL)).toBe(true)
+		await expect(
+			check_inputs.touches_inputs(UNIT_LABEL, ['README.md'], never_ignored, PROJECT_ROOT),
+		).resolves.toBe(false)
+		expect(reaches).toHaveBeenCalledWith(PROJECT_ROOT, ['README.md'])
+	})
+
+	it('reads a lock file as an input without asking', async () => {
+		const reaches = vi.spyOn(test_related, 'reaches_tests').mockResolvedValue(false)
+
+		await expect(check_inputs.touches_inputs(UNIT_LABEL, [LOCK_FILE], never_ignored)).resolves.toBe(
+			true,
+		)
+		expect(reaches).not.toHaveBeenCalled()
 	})
 })
 
