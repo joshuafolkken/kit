@@ -1,3 +1,5 @@
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { lane_residents, type ResidentProbes } from './lane-residents'
 
@@ -28,9 +30,11 @@ const GROUPS = new Map([
 function probes_over(
 	directories: ReadonlyMap<number, string>,
 	signalled: Array<number>,
+	marks: ReadonlyMap<number, string> = new Map(),
 ): ResidentProbes {
 	return {
 		directories: () => directories,
+		marks: () => marks,
 		own: () => new Set([OWN]),
 		groups_of: (pids) => new Map(pids.map((pid) => [pid, GROUPS.get(pid) ?? pid])),
 		terminate: (pid) => {
@@ -40,6 +44,24 @@ function probes_over(
 		},
 	}
 }
+
+const SUBJECT = { issue: '42', directory: LANE }
+const MARKED_IN_MAIN = 71_001
+const MARKED_IN_TMP = 71_002
+const OTHER_MARKED = 71_003
+const MARKED_MACHINE = new Map([
+	[DETACHED_BOARD, LANE],
+	[MARKED_IN_MAIN, MAIN_CHECKOUT],
+	[MARKED_IN_TMP, path.join(os.tmpdir(), 'rb42')],
+	[OTHER_MARKED, MAIN_CHECKOUT],
+	[MAIN_NODE, MAIN_CHECKOUT],
+])
+const MARKS = new Map([
+	[DETACHED_BOARD, '42'],
+	[MARKED_IN_MAIN, '42'],
+	[MARKED_IN_TMP, '42'],
+	[OTHER_MARKED, '420'],
+])
 
 const MACHINE = new Map([
 	[DETACHED_BOARD, LANE],
@@ -57,7 +79,7 @@ describe('lane_residents.end_residents', () => {
 	it('terminates every process running from the lane checkout, at any depth', () => {
 		const signalled: Array<number> = []
 		const ended = lane_residents.end_residents(
-			LANE,
+			SUBJECT,
 			[ALREADY_REAPED],
 			probes_over(MACHINE, signalled),
 		)
@@ -69,13 +91,45 @@ describe('lane_residents.end_residents', () => {
 	it('never signals another lane’s, the main checkout’s or the caller’s own processes', () => {
 		const signalled: Array<number> = []
 
-		lane_residents.end_residents(LANE, [], probes_over(MACHINE, signalled))
+		lane_residents.end_residents(SUBJECT, [], probes_over(MACHINE, signalled))
 
 		expect(signalled).not.toContain(OTHER_LANE_NODE)
 		expect(signalled).not.toContain(MAIN_NODE)
 		expect(signalled).not.toContain(OWN)
 		expect(signalled).not.toContain(OWN_HELPER)
 		expect(signalled).not.toContain(PIPED_SIBLING)
+	})
+})
+
+// joshuafolkken/kit#4315: two `script`-wrapped `run:board` processes a lane started from the main
+// checkout sat under pid 1 for nine hours — no working directory under the lane found them, the mark did.
+describe('lane_residents.end_residents — the lane mark', () => {
+	it('terminates a marked process wherever it runs, once even when its directory matches too', () => {
+		const ended = lane_residents.end_residents(SUBJECT, [], probes_over(MARKED_MACHINE, [], MARKS))
+
+		expect(ended).toStrictEqual([DETACHED_BOARD, MARKED_IN_MAIN, MARKED_IN_TMP])
+	})
+
+	it('never signals an unmarked process outside the lane, nor one marked for another issue', () => {
+		const ended = lane_residents.end_residents(SUBJECT, [], probes_over(MARKED_MACHINE, [], MARKS))
+
+		expect(ended).not.toContain(MAIN_NODE)
+		expect(ended).not.toContain(OTHER_MARKED)
+	})
+
+	it('spares the caller’s ancestry and group even when they carry the mark', () => {
+		const marks = new Map([...MARKS, [OWN, SUBJECT.issue], [OWN_HELPER, SUBJECT.issue]])
+		const ended = lane_residents.end_residents(SUBJECT, [], probes_over(new Map(), [], marks))
+
+		expect(ended).toStrictEqual([DETACHED_BOARD, MARKED_IN_MAIN, MARKED_IN_TMP])
+	})
+
+	it('answers undefined, signalling nothing, when the marks could not be read', () => {
+		const signalled: Array<number> = []
+		const probes = { ...probes_over(MACHINE, signalled), marks: () => undefined }
+
+		expect(lane_residents.end_residents(SUBJECT, [], probes)).toBeUndefined()
+		expect(signalled).toStrictEqual([])
 	})
 })
 
@@ -87,7 +141,7 @@ describe('lane_residents.end_residents when a signal or the reading fails', () =
 			directories: () => undefined,
 		}
 
-		expect(lane_residents.end_residents(LANE, [], probes)).toBeUndefined()
+		expect(lane_residents.end_residents(SUBJECT, [], probes)).toBeUndefined()
 		expect(signalled).toStrictEqual([])
 	})
 
@@ -97,7 +151,7 @@ describe('lane_residents.end_residents when a signal or the reading fails', () =
 			terminate: (pid) => pid !== DETACHED_NODE,
 		}
 
-		expect(lane_residents.end_residents(LANE, [], probes)).toStrictEqual([
+		expect(lane_residents.end_residents(SUBJECT, [], probes)).toStrictEqual([
 			DETACHED_BOARD,
 			DEEP_NODE,
 			ALREADY_REAPED,
@@ -106,7 +160,7 @@ describe('lane_residents.end_residents when a signal or the reading fails', () =
 
 	it('spares the caller’s ancestry alone when its own group could not be read', () => {
 		const probes: ResidentProbes = { ...probes_over(MACHINE, []), groups_of: () => new Map() }
-		const ended = lane_residents.end_residents(LANE, [ALREADY_REAPED], probes)
+		const ended = lane_residents.end_residents(SUBJECT, [ALREADY_REAPED], probes)
 
 		expect(ended).not.toContain(OWN)
 		expect(ended).toContain(OWN_HELPER)
@@ -116,7 +170,7 @@ describe('lane_residents.end_residents when a signal or the reading fails', () =
 describe('lane_residents.residents_sentence', () => {
 	it('says nothing when nothing ran from the checkout, and a failed reading as failed', () => {
 		expect(lane_residents.residents_sentence([], '#42')).toBeUndefined()
-		expect(lane_residents.residents_sentence(undefined, '#42')).toContain('lsof failed')
+		expect(lane_residents.residents_sentence(undefined, '#42')).toContain('lsof or ps failed')
 	})
 })
 

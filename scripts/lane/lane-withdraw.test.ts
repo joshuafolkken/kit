@@ -164,7 +164,7 @@ describe('lane_withdraw.withdraw — processes still running from the checkout',
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain(
-			`Terminated 1 process(es) still running from the lane checkout`,
+			`Terminated 1 process(es) still running from the lane`,
 		)
 	})
 
@@ -172,7 +172,7 @@ describe('lane_withdraw.withdraw — processes still running from the checkout',
 		close_lane.mockResolvedValue({ ...CLOSED_LANE, residents: undefined })
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('lsof failed')
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('lsof or ps failed')
 	})
 })
 

@@ -198,9 +198,10 @@ describe('ending the lane child with its lane', () => {
 
 		const outcome = await lane_close.close_lane(ISSUE)
 
-		expect(vi.mocked(lane_residents.end_residents)).toHaveBeenCalledWith(lane.directory, [
-			hung_child,
-		])
+		expect(vi.mocked(lane_residents.end_residents)).toHaveBeenCalledWith(
+			{ issue: ISSUE, directory: lane.directory },
+			[hung_child],
+		)
 		expect(outcome.residents).toStrictEqual(detached)
 	})
 })
