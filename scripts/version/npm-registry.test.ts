@@ -170,3 +170,39 @@ describe('npm_registry.has_public_version', () => {
 		expect(npm_registry.has_public_version(KIT_PACKAGE, LATEST)).toBe(false)
 	})
 })
+
+describe('npm_registry.view', () => {
+	const VIEW_OPTIONS = { reject: false, timeout: 30_000 }
+
+	it('asks pnpm for the field of the spec', () => {
+		execa_outcomes.mockReturnValue(fake_result(LATEST))
+
+		expect(npm_registry.view(KIT_PACKAGE, 'version')).toStrictEqual({
+			exit_code: 0,
+			stdout: LATEST,
+		})
+		expect(execa_outcomes).toHaveBeenCalledWith(
+			'pnpm',
+			['view', KIT_PACKAGE, 'version'],
+			VIEW_OPTIONS,
+		)
+	})
+
+	it('asks for JSON when the format is json', () => {
+		execa_outcomes.mockReturnValue(fake_result('{}'))
+		npm_registry.view('pnpm', 'time', 'json')
+
+		expect(execa_outcomes).toHaveBeenCalledWith(
+			'pnpm',
+			['view', 'pnpm', 'time', '--json'],
+			VIEW_OPTIONS,
+		)
+	})
+
+	// A timed-out spawn carries no exit code, which must not read as success.
+	it('reads a missing exit code as a failure', () => {
+		execa_outcomes.mockReturnValue({ stdout: '' })
+
+		expect(npm_registry.view(KIT_PACKAGE, 'version').exit_code).toBe(1)
+	})
+})
