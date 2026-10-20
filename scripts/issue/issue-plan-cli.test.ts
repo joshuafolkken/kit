@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLANNED_LABEL } from './issue-labels'
 import { issue_plan_cli } from './issue-plan-cli'
+import { plan_consumers_section } from './plan-consumers-section'
 
 // joshuafolkken/kit#4134: the title, the plan and `run:planned` in one call. The `gh` surface is mocked
 // so each write the command would make is read back without touching GitHub.
@@ -32,7 +33,9 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 
 const ISSUE_URL = 'https://github.com/o/r/issues/7'
 const COMMENT_URL = 'https://github.com/o/r/issues/7#issuecomment-1'
-const PLAN = '## Plan\n- step one\n'
+const CONSUMERS_SECTION = `${plan_consumers_section.HEADING}\n- なし（the plan adds no concept）\n`
+const PLAN = `## Plan\n- step one\n\n${CONSUMERS_SECTION}`
+const PLAN_WITHOUT_CONSUMERS = '## Plan\n- step one\n'
 const TITLE = 'Add issue:plan'
 const OTHER_REPO = 'joshuafolkken/kit'
 const BODY_FILE_FLAG = '--body-file'
@@ -42,9 +45,11 @@ const FILLED_BODY = '## Background'
 const work = mkdtempSync(path.join(tmpdir(), 'issue-plan-cli-'))
 const PLAN_FILE = path.join(work, 'plan.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
+const NO_CONSUMERS_FILE = path.join(work, 'no-consumers.md')
 
 writeFileSync(PLAN_FILE, PLAN)
 writeFileSync(EMPTY_FILE, '  \n')
+writeFileSync(NO_CONSUMERS_FILE, PLAN_WITHOUT_CONSUMERS)
 
 const printed: Array<string> = []
 const errors: Array<string> = []
@@ -189,6 +194,15 @@ describe('issue_plan_cli.run — refuses a call it cannot record', () => {
 		expect(code).toBe(1)
 		expect(errors).toContain(issue_plan_cli.USAGE)
 		expect(issue_get_body).not.toHaveBeenCalled()
+	})
+
+	it('refuses a plan without the existing-consumers section before any write', async () => {
+		const code = await issue_plan_cli.run(['7', BODY_FILE_FLAG, NO_CONSUMERS_FILE, PLANNED_FLAG])
+
+		expect(code).toBe(1)
+		expect(errors.join('\n')).toContain(plan_consumers_section.HEADING)
+		expect(issue_get_body).not.toHaveBeenCalled()
+		expect(issue_add_label).not.toHaveBeenCalled()
 	})
 
 	it('names the resolved path when the plan file is missing', async () => {

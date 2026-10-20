@@ -1,4 +1,4 @@
-import { get_exit_code } from '#scripts/git/git-execa-error'
+import { git_grep_hits, type Hit } from '#scripts/git/git-grep-hits'
 import { git_spawn } from '#scripts/git/git-spawn'
 
 // The code locations an issue names, bundled into `run:prep`. Investigation is most of a run's
@@ -17,18 +17,13 @@ const LINE_SUFFIX = /(?::\d+)+$/u
 // A name carries a separator a prose word does not — `run:prep`, `run_prep`, `run-prep.ts`, `a/b`.
 const NAME_CHARACTERS = /^[\w@./:-]+$/u
 const NAME_SEPARATOR = /[./:_-]/u
-const GREP_LINE = /^(?<path>[^:]+):(?<line>\d+):(?<text>.*)$/u
 const MIN_TARGET_LENGTH = 3
 const MAX_TARGETS = 10
 const MAX_FILES_PER_TARGET = 3
-const MAX_EXCERPT_LENGTH = 80
-const ELLIPSIS = '…'
 const INDENT = '  '
 const HIT_SEPARATOR = '  '
 const NO_MATCH = ' — no match in code'
 const SEARCH_FAILED = ' — git grep failed; not searched'
-// `git grep` exits 1 for no match; any other exit is a search that never ran.
-const GREP_NO_MATCH_EXIT = 1
 const FILE_PATHSPEC = ':(glob)**/'
 const FILE_HIT = { line: '1', excerpt: '(file named in the issue)' }
 const NO_TARGETS = '(no backticked path or identifier in the issue)'
@@ -42,12 +37,6 @@ const CODE_PATHS = [
 	':(exclude)*.e2e.ts',
 	':(exclude)*.snap',
 ]
-
-interface Hit {
-	path: string
-	line: string
-	excerpt: string
-}
 
 interface Located {
 	target: string
@@ -73,32 +62,6 @@ function extract_targets(text: string): Array<string> {
 	return [...new Set(targets.filter((target) => is_name(target)))].slice(0, MAX_TARGETS)
 }
 
-function shorten(text: string): string {
-	const trimmed = text.trim()
-
-	if (trimmed.length <= MAX_EXCERPT_LENGTH) return trimmed
-
-	return `${trimmed.slice(0, MAX_EXCERPT_LENGTH)}${ELLIPSIS}`
-}
-
-// `git grep -n` prints `path:line:text`; the text may itself hold colons, so only the first two split.
-function to_hit(output_line: string): Hit | undefined {
-	const groups = GREP_LINE.exec(output_line)?.groups
-
-	if (groups === undefined) return undefined
-
-	// All three groups are non-optional in `GREP_LINE`, so a match always carries each of them.
-	const { path, line, text } = groups as Record<'line' | 'path' | 'text', string>
-
-	return { path, line, excerpt: shorten(text) }
-}
-
-function parse_hits(stdout: string): Array<Hit> {
-	const hits = stdout.split('\n').map((line) => to_hit(line))
-
-	return hits.filter((hit): hit is Hit => hit !== undefined).slice(0, MAX_FILES_PER_TARGET)
-}
-
 function format_target(located: Located): string {
 	if (located.has_failed) return `${located.target}${SEARCH_FAILED}`
 	if (located.hits.length === 0) return `${located.target}${NO_MATCH}`
@@ -116,18 +79,12 @@ function format_locations(located: ReadonlyArray<Located>): string {
 	return located.map((entry) => format_target(entry)).join('\n')
 }
 
-// `git grep` exits 1 when nothing matches, which `git_spawn.read` raises. Neither that nor a search
-// that could not run fails the bundle — the issue body is still worth printing without it — but only
-// the first is reported as "no match": a git without `grep -m` (older than 2.38) exits 129, and naming
-// every target absent then would send the reader away from code that is there.
+// Neither a no-match nor a search that could not run fails the bundle — the issue body is still worth
+// printing without it — but only the first is reported as "no match" (`git-grep-hits.ts`).
 async function grep(target: string): Promise<Located> {
-	const grep_arguments = ['grep', '-n', '-I', '-F', '-m', '1', '-e', target, '--', ...CODE_PATHS]
+	const { hits, has_failed } = await git_grep_hits.search(target, ['-m', '1'], CODE_PATHS)
 
-	try {
-		return { target, hits: parse_hits(await git_spawn.read(grep_arguments)), has_failed: false }
-	} catch (error) {
-		return { target, hits: [], has_failed: get_exit_code(error) !== GREP_NO_MATCH_EXIT }
-	}
+	return { target, hits: hits.slice(0, MAX_FILES_PER_TARGET), has_failed }
 }
 
 // A path is rarely spelled out inside code — imports drop the extension and resolve relatively — so
@@ -158,7 +115,7 @@ async function locate(text: string): Promise<string> {
 	return format_locations(located)
 }
 
-const run_prep_locate = { extract_targets, locate, parse_hits }
+const run_prep_locate = { extract_targets, locate }
 
-export type { Hit, Located }
+export type { Located }
 export { run_prep_locate }

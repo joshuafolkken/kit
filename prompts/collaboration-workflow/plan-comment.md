@@ -3,6 +3,7 @@
 1. 提案を人間が判断する
 2. 採用した計画をファイルに書き、`pnpm josh issue:plan <N> --body-file <path>` で Issue に記録する。body が空なら本文に、空でなければコメントになる（本文はパスで渡す — `shell-body.md`）
    - 計画が stash の復元を含むときの書き方: `operating-rules.md` → "no-self-staging"
+   - 計画には `### 影響を受ける既存の利用者` が必須（`pnpm josh plan:consumers <識別子...>` が下書きを出す。書き方: `kickoff.md` の手順 4）
 3. Telegram で計画開始を通知する:
 
    ```bash

@@ -1,0 +1,9 @@
+{
+	"reason": "Review fixes for #4273: plan:consumers searches the whole tracked tree with a config kind, and the section check reads fence-free lines and judges none only as the opening entry",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 180,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 773
+	}
+}
