@@ -10,7 +10,7 @@ const BODY_FILE = '--body-file <path>'
 /* eslint-disable @typescript-eslint/naming-convention */
 const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:comment': {
-		script: 'scripts/issue/issue-comment-cli.ts',
+		script: 'scripts/issue/issue-comment-main.ts',
 		description: 'Post one comment to an issue from a file, so no shell expands the body',
 		category: 'AI tools',
 		reference: ['<issue> --body <text> | --body-file <path>', 'automation', ['network']],

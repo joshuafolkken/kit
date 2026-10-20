@@ -30,7 +30,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '3773' }] },
 	},
 	'issue:read': {
-		script: 'scripts/issue/issue-read-cli.ts',
+		script: 'scripts/issue/issue-read-main.ts',
 		description: "Print each issue's title, body and every comment on it, in one call",
 		category: 'AI tools',
 		reference: ['<issue...>', 'automation', ['network']],
@@ -39,7 +39,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'issue:state': {
-		script: 'scripts/issue/issue-state-cli.ts',
+		script: 'scripts/issue/issue-state-main.ts',
 		description:
 			"Print each issue's state and labels, in the spelling the documents compare against",
 		category: 'AI tools',
@@ -54,7 +54,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'issue:scout': {
-		script: 'scripts/issue/issue-scout-cli.ts',
+		script: 'scripts/issue/issue-scout-main.ts',
 		description:
 			'Before filing: say whether an issue like this exists and which epic it belongs to',
 		category: 'AI tools',
@@ -80,7 +80,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'defect:rate': {
-		script: 'scripts/issue/defect-rate-cli.ts',
+		script: 'scripts/issue/defect-rate-main.ts',
 		description: 'Print the defect rate of merged work: defects filed per enhancement completed',
 		category: 'AI tools',
 		reference: ['[--days <n>]', 'automation', ['network']],
@@ -96,7 +96,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'issue:fold': {
-		script: 'scripts/issue/issue-fold-cli.ts',
+		script: 'scripts/issue/issue-fold-main.ts',
 		description:
 			'Before a second filing: say whether findings from this session fold into one issue',
 		category: 'AI tools',
@@ -128,7 +128,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: 'assessment.json --json' }] },
 	},
 	'issue:cite': {
-		script: 'scripts/issue/issue-cite-cli.ts',
+		script: 'scripts/issue/issue-cite-main.ts',
 		description: 'Print the paste-ready number-link citation line for each issue, in one call',
 		category: 'AI tools',
 		reference: [ISSUES_WITH_REPO, 'automation', ['network']],
@@ -153,7 +153,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	...ISSUE_WRITE_COMMANDS,
 	'issue:release': {
-		script: 'scripts/issue/issue-release-cli.ts',
+		script: 'scripts/issue/issue-release-main.ts',
 		description:
 			"Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open",
 		category: 'AI tools',

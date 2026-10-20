@@ -164,6 +164,6 @@ describe('josh issue:read registration', () => {
 		const source = readFileSync('scripts/josh/josh-commands-issue.ts', 'utf8')
 
 		expect(source).toContain("'issue:read'")
-		expect(source).toContain('scripts/issue/issue-read-cli.ts')
+		expect(source).toContain('scripts/issue/issue-read-main.ts')
 	})
 })

@@ -7,7 +7,7 @@ import type { CommandEntry } from './josh-command-types'
 /* eslint-disable @typescript-eslint/naming-convention */
 const LINT_COMMANDS: Record<string, CommandEntry> = {
 	'issue:lint': {
-		script: 'scripts/issue/issue-lint-cli.ts',
+		script: 'scripts/issue/issue-lint-main.ts',
 		description: "Check an issue body file for the template's required headings",
 		category: 'AI tools',
 		reference: ['<path>', 'automation', ['files']],

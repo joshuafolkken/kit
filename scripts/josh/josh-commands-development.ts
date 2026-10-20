@@ -17,7 +17,7 @@ const PATH_ARGUMENTS = '<path...>'
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'pr:classification': {
-		script: 'scripts/ci/pr-classification.ts',
+		script: 'scripts/ci/pr-classification-main.ts',
 		description: 'Require one release classification on a pull request',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],

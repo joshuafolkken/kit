@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { issue_label_schema } from '#scripts/git/git-schemas'
@@ -33,8 +31,6 @@ const DAYS_PATTERN = /^[1-9]\d*$/u
 // Ten years — far past any window worth asking for, and far inside the Date range, so an absurd value
 // is refused with the usage instead of crashing the window's date conversion.
 const MAX_WINDOW_DAYS = 3650
-
-const ARGV_OFFSET = 2
 
 const search_item_schema = z.object({
 	body: z.string().nullish(),
@@ -196,12 +192,6 @@ async function run(argv: ReadonlyArray<string>, now_ms: number = Date.now()): Pr
 	return await report(repo, days, now_ms)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { defect_rate_cli }
