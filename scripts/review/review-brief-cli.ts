@@ -14,6 +14,7 @@ import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { removed_tests_check } from './removed-tests-check'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -227,6 +228,16 @@ async function read_diff(
 	}
 }
 
+// **Swallowed, and the brief omits the list**: `josh ship` and `followup` read the same list again
+// and refuse on a failure, so the merge never rests on this reading.
+async function read_removed_tests(): Promise<ReadonlyArray<string>> {
+	try {
+		return (await removed_tests_check.read()) ?? []
+	} catch {
+		return []
+	}
+}
+
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile } = request
 	const contract = await open_contract()
@@ -251,6 +262,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		rubric_path: RUBRIC_PATH,
 		...contract,
 		diff: await read_diff(contract.checkout.root, base, paths),
+		removed_tests: await read_removed_tests(),
 	})
 }
 

@@ -11,6 +11,7 @@ import { report_format_reference } from '#scripts/report/report-format-reference
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
+import { removed_tests_check } from '#scripts/review/removed-tests-check'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_scoped } from './run-ship-scoped'
 
@@ -33,6 +34,7 @@ const UNREADABLE = Symbol('unreadable body')
 const PRECONDITION = {
 	LIVE_EVIDENCE: 'live-evidence',
 	ACCEPTANCE_MAP: 'acceptance-map',
+	REMOVED_TESTS: 'removed-tests',
 	LOCK: 'lock',
 	SCOPED: 'scoped',
 	UNREADABLE: 'unreadable',
@@ -121,6 +123,16 @@ async function acceptance_problems(body_path: string | undefined): Promise<Array
 	return problem === undefined ? [] : of_kind(PRECONDITION.ACCEPTANCE_MAP, [problem])
 }
 
+// `followup`'s removed-test refusal, asked of the body this ship will deliver.
+async function removed_test_problems(body_path: string | undefined): Promise<Array<Unmet>> {
+	const body = await readable_body(body_path)
+
+	if (body === UNREADABLE) return []
+	const problem = await removed_tests_check.body_refusal(body)
+
+	return problem === undefined ? [] : of_kind(PRECONDITION.REMOVED_TESTS, [problem])
+}
+
 async function lock_problems(): Promise<Array<Unmet>> {
 	return of_kind(PRECONDITION.LOCK, await run_ship_lock.lock_problems())
 }
@@ -128,14 +140,15 @@ async function lock_problems(): Promise<Array<Unmet>> {
 // The lock file is asked here too, so a drift stops the ship before the gate
 // rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> {
-	const [preflight, evidence, acceptance, lock] = await Promise.all([
+	const [preflight, evidence, acceptance, removed, lock] = await Promise.all([
 		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
 		caught(evidence_problems(request.body_path)),
 		caught(acceptance_problems(request.body_path)),
+		caught(removed_test_problems(request.body_path)),
 		caught(lock_problems()),
 	])
 
-	return [...preflight, ...evidence, ...acceptance, ...lock]
+	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock]
 }
 
 async function stage(request: PreflightRequest): Promise<PreflightResult> {

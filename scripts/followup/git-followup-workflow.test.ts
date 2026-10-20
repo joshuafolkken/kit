@@ -119,6 +119,15 @@ vi.mock('#scripts/review/acceptance-map-check', () => ({
 	acceptance_map_check: { refusal: map_refusal_mock },
 }))
 
+// **Mocked for the same reason** (joshuafolkken/kit#4287): the real check reads the branch diff and
+// the pull request body. Its default is no refusal, so the import-time `main` passes.
+const REMOVED_REFUSAL = vi.hoisted(() => 'removed-tests-refusal-sentinel')
+const removed_mock = vi.hoisted(() => vi.fn(async (): Promise<string | undefined> => undefined))
+
+vi.mock('#scripts/review/removed-tests-check', () => ({
+	removed_tests_check: { refusal: removed_mock },
+}))
+
 // **Mocked because `git_pr_followup` reaches `telegram-notify` and `main` runs at import time** — so
 // an unmocked sender would put this suite one send away from a live HTTP request.
 vi.mock('#scripts/notify/telegram-notify', () => ({
@@ -382,6 +391,19 @@ describe('a merge is refused until every acceptance criterion maps to a row', ()
 		await git_followup_workflow.assert_acceptance_mapped(should_merge, issue, BRANCH)
 
 		expect(map_refusal_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('a merge is refused until every removed test is disposed of', () => {
+	it('throws the refusal the check names for this branch, and asks nothing without a merge', async () => {
+		removed_mock.mockClear().mockResolvedValueOnce(REMOVED_REFUSAL)
+
+		await expect(
+			git_followup_workflow.assert_removed_tests_disposed(true, FEATURE_BRANCH),
+		).rejects.toThrow(REMOVED_REFUSAL)
+		await git_followup_workflow.assert_removed_tests_disposed(false, FEATURE_BRANCH)
+
+		expect(removed_mock).toHaveBeenCalledExactlyOnceWith(FEATURE_BRANCH)
 	})
 })
 

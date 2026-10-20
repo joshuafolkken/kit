@@ -41,6 +41,9 @@ review, its severity tests and the round cap are unchanged.
 5. **The Issue is met on HEAD** — the premises you relied on hold on the current tree, and each
    acceptance criterion is checked against the diff.
 
+The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
+merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".
+
 ---
 
 ## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
