@@ -1,5 +1,6 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
+import { run_board_lane_state } from './run-board-lane-state'
 import { run_board_status } from './run-board-status'
 
 // joshuafolkken/kit#3769: when a running child entered the phase it is on, so the board can say how long
@@ -10,7 +11,7 @@ const T0 = '2026-10-08T09:00:00.000Z'
 const T1 = '2026-10-08T09:05:00.000Z'
 const T2 = '2026-10-08T09:10:00.000Z'
 const T3 = '2026-10-08T09:15:00.000Z'
-const NONE: ReadonlySet<number> = new Set()
+const { NO_LANES } = run_board_lane_state
 
 // One event naming #3409, as when it was written, its kind and its text.
 type Step = [string, string, string]
@@ -26,7 +27,7 @@ function phase_ms_after(...steps: ReadonlyArray<Step>): number | undefined {
 		text,
 	}))
 
-	return run_board_status.statuses_of(events, [], NONE).get(3409)?.phase_ms
+	return run_board_status.statuses_of(events, NO_LANES).get(3409)?.phase_ms
 }
 
 describe('run_board_status.statuses_of phase start', () => {

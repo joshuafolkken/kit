@@ -1,8 +1,10 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
+import { run_board_lane_state } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { ItemStatus } from './run-board-status'
@@ -15,7 +17,9 @@ import type { UsageMark } from './run-board-usage'
 
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
+const { NO_LANES } = run_board_lane_state
 const { PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { EARLIER_ICON } = run_board_earlier
 const EARLIER = 4173
 const OWN = 4195
 const MINUTE_MS = 60_000
@@ -30,26 +34,28 @@ function event_of(pos: number, kind: string, text: string): RunEvent {
 // What the whole stream says the earlier lane is doing: launched before this run began.
 const EARLIER_STATUS: ItemStatus = { state: 'running', started_ms: LAUNCHED_MS }
 
-const HELD: LocalRead = {
-	...LOCAL,
-	lanes: [String(EARLIER)],
-	earlier_lanes: [String(EARLIER)],
-	earlier_occupied: [String(EARLIER)],
-	earlier_statuses: new Map([[EARLIER, EARLIER_STATUS]]),
+// The earlier lane holding a place, doing what its record and the stream say (`status`).
+function held(status: ItemStatus): LocalRead {
+	return {
+		...LOCAL,
+		lanes: [String(EARLIER)],
+		lane_states: { ...NO_LANES, earlier: new Map([[EARLIER, status]]) },
+		earlier_occupied: [String(EARLIER)],
+	}
 }
 
-function usage_mark(paused: ReadonlyMap<string, number>): UsageMark {
-	return {
-		at_ms: 0,
-		processes: new Map([[1, { cpu_ms: 0, memory_bytes: 100, compressed_bytes: 0 }]]),
-		lanes: new Map([[1, String(EARLIER)]]),
-		names: new Map([[1, 'node']]),
-		parents: new Map(),
-		folded: new Set(),
-		paused,
-		cores: 1,
-		total_bytes: 1000,
-	}
+const HELD = held(EARLIER_STATUS)
+
+// Its child's process, still working — not stopped as a paused lane's are.
+const LIVE_MARK: UsageMark = {
+	at_ms: 0,
+	processes: new Map([[1, { cpu_ms: 0, memory_bytes: 100, compressed_bytes: 0 }]]),
+	lanes: new Map([[1, String(EARLIER)]]),
+	names: new Map([[1, 'eslint_d']]),
+	parents: new Map(),
+	folded: new Set(),
+	cores: 1,
+	total_bytes: 1000,
 }
 
 // The board's last frame; no plan read unless `plans` answers one.
@@ -75,13 +81,12 @@ function header(lines: ReadonlyArray<string>): Array<string> {
 }
 
 describe('run_board_tick.tick — what an earlier run’s lane is doing', () => {
-	it('draws its phase, its time from its launch and its newest activity', async () => {
-		const phase = event_of(1, 'lane-phase', `#${String(EARLIER)} implement`)
-		const row = row_of(await frame_of({ ...HELD, events: [phase] }), EARLIER)
+	it('draws it marked 🧳, with its phase and its time from its launch', async () => {
+		const status: ItemStatus = { ...EARLIER_STATUS, track: ['implement'], phase_ms: LAUNCHED_MS }
+		const row = row_of(await frame_of(held(status)), EARLIER)
 
-		expect(row).toContain(STATE_ICONS.earlier)
+		expect(row).toContain(`${EARLIER_ICON} ${String(EARLIER)}`)
 		expect(row).toContain(`${String(LAUNCHED_MINUTES)}′00″`)
-		expect(row).toContain(PHASE_ICONS.implement)
 	})
 
 	it('draws its newest activity as this run’s own row does', async () => {
@@ -91,9 +96,10 @@ describe('run_board_tick.tick — what an earlier run’s lane is doing', () => 
 		expect(row).toMatch(new RegExp(`${PHASE_ICONS.gate} 0″$`, 'u'))
 	})
 
-	it('draws its lane paused as this run’s own is', async () => {
-		const mark = usage_mark(new Map([[String(EARLIER), LOCAL.started_ms]]))
-		const row = row_of(await frame_of(HELD, mark), EARLIER)
+	// joshuafolkken/kit#4269: paused is the record's, whatever processes the lane still has running.
+	it('draws its lane paused as its record says, beside a process still working', async () => {
+		const paused = held({ ...EARLIER_STATUS, state: 'paused', ended_ms: LOCAL.started_ms })
+		const row = row_of(await frame_of(paused, LIVE_MARK), EARLIER)
 
 		expect(row.trim().startsWith(STATE_ICONS.paused)).toBe(true)
 	})
@@ -112,7 +118,7 @@ describe('run_board_tick.tick — an earlier run’s lane its child cut and resu
 		const lines = await frame_of({ ...HELD, events: CUT_RESUME }, undefined, plans)
 		const quiet = await frame_of(HELD, undefined, plans)
 
-		expect(row_of(lines, EARLIER).trim().startsWith(STATE_ICONS.earlier)).toBe(true)
+		expect(row_of(lines, EARLIER)).toContain(`${EARLIER_ICON} ${String(EARLIER)}`)
 		expect(header(lines)[0]).toBe(header(quiet)[0])
 	})
 
@@ -124,7 +130,7 @@ describe('run_board_tick.tick — an earlier run’s lane its child cut and resu
 		const own = [launch, ...CUT_RESUME.map((event) => ({ ...event, text: `#${String(OWN)} x` }))]
 		const lines = await frame_of({ ...HELD, lanes: [String(OWN), String(EARLIER)], events: own })
 
-		expect(row_of(lines, OWN)).not.toContain(STATE_ICONS.earlier)
+		expect(row_of(lines, OWN)).not.toContain(EARLIER_ICON)
 		expect(header(lines)[0]).toContain('🔄 1')
 	})
 })

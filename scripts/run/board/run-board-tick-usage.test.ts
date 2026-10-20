@@ -25,7 +25,6 @@ function reading(at_ms: number, cpu_ms: number): UsageMark {
 		names: new Map([[1, 'node']]),
 		parents: new Map(),
 		folded: new Set(),
-		paused: new Map(),
 		cores: 1,
 		total_bytes: 1000,
 	}

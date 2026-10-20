@@ -11,6 +11,7 @@ import {
 	type GatherState,
 } from './run-board-gather'
 import { run_board_labels } from './run-board-labels'
+import { run_board_lane_state } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
@@ -27,6 +28,7 @@ const LOCAL: LocalRead = {
 	scope: ALL,
 	events: [],
 	lanes: [],
+	lane_states: run_board_lane_state.NO_LANES,
 	resume: undefined,
 	is_stranded: false,
 }

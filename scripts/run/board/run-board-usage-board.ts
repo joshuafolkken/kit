@@ -46,8 +46,8 @@ async function primed(
 	return { before: first, table: ports.read_table }
 }
 
-// Read on the machine's second; a reading that failed draws no usage but keeps the last reading, so a
-// paused lane stays paused through a `ps` timed out under load and the next reading spans the gap.
+// Read on the machine's second; a reading that failed draws no usage but keeps the last reading, so the
+// next reading after a `ps` timed out under load spans the gap.
 async function read_usages(
 	state: GatherState,
 	ports: GatherPorts,

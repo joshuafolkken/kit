@@ -97,7 +97,6 @@ const FRESH_STATE: BoardState = {
 	spots: [],
 	usages: undefined,
 	budget_waits: [],
-	paused: undefined,
 	thanks: [],
 	thanks_fetch: undefined,
 	thanks_attempted_ms: undefined,

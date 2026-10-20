@@ -45,7 +45,6 @@ function mark(at_ms: number, rows: ReadonlyArray<Row>): UsageMark {
 		names,
 		parents,
 		folded,
-		paused: new Map(),
 		cores: CORES,
 		total_bytes: TOTAL_BYTES,
 	}

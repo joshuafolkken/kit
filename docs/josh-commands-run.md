@@ -651,7 +651,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), then `🧳` an earlier run's lane holding a place (its phase, elapsed time, usage and newest activity drawn alike, never counted as the run's), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (run `pnpm josh lane:state --backfill`), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 

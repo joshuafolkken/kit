@@ -72,6 +72,7 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 		expect(emit).toHaveBeenCalledExactlyOnceWith(
 			run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 			`#${ISSUE} dispatched`,
+			expect.any(Date),
 		)
 	})
 
@@ -119,12 +120,24 @@ describe('lane_dispatch.dispatch_child — the lane state record', () => {
 		launch.mockReturnValue({ kind: 'launched', pid: PID })
 		await lane_dispatch.dispatch_child(ISSUE, start)
 
-		expect(record).toHaveBeenCalledExactlyOnceWith({
+		expect(record).toHaveBeenCalledOnce()
+		expect(record.mock.calls[0]?.[0]).toStrictEqual({
 			issue: ISSUE,
 			state: 'running',
 			command,
 			is_launch: true,
 		})
+	})
+
+	// joshuafolkken/kit#4269: run:board reads the lane's events from the record's launch on, so a launch
+	// event stamped before the record's launch fell out of them.
+	it('stamps the record’s launch with the launch event’s instant', async () => {
+		const record = vi.spyOn(lane_state, 'record_change').mockResolvedValue(SKIPPED)
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(record.mock.calls[0]?.[1]?.now).toBe(emit.mock.calls[0]?.[2])
 	})
 
 	it('records no state when the launch started no child', async () => {

@@ -1,5 +1,6 @@
 import { styleText } from 'node:util'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
@@ -52,14 +53,19 @@ function states_of(states: ReadonlyArray<readonly [ItemState, keyof Words]>): Le
 
 // The row leads the legend can name, each with its word: in progress first, then the settled ones.
 const PROGRESS_STATES: LeadWords = states_of([['running', 'in_progress']])
-const SETTLED_STATES: LeadWords = states_of([
-	['parked', 'parked'],
-	['paused', 'paused'],
-	['stopped', 'stopped'],
-	['earlier', 'earlier'],
-	['done', 'done'],
-	['withdrawn', 'withdrawn'],
-])
+const SETTLED_STATES: LeadWords = [
+	...states_of([
+		['parked', 'parked'],
+		['paused', 'paused'],
+		['stopped', 'stopped'],
+	]),
+	[run_board_earlier.EARLIER_ICON, 'earlier'],
+	...states_of([
+		['unknown', 'unknown'],
+		['done', 'done'],
+		['withdrawn', 'withdrawn'],
+	]),
+]
 
 function state_legend(states: LeadWords, leads: ReadonlySet<string>): Array<string> {
 	return states.filter(([icon]) => leads.has(icon)).map(([icon, word]) => `${icon} ${WORDS[word]}`)

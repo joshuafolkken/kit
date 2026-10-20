@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
@@ -13,7 +14,8 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const { STATE_ICONS, WORDS } = run_board_labels
+const { WORDS } = run_board_labels
+const { EARLIER_ICON } = run_board_earlier
 const REPO = 'joshuafolkken/kit'
 const RUNNING = 4195
 const QUEUED = 4197
@@ -36,7 +38,11 @@ const PLAN: BoardPlan = {
 const FULL: LocalRead = {
 	...LOCAL,
 	lanes: [String(RUNNING), ...EARLIER],
-	earlier_lanes: EARLIER,
+	lane_states: {
+		own: new Map([[RUNNING, { state: 'running', lane: `lane ${String(RUNNING)}` }]]),
+		earlier: new Map(EARLIER.map((issue) => [Number(issue), { state: 'running' }])),
+		unknown: [],
+	},
 	earlier_occupied: EARLIER,
 	free_lanes: 0,
 	lane_limit: LANE_LIMIT,
@@ -81,12 +87,11 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 		const rows = lane_rows(lines)
 
 		expect(rows[0]).toContain(String(RUNNING))
-		expect(rows.slice(1).map((row) => row.trim().split(/\s+/u).slice(0, 2))).toStrictEqual(
-			EARLIER.map((issue) => [STATE_ICONS.earlier, issue]),
+		// A running row leads with its spinner, then its mark.
+		expect(rows.slice(1).map((row) => row.trim().split(/\s+/u).slice(1, 3))).toStrictEqual(
+			EARLIER.map((issue) => [EARLIER_ICON, issue]),
 		)
-		expect(lines.some((line) => line.includes(`${STATE_ICONS.earlier} ${WORDS.earlier}`))).toBe(
-			true,
-		)
+		expect(lines.some((line) => line.includes(`${EARLIER_ICON} ${WORDS.earlier}`))).toBe(true)
 	})
 
 	it('counts no earlier run’s row among this run’s children', async () => {
@@ -98,7 +103,7 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 
 	it('draws the earlier run’s lanes before the plan is read', async () => {
 		const lines = await frame_of(FULL, [])
-		const row = new RegExp(String.raw`^\s*${STATE_ICONS.earlier} \d`, 'u')
+		const row = new RegExp(String.raw`^\s*\S ${EARLIER_ICON} \d`, 'u')
 
 		expect(lines.filter((line) => row.test(line))).toHaveLength(EARLIER.length)
 	})

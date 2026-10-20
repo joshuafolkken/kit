@@ -6,12 +6,14 @@ import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
+import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import {
 	run_board_operation_read,
 	type OperationSources,
@@ -21,7 +23,6 @@ import type { ProcessRoots } from './run-board-process-groups'
 import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
-import { run_board_status, type ItemStatus } from './run-board-status'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
 
 // What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
@@ -34,6 +35,9 @@ interface LocalRead {
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
 	lanes: ReadonlyArray<string>
+	// The open lanes as their lane state records sort them — this run's, an earlier run's and the ones
+	// with no record — with what each is doing (`run-board-lane-state.ts`).
+	lane_states: BoardLanes
 	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
 	// The run is carried but nothing drives it — its owner and its supervisor are both gone
@@ -44,15 +48,9 @@ interface LocalRead {
 	// The open lanes no child is working in at this read (`lane-spent.ts`); one is drawn stopped once it
 	// has stayed so (`run-board-idle.ts`).
 	idle_lanes?: ReadonlyArray<string> | undefined
-	// The open lanes that last took a child before the run started — an earlier run's, until this run
-	// dispatches into one again.
-	earlier_lanes?: ReadonlyArray<string> | undefined
 	// The earlier run's lanes that still hold a place under the limit — counted in `occupied_count`, so
 	// the lanes section draws them beside this run's own.
 	earlier_occupied?: ReadonlyArray<string> | undefined
-	// What each earlier run's lane is doing, folded from the whole stream since its newest launch
-	// (`run_board_status.earlier_of`) — the span's events alone hold none of its launch.
-	earlier_statuses?: ReadonlyMap<number, ItemStatus> | undefined
 	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
 	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
@@ -148,11 +146,30 @@ function sources_of(
 	}
 }
 
-// joshuafolkken/kit#3969: a lane whose last dispatch is unknown is not called earlier.
-function earlier_lanes(lanes: ReadonlyArray<LaneInfo>, started_ms: number): Array<string> {
-	return lanes
-		.filter((lane) => lane.dispatched_ms !== undefined && lane.dispatched_ms < started_ms)
-		.map((lane) => lane.issue)
+// Each open lane's lane state record, by issue; a lane with none is left out.
+async function records_of(
+	lanes: ReadonlyArray<LaneInfo>,
+	repository: string,
+): Promise<Map<string, LaneStateRecord>> {
+	const read = await Promise.all(
+		lanes.map(async (lane) => [lane.issue, await lane_state.read_state(lane.issue, repository)]),
+	)
+
+	return new Map(read.filter((entry): entry is [string, LaneStateRecord] => entry[1] !== undefined))
+}
+
+// The open lanes sorted by their records, each folded from the whole stream, not the run's span: an
+// earlier run's lane launched before the span began.
+async function lanes_here(
+	lanes: ReadonlyArray<LaneInfo>,
+	repository: string,
+	events: ReadonlyArray<RunEvent>,
+	started_ms: number,
+): Promise<BoardLanes> {
+	const records = await records_of(lanes, repository)
+	const issues = lanes.map((lane) => lane.issue)
+
+	return run_board_lane_state.lanes_of({ events, lanes: issues, records, started_ms })
 }
 
 type LaneRoomRead = Pick<
@@ -164,7 +181,7 @@ type LaneRoomRead = Pick<
 // among them and the idle ones agree.
 async function lane_room_of(
 	lanes: ReadonlyArray<LaneInfo>,
-	earlier: ReadonlyArray<string>,
+	sorted: BoardLanes,
 	table: TableRead | undefined,
 ): Promise<LaneRoomRead> {
 	const room = await backlog_ready.lane_room(lanes, table)
@@ -175,7 +192,7 @@ async function lane_room_of(
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
 		occupied_count: occupied.length,
-		earlier_occupied: occupied.filter((issue) => earlier.includes(issue)),
+		earlier_occupied: occupied.filter((issue) => sorted.earlier.has(Number(issue))),
 		idle_lanes: room.idle,
 	}
 }
@@ -192,7 +209,7 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 }
 
 // `undefined` when no run has started here. The lane count reads `table`, the redraw's process
-// snapshot, so it agrees with the usage columns' paused lanes.
+// snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
 	const { span, resume, transcript, roots, carry, is_stranded } =
@@ -202,7 +219,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes(await main_root())
-	const earlier = earlier_lanes(lanes, span.started_ms)
+	const lane_states = await lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
 		started_ms: span.started_ms,
@@ -210,14 +227,13 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		scope: run_board_scope.scope_of(span.invocation),
 		events: run_board_span.events_of(events, span),
 		lanes: lanes.map((lane) => lane.issue),
+		lane_states,
 		resume,
 		roots,
 		carry,
 		is_stranded,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-		earlier_lanes: earlier,
-		earlier_statuses: run_board_status.earlier_of(events, earlier),
-		...(await lane_room_of(lanes, earlier, table)),
+		...(await lane_room_of(lanes, lane_states, table)),
 		...ledger_here(repository),
 	}
 }

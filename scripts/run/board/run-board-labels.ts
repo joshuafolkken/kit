@@ -52,6 +52,7 @@ const WORDS = {
 	stopped: 'stopped',
 	paused: 'paused',
 	earlier: 'earlier run',
+	unknown: 'lane state unknown',
 	waiting: 'waiting',
 	queued: 'queued',
 	not_before: 'not before',
@@ -139,7 +140,7 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	stopped: '🛑',
 	paused: '🧊',
 	withdrawn: '🚫',
-	earlier: '🧳',
+	unknown: '❔',
 }
 
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
