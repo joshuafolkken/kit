@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
@@ -30,13 +29,12 @@ import { run_wake_supervise } from './run-wake-supervise'
 // The stdout/stderr split is the contract every `run:*` command shares: exactly one verdict token on
 // stdout on every path, the reason and the advice on stderr, so a loop branches on one token.
 //
-// **`--start` and `--loop` are two halves of one thing.** `--start` spawns this same script detached
+// **`--start` and `--loop` are two halves of one thing.** `--start` spawns the command's entry detached
 // with `--loop` and returns immediately, which is what leaves the supervisor outside the conversation;
 // `--loop` is the body, and running it in the foreground is how a person watches what it does.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const ONE_GROUP = 1
 // The interval is whole and positive (`cli_flags.to_positive`): a zero interval is a busy loop against
 // the temp directory, not a faster supervisor.
@@ -45,7 +43,8 @@ const ONE_GROUP = 1
 // the busy loop the lower bound exists to prevent. An hour is far past any useful polling interval and
 // nowhere near the clamp.
 const MAX_INTERVAL_SECONDS = 3600
-const SCRIPT_PATH = fileURLToPath(import.meta.url)
+// The command's entry, not this module: the guard that runs `main` lives in `run-wake-main.ts`.
+const SCRIPT_PATH = fileURLToPath(new URL('run-wake-main.ts', import.meta.url))
 
 const STARTED_VERDICT = 'started'
 const RUNNING_VERDICT = 'running'
@@ -447,14 +446,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await dispatch(values, context, interval_ms)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_wake_cli = {
 	FAILED_VERDICT,
 	NONE_VERDICT,
 	RUNNING_VERDICT,
+	SCRIPT_PATH,
 	STALE_VERDICT,
 	STOPPED_VERDICT,
 	SUPERVISING_VERDICT,
@@ -469,7 +465,5 @@ const run_wake_cli = {
 	stop_body,
 	warning_body,
 }
-
-if (process.argv[1] === SCRIPT_PATH) await main(process.argv.slice(ARGV_OFFSET))
 
 export { run_wake_cli }

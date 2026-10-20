@@ -98,6 +98,6 @@ describe('cost_audit_cli.summary — the lines josh retrospective carries', () =
 
 describe('josh cost:audit registration', () => {
 	it('is registered as a command', () => {
-		expect(COMMAND_MAP['cost:audit']?.script).toBe('tools/cost-audit/cost-audit-cli.ts')
+		expect(COMMAND_MAP['cost:audit']?.script).toBe('tools/cost-audit/cost-audit-main.ts')
 	})
 })

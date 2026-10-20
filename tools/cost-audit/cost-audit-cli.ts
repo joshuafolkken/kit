@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
@@ -19,7 +17,6 @@ import { cost_audit_read } from './cost-audit-read'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: pnpm josh cost:audit [--period <days>]'
 const OPTIONS = { period: { type: 'string' } } as const
 // A positive whole number of days (`cli_flags.to_positive`), at most ten years.
@@ -110,12 +107,6 @@ async function run(
 	return SUCCESS_EXIT_CODE
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const cost_audit_cli = { USAGE, read_period, merged_query, run, summary }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { cost_audit_cli }

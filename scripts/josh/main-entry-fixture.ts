@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { import_closure } from '#scripts/build/import-closure-fixture'
 import { expect, vi, type Mock } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
 import { josh_in_process } from './josh-in-process'
@@ -8,7 +8,6 @@ import { josh_in_process } from './josh-in-process'
 // (joshuafolkken/kit#4186). Each entry's own test mocks the module it calls and hands the mock here,
 // so the three facts are stated once: the command runs the entry, the imported module carries no
 // main guard of its own, and the entry passes the command's arguments through and answers its code.
-const MAIN_GUARD = 'process.argv[1]'
 const ARGUMENTS: ReadonlyArray<string> = ['12', '--json']
 const EXIT_CODE = 3
 const ORIGINAL_ARGV = process.argv
@@ -79,7 +78,7 @@ function entry_cases(entry_case: EntryCase): ReadonlyArray<NamedCase> {
 		[
 			'leaves the module other files import without a main guard',
 			() => {
-				expect(readFileSync(library, 'utf8')).not.toContain(MAIN_GUARD)
+				expect(import_closure.has_main_guard(library)).toBe(false)
 			},
 		],
 		[

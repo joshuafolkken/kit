@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { import_closure } from './import-closure-fixture'
 
 // `pnpm build` runs every step from `build.ts`, so the step modules it imports carry no main guard of
 // their own: a bundle is one file, and a guard in an imported module fires with the entry's
 // (joshuafolkken/kit#4186).
-const MAIN_GUARD = /^if \(process\.argv\[1\] ===/mu
 const BUILD_ENTRY = 'scripts/build/build.ts'
 const STEP_MODULES: ReadonlyArray<string> = [
 	'scripts/build/build-bin.ts',
@@ -27,10 +27,10 @@ describe('build entry', () => {
 	})
 
 	it('keeps its own main guard', () => {
-		expect(readFileSync(BUILD_ENTRY, 'utf8')).toMatch(MAIN_GUARD)
+		expect(import_closure.has_main_guard(BUILD_ENTRY)).toBe(true)
 	})
 
 	it.each(STEP_MODULES)('%s carries no main guard', (module_path) => {
-		expect(readFileSync(module_path, 'utf8')).not.toMatch(MAIN_GUARD)
+		expect(import_closure.has_main_guard(module_path)).toBe(false)
 	})
 })

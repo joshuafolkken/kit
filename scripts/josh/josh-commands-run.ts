@@ -159,7 +159,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'run:wake': {
-		script: 'scripts/run/wake/run-wake-cli.ts',
+		script: 'scripts/run/wake/run-wake-main.ts',
 		// `.env` rather than the ambient environment:
 		// the failure warning needs the Telegram credentials, the same
 		// reasons `notify` and `followup` carry these flags.
@@ -264,6 +264,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],
+		is_bundled: true,
 		usage: { examples: [ISSUE] },
 	},
 	// The entry sequence a lane opened on, folded into one call: claim the tree,
@@ -306,6 +307,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 			'Print the run’s next single action, computed from the event stream, carry record and issue state',
 		category: 'AI tools',
 		reference: ['[<issue>]', 'automation', ['network', 'files']],
+		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: '<N>', note: "the run's next action for issue <N>" },
