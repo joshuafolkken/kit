@@ -21,6 +21,7 @@ const RELATED_SUFFIX = ':related'
 // Why a claim waits, as the header draws the gauge it waits on.
 const REASON_ICONS: Readonly<Record<WaitReason, string>> = {
 	cores: HEADER_ICONS.cpu,
+	cpu: HEADER_ICONS.cpu,
 	memory: HEADER_ICONS.memory,
 	pressure: HEADER_ICONS.memory,
 }

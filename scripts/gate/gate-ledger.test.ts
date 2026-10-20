@@ -14,7 +14,7 @@ import { machine_capacity } from './machine-capacity'
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'gate-ledger-test-'))
 const read_machine = vi.spyOn(machine_capacity, 'read_machine')
-const QUIET_BUSY = machine_capacity.BASELINE_CORES
+const QUIET_BUSY = gate_ledger.BACKGROUND_CORES
 const BUSY_EXTERNAL = 3
 const OUTCOME = { elapsed_ms: 1000, is_passed: true }
 const live_reservations = vi.spyOn(core_budget, 'live_reservations')

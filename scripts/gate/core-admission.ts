@@ -62,7 +62,7 @@ function add_load(totals: LedgerLoad, reservation: LedgerReservation): void {
 	totals.memory_mb += reservation.memory_mb ?? 0
 }
 
-function exceeds(totals: LedgerLoad, budget: MachineBudget): boolean {
+function exceeds(totals: LedgerLoad, budget: LedgerLoad): boolean {
 	return totals.cores > budget.cores || totals.memory_mb > budget.memory_mb
 }
 
@@ -72,19 +72,20 @@ function exceeds(totals: LedgerLoad, budget: MachineBudget): boolean {
 // place is never jumped: admission is in claim order, which is what removes the start-time asymmetry.
 // Memory is walked the same way, so a claim whose tool would not fit in free memory waits like one whose
 // cores would not fit.
-function admitted_keys(
+//
+// `exempt_index` is the place admitted whatever the budget says: the head's, or none.
+function walk_admitted(
 	reservations: ReadonlyArray<LedgerEntry>,
-	budget: number,
-	memory_budget = Infinity,
+	limit: LedgerLoad,
+	exempt_index: number,
 ): Set<string> {
-	const limit = { cores: budget, memory_mb: memory_budget }
 	const totals = { cores: 0, memory_mb: 0 }
 	const admitted = new Set<string>()
 
 	for (const [index, entry] of reservations.toSorted(compare_claim).entries()) {
 		add_load(totals, entry.reservation)
 
-		if (index !== 0 && exceeds(totals, limit)) break
+		if (index !== exempt_index && exceeds(totals, limit)) break
 
 		admitted.add(entry.key)
 	}
@@ -92,12 +93,27 @@ function admitted_keys(
 	return admitted
 }
 
+function admitted_keys(
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: number,
+	memory_budget = Infinity,
+): Set<string> {
+	return walk_admitted(reservations, { cores: budget, memory_mb: memory_budget }, 0)
+}
+
+// **A saturated CPU holds the head too** (joshuafolkken/kit#4238): when the reading found the CPU
+// busier than the ledger declares, the room is coming back as that load leaves, so the head waits for
+// it like any claim — and the wait cap still admits it if the load never leaves. Only the cores hold it:
+// busy cores say nothing about memory, so the head keeps its memory exemption.
 function is_admitted(
 	key: string,
 	reservations: ReadonlyArray<LedgerEntry>,
 	budget: MachineBudget,
 ): boolean {
-	return admitted_keys(reservations, budget.cores, budget.memory_mb).has(key)
+	if (!walk_admitted(reservations, budget, 0).has(key)) return false
+	if ((budget.busy_excess ?? 0) === 0) return true
+
+	return walk_admitted(reservations, { cores: budget.cores, memory_mb: Infinity }, -1).has(key)
 }
 
 function sum_load(reservations: ReadonlyArray<LedgerEntry>): LedgerLoad {

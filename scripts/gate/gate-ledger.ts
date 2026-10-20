@@ -13,8 +13,8 @@ import { machine_capacity } from './machine-capacity'
 //
 // **The machine is read where none of the gate's own checks runs — before the first starts and after
 // the last ends.** The load average cannot tell the two apart: a solo gate started at 4 on the 11-core
-// machine ended at 21, its own load. The reading is the core budget's own, so "quiet" means what
-// admission means by it: no whole core busy beyond the baseline the gate's weights were measured beside.
+// machine ended at 21, its own load. The reading is the core budget's own; "quiet" is no whole core
+// busy beyond the background a developer machine always carries.
 //
 // **Between the ends, the load is read off the core budget's ledger, not the CPU**.
 // Two readings missed every lane whose lint, tests or `ship` ran only while
@@ -23,7 +23,11 @@ import { machine_capacity } from './machine-capacity'
 // is what tells the two apart: another `josh` run's admitted claim is another process's place, and its
 // weight is the cores it holds. A claim still waiting holds none.
 
-const NO_LEDGER_CORES = 0
+// **The background a quiet machine still carries.** On 2026-10-07 the 11-core machine idled at about
+// 1.5 cores outside `josh` — Claude sessions 0.55, the window server 0.47, a browser 0.5. Admission
+// counts it (`machine_capacity.external_cores`, joshuafolkken/kit#4238), but a gate timed beside it is
+// still a solo gate for `josh metrics`, so it is no external load here.
+const BACKGROUND_CORES = 2
 // Often enough to catch another lane's shortest related lint, seldom enough that reading the markers —
 // a process probe each — costs the gate nothing it could measure.
 const SAMPLE_INTERVAL_MS = 3000
@@ -48,7 +52,7 @@ async function read_external_cores(): Promise<number | undefined> {
 
 	if (busy_cores === undefined) return undefined
 
-	return machine_capacity.external_cores(busy_cores, NO_LEDGER_CORES)
+	return machine_capacity.external_cores(busy_cores, BACKGROUND_CORES)
 }
 
 // The cores other processes' admitted claims hold now. This gate's own claims are written by this
@@ -119,6 +123,7 @@ async function record(
 }
 
 const gate_ledger = {
+	BACKGROUND_CORES,
 	SAMPLE_INTERVAL_MS,
 	record,
 	start,

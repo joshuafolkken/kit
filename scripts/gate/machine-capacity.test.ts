@@ -44,18 +44,11 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 		expect(machine_capacity.machine_budget(CORES, reading, ledger).cores).toBe(CORES)
 	})
 
-	it('gives way to busy cores beyond the baseline the weights were measured beside', () => {
+	it('gives way to every busy core outside the ledger, the background included', () => {
 		const external = 5
 		const reading = { busy_cores: external, available_mb: AVAILABLE_MB }
-		const expected = CORES - (external - machine_capacity.BASELINE_CORES)
 
-		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(expected)
-	})
-
-	it('does not count the baseline itself as external load', () => {
-		const reading = { busy_cores: machine_capacity.BASELINE_CORES, available_mb: undefined }
-
-		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(CORES)
+		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(CORES - external)
 	})
 
 	it('adds back the memory the admitted ledger already holds', () => {
@@ -71,7 +64,29 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 		expect(machine_capacity.machine_budget(CORES, UNREAD, NO_LEDGER)).toEqual({
 			cores: CORES,
 			memory_mb: Infinity,
+			busy_excess: 0,
 		})
+	})
+})
+
+// joshuafolkken/kit#4238: 10 cores reserved and all 11 busy read as no excess under the old two-core
+// baseline, so the next claim was admitted onto a saturated CPU.
+describe('machine_capacity.machine_budget — a CPU busier than the ledger declares', () => {
+	it('leaves no room past the ledger when every core is busy', () => {
+		const ledger_cores = 10
+		const reading = { busy_cores: CORES, available_mb: undefined }
+		const budget = machine_capacity.machine_budget(CORES, reading, {
+			cores: ledger_cores,
+			memory_mb: 0,
+		})
+
+		expect(budget).toMatchObject({ cores: ledger_cores, busy_excess: 1 })
+	})
+
+	it('is never below zero when outside load passes the core count', () => {
+		const reading = { busy_cores: CORES + LEDGER_CORES, available_mb: undefined }
+
+		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(0)
 	})
 })
 

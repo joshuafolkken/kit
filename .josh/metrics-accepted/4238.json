@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 review fix: average the load outside the ledger per sample (a released claim no longer counts as external) and test the averaging through reserve",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 63
+	}
+}

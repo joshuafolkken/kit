@@ -23,6 +23,21 @@ describe('core_wait.wait_reason — why a claim waits', () => {
 		)
 	})
 
+	// joshuafolkken/kit#4238: the ledger's reservations fit, but busy load beyond them took the cores.
+	it('names the CPU when the claim fits on what the ledger declares', () => {
+		const ledger = [entry('first', CORES - 1, 0), entry('second', 1, 0)]
+		const budget = { cores: CORES - 1, memory_mb: MEMORY_MB, busy_excess: 1 }
+
+		expect(core_wait.wait_reason('second', ledger, budget)).toBe('cpu')
+	})
+
+	it('names the cores when the claim would not fit on what the ledger declares either', () => {
+		const ledger = [entry('first', CORES, 0), entry('second', 1, 0)]
+		const budget = { cores: CORES - 1, memory_mb: MEMORY_MB, busy_excess: 1 }
+
+		expect(core_wait.wait_reason('second', ledger, budget)).toBe('cores')
+	})
+
 	it('names the memory when the claim fits on cores alone', () => {
 		const ledger = [entry('first', 1, MEMORY_MB), entry('second', 1, MEMORY_MB)]
 

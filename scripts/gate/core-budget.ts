@@ -9,8 +9,10 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
+import { busy_average, type BusySample } from './busy-average'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
 import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
+import { core_weights } from './core-weights'
 import { held_mark } from './held-mark'
 import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
 
@@ -26,7 +28,8 @@ import { machine_capacity, type MachineBudget, type MachineReading } from './mac
 // **A solo run is bit-for-bit unchanged, and that is arithmetic rather than a branch.** The gate's
 // weights are its `reserved_cores` (the static checks) and its `unit_worker_cap` (the unit suite), and
 // `reserved(2 + 1 + 1) + unit_cap(cores - 4)` is exactly `cores` — so a single gate's four claims sum
-// to the whole budget and every one is admitted the instant it is made, with no poll and no wait. Under
+// to the whole budget and, while the busy cores stay within what the ledger holds, every one is
+// admitted the instant it is made, with no poll and no wait. Under
 // concurrency the same weights sum past the budget and the ledger is what holds the machine down.
 //
 // **Liveness is `process_identity`'s, reused rather than re-invented.** A run
@@ -48,49 +51,8 @@ const POLL_INTERVAL_MS = 50
 // make progress even if the budget never clears, so a leaked or wedged sibling cannot stall the machine
 // for good. Two minutes is well past a unit suite's worst measured time under six-way load.
 const WAIT_CAP_MS = 120_000
-// The head of the ledger is always admitted, so the smallest budget worth planning against is one core.
+// The head of an unsaturated ledger is always admitted, so the smallest declared budget is one core.
 const MIN_BUDGET = 1
-
-// **The cores each heavy tool occupies, declared once for both places that reserve them**
-// `gate-plan.ts`'s checks and the `josh` commands that run the same tools
-// directly read these, so a direct `josh lint` claims what the gate's lint claims. The lint, type check
-// and spell check numbers are `gate-plan.ts`'s measured table, floored. The whole-tree eslint scan
-// behind `josh lines` and `josh refactor:scan` runs in one process: measured cold on the 11-core
-// machine on 2026-10-06, 113s of CPU over 98s of wall, so it gets one core.
-//
-// The rest ran outside the ledger until joshuafolkken/kit#3944, measured with `/usr/bin/time -l` on the
-// same machine on 2026-10-17 under a load average of 16. Every one stays under one core, so each takes
-// one: `prettier --check` over 40 staged files 2.1s of CPU over 1.7s of wall (`format`), `josh
-// retrospective` 16.5s over 19.8s, and a fresh lane's `pnpm install --frozen-lockfile` 1.9s over 6.1s.
-// `e2e` is the Playwright worker count `josh test:e2e` passes locally — the two-worker run CI already
-// sizes for its four-core runner — since kit has no e2e suite of its own to time.
-const CORE_WEIGHTS = {
-	lint: 2,
-	type_check: 1,
-	spell_check: 1,
-	eslint_scan: 1,
-	format: 1,
-	retrospective: 1,
-	install: 1,
-	e2e: 2,
-} as const
-
-// **The memory each heavy tool holds, declared beside its cores**: peak
-// resident size in MB, rounded up. Measured with `/usr/bin/time -l` on the 11-core / 18 GB machine on
-// 2026-10-07: the type check 1,244 MB, the spell check 330 MB, and one unit worker 319 MB over 54 test
-// files. Typed eslint was 1,207 MB over one directory and was observed at 1.6–2.4 GB per whole-tree
-// `eslint .` with three lanes running the same day, so lint and the whole-tree scan take that peak.
-// On 2026-10-17: prettier 260 MB, the retrospective 862 MB and a lane install 65 MB.
-const MEMORY_MB = {
-	lint: 2400,
-	type_check: 1300,
-	spell_check: 350,
-	eslint_scan: 2400,
-	unit_worker: 350,
-	format: 300,
-	retrospective: 900,
-	install: 100,
-} as const
 
 // `memory_mb` and `admitted_at` are optional so a marker an older `josh` wrote still reads: it holds no
 // declared memory, and it counts as load from outside the ledger until it is gone.
@@ -242,6 +204,7 @@ interface WaitContext extends TimingConfig {
 	budget: number
 	deadline: number
 	fields: ReservationFields
+	busy_samples: Array<BusySample>
 }
 
 function resolve_timing(options: ReserveOptions): TimingConfig {
@@ -253,19 +216,27 @@ function resolve_timing(options: ReserveOptions): TimingConfig {
 	}
 }
 
-// **A claim alone in the ledger reads nothing from the machine**: the head is admitted whatever the
-// budget says, so a solo run pays no sampling window and starts exactly as it did before.
+// **A claim alone in the ledger reads the machine too** (joshuafolkken/kit#4238): load outside the
+// ledger saturates the CPU whether or not another claim is in it. The busy cores are the mean of this
+// wait's recent readings of load outside the ledger (`busy-average.ts`). The budget may fall to zero,
+// which only a saturated CPU does, and then even the head waits (`core_admission.is_admitted`).
 async function current_budget(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
 ): Promise<MachineBudget> {
-	if (reservations.length <= 1) return { cores: context.budget, memory_mb: Infinity }
-
 	const reading = await context.read_machine()
 	const ledger = core_admission.ledger_load(reservations, context.now())
-	const budget = machine_capacity.machine_budget(context.budget, reading, ledger)
 
-	return { ...budget, cores: normalize_budget(budget.cores) }
+	context.busy_samples = busy_average.with_reading(
+		context.busy_samples,
+		reading,
+		ledger.cores,
+		context.now(),
+	)
+
+	const mean = busy_average.averaged(reading, context.busy_samples, ledger.cores)
+
+	return machine_capacity.machine_budget(context.budget, mean, ledger)
 }
 
 // The claim is admitted: its marker records when, which moves its load from "load outside the ledger"
@@ -374,6 +345,7 @@ async function reserve(weight: number, options: ReserveOptions = {}): Promise<Ha
 		budget: normalize_budget(options.budget ?? availableParallelism()),
 		deadline: claimed_at + timing.wait_cap_ms,
 		fields,
+		busy_samples: [],
 		...resolve_ports(options),
 	})
 
@@ -443,10 +415,10 @@ function held_unit_claim(directory: string = PLATFORM_TEMP_ROOT): Reservation | 
 }
 
 const core_budget = {
-	CORE_WEIGHTS,
+	CORE_WEIGHTS: core_weights.CORE_WEIGHTS,
 	HELD_KEY: held_mark.HELD_KEY,
 	HELD_VALUE: held_mark.HELD_VALUE,
-	MEMORY_MB,
+	MEMORY_MB: core_weights.MEMORY_MB,
 	RESERVED_PREFIX,
 	admitted_keys: core_admission.admitted_keys,
 	admitted_load: core_admission.admitted_load,

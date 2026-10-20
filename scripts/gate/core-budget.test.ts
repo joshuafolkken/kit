@@ -76,6 +76,13 @@ describe('core_budget.admitted_keys — FIFO admission within the budget', () =>
 
 		expect(core_budget.admitted_keys(reservations, MEASURED_CORES)).toEqual(new Set(['huge']))
 	})
+
+	// joshuafolkken/kit#4238: work outside the ledger already fills the machine, so the head waits too.
+	it('holds the head too when the CPU is busier than the ledger declares', () => {
+		const budget = { cores: 0, memory_mb: Infinity, busy_excess: MEASURED_CORES }
+
+		expect(core_admission.is_admitted('only', [reservation(1, 1, 'only')], budget)).toBe(false)
+	})
 })
 
 describe('core_budget.admitted_load — the peak stays within the budget', () => {
@@ -187,6 +194,7 @@ async function reserve_admits_solo_without_waiting(): Promise<void> {
 		const handle = await core_budget.reserve(SOLO_UNIT_WEIGHT, {
 			directory,
 			budget: MEASURED_CORES,
+			read_machine: unread_machine,
 			sleep,
 		})
 
@@ -245,7 +253,7 @@ async function reserve_admits_at_wait_cap(): Promise<void> {
 		expect(handle.admission.overflow).toEqual({
 			waited_ms: TEST_WAIT_CAP_MS,
 			ledger: { cores: MEASURED_CORES + SOLO_UNIT_WEIGHT, memory_mb: 0 },
-			budget: { cores: MEASURED_CORES, memory_mb: Infinity },
+			budget: { cores: MEASURED_CORES, memory_mb: Infinity, busy_excess: 0 },
 		})
 		expect(core_budget.describe_overflow(handle.admission)).toContain('past the core budget')
 	})
@@ -261,6 +269,9 @@ describe('core_budget.reserve — waiting on the machine-wide budget', () => {
 // eslint runs started together and swapped. A claim now also waits while its tool's memory is not free.
 const TOOL_MEMORY_MB = 2400
 const LOW_AVAILABLE_MB = 500
+
+// A claim made at time 1 on a machine it cannot read, so the test machine's own load never holds it.
+const UNREAD_AT_ONE = { read_machine: unread_machine, now: (): number => 1 }
 
 function marker_payload(directory: string, name: string): unknown {
 	return JSON.parse(readFileSync(path.join(directory, name), 'utf8'))
@@ -314,7 +325,7 @@ describe('core_budget memory admission', () => {
 		const replace = vi.spyOn(stamp_file, 'replace_stamp')
 
 		await with_probe(async (directory) => {
-			const handle = await core_budget.reserve(1, { directory, now: () => 1 })
+			const handle = await core_budget.reserve(1, { directory, ...UNREAD_AT_ONE })
 
 			expect(replace).toHaveBeenLastCalledWith(
 				handle.target,
@@ -326,7 +337,7 @@ describe('core_budget memory admission', () => {
 
 	it('records when its marker was admitted once it runs', async () => {
 		await with_probe(async (directory) => {
-			const options = { directory, memory_mb: TOOL_MEMORY_MB, now: () => 1 }
+			const options = { directory, memory_mb: TOOL_MEMORY_MB, ...UNREAD_AT_ONE }
 			const handle = await core_budget.reserve(1, options)
 
 			expect(marker_payload(directory, path.basename(handle.target))).toMatchObject({
@@ -353,7 +364,7 @@ async function run_command_reservation(directory: string): Promise<CommandRun> {
 	return await core_budget.with_command_reservation(
 		core_budget.CORE_WEIGHTS.lint,
 		async () => ({ places: marker_count(directory), mark: process.env[core_budget.HELD_KEY] }),
-		{ directory, budget: MEASURED_CORES, sleep },
+		{ directory, budget: MEASURED_CORES, read_machine: unread_machine, sleep },
 	)
 }
 
