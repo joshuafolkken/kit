@@ -19,6 +19,7 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
+import { run_board_render_cell } from './run-board-render-cell'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
 import { run_board_render_icon } from './run-board-render-icon'
@@ -45,7 +46,8 @@ const { time_of, time_width } = run_board_render_time
 const { is_live } = run_board_earlier
 const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
-const { cell_of, column_width, slot_of } = run_board_render_slot
+const { column_width } = run_board_render_slot
+const { cell_text } = run_board_render_cell
 const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
 const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, row_overrun, title_of } =
 	run_board_render_title
@@ -142,31 +144,6 @@ function indent_of(prefix: string, row: BoardRow, header: BoardHeader): string {
 	return `${header.spinner}${prefix.slice(1)}`
 }
 
-// A row's finish-time column as drawn: a settled row's finish time emphasized while it is fresh.
-function slot_text(row: BoardRow, header: BoardHeader): string | undefined {
-	const slot = slot_of(row, header.now_ms)
-
-	return slot === undefined ? slot : run_board_fresh.since(slot, row.status?.ended_ms, header)
-}
-
-// A parked row has no finish time — a decision park drawn 🙋 among them.
-function is_parked(row: BoardRow): boolean {
-	return row.status?.state === 'parked'
-}
-
-// A row's finish-time column where the frame draws one, padded to one width so every finish time and
-// what follows it start in one column. A plan row the run has not touched draws blanks in its place; a
-// parked row draws none, and its reason follows its time; a row that ends on a tail draws none either,
-// its tail following its time (joshuafolkken/kit#4217).
-function cell_text(row: BoardRow, frame: RowFrame): string | undefined {
-	const { slot_width } = frame
-
-	if (slot_width === 0 || is_parked(row) || run_board_render_tail.is_tailed(row)) return undefined
-	if (row.status === undefined) return ' '.repeat(slot_width)
-
-	return cell_of(slot_text(row, frame.header), slot_width)
-}
-
 function joined(parts: ReadonlyArray<string | undefined>): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
@@ -197,7 +174,7 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 
 	if (row.state === 'waiting') return lead
 
-	return joined([lead, time, cell_text(row, frame)])
+	return joined([lead, time, cell_text(row, frame.slot_width, frame.header)])
 }
 
 // Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
