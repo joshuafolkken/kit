@@ -83,6 +83,8 @@ describe('vitest configs — native config loader resolves local imports', () =>
 const PATHS = z.array(z.string())
 const GUARDS = z.object({ globalSetup: PATHS, setupFiles: PATHS.optional() })
 const GUARDED_CONFIG = z.object({ default: z.object({ test: GUARDS }) })
+const OPTIMIZED_TEST = z.object({ deps: z.unknown() }).loose()
+const OPTIMIZED_CONFIG = z.object({ default: z.object({ test: OPTIMIZED_TEST }) })
 
 type GuardedConfig = z.infer<typeof GUARDED_CONFIG>['default']
 
@@ -107,6 +109,14 @@ describe('vitest configs — every config arms the same guards', () => {
 		const sized = z.object({ default: z.object({ test: z.object({}).loose() }) }).parse(loaded)
 
 		expect(Object.hasOwn(sized.default.test, 'maxWorkers')).toBe(true)
+	})
+
+	// joshuafolkken/kit#4301: on the root, not per project, so both projects share its Vite server.
+	it('sets the dependency optimizer on the main config root', async () => {
+		const loaded: unknown = await import(pathToFileURL(path.resolve(MAIN_CONFIG)).href)
+		const optimized = OPTIMIZED_CONFIG.parse(loaded)
+
+		expect(optimized.default.test.deps).toEqual(unit_projects.DEPENDENCY_OPTIMIZER)
 	})
 
 	it('arms the network guard and the worker guards in the harness config', async () => {

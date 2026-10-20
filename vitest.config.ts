@@ -19,6 +19,8 @@ export default defineConfig({
 		// `undefined` — alone, or driven by `josh`, whose guard sizes the run itself — leaves the choice
 		// to the command line or vitest's default (joshuafolkken/kit#4262).
 		maxWorkers: vitest_config_workers.config_workers(),
+		// Root-level so both projects keep sharing this config's Vite server (joshuafolkken/kit#4301).
+		deps: unit_projects.DEPENDENCY_OPTIMIZER,
 		coverage: {
 			provider: 'v8',
 		},
