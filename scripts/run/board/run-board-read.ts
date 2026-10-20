@@ -6,6 +6,7 @@ import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -77,6 +78,7 @@ const NO_SPAN: SpanHere = {
 	transcript: undefined,
 	roots: {},
 	carry: undefined,
+	is_stranded: false,
 }
 
 interface SpanHere {
@@ -86,19 +88,42 @@ interface SpanHere {
 	transcript: string | undefined
 	roots: ProcessRoots
 	carry: RunCarry | undefined
+	is_stranded: boolean
 }
 
-function span_here(repository: string): SpanHere {
+// The main work tree, resolved once: it does not move while the board is open, and resolving it runs a
+// `git` subprocess the redraw would wait on (joshuafolkken/kit#4263). A failed resolve is forgotten,
+// so a `git` that timed out once is asked again on the next redraw rather than failing every one.
+const main_roots = stamped_memo.create<Promise<string>>()
+
+async function main_root(): Promise<string> {
+	try {
+		return await main_roots.of(
+			process.cwd(),
+			stamped_memo.NO_STAMP,
+			async () => await lane_registry.main_repository_root(),
+		)
+	} catch (error) {
+		main_roots.keep(new Set())
+		throw error
+	}
+}
+
+// Every process the run's record names is asked of `table`, the redraw's own `ps` snapshot.
+async function span_here(repository: string, table: TableRead | undefined): Promise<SpanHere> {
+	const same_process = await run_board_roots.same_in(table)
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
 	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
 	const launch = backlogrun_launch.pending_launch(repository)
+	const stranded_ports = run_stranded_detect.ports_with(same_process)
 
 	return {
 		span: run_board_span.span_of(read, ended, launch),
 		resume: run_board_span.resume_of(read, ended, launch),
 		transcript: read.kind === 'carried' ? read.carry.owner_transcript : undefined,
-		roots: run_board_roots.roots_of(repository, read),
+		roots: run_board_roots.roots_of(repository, read, same_process),
 		carry: read.kind === 'carried' ? read.carry : undefined,
+		is_stranded: run_stranded_detect.is_stranded_at(repository, stranded_ports),
 	}
 }
 
@@ -165,13 +190,13 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 // snapshot, so it agrees with the usage columns' paused lanes.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const repository = await run_carry.repository_directory()
-	const { span, resume, transcript, roots, carry } =
-		repository === undefined ? NO_SPAN : span_here(repository)
+	const { span, resume, transcript, roots, carry, is_stranded } =
+		repository === undefined ? NO_SPAN : await span_here(repository, table)
 
 	if (repository === undefined || span === undefined) return undefined
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
-	const lanes = await lane_registry.list_lanes()
+	const lanes = await lane_registry.list_lanes(await main_root())
 	const earlier = earlier_lanes(lanes, span.started_ms)
 
 	return {
@@ -183,7 +208,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		resume,
 		roots,
 		carry,
-		is_stranded: run_stranded_detect.is_stranded_at(repository),
+		is_stranded,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		earlier_lanes: earlier,
 		earlier_statuses: run_board_status.earlier_of(events, earlier),

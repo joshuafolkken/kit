@@ -1,0 +1,7 @@
+{
+	"reason": "#4263 adds stamped-memo and run-board-app-name modules with their tests and splits run-board-read tests into a fixture; unit time rose under concurrent lane load, not from the few added tests",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 174
+	}
+}

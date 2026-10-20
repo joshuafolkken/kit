@@ -1,6 +1,7 @@
 import { appendFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger } from './lane-ledger'
@@ -45,6 +46,31 @@ describe('lane_ledger.read_entries', () => {
 
 	it('reads an absent file as an empty ledger', () => {
 		expect(lane_ledger.read_entries(ledger('absent'))).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4263: `run:board` reads the ledger on every local read; an unchanged file is not
+// parsed again.
+describe('lane_ledger.read_entries over an unchanged ledger', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('parses the ledger once while it is unchanged, and again once it is appended to', () => {
+		const target = ledger('unchanged')
+
+		lane_ledger.append(target, { kind: 'merge', at: AT, issue: 1 })
+		const parse = vi.spyOn(json_value, 'parse_or_undefined')
+
+		lane_ledger.read_entries(target)
+		const parsed = parse.mock.calls.length
+
+		lane_ledger.read_entries(target)
+		expect(parsed).toBeGreaterThan(0)
+		expect(parse).toHaveBeenCalledTimes(parsed)
+
+		lane_ledger.append(target, { kind: 'merge', at: AT, issue: 2 })
+		expect(lane_ledger.read_entries(target)).toHaveLength(2)
 	})
 })
 

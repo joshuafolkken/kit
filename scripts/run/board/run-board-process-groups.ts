@@ -1,5 +1,6 @@
-import path from 'node:path'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
+import { run_board_app_name } from './run-board-app-name'
 import {
 	run_board_usage,
 	type ProcessFigures,
@@ -16,8 +17,6 @@ import {
 // found by walking each process's parents up to the nearest of the two; anything else is an app, named
 // by its bundle or its command, so a Claude session that is not this run's is an app too.
 
-const APP_SUFFIX = '.app'
-const COMMAND_SEPARATOR = ' '
 // How many apps the section names, the largest by memory first.
 const APP_LIMIT = 4
 
@@ -58,15 +57,12 @@ interface ProcessGroups {
 type Membership =
 	{ kind: 'lane' | 'leftover'; lane: number } | { kind: 'supervisor' | 'parent' } | { kind: 'app' }
 
-// An app's name: the outermost `.app` bundle its executable sits in, else its command's own name.
+// Each command's app name, kept across redraws: the command alone decides it, and one gone from the
+// table is forgotten (joshuafolkken/kit#4263).
+const app_names = stamped_memo.create<string>()
+
 function app_of(command: string): string {
-	const bundle = command.split(path.sep).find((part) => part.endsWith(APP_SUFFIX))
-
-	if (bundle !== undefined) return bundle.slice(0, -APP_SUFFIX.length)
-
-	const executable = command.startsWith(path.sep) ? command : command.split(COMMAND_SEPARATOR)[0]
-
-	return path.basename(executable ?? command)
+	return app_names.of(command, stamped_memo.NO_STAMP, () => run_board_app_name.app_of(command))
 }
 
 // A process and its ancestors, the nearest first — at most once round the parents.
@@ -161,6 +157,9 @@ function backlogrun_of(
 
 function groups_of(sources: GroupSources): ProcessGroups {
 	const { figures, mark } = sources
+
+	app_names.keep(new Set(mark.names.values()))
+
 	const memberships = new Map([...figures.keys()].map((pid) => [pid, membership_of(pid, sources)]))
 	const apps = figures_where(sources, memberships, 'app')
 	const leftover = figures_where(sources, memberships, 'leftover')

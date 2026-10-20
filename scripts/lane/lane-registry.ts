@@ -222,9 +222,12 @@ async function main_repository_root(): Promise<string> {
 	return repo_discovery.main_worktree(await git_command.repository_root())
 }
 
-/** Every open lane of this repository, lowest issue number first. */
-async function list_lanes(): Promise<Array<LaneInfo>> {
-	const root = lane_paths.lane_root(await main_repository_root())
+/**
+ * Every open lane of this repository, lowest issue number first. `main_root` is the main work tree a
+ * caller already resolved — `run:board` resolves it once rather than with a `git` call each read.
+ */
+async function list_lanes(main_root?: string): Promise<Array<LaneInfo>> {
+	const root = lane_paths.lane_root(main_root ?? (await main_repository_root()))
 	const blocks = await worktree_blocks()
 	const lanes = blocks.map((block) => parse_block(block, root)).filter(is_lane)
 
