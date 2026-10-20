@@ -142,6 +142,18 @@ function readers_of(map: ReadMap, relative: string): Array<string> {
 	return [...new Set(keys.flatMap((key) => map.readers[key] ?? []))]
 }
 
+// **A directory the recorded tree held, inside which no recorded test listed, walked or read any
+// entry** (joshuafolkken/kit#4303). A file added to it since is one no test reads, as surely as one
+// the tree already held there: a test that builds a path into it reads some file there, and one that
+// enumerates it lists it, both of which leave a key whose directory is this one.
+function in_unread_directory(map: ReadMap, relative: string): boolean {
+	const directory = path.dirname(relative)
+
+	if (!map.directories.includes(directory)) return false
+
+	return Object.keys(map.readers).every((key) => path.dirname(key) !== directory)
+}
+
 function map_path(root: string): string | undefined {
 	const common = git_common_directory.repository(root)
 
@@ -187,6 +199,7 @@ function collect_records(directory: string): Array<ReadRecords> {
 const test_read_map = {
 	MAP_VERSION,
 	collect_records,
+	in_unread_directory,
 	map_path,
 	merge_records,
 	parse_map,
