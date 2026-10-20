@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createServer, type Server } from 'node:net'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // Whether the process a record names is still the one that wrote it.
 //
