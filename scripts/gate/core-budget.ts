@@ -279,10 +279,9 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 	// A unit claim is admitted at the room the budget leaves rather than at full width — the first
 	// waiter, which load outside the ledger does not hold, as well as one past the wait cap.
 	const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
+	const reason = core_wait.hold_reason(context.key, reservations, budget, granted)
 
-	if (core_admission.is_admitted(context.key, reservations, budget)) {
-		return admit(context, undefined, granted)
-	}
+	if (reason === undefined) return admit(context, undefined, granted)
 
 	if (context.now() >= context.deadline) {
 		const held = core_admission.with_grant(context.key, reservations, granted)
@@ -290,7 +289,7 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 		return admit(context, overflow_of(context, held, budget), granted)
 	}
 
-	mark_waiting(context, core_wait.wait_reason(context.key, reservations, budget))
+	mark_waiting(context, reason)
 
 	return undefined
 }

@@ -66,6 +66,24 @@ describe('core_wait.wait_reason — why a claim waits', () => {
 	})
 })
 
+// joshuafolkken/kit#4167: a unit claim the budget admits only below half its width still waits.
+describe('core_wait.hold_reason — whether an admitted claim still waits', () => {
+	const ledger: Array<LedgerEntry> = [
+		{ key: 'own', reservation: { weight: CORES, claimed_at: 0, is_unit: true } },
+	]
+	const budget = { cores: CORES, memory_mb: MEMORY_MB }
+	// Busy load beyond the ledger leaves the claim alone in it one core.
+	const busy = { cores: 1, memory_mb: MEMORY_MB, busy_excess: CORES - 1 }
+
+	it('holds a claim granted below half its width, on the CPU', () => {
+		expect(core_wait.hold_reason('own', ledger, busy, 1)).toBe('cpu')
+	})
+
+	it('admits a claim granted half its width or more', () => {
+		expect(core_wait.hold_reason('own', ledger, budget, CORES / 2)).toBeUndefined()
+	})
+})
+
 describe('core_wait.wait_line — what a waiting command prints', () => {
 	it('names the command and the reason', () => {
 		expect(core_wait.wait_line('lint', 'pressure')).toBe(

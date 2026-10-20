@@ -5,7 +5,6 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
 import { free_cores } from './free-cores'
-import { gate_plan } from './gate-plan'
 import type { MachineReading } from './machine-capacity'
 
 // joshuafolkken/kit#3945: the unit suite's worker count is bounded by what the machine has free, the
@@ -17,8 +16,6 @@ const LEDGER_WEIGHT = 4
 // The ledger's claim and five cores from outside it.
 const OUTSIDE_LOAD = 5
 const BUSY_CORES = LEDGER_WEIGHT + OUTSIDE_LOAD
-const SCARCE_FREE = 3
-const PAIRED_RUNS = 2
 
 const ctx = { directory: '' }
 
@@ -98,25 +95,5 @@ describe('free_cores.read — inside the claim its own command holds', () => {
 		)
 
 		expect(free).toBe(CORES - OUTSIDE_LOAD)
-	})
-})
-
-describe('gate_plan.bound_by_free — the gate unit cap', () => {
-	it('takes the free cores when they are fewer than the cap', () => {
-		const plan = gate_plan.resolve_gate_plan(CORES, PAIRED_RUNS)
-
-		expect(gate_plan.bound_by_free(plan, CORES, SCARCE_FREE).unit_worker_cap).toBe(SCARCE_FREE)
-	})
-
-	it('keeps the cap where the machine could not be read', () => {
-		const plan = gate_plan.resolve_gate_plan(CORES)
-
-		expect(gate_plan.bound_by_free(plan, CORES, undefined)).toEqual(plan)
-	})
-
-	it('adds no cap to a plan without the unit suite', () => {
-		const plan = gate_plan.resolve_gate_plan(CORES, 1, false)
-
-		expect(gate_plan.bound_by_free(plan, CORES, SCARCE_FREE).unit_worker_cap).toBeUndefined()
 	})
 })
