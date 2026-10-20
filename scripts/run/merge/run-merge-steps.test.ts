@@ -41,6 +41,7 @@ const CONTEXT = {
 	over: CONTEXT_CUT_THRESHOLD,
 	owner: run_carry.NO_OWNER,
 }
+const CHILD_LANE = { issue: CONTEXT.child, directory: `/w/.kit-lanes/${CONTEXT.child}` }
 
 // A carry record whose budget has been handed off to a successor (joshuafolkken/kit#2114).
 const HANDED_OFF_CARRY = {
@@ -63,6 +64,7 @@ beforeEach(() => {
 	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'missing' })
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(lane_registry, 'lane_location').mockResolvedValue(CHILD_LANE)
 })
 
 // joshuafolkken/kit#2421: the branches that judge a child finished are where its lingering process is
@@ -71,13 +73,13 @@ describe('run_merge_steps — ending the child process where the child is judged
 	it('do_failed terminates the abandoned child', async () => {
 		await run_merge_steps.do_failed(CONTEXT)
 
-		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+		expect(reap_mock).toHaveBeenCalledWith(CHILD_LANE)
 	})
 
 	it('do_outage terminates the old child before the re-dispatch launches another', async () => {
 		await run_merge_steps.do_outage(CONTEXT)
 
-		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+		expect(reap_mock).toHaveBeenCalledWith(CHILD_LANE)
 	})
 
 	it('touches no process when the carry record refused the count', async () => {

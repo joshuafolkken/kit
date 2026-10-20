@@ -180,7 +180,7 @@ describe('lane_withdraw.withdraw — what is left when a step fails', () => {
 
 		expect(outcome).toStrictEqual({ kind: 'unsaved', directory: DIRECTORY, reason: LOCK_ERROR })
 		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.WITHDRAW, expect.any(String))
-		expect(reap_child).toHaveBeenCalledWith(ISSUE)
+		expect(reap_child).toHaveBeenCalledWith(LANE)
 		expect(close_not_planned).not.toHaveBeenCalled()
 		expect(close_lane).not.toHaveBeenCalled()
 	})

@@ -2,7 +2,9 @@
 import { fileURLToPath } from 'node:url'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { lane_pause } from './lane-pause'
+import { lane_pause, type LaneSignalled } from './lane-pause'
+import type { LaneProcesses } from './lane-reap'
+import { lane_registry } from './lane-registry'
 
 // `josh lane:pause <issue> | --all` and `josh lane:resume <issue> | --all` — one script told apart by
 // the verb the registry passes first. A named lane with no child process to signal exits non-zero, so a
@@ -28,34 +30,39 @@ function is_verb(value: string | undefined): value is Verb {
 	return value === 'pause' || value === 'resume'
 }
 
-async function issues_of(target: ReadonlyArray<string>): Promise<Array<string> | undefined> {
+async function lanes_of(target: ReadonlyArray<string>): Promise<Array<LaneProcesses> | undefined> {
 	const [issue, ...rest] = target
 
 	if (issue === undefined || rest.length > 0) return undefined
-	if (issue === ALL_FLAG) return await lane_pause.open_issues()
+	if (issue === ALL_FLAG) return await lane_pause.open_lanes()
+	if (!issue_number_shape.is_issue_number(issue)) return undefined
 
-	return issue_number_shape.is_issue_number(issue) ? [issue] : undefined
+	return [await lane_registry.lane_location(issue)]
+}
+
+// The daemons are named only when there were any, so a lane without one reads as it always did.
+function outcome_of(verb: Verb, result: LaneSignalled): string {
+	const { done } = VERBS[verb]
+	const daemons =
+		result.ended.length === 0 ? '' : `, ended ${String(result.ended.length)} daemon(s)`
+
+	if (result.signalled.length === 0) return `no child process running — nothing ${done}${daemons}`
+
+	return `${done} ${String(result.signalled.length)} process(es)${daemons}`
 }
 
 // One line per lane: how many of its processes were signalled.
-function report(verb: Verb, issue: string, pids: ReadonlyArray<number>): void {
-	const lane = `lane:${verb} ${issue_cite.plain(issue)}`
-	const { done } = VERBS[verb]
-	const outcome =
-		pids.length === 0
-			? `no child process running — nothing ${done}`
-			: `${done} ${String(pids.length)} process(es)`
-
-	console.info(`${lane}: ${outcome}`)
+function report(verb: Verb, issue: string, result: LaneSignalled): void {
+	console.info(`lane:${verb} ${issue_cite.plain(issue)}: ${outcome_of(verb, result)}`)
 }
 
-function apply(verb: Verb, issues: ReadonlyArray<string>, is_named: boolean): number {
-	const signalled = issues.map((issue) => {
-		const pids = lane_pause[VERBS[verb].act](issue)
+function apply(verb: Verb, lanes: ReadonlyArray<LaneProcesses>, is_named: boolean): number {
+	const signalled = lanes.map((lane) => {
+		const result = lane_pause[VERBS[verb].act](lane)
 
-		report(verb, issue, pids)
+		report(verb, lane.issue, result)
 
-		return pids.length
+		return result.signalled.length
 	})
 
 	return is_named && signalled.includes(0) ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
@@ -70,9 +77,9 @@ function report_usage(): number {
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [verb, ...target] = argv
 	if (!is_verb(verb)) return report_usage()
-	const issues = await issues_of(target)
+	const lanes = await lanes_of(target)
 
-	return issues === undefined ? report_usage() : apply(verb, issues, target[0] !== ALL_FLAG)
+	return lanes === undefined ? report_usage() : apply(verb, lanes, target[0] !== ALL_FLAG)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

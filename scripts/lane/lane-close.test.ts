@@ -25,8 +25,8 @@ vi.mock('./lane-registry', () => ({
 	lane_registry: {
 		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
 			lanes.find((lane) => lane.issue === issue),
+		lane_root_directory: vi.fn(),
 		list_lanes: vi.fn(),
-		main_repository_root: vi.fn(),
 	},
 }))
 
@@ -47,7 +47,6 @@ const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-close-test-'))
-const REPOSITORY_ROOT = path.join(scratch, 'kit')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
@@ -93,7 +92,7 @@ beforeEach(() => {
 	mkdirSync(LANE_ROOT, { recursive: true })
 	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
 	lanes_are([])
-	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	vi.mocked(lane_registry.lane_root_directory).mockResolvedValue(LANE_ROOT)
 	vi.mocked(git_worktree.worktree_prune).mockResolvedValue('')
 	vi.mocked(git_worktree.branch_delete).mockResolvedValue('')
 	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
@@ -165,7 +164,10 @@ describe('ending the lane child with its lane', () => {
 
 		const outcome = await lane_close.close_lane(ISSUE)
 
-		expect(vi.mocked(lane_reap.reap_child)).toHaveBeenCalledWith(ISSUE)
+		expect(vi.mocked(lane_reap.reap_child)).toHaveBeenCalledWith({
+			issue: ISSUE,
+			directory: lane.directory,
+		})
 		expect(outcome.reaped).toStrictEqual([hung_child])
 	})
 })

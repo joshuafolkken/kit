@@ -79,7 +79,7 @@ describe('lane_restart.restart — stopping and re-dispatching', () => {
 	it('stops the child, then dispatches the issue in a fresh session', async () => {
 		const outcome = await lane_restart.restart(ISSUE)
 
-		expect(reap_child).toHaveBeenCalledWith(ISSUE)
+		expect(reap_child).toHaveBeenCalledWith(LANE)
 		expect(dispatch_child).toHaveBeenCalledWith(ISSUE, 'restart')
 		expect(outcome).toStrictEqual({ kind: 'restarted', dispatch: DISPATCHED, stash: undefined })
 	})

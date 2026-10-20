@@ -970,9 +970,10 @@ pnpm josh lane:resume --all   # every open lane
 <!-- /usage -->
 
 - Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch, Issue and event stream are untouched; the child keeps its memory.
+- A pause ends the lane's detached `eslint_d` (titled `eslint_d - <lane directory>`) rather than stopping it: a resume would not reach it, and the next lint starts it again. `lane:close`, `lane:withdraw` and `lane:restart` end it too.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
 
-**Output / exit codes:** one line per lane, exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
+**Output / exit codes:** one line per lane (`, ended N daemon(s)` when a pause ended any), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
 
 ### `josh rule:value`
 

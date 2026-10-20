@@ -288,7 +288,7 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 // `in-progress`, and close its lane if the child left nothing in it. The reap comes first, so the lane
 // reads with no live process.
 async function release_child(child: string): Promise<void> {
-	lane_reap.reap_child(child)
+	lane_reap.reap_child(await lane_registry.lane_location(child))
 	await run_label.unmark(child)
 	await close_vacant_lane(child)
 }

@@ -112,21 +112,15 @@ function close_kind(did_exist: boolean, left_behind: ReadonlyArray<string>): Clo
 	return did_exist ? 'closed' : 'none'
 }
 
-// The main work tree's root, not this one's — the same reading `list_lanes` uses, so the fallback
-// directory an unregistered lane is closed by is the one `lane:open` would have created.
-// Derived here from the current work tree, a close run inside a lane
-// reports `none` over a directory that is still on disk.
-async function lane_root_directory(): Promise<string> {
-	return lane_paths.lane_root(await lane_registry.main_repository_root())
-}
-
+// The lane root is the main work tree's (`lane_root_directory`), so the fallback directory an
+// unregistered lane is closed by is the one `lane:open` would have created.
 /**
  * Close the lane for `issue`. `none` means there was nothing there, which is not a failure: a caller
  * cleaning up after an interruption cannot know whether the lane was ever opened. `incomplete` means
  * something survived the removal, and `left_behind` names it.
  */
 async function resolve_lane(issue: string): Promise<ResolvedLane> {
-	const root = await lane_root_directory()
+	const root = await lane_registry.lane_root_directory()
 	const existing = lane_registry.find_lane(await lane_registry.list_lanes(), issue)
 
 	return { existing, targets: lane_targets(root, issue, existing) }
@@ -138,7 +132,7 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	// Before the removal, not after: a child still running in the tree would keep writing into a
 	// directory being deleted, and a process outliving its lane is a half-discarded state — the work
 	// tree gone, the child still answering `alive`.
-	const reaped = lane_reap.reap_child(issue)
+	const reaped = lane_reap.reap_child({ issue, directory: targets.directory })
 
 	await remove_lane(targets)
 

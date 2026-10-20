@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_pause } from './lane-pause'
 import { lane_pause_cli } from './lane-pause-cli'
+import { lane_registry } from './lane-registry'
 
 // joshuafolkken/kit#4198: `josh lane:pause` / `lane:resume` take one issue or `--all`, and a named lane
 // with nothing to signal exits non-zero.
 
 const ISSUE = '4198'
 const OTHER = '4197'
+const LANE = { issue: ISSUE, directory: '/w/.kit-lanes/4198' }
+const OTHER_LANE = { issue: OTHER, directory: '/w/.kit-lanes/4197' }
 const SUCCESS = 0
 const FAILURE = 1
-const TREE = [101, 102]
+const TREE = { signalled: [101, 102], ended: [] }
+const NOTHING = { signalled: [], ended: [] }
 const USAGE = [
 	'Usage: josh lane:pause <issue-number> | josh lane:pause --all',
 	'       josh lane:resume <issue-number> | josh lane:resume --all',
@@ -17,7 +21,8 @@ const USAGE = [
 
 const pause_lane = vi.spyOn(lane_pause, 'pause_lane')
 const resume_lane = vi.spyOn(lane_pause, 'resume_lane')
-const open_issues = vi.spyOn(lane_pause, 'open_issues')
+const open_lanes = vi.spyOn(lane_pause, 'open_lanes')
+const lane_of = vi.spyOn(lane_registry, 'lane_location')
 const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
 
@@ -27,36 +32,57 @@ beforeEach(() => {
 	info.mockImplementation(vi.fn())
 	pause_lane.mockReturnValue(TREE)
 	resume_lane.mockReturnValue(TREE)
+	lane_of.mockResolvedValue(LANE)
 })
 
 describe('lane_pause_cli.run — one lane', () => {
 	it('pauses the named lane and reports how many processes it stopped', async () => {
 		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(SUCCESS)
-		expect(pause_lane).toHaveBeenCalledWith(ISSUE)
+		expect(lane_of).toHaveBeenCalledWith(ISSUE)
+		expect(pause_lane).toHaveBeenCalledWith(LANE)
 		expect(info).toHaveBeenCalledWith('lane:pause #4198: paused 2 process(es)')
 	})
 
 	it('resumes the named lane', async () => {
 		expect(await lane_pause_cli.run(['resume', ISSUE])).toBe(SUCCESS)
-		expect(resume_lane).toHaveBeenCalledWith(ISSUE)
+		expect(resume_lane).toHaveBeenCalledWith(LANE)
 		expect(pause_lane).not.toHaveBeenCalled()
 	})
 
 	it('exits non-zero when the named lane has no child process to signal', async () => {
-		pause_lane.mockReturnValue([])
+		pause_lane.mockReturnValue(NOTHING)
 
 		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('lane:pause #4198: no child process running — nothing paused')
 	})
 })
 
+// joshuafolkken/kit#4265: the daemons a pause ended are named beside the processes it stopped.
+describe('lane_pause_cli.run — the lane’s daemon', () => {
+	it('names the daemons it ended', async () => {
+		pause_lane.mockReturnValue({ signalled: [101], ended: [201] })
+
+		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(SUCCESS)
+		expect(info).toHaveBeenCalledWith('lane:pause #4198: paused 1 process(es), ended 1 daemon(s)')
+	})
+
+	it('still exits non-zero when only a daemon was there', async () => {
+		pause_lane.mockReturnValue({ signalled: [], ended: [201] })
+
+		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(FAILURE)
+		expect(info).toHaveBeenCalledWith(
+			'lane:pause #4198: no child process running — nothing paused, ended 1 daemon(s)',
+		)
+	})
+})
+
 describe('lane_pause_cli.run — --all', () => {
 	it('signals every open lane, and an idle one is not a failure', async () => {
-		open_issues.mockResolvedValue([OTHER, ISSUE])
-		pause_lane.mockReturnValueOnce([])
+		open_lanes.mockResolvedValue([OTHER_LANE, LANE])
+		pause_lane.mockReturnValueOnce(NOTHING)
 
 		expect(await lane_pause_cli.run(['pause', '--all'])).toBe(SUCCESS)
-		expect(pause_lane.mock.calls).toStrictEqual([[OTHER], [ISSUE]])
+		expect(pause_lane.mock.calls).toStrictEqual([[OTHER_LANE], [LANE]])
 	})
 })
 
