@@ -5,7 +5,7 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_section, type RuleColumn } from './run-board-render-section'
 import type { LaneUsages, UsageFigure, UsageScale } from './run-board-usage'
-import { run_board_usage_text } from './run-board-usage-text'
+import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 
 // The run's own rows' CPU, MEM and CMPRS cells, right after each row's number, under a rule whose
 // labels stand over them: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ─ 🤏 CMPRS ───`. A running row draws its
@@ -13,7 +13,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // starts in one column. Drawn with gauges on a terminal and as figures alone anywhere else.
 
 const { HEADER_ICONS } = run_board_labels
-const { cell_widths, cells_of } = run_board_usage_text
+const { cell_widths, cells_of, lane_limits } = run_board_usage_text
 const { columns_rule, label_room } = run_board_render_section
 const { width_of } = run_board_fit
 const GAUGE = 5
@@ -31,6 +31,8 @@ const NUMBER_START = '  🔄 '
 interface LaneCells {
 	usages: LaneUsages
 	scale: UsageScale
+	// Each live row's share of the header's yellow thresholds, counted once a frame.
+	limits: CellLimits
 	gauge: number
 	// The widest row number of the section, so the cells after it start in one column.
 	number_width: number
@@ -49,10 +51,16 @@ function column_widths(gauge: number): Array<number> {
 	)
 }
 
-// A figure's cells, each right-aligned in its column.
-function column_cells(figure: UsageFigure | undefined, scale: UsageScale, gauge: number): string {
+// A figure's cells, each right-aligned in its column — shaded at `limits` where a lane row passes its
+// share, at the whole machine's thresholds where not.
+function column_cells(
+	figure: UsageFigure | undefined,
+	scale: UsageScale,
+	gauge: number,
+	limits?: CellLimits,
+): string {
 	const widths = column_widths(gauge)
-	const cells = cells_of(figure, scale, gauge).map(
+	const cells = cells_of(figure, scale, gauge, limits).map(
 		(cell, index) => `${' '.repeat(Math.max(0, (widths[index] ?? 0) - width_of(cell)))}${cell}`,
 	)
 
@@ -72,10 +80,12 @@ function lane_cells_of(header: BoardHeader, rows: ReadonlyArray<BoardRow>): Lane
 	if (usages === undefined) return undefined
 
 	const widest = Math.max(0, ...rows.map((row) => String(row.number).length))
+	const running = rows.filter((row) => run_board_earlier.is_live(row)).length
 
 	return {
 		usages: usages.lanes,
 		scale: usages.scale,
+		limits: lane_limits(running),
 		gauge: gauge_of(header),
 		number_width: lead_width(widest, LANES_LABEL, width_of(NUMBER_START)),
 	}
@@ -93,7 +103,7 @@ function number_text(
 	if (cells === undefined) return link(number)
 
 	const figure = run_board_earlier.is_live(row) ? cells.usages.get(row.number) : undefined
-	const drawn = column_cells(figure, cells.scale, cells.gauge)
+	const drawn = column_cells(figure, cells.scale, cells.gauge, cells.limits)
 
 	return `${link(number)}${' '.repeat(cells.number_width - number.length)} ${drawn}`
 }
