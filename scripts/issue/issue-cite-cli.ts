@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
@@ -24,7 +22,6 @@ import { issue_cite, type CiteTarget } from './issue-cite'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 // The same bound `issue:read` puts on its batch read: every read is a `gh` process, and an unbounded
 // fan-out is answered with secondary rate limiting rather than with titles.
 const READ_CONCURRENCY = 8
@@ -160,17 +157,11 @@ async function run(args: ReadonlyArray<string>): Promise<number> {
 	return report(cited)
 }
 
-async function main(args: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(args)
-}
-
 const issue_cite_cli = {
 	USAGE,
 	cite,
 	parse_targets,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_cite_cli }

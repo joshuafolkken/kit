@@ -188,8 +188,8 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh rule:value` · `josh ruv` | `[--refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
 | `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
-| `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |
-| `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>]` | automation | files | Cut a lane child before the gate and resume a fresh process |
+| `josh run:carry` | `[options]` | automation | files | Carry one invocation’s budget across its own session cuts |
+| `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>] [--json] [--end]` | automation | files | Cut a lane child before the gate and resume a fresh process |
 | `josh run:ending` | `<issue> --output <path> [--repo <owner/repo>]` | automation | network | Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable) |
 | `josh run:entry` | `<issue> [--to <command>]` | automation | git, network, files | Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step |
 | `josh run:event` | `--append <kind> <text> \| --from\|--follow <n> \| --watch [<n>] \| --last` | automation | files | Append to, read or watch the run’s append-only event stream (--append <kind> <text> \| --from\|--follow <n> \| --watch [<n>] \| --last) |

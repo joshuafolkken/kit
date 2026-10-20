@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
@@ -34,7 +32,6 @@ const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const SCORE_DIGITS = 2
 const USAGE = 'Usage: josh issue:scout "<title>" [--body "<draft>" | --body-file <path>]'
 const UNKNOWN_REPO_MESSAGE =
@@ -394,12 +391,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await report(args, repo)
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
-// a pipe is asynchronous on macOS, so exiting can tear the process down before it drains.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_scout_cli = {
 	USAGE,
 	UNKNOWN_REPO_MESSAGE,
@@ -414,8 +405,6 @@ const issue_scout_cli = {
 	scout,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { ScoutArguments, ScoutOutcome }
 export { issue_scout_cli }

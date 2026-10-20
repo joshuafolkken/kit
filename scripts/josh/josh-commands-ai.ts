@@ -63,7 +63,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<epic>', 'automation', ['network']],
 	},
 	'auto-ok:next': {
-		script: 'scripts/auto-ok/auto-ok-cli.ts',
+		script: 'scripts/auto-ok/auto-ok-main.ts',
 		description: 'Print the next opted-in issue an unattended run may pick up outside an epic',
 		category: 'AI tools',
 		reference: ['[--exclude <n>[,<n>...]] [--label <name>]', 'automation', ['network']],

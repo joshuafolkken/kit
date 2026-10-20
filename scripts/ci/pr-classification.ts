@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
@@ -117,18 +116,6 @@ function check_event(
 	const labels = read_labels(event.repository.full_name, event.pull_request.number)
 
 	return classification_error(labels, event.pull_request.user.login)
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const event_path = process.env['GITHUB_EVENT_PATH']
-	if (!event_path) throw new Error('GITHUB_EVENT_PATH is required')
-
-	const error = check_event(event_path)
-
-	if (error) {
-		console.error(`::error::${error}`)
-		process.exitCode = 1
-	}
 }
 
 const pr_classification = {

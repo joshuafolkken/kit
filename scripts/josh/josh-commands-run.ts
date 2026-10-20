@@ -43,7 +43,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Carry one invocation’s budget across its own session cuts',
 		category: 'AI tools',
-		reference: ['<operation> [arguments...]', 'automation', ['files']],
+		reference: ['[options]', 'automation', ['files']],
 	},
 	'run:add': {
 		script: 'scripts/run/add/run-add-cli.ts',
@@ -65,7 +65,11 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/cut/run-cut-cli.ts',
 		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
-		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
+		reference: [
+			'[--resume] <issue> [--impl] [--handoff <path>] [--json] [--end]',
+			'automation',
+			['files'],
+		],
 	},
 	'run:park': {
 		script: 'scripts/run/park/run-park-cli.ts',
