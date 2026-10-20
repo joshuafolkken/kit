@@ -18,6 +18,12 @@ import { process_tools } from './process-tools'
 //
 // **The caller's own ancestry is never touched.** A `lane:close` issued from inside the lane it
 // closes would otherwise end the very session running it, before it could report.
+//
+// **A lane's `eslint_d` is ended with it, found by its title rather than its ancestry**
+// (joshuafolkken/kit#4265). The edit hook starts the daemon in the lane's directory and it detaches to
+// pid 1, so no tree reaches it, and it lives on for 15 minutes after its last lint — a paused lane kept
+// a running process and `run:board` drew it as working. It titles itself `eslint_d - <cwd>`, the lane
+// directory, so the match is exact to one lane. It is a cache: the next lint starts it again.
 
 const PGREP_COMMAND = 'pgrep'
 const MATCH_FULL_COMMAND_LINE = '-f'
@@ -29,6 +35,21 @@ const TERMINATE_SIGNAL = 'SIGTERM'
 const CONTINUE_SIGNAL = 'SIGCONT'
 // `0` addresses the caller's own process group and `1` is init — neither is ever a lane child.
 const LOWEST_CHILD_PID = 2
+// The title `eslint_d` gives itself when it serves the directory it started in. The title is written
+// over the original arguments, so on macOS `pgrep -f` reads it followed by a blank and what is left of
+// the environment — the directory ends at a blank, not at the end of the line, and `/42` never
+// matches `/420`.
+const DAEMON_TITLE = 'eslint_d - '
+const DIRECTORY_END = '( |$)'
+// What `pgrep -f`'s extended regular expression reads as other than itself.
+const PATTERN_SPECIALS = /[$()*+.?[\\\]^{|}]/gu
+const ESCAPE = '\\'
+
+// The lane a reap or a pause acts on: the child by its issue, the daemon by its directory.
+interface LaneProcesses {
+	issue: string
+	directory: string
+}
 
 // What collecting a lane's process tree reads — shared with `lane:pause` (`lane-pause.ts`).
 interface TreeProbes {
@@ -147,13 +168,36 @@ function lane_tree(issue: string, probes: TreeProbes = SYSTEM_PROBES): Array<num
 	return tree_of(roots_of(issue, own, probes), probes).filter((pid) => !own.has(pid))
 }
 
+function daemon_pattern(directory: string): string {
+	const literal = directory.replaceAll(PATTERN_SPECIALS, (special) => `${ESCAPE}${special}`)
+
+	return `^${DAEMON_TITLE}${literal}${DIRECTORY_END}`
+}
+
+/** The `eslint_d` serving the lane `directory` — never another lane's, the main checkout's, or the caller. */
+function lane_daemons(directory: string, probes: TreeProbes = SYSTEM_PROBES): Array<number> {
+	const own = own_ancestry(probes)
+
+	return probes.matching(daemon_pattern(directory)).filter((pid) => !own.has(pid))
+}
+
+/** Terminate the lane's `eslint_d`; returns the pids the signal reached. */
+function end_daemons(directory: string, probes: ReapProbes = SYSTEM_PROBES): Array<number> {
+	return lane_daemons(directory, probes).filter((pid) => probes.terminate(pid))
+}
+
 /**
- * Terminate every process of the lane child for `issue` and everything under it, sparing the caller's
- * own ancestry. Returns the pids that were signalled — the empty list is the healthy case, a child
- * that had already ended by itself.
+ * Terminate every process of the lane child for `lane.issue` and everything under it, sparing the
+ * caller's own ancestry, and the lane's `eslint_d` with them. Returns the child's pids that were
+ * signalled — the empty list is the healthy case, a child that had already ended by itself; the
+ * daemon is left out of it, so the count still answers whether a child was running.
  */
-function reap_child(issue: string, probes: ReapProbes = SYSTEM_PROBES): Array<number> {
-	return lane_tree(issue, probes).filter((pid) => probes.terminate(pid))
+function reap_child(lane: LaneProcesses, probes: ReapProbes = SYSTEM_PROBES): Array<number> {
+	const reaped = lane_tree(lane.issue, probes).filter((pid) => probes.terminate(pid))
+
+	end_daemons(lane.directory, probes)
+
+	return reaped
 }
 
 /** Whether a lane child for `issue` is running, by the same match `reap_child` would end. */
@@ -162,7 +206,9 @@ function is_child_running(issue: string, probes: TreeProbes = SYSTEM_PROBES): bo
 }
 
 const lane_reap = {
+	end_daemons,
 	is_child_running,
+	lane_daemons,
 	lane_tree,
 	own_ancestry,
 	parse_pids,
@@ -171,5 +217,5 @@ const lane_reap = {
 	SYSTEM_PROBES,
 }
 
-export type { ReapProbes, TreeProbes }
+export type { LaneProcesses, ReapProbes, TreeProbes }
 export { lane_reap }

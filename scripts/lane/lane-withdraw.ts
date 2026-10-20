@@ -108,7 +108,7 @@ async function close_issue(
 
 async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawOutcome> {
 	await record_withdraw(lane.issue, reason)
-	const reaped = lane_reap.reap_child(lane.issue).length
+	const reaped = lane_reap.reap_child(lane).length
 	const saved = await lane_preserve.keep_work(lane.issue, lane.directory, WITHDRAW_OCCASION)
 
 	if (saved.kind === 'unsaved') return saved

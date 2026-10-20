@@ -6,23 +6,40 @@ import { lane_reap, type ReapProbes } from './lane-reap'
 // the reaper signals — the matched child, everything under it, and never the caller's own ancestry.
 
 const ISSUE = '2398'
+const DIRECTORY = '/w/.kit-lanes/2398'
+const LANE = { issue: ISSUE, directory: DIRECTORY }
 const CHILD = 48_848
 const LOOP_SHELL = 48_900
 const LOOP_SUBSHELL = 48_901
 const STRANGER = 70_000
 const OWN_PARENT = 60_000
 const INIT = 1
+const DAEMON = 20_611
+const DAEMON_PATTERN_START = '^eslint_d'
 
 interface FakeTable {
 	matching: Array<number>
 	children: Record<number, Array<number>>
 	parents: Record<number, number>
 	immune?: Array<number>
+	// Detached processes by the title `ps` shows, matched as `pgrep -f` would.
+	titles?: Record<number, string>
+}
+
+function matching_titles(table: FakeTable, pattern: string): Array<number> {
+	const titles = Object.entries(table.titles ?? {})
+
+	return titles
+		.filter(([, title]) => new RegExp(pattern, 'u').test(title))
+		.map(([pid]) => Number(pid))
 }
 
 function probes_over(table: FakeTable, signalled: Array<number>): ReapProbes {
 	return {
-		matching: () => [...table.matching],
+		matching: (pattern) =>
+			pattern.startsWith(DAEMON_PATTERN_START)
+				? matching_titles(table, pattern)
+				: [...table.matching],
 		children_of: (pid) => table.children[pid] ?? [],
 		parent_of: (pid) => table.parents[pid],
 		terminate: (pid) => {
@@ -50,7 +67,7 @@ describe('lane_reap.reap_child', () => {
 			signalled,
 		)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([CHILD, LOOP_SHELL, LOOP_SUBSHELL])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([CHILD, LOOP_SHELL, LOOP_SUBSHELL])
 		expect(signalled).toStrictEqual([CHILD, LOOP_SHELL, LOOP_SUBSHELL])
 	})
 
@@ -58,7 +75,7 @@ describe('lane_reap.reap_child', () => {
 		const signalled: Array<number> = []
 		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry() }, signalled)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([])
 		expect(signalled).toStrictEqual([])
 	})
 })
@@ -76,7 +93,7 @@ describe('lane_reap.reap_child — what it spares', () => {
 			signalled,
 		)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([CHILD])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([CHILD])
 		expect(signalled).not.toContain(process.pid)
 		expect(signalled).not.toContain(OWN_PARENT)
 	})
@@ -93,7 +110,58 @@ describe('lane_reap.reap_child — what it spares', () => {
 			signalled,
 		)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([CHILD])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([CHILD])
+	})
+})
+
+// joshuafolkken/kit#4265: the edit hook's `eslint_d` detaches to pid 1, so no tree reaches it, and a
+// paused lane kept it running. It is found by its `eslint_d - <lane directory>` title.
+describe('lane_reap.lane_daemons', () => {
+	it('finds only the daemon serving that lane directory', () => {
+		const titles = {
+			[DAEMON]: `eslint_d - ${DIRECTORY}     PORT_SEED=1 TERM_PROGRAM=vscode`,
+			[DAEMON + 1]: `eslint_d - ${DIRECTORY}0`,
+			[DAEMON + 2]: 'eslint_d - /w/kit',
+			[DAEMON + 3]: 'eslint_d - /w/_kit-lanes/2398',
+			[DAEMON + 4]: `node ${DIRECTORY}/eslint_d - ${DIRECTORY}`,
+		}
+		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry(), titles }, [])
+
+		expect(lane_reap.lane_daemons(DIRECTORY, probes)).toStrictEqual([DAEMON])
+	})
+
+	it('never answers the caller or its ancestors', () => {
+		const titles = { [OWN_PARENT]: `eslint_d - ${DIRECTORY}` }
+		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry(), titles }, [])
+
+		expect(lane_reap.lane_daemons(DIRECTORY, probes)).toStrictEqual([])
+	})
+})
+
+describe('lane_reap.reap_child — the lane’s daemon', () => {
+	it('terminates the daemon with the tree and counts only the child’s processes', () => {
+		const signalled: Array<number> = []
+		const table: FakeTable = {
+			matching: [CHILD],
+			children: {},
+			parents: own_ancestry(),
+			titles: { [DAEMON]: `eslint_d - ${DIRECTORY}` },
+		}
+
+		expect(lane_reap.reap_child(LANE, probes_over(table, signalled))).toStrictEqual([CHILD])
+		expect(signalled).toStrictEqual([CHILD, DAEMON])
+	})
+
+	it('ends a daemon a child that already ended left behind', () => {
+		const signalled: Array<number> = []
+		const titles = { [DAEMON]: `eslint_d - ${DIRECTORY}` }
+		const probes = probes_over(
+			{ matching: [], children: {}, parents: own_ancestry(), titles },
+			signalled,
+		)
+
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([])
+		expect(signalled).toStrictEqual([DAEMON])
 	})
 })
 

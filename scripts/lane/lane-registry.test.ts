@@ -242,6 +242,17 @@ describe('finding one lane', () => {
 		expect(lane_registry.find_lane(lanes, '1490')?.branch).toBe('1490-lane')
 		expect(lane_registry.find_lane(lanes, '9999')).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4265: a named lane is placed by its issue, registered or not, so its processes
+	// can still be ended once `list_lanes` no longer reads it.
+	it('places an unregistered lane in the repository’s lane root', async () => {
+		list_of()
+
+		expect(await lane_registry.lane_location('4265')).toStrictEqual({
+			issue: '4265',
+			directory: path.join(LANE_ROOT, '4265'),
+		})
+	})
 })
 
 // joshuafolkken/kit#3370: the stray sweep keeps off every registered work tree, not only the ones
