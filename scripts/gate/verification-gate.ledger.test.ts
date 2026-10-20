@@ -4,6 +4,7 @@ import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { core_budget } from './core-budget'
 import { gate_ledger } from './gate-ledger'
 import { gate_test_fixture } from './gate-test-fixture'
 import { machine_capacity } from './machine-capacity'
@@ -49,13 +50,21 @@ async function run_into(ledger_path: string | undefined, exit_code: number): Pro
 	}
 }
 
+// joshuafolkken/kit#4309: the gate under test runs under the held mark, as it does inside `josh gate`,
+// so its checks never claim the real machine-wide budget — a mocked busy machine would otherwise
+// leave the unit claim waiting out `WAIT_CAP_MS`. No other lane's reservation reaches the sampler.
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv(core_budget.HELD_KEY, core_budget.HELD_VALUE)
+	vi.spyOn(core_budget, 'live_reservations').mockReturnValue([])
 	live_runs.mockReturnValue(0)
 	RECORDS.clear()
 })
 
-afterEach(RECORDS.clear)
+afterEach(() => {
+	vi.unstubAllEnvs()
+	RECORDS.clear()
+})
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
