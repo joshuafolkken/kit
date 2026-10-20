@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { repo_map_logic, type DiscoveredRepo, type RepoMap } from './repo-map-logic'
 import { repo_origin } from './repo-origin'
 
@@ -59,16 +60,33 @@ function resolve_git_directory(repository_path: string): string | undefined {
 	}
 }
 
-// The work tree's git config text, or nothing when it is unreadable or not a work tree.
-function read_config(repository_path: string): string | undefined {
-	const git_directory = resolve_git_directory(repository_path)
-	if (git_directory === undefined) return undefined
-
+function read_text(file: string): string | undefined {
 	try {
-		return readFileSync(path.join(git_directory, GIT_CONFIG), 'utf8')
+		return readFileSync(file, 'utf8')
 	} catch {
 		return undefined
 	}
+}
+
+// Each work tree's git directory and each config's text, read again only once the `.git` entry or the
+// config itself has changed: `run:board` cites issues through the origin on every redraw
+// (joshuafolkken/kit#4263).
+const git_directories = stamped_memo.create<string | undefined>()
+const configs = stamped_memo.create<string | undefined>()
+
+// The work tree's git config text, or nothing when it is unreadable or not a work tree.
+function read_config(repository_path: string): string | undefined {
+	const git_entry = path.join(repository_path, GIT_DIRECTORY)
+	const git_directory = git_directories.of(
+		repository_path,
+		stamped_memo.file_stamp(git_entry),
+		() => resolve_git_directory(repository_path),
+	)
+	if (git_directory === undefined) return undefined
+
+	const config = path.join(git_directory, GIT_CONFIG)
+
+	return configs.of(config, stamped_memo.file_stamp(config), () => read_text(config))
 }
 
 // The `origin` URL a work tree declares, or nothing when it has no `origin`, no readable config, or

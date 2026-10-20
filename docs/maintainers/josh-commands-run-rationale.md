@@ -148,6 +148,13 @@ Right above the legend, the terminal board (the live redraw and `--once`) names 
 
 Output / exit codes: the stream, the lanes and the end of each session's log re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed, whether a merged pull request closed it and whether it was closed as not planned — and drawn `✅` (merged), `🚫` (not planned) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. A parked child is settled by that read alone: closed, it leaves `💤` for `✅` or `🚫` (or `🏁`); still open, it stays `💤` whatever its labels say. A `💤` row ends with its newest park's reason, and a `🚫` row with the reason given to `lane:withdraw`, if one was given. Both go where a `⏳` row puts why it waits. A park whose reason its row shows is not repeated among the newest parks, unless it is a `needs-decision` park. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏰` and when it ended in the header, only that run's events — until the next run begins. An ended run asks GitHub about its unread closed children once after it ended, then reads nothing until the next run. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument, or an `--every` that is not a positive number of minutes, exits 1; Ctrl+C exits 130 and SIGTERM 143.
 
+Each read recomputes only what changed (#4263); a `git` or `ps` call inside a read freezes the spinner while it runs.
+
+- An app name is worked out once per command line.
+- The ledger and each lane's git config are parsed again only when the file's stamp (inode, mtime, ctime, size) changes.
+- The main work tree is resolved once per working directory, and again after a failed resolve.
+- Each process's start time comes from the board's one `ps` snapshot, never a `ps` call per process.
+
 ## `josh run:stranded` in detail
 
 Report whether the run has been left stranded: the session that owned the budget has died — at a cut it handed off, or with no hand-off at all — no successor holds it, and no `run:wake` supervisor is watching. Three facts are read and never weighed — the driver the carry record names, the owner's liveness, and the supervisor's — so a strand is detected without any judgement. Wired into the `Stop` hook beside `backlog:stalled`, so it runs at each loop boundary; a strand emits one marker on the run's event stream and sends one 🚨 Telegram naming the recovery. It reports, it never stops: a false positive costs one notification, never a halted run or a torn-down lane.
