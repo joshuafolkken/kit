@@ -67,6 +67,8 @@ const WORDS = {
 	held: 'held by triage',
 	headroom: 'memory headroom',
 	untriaged: 'untriaged',
+	solo: 'runs alone',
+	solo_ahead: 'behind solo',
 	// A check held back by the machine-wide core budget, and why.
 	held_check: 'held check',
 	memory: 'memory',
@@ -252,13 +254,16 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 
 // What a queued or waiting row leads with (joshuafolkken/kit#4288), in place of ⏳: 📂 a path a
 // running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
-// judged, chosen on the same rule as every row icon. The rest are the board's own, shared rather than
-// copied.
+// judged, 🧍 a `run:solo` issue waiting for the running lanes and 🙅 a row behind it (#4294; 🚧 is a
+// held check's), chosen on the same rule as every row icon. The rest are the board's own, shared
+// rather than copied.
 const WAIT_ICONS = {
 	path: '📂',
 	named: '📋',
 	held: '✋',
 	untriaged: '❓',
+	solo: '🧍',
+	solo_ahead: '🙅',
 	lane: LANES_ICON,
 	memory: HEADER_ICONS.memory,
 	blocker: WAITS_ICON,
@@ -275,6 +280,8 @@ const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
 	[WAIT_ICONS.path, 'path'],
 	[WAIT_ICONS.named, 'named'],
 	[WAIT_ICONS.held, 'held'],
+	[WAIT_ICONS.solo, 'solo'],
+	[WAIT_ICONS.solo_ahead, 'solo_ahead'],
 	[WAIT_ICONS.memory, 'headroom'],
 	[WAIT_ICONS.untriaged, 'untriaged'],
 	[WAIT_ICONS.blocker, 'waits'],

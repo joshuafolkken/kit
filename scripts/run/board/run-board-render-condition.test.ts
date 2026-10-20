@@ -114,6 +114,20 @@ describe('run_board_render.render — the condition column across sections', () 
 		expect(queued_line).not.toBe('')
 	})
 
+	// joshuafolkken/kit#4294: 🧍 names the first lane it waits for in the column, the rest after the title.
+	it('draws a run:solo row and a row behind it in the same column', () => {
+		const solo = row(4287, { icon: WAIT_ICONS.solo, issues: ['4288', '4268'] })
+		const behind = row(4269, { icon: WAIT_ICONS.solo_ahead, issues: ['4287'] })
+		const rows = [solo, behind].map((entry) => ({ kind: 'row' as const, row: entry }))
+		const drawn = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: rows } }))
+		const solo_line = drawn.find((line) => line.startsWith(`  ${WAIT_ICONS.solo} `)) ?? ''
+		const behind_line = drawn.find((line) => line.startsWith(`  ${WAIT_ICONS.solo_ahead} `)) ?? ''
+
+		expect(solo_line).toContain(`4288+1${' '.repeat(CONDITION_WIDTH - '4288+1'.length)} 4287`)
+		expect(solo_line.endsWith('4268')).toBe(true)
+		expect(solo_line.indexOf(' 4287')).toBe(behind_line.indexOf(' 4269'))
+	})
+
 	it('draws each row’s wait icon once', () => {
 		const waiting_line = lines.find((line) => line.includes('1234')) ?? ''
 
