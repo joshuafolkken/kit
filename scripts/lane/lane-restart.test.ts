@@ -9,6 +9,7 @@ import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_preserve } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 import { lane_restart } from './lane-restart'
 
 // joshuafolkken/kit#3772: a person stops a running lane child and re-dispatches its issue in a fresh
@@ -48,6 +49,9 @@ const dispatch_child = vi.spyOn(lane_dispatch, 'dispatch_child')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const lane_cut_sync = vi.spyOn(run_cut, 'lane_cut_sync')
 const end_cut = vi.spyOn(run_cut, 'end_cut')
+const end_residents = vi.spyOn(lane_residents, 'end_residents')
+
+vi.spyOn(lane_residents, 'report').mockReturnValue()
 
 vi.spyOn(lane_dispatch, 'describe').mockReturnValue('dispatch described')
 
@@ -67,6 +71,7 @@ function arrange_relaunch(): void {
 	emit.mockResolvedValue()
 	lane_cut_sync.mockReturnValue(undefined)
 	end_cut.mockReturnValue()
+	end_residents.mockReturnValue([])
 }
 
 beforeEach(() => {
@@ -102,6 +107,16 @@ describe('lane_restart.restart — stopping and re-dispatching', () => {
 		)
 		expect(dispatch_child.mock.invocationCallOrder[0]).toBeLessThan(
 			emit.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	// joshuafolkken/kit#4315: what the stopped child started outside its tree goes before the relaunch.
+	it('ends the stopped child’s residents, sparing what the reap ended, before the dispatch', async () => {
+		await lane_restart.restart(ISSUE)
+
+		expect(end_residents).toHaveBeenCalledWith(LANE, [PID])
+		expect(end_residents.mock.invocationCallOrder[0]).toBeLessThan(
+			dispatch_child.mock.invocationCallOrder[0] ?? 0,
 		)
 	})
 })

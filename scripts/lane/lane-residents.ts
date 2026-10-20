@@ -2,17 +2,23 @@ import { spawnSync } from 'node:child_process'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_reap } from './lane-reap'
 import { process_directories } from './process-directories'
+import { process_lane_marks } from './process-lane-marks'
 
-// Ending what still runs from a lane's checkout when the lane closes (joshuafolkken/kit#4304).
+// Ending what still runs from a lane's checkout, or carries its mark, when the lane closes
+// (joshuafolkken/kit#4304, joshuafolkken/kit#4315).
 //
 // **The lane child's tree and its `eslint_d` are not everything a lane starts.** A diagnostic the
 // child launched under `script`, or a `node` it detached, is re-parented to pid 1 and outlives the
 // merge: no tree reaches it and no title names it, and `run:board` drew such processes as a leftover
 // holding gigabytes while nothing ended them. Its working directory still sits under the lane, which
 // is what finds it — the same reading the board's leftover is drawn from (`process-directories.ts`).
+// **A process the child started from elsewhere** — a measurement run from the main checkout or `/tmp`
+// — has no such directory, so the lane's mark it inherited finds it instead (`process-lane-marks.ts`):
+// the issue number `lane:dispatch` put in the child's environment. A process without the mark, or with
+// another issue's, is never this lane's.
 //
-// **Only that lane's directory, and never the caller.** Another lane's and the main checkout's
-// processes are not under it. A `lane:close` run from inside the lane would match itself, so its
+// **Only that lane's processes, and never the caller.** Another lane's and the main checkout's
+// unmarked processes are not its. A `lane:close` run from inside the lane would match itself, so its
 // ancestry is spared, as `lane-reap.ts` spares it — and so is its process group: its own helpers
 // (`tsx`'s `esbuild`) and the commands piped beside it share the group, while a detached process
 // (`script`, a new session) has left it.
@@ -22,9 +28,16 @@ const PID_SEPARATOR = ','
 // `ps`'s line: the process and its group.
 const PAIR_LENGTH = 2
 
+interface ResidentLane {
+	issue: string
+	directory: string
+}
+
 interface ResidentProbes {
 	// `undefined` where the working directories could not be read.
 	directories: () => ReadonlyMap<number, string> | undefined
+	// Each marked process's issue; `undefined` where the marks could not be read.
+	marks: () => ReadonlyMap<number, string> | undefined
 	own: () => ReadonlySet<number>
 	// Each listed process's group; a process gone by then is missing.
 	groups_of: (pids: ReadonlyArray<number>) => ReadonlyMap<number, number>
@@ -54,6 +67,7 @@ function groups_of(pids: ReadonlyArray<number>): Map<number, number> {
 
 const SYSTEM_PROBES: ResidentProbes = {
 	directories: () => process_directories.list_all(),
+	marks: () => process_lane_marks.list_all(),
 	own: () => lane_reap.own_ancestry(),
 	groups_of,
 	terminate: (pid) => lane_reap.SYSTEM_PROBES.terminate(pid),
@@ -69,41 +83,55 @@ function outside_own_group(candidates: Array<number>, probes: ResidentProbes): A
 	return candidates.filter((pid) => own_group === undefined || groups.get(pid) !== own_group)
 }
 
+// Every process running from the lane's directory or carrying its mark, once each.
+function lane_processes(
+	lane: ResidentLane,
+	directories: ReadonlyMap<number, string>,
+	marks: ReadonlyMap<number, string>,
+): Array<number> {
+	const within = [...directories]
+		.filter(([, cwd]) => process_directories.is_within(cwd, lane.directory))
+		.map(([pid]) => pid)
+	const marked = [...marks].filter(([, issue]) => issue === lane.issue).map(([pid]) => pid)
+
+	return [...new Set([...within, ...marked])]
+}
+
 /**
- * The processes whose working directory sits under the lane `directory`, the caller's ancestry and
- * process group left out; `undefined` where the working directories could not be read.
+ * The processes running from `lane`'s directory or carrying its mark, the caller's ancestry and process
+ * group left out; `undefined` where the working directories or the marks could not be read.
  */
 function residents(
-	directory: string,
+	lane: ResidentLane,
 	probes: ResidentProbes = SYSTEM_PROBES,
 ): Array<number> | undefined {
 	const directories = probes.directories()
+	const marks = probes.marks()
 
-	if (directories === undefined) return undefined
+	if (directories === undefined || marks === undefined) return undefined
 	const own = probes.own()
-	const candidates = [...directories]
-		.filter(([pid, cwd]) => !own.has(pid) && process_directories.is_within(cwd, directory))
-		.map(([pid]) => pid)
+	const candidates = lane_processes(lane, directories, marks).filter((pid) => !own.has(pid))
 
 	return outside_own_group(candidates, probes)
 }
 
 /**
- * Terminate the processes still running from the lane `directory`, except `spared` — what the close
- * already ended. Returns the pids the signal reached, `undefined` where they could not be read.
+ * Terminate the processes still running from `lane`'s directory or carrying its mark, except `spared`
+ * — what the close already ended. Returns the pids the signal reached, `undefined` where they could
+ * not be read.
  */
 function end_residents(
-	directory: string,
+	lane: ResidentLane,
 	spared: ReadonlyArray<number>,
 	probes: ResidentProbes = SYSTEM_PROBES,
 ): Array<number> | undefined {
-	return residents(directory, probes)
+	return residents(lane, probes)
 		?.filter((pid) => !spared.includes(pid))
 		.filter((pid) => probes.terminate(pid))
 }
 
 /**
- * What `end_residents` did, said for the issue `cited`; `undefined` when nothing ran from the checkout.
+ * What `end_residents` did, said for the issue `cited`; `undefined` when nothing of the lane still ran.
  * A reading that failed is said, never read as none.
  */
 function residents_sentence(
@@ -111,12 +139,12 @@ function residents_sentence(
 	cited: string,
 ): string | undefined {
 	if (ended === undefined) {
-		return `Could not read which processes still run from the lane checkout for ${cited} (lsof failed); none of them was ended.`
+		return `Could not read which processes still run from the lane for ${cited} (lsof or ps failed); none of them was ended.`
 	}
 
 	if (ended.length === 0) return undefined
 
-	return `Terminated ${String(ended.length)} process(es) still running from the lane checkout for ${cited}: ${ended.join(', ')}.`
+	return `Terminated ${String(ended.length)} process(es) still running from the lane for ${cited}: ${ended.join(', ')}.`
 }
 
 /** Print `residents_sentence` to stderr, where a close reports what it ended. */
@@ -128,5 +156,5 @@ function report(ended: ReadonlyArray<number> | undefined, cited: string): void {
 
 const lane_residents = { end_residents, parse_groups, report, residents_sentence }
 
-export type { ResidentProbes }
+export type { ResidentLane, ResidentProbes }
 export { lane_residents }

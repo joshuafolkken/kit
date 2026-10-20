@@ -10,6 +10,7 @@ import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_preserve, type KeptWork } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 
 // `josh lane:restart <N>` — a person stops a running lane child and starts its issue over in a fresh
 // session, typically after correcting the Issue's specification mid-run.
@@ -88,8 +89,13 @@ async function relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 
 // A child that ended on its own during the claim (say, right after merging its PR) is a finished child
 // for `run:merge` to collect — relaunching it would re-run a done issue inside the re-confirm window.
+// What the stopped child started outside its tree goes with it, so the fresh session starts beside none
+// of it (`lane-residents.ts`).
 async function stop_and_relaunch(lane: LaneInfo): Promise<RestartOutcome> {
-	if (lane_reap.reap_child(lane).length === 0) return { kind: NOT_RUNNING_KIND }
+	const reaped = lane_reap.reap_child(lane)
+
+	if (reaped.length === 0) return { kind: NOT_RUNNING_KIND }
+	lane_residents.report(lane_residents.end_residents(lane, reaped), session_cite.issue(lane.issue))
 
 	return await relaunch(lane)
 }

@@ -39,8 +39,8 @@ interface CloseOutcome {
 	left_behind: Array<string>
 	// The lane child's processes this close terminated — empty for a child that ended by itself.
 	reaped: Array<number>
-	// What else still ran from the lane's checkout and this close terminated (`lane-residents.ts`);
-	// `undefined` where the processes' working directories could not be read.
+	// What else still ran from the lane's checkout or carried its mark and this close terminated
+	// (`lane-residents.ts`); `undefined` where the processes could not be read.
 	residents: Array<number> | undefined
 }
 
@@ -139,7 +139,7 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	// directory being deleted, and a process outliving its lane is a half-discarded state — the work
 	// tree gone, the child still answering `alive`. What else still runs from the checkout goes too.
 	const reaped = lane_reap.reap_child({ issue, directory: targets.directory })
-	const residents = lane_residents.end_residents(targets.directory, reaped)
+	const residents = lane_residents.end_residents({ issue, directory: targets.directory }, reaped)
 
 	await remove_lane(targets)
 

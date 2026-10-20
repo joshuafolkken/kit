@@ -48,7 +48,7 @@ describe('lane:close reporting what still ran from the checkout', () => {
 		expect(printed).toStrictEqual([ISSUE])
 		expect(console.error).toHaveBeenCalledExactlyOnceWith(
 			expect.stringMatching(
-				/^Terminated 2 process\(es\) still running from the lane checkout for .*#1490.*: 66330, 79739\.$/u,
+				/^Terminated 2 process\(es\) still running from the lane for .*#1490.*: 66330, 79739\.$/u,
 			),
 		)
 	})
@@ -65,7 +65,7 @@ describe('lane:close reporting what still ran from the checkout', () => {
 
 		expect(await lane_cli.run(['close', ISSUE])).toBe(SUCCESS)
 		expect(console.error).toHaveBeenCalledExactlyOnceWith(
-			expect.stringContaining('(lsof failed); none of them was ended.'),
+			expect.stringContaining('(lsof or ps failed); none of them was ended.'),
 		)
 	})
 })
