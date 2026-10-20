@@ -9,7 +9,7 @@ import type { CommandEntry } from './josh-command-types'
 /* eslint-disable @typescript-eslint/naming-convention */
 const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 	'doc:section': {
-		script: 'scripts/document/document-section-cli.ts',
+		script: 'scripts/document/document-section-main.ts',
 		description: 'Print one section of a markdown document, for a `file.md` → "Heading" reference',
 		category: 'AI tools',
 		reference: ['<file> <heading>', 'automation', ['none']],

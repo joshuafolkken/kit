@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -11,7 +10,6 @@ import {
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
-import { error_text } from '#scripts/lib/error-message'
 import { build, type OnLoadArgs, type OutputFile, type Plugin, type PluginBuild } from 'esbuild'
 
 const BUILD_SCRIPT = fileURLToPath(import.meta.url)
@@ -185,18 +183,6 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 
 	place_build(out_directory, files, stamp)
 }
-
-async function main(): Promise<void> {
-	try {
-		await build_hooks()
-		for (const bundle of HOOK_BUNDLES) console.info(`  ✔ ${outfile_for(bundle)} built`)
-	} catch (error) {
-		console.error(error_text.message_of(error))
-		process.exit(1)
-	}
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 export type { HookBundle }
 export { build_hooks, HOOK_BUNDLES, OUT_DIR, outfile_for, STAGING_PREFIX }

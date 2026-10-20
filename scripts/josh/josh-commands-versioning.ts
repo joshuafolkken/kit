@@ -3,7 +3,7 @@ import type { CommandEntry } from './josh-command-types'
 /* eslint-disable @typescript-eslint/naming-convention */
 const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	bump: {
-		script: 'scripts/version/bump-version.ts',
+		script: 'scripts/version/bump-version-main.ts',
 		description: 'Bump package version',
 		category: 'Versioning',
 		reference: ['[major|minor|patch]', 'maintainer', ['files']],
@@ -74,7 +74,7 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	// answer this question: it refuses off the default branch and on a dirty tree, which is every
 	// position a run asks it from. A `script` entry for the same reason `release` is one.
 	'release:scope': {
-		script: 'scripts/release/release-scope-cli.ts',
+		script: 'scripts/release/release-scope-main.ts',
 		description: 'Say whether a release is owed, from the unreleased merges on main',
 		category: 'Versioning',
 		reference: ['[--json]', 'automation', ['none']],
