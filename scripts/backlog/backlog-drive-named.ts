@@ -1,5 +1,6 @@
 import { lane_parked } from '#scripts/lane/lane-parked'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
@@ -147,4 +148,30 @@ async function reconcile(
 	}
 }
 
-export const backlog_drive_named = { offer, held_after, mark_done, reconcile }
+// The issues the run names: the declared list in its order, with the ones `run:add` put in.
+function named_issues(carry: RunCarry): ReadonlyArray<number> {
+	return run_carry_added.ordered(run_invocation.issue_numbers(carry.invocation) ?? [], carry.added)
+}
+
+// **A `--only` run adopts only the carried lanes it names** (joshuafolkken/kit#4282): it drains
+// nothing, and its stop waits for every lane in flight, so a lane an earlier invocation dispatched for
+// another issue would hold the run's end until that issue settled. The next draining run collects it.
+function own_carried(
+	carry: RunCarry,
+	dispatched: ReadonlyArray<string>,
+	is_only: boolean,
+): ReadonlyArray<string> {
+	if (!is_only) return dispatched
+	const named = named_issues(carry)
+
+	return dispatched.filter((issue) => named.includes(Number(issue)))
+}
+
+export const backlog_drive_named = {
+	offer,
+	held_after,
+	mark_done,
+	named_issues,
+	own_carried,
+	reconcile,
+}

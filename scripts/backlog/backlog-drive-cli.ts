@@ -237,7 +237,8 @@ async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string
 
 	const open = await open_lanes()
 	const lanes = [...new Set([...open.map((lane) => lane.issue), ...context.awaited])]
-	const dispatched = await backlog_drive_carried.carried(open)
+	const carried = await backlog_drive_carried.carried(open)
+	const dispatched = backlog_drive_named.own_carried(carry, carried, context.is_only)
 
 	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [], dispatched)
 }
