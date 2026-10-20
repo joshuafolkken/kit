@@ -661,7 +661,7 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 
 - `untriaged` — the issue carries neither `run:lane` nor `run:solo`. It is the one reason drawn beside a `🔗`, since judging it is what a person can do meanwhile.
 - `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local `YYYY-MM-DD HH:MM`; `backlog:next` keeps the UTC spelling. First of the reasons below.
-- `after <N> · named order` — a named run's declared issue is in flight ahead of it; `<N>` is the one declared before it. Never on a `run:add` issue; first of the reasons below.
+- `after <N> · named order` — a named run's declared issue is ahead of it, in flight or not yet started; `<N>` is the one declared before it. Never on a `run:add` issue; first of the reasons below.
 - `held by triage` — judged and unblocked, but an unblocked untriaged issue withholds the whole pool.
 - `after <N> · <file>` — a path its body declares overlaps one the running issue `<N>` declares; `backlog:next` answers "waits: its `<file>` overlaps …".
 - `next free lane (<used>/<limit>)` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read: `next free lane (4/4)`. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves `next free lane` alone.
@@ -669,6 +669,8 @@ A waiting row (`⏳`) ends with why it waits, in English whatever the session la
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows its stage, such as `opening lane 5″`.
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.
+
+While the run is at its `planning` stage, the one row it launches next — a named run's next declared issue, else the plan's first waiting row — shows `📝 planning <time>` in place of any reason above, beside a `🔗` too; no other row says it.
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 

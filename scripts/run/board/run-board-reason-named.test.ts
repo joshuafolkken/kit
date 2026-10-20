@@ -79,8 +79,13 @@ describe('run_board_reason.reader — a row the declared order keeps waiting', (
 		])
 	})
 
-	it('says nothing of the declared order while no declared issue is in flight', () => {
-		expect(reasons({ statuses: new Map() })).toStrictEqual([undefined, undefined, undefined])
+	// joshuafolkken/kit#4279: `backlogrun #4263 #4262 --only` left 4262's row blank before 4263 started.
+	it('names the declared order before its first issue starts', () => {
+		expect(reasons({ statuses: new Map() })).toStrictEqual([
+			`after ${String(RUNNING)} · named order`,
+			`after ${String(THIRD)} · named order`,
+			undefined,
+		])
 	})
 
 	it('leaves a run that names no issues as it was', () => {

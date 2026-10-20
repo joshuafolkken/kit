@@ -35,15 +35,16 @@ function next_of(carry: RunCarry, in_flight: ReadonlyArray<string>): number | un
 }
 
 // The declared issue `issue` starts after while the declared order holds it: the one declared just
-// before it, once `next_of` — what `offer` waits on — is in flight ahead of it. `run:board` names it on
-// the queued row; an issue `run:add` put in is held by nothing.
+// before it, once it is behind `next_of` — what `offer` runs or waits on — whether that has started yet
+// or not (joshuafolkken/kit#4279). `run:board` names it on the queued row; an issue `run:add` put in, or
+// one already in flight, is held by nothing.
 function held_after(
 	carry: RunCarry,
 	in_flight: ReadonlyArray<string>,
 	issue: number,
 ): number | undefined {
 	const next = next_of(carry, in_flight)
-	if (next === undefined || !in_flight.includes(String(next))) return undefined
+	if (next === undefined || in_flight.includes(String(issue))) return undefined
 	const declared = (run_carry.remaining_of(carry) ?? []).filter((number) =>
 		is_declared(carry, String(number)),
 	)
@@ -168,6 +169,7 @@ function own_carried(
 }
 
 export const backlog_drive_named = {
+	next_of,
 	offer,
 	held_after,
 	mark_done,

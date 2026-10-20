@@ -61,8 +61,10 @@ test('names the declared issue just before one the declared order holds', () => 
 	expect(backlog_drive_named.held_after(carry, ['1'], 1)).toBeUndefined()
 })
 
-test('holds nothing while the next declared issue is not in flight', () => {
-	expect(backlog_drive_named.held_after(CARRY, [], 2)).toBeUndefined()
+// joshuafolkken/kit#4279: before the first declared issue started, the one after it said nothing.
+test('holds the declared order before its first issue starts, and never an issue in flight', () => {
+	expect(backlog_drive_named.held_after(CARRY, [], 2)).toBe(1)
+	expect(backlog_drive_named.held_after(CARRY, [], 1)).toBeUndefined()
 	expect(backlog_drive_named.held_after(CARRY, ['2'], 2)).toBeUndefined()
 	const unnamed = { ...CARRY, invocation: 'backlogrun' }
 
