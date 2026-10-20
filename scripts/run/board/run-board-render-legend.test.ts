@@ -171,3 +171,21 @@ describe('run_board_render_legend.legend_of with the third line’s kind', () =>
 		expect(legend_of([row(1)], { named: [OPERATION, OPERATION] })).toStrictEqual([OPERATION])
 	})
 })
+
+// joshuafolkken/kit#4294: 🧍 and 🙅 are named only while a row leads with them.
+describe('run_board_render_legend.legend_of run:solo icons', () => {
+	const { WAIT_ICONS } = run_board_labels
+
+	it('names 🧍 and 🙅 where a row leads with each', () => {
+		const solo = row(1, { reason: { icon: WAIT_ICONS.solo, issues: ['3'] } })
+		const behind = row(2, { reason: { icon: WAIT_ICONS.solo_ahead, issues: ['1'] } })
+
+		expect(legend_of([solo, behind])).toStrictEqual(['🧍 runs alone  🙅 behind solo'])
+	})
+
+	it('names neither where no row leads with them', () => {
+		expect(legend_of([row(1, { reason: { icon: WAIT_ICONS.lane } })])).toStrictEqual([
+			'🧵 free lane',
+		])
+	})
+})

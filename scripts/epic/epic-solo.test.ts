@@ -155,3 +155,25 @@ describe('epic_solo.gate on a later run:solo candidate', () => {
 		expect(epic_report.candidates_for_repo(gated.result, OTHER_REPO)).toHaveLength(1)
 	})
 })
+
+// joshuafolkken/kit#4294: `run:board` reads the same first `run:solo` candidate the gate does.
+describe('epic_solo.queue_of', () => {
+	it('answers nothing where no candidate carries run:solo', () => {
+		expect(epic_solo.queue_of([child(FIRST), child(SECOND)])).toBeUndefined()
+	})
+
+	it('names a run:solo head and every candidate behind it', () => {
+		const queue = epic_solo.queue_of([solo(FIRST), child(SECOND), solo(THIRD)])
+
+		expect(queue?.solo.number).toBe(FIRST)
+		expect(queue?.index).toBe(0)
+		expect(queue?.behind.map((item) => item.number)).toStrictEqual([SECOND, THIRD])
+	})
+
+	it('names where a later run:solo candidate sits, the ones ahead of it not behind', () => {
+		const queue = epic_solo.queue_of([child(FIRST), solo(SECOND), child(THIRD)])
+
+		expect(queue?.index).toBe(1)
+		expect(queue?.behind.map((item) => item.number)).toStrictEqual([THIRD])
+	})
+})
