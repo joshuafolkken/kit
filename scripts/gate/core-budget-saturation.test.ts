@@ -108,6 +108,47 @@ describe('core_budget.reserve — a saturated CPU holds a new claim', () => {
 	})
 })
 
+// Readings of `busy_cores` in turn, the last one repeated.
+function busy_in_turn(busy_cores: ReadonlyArray<number>): () => Promise<MachineReading> {
+	let index = 0
+
+	return async () => {
+		const value = busy_cores[Math.min(index, busy_cores.length - 1)]
+
+		index += 1
+
+		return { busy_cores: value, available_mb: undefined }
+	}
+}
+
+describe('core_budget.reserve — a waiting claim admits against its recent readings', () => {
+	const STEP_MS = 300
+	const STEPS_TO_CAP = 5
+
+	// Three readings three cores past the ledger, then a dip: one reading alone would admit at the dip,
+	// the mean holds the claim until the wait cap.
+	it('keeps waiting through a momentary dip in a saturated CPU', async () => {
+		write_reserved(RESERVED)
+
+		const clock = { value: 1 }
+		const handle = await core_budget.reserve(1, {
+			directory: probe.directory,
+			budget: CORES,
+			read_machine: busy_in_turn([CORES + 2, CORES + 2, CORES + 2, RESERVED]),
+			report: vi.fn(),
+			wait_cap_ms: STEP_MS * STEPS_TO_CAP,
+			now: () => clock.value,
+			sleep: async () => {
+				clock.value += STEP_MS
+			},
+		})
+
+		core_budget.release(handle)
+
+		expect(handle.admission.overflow).toBeDefined()
+	})
+})
+
 describe('core_admission.is_admitted — a busy CPU holds the head on cores only', () => {
 	// Busy cores say nothing about memory: a head whose cores fit still runs past a memory shortfall.
 	it('keeps the head exempt from memory while the CPU is only partly busy', () => {

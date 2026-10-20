@@ -324,7 +324,8 @@ function solo_unit_weight(available_cores: number): number {
 // admission with it.
 //
 // **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 1 + 1) +
-// unit_cap(cores - 4)` is `cores` — which is what lets every check of a lone gate be admitted at once,
+// unit_cap(cores - 4)` is `cores` — which is what lets every check of a lone gate on a machine with room
+// (its busy cores within what the ledger holds, `core-budget.ts`) be admitted at once,
 // its concurrency unchanged. A machine below the measured one leaves the unit suite uncapped and reads
 // its weight from the same identity, `cores - RESERVED_CORES` clamped at zero, so the sum is the core
 // count there too.

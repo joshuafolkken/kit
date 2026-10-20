@@ -28,7 +28,8 @@ import { machine_capacity, type MachineBudget, type MachineReading } from './mac
 // **A solo run is bit-for-bit unchanged, and that is arithmetic rather than a branch.** The gate's
 // weights are its `reserved_cores` (the static checks) and its `unit_worker_cap` (the unit suite), and
 // `reserved(2 + 1 + 1) + unit_cap(cores - 4)` is exactly `cores` — so a single gate's four claims sum
-// to the whole budget and every one is admitted the instant it is made, with no poll and no wait. Under
+// to the whole budget and, while the busy cores stay within what the ledger holds, every one is
+// admitted the instant it is made, with no poll and no wait. Under
 // concurrency the same weights sum past the budget and the ledger is what holds the machine down.
 //
 // **Liveness is `process_identity`'s, reused rather than re-invented.** A run
@@ -217,23 +218,25 @@ function resolve_timing(options: ReserveOptions): TimingConfig {
 
 // **A claim alone in the ledger reads the machine too** (joshuafolkken/kit#4238): load outside the
 // ledger saturates the CPU whether or not another claim is in it. The busy cores are the mean of this
-// wait's recent readings (`busy-average.ts`). The budget may fall to zero, which only a saturated CPU
-// does, and then even the head waits (`core_admission.is_admitted`).
+// wait's recent readings of load outside the ledger (`busy-average.ts`). The budget may fall to zero,
+// which only a saturated CPU does, and then even the head waits (`core_admission.is_admitted`).
 async function current_budget(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
 ): Promise<MachineBudget> {
 	const reading = await context.read_machine()
-
-	context.busy_samples = busy_average.with_reading(context.busy_samples, reading, context.now())
-
 	const ledger = core_admission.ledger_load(reservations, context.now())
 
-	return machine_capacity.machine_budget(
-		context.budget,
-		busy_average.averaged(reading, context.busy_samples),
-		ledger,
+	context.busy_samples = busy_average.with_reading(
+		context.busy_samples,
+		reading,
+		ledger.cores,
+		context.now(),
 	)
+
+	const mean = busy_average.averaged(reading, context.busy_samples, ledger.cores)
+
+	return machine_capacity.machine_budget(context.budget, mean, ledger)
 }
 
 // The claim is admitted: its marker records when, which moves its load from "load outside the ledger"
