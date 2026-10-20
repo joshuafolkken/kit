@@ -282,7 +282,7 @@ async function dispatch_entry(
 	return await core_budget.with_command_reservation(
 		weight,
 		async () => await run_entry(entry, subcommand_arguments),
-		{ memory_mb: declared(entry.memory_mb), command },
+		{ memory_mb: declared(entry.memory_mb), command, is_unit: entry.is_unit_claim },
 	)
 }
 
