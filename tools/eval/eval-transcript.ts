@@ -1,5 +1,6 @@
 import { claude_result_event } from '#scripts/agent/claude-result-event'
 import { json_value } from '#scripts/lib/json-value'
+import { transcript_record } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 
 // `claude -p --output-format stream-json --verbose` writes one JSON object per line. Only the
@@ -8,31 +9,9 @@ import { z } from 'zod'
 // reasoning, text, usage, the final result — is deliberately not read, because judging any of it
 // would put the suite back to grading prose.
 
-const TOOL_USE_BLOCK_SCHEMA = z.looseObject({
-	type: z.literal('tool_use'),
-	name: z.string(),
-	input: z.unknown(),
-})
-
-const MESSAGE_SCHEMA = z.looseObject({ content: z.array(z.unknown()).optional() })
-
-const STREAM_EVENT_SCHEMA = z.looseObject({ message: MESSAGE_SCHEMA.optional() })
-
 interface ToolCall {
 	name: string
 	input: string
-}
-
-function tool_call_in_block(block: unknown): ToolCall | undefined {
-	const result = TOOL_USE_BLOCK_SCHEMA.safeParse(block)
-
-	if (!result.success) return undefined
-
-	return { name: result.data.name, input: JSON.stringify(result.data.input ?? {}) }
-}
-
-function tool_calls_in_content(content: ReadonlyArray<unknown>): ReadonlyArray<ToolCall> {
-	return content.map((block) => tool_call_in_block(block)).filter((call) => call !== undefined)
 }
 
 // A malformed line is skipped rather than thrown on: the stream carries progress lines that are not
@@ -41,11 +20,10 @@ function tool_calls_in_content(content: ReadonlyArray<unknown>): ReadonlyArray<T
 // for them to disagree about what an unreadable line means, so all three
 // read a line through `json_value.parse_or_undefined` — blank or not JSON is `undefined`.
 function tool_calls_in_line(line: string): ReadonlyArray<ToolCall> {
-	const parsed = STREAM_EVENT_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	const record = transcript_record.parse(line)
+	const calls = record === undefined ? [] : transcript_record.tool_calls_of(record)
 
-	if (!parsed.success) return []
-
-	return tool_calls_in_content(parsed.data.message?.content ?? [])
+	return calls.map((call) => ({ name: call.name, input: JSON.stringify(call.input ?? {}) }))
 }
 
 // Whether the session got far enough to announce itself. `claude -p --output-format stream-json`

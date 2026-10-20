@@ -72,6 +72,17 @@ describe('parse_line — the user side', () => {
 		expect(block?.text).toBe('a')
 	})
 
+	it('reads a tool_result body of neither shape as empty text without losing its line', () => {
+		const blocks = cost_blocks.parse_line(
+			user_line([
+				{ type: TOOL_RESULT, content: 42 },
+				{ type: TOOL_RESULT, content: 'kept' },
+			]),
+		)
+
+		expect(blocks.map((block) => block.text)).toEqual(['', 'kept'])
+	})
+
 	it('reads a bare string user turn as text', () => {
 		const block = first(user_line(BARE_PROMPT))
 

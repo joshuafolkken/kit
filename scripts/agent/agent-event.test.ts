@@ -26,6 +26,26 @@ describe('Claude event normalization', () => {
 			result: 'completed',
 		})
 	})
+
+	it('reads progress from an assistant line only, and from its last non-blank text block', () => {
+		const transcript = lines(
+			{ type: 'assistant', message: { content: [{ type: 'text', text: CHECKING_GATE }] } },
+			{
+				type: 'assistant',
+				message: {
+					content: [
+						{ type: 'text', text: 'first' },
+						{ type: 'text', text: 'last' },
+						{ type: 'text', text: ' ' },
+					],
+				},
+			},
+			{ type: 'user', message: { content: [{ type: 'text', text: 'a prompt' }] } },
+			{ type: 'assistant' },
+		)
+
+		expect(agent_event.read(transcript)).toMatchObject({ provider: 'anthropic', progress: 'last' })
+	})
 })
 
 describe('Claude terminal result normalization', () => {
