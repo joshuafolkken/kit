@@ -17,14 +17,12 @@ function show_sample(action: FileAction): void {
 	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
 }
 
-// A file that already holds the sample needs nothing added, so only one that differs gets it shown —
-// for a create-only file (no merge) as for a merge that only migrates a kit-written line (#3069).
+// A file that already holds the sample needs nothing added, so only a create-only file (no merge)
+// that differs gets it shown (#3069).
 function report_unchanged(action: FileAction, existing: string): void {
 	const is_sample_missing = existing !== action.create()
-	const should_show_sample =
-		action.merge === undefined || action.should_show_sample_when_unchanged === true
 
-	if (is_sample_missing && should_show_sample) show_sample(action)
+	if (is_sample_missing && action.merge === undefined) show_sample(action)
 	else console.info(`  ✔ unchanged ${action.dest}`)
 }
 

@@ -92,6 +92,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh latest` · `josh u` | — | developer | files, network, processes | Update dependencies, run security audit, then update pnpm |
 | `josh latest:corepack` · `josh lc` | — | developer | files, network | Update pnpm on the current major while preserving the integrity pin |
 | `josh latest:guard` | — | automation | files | Refuse josh latest inside a lane (the update stamp is keyed to the project root) |
+| `josh latest:if-required` | — | automation | files, network, processes | Run josh latest only when latest:scope answers required, stashing around it |
 | `josh latest:scope` | `[--record] [--json]` | automation | files | Say whether this run has to update dependencies, from when josh latest last finished (--record notes a run) |
 | `josh latest:update` · `josh lu` | — | developer | files, network | Update all dependencies to latest |
 | `josh lockfile:policy` · **kit only** | — | automation | network | Verify the lockfile against pnpm's supply-chain policy (minimumReleaseAge) when it or the policy moved from the merge-base |
@@ -137,7 +138,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
 | `josh epic` | `<title> <issue...> [--ordered]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
-| `josh epic:bundle` | `<issue>` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
+| `josh epic:bundle` | `<issue> [--apply]` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
 | `josh epic:check` | `<epic>` | automation | network | Check an epic issue against the tracking requirements |
 | `josh epic:next` | `<epic>... [--repo <owner/repo>] [--lanes]` | automation | network | List an epic's runnable children, bundled per repository |
 | `josh eval` · `josh ev` · **kit only** | `[scenario...]` | maintainer | processes, network | Run the agent rule-compliance scenarios (real Claude sessions) |
@@ -198,10 +199,11 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh run:merge` | `<issue> [options]` | automation | git, network | Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child |
 | `josh run:next` | `<issue>` | automation | network | Print the next step a fullrun takes, computed from the run’s state |
 | `josh run:park` | `<issue> --body-file <path> \| <issue> --clear` | automation | files, network | Park a lane child for a decision, or clear the park |
+| `josh run:pause` | `<issue> --for <prerequisite>` | automation | git, network, files | Set a run aside while its prerequisite lands first |
 | `josh run:prep` | `<issue>` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
-| `josh run:report` | — | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
+| `josh run:report` | `[--handoff]` | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
 | `josh run:review` | `[--join]` | automation | processes, files | Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict) |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |

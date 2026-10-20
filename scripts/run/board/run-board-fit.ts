@@ -37,25 +37,38 @@ interface PlanLine {
 	row: RowYield | undefined
 }
 
+// A section a person folds and unfolds with one key on a live board (`run-board-fold.ts`).
+type SectionKey = 'lanes' | 'processes' | 'findings' | 'queued' | 'waiting' | 'done'
+
+// What a foldable part's rule is labeled, and whether a person folded it to its heading alone.
+interface Foldable {
+	label?: string | undefined
+	is_folded?: boolean | undefined
+}
+
 // A plan section drops its heading once none of its rows is left — unless it folds: then its cut rows
-// are counted on its own last line, drawn by `fold`, rather than on the plan's `more N`.
-interface PlanSection {
+// are counted on its own last line, drawn by `fold`, rather than on the plan's `more N`. A folded one
+// is its heading alone.
+interface PlanSection extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<PlanLine>
 	fold?: ((cut: ReadonlyArray<PlanLine>) => string) | undefined
+	key?: SectionKey | undefined
 }
 
 // The newest notes shown, and how many older ones are already past the section's limit.
-interface NotesPart {
+interface NotesPart extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<string>
 	hidden: number
 }
 
-// A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once.
-interface DetailPart {
+// A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once;
+// `summary` is what its folded heading says.
+interface DetailPart extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<{ text: string; is_detail: boolean }>
+	summary?: string | undefined
 }
 
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around
@@ -135,6 +148,8 @@ function fold_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<str
 }
 
 function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<string> {
+	if (section.is_folded === true) return [...section.head]
+
 	const kept = kept_lines(section, cut)
 
 	if (kept.length === 0) return []
@@ -152,6 +167,8 @@ function unfolded(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>):
 
 // The notes give way from the oldest shown; with none left the section goes, heading and all.
 function notes_lines(notes: NotesPart, cut: number): Array<string> {
+	if (notes.is_folded === true) return [...notes.head]
+
 	const kept = notes.lines.slice(0, notes.lines.length - cut)
 
 	if (kept.length === 0) return []
@@ -324,6 +341,7 @@ export type {
 	PlanLine,
 	PlanSection,
 	RowYield,
+	SectionKey,
 	TerminalSize,
 	YieldStage,
 }

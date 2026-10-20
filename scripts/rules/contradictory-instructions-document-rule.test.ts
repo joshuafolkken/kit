@@ -28,7 +28,7 @@ const CORRECTIONS: ReadonlyArray<Correction> = [
 		present: '`pnpm-workspace.yaml` の `overrides`',
 		absent: 'package.json の overrides に',
 	},
-	{ document_path: PLAN_COMMENT, present: 'pnpm josh latest:scope', absent: 'pnpm latest' },
+	{ document_path: PLAN_COMMENT, present: 'pnpm josh latest:if-required', absent: 'pnpm latest' },
 	{
 		document_path: PLAN_COMMENT,
 		present: 'pnpm josh issue:plan <N> --body-file <path>',

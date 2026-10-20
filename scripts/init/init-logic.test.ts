@@ -131,7 +131,18 @@ describe('get_ai_copy_files - AI and community files', () => {
 		expect(result).toContain('.github/workflows/pr-classification.yml')
 		expect(result).toContain('.github/pull_request_template.md')
 		expect(result).toContain('.github/release.yml')
-		expect(result).toContain('.github/dependabot.yml')
+	})
+
+	// kit's own `.github/dependabot.yml` groups its github-actions bumps; consumers receive the
+	// ungrouped template instead (joshuafolkken/kit#4148).
+	it('distributes dependabot.yml from its template, not as a byte-copy of kit file', () => {
+		const destination = '.github/dependabot.yml'
+
+		expect(init_logic.get_ai_copy_files()).not.toContain(destination)
+		expect(init_logic.get_ai_copy_file_mappings()).toContainEqual({
+			src: 'templates/dependabot.yml',
+			dest: destination,
+		})
 	})
 })
 
@@ -248,29 +259,13 @@ describe('get_suggested_scripts', () => {
 	})
 })
 
+// joshuafolkken/kit#4187: no consumer carries a retired script any longer, so one is the project's own.
 describe('merge_package_scripts retired scripts', () => {
-	it('removes retired script keys from existing package.json content', () => {
-		const content = JSON.stringify({
-			scripts: { lint: 'pnpm lint:prettier && pnpm lint:eslint', josh: 'josh' },
-		})
-		const result = init_logic.merge_package_scripts(content, {})
-
-		expect(result).not.toContain('"lint"')
-		expect(result).toContain('"josh"')
-	})
-
-	it('removes all retired managed scripts', () => {
+	it('keeps a script under a retired name', () => {
 		const existing = Object.fromEntries(RETIRED_SCRIPTS.map((k) => [k, `josh ${k}`]))
 		const content = JSON.stringify({ scripts: { ...existing, josh: 'josh' } })
-		const result = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
-			scripts: Record<string, string>
-		}
 
-		for (const key of RETIRED_SCRIPTS) {
-			expect(result.scripts).not.toHaveProperty(key)
-		}
-
-		expect(result.scripts).toHaveProperty('josh')
+		expect(init_logic.merge_package_scripts(content, {})).toBe(content)
 	})
 })
 

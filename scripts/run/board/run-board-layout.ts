@@ -10,6 +10,7 @@ import {
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_board_kind } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -119,12 +120,25 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 	return child.blocked_by.some((edge) => is_waiting_on(edge, overlay))
 }
 
+// A stalled row's right end names the action that resumes it (`run-stalled.ts`), with no event to
+// name its cause.
+function stalled_reason(number: number): RowReason {
+	return { text: run_stalled.row_text(number) }
+}
+
+// Why a waiting row waits, or what resumes a stalled one.
+function plan_reason(child: EpicChild, state: ItemState, overlay: Drawn): RowReason | undefined {
+	if (state === 'stopped') return stalled_reason(child.number)
+
+	return state === 'waiting' ? overlay.reason_of?.(child) : undefined
+}
+
 function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow {
 	const { context } = overlay.plan
 	const waits = child.blocked_by
 		.filter((edge) => is_waiting_on(edge, overlay))
 		.map((edge) => reference_of(edge, context.repo))
-	const reason = state === 'waiting' ? overlay.reason_of?.(child) : undefined
+	const reason = plan_reason(child, state, overlay)
 
 	return {
 		...(reason !== undefined && { reason }),
@@ -169,9 +183,25 @@ function active_order(left: BoardRow, right: BoardRow): number {
 	return compared(rank_of(left), rank_of(right)) || compared(key_of(left), key_of(right))
 }
 
-// The reason a parked or withdrawn row draws where ⏳ draws why it waits — its ending event's own.
-function ending_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
-	return status.reason === undefined ? {} : { reason: { text: status.reason } }
+// The states a row its labels say stalled can be drawn in: 🛑, and 💤 where its last park event was
+// bare — `run:merge`'s park of a child already labelled (`on_parked`) after the ship-stop cap's.
+const STALLED_STATES: ReadonlySet<ItemState> = new Set(['stopped', 'parked'])
+
+// A row its labels say stalled, which no ending event explains.
+function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boolean {
+	return STALLED_STATES.has(status.state) && has_label_name(labels, RUN_STALLED_LABEL)
+}
+
+// The reason a parked or withdrawn row draws where ⏳ draws why it waits — its ending event's own —
+// and a stalled row the action that resumes it.
+function ending_reason(
+	number: number,
+	status: ItemStatus,
+	labels: ReadonlyArray<string> | undefined,
+): Pick<BoardRow, 'reason'> {
+	if (status.reason !== undefined) return { reason: { text: status.reason } }
+
+	return is_stalled(status, labels) ? { reason: stalled_reason(number) } : {}
 }
 
 // A park waiting on a person's decision (joshuafolkken/kit#4099) — the one answer the 🙋 decision
@@ -184,12 +214,13 @@ function is_decision(reason: string | undefined): boolean {
 // child does, and the section it is drawn in already says why, so its row draws no reason.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
 	const is_asked = status.state === 'parked' && is_decision(status.reason)
+	const labels = read.labels.get(number)
 
 	return {
-		...(!is_asked && ending_reason(status)),
+		...(!is_asked && ending_reason(number, status, labels)),
 		number,
 		title: read.titles.get(number),
-		kind: run_board_kind.kind_of(read.labels.get(number)),
+		kind: run_board_kind.kind_of(labels),
 		state: is_asked ? 'human' : status.state,
 		status,
 		waits: [],
@@ -332,9 +363,11 @@ function local_layout_of(
 	}
 }
 
-// The run's scope a lane is checked against.
+// The run's scope a lane is checked against — its running issues too, which no wave holds.
 function numbers_of(plan: BoardPlan): ReadonlySet<number> {
-	return new Set(children_of(plan).map((child) => child.number))
+	const running = plan.waves.running ?? []
+
+	return new Set([...children_of(plan), ...running].map((child) => child.number))
 }
 
 // Every row the layout draws, an epic's children among them — what the header counts and the legend reads.

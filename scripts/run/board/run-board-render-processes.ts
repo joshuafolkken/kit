@@ -25,13 +25,15 @@ const NAME_LIMIT = 24
 // draws them: 🖥 and 🎛, text symbols drawn as emoji, overlapped the blank after them.
 const LABEL = '💻 processes'
 const PART_GAP = ' · '
+const SUMMARY_GAP = ' ── '
+const ICONS = { backlogrun: '▶', apps: '🌐', leftover: '👻' }
 const LABELS = {
-	backlogrun: '▶ backlogrun',
+	backlogrun: `${ICONS.backlogrun} backlogrun`,
 	supervisor: '🧭 supervisor',
 	parent: '🎬 parent',
 	lanes: LANES_LABEL,
-	apps: '🌐 apps',
-	leftover: '👻 leftover',
+	apps: `${ICONS.apps} apps`,
+	leftover: `${ICONS.leftover} leftover`,
 }
 
 interface Labeled {
@@ -152,13 +154,31 @@ function plain_part(usage: BoardUsage): DetailPart {
 	return { head: heading_lines(LABEL), lines: [{ text, is_detail: false }] }
 }
 
+// What the folded section says: each group's totals behind its icon,
+// `▶ 44.5%/4.0G/3.3G ── 🌐 28.2%/18.8G/12.4G`, the leftover only where a run left any.
+function summary_of(usage: BoardUsage): string {
+	const { processes, scale } = usage
+	const { backlogrun, apps, leftover } = processes
+	const left =
+		leftover.entries.length === 0 ? [] : [`${ICONS.leftover} ${plain_of(leftover.total, scale)}`]
+	const groups = [
+		`${ICONS.backlogrun} ${plain_of(backlogrun.total, scale)}`,
+		`${ICONS.apps} ${plain_of(apps.total, scale)}`,
+		...left,
+	]
+
+	return groups.join(SUMMARY_GAP)
+}
+
 // `undefined` where the frame read no usage.
 function processes_part(header: BoardHeader): DetailPart | undefined {
 	const { usages } = header
 
 	if (usages === undefined) return undefined
 
-	return header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+
+	return { ...part, label: LABEL, summary: summary_of(usages) }
 }
 
 const run_board_render_processes = { processes_part }

@@ -63,7 +63,9 @@ describe('run_board_render_lanes.lanes_section', () => {
 	})
 
 	it('heads the lines with a blank line where no cells are drawn', () => {
-		expect(lanes_section([LINE], undefined)).toStrictEqual([{ head: [''], lines: [LINE] }])
+		expect(lanes_section([LINE], undefined)).toStrictEqual([
+			{ head: [''], lines: [LINE], label: LANES_LABEL, key: 'lanes' },
+		])
 	})
 
 	it('heads the lines with a rule whose labels stand over the cells', () => {

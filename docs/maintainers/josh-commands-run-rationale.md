@@ -54,6 +54,7 @@ the behavior. joshuafolkken/kit#3277 moved these commands out of the automation 
 | Command                              | Issues                                                               |
 | ------------------------------------ | -------------------------------------------------------------------- |
 | `josh run:hold` / `josh run:release` | #2760, #2796, #3023                                                  |
+| `josh run:pause`                     | #4160                                                                |
 | `josh run:carry`                     | #2136, #2342, #2492, #2760                                           |
 | `josh run:cut`                       | #2346, #2354, #2382, #2484, #2489, #2760                             |
 | `josh run:ending`                    | #2240                                                                |
@@ -75,6 +76,12 @@ the behavior. joshuafolkken/kit#3277 moved these commands out of the automation 
 | `josh doc:read`                      | #1797, #2188                                                         |
 | `josh read:files`                    | #2202                                                                |
 | `josh edit:files`                    | #2162, #2165, #2202, #2366, #2493                                    |
+
+## `josh run:pause` in detail
+
+Four steps, in order: stash the work as `run:pause: #<issue> waits on #<prerequisite>` (`stash:push`); comment on `<issue>` with the `stash:pop` that recovers it (`issue:comment`); record `<issue>` blocked by `<prerequisite>` — through `epic --add <E> <prerequisite> --before <issue>` when an open epic tracks `<issue>`, directly otherwise; then `run:release <issue>`. Each step checks whether it is already done before it writes, so a rerun after a failure continues from the step that failed.
+
+**Output / exit codes:** one `<step>: <detail>` line per step done (`already` for a step an earlier run did). A failure prints the step, the steps done and the rerun to stderr and exits 1.
 
 ## `josh run:hold` / `josh run:release` in detail
 

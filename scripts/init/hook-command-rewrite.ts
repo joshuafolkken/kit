@@ -49,8 +49,19 @@ const PLAIN_KIT_COMMANDS: ReadonlySet<string> = new Set(
 		'session:lang',
 	].map((command) => `${PNPM_JOSH_PREFIX}${command}`),
 )
-// The values below are matched inside raw JSON text, so the root prefix is taken in its escaped form.
-const PROJECT_ROOT_PREFIX = JSON.stringify(hook_launch.PROJECT_ROOT_PREFIX).slice(1, -1)
+// The root prefix kit wrote until joshuafolkken/kit#4187 moved the git location variables into the
+// launcher. A consumer's file still carries it until its next sync, which replaces it with the current
+// one. History, never edited; removable from kit 2.0.0.
+const LOCATION_VARIABLES =
+	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
+const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
+const LEGACY_ROOT_PREFIX = `if project_root="$(unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null)"; then unset ${LOCATION_VARIABLES}; else project_root="$(${ROOT_LOOKUP})"; fi && cd "$project_root" && `
+// The values below are matched inside raw JSON text, so each root prefix is taken in its escaped form.
+const ROOT_PREFIXES: ReadonlyArray<string> = [
+	hook_launch.PROJECT_ROOT_PREFIX,
+	LEGACY_ROOT_PREFIX,
+].map((prefix) => JSON.stringify(prefix).slice(1, -1))
+const [PROJECT_ROOT_PREFIX = ''] = ROOT_PREFIXES
 // Capture the value of every `"command"` field, escapes and all, so the rewrites below touch command
 // values alone — never an echo reminder's prose or a `"description"` that merely mentions the string.
 const COMMAND_FIELD = /("command":\s*")((?:[^"\\]|\\.)*)(")/gu
@@ -76,10 +87,13 @@ function rewrite_command_value(value: string): string {
 }
 
 // kit's own commands already start from the root (`hook-launch.ts`), and so does an already-rewritten
-// value. The prefix is taken off before the rewrite and put back after it, so the install guard sits
-// behind the `cd` it depends on and a second pass never doubles the prefix.
+// value. The prefix — the current one or the one before it — is taken off before the rewrite and the
+// current one put back after it, so the install guard sits behind the `cd` it depends on and a second
+// pass never doubles the prefix.
 function without_root_prefix(value: string): string {
-	return value.startsWith(PROJECT_ROOT_PREFIX) ? value.slice(PROJECT_ROOT_PREFIX.length) : value
+	const prefix = ROOT_PREFIXES.find((candidate) => value.startsWith(candidate)) ?? ''
+
+	return value.slice(prefix.length)
 }
 
 function rewrite_hook_commands(content: string, is_codex = false): string {

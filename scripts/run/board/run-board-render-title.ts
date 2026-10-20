@@ -3,8 +3,8 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
-// that says why it waits keeps saying it on a narrow pane, its title giving up the columns the line
-// runs over down to a floor and its reason the rest, where every other row wraps.
+// that says why it waits, or draws a tail, keeps its line on a narrow pane, its title giving up the
+// columns the line runs over down to a floor and its reason the rest; past the floor it wraps.
 
 // The columns a terminal row gives its title: a longer one is cut to an ellipsis.
 const TITLE_LIMIT = 48
@@ -68,14 +68,17 @@ function overrun_of(text: string, is_kept: boolean, columns: number | undefined)
 	return Math.max(0, run_board_fit.width_of(text) - columns)
 }
 
-// How a row is fitted: whether it keeps a held check, the columns its title cell leads its title
-// with, a ✚ on a row the run filed, and its head as drawn, kept on one line where the row's head is
-// too wide to assume it fits — a lane row's, with its cells (joshuafolkken/kit#3769).
+// How a row is fitted: whether it keeps its whole line — a row that draws a tail, a held check among
+// it (joshuafolkken/kit#4052) — the columns its title cell leads its title with, a ✚ on a row the run
+// filed, its head as drawn, kept on one line where the row's head is too wide to assume it fits — a
+// lane row's, with its cells (joshuafolkken/kit#3769) — and the columns its section's rows give up
+// together, so their titles end in one column.
 interface RowFit {
-	is_held?: boolean
+	is_line_kept?: boolean
 	lead?: number
 	head?: (cut: RowCut) => string
 	is_head_kept?: boolean
+	shared?: number | undefined
 }
 
 // The columns a row's head runs past the pane at its whole title; none where it is not kept.
@@ -112,8 +115,24 @@ function reason_fitted(
 	return reason_cut === 0 ? text : draw({ title_limit, reason_cut })
 }
 
-// A row's line as `draw` draws it: whole, or — where that line would run past the pane and the row has
-// a reason, or a held check (joshuafolkken/kit#4052), to keep, or where its kept head would — with its
+// The columns a row's line runs past the pane at its whole title, where the row has a reason or a
+// whole line to keep, or its kept head does.
+function row_overrun(
+	row: BoardRow,
+	columns: number | undefined,
+	draw: (cut: RowCut) => string,
+	fit: RowFit = {},
+): number {
+	const line = overrun_of(
+		draw(WHOLE),
+		fit.is_line_kept === true || row.reason !== undefined,
+		columns,
+	)
+
+	return Math.max(line, head_overrun(fit, columns))
+}
+
+// A row's line as `draw` draws it: whole, or — where it or its section runs past the pane — with its
 // title narrowed first and its reason cut after.
 function fitted(
 	row: BoardRow,
@@ -121,14 +140,21 @@ function fitted(
 	draw: (cut: RowCut) => string,
 	fit: RowFit = {},
 ): string {
-	const text = draw(WHOLE)
-	const line = overrun_of(text, fit.is_held === true || row.reason !== undefined, columns)
-	const overrun = Math.max(line, head_overrun(fit, columns))
-	const limit = narrowed_limit(row, overrun, fit.lead ?? 0)
+	const overrun = Math.max(row_overrun(row, columns, draw, fit), fit.shared ?? 0)
 
-	return overrun === 0 ? text : reason_fitted(row, columns, limit, draw)
+	if (overrun === 0) return draw(WHOLE)
+
+	return reason_fitted(row, columns, narrowed_limit(row, overrun, fit.lead ?? 0), draw)
 }
 
-const run_board_render_title = { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of }
+const run_board_render_title = {
+	ELLIPSIS,
+	TITLE_LIMIT,
+	WHOLE,
+	fitted,
+	reason_text,
+	row_overrun,
+	title_of,
+}
 
-export { run_board_render_title, type RowCut }
+export { run_board_render_title, type RowCut, type RowFit }

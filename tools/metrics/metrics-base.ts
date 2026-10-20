@@ -8,6 +8,7 @@ import { git_location_environment } from '#scripts/git/git-location-environment'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
 import { file_reader } from '#scripts/lib/read-file'
+import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { execa } from 'execa'
 import type { Metrics } from './metrics-logic'
 import { metrics_ratchet, type Approval } from './metrics-ratchet'
@@ -29,12 +30,13 @@ import { metrics_ratchet, type Approval } from './metrics-ratchet'
 // than "nothing to compare" — that reading would turn the ratchet off in the one place nobody watches.
 //
 // **An approval is one file per issue** — `.josh/metrics-accepted/<N>.json` — so two pull requests
-// never write the same file, and the reason and the date stay readable on the default branch.
+// never write the same file, and the reason and the date stay readable on the default branch until
+// the next release drops it (`release-approval-prune.ts`).
 
 const BASE_VARIABLE = 'JOSH_METRICS_BASE'
 // Peels a tag to the commit it names and refuses anything that is not one.
 const COMMIT_PEEL = '^{commit}'
-const APPROVAL_DIRECTORY = '.josh/metrics-accepted'
+const { APPROVAL_DIRECTORY } = release_approval_prune
 const APPROVAL_EXTENSION = '.json'
 const TREE_PREFIX = 'josh-metrics-base-'
 const JSON_FLAG = '--json'

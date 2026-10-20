@@ -291,6 +291,16 @@ describe('run_board_layout.layout_of unreached order', () => {
 	})
 })
 
+// joshuafolkken/kit#4222: a running issue sits in no wave, yet its lane is still the run's own.
+describe('run_board_layout.numbers_of', () => {
+	it('holds the running issues beside the waves and the unreached ones', () => {
+		const plan = plan_of([[child(2)]], [child(3)])
+		const running = { ...plan, waves: { ...plan.waves, running: [child(1)] } }
+
+		expect([...run_board_layout.numbers_of(running)]).toStrictEqual([2, 3, 1])
+	})
+})
+
 // joshuafolkken/kit#4042: the running rows first, then the parked and stopped ones, each in the order
 // it started; then the finished ones from the newest end, one with no recorded end last.
 describe('run_board_layout.layout_of active order', () => {

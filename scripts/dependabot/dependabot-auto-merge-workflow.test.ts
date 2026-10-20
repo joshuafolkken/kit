@@ -120,7 +120,10 @@ describe('dependabot-auto-merge.yml distribution', () => {
 	// without the workflow that merges them is the state kit#804 deliberately left behind and #834
 	// closes.
 	it('ships alongside the dependabot config that opens the pull requests', () => {
-		expect(init_logic.get_ai_copy_files()).toContain('.github/dependabot.yml')
+		expect(init_logic.get_ai_copy_file_mappings()).toContainEqual({
+			src: 'templates/dependabot.yml',
+			dest: '.github/dependabot.yml',
+		})
 	})
 })
 

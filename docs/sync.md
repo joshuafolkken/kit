@@ -133,6 +133,7 @@ These are fully-managed files whose package source has a different name than the
 | Package source                                  | Destination                                   |
 | ----------------------------------------------- | --------------------------------------------- |
 | `templates/workflows/ci.yml`                    | `.github/workflows/ci.yml`                    |
+| `templates/dependabot.yml`                      | `.github/dependabot.yml`                      |
 | `templates/workflows/dependabot-auto-merge.yml` | `.github/workflows/dependabot-auto-merge.yml` |
 | `templates/workflows/github-release.yml`        | `.github/workflows/github-release.yml`        |
 

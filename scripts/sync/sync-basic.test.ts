@@ -19,10 +19,8 @@ const BASIC = 'basic'
 const PACKAGE_JSON = 'package.json'
 const CLAUDE_MD = 'CLAUDE.md'
 const BASIC_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md'
-const STATIC_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.static.md'
 const FULL_IMPORT = '@node_modules/@joshuafolkken/kit/dist/CLAUDE.md'
 const PROJECT_NOTES = '## Project notes\n'
-const PRETTIER_CONFIG = 'prettier.config.mjs'
 const PRETTIER_IGNORE = '.prettierignore'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CI_WORKFLOW = '.github/workflows/ci.yml'
@@ -57,10 +55,6 @@ function read_template(name: string): string {
 
 function read_repository_file(name: string): string {
 	return readFileSync(path.join(REPOSITORY_ROOT, name), 'utf8')
-}
-
-function prettier_config(preset: string): string {
-	return `import { config } from '@joshuafolkken/kit/prettier/${preset}'\n\nexport default config\n`
 }
 
 function write_manifest(profile: string): void {
@@ -157,7 +151,7 @@ describe('josh sync file set in a basic project', () => {
 	)
 })
 
-describe('josh sync path migration in a basic project', () => {
+describe('josh sync CLAUDE.md in a basic project', () => {
 	it('creates a CLAUDE.md that imports only the basic rules', async () => {
 		await run_sync(BASIC)
 
@@ -165,16 +159,9 @@ describe('josh sync path migration in a basic project', () => {
 		expect(read_project_file(CLAUDE_MD)).not.toContain(FULL_IMPORT)
 	})
 
-	it('moves a pre-rename CLAUDE.md import onto the basic path and adds no full import', async () => {
-		writeFileSync(project_file(CLAUDE_MD), `${STATIC_IMPORT}\n\n## Project notes\n`)
-		await run_sync(BASIC)
-
-		expect(read_project_file(CLAUDE_MD)).toBe(`${BASIC_IMPORT}\n\n## Project notes\n`)
-	})
-
 	it('removes the full import an earlier sync wrote above the basic one', async () => {
 		const { init_logic } = await import('#scripts/init/init-logic')
-		const basic = `${STATIC_IMPORT}\n\n## Project notes\n`
+		const basic = `${BASIC_IMPORT}\n\n## Project notes\n`
 
 		writeFileSync(project_file(CLAUDE_MD), init_logic.ensure_claude_md_import(basic))
 		await run_sync(BASIC)
@@ -192,13 +179,6 @@ describe('josh sync path migration in a basic project', () => {
 		expect(read_project_file(CLAUDE_MD)).toBe(
 			`${init_ai_copy.ensure_basic_claude_md(undefined)}\n${PROJECT_NOTES}`,
 		)
-	})
-
-	it('moves a pre-rename prettier preset path onto the basic one', async () => {
-		writeFileSync(project_file(PRETTIER_CONFIG), prettier_config('static'))
-		await run_sync(BASIC)
-
-		expect(read_project_file(PRETTIER_CONFIG)).toBe(prettier_config(BASIC))
 	})
 })
 

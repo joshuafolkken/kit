@@ -1,11 +1,13 @@
 import { cpus, totalmem } from 'node:os'
 import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
-import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
-import { run_board_paused, type StatedProcess } from './run-board-paused'
+import { run_board_paused } from './run-board-paused'
 import type { ProcessReading, UsageMark } from './run-board-usage'
+import { run_board_usage_listing, type ProcessListing } from './run-board-usage-listing'
 import {
 	run_board_usage_rusage,
 	type RusageReader,
@@ -14,7 +16,8 @@ import {
 import { run_board_usage_top, type TopReading, type TopReadings } from './run-board-usage-top'
 
 // How `run:board` reads which lane each process belongs to and what it uses.
-// **One `ps` a second, and `lsof` only for a process not seen before.** `ps` lists every process's
+// **One `ps` a second, and `lsof` only for a process not seen before.** `ps` — the snapshot the lane
+// count reads in the same refresh (`lane-process-table.ts`), never one of its own — lists every process's
 // cumulative CPU time and resident memory in about 15 ms; a process is put in the lane its working
 // directory sits under (`.kit-lanes/<N>`), looked up once and remembered, so a full `lsof` (about
 // 220 ms) is paid on the first sample alone. The working directory rather than the parent chain: a
@@ -31,35 +34,19 @@ import { run_board_usage_top, type TopReading, type TopReadings } from './run-bo
 // where it can, else `top`'s last reading (`run-board-usage-top.ts`, at most once every 30 s), else
 // `ps`'s resident set; compressed memory only `top` has, so it is 0 until `top` has answered.
 
-const PS_ARGUMENTS = ['-A', '-o', 'pid=,ppid=,time=,rss=,stat=,comm=']
 const LSOF_ARGUMENTS = ['-a', '-d', 'cwd', '-Fn', '-p']
 const PID_SEPARATOR = ','
-const COMMAND_SEPARATOR = ' '
-// `pid ppid time rss stat` before the command, which may itself hold spaces.
-const PS_FIELDS = 5
-const DAY_SEPARATOR = '-'
-const CLOCK_SEPARATOR = ':'
-const SECONDS_PER_DAY = 86_400
-const SECONDS_PER_CLOCK_PART = 60
-const BYTES_PER_KB = 1024
 // `lsof -F`'s field lines: `p<pid>` opens a process, `n<path>` names its directory.
 const LSOF_PROCESS = /^(?=p)/mu
 const LSOF_NAME = 'n'
 const { load_builtin, rusage_reader } = run_board_usage_rusage
 const { list_top, top_reader } = run_board_usage_top
 const { paused_lanes, paused_since } = run_board_paused
-
-// One process's line of `ps`'s listing: its own CPU time, resident set and state.
-interface ProcessListing extends StatedProcess {
-	parent: number
-	command: string
-	cpu_ms: number
-	rss_bytes: number
-}
+const { listings_of } = run_board_usage_listing
 
 interface UsagePorts {
-	// `ps`'s listing.
-	list: () => Promise<string>
+	// The process snapshot the lane count reads too (`lane-process-table.ts`).
+	list: TableRead
 	// Each process's CPU time with its reaped children's and its footprint, where `node:ffi` reaches it.
 	rusage: RusageReader | undefined
 	// `top`'s last memory and compressed-memory reading.
@@ -69,34 +56,6 @@ interface UsagePorts {
 	now: () => number
 	// The board's own lanes root.
 	root: string
-}
-
-// `ps`'s `time`, `[DD-][HH:]MM:SS[.ss]`, in milliseconds.
-function cpu_ms_of(text: string): number {
-	const [days, clock = ''] = text.includes(DAY_SEPARATOR) ? text.split(DAY_SEPARATOR) : ['0', text]
-	const seconds = clock
-		.split(CLOCK_SEPARATOR)
-		.reduce((sum, part) => sum * SECONDS_PER_CLOCK_PART + Number(part), 0)
-
-	return (Number(days) * SECONDS_PER_DAY + seconds) * MS_PER_SECOND
-}
-
-function listing_of(line: string): [number, ProcessListing] | undefined {
-	const fields = line.trim().split(/\s+/u)
-	const [pid, parent, time = '', rss, stat = ''] = fields
-	const command = fields.slice(PS_FIELDS).join(COMMAND_SEPARATOR)
-	const listing = { parent: Number(parent), command, cpu_ms: cpu_ms_of(time), stat }
-	const rss_bytes = Number(rss) * BYTES_PER_KB
-
-	if (command === '' || Number.isNaN(listing.cpu_ms + rss_bytes + listing.parent)) return undefined
-
-	return [Number(pid), { ...listing, rss_bytes }]
-}
-
-function parse_ps(output: string): Map<number, ProcessListing> {
-	const listings = output.split('\n').map((line) => listing_of(line))
-
-	return new Map(listings.filter((listing) => listing !== undefined))
 }
 
 // What one reading is made from: `ps`'s line, `node:ffi`'s reading and `top`'s — `ps`'s resident set
@@ -213,11 +172,22 @@ function paused_of(
 	return paused_since(before?.paused, paused, at_ms)
 }
 
+// The snapshot's listings and `top`'s reading, read together; a snapshot `ps` did not answer fails the
+// sample.
+async function listed_of(
+	ports: UsagePorts,
+): Promise<{ listed: Map<number, ProcessListing>; top: TopReadings }> {
+	const [table, top] = await Promise.all([ports.list(), ports.top()])
+
+	if (table === undefined) throw new Error('ps did not answer')
+
+	return { listed: listings_of(table), top }
+}
+
 async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise<UsageMark> {
 	const at_ms = ports.now()
-	const [listings, top] = await Promise.all([ports.list(), ports.top()])
+	const { listed, top } = await listed_of(ports)
 	const earlier = before?.processes ?? new Map()
-	const listed = parse_ps(listings)
 	const readings = readings_of(listed, { rusage: ports.rusage, top, earlier })
 	const lanes = await lanes_for(before?.lanes ?? new Map(), readings.processes, ports)
 	const paused = paused_of(before, paused_lanes(listed, lanes), at_ms)
@@ -242,18 +212,14 @@ async function darwin_directories(
 const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, UsagePorts['directories']>>> =
 	{ darwin: darwin_directories }
 
-async function list_live(): Promise<string> {
-	const { stdout } = await execa('ps', PS_ARGUMENTS, { timeout: PROBE_TIMEOUT_MS })
-
-	return stdout
-}
-
 async function board_lane_root(): Promise<string> {
 	return lane_paths.lane_root(await lane_registry.main_repository_root())
 }
 
-// What one board's reader resolves once and keeps, since none moves while the board is open.
+// What one reading is taken through: the board's snapshot, and what its reader resolves once and keeps,
+// since none of those moves while the board is open.
 interface ReaderSetup {
+	list: TableRead
 	root: Promise<string>
 	rusage: RusageReader | undefined
 	top: UsagePorts['top']
@@ -271,34 +237,40 @@ async function read_usage(
 	if (directories === undefined) return undefined
 
 	try {
-		const { rusage, top } = setup
+		const { list, rusage, top } = setup
 		const root = await setup.root
 
-		return await sample(before, { list: list_live, rusage, top, directories, now: Date.now, root })
+		return await sample(before, { list, rusage, top, directories, now: Date.now, root })
 	} catch {
 		return undefined
 	}
 }
 
+type UsageReader = (
+	before: UsageMark | undefined,
+	table: TableRead,
+) => Promise<UsageMark | undefined>
+
 // One board's reader: the `node:ffi` and `top` readers are opened with it, and the lanes root resolved
-// on the first sample.
-function usage_reader(
-	platform: NodeJS.Platform = process.platform,
-): (before: UsageMark | undefined) => Promise<UsageMark | undefined> {
+// on the first sample. Each reading takes the refresh's snapshot rather than a `ps` of its own.
+function usage_reader(platform: NodeJS.Platform = process.platform): UsageReader {
 	const rusage = rusage_reader(platform, load_builtin)
 	const top = top_reader({ list: list_top, now: Date.now })
 	const resolved: { root?: Promise<string> } = {}
 
-	async function read(before: UsageMark | undefined): Promise<UsageMark | undefined> {
+	async function read(
+		before: UsageMark | undefined,
+		table: TableRead,
+	): Promise<UsageMark | undefined> {
 		resolved.root ??= board_lane_root()
 
-		return await read_usage(before, { root: resolved.root, rusage, top }, platform)
+		return await read_usage(before, { list: table, root: resolved.root, rusage, top }, platform)
 	}
 
 	return read
 }
 
-const run_board_usage_read = { lane_of, parse_lsof, parse_ps, sample, usage_reader }
+const run_board_usage_read = { lane_of, parse_lsof, sample, usage_reader }
 
 export { run_board_usage_read }
-export type { UsagePorts }
+export type { UsagePorts, UsageReader }

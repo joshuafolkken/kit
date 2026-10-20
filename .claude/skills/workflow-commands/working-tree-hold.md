@@ -57,7 +57,7 @@ run:hold` / `josh run:release`".
 its record (a `halfrun new` adopted its unnumbered one at filing) — a `halfrun` still implementing or a
 `backlogrun` child leaves the same dirty tree and is not adopted. On a marked hold for `#<N>`,
 `run:entry` asks the session budget, adopts the hold and prints `entry #<N> — resume: halfrun`. **Skip
-the title, the plan, the split assessment, `pnpm josh ms`, `latest:scope` and the implementation**;
+the title, the plan, the split assessment, `pnpm josh ms`, `latest:if-required` and the implementation**;
 re-read the issue (`pnpm josh issue:read <N>`), run the gate **in full** from the refactor
 (`chain-rule.md` → "Run the review-to-merge chain"), and ship as any `fullrun` does.
 

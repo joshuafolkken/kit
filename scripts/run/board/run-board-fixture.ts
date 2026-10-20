@@ -1,12 +1,12 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import { vi } from 'vitest'
 import type { ClosedAnswer } from './run-board-closed'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
-import type { UsageMark } from './run-board-usage'
 
 // What the `run:board` redraw suites share: the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
@@ -34,12 +34,12 @@ const SAMPLE: MachineSample = {
 // The counted reads a test answers and inspects.
 interface Reads {
 	read_plan: ReturnType<typeof vi.fn<(scope: NamedPlan) => Promise<BoardPlan | undefined>>>
-	read_local: ReturnType<typeof vi.fn<() => Promise<LocalRead | undefined>>>
+	// No process snapshot is read unless a test answers otherwise.
+	read_table: ReturnType<typeof vi.fn<TableRead>>
+	read_local: ReturnType<typeof vi.fn<(table: TableRead) => Promise<LocalRead | undefined>>>
 	read_machine: ReturnType<typeof vi.fn<() => Promise<MachineSample>>>
 	// No process is read unless a test answers otherwise.
-	read_usage: ReturnType<
-		typeof vi.fn<(before: UsageMark | undefined) => Promise<UsageMark | undefined>>
-	>
+	read_usage: ReturnType<typeof vi.fn<BoardPorts['read_usage']>>
 	// Nothing reads closed unless a test answers otherwise.
 	read_closed: ReturnType<typeof vi.fn<(issues: ReadonlyArray<number>) => Promise<ClosedAnswer>>>
 }
@@ -77,9 +77,10 @@ function stopper(): () => Promise<void> {
 function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Reads {
 	return {
 		read_plan: vi.fn(async (_scope: NamedPlan) => plans.shift()),
-		read_local: vi.fn(async () => local),
+		read_table: vi.fn<TableRead>(),
+		read_local: vi.fn(async (_table: TableRead) => local),
 		read_machine: vi.fn(async () => SAMPLE),
-		read_usage: vi.fn<(before: UsageMark | undefined) => Promise<UsageMark | undefined>>(),
+		read_usage: vi.fn<BoardPorts['read_usage']>(),
 		read_closed: vi.fn(async (_issues: ReadonlyArray<number>): Promise<ClosedAnswer> => ({
 			closed: new Map(),
 			is_whole: true,

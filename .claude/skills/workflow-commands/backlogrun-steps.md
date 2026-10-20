@@ -134,7 +134,7 @@ verdicts and stops are the driver's own.
 | Step | Where it is defined |
 | --- | --- |
 | `run:carry --begin` + `run:wake --start` before the plan; `run:carry --end` + `run:wake --stop` at the end | "The session cut is inside the invocation" above |
-| `pnpm josh ms`, `pnpm josh latest:scope`, `lane:prune` in the primary checkout before the first lane | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
+| `pnpm josh ms`, `pnpm josh latest:if-required`, `lane:prune` in the primary checkout before the first lane | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, once, never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight, before each child not in a lane | `docs/josh-commands-run.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |

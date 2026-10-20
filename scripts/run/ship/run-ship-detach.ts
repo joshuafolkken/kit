@@ -58,6 +58,7 @@ const RECORD_WAIT_ATTEMPTS = 200
 // a `pnpm josh ship` start-up, far below the lifetime a reused pid could otherwise be believed for.
 const CLAIM_WINDOW_MS = 120_000
 type ShipResult = 'running' | 'success' | 'failed' | 'abnormal'
+type StartRead = (pid: number) => string | undefined
 
 interface ShipRecord {
 	pid?: number | undefined
@@ -146,35 +147,39 @@ function is_within_claim_window(record: ShipRecord): boolean {
 	return record.launched_at !== undefined && Date.now() - record.launched_at < CLAIM_WINDOW_MS
 }
 
-function has_live_identity(pid: number, record: ShipRecord): boolean {
+function has_live_identity(pid: number, record: ShipRecord, read: StartRead): boolean {
 	if (record.process_start === undefined) {
 		return is_within_claim_window(record) && process_identity.is_live_pid(pid)
 	}
 
-	return process_identity.is_same_process(pid, record.process_start) !== false
+	return process_identity.is_same_process(pid, record.process_start, read) !== false
 }
 
-function result_of(record: ShipRecord): ShipResult {
+function result_of(record: ShipRecord, read: StartRead): ShipResult {
 	if (record.pid === undefined) {
-		const is_launcher = process_identity.is_same_process(record.launcher_pid, record.launcher_start)
+		const { launcher_pid, launcher_start } = record
+		const is_launcher = process_identity.is_same_process(launcher_pid, launcher_start, read)
 
 		return is_launcher === false ? 'abnormal' : 'running'
 	}
 
-	if (has_live_identity(record.pid, record)) return 'running'
+	if (has_live_identity(record.pid, record, read)) return 'running'
 
 	return record.result ?? 'abnormal'
 }
 
+// `read` answers each recorded process's start time: a reader holding one process snapshot passes its
+// own, so the reading starts no `ps` (joshuafolkken/kit#4245).
 function read_result(
 	repository: string,
 	number: string,
+	read: StartRead = process_identity.read_start,
 ): { launch_id: string; result: ShipResult } | undefined {
 	const record = read_record(repository, number)
 
 	return record === undefined
 		? undefined
-		: { launch_id: record.launch_id, result: result_of(record) }
+		: { launch_id: record.launch_id, result: result_of(record, read) }
 }
 
 function current_record(repository: string, number: string): ShipRecord | undefined {
@@ -188,7 +193,9 @@ function current_record(repository: string, number: string): ShipRecord | undefi
 function running_since(repository: string, number: string): number | undefined {
 	const record = read_record(repository, number)
 
-	return record !== undefined && result_of(record) === 'running' ? record.launched_at : undefined
+	return record !== undefined && result_of(record, process_identity.read_start) === 'running'
+		? record.launched_at
+		: undefined
 }
 
 function is_pending(record: ShipRecord | undefined): boolean {

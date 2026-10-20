@@ -4,6 +4,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch, type RemoteAnswer } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
 import { release_progress } from './release-progress'
@@ -56,6 +57,7 @@ function arrange_worktree(): void {
 
 function arrange_commit(): void {
 	vi.spyOn(git_command, 'add_path').mockResolvedValue(undefined)
+	vi.spyOn(release_approval_prune, 'prune').mockResolvedValue(undefined)
 	vi.spyOn(git_command, 'commit').mockResolvedValue(undefined)
 	vi.spyOn(git_command, 'push').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'pr_create').mockResolvedValue(
@@ -141,6 +143,18 @@ describe('release_publish.publish', () => {
 		)
 		expect(vi.mocked(git_gh_command.pr_create).mock.invocationCallOrder[0]).toBeLessThan(
 			vi.mocked(git_pr_checks.wait_for_pr_success).mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	// The release commit carries the removal of every merged metrics approval (joshuafolkken/kit#4187).
+	it('prunes the merged metrics approvals into the release commit', async () => {
+		arrange_publish()
+
+		await release_publish.publish(PUBLISH_PLAN)
+
+		expect(release_approval_prune.prune).toHaveBeenCalledTimes(1)
+		expect(vi.mocked(release_approval_prune.prune).mock.invocationCallOrder[0]).toBeLessThan(
+			vi.mocked(git_command.commit).mock.invocationCallOrder[0] ?? 0,
 		)
 	})
 

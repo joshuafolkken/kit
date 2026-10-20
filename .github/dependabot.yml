@@ -8,6 +8,16 @@ updates:
       - '/.github/actions/*'
     schedule:
       interval: 'weekly'
+    # One pull request for every minor and patch bump. Separate pull requests that touch the same
+    # workflow file leave the later merge writing workflow content its head does not hold, which
+    # `GITHUB_TOKEN` may not, so GitHub withdraws its auto-merge (joshuafolkken/kit#4148). kit's own
+    # file only: the distributed `templates/dependabot.yml` stays ungrouped, because a consumer's
+    # auto-merge holds a whole pull request that touches an upstream-managed workflow.
+    groups:
+      github-actions:
+        update-types:
+          - 'minor'
+          - 'patch'
     cooldown:
       default-days: 3
   # Version updates are disabled: `josh latest` runs at the start of every fullrun / halfrun /

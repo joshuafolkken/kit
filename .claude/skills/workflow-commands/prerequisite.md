@@ -29,7 +29,7 @@ offer hands it back once its blockers merge.
 
 **A wait for the next published release is a dependency too** — never `needs-decision`. Record it
 with `pnpm josh issue:release <M> --wait` (`<M>` blocked by the release Issue, filed when none is
-open), then stash, comment and `pnpm josh run:release <M>` as for a prerequisite below; `fullrun` /
+open), then `pnpm josh run:pause <M> --for <the release Issue>` as for a prerequisite below; `fullrun` /
 `halfrun` stop, `backlogrun` continues. Closing the release Issue once a person has published it hands
 `<M>` back to `backlog:next` (`docs/josh-commands-backlog.md` → `josh issue:release`).
 
@@ -50,24 +50,17 @@ later steps name its number. **Its duplicate scan is read exactly as it is for a
 
 **Each entry point's own branch stays in that entry's file:**
 
-- **A named epic under `backlogrun`** files without confirmation, records the dependency with
-  `pnpm josh epic --add <E> <N> --before <M>` — `<E>` the epic, `<N>` the prerequisite just filed,
-  `<M>` the child in hand — and the run **continues rather than parking it** (`backlogrun-park.md` → "A
-  prerequisite discovered mid-run"). A child outside any epic records the same relation on itself
-  directly; that branch is the same section's.
+- **A named epic under `backlogrun`** files without confirmation, sets `<M>` — the child in hand —
+  aside with `run:pause` below, and the run **continues rather than parking it** (`backlogrun-park.md` →
+  "A prerequisite discovered mid-run").
 - **`fullrun` / `halfrun`** file the same way without asking, insert the prerequisite into the epic
   that already tracks the Issue or create one over both, and then **stop**, leaving the person one
   command to type (`fullrun.md` / `halfrun.md`). Typing `fullrun` approved implementing **one** Issue;
   a batch is a different authorization, so the stop stays.
 
-**Two steps every entry's procedure turns on:**
-
-- **`pnpm josh stash:push "<message>"` is the only push.** The work in progress almost
-  always includes a new, untracked `*.test.ts`; the command takes it and leaves the observation ledger
-  (`docs/josh-commands-backlog.md` → `josh stash:push`).
-- **The Issue comment is what gets the stash popped, not the Telegram.** The run that picks the Issue up
-  reads it and pops before implementing with `pnpm josh stash:pop "<the stash:push message>"`. Say it in
-  the Telegram too.
+**Once the prerequisite is filed, every entry sets `<M>` aside with `pnpm josh run:pause <M> --for <N>`**
+— the stash, the comment naming its `stash:pop`, the blocked-by and the release; a failure is rerun as
+is (`docs/josh-commands-run.md` → `josh run:pause`). Name the comment's pop in the Telegram too.
 
 **Automatic filing is capped at 10 Issues per run** at every entry point; `pnpm josh rule:guard`
 refuses the eleventh filing (`prompts/collaboration-workflow/rule-delivery.md`). On reaching it, stop

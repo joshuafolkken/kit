@@ -6,6 +6,7 @@ import { repository_lock } from '#scripts/git/repository-lock'
 import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
+import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
 import { release_progress } from './release-progress'
@@ -109,6 +110,7 @@ async function clear_the_way(branch_name: string): Promise<void> {
 async function commit_release(plan: ReleasePlan): Promise<string> {
 	write_version(plan.next_version)
 	await git_command.add_path(PACKAGE_JSON)
+	await release_approval_prune.prune()
 	await git_command.commit(commit_message(plan.next_version))
 	await git_command.push()
 	const pr_url = await git_gh_command.pr_create(

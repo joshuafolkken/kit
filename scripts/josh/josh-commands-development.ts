@@ -1,6 +1,12 @@
+import { ports } from '#ports'
 import { core_budget } from '#scripts/gate/core-budget'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
+import { AGENT_HOOK_COMMANDS } from './josh-commands-agent-hooks'
+
+const NARROWED = { arguments: 'scripts/thing.ts', note: 'narrow by the given files instead' }
+// The unseeded ports are read from `ports/index.js`, their one definition (#818).
+const UNSEEDED: Readonly<Record<string, string | undefined>> = {}
 
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
@@ -15,12 +21,23 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Require one release classification on a pull request',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
+		usage: {
+			examples: [{ arguments: '', note: 'run by CI on a pull request; fails without one label' }],
+		},
 	},
 	[GATE_COMMAND]: {
 		script: 'scripts/gate/verification-gate.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 		reference: ['[--verbose|--force|--no-unit]', 'developer', ['files', 'processes']],
+		usage: {
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--verbose', note: "every check's output, passing ones included" },
+				{ arguments: '--force', note: 're-run even on a tree already recorded green' },
+				{ arguments: '--no-unit', note: 'the static checks only (CI only)' },
+			],
+		},
 	},
 	lint: {
 		script: 'scripts/lint/lint-parallel.ts',
@@ -29,6 +46,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[--changed]', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.lint,
 		memory_mb: core_budget.MEMORY_MB.lint,
+		usage: {
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--changed', note: "the branch's changed files — the gate's form" },
+			],
+		},
 	},
 	'lint:related': {
 		script: 'scripts/lint/lint-related.ts',
@@ -37,6 +60,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.lint,
 		memory_mb: core_budget.MEMORY_MB.lint,
+		usage: { examples: [{ arguments: '' }, NARROWED] },
 	},
 	lines: {
 		script: 'scripts/lines/lines-command.ts',
@@ -45,6 +69,9 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		usage: {
+			examples: [{ arguments: 'scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts' }],
+		},
 	},
 	metrics: {
 		script: 'tools/metrics/metrics-command.ts',
@@ -59,6 +86,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
 		is_kit_only: true,
+		usage: {
+			examples: [
+				{ arguments: '', note: "print the totals and check them against the merge-base's" },
+				{ arguments: '--accept --reason "<why>"', note: "record this branch's growth and why" },
+			],
+		},
 	},
 	'refactor:scan': {
 		script: 'scripts/refactor/refactor-scan-cli.ts',
@@ -68,6 +101,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		usage: { examples: [{ arguments: '' }] },
 	},
 	bytes: {
 		script: 'scripts/lines/bytes-command.ts',
@@ -75,6 +109,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			"Print an agent-read document's byte size against its ceiling and the headroom left",
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
+		usage: {
+			examples: [
+				{ arguments: 'docs/josh-commands.md', note: 'one document' },
+				{ arguments: '', note: 'scan: every budgeted document near its ceiling' },
+			],
+		},
 	},
 	'rule:value': {
 		script: 'scripts/rules/rule-value-cli.ts',
@@ -82,6 +122,15 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
 		category: 'AI tools',
 		reference: ['[--refresh]', 'developer', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '' },
+				{
+					arguments: '--refresh',
+					note: 'write the reading to the loop-head cache instead of stdout',
+				},
+			],
+		},
 	},
 	'rule:list': {
 		script: 'scripts/rules/rule-list.ts',
@@ -89,73 +138,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			"Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows",
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
+		usage: { examples: [{ arguments: '', note: 'print every trigger-delivered rule' }] },
 	},
 	format: {
 		script: 'scripts/lint/format.ts',
 		description: 'Format code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
 		reference: ['', 'developer', ['files', 'processes']],
+		usage: { examples: [{ arguments: '' }] },
 	},
-	'format:edited': {
-		script: 'scripts/hooks/format-edited-cli.ts',
-		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
-		category: 'Development',
-		reference: ['', 'automation', ['files', 'processes']],
-	},
-	'batch:guard': {
-		script: 'scripts/hooks/batch-guard.ts',
-		description:
-			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
-		category: 'Development',
-		reference: ['', 'automation', ['none']],
-		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` is a per-machine preference kept in
-		// `.env`, which every other command reads through `OPTIONAL_ENV_FILE_FLAGS` — but declaring any
-		// `tsx_arguments` disqualifies a command from in-process dispatch (`josh-in-process.ts`), and
-		// this one runs before every `Bash` call, where a second ~0.16 s tsx start is not affordable.
-		// The script calls `process.loadEnvFile` itself instead, which is
-		// node's own `--env-file` parser with node's own precedence.
-	},
-	'pretool:guard': {
-		script: 'scripts/hooks/pretool-guard-cli.ts',
-		description:
-			'Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin)',
-		category: 'Development',
-		reference: ['', 'automation', ['none']],
-		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this is the one
-		// PreToolUse hook consumers run before every guarded call, so it must stay eligible for
-		// in-process dispatch rather than pay a second tsx start. Each guard it composes loads `.env`
-		// through the shared loader.
-	},
-	'stop:guard': {
-		script: 'scripts/hooks/stop-guard.ts',
-		description:
-			'Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin)',
-		category: 'Development',
-		reference: ['', 'automation', ['none']],
-		// **No `tsx_arguments`, deliberately**, the same as `pretool:guard` above: this runs at every
-		// turn end, so it must stay eligible for in-process dispatch rather than pay a second tsx start.
-		// It loads `.env` through the shared `hook-decision.ts` loader.
-	},
-	'session:lang': {
-		script: 'scripts/josh/session-language-cli.ts',
-		description:
-			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)',
-		category: 'Development',
-		reference: ['', 'automation', ['none']],
-		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every
-		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
-		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
-	},
-	'codex:hook-adapter': {
-		script: 'scripts/hooks/codex-hook-adapter.ts',
-		description:
-			'Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin)',
-		category: 'Development',
-		reference: ['<pretool|posttool>', 'automation', ['none']],
-		// The live-source fallback `scripts/hooks/run-hook.sh` derives from the `codex-hook-adapter`
-		// bundle name. **No `tsx_arguments`**, the same as `pretool:guard`
-		// above: it runs before every guarded Codex call.
-	},
+	...AGENT_HOOK_COMMANDS,
 	'cspell:dot': {
 		script: 'scripts/lint/cspell-cached.ts',
 		description: 'Run spell check including dotfiles',
@@ -163,6 +155,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.spell_check,
 		memory_mb: core_budget.MEMORY_MB.spell_check,
+		usage: { examples: [{ arguments: '', note: 'includes dotfiles' }] },
 	},
 	behavior: {
 		script: 'scripts/behavior/behavior-cli.ts',
@@ -170,6 +163,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			"Check the current run's recorded transcript against the behavior assertions (no model call)",
 		category: 'Development',
 		reference: ['', 'developer', ['files']],
+		usage: { examples: [{ arguments: '' }] },
 	},
 	'exports:unused': {
 		script: 'scripts/exports/unused-members-cli.ts',
@@ -177,6 +171,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Report exported namespace members nothing reads (kit only; a consumer project skips it)',
 		category: 'Development',
 		reference: ['', 'developer', ['none']],
+		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:unit': {
 		script: 'scripts/test/test-unit-guard.ts',
@@ -185,6 +180,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
 		...gate_plan.DIRECT_UNIT_CLAIM,
+		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:related': {
 		script: 'scripts/test/test-related.ts',
@@ -192,6 +188,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
 		...gate_plan.DIRECT_UNIT_CLAIM,
+		usage: {
+			examples: [
+				{ arguments: '' },
+				NARROWED,
+				{ arguments: '--silent', note: 'flags are forwarded to vitest' },
+			],
+		},
 	},
 	'test:declared': {
 		script: 'scripts/test/test-declared.ts',
@@ -199,6 +202,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin',
 		category: 'Development',
 		reference: [MATCH_ARGUMENTS, 'developer', ['processes']],
+		usage: {
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--match', note: 'check Step 0 declarations on stdin' },
+				{ arguments: '--help', note: 'print usage, including the --match stdin form' },
+			],
+		},
 	},
 	'test:red': {
 		script: 'scripts/test/test-red.ts',
@@ -206,6 +216,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only',
 		category: 'Development',
 		reference: ['', 'developer', ['git', 'processes']],
+		usage: { examples: [{ arguments: '', note: 'red, green, no-test or test-only' }] },
 	},
 	disposition: {
 		script: 'scripts/review/disposition-cli.ts',
@@ -213,18 +224,21 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)',
 		category: 'AI tools',
 		reference: [PATH_ARGUMENTS, 'automation', ['none']],
+		usage: { examples: [{ arguments: '<path...>', note: '→ runtime | non-runtime' }] },
 	},
 	'e2e:retry-check': {
 		script: 'scripts/test/e2e-retry-check.ts',
 		description: 'Report whether the preview server crashed during a failed E2E attempt (CI)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
+		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:e2e': {
 		script: 'scripts/test/test-e2e-guard.ts',
 		description: 'Run E2E tests with Playwright (skips when absent or no e2e files)',
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
+		usage: { examples: [{ arguments: '' }] },
 	},
 	test: {
 		shell: ['sh', '-c', 'pnpm josh test:unit && pnpm josh test:e2e'],
@@ -232,6 +246,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		argument_targets: ['test:unit', 'test:e2e'],
+		usage: { examples: [{ arguments: '' }] },
 	},
 	check: {
 		script: 'scripts/gate/type-check-command.ts',
@@ -240,12 +255,25 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['[arguments...]', 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.type_check,
 		memory_mb: core_budget.MEMORY_MB.type_check,
+		usage: { examples: [{ arguments: '' }] },
 	},
 	port: {
 		script: 'scripts/ports/port-command.ts',
 		description: 'Print the PORT_SEED-resolved dev or preview port',
 		category: 'Development',
 		reference: ['<dev|preview>', 'developer', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: 'dev',
+					note: `${String(ports.resolve_development_port(UNSEEDED))} with no seed set`,
+				},
+				{
+					arguments: 'preview',
+					note: `${String(ports.resolve_preview_port(UNSEEDED))} with no seed set`,
+				},
+			],
+		},
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

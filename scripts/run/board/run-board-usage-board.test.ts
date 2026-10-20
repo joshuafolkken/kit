@@ -78,7 +78,7 @@ describe('run_board_usage_board.read_usages', () => {
 
 		read_usage.mockResolvedValueOnce(undefined)
 
-		const read = await read_usages({ ...FRESH_STATE, usage: last }, ports)
+		const read = await read_usages({ ...FRESH_STATE, usage: last }, ports, ports.read_table)
 
 		expect(read).toStrictEqual({ usage: last, usages: undefined })
 	})
