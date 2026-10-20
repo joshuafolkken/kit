@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_command } from '#scripts/git/git-command'
 import { path_decision } from '#scripts/josh/path-decision'
 import { split_assess } from './split-assess'
+import { split_measure } from './split-measure'
 
 // `josh split:assess` — measure a branch's change size, tests excluded, and answer the size question
 // of the split assessment.
@@ -33,7 +33,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const measurement = split_assess.assess(await git_command.diff_main_numstat())
+	const measurement = await split_measure.read_branch()
 	const reason = split_assess.reason(measurement)
 
 	path_decision.print_decision(JSON_KEY, measurement.verdict, reason, is_json)

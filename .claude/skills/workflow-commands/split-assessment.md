@@ -37,6 +37,18 @@ threshold that splits more is required to say why the round-1 measurement does n
 files and lines, test files excluded, and answers `split` / `single` on size alone. Separability stays
 a judgement, so its `split` is the size condition met, not a decision to divide.
 
+## Over the guide before the gate
+
+**Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
+included, answers `split` on `split:assess`. Take one action before `pnpm josh run:cut <N>`
+(`chain-rule.md` step 1) — the cut ends the turn, and the resumed run does not see the notice:
+
+- Keep it one Issue — it must land together: record why in one Issue comment, citing the counts.
+- Carve the rest out — the unimplemented part merges separately: `pnpm josh issue:file` it, narrow
+  this Issue's acceptance criteria to this branch, then gate.
+
+The notice never stops the run and never creates an epic.
+
 ## What each entry point does with the answer
 
 | Entry | Single | Two or more |

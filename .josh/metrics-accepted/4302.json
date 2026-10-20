@@ -1,0 +1,8 @@
+{
+	"reason": "Review round 1: split measurement now counts untracked new files (split-measure.ts, shared by split:assess, issue:fold and main:merge) and the notice section names the run:cut boundary",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 56,
+		"ai_cost.on_demand_bytes": 646
+	}
+}
