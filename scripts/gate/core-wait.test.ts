@@ -10,8 +10,19 @@ import { core_wait, type BudgetWait } from './core-wait'
 const CORES = 4
 const MEMORY_MB = 1000
 
+// A claim past the window a lighter one may pass it in (`core_admission`'s 30 s), so `second` queues.
+const LONG_AGO = -60_000
+
+// `first` is running; every other entry is still waiting.
 function entry(key: string, weight: number, memory_mb: number): LedgerEntry {
-	return { key, reservation: { weight, memory_mb, claimed_at: key === 'first' ? 0 : 1 } }
+	const claimed_at = key === 'first' ? 0 : 1
+	const admitted_at = key === 'first' ? 0 : undefined
+
+	return { key, reservation: { weight, memory_mb, claimed_at, admitted_at } }
+}
+
+function waiter_ahead(weight: number): LedgerEntry {
+	return { key: 'ahead', reservation: { weight, memory_mb: 0, claimed_at: LONG_AGO } }
 }
 
 describe('core_wait.wait_reason — why a claim waits', () => {
@@ -23,16 +34,17 @@ describe('core_wait.wait_reason — why a claim waits', () => {
 		)
 	})
 
-	// joshuafolkken/kit#4238: the ledger's reservations fit, but busy load beyond them took the cores.
+	// joshuafolkken/kit#4238: the ledger's reservations fit, but busy load beyond them took the cores. The
+	// first waiter is not held by that load (#4313), so the claim waits behind another one.
 	it('names the CPU when the claim fits on what the ledger declares', () => {
-		const ledger = [entry('first', CORES - 1, 0), entry('second', 1, 0)]
+		const ledger = [entry('first', CORES - 2, 0), waiter_ahead(1), entry('second', 1, 0)]
 		const budget = { cores: CORES - 1, memory_mb: MEMORY_MB, busy_excess: 1 }
 
 		expect(core_wait.wait_reason('second', ledger, budget)).toBe('cpu')
 	})
 
 	it('names the cores when the claim would not fit on what the ledger declares either', () => {
-		const ledger = [entry('first', CORES, 0), entry('second', 1, 0)]
+		const ledger = [entry('first', CORES, 0), waiter_ahead(1), entry('second', 1, 0)]
 		const budget = { cores: CORES - 1, memory_mb: MEMORY_MB, busy_excess: 1 }
 
 		expect(core_wait.wait_reason('second', ledger, budget)).toBe('cores')

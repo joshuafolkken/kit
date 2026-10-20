@@ -293,16 +293,15 @@ function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
 	)
 }
 
-// **Memory under compression and swap pressure has nothing free to admit against.** The level counts
-// compressible pages as available, so on 2026-10-16 it read 5.4 GB free while the compressor held
-// 5.9 GB and compressed and decompressed about 3.3 GB every three seconds, and 5.2 GB of reservations
-// were admitted on top. A reading the kernel calls critical, or one with swap or compressor traffic
-// across the window, answers no free memory: what the ledger holds keeps running and a heavy claim waits
-// for the pressure to pass.
-function pressured_available(before: MemoryReading, after: MemoryReading): number | undefined {
+// **Only a reading the kernel calls critical has nothing free to admit against.** Swap and compressor
+// traffic across the window used to answer no free memory too (joshuafolkken/kit#3943), but this machine
+// swaps out 0.4–1.3 TB a day as a matter of course, so that traffic held about a third of every wait
+// with memory to spare (joshuafolkken/kit#4313). A claim now waits on memory only when the free figure
+// falls short of what it declares; the traffic still names the wait as pressure (`memory_pressured`).
+function pressured_available(after: MemoryReading): number | undefined {
 	if (after.available_mb === undefined) return undefined
 
-	return is_pressured(before, after) ? 0 : after.available_mb
+	return (after.pressure_level ?? 0) >= PRESSURE_HOLD ? 0 : after.available_mb
 }
 
 // Memory is read at both ends of the window, so the swap counter's difference is the activity during it.
@@ -318,7 +317,7 @@ async function read_machine(
 
 	return {
 		busy_cores,
-		available_mb: pressured_available(memory_before, memory_after),
+		available_mb: pressured_available(memory_after),
 		memory_pressured: is_pressured(memory_before, memory_after),
 	}
 }

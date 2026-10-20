@@ -1,0 +1,7 @@
+{
+	"reason": "#4313 adds the bypass rule (may_pass, BYPASS_WINDOW_MS) and the first-waiter limit to core admission, and narrows granted workers on normal admission",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}

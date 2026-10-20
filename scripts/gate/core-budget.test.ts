@@ -56,8 +56,8 @@ describe('core_budget.admitted_keys — FIFO admission within the budget', () =>
 		expect(core_budget.admitted_keys(gate, MEASURED_CORES).size).toBe(gate.length)
 	})
 
-	// A place is never jumped: the first claim that does not fit stops the walk, so admission follows
-	// claim order rather than seizing whatever fits.
+	// Claim order: a claim that fits neither after the claims ahead of it nor beside the running ones
+	// waits, so admission does not seize whatever fits.
 	it('defers the claims past the budget in claim order', () => {
 		const reservations = [
 			reservation(8, 1, 'first'),
@@ -77,11 +77,11 @@ describe('core_budget.admitted_keys — FIFO admission within the budget', () =>
 		expect(core_budget.admitted_keys(reservations, MEASURED_CORES)).toEqual(new Set(['huge']))
 	})
 
-	// joshuafolkken/kit#4238: work outside the ledger already fills the machine, so the head waits too.
-	it('holds the head too when the CPU is busier than the ledger declares', () => {
+	// joshuafolkken/kit#4313: work outside the ledger fills the machine, and the lone claim still runs.
+	it('admits the head when the CPU is busier than the ledger declares', () => {
 		const budget = { cores: 0, memory_mb: Infinity, busy_excess: MEASURED_CORES }
 
-		expect(core_admission.is_admitted('only', [reservation(1, 1, 'only')], budget)).toBe(false)
+		expect(core_admission.is_admitted('only', [reservation(1, 1, 'only')], budget)).toBe(true)
 	})
 })
 
@@ -164,13 +164,14 @@ function marker_count(directory: string): number {
 		.length
 }
 
-// A live place that fills the whole budget on its own, claimed before anything this run does, so a new
-// reservation cannot fit until it is freed.
+// A running place that fills the whole budget on its own, claimed before anything this run does, so a
+// new reservation cannot fit until it is freed.
 function write_blocking_marker(directory: string): void {
 	write_marker(directory, ALIVE_MARKER, {
 		...process_identity.own_fields(),
 		weight: MEASURED_CORES,
 		claimed_at: 0,
+		admitted_at: 0,
 	})
 }
 
