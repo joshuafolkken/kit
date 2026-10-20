@@ -55,6 +55,16 @@ const WORDS = {
 	not_before: 'not before',
 	decision: 'decision',
 	waits: 'waits on',
+	// What a waiting row waits on, where the legend names its icon.
+	opening: 'opening lane',
+	installing: 'installing',
+	dispatching: 'dispatching',
+	lane: 'free lane',
+	path: 'path held',
+	named: 'named order',
+	held: 'held by triage',
+	headroom: 'memory headroom',
+	untriaged: 'untriaged',
 	// A check held back by the machine-wide core budget, and why.
 	held_check: 'held check',
 	memory: 'memory',
@@ -134,6 +144,9 @@ const WAITS_ICON = '🔗'
 // A waiting row that waits on the start time its body declares rather than on a blocker
 // (joshuafolkken/kit#4079), chosen on the same rule: 🗓 is a text symbol.
 const NOT_BEFORE_ICON = '📅'
+
+// The lanes section's rule, and a waiting row that waits on a free lane.
+const LANES_ICON = '🧵'
 
 // A running row's phases as icons, chosen on the same rule; the row draws every phase it has passed,
 // so the rightmost icon is what it is doing now. Each of `josh ship`'s stages has its own; ⚓ rather
@@ -221,6 +234,8 @@ const HEADER_ICONS = {
 // draws the header's own end mark — 🏁 is already a done row's state icon.
 const NOW_ICONS = { operation: '🔧', watching: '🔭', ended: HEADER_ICONS.ended } as const
 const { STAGE, LANE_STAGE } = run_event_setup
+// The stages a lane's launch passes, which a queued row waiting on its lane leads with too.
+const LANE_STAGE_ICONS = { opening: '🚪', installing: '📥', dispatching: '📤' } as const
 const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.STARTING]: '🚀',
 	[STAGE.PLANNING]: '📝',
@@ -228,10 +243,41 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.JUDGING]: '🤔',
 	[STAGE.SESSION]: '💭',
 	[STAGE.NO_CHILD]: '🚫',
-	[LANE_STAGE.OPENING]: '🚪',
-	[LANE_STAGE.INSTALLING]: '📥',
-	[LANE_STAGE.DISPATCHING]: '📤',
+	[LANE_STAGE.OPENING]: LANE_STAGE_ICONS.opening,
+	[LANE_STAGE.INSTALLING]: LANE_STAGE_ICONS.installing,
+	[LANE_STAGE.DISPATCHING]: LANE_STAGE_ICONS.dispatching,
 }
+
+// What a queued or waiting row leads with (joshuafolkken/kit#4288), in place of ⏳: 📂 a path a
+// running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
+// judged, chosen on the same rule as every row icon. The rest are the board's own, shared rather than
+// copied.
+const WAIT_ICONS = {
+	path: '📂',
+	named: '📋',
+	held: '✋',
+	untriaged: '❓',
+	lane: LANES_ICON,
+	memory: HEADER_ICONS.memory,
+	blocker: WAITS_ICON,
+	not_before: NOT_BEFORE_ICON,
+} as const
+
+// The legend's word for each icon a waiting row can lead with — a lane's stage among them. 📝, the
+// planning a row waits on, is the plan phase's icon, which the legend names already.
+const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
+	[LANE_STAGE_ICONS.opening, 'opening'],
+	[LANE_STAGE_ICONS.installing, 'installing'],
+	[LANE_STAGE_ICONS.dispatching, 'dispatching'],
+	[WAIT_ICONS.lane, 'lane'],
+	[WAIT_ICONS.path, 'path'],
+	[WAIT_ICONS.named, 'named'],
+	[WAIT_ICONS.held, 'held'],
+	[WAIT_ICONS.memory, 'headroom'],
+	[WAIT_ICONS.untriaged, 'untriaged'],
+	[WAIT_ICONS.blocker, 'waits'],
+	[WAIT_ICONS.not_before, 'not_before'],
+]
 
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red
 // in the system's dark-mode values. A palette's `green` draws blue and its `red` orange in a VSCode
@@ -244,13 +290,13 @@ const GAUGE_SHADES = {
 
 const { two_digits, clock_of, minute_of } = figure_format
 
-// The local `YYYY-MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
-// start.
-function date_minute_of(ms: number): string {
+// The local `MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
+// start, in the condition column it is the widest value of (joshuafolkken/kit#4288).
+function day_minute_of(ms: number): string {
 	const date = new Date(ms)
 	const day = [date.getMonth() + 1, date.getDate()].map((value) => two_digits(value))
 
-	return `${[String(date.getFullYear()), ...day].join('-')} ${minute_of(ms)}`
+	return `${day.join('-')} ${minute_of(ms)}`
 }
 
 // A length as its hours, and its minutes and seconds within the hour, each with its unit; a negative
@@ -344,7 +390,6 @@ const run_board_labels = {
 	KIND_WORDS,
 	NOTES_ICON,
 	NOTE_ICONS,
-	NOT_BEFORE_ICON,
 	NOW_ICONS,
 	PHASE_ICONS,
 	PHASE_WORDS,
@@ -354,8 +399,11 @@ const run_board_labels = {
 	WAITS_ICON,
 	WORDS,
 	bar_of,
+	LANES_ICON,
+	WAIT_ICONS,
+	WAIT_WORDS,
 	clock_of,
-	date_minute_of,
+	day_minute_of,
 	minute_of,
 	minute_span_of,
 	painted,

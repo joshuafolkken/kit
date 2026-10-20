@@ -8,7 +8,7 @@ import { run_board_phase } from './run-board-phase'
 
 const { WORDS, bar_of, clock_of, minute_of, span_of, spinner_of } = run_board_labels
 const { GAUGE_SHADES, PHASE_ICONS, PHASE_WORDS, SPINNER_INTERVAL_MS, painted } = run_board_labels
-const { date_minute_of, minute_span_of } = run_board_labels
+const { day_minute_of, minute_span_of } = run_board_labels
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -186,22 +186,23 @@ describe('run_board_labels.minute_of', () => {
 	})
 })
 
-// joshuafolkken/kit#4017: a waiting row's start time reads in the local zone, its date included.
-describe('run_board_labels.date_minute_of', () => {
+// joshuafolkken/kit#4017: a waiting row's start time reads in the local zone, its day included;
+// joshuafolkken/kit#4288: without the year, to fit the condition column.
+describe('run_board_labels.day_minute_of', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()
 	})
 
-	it('draws the local date and wall clock of a moment to the minute', () => {
+	it('draws the local month, day and wall clock of a moment to the minute', () => {
 		const moment = new Date(2026, 9, 8, 7, 4, 59).getTime()
 
-		expect(date_minute_of(moment)).toBe('2026-10-08 07:04')
+		expect(day_minute_of(moment)).toBe('10-08 07:04')
 	})
 
 	it('carries a UTC evening into the next local day', () => {
 		vi.stubEnv('TZ', 'Asia/Bangkok')
 
-		expect(date_minute_of(Date.parse('2026-10-18T21:00Z'))).toBe('2026-10-19 04:00')
-		expect(date_minute_of(Date.parse('2026-12-31T20:30Z'))).toBe('2027-01-01 03:30')
+		expect(day_minute_of(Date.parse('2026-10-18T21:00Z'))).toBe('10-19 04:00')
+		expect(day_minute_of(Date.parse('2026-12-31T20:30Z'))).toBe('01-01 03:30')
 	})
 })

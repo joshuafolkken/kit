@@ -33,10 +33,13 @@ describe('run_board_render_icon.state_icon', () => {
 		expect(state_icon(row('merged', { state: 'merged', track }), header())).toBe('✅')
 	})
 
-	it('leads a row waiting on its start time with 📅', () => {
-		const reason = { text: 'not before', not_before_ms: 0 }
+	// joshuafolkken/kit#4288: every wait leads with its own icon in place of ⏳.
+	it.each(['📅', '🧵', '📂', '❓'])('leads a row whose wait leads with %s with it', (icon) => {
+		expect(state_icon(row('waiting', undefined, { icon }), header())).toBe(icon)
+	})
 
-		expect(state_icon(row('waiting', undefined, reason), header())).toBe('📅')
+	it('leads a waiting row whose wait names no icon with ⏳', () => {
+		expect(state_icon(row('waiting', undefined, { tail: 'fullrun #3' }), header())).toBe('⏳')
 	})
 
 	it('leads a running lane held for the budget with 🚧 over its phase', () => {

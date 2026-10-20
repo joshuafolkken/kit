@@ -1,0 +1,7 @@
+{
+	"reason": "#4288 adds the run:board condition column module and the structured wait reasons (icon, value, issues, tail) the queued and waiting rows draw, and moves a cross-repo blocker that overruns the column after the title",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 88
+	}
+}

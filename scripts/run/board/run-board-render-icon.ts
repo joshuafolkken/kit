@@ -6,11 +6,12 @@ import { run_board_render_waits } from './run-board-render-waits'
 // The icon a `run:board` row leads with: its state's, its phase's while it runs, or 🚧 while its lane
 // is held.
 
-const { NOT_BEFORE_ICON, PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { PHASE_ICONS, STATE_ICONS } = run_board_labels
 
-// A row waiting on the start time its body declares leads with 📅 in place of its state's icon.
+// A row that says what it waits on leads with that wait's icon in place of its state's
+// (joshuafolkken/kit#4288).
 function state_lead(row: BoardRow): string {
-	return row.reason?.not_before_ms === undefined ? STATE_ICONS[row.state] : NOT_BEFORE_ICON
+	return row.reason?.icon ?? STATE_ICONS[row.state]
 }
 
 // A running row leads with the icon of the phase it is in now — the last its track reached — and

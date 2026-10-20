@@ -6,15 +6,13 @@ import type { ReasonRead } from './run-board-reason'
 import { run_board_setup } from './run-board-setup'
 
 // The queued row the run's planning is for (joshuafolkken/kit#4279): while the run stands at its
-// `planning` stage, the one issue it launches next says `📝 planning` and how long it has planned, and
+// `planning` stage, the one issue it launches next leads with 📝 and says how long it has planned, and
 // no other row does. That issue is the driver's own next in a named run (`backlog-drive-named.ts`), else
 // the plan's first waiting row — the head of its first wave. No event says it; the stage and the order do.
 
 const { STAGE } = run_event_setup
 const FIRST = 0
-const PLANNING_TEXT = [run_board_labels.STAGE_ICONS[STAGE.PLANNING], STAGE.PLANNING]
-	.filter((word) => word !== undefined)
-	.join(' ')
+const PLANNING_ICON = run_board_labels.STAGE_ICONS[STAGE.PLANNING]
 
 interface Planning {
 	issue: number
@@ -38,7 +36,7 @@ function planning_of(read: ReasonRead, in_flight: ReadonlyArray<number>): Planni
 
 	return issue === undefined
 		? undefined
-		: { issue, reason: { text: PLANNING_TEXT, since_ms: setup_ms } }
+		: { issue, reason: { icon: PLANNING_ICON, since_ms: setup_ms } }
 }
 
 const run_board_planning = { planning_of }

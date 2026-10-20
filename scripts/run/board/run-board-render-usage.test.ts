@@ -225,7 +225,13 @@ describe('run_board_render.render finish column on a narrow pane', () => {
 // joshuafolkken/kit#4026: a plan row the run has not touched draws no blanks in the column, so what it
 // waits on follows its title rather than starting where a running row's tail does.
 function planned_lines(): Array<string> {
-	const planned: BoardRow = { ...waiting, number: 9, title: 'Planned', waits: ['3554'] }
+	const planned: BoardRow = {
+		...waiting,
+		number: 9,
+		title: 'Planned',
+		waits: ['3553', '3554'],
+		reason: { icon: '🔗', issues: ['3553', '3554'] },
+	}
 	const queued = [{ kind: 'row' as const, row: planned }]
 	const layout = { ...EMPTY_LAYOUT, active: mixed, queued }
 	const size = { columns: WIDE, rows: 50 }
@@ -242,6 +248,6 @@ describe('run_board_render.render usage column on a plan row', () => {
 	it('starts what an untouched row waits on two blanks after its title', () => {
 		const lines = planned_lines()
 
-		expect(row_line(lines, 'Planned')).toMatch(/Planned {2}🔗 3554$/u)
+		expect(row_line(lines, 'Planned')).toMatch(/Planned {2}3554$/u)
 	})
 })

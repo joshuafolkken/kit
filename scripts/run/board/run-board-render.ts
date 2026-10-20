@@ -19,6 +19,7 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
+import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
@@ -49,6 +50,7 @@ const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
 const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, row_overrun, title_of } =
 	run_board_render_title
 const { padded } = run_board_fresh
+const { condition_of, waits_of } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const GAP = '  '
 const INDENT = '  '
@@ -86,6 +88,8 @@ interface RowFrame {
 	filed: ReadonlySet<number>
 	// The columns a lane row that draws a tail gives up with every other such row.
 	shared?: number | undefined
+	// The queued and waiting sections draw a condition column after the icon (joshuafolkken/kit#4288).
+	is_conditioned?: boolean | undefined
 }
 
 // A row drawn before the plan is read has no title yet, and says so.
@@ -93,12 +97,6 @@ function row_title(row: BoardRow, header: BoardHeader): string | undefined {
 	if (row.title !== undefined || run_board_header.is_plan_read(header)) return row.title
 
 	return ELLIPSIS
-}
-
-function waits_of(row: BoardRow, header: BoardHeader): string | undefined {
-	if (row.waits.length === 0) return undefined
-
-	return `${WAITS_ICON} ${row.waits.map((reference) => header.link(reference)).join(', ')}`
 }
 
 // A running row's part that changed at `at_ms`, emphasized while fresh (`run-board-fresh.ts`) — its
@@ -173,13 +171,20 @@ function joined(parts: ReadonlyArray<string | undefined>): string {
 	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
 }
 
+// The icon and, in a section that draws one, the condition column after it.
+function icon_text(row: BoardRow, frame: RowFrame): string {
+	const { header } = frame
+	const icon = running_fresh(row, state_icon(row, header), row.status?.phase_ms, header)
+
+	return frame.is_conditioned === true ? `${icon} ${condition_of(row, header)}` : icon
+}
+
 // The release kind's icon between the number — and its lane cells, where drawn — and the title, one
 // space either side; a row with no title ends at its icon, so what follows keeps its usual gap.
 function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
 	const { header } = frame
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
-	const icon = running_fresh(row, state_icon(row, header), row.status?.phase_ms, header)
-	const lead = `${icon} ${number_text(row, frame.cells, header.link)} ${kind}`
+	const lead = `${icon_text(row, frame)} ${number_text(row, frame.cells, header.link)} ${kind}`
 
 	return title === '' ? lead : `${lead} ${title}`
 }
@@ -195,12 +200,12 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 	return joined([lead, time, cell_text(row, frame)])
 }
 
-// Every row carries its state's icon, a waiting one ⏳ too; a running row ends on its tail
+// Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
 // (`run-board-render-tail.ts`), and a row with nothing after its padded columns ends where its text does.
 function row_text(row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
 	const tail = run_board_render_tail.tail_of(row, header)
-	const notes = [waits_of(row, header), reason_text(row, header.now_ms, frame.reason_cut)]
+	const notes = [waits_of(row, header, frame.is_conditioned), reason_text(row, frame.reason_cut)]
 
 	return joined([head_text(row, frame), ...tail, ...notes]).trimEnd()
 }
@@ -327,7 +332,7 @@ function frame_of(
 function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
 	return plan_section(
 		`${STATE_ICONS.waiting} ${WORDS.queued}`,
-		layout.queued.flatMap((entry) => entry_lines(entry, frame)),
+		layout.queued.flatMap((entry) => entry_lines(entry, { ...frame, is_conditioned: true })),
 	)
 }
 
@@ -370,7 +375,10 @@ function plan_parts(
 		plan: active_sections(layout, frame, done),
 		below: [
 			...keyed('queued', queued_section(layout, frame)),
-			...keyed('waiting', rows_section(waiting, layout.unreached, frame, 'waiting')),
+			...keyed(
+				'waiting',
+				rows_section(waiting, layout.unreached, { ...frame, is_conditioned: true }, 'waiting'),
+			),
 			...done_section(done, (row) => row_line(INDENT, row, frame)),
 		],
 	}

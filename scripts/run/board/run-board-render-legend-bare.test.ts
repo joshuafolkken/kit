@@ -55,7 +55,12 @@ const LAYOUT: BoardLayout = {
 		running(2, 'gate'),
 		row(3, { state: 'parked', kind: 'enhancement' }),
 	],
-	queued: [{ kind: 'row', row: row(4, { kind: 'bug', waits: ['3'] }) }],
+	queued: [
+		{
+			kind: 'row',
+			row: row(4, { kind: 'bug', waits: ['3'], reason: { icon: '🔗', issues: ['3'] } }),
+		},
+	],
 }
 
 function board_of(): Array<string> {

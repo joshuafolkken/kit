@@ -67,11 +67,12 @@ function lane_rows(lines: ReadonlyArray<string>): Array<string> {
 describe('run_board_tick.tick — an earlier run’s lanes holding a place', () => {
 	it('draws as many lane rows as the queued reason counts lanes holding a place', async () => {
 		const lines = await frame_of(FULL)
-		const queued = lines.find((line) => line.includes(` ${String(QUEUED)} `)) ?? ''
+		const lanes = `${String(LANE_LIMIT)}/${String(LANE_LIMIT)}`
+		// joshuafolkken/kit#4288: the count fills the condition column; a row with no title ends at its
+		// number.
+		const queued = new RegExp(`^ {2}🧵 ${lanes} +${String(QUEUED)}$`, 'u')
 
-		expect(queued).toMatch(
-			new RegExp(String.raw`\(${String(LANE_LIMIT)}/${String(LANE_LIMIT)}\)$`, 'u'),
-		)
+		expect(lines).toContainEqual(expect.stringMatching(queued))
 		expect(lane_rows(lines)).toHaveLength(LANE_LIMIT)
 	})
 

@@ -2,12 +2,14 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { describe, expect, it } from 'vitest'
-import type { BoardPlan } from './run-board-layout'
+import { run_board_labels } from './run-board-labels'
+import type { BoardPlan, RowReason } from './run-board-layout'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import type { ItemStatus } from './run-board-status'
 
 // joshuafolkken/kit#4206: `backlogrun 4199 4198 4201 4200 --only` held 4201 and 4200 behind a running
-// 4198, and their queued rows said `next free lane` or nothing at all.
+// 4198, and their queued rows said `next free lane` or nothing at all. joshuafolkken/kit#4288: each
+// leads with 📋 and the issue it starts after.
 
 const REPO = 'joshuafolkken/kit'
 const FIRST = 4199
@@ -17,7 +19,7 @@ const FOURTH = 4200
 const ADDED = 4300
 const NO_LANE_LEFT = 0
 const ONE_LANE_LEFT = 1
-const NO_LANE_WORD = 'next free lane'
+const { WAIT_ICONS } = run_board_labels
 const CARRY: RunCarry = {
 	invocation: `backlogrun #${String(FIRST)} #${String(RUNNING)} #${String(THIRD)} #${String(FOURTH)} --only`,
 	started_at: '2026-10-19T00:00:00.000Z',
@@ -47,7 +49,11 @@ function plan_of(children: Array<EpicChild>): BoardPlan {
 	}
 }
 
-function reasons(extra: Partial<ReasonRead> = {}): Array<unknown> {
+function named(holder: number): RowReason {
+	return { icon: WAIT_ICONS.named, issues: [String(holder)] }
+}
+
+function reasons(extra: Partial<ReasonRead> = {}): Array<RowReason | undefined> {
 	const children = ROWS.map((number) => child(number))
 	const reason_of = run_board_reason.reader({
 		plan: plan_of(children),
@@ -59,31 +65,27 @@ function reasons(extra: Partial<ReasonRead> = {}): Array<unknown> {
 		...extra,
 	})
 
-	return children.map((item) => reason_of(item)?.text)
+	return children.map((item) => reason_of(item, []))
 }
 
 describe('run_board_reason.reader — a row the declared order keeps waiting', () => {
 	it('names the declared issue each queued row starts after', () => {
-		expect(reasons()).toStrictEqual([
-			`after ${String(RUNNING)} · named order`,
-			`after ${String(THIRD)} · named order`,
-			undefined,
-		])
+		expect(reasons()).toStrictEqual([named(RUNNING), named(THIRD), undefined])
 	})
 
 	it('says the declared order before a full pool, which only an added row waits on', () => {
 		expect(reasons({ free_lanes: NO_LANE_LEFT, lane_limit: 1, occupied_count: 1 })).toStrictEqual([
-			`after ${String(RUNNING)} · named order`,
-			`after ${String(THIRD)} · named order`,
-			`${NO_LANE_WORD} (1/1)`,
+			named(RUNNING),
+			named(THIRD),
+			{ icon: WAIT_ICONS.lane, value: '1/1' },
 		])
 	})
 
 	// joshuafolkken/kit#4279: `backlogrun #4263 #4262 --only` left 4262's row blank before 4263 started.
 	it('names the declared order before its first issue starts', () => {
 		expect(reasons({ statuses: new Map() })).toStrictEqual([
-			`after ${String(RUNNING)} · named order`,
-			`after ${String(THIRD)} · named order`,
+			named(RUNNING),
+			named(THIRD),
 			undefined,
 		])
 	})

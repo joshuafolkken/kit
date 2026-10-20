@@ -10,8 +10,10 @@ const NOW = 1_000_000
 const STAGE_SECONDS = 42
 const LONG_TITLE = 'Verify josh start end-to-end on a fresh machine with nothing installed'
 const SHORT_TITLE = 'Short title'
-const UNTRIAGED: RowReason = { text: 'untriaged' }
-const INSTALLING: RowReason = { text: 'installing', since_ms: NOW - STAGE_SECONDS * SECOND }
+const TAIL = 'untriaged'
+const UNTRIAGED: RowReason = { tail: TAIL }
+// joshuafolkken/kit#4288: a stage's time is the condition column's, never what follows the title.
+const INSTALLING: RowReason = { icon: '📥', since_ms: NOW - STAGE_SECONDS * SECOND }
 const TITLE_FLOOR = 8
 const OVERRUN = 8
 const TINY_PANE = 10
@@ -36,7 +38,7 @@ function row_of(extra: Partial<BoardRow> = {}): BoardRow {
 // A row's line as a renderer would draw it: its title at the limit, then its reason with its cut.
 function draw_of(row: BoardRow): (cut: RowCut) => string {
 	return function draw({ title_limit, reason_cut }: RowCut): string {
-		return `${title_of(row.title, title_limit)} ${reason_text(row, NOW, reason_cut) ?? ''}`
+		return `${title_of(row.title, title_limit)} ${reason_text(row, reason_cut) ?? ''}`
 	}
 }
 
@@ -68,27 +70,27 @@ describe('run_board_render_title.title_of', () => {
 
 describe('run_board_render_title.reason_text', () => {
 	it('says nothing for a row with no reason', () => {
-		expect(reason_text(row_of(), NOW)).toBeUndefined()
+		expect(reason_text(row_of())).toBeUndefined()
 	})
 
-	it('says a reason with no stage as it is', () => {
-		expect(reason_text(row_of({ reason: UNTRIAGED }), NOW)).toBe('untriaged')
+	it('says the reason’s tail as it is', () => {
+		expect(reason_text(row_of({ reason: UNTRIAGED }))).toBe(TAIL)
 	})
 
-	it('says a stage with how long the lane has stood at it', () => {
-		expect(reason_text(row_of({ reason: INSTALLING }), NOW)).toBe('installing 42″')
+	it('says nothing after the title of a stage, whose time the condition column draws', () => {
+		expect(reason_text(row_of({ reason: INSTALLING }))).toBeUndefined()
 	})
 
 	it('gives up the cut columns at the reason end, ending on an ellipsis', () => {
 		// The ellipsis takes one of the columns left.
-		const kept = UNTRIAGED.text.slice(0, UNTRIAGED.text.length - REASON_CUT - ELLIPSIS.length)
+		const kept = TAIL.slice(0, TAIL.length - REASON_CUT - ELLIPSIS.length)
 
-		expect(reason_text(row_of({ reason: UNTRIAGED }), NOW, REASON_CUT)).toBe(`${kept}${ELLIPSIS}`)
+		expect(reason_text(row_of({ reason: UNTRIAGED }), REASON_CUT)).toBe(`${kept}${ELLIPSIS}`)
 	})
 
 	it('cuts a wide-character reason by the columns it takes, not its characters', () => {
-		const row = row_of({ reason: { text: WIDE_REASON } })
-		const cut = reason_text(row, NOW, REASON_CUT) ?? ''
+		const row = row_of({ reason: { tail: WIDE_REASON } })
+		const cut = reason_text(row, REASON_CUT) ?? ''
 
 		expect(cut).toBe(`理由を${ELLIPSIS}`)
 		expect(run_board_fit.width_of(cut)).toBeLessThanOrEqual(
@@ -97,7 +99,7 @@ describe('run_board_render_title.reason_text', () => {
 	})
 
 	it('leaves only the ellipsis for a cut at or past the reason length', () => {
-		expect(reason_text(row_of({ reason: UNTRIAGED }), NOW, UNTRIAGED.text.length)).toBe(ELLIPSIS)
+		expect(reason_text(row_of({ reason: UNTRIAGED }), TAIL.length)).toBe(ELLIPSIS)
 	})
 })
 
@@ -126,7 +128,7 @@ describe('run_board_render_title.fitted', () => {
 		function draw({ title_limit, reason_cut }: RowCut): string {
 			const title = title_of(row.title, title_limit - lead.length)
 
-			return `${lead}${title} ${reason_text(row, NOW, reason_cut) ?? ''}`
+			return `${lead}${title} ${reason_text(row, reason_cut) ?? ''}`
 		}
 
 		const columns = run_board_fit.width_of(draw(WHOLE)) - OVERRUN

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_render } from './run-board-render'
+import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 
@@ -11,6 +12,8 @@ import type { ItemStatus } from './run-board-status'
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header, lines_of, note, rule } =
 	run_board_render_fixture
 const SECOND = 1000
+// A queued or waiting row's condition column where it names no condition (joshuafolkken/kit#4288).
+const BLANK_CONDITION = ' '.repeat(run_board_render_condition.CONDITION_WIDTH)
 
 function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -123,26 +126,24 @@ describe('run_board_render.render release kinds', () => {
 	})
 })
 
-// joshuafolkken/kit#4079: a row waiting on its declared start time leads with 📅, a blocked one ⏳.
+// joshuafolkken/kit#4079: a row waiting on its declared start time leads with 📅.
+// joshuafolkken/kit#4288: its start time fills the condition column, and the legend names 📅.
 describe('run_board_render.render a row waiting on its start time', () => {
-	// joshuafolkken/kit#4173: neither is named in the legend — 📅 is followed by `not before <time>`
-	// and ⏳ sits under `⏳ queued`.
-	it('leads the row with 📅 and names neither it nor ⏳ in the legend', () => {
-		const dated = row(14, { reason: { text: 'not before 2999-01-01 09:00', not_before_ms: 0 } })
-		const blocked = row(15, { waits: ['3'] })
-		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [dated, blocked] } }))
+	it('leads the row with 📅 and its start time, and names 📅 in the legend', () => {
+		const reason = { icon: '📅', value: '01-01 09:00', not_before_ms: 0 }
+		const dated = { kind: 'row' as const, row: row(14, { reason }) }
+		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: [dated] } }))
 
-		expect(lines.some((line) => line.startsWith('  📅 14'))).toBe(true)
-		expect(lines.some((line) => line.startsWith('  ⏳ 15'))).toBe(true)
-		expect(lines.find((line) => line.startsWith('  📅 14'))).toContain('not before 2999-01-01')
-		expect(lines.at(-1)).toBe('🔗 waits on')
+		expect(lines).toContain('  📅 01-01 09:00 14    Issue 14')
+		expect(lines.at(-1)).toBe('📅 not before')
 	})
 })
 
 describe('run_board_render.render sections', () => {
 	it('draws an epic with its title as a tree, a wait as a link, and cuts a long title', () => {
 		const long_title = 'x'.repeat(run_board_render.TITLE_LIMIT + 5)
-		const long = row(5, { title: long_title, waits: ['3409'] })
+		const reason = { icon: '🔗', issues: ['3409', '3410'] }
+		const long = row(5, { title: long_title, waits: ['3409', '3410'], reason })
 		const children = [row(11), row(12)]
 		const epic = { kind: 'epic' as const, epic: 10, title: 'Epic ten', rows: children }
 		const layout = { ...EMPTY_LAYOUT, queued: [epic, { kind: 'row' as const, row: long }] }
@@ -152,9 +153,9 @@ describe('run_board_render.render sections', () => {
 		expect(lines.slice(lines.indexOf(queued_rule), -2)).toStrictEqual([
 			queued_rule,
 			'  📁 10  Epic ten',
-			'     ├ ⏳ 11    Issue 11',
-			'     └ ⏳ 12    Issue 12',
-			`  ⏳ 5    ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  🔗 3409`,
+			`     ├ ⏳ ${BLANK_CONDITION} 11    Issue 11`,
+			`     └ ⏳ ${BLANK_CONDITION} 12    Issue 12`,
+			`  🔗 3409+1      5    ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  3410`,
 		])
 	})
 
@@ -246,8 +247,8 @@ describe('run_board_render.render running row lead', () => {
 		const queued = [{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued }, spinner: '⠙' }))
 
-		expect(lines.some((line) => line.startsWith('⠙    ├ 🚦 4    Issue 4'))).toBe(true)
-		expect(lines).toContain('     └ ⏳ 5    Issue 5')
+		expect(lines.join('\n')).toContain(`⠙    ├ 🚦 ${BLANK_CONDITION} 4    Issue 4`)
+		expect(lines).toContain(`     └ ⏳ ${BLANK_CONDITION} 5    Issue 5`)
 	})
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before it reaches one', () => {
@@ -287,7 +288,7 @@ describe('run_board_render.render links', () => {
 		const lines = lines_of(header({ layout, link: bracketed }))
 
 		expect(lines).toContain('  📁 [10]')
-		expect(lines).toContain('     └ ⏳ [11]    Issue 11')
+		expect(lines).toContain(`     └ ⏳ ${BLANK_CONDITION} [11]    Issue 11`)
 		expect(lines.join('\n')).toContain('🔗 [other/repo#7]')
 	})
 
