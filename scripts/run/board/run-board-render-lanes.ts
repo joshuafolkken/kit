@@ -22,7 +22,7 @@ const CELL_GAP = ' '
 const LABEL_TAIL = 2
 // Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a
 // terminal draws them: 🛤 and 🗜, text symbols drawn as emoji, overlapped the blank after them.
-const LANES_LABEL = '🧵 lanes'
+const LANES_LABEL = `${run_board_labels.LANES_ICON} lanes`
 const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🤏 CMPRS']
 // What a row draws before its number: the indent and the state icon, then a blank.
 const NUMBER_START = '  🔄 '

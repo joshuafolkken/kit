@@ -653,24 +653,27 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 
 Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), then `🧳` an earlier run's lane holding a place (its phase, elapsed time, usage and newest activity drawn alike, never counted as the run's), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
-`⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the reason at a row's end is what it waits on. An epic's children stay gathered under the epic.
+`⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped, with no elapsed time; a probe that does not answer leaves it running. A single frame that finds an idle lane waits out the window and reads again.
 
-A waiting row (`⏳`) ends with why it waits, in English whatever the session language, after its `🔗` blockers, so a row with both shows both:
+A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
-- `untriaged` — the issue carries neither `run:lane` nor `run:solo`. It is the one reason drawn beside a `🔗`, since judging it is what a person can do meanwhile.
-- `not before <time>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local `YYYY-MM-DD HH:MM`; `backlog:next` keeps the UTC spelling. First of the reasons below.
-- `after <N> · named order` — a named run's declared issue is ahead of it, in flight or not yet started; `<N>` is the one declared before it. Never on a `run:add` issue; first of the reasons below.
-- `held by triage` — judged and unblocked, but an unblocked untriaged issue withholds the whole pool.
-- `after <N> · <file>` — a path its body declares overlaps one the running issue `<N>` declares; `backlog:next` answers "waits: its `<file>` overlaps …".
-- `next free lane (<used>/<limit>)` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read: `next free lane (4/4)`. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves `next free lane` alone.
-- `no memory headroom — 🧠 <n>% · 💾 <n>M/s` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
+- `🚪` / `📥` / `📤` `<time>` — its lane is being opened, installed or dispatched, for that long.
+- `❓` — the issue carries neither `run:lane` nor `run:solo`; with a standing blocker, the column names the first one. It leads a blocked row too, since judging it is what a person can do meanwhile.
+- `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker that overruns the column — another repository's `owner/repo#N` — leaves it blank, and every blocker follows the title.
+- `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local time; `backlog:next` keeps the UTC spelling.
+- `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
+- `✋ <N>` — judged and unblocked, but the unblocked untriaged issue `<N>` withholds the whole pool.
+- `📂 <N>` — a path its body declares overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves the column blank.
+- `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
+- `⏳` with a blank column — no wait is read.
 
-A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`; a row whose lane is being opened shows its stage, such as `opening lane 5″`.
+A `🙋` or stopped row outside those sections still ends with `🔗` and every standing blocker.
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.
 
-While the run is at its `planning` stage, the one row it launches next — a named run's next declared issue, else the plan's first waiting row — shows `📝 planning <time>` in place of any reason above, beside a `🔗` too; no other row says it.
+While the run is at its `planning` stage, the one row it launches next — a named run's next declared issue, else the plan's first waiting row — leads with `📝 <time>` in place of any wait above; no other row draws it.
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 

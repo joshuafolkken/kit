@@ -11,9 +11,9 @@ import type { ItemState } from './run-board-status'
 // The legend at the foot of `run:board`: the symbols the frame draws, named once, so a row carries
 // only what differs between rows. Drawn apart from the rows, which tell it the icons they draw.
 // joshuafolkken/kit#4047: each naming only what the frame draws, on one line. An icon the frame draws
-// beside its own word is not named — ⏳ under `⏳ queued`, 🙋 under `🙋 decision`, ✅ under `✅ done`,
-// 📌 on `📌 findings` and 📅 before `not before <time>` — so the legend names only an icon drawn with
-// no word beside it.
+// beside its own word is not named — ⏳ under `⏳ queued`, 🙋 under `🙋 decision`, ✅ under `✅ done`
+// and 📌 on `📌 findings` — so the legend names only an icon drawn with no word beside it, what a
+// waiting row leads with among them.
 
 const {
 	FILED_KIND_ICONS,
@@ -23,6 +23,7 @@ const {
 	PHASE_WORDS,
 	STATE_ICONS,
 	WAITS_ICON,
+	WAIT_WORDS,
 	WORDS,
 } = run_board_labels
 const GAP = '  '
@@ -78,8 +79,19 @@ function kinds_of(rows: ReadonlyArray<BoardRow>): Array<FiledKind> {
 	return run_board_kind.KIND_ORDER.filter((kind) => drawn.has(kind))
 }
 
+// The wait icon a row draws: the one a waiting row leads with, which names its blockers itself, else
+// 🔗 where blockers follow the title of a row that waits on no condition of its own.
+function wait_icon(row: BoardRow): string | undefined {
+	return row.reason?.icon ?? (row.waits.length > 0 ? WAITS_ICON : undefined)
+}
+
+// What the waiting rows the frame draws lead with (joshuafolkken/kit#4288), in one fixed order.
 function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
-	return rows.some((row) => row.waits.length > 0) ? [`${WAITS_ICON} ${WORDS.waits}`] : []
+	const drawn = new Set(rows.map((row) => wait_icon(row)))
+
+	return WAIT_WORDS.filter(([icon]) => drawn.has(icon)).map(
+		([icon, word]) => `${icon} ${WORDS[word]}`,
+	)
 }
 
 // ✚ is named only while a row the run filed draws it (joshuafolkken/kit#4099).

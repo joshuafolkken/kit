@@ -1,5 +1,4 @@
 import { run_board_fit } from './run-board-fit'
-import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
@@ -26,16 +25,6 @@ function title_of(title = '', limit = TITLE_LIMIT): string {
 	return title.length > limit ? `${title.slice(0, limit - 1)}${ELLIPSIS}` : title
 }
 
-// Why a waiting row waits, after its blockers, or why a parked or withdrawn row ended; a lane's stage
-// with how long the lane has stood at it.
-function whole_reason(row: BoardRow, now_ms: number): string | undefined {
-	const { reason } = row
-
-	if (reason?.since_ms === undefined) return reason?.text
-
-	return `${reason.text} ${run_board_labels.span_of(now_ms - reason.since_ms)}`
-}
-
 const GRAPHEMES = new Intl.Segmenter()
 
 // The text cut to `columns` terminal columns — a wide character takes two — ending on an ellipsis.
@@ -50,10 +39,11 @@ function columns_cut(text: string, columns: number): string {
 	return `${kept}${ELLIPSIS}`
 }
 
-// The row's reason with `cut` columns given up at its end, which then ends on an ellipsis; at least
-// the ellipsis is left.
-function reason_text(row: BoardRow, now_ms: number, cut = 0): string | undefined {
-	const text = whole_reason(row, now_ms)
+// The row's reason as it follows the title — what a waiting row waits on there, or why a parked or
+// withdrawn row ended — with `cut` columns given up at its end, which then ends on an ellipsis; at
+// least the ellipsis is left.
+function reason_text(row: BoardRow, cut = 0): string | undefined {
+	const text = row.reason?.tail
 
 	if (text === undefined || cut === 0) return text
 

@@ -8,19 +8,27 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#3750: a waiting row says why it waits after its blockers, a lane being opened says
 // its stage and how long it has stood there, and a narrow pane cuts the title rather than the reason.
+// joshuafolkken/kit#4288: a waiting row leads with its wait's icon and condition column; only what
+// is too long for the column follows its title.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, board_usage, header } = run_board_render_fixture
 const SECOND = 1000
 const ISSUE = 3720
 const BLOCKER = '3409'
+const OTHER_BLOCKER = '3410'
+const HOLDER = '3701'
 const SHORT_TITLE = 'Short title'
 const LONG_TITLE = 'Verify josh start end-to-end on a fresh machine with nothing installed'
 const MIDDLE_TITLE = 'A title of about thirty chars!'
 const TITLE_START = 'Verify j'
-const UNTRIAGED: RowReason = { text: 'untriaged' }
+const PATH = 'package.json'
+const HELD: RowReason = { icon: '📂', issues: [HOLDER], tail: PATH }
+const ENDING = 'superseded'
+const ENDED_REASON: RowReason = { tail: ENDING }
 const STAGE_SECONDS = 42
-const INSTALLING: RowReason = { text: 'installing', since_ms: NOW - STAGE_SECONDS * SECOND }
-const NARROW = 40
+const INSTALLING: RowReason = { icon: '📥', since_ms: NOW - STAGE_SECONDS * SECOND }
+// A pane the condition column's 12 columns (joshuafolkken/kit#4288) leave 40 in.
+const NARROW = 52
 const TALL = 100
 const JAPANESE = /[぀-ヿ一-鿿]/u
 
@@ -59,22 +67,23 @@ function line_of(row: BoardRow, columns?: number): string {
 }
 
 describe('run_board_render.render — why a waiting row waits', () => {
-	it('draws the reason two blanks after the title, not past the title column', () => {
-		const line = line_of(waiting({ reason: UNTRIAGED }))
+	it('draws the tail two blanks after the title, not past the title column', () => {
+		const line = line_of(waiting({ reason: HELD }))
 		const title_column = line.indexOf(SHORT_TITLE)
 
-		expect(line).toMatch(/Short title {2}untriaged$/u)
-		expect(line.indexOf('untriaged')).toBe(title_column + SHORT_TITLE.length + 2)
+		expect(line).toMatch(/^ {2}📂 3701 {8}3720 {4}Short title {2}package\.json$/u)
+		expect(line.indexOf(PATH)).toBe(title_column + SHORT_TITLE.length + 2)
 	})
 
-	it('draws the blockers right after the title, and the reason after them', () => {
-		const line = line_of(waiting({ waits: [BLOCKER], reason: UNTRIAGED }))
+	it('draws the first blocker in the condition column and the rest after the title', () => {
+		const waits = [BLOCKER, OTHER_BLOCKER]
+		const line = line_of(waiting({ waits, reason: { icon: '🔗', issues: waits } }))
 
-		expect(line).toMatch(/Short title {2}🔗 3409 {2}untriaged$/u)
+		expect(line).toMatch(/^ {2}🔗 3409\+1 {6}3720 {4}Short title {2}3410$/u)
 	})
 
 	it('keeps a running row’s columns where they are beside a waiting row', () => {
-		const other = waiting({ number: ISSUE + 1, reason: UNTRIAGED })
+		const other = waiting({ number: ISSUE + 1, reason: HELD })
 		const [alone, beside] = [[running()], [running(), other]].map((rows) =>
 			lines_of(rows).find((line) => line.includes(` ${String(ISSUE)} `)),
 		)
@@ -82,19 +91,18 @@ describe('run_board_render.render — why a waiting row waits', () => {
 		expect(beside).toBe(alone)
 	})
 
-	it('draws the reason after the row’s blockers, which stay as they were', () => {
-		const blocked = waiting({ waits: [BLOCKER] })
+	it('draws the tail after what the row draws without one, which stays as it was', () => {
+		const bare = waiting({ reason: { ...HELD, tail: undefined } })
 
-		expect(line_of({ ...blocked, reason: UNTRIAGED })).toBe(`${line_of(blocked)}  untriaged`)
-		expect(line_of(blocked)).toMatch(/🔗 3409$/u)
+		expect(line_of(waiting({ reason: HELD }))).toBe(`${line_of(bare)}  ${PATH}`)
 	})
 
-	it('draws a lane’s stage with how long the lane has stood at it', () => {
-		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/ {2}installing 42″$/u)
+	it('draws a lane’s stage with how long the lane has stood at it before the number', () => {
+		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/^ {2}📥 42″ {9}3720 {4}Short title$/u)
 	})
 
 	it('draws no Japanese in what it adds to the row', () => {
-		const added = [UNTRIAGED, INSTALLING].map((reason) => line_of(waiting({ reason })))
+		const added = [HELD, INSTALLING].map((reason) => line_of(waiting({ reason })))
 
 		expect(added.join('\n')).not.toMatch(JAPANESE)
 	})
@@ -102,30 +110,30 @@ describe('run_board_render.render — why a waiting row waits', () => {
 
 describe('run_board_render.render — a reason in a narrow pane', () => {
 	it('cuts the title to keep the reason on the row’s one line', () => {
-		const line = line_of(waiting({ title: LONG_TITLE, reason: UNTRIAGED }), NARROW)
+		const line = line_of(waiting({ title: LONG_TITLE, reason: HELD }), NARROW)
 
-		expect(line).toMatch(/… {2}untriaged$/u)
+		expect(line).toMatch(/… {2}package\.json$/u)
 		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
 	})
 
 	it('never cuts the title under what tells two rows apart', () => {
-		const reason = { text: 'after 3701 · scripts/run/board/run-board-render.ts' }
+		const reason = { ...HELD, tail: 'scripts/run/board/run-board-render.ts' }
 		const line = line_of(waiting({ title: LONG_TITLE, reason }), NARROW)
 
-		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  after 3701`)
+		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  scripts/run`)
 	})
 
 	it('leaves a title that already fits the pane whole', () => {
-		const line = line_of(waiting({ reason: UNTRIAGED }), NARROW)
+		const line = line_of(waiting({ reason: ENDED_REASON }), NARROW)
 
-		expect(line).toMatch(/Short title {2}untriaged$/u)
+		expect(line).toMatch(/Short title {2}superseded$/u)
 		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
 	})
 
 	it('cuts a title shorter than the title column by just the columns the line runs over', () => {
-		const line = line_of(waiting({ title: MIDDLE_TITLE, reason: UNTRIAGED }), NARROW)
+		const line = line_of(waiting({ title: MIDDLE_TITLE, reason: HELD }), NARROW)
 
-		expect(line).toMatch(/… {2}untriaged$/u)
+		expect(line).toMatch(/… {2}package\.json$/u)
 		expect(run_board_fit.width_of(line)).toBe(NARROW)
 	})
 
@@ -133,7 +141,7 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 		const wide = line_of(waiting({ title: LONG_TITLE }))
 
 		expect(wide).toContain(`${LONG_TITLE.slice(0, run_board_render.TITLE_LIMIT - 1)}…`)
-		expect(line_of(running())).not.toContain('untriaged')
+		expect(line_of(running())).not.toContain(PATH)
 		expect(line_of(running(), NARROW * 2)).toBe(line_of({ ...running(), reason: undefined }))
 	})
 })
@@ -147,18 +155,18 @@ describe('run_board_render.render — why a parked row ended', () => {
 	const OVERRUN = 5
 
 	it('draws the reason after the row’s padded columns, which stay as they were', () => {
-		const line = line_of({ ...parked, reason: UNTRIAGED })
+		const line = line_of({ ...parked, reason: ENDED_REASON })
 
 		expect(line.startsWith(line_of(parked))).toBe(true)
-		expect(line).toMatch(/ {2}untriaged$/u)
+		expect(line).toMatch(/ {2}superseded$/u)
 	})
 
 	it('cuts the padded title by just the columns the line runs over', () => {
-		const reasoned = { ...parked, reason: UNTRIAGED }
+		const reasoned = { ...parked, reason: ENDED_REASON }
 		const columns = run_board_fit.width_of(line_of(reasoned)) - OVERRUN
 		const line = line_of(reasoned, columns)
 
-		expect(line).toMatch(/ {2}untriaged$/u)
+		expect(line).toMatch(/ {2}superseded$/u)
 		expect(run_board_fit.width_of(line)).toBe(columns)
 	})
 })
@@ -167,11 +175,11 @@ describe('run_board_render.render — why a parked row ended', () => {
 // time; a reason the floored title still runs past the pane with is cut to an ellipsis.
 const ENDED = { started_ms: STARTED + MINUTE, ended_ms: NOW - MINUTE }
 const WORDY: RowReason = {
-	text: `the sandbox approach breaks pnpm store access; ${'x'.repeat(NARROW)}`,
+	tail: `the sandbox approach breaks pnpm store access; ${'x'.repeat(NARROW)}`,
 }
 const NO_USAGE = board_usage(new Map())
 const parked: BoardRow = {
-	...waiting({ reason: UNTRIAGED }),
+	...waiting({ reason: ENDED_REASON }),
 	state: 'parked',
 	status: { state: 'parked', ...ENDED },
 }
@@ -192,7 +200,7 @@ function parked_line(): string {
 
 describe('run_board_render.render — a parked row’s reason, and a reason cut to the pane', () => {
 	it('draws a parked row’s reason two columns after its time', () => {
-		expect(parked_line()).toMatch(/\d″ {2}untriaged$/u)
+		expect(parked_line()).toMatch(/\d″ {2}superseded$/u)
 	})
 
 	it('cuts a withdrawn row’s reason to an ellipsis once its title is at the floor', () => {
@@ -221,7 +229,7 @@ describe('run_board_render.render — a parked row’s reason, and a reason cut 
 // joshuafolkken/kit#4215: a stalled row names its cause and the action that resumes it, which a narrow
 // pane keeps by cutting the title first.
 describe('run_board_render.render — a stalled row’s cause and resume action', () => {
-	const STALLED: RowReason = { text: run_stalled.row_text(ISSUE, 'review failed') }
+	const STALLED: RowReason = { tail: run_stalled.row_text(ISSUE, 'review failed') }
 	const stalled: BoardRow = {
 		...waiting({ title: LONG_TITLE, reason: STALLED }),
 		state: 'stopped',

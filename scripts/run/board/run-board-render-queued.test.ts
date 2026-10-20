@@ -40,7 +40,7 @@ describe('run_board_render.render queued rows', () => {
 
 	it('lists the rows in the order the waves give', () => {
 		const order = ['4134', '4133', '4131', '4129'].map((number) =>
-			lines.findIndex((line) => line.includes(`⏳ ${number}`)),
+			lines.findIndex((line) => line.includes(` ${number} `)),
 		)
 
 		expect(order.every((index) => index !== -1)).toBe(true)

@@ -39,18 +39,26 @@ interface BoardPlan {
 	declared?: Declared | undefined
 }
 
-// Why a waiting row waits, or the stage its lane's launch is at, in the board's own words.
+// Why a waiting row waits, or the stage its lane's launch is at, as one value its row only draws
+// (joshuafolkken/kit#4288): the icon it leads with in place of ⏳, the condition column's value, and
+// what follows its title. A parked, withdrawn or stalled row draws its tail alone.
 interface RowReason {
-	text: string
-	// When the row entered a stage, where the reason is one — how long it has stood there is counted
-	// from it.
+	icon?: string | undefined
+	// The condition column's figure — a lane count, a memory reading, a start time.
+	value?: string | undefined
+	// The issues the wait names, in place of a figure: the first in the condition column, with
+	// `+<rest>` where the rest follow its title.
+	issues?: ReadonlyArray<string> | undefined
+	tail?: string | undefined
+	// When the row entered a stage, where the reason is one — the condition column counts how long it
+	// has stood there from it.
 	since_ms?: number | undefined
-	// The start time its body declares and the row waits on, which it leads with 📅 rather than ⏳.
+	// The start time its body declares and the row waits on, which orders the 📅 rows.
 	not_before_ms?: number | undefined
 }
 
-// What a waiting child's row says after its blockers; `undefined` says nothing.
-type ReasonOf = (child: EpicChild) => RowReason | undefined
+// What a waiting child's row says, given the blockers still standing for it; `undefined` says nothing.
+type ReasonOf = (child: EpicChild, waits: ReadonlyArray<string>) => RowReason | undefined
 
 interface BoardRow {
 	number: number
@@ -124,14 +132,19 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 // A stalled row's right end names the action that resumes it (`run-stalled.ts`), with no event to
 // name its cause.
 function stalled_reason(number: number): RowReason {
-	return { text: run_stalled.row_text(number) }
+	return { tail: run_stalled.row_text(number) }
 }
 
 // Why a waiting row waits, or what resumes a stalled one.
-function plan_reason(child: EpicChild, state: ItemState, overlay: Drawn): RowReason | undefined {
+function plan_reason(
+	child: EpicChild,
+	state: ItemState,
+	overlay: Drawn,
+	waits: ReadonlyArray<string>,
+): RowReason | undefined {
 	if (state === 'stopped') return stalled_reason(child.number)
 
-	return state === 'waiting' ? overlay.reason_of?.(child) : undefined
+	return state === 'waiting' ? overlay.reason_of?.(child, waits) : undefined
 }
 
 function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow {
@@ -139,7 +152,7 @@ function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow 
 	const waits = child.blocked_by
 		.filter((edge) => is_waiting_on(edge, overlay))
 		.map((edge) => reference_of(edge, context.repo))
-	const reason = plan_reason(child, state, overlay)
+	const reason = plan_reason(child, state, overlay, waits)
 
 	return {
 		...(reason !== undefined && { reason }),
@@ -200,7 +213,7 @@ function ending_reason(
 	status: ItemStatus,
 	labels: ReadonlyArray<string> | undefined,
 ): Pick<BoardRow, 'reason'> {
-	if (status.reason !== undefined) return { reason: { text: status.reason } }
+	if (status.reason !== undefined) return { reason: { tail: status.reason } }
 
 	return is_stalled(status, labels) ? { reason: stalled_reason(number) } : {}
 }

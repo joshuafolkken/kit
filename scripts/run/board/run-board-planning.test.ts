@@ -15,8 +15,10 @@ const HEAD = 4263
 const SECOND = 4262
 const PLANNED_AT = '2026-10-20T04:00:00.000Z'
 const OPENING_AT = '2026-10-20T04:01:00.000Z'
-const PLANNING = '📝 planning'
-const NAMED_ORDER = `after ${String(HEAD)} · named order`
+// joshuafolkken/kit#4288: the row leads with 📝, and its condition column counts the planning.
+const PLANNING = '📝'
+const NAMED_ORDER = '📋'
+const OPENING = '🚪'
 const CARRY: RunCarry = {
 	invocation: `backlogrun #${String(HEAD)} #${String(SECOND)} --only`,
 	started_at: PLANNED_AT,
@@ -50,8 +52,8 @@ function plan_of(children: Array<EpicChild>): BoardPlan {
 	}
 }
 
-// Each row's words and the time its reason counts from, the plan's wave order second-first.
-function rows(extra: Partial<ReasonRead> = {}): Array<unknown> {
+// Each row's icon and the time its reason counts from, the plan's wave order second-first.
+function rows(extra: Partial<ReasonRead> = {}): Array<Array<string | number | undefined>> {
 	const children = [child(SECOND), child(HEAD)]
 	const reason_of = run_board_reason.reader({
 		plan: plan_of(children),
@@ -64,9 +66,9 @@ function rows(extra: Partial<ReasonRead> = {}): Array<unknown> {
 	})
 
 	return children.map((item) => {
-		const reason = reason_of(item)
+		const reason = reason_of(item, [])
 
-		return [reason?.text, reason?.since_ms]
+		return [reason?.icon, reason?.since_ms]
 	})
 }
 
@@ -90,7 +92,7 @@ describe('run_board_reason.reader — the row a planning run is for', () => {
 
 		expect(rows({ events: [...PLANNING_EVENTS, opening] })).toStrictEqual([
 			[NAMED_ORDER, undefined],
-			['opening lane', Date.parse(OPENING_AT)],
+			[OPENING, Date.parse(OPENING_AT)],
 		])
 	})
 

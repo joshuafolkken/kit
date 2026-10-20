@@ -10,7 +10,7 @@ import type { ItemState } from './run-board-status'
 // joshuafolkken/kit#4047: only what the frame draws. joshuafolkken/kit#4173: on one line, and never an
 // icon the frame draws beside its own word.
 
-const { NOT_BEFORE_ICON, STATE_ICONS } = run_board_labels
+const { STATE_ICONS } = run_board_labels
 // joshuafolkken/kit#3767: the third line's kind is named among what is in progress.
 const OPERATION = '🔧 operation'
 const CODERABBIT = '🐰 CodeRabbit'
@@ -116,12 +116,46 @@ describe('run_board_render_legend.legend_of order', () => {
 	})
 })
 
-// joshuafolkken/kit#4173: ⏳ under `⏳ queued`, 🙋 under `🙋 decision`, ✅ under `✅ done` and 📅
-// before `not before <time>` carry their own word.
+// joshuafolkken/kit#4288: what each waiting row leads with, named once, in one fixed order.
+describe('run_board_render_legend.legend_of wait icons', () => {
+	it('names the icons the waiting rows lead with, and none they do not', () => {
+		const rows = [row(1, { reason: { icon: '❓' } }), row(2, { reason: { icon: '🧵' } })]
+		const again = [...rows, row(3, { reason: { icon: '🧵', value: '3/3' } })]
+		const named = ['🧵 free lane  ❓ untriaged']
+
+		expect(legend_of(rows)).toStrictEqual(named)
+		expect(legend_of(again)).toStrictEqual(named)
+		expect(legend_of([row(1, { reason: { tail: 'fullrun #1' } })])).toStrictEqual([])
+	})
+
+	it('names 🔗 for blockers after a title, not for a waiting row its own icon leads', () => {
+		const untriaged = row(1, { waits: ['3'], reason: { icon: '❓', issues: ['3'] } })
+		const asked = row(2, { state: 'human', waits: ['3'] })
+
+		expect(legend_of([untriaged])).toStrictEqual(['❓ untriaged'])
+		expect(legend_of([asked])).toStrictEqual(['🔗 waits on'])
+	})
+
+	it.each([
+		['🚪', 'opening lane'],
+		['📥', 'installing'],
+		['📤', 'dispatching'],
+		['📂', 'path held'],
+		['📋', 'named order'],
+		['✋', 'held by triage'],
+		['🧠', 'memory headroom'],
+		['📅', 'not before'],
+	])('names %s as "%s"', (icon, word) => {
+		expect(legend_of([row(1, { reason: { icon } })])).toStrictEqual([`${icon} ${word}`])
+	})
+})
+
+// joshuafolkken/kit#4173: ⏳ under `⏳ queued`, 🙋 under `🙋 decision` and ✅ under `✅ done` carry
+// their own word. joshuafolkken/kit#4288: 📅 no longer does, so the wait icons name it.
 describe('run_board_render_legend.legend_of icons drawn with their own word', () => {
-	it('names none of ⏳, 📅, 🙋 and ✅, and draws nothing where they are all the frame draws', () => {
+	it('names none of ⏳, 🙋 and ✅, and draws nothing where they are all the frame draws', () => {
 		const rows = rows_in(['waiting', 'human', 'merged'])
-		const leads = new Set([...rows.map((entry) => STATE_ICONS[entry.state]), NOT_BEFORE_ICON])
+		const leads = new Set(rows.map((entry) => STATE_ICONS[entry.state]))
 
 		expect(legend_of(rows, { leads, icons: leads })).toStrictEqual([])
 	})

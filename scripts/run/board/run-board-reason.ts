@@ -13,35 +13,28 @@ import { run_board_planning, type Planning } from './run-board-planning'
 import { run_board_setup } from './run-board-setup'
 import type { ItemStatus } from './run-board-status'
 
-// Why each waiting row waits — pure, so the words are tested apart from the screen. A row whose lane is
-// being opened says the stage that lane is at; any other says what `backlog:next` would answer for it,
-// read off the same rules — after the row a planning run is for, which says so (`run-board-planning.ts`): the driver's declared order for a named run's issue, `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
-// running issue holds, the lane limit for a full pool. A start time the body declares and the clock has
-// not reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers
-// the row until then; it reads in the local time every other time on the board does (#4017). A blocker stays the row's `🔗`; only a row that nobody has judged says so beside
-// it, since judging it is what a person can do meanwhile.
-// Every word is English whatever the session language, as every other word on the board is.
+// Why each waiting row waits — pure, so the reasons are tested apart from the screen. Each is one
+// `RowReason` its row only draws (joshuafolkken/kit#4288): an icon, the condition column's value and
+// what follows the title. A row whose lane is being opened leads with the stage that lane is at; any
+// other with what `backlog:next` would answer for it, read off the same rules — after the row a
+// planning run is for, which says so (`run-board-planning.ts`): the driver's declared order for a named
+// run's issue, `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a running
+// issue holds, the lane limit for a full pool. A start time the body declares and the clock has not
+// reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers the
+// row until then; it reads in the local time every other time on the board does (#4017). A blocker
+// leads its row with `🔗`; a row that nobody has judged leads with ❓ even where it is blocked, since
+// judging it is what a person can do meanwhile.
 
 const { LANE_STAGE } = run_event_setup
-const { HEADER_ICONS } = run_board_labels
+const { HEADER_ICONS, STAGE_ICONS, WAIT_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
+const FIRST_ONLY = 1
 
-const WORDS = {
-	untriaged: 'untriaged',
-	held: 'held by triage',
-	no_lane: 'next free lane',
-	no_memory: 'no memory headroom',
-	after: 'after',
-	named: 'named order',
-} as const
-
-const FIGURE_SEPARATOR = ' · '
-
-// A lane's stage as its row says it: the event's own words, cut to what fits beside a title.
-const STAGE_WORDS: ReadonlyArray<readonly [stage: string, word: string]> = [
-	[LANE_STAGE.OPENING, 'opening lane'],
-	[LANE_STAGE.INSTALLING, 'installing'],
-	[LANE_STAGE.DISPATCHING, 'dispatching'],
+// The stages a lane's launch passes, each leading its row with its own icon.
+const LANE_STAGES: ReadonlyArray<string> = [
+	LANE_STAGE.OPENING,
+	LANE_STAGE.INSTALLING,
+	LANE_STAGE.DISPATCHING,
 ]
 
 // What the reasons are read from, beside the plan and the statuses a layout is drawn from.
@@ -49,7 +42,7 @@ interface ReasonRead extends Overlay {
 	events: ReadonlyArray<RunEvent>
 	// How many more lanes the limit allows; `undefined` where it could not be read.
 	free_lanes: number | undefined
-	// How many lanes hold a place under the limit, counted after `next free lane`.
+	// How many lanes hold a place under the limit, counted after `🧵`.
 	occupied_count?: number | undefined
 	// The limit those lanes fill; `undefined` where it could not be read.
 	lane_limit?: number | undefined
@@ -65,24 +58,26 @@ interface ReasonRead extends Overlay {
 
 // What every row of one layout is weighed against, read once.
 interface Pool {
-	// An untriaged issue nothing blocks withholds every candidate (`epic-triage.ts`).
-	is_held: boolean
+	// The untriaged issue nothing blocks that withholds every candidate (`epic-triage.ts`), if any.
+	held_by: number | undefined
 	running: ReadonlyArray<number>
 	// The row the run's planning is for, while the run plans (`run-board-planning.ts`).
 	planning: Planning | undefined
 }
 
-function stage_word(text: string): string | undefined {
-	return STAGE_WORDS.find(([stage]) => text.startsWith(stage))?.[1]
+function stage_icon(text: string): string | undefined {
+	const stage = LANE_STAGES.find((name) => text.startsWith(name))
+
+	return stage === undefined ? undefined : STAGE_ICONS[stage]
 }
 
 function stage_of(child: EpicChild, read: ReasonRead): RowReason | undefined {
 	const stage = read.is_stopped ? undefined : run_board_setup.lane_stage(read.events, child.number)
-	const text = stage === undefined ? undefined : stage_word(stage.text)
+	const icon = stage === undefined ? undefined : stage_icon(stage.text)
 
-	if (stage === undefined || text === undefined) return undefined
+	if (stage === undefined || icon === undefined) return undefined
 
-	return { text, since_ms: stage.at_ms }
+	return { icon, since_ms: stage.at_ms }
 }
 
 function is_untriaged_candidate(child: EpicChild, read: ReasonRead): boolean {
@@ -103,7 +98,7 @@ function pool_of(read: ReasonRead): Pool {
 	const running = running_of(read)
 
 	return {
-		is_held: waiting.some((child) => is_untriaged_candidate(child, read)),
+		held_by: waiting.find((child) => is_untriaged_candidate(child, read))?.number,
 		running,
 		planning: run_board_planning.planning_of(read, running),
 	}
@@ -113,112 +108,113 @@ function planned_of(child: EpicChild, pool: Pool): RowReason | undefined {
 	return pool.planning?.issue === child.number ? pool.planning.reason : undefined
 }
 
-function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
+// `📂 4238 … scripts/gate/machine-capacity.ts`: the running issue holding a path this row declares,
+// and the path after the title.
+function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	const { declared = new Map(), context } = read.plan
 	const holding = { holders: pool.running, repo: context.repo }
 	const clash = backlog_overlap.running_clash(child, declared, holding)
 
-	return clash === undefined
-		? undefined
-		: `${WORDS.after} ${String(clash.holder)}${FIGURE_SEPARATOR}${clash.path}`
+	if (clash === undefined) return undefined
+
+	return { icon: WAIT_ICONS.path, issues: [String(clash.holder)], tail: clash.path }
 }
 
-// `next free lane (4/4)`: what the row starts after, and how many lanes hold a place against the
-// limit. Every waiting row repeated the same breakdown of them, so the row counts them and names none
-// (#4111); it says what it starts after rather than what it lacks (joshuafolkken/kit#4137).
-function no_lane_of(read: ReasonRead): string {
+// `🧵 4/4`: how many lanes hold a place against the limit the row starts after a free one of. Every
+// waiting row repeated the same breakdown of them, so the row counts them and names none (#4111).
+function no_lane_of(read: ReasonRead): RowReason {
 	const { occupied_count = 0, lane_limit } = read
 
-	if (lane_limit === undefined) return WORDS.no_lane
+	if (lane_limit === undefined) return { icon: WAIT_ICONS.lane }
 
-	return `${WORDS.no_lane} (${String(occupied_count)}/${String(lane_limit)})`
+	return { icon: WAIT_ICONS.lane, value: `${String(occupied_count)}/${String(lane_limit)}` }
 }
 
-// `no memory headroom — 🧠 88% · 💾 12M/s`: run:board's own latest 🧠 / 💾, not the driver's reading,
-// so a hold the kernel's verdict alone raised may show both green. Each is drawn only where it was
-// read (#4084).
-function figure_of(
-	icon: string,
-	value: number | undefined,
-	format: (value: number) => string,
-): string | undefined {
-	return value === undefined ? undefined : `${icon} ${format(value).trim()}`
-}
-
-function no_memory_of(gauges: MachineGauges | undefined): string {
+// `🧠 88% … 💾 12M/s`: run:board's own latest 🧠 / 💾, not the driver's reading, so a hold the kernel's
+// verdict alone raised may show both green. Each is drawn only where it was read (#4084); the 💾 follows
+// the title, so the row draws 🧠 once.
+function no_memory_of(gauges: MachineGauges | undefined): RowReason {
 	const { percent_text, rate_text } = run_board_machine
-	const figures = [
-		figure_of(HEADER_ICONS.memory, gauges?.memory_percent, percent_text),
-		figure_of(HEADER_ICONS.swap, gauges?.swap_mb_per_s, rate_text),
-	].filter((figure) => figure !== undefined)
+	const memory = gauges?.memory_percent
+	const swap = gauges?.swap_mb_per_s
 
-	if (figures.length === 0) return WORDS.no_memory
-
-	return `${WORDS.no_memory} — ${figures.join(FIGURE_SEPARATOR)}`
+	return {
+		icon: WAIT_ICONS.memory,
+		value: memory === undefined ? undefined : percent_text(memory).trim(),
+		tail: swap === undefined ? undefined : `${HEADER_ICONS.swap} ${rate_text(swap).trim()}`,
+	}
 }
 
 // The machine's room: no lane left under the limit, else no memory for one more.
-function room_wait(read: ReasonRead): string | undefined {
+function room_wait(read: ReasonRead): RowReason | undefined {
 	if (read.free_lanes === NO_FREE_LANES) return no_lane_of(read)
 
 	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
 }
 
-// `after 4198 · named order`: the declared issue a named run starts this one after — the driver's own
-// reading (`backlog-drive-named.ts`), asked before it offers anything.
-function named_of(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
+// `📋 4198`: the declared issue a named run starts this one after — the driver's own reading
+// (`backlog-drive-named.ts`), asked before it offers anything.
+function named_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	if (read.carry === undefined) return undefined
 	const in_flight = pool.running.map(String)
 	const holder = backlog_drive_named.held_after(read.carry, in_flight, child.number)
 
-	return holder === undefined
-		? undefined
-		: `${WORDS.after} ${String(holder)}${FIGURE_SEPARATOR}${WORDS.named}`
+	return holder === undefined ? undefined : { icon: WAIT_ICONS.named, issues: [String(holder)] }
+}
+
+// `✋ 4301`: the untriaged issue the pool is held for a judgment of.
+function held_of(pool: Pool): RowReason | undefined {
+	if (pool.held_by === undefined) return undefined
+
+	return { icon: WAIT_ICONS.held, issues: [String(pool.held_by)] }
 }
 
 // A candidate nothing blocks, in the order the driver answers: the declared order, then what
 // `backlog:next` answers — the pool held for a judgment, then a path a running issue declares, then a
 // pool with no lane left, then a machine with no memory.
-function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
-	const named = named_of(child, read, pool)
-
-	if (named !== undefined) return named
-	if (pool.is_held) return WORDS.held
-
-	return overlap_of(child, read, pool) ?? room_wait(read)
+function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
+	return (
+		named_of(child, read, pool) ?? held_of(pool) ?? overlap_of(child, read, pool) ?? room_wait(read)
+	)
 }
 
-// The start time the body declares and the clock has not reached, in the board's local time.
+// `📅 10-20 16:30`: the start time the body declares and the clock has not reached, in the board's
+// local time.
 function not_before_of(child: EpicChild): RowReason | undefined {
 	const ms = issue_not_before.waiting_ms(child.body)
 
 	if (ms === undefined) return undefined
 
 	return {
-		text: `${run_board_labels.WORDS.not_before} ${run_board_labels.date_minute_of(ms)}`,
+		icon: WAIT_ICONS.not_before,
+		value: run_board_labels.day_minute_of(ms),
 		not_before_ms: ms,
 	}
 }
 
-function wait_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
-	if (!epic_triage.is_triaged(child)) return { text: WORDS.untriaged }
-	if (run_board_layout.is_blocked(child, read)) return undefined
+// `❓ 4183`: an issue nobody has judged, naming its first standing blocker where it has one.
+function untriaged_of(waits: ReadonlyArray<string>): RowReason {
+	return { icon: WAIT_ICONS.untriaged, issues: waits.slice(0, FIRST_ONLY) }
+}
 
-	const dated = not_before_of(child)
+function wait_of(
+	child: EpicChild,
+	waits: ReadonlyArray<string>,
+	read: ReasonRead,
+	pool: Pool,
+): RowReason | undefined {
+	if (!epic_triage.is_triaged(child)) return untriaged_of(waits)
+	if (waits.length > 0) return { icon: WAIT_ICONS.blocker, issues: waits }
 
-	if (dated !== undefined) return dated
-
-	const text = offer_wait(child, read, pool)
-
-	return text === undefined ? undefined : { text }
+	return not_before_of(child) ?? offer_wait(child, read, pool)
 }
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
 function reader(read: ReasonRead): ReasonOf {
 	const pool = pool_of(read)
 
-	return function reason_of(child: EpicChild): RowReason | undefined {
-		return stage_of(child, read) ?? planned_of(child, pool) ?? wait_of(child, read, pool)
+	return function reason_of(child, waits) {
+		return stage_of(child, read) ?? planned_of(child, pool) ?? wait_of(child, waits, read, pool)
 	}
 }
 

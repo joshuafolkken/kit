@@ -228,7 +228,7 @@ function tail_lines(extra: Partial<BoardHeader> = {}): Array<string> {
 	const layout = {
 		...EMPTY_LAYOUT,
 		active: [running(1, 'Short'), running(2, 'A much longer title than the other')],
-		unreached: [{ ...waiting, waits: ['9'] }],
+		unreached: [{ ...waiting, waits: ['9', '10'], reason: { icon: '🔗', issues: ['9', '10'] } }],
 	}
 
 	return lines_of(board({ layout, ...extra }))
@@ -263,11 +263,12 @@ describe('run_board_render.render tail column', () => {
 		expect(short_end).toBe(long_end)
 	})
 
-	// joshuafolkken/kit#4026: a waiting row lines nothing up, so its 🔗 follows its title.
-	it('starts a waiting row’s 🔗 two blanks after its title', () => {
+	// joshuafolkken/kit#4026: a waiting row lines nothing up, so what it waits on follows its title.
+	// joshuafolkken/kit#4288: the first blocker leads it with 🔗, and the rest follow the title.
+	it('starts a waiting row’s other blockers two blanks after its title', () => {
 		const line = tail_lines().find((text) => text.includes('Waiting'))
 
-		expect(line).toMatch(/Waiting {2}🔗 /u)
+		expect(line).toMatch(/^ {2}🔗 9\+1 {9}3 {4}Waiting {2}10$/u)
 	})
 
 	// The header's third line says the run has ended, so only the row's tail draws 🔧.

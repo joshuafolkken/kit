@@ -67,7 +67,7 @@ function row_of(lines: ReadonlyArray<string>): string | undefined {
 describe('run_board_tick.tick — a parked child a person released', () => {
 	it('draws it waiting on its start time and leaves it out of the parked count', async () => {
 		const lines = await frame_with(RELEASED_LABELS)
-		const not_before = `not before ${run_board_labels.date_minute_of(Date.parse(FUTURE))}`
+		const not_before = `📅 ${run_board_labels.day_minute_of(Date.parse(FUTURE))}`
 		const row = row_of(lines)
 
 		expect(row).not.toContain('💤')

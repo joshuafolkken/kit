@@ -16,6 +16,7 @@ import type { ItemStatus } from './run-board-status'
 const REPO = 'joshuafolkken/kit'
 const BREAKING = 'breaking-change'
 const NO_STATUSES: ReadonlyMap<number, ItemStatus> = new Map()
+const OPEN_BLOCKER = 3409
 
 function child(
 	number: number,
@@ -37,7 +38,7 @@ function plan_of(
 	return {
 		waves: { waves, unreached },
 		tracked,
-		context: { repo: REPO, titles: new Map(), open_numbers: new Set([...numbers, 3409]) },
+		context: { repo: REPO, titles: new Map(), open_numbers: new Set([...numbers, OPEN_BLOCKER]) },
 		labels: new Map(),
 	}
 }
@@ -148,13 +149,27 @@ describe('run_board_layout.layout_of release kinds', () => {
 	})
 })
 
+function issues_of(_child: EpicChild, waits: ReadonlyArray<string>): RowReason {
+	return { issues: waits }
+}
+
 // joshuafolkken/kit#3750: a waiting row carries why it waits; a row the run has touched never does.
 describe('run_board_layout.layout_of waiting reasons', () => {
-	const REASON = { text: 'untriaged' }
+	const REASON: RowReason = { tail: 'untriaged' }
 
-	function reason_of(): typeof REASON {
+	function reason_of(): RowReason {
 		return REASON
 	}
+
+	// joshuafolkken/kit#4288: the reader leads a blocked row with its blockers, so it is handed them.
+	it('hands the reader the blockers still standing for the row', () => {
+		const plan = plan_of([[child(1, [OPEN_BLOCKER])]])
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES, issues_of)
+
+		expect(run_board_layout.rows_of(layout)[0]?.reason).toStrictEqual({
+			issues: [String(OPEN_BLOCKER)],
+		})
+	})
 
 	it('gives every waiting row what the reader says of it, in the waves and outside them', () => {
 		const plan = plan_of([[child(1)]], [child(2)])
@@ -199,10 +214,10 @@ describe('run_board_layout.layout_of ending reasons', () => {
 		const reasons = layout.active.map((row) => [row.number, row.reason])
 
 		expect(reasons).toStrictEqual([
-			[1, { text: CAP }],
+			[1, { tail: CAP }],
 			[4, undefined],
 			[3, undefined],
-			[2, { text: 'superseded' }],
+			[2, { tail: 'superseded' }],
 		])
 	})
 
@@ -279,7 +294,7 @@ const STARTS: ReadonlyMap<number, number> = new Map([
 function start_reason(item: EpicChild): RowReason {
 	const not_before_ms = STARTS.get(item.number)
 
-	return { text: 'waits', ...(not_before_ms !== undefined && { not_before_ms }) }
+	return { tail: 'waits', ...(not_before_ms !== undefined && { not_before_ms }) }
 }
 
 describe('run_board_layout.layout_of unreached order', () => {

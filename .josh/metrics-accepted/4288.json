@@ -1,0 +1,7 @@
+{
+	"reason": "#4288 adds the run:board condition column module and the structured wait reasons (icon, value, issues, tail) the queued and waiting rows draw, moves a cross-repo blocker that overruns the column after the title, and splits the finish-time cell out of run-board-render.ts to keep it within max-lines once merged with main",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 97
+	}
+}
