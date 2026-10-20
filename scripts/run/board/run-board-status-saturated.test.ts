@@ -2,11 +2,15 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_fixture } from '#scripts/run/event/run-event-stream-fixture'
 import { run_ship_stage, type Stage } from '#scripts/run/ship/run-ship-stage'
 import { afterAll, describe, expect, it } from 'vitest'
+import { run_board_lane_state } from './run-board-lane-state'
 import { run_board_status, type ItemStatus } from './run-board-status'
+
+const { NO_LANES } = run_board_lane_state
 
 // joshuafolkken/kit#3552: on a stream the positions fill to `EVENT_CAP`, only each issue's newest
 // ship-stage line survives, so that line alone has to draw the attempt's whole track.
@@ -14,6 +18,7 @@ import { run_board_status, type ItemStatus } from './run-board-status'
 const KIND = run_event_stream.EVENT_KIND
 const { PHASE, STAGE } = run_ship_stage
 const AT = '2026-10-09T00:00:00.000Z'
+const RUN_STARTED_AT = '2026-10-08T23:00:00.000Z'
 const ISSUE = '3552'
 const CITE = `#${ISSUE}`
 // The launch, the first edit, the ship launch and the merge — the positions the child itself writes.
@@ -75,7 +80,25 @@ function run_stages(target: string, stages: ReadonlyArray<Stage>, started: Array
 function status_of(target: string): ItemStatus | undefined {
 	const events: ReadonlyArray<RunEvent> = run_event_stream.read_events(target)
 
-	return run_board_status.statuses_of(events, [], new Set()).get(Number(ISSUE))
+	return run_board_status.statuses_of(events, NO_LANES).get(Number(ISSUE))
+}
+
+// The status of a child whose lane's record says this run launched it before the stream's events.
+function recorded_status_of(target: string): ItemStatus | undefined {
+	const events: ReadonlyArray<RunEvent> = run_event_stream.read_events(target)
+	const record: LaneStateRecord = {
+		issue: ISSUE,
+		run: { started_at: RUN_STARTED_AT },
+		state: 'running',
+		launched_at: RUN_STARTED_AT,
+		changed_at: RUN_STARTED_AT,
+		changed_by: 'lane:dispatch',
+	}
+	const started_ms = Date.parse(RUN_STARTED_AT)
+	const records = new Map([[ISSUE, record]])
+	const lanes = run_board_lane_state.lanes_of({ events, lanes: [ISSUE], records, started_ms })
+
+	return run_board_status.statuses_of(events, lanes).get(Number(ISSUE))
 }
 
 describe('run_board_status — a ship on a stream full of positions', () => {
@@ -133,6 +156,18 @@ describe('run_board_status — a ship whose launch the stream rolled off', () =>
 		run_event_stream.append(target, KIND.RESUME, CITE, AT)
 		run_event_stream.append(target, KIND.SHIP_STAGE, text, AT)
 
-		expect(status_of(target)).toMatchObject({ state: 'running', track: ['ship', 'review'] })
+		expect(recorded_status_of(target)).toMatchObject({
+			state: 'running',
+			track: ['ship', 'review'],
+		})
+	})
+
+	// joshuafolkken/kit#4269: with no lane record, a resume alone makes no status.
+	it('makes no status of a resume whose child no lane record holds', () => {
+		const target = path.join(TEMPORARY, `${randomUUID()}.jsonl`)
+
+		run_event_stream.append(target, KIND.RESUME, CITE, AT)
+
+		expect(status_of(target)).toBeUndefined()
 	})
 })

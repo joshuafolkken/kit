@@ -72,6 +72,8 @@ interface BoardRow {
 	// Why the row waits beyond its blockers (`run-board-reason.ts`), or why a parked or withdrawn row
 	// ended; any other row the run has touched has none.
 	reason?: RowReason | undefined
+	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳.
+	is_earlier?: boolean | undefined
 }
 
 type QueuedEntry =
@@ -83,8 +85,8 @@ interface BoardLayout {
 	queued: ReadonlyArray<QueuedEntry>
 	people: ReadonlyArray<BoardRow>
 	unreached: ReadonlyArray<BoardRow>
-	// The earlier run's lanes that still hold a place under the limit — drawn after the run's own lanes,
-	// and no row the header counts.
+	// The earlier run's lanes that still hold a place under the limit, and the lanes with no record —
+	// drawn after the run's own lanes, and no row the header counts.
 	earlier?: ReadonlyArray<BoardRow> | undefined
 }
 

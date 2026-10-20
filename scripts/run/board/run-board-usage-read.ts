@@ -5,7 +5,6 @@ import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
-import { run_board_paused } from './run-board-paused'
 import type { ProcessReading, UsageMark } from './run-board-usage'
 import { run_board_usage_listing, type ProcessListing } from './run-board-usage-listing'
 import {
@@ -41,7 +40,6 @@ const LSOF_PROCESS = /^(?=p)/mu
 const LSOF_NAME = 'n'
 const { load_builtin, rusage_reader } = run_board_usage_rusage
 const { list_top, top_reader } = run_board_usage_top
-const { paused_lanes, paused_since } = run_board_paused
 const { listings_of } = run_board_usage_listing
 
 interface UsagePorts {
@@ -164,14 +162,6 @@ async function lanes_for(
 	return new Map([...kept, ...found])
 }
 
-function paused_of(
-	before: UsageMark | undefined,
-	paused: ReadonlySet<string>,
-	at_ms: number,
-): Map<string, number> {
-	return paused_since(before?.paused, paused, at_ms)
-}
-
 // The snapshot's listings and `top`'s reading, read together; a snapshot `ps` did not answer fails the
 // sample.
 async function listed_of(
@@ -190,9 +180,8 @@ async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise
 	const earlier = before?.processes ?? new Map()
 	const readings = readings_of(listed, { rusage: ports.rusage, top, earlier })
 	const lanes = await lanes_for(before?.lanes ?? new Map(), readings.processes, ports)
-	const paused = paused_of(before, paused_lanes(listed, lanes), at_ms)
 
-	return { at_ms, ...readings, lanes, paused, cores: cpus().length, total_bytes: totalmem() }
+	return { at_ms, ...readings, lanes, cores: cpus().length, total_bytes: totalmem() }
 }
 
 async function darwin_directories(

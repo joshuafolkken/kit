@@ -60,9 +60,8 @@ describe('run_board_usage_listing.listings_of', () => {
 			command: CHROME,
 			cpu_ms: 93_784_000,
 			rss_bytes: 2048 * KB,
-			stat: 'S',
 		})
-		expect(listings.get(13)).toMatchObject({ cpu_ms: 754_500, stat: 'TN+' })
+		expect(listings.get(13)).toMatchObject({ cpu_ms: 754_500 })
 		expect(listings.get(14)?.command).toBe('eslint_d')
 	})
 

@@ -71,17 +71,6 @@ function names(event: RunEvent, issue: number): boolean {
 	return Number(run_event_scope.issue_named(event)) === issue
 }
 
-// A lane the stream saw no launch for is not yet this run's child when the run says it is still
-// setting up: it has launched nothing at all, so any lane here is an earlier run's, or it is opening
-// this very lane. A stream with no stage on it says neither, and the lane is read as before.
-function is_lane_pending(events: ReadonlyArray<RunEvent>, issue: number): boolean {
-	const stages = events.filter((event) => is_setup(event))
-
-	if (stages.length === 0) return false
-
-	return !has_launched(events) || stages.some((stage) => names(stage, issue))
-}
-
 // A stage of one lane's launch, as its event wrote it, and when the lane entered it.
 interface LaneStage {
 	text: string
@@ -115,7 +104,7 @@ function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage |
 	return { text: step.text, at_ms: Date.parse(step.at) }
 }
 
-const run_board_setup = { is_lane_pending, lane_stage, read }
+const run_board_setup = { lane_stage, read }
 
 export { run_board_setup }
 export type { LaneStage, SetupRead }

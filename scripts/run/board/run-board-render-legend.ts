@@ -16,6 +16,7 @@ import type { ItemState } from './run-board-status'
 // waiting row leads with among them.
 
 const {
+	EARLIER_ICON,
 	FILED_KIND_ICONS,
 	FILED_RUN_MARK,
 	KIND_WORDS,
@@ -52,14 +53,19 @@ function states_of(states: ReadonlyArray<readonly [ItemState, keyof Words]>): Le
 
 // The row leads the legend can name, each with its word: in progress first, then the settled ones.
 const PROGRESS_STATES: LeadWords = states_of([['running', 'in_progress']])
-const SETTLED_STATES: LeadWords = states_of([
-	['parked', 'parked'],
-	['paused', 'paused'],
-	['stopped', 'stopped'],
-	['earlier', 'earlier'],
-	['done', 'done'],
-	['withdrawn', 'withdrawn'],
-])
+const SETTLED_STATES: LeadWords = [
+	...states_of([
+		['parked', 'parked'],
+		['paused', 'paused'],
+		['stopped', 'stopped'],
+	]),
+	[EARLIER_ICON, 'earlier'],
+	...states_of([
+		['unknown', 'unknown'],
+		['done', 'done'],
+		['withdrawn', 'withdrawn'],
+	]),
+]
 
 function state_legend(states: LeadWords, leads: ReadonlySet<string>): Array<string> {
 	return states.filter(([icon]) => leads.has(icon)).map(([icon, word]) => `${icon} ${WORDS[word]}`)

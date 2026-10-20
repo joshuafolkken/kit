@@ -27,8 +27,6 @@ interface UsageMark {
 	// keeps the larger of `ps`'s own time and its last reading, so nothing reaped is taken off it. Empty
 	// on the `ps` path, so nothing is deducted there.
 	folded: ReadonlySet<number>
-	// Each lane whose processes are all stopped, with when it was first seen so (`run-board-paused.ts`).
-	paused: ReadonlyMap<string, number>
 	cores: number
 	total_bytes: number
 }

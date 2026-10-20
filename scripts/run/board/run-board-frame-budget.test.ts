@@ -88,7 +88,6 @@ function mark(at_ms: number, cpu_ms: number): UsageMark {
 		names: new Map(pids.map((pid) => [pid, pid % 2 === 0 ? 'node' : 'claude'])),
 		parents: new Map(),
 		folded: new Set(),
-		paused: new Map(),
 		cores: LANES,
 		total_bytes: PROCESSES * SECOND_MS,
 	}

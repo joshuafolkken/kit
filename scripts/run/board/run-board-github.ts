@@ -1,11 +1,9 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import type { ClosedAnswer } from './run-board-closed'
-import { run_board_earlier } from './run-board-earlier'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_idle } from './run-board-idle'
-import { run_board_layout, type BoardPlan } from './run-board-layout'
-import { run_board_paused } from './run-board-paused'
+import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type ItemStatus } from './run-board-status'
@@ -75,25 +73,10 @@ function fold_plan(state: BoardState): BoardState {
 	}
 }
 
-// joshuafolkken/kit#3969: the planned issues whose open lane may be this run's though the stream never
-// saw it launched. An earlier run's lane is not, so its issue waits until this run launches it.
-function lanes_in_run(plan: BoardPlan, local: LocalRead): ReadonlySet<number> {
-	const earlier = new Set(local.earlier_lanes?.map(Number))
-
-	return new Set([...run_board_layout.numbers_of(plan)].filter((issue) => !earlier.has(issue)))
-}
-
-function statuses_for(
-	state: BoardState,
-	plan: BoardPlan,
-	local: LocalRead,
-): ReadonlyMap<number, ItemStatus> {
-	const in_run = lanes_in_run(plan, local)
+function statuses_for(state: BoardState, local: LocalRead): ReadonlyMap<number, ItemStatus> {
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
-	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
-	const own = run_board_earlier.own_statuses(statuses, local.earlier_lanes)
 
-	return run_board_paused.paused_over(own, state.paused)
+	return run_board_status.statuses_of(local.events, local.lane_states, stopped)
 }
 
 // The children the run touched that the open listing no longer holds and the board has not read yet.
@@ -103,7 +86,7 @@ function unread_closed(state: BoardState, local: LocalRead): Array<number> {
 
 	if (open === undefined || state.plan === undefined) return []
 
-	const touched = [...statuses_for(state, state.plan, local).keys()]
+	const touched = [...statuses_for(state, local).keys()]
 
 	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
 }

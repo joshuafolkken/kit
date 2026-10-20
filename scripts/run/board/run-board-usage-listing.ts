@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { ProcessRow, ProcessTable } from '#scripts/lane/lane-process-table'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import type { StatedProcess } from './run-board-paused'
 
 // The usage columns' reading of one process snapshot (`lane-process-table.ts`), the same rows the lane
 // count reads, so no second `ps` is spawned (joshuafolkken/kit#4246).
@@ -21,8 +20,8 @@ const BYTES_PER_KB = 1024
 const WORD_SEPARATOR = ' '
 const OPTION_PREFIX = '-'
 
-// One process's line of the snapshot: its own CPU time, resident set and state.
-interface ProcessListing extends StatedProcess {
+// One process's line of the snapshot: its own CPU time and resident set.
+interface ProcessListing {
 	parent: number
 	// The executable, which names the app the process belongs to.
 	command: string
@@ -71,12 +70,12 @@ function executable_of(command: string): string {
 }
 
 function listing_of(row: ProcessRow): [number, ProcessListing] | undefined {
-	const { pid, parent, time, rss_kb, stat, command } = row
+	const { pid, parent, time, rss_kb, command } = row
 	const cpu_ms = cpu_ms_of(time)
 
 	if (Number.isNaN(cpu_ms)) return undefined
 
-	const listing = { parent, command: executable_of(command), cpu_ms, stat }
+	const listing = { parent, command: executable_of(command), cpu_ms }
 
 	return [pid, { ...listing, rss_bytes: rss_kb * BYTES_PER_KB }]
 }

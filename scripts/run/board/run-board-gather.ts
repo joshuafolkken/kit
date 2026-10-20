@@ -52,8 +52,6 @@ interface GatherRead {
 	// Each lane's and each process group's usage, `undefined` where none could be read.
 	usages: BoardUsage | undefined
 	budget_waits: ReadonlyArray<BudgetWait>
-	// Each lane whose processes are all stopped (`run-board-paused.ts`), `undefined` before a reading.
-	paused: ReadonlyMap<string, number> | undefined
 	// When the reads last failed; `undefined` once a read has answered since.
 	read_failed_ms?: number | undefined
 }
@@ -77,7 +75,6 @@ const FRESH_GATHER: GatherState = {
 	gauges: undefined,
 	usages: undefined,
 	budget_waits: [],
-	paused: undefined,
 	machine: undefined,
 	sampled_ms: undefined,
 	usage: undefined,
@@ -165,9 +162,8 @@ async function gather(state: GatherState, ports: GatherPorts, pace: Pace): Promi
 // What a frame draws, without the marks the next reads compare against.
 function read_of(state: GatherState): GatherRead {
 	const { local, read_ms, idle_since, gauges, usages, budget_waits, read_failed_ms } = state
-	const paused = state.usage?.paused
 
-	return { local, read_ms, idle_since, gauges, usages, budget_waits, paused, read_failed_ms }
+	return { local, read_ms, idle_since, gauges, usages, budget_waits, read_failed_ms }
 }
 
 // A single frame's reads, taken afresh each time it is drawn.

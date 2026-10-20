@@ -3,7 +3,9 @@ import { lane_await } from '#scripts/lane/lane-await'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather } from './run-board-gather'
+import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import type { LocalRead } from './run-board-read'
+import { run_board_status } from './run-board-status'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#3893: a lane whose child had died was drawn running, and one probe alone drew a lane
@@ -17,7 +19,20 @@ const WINDOW = lane_await.RECONFIRM_MS
 const CHILD = 3421
 const LANE = String(CHILD)
 const LAUNCH = { pos: 1, at: '2026-10-08T09:00:00.000Z', kind: 'child-launch', text: '#3421 a' }
-const IDLE: LocalRead = { ...LOCAL, events: [LAUNCH], lanes: [LANE], idle_lanes: [LANE] }
+// This run's lane, as its record and its launch draw it.
+const OWN: BoardLanes = {
+	...run_board_lane_state.NO_LANES,
+	own: new Map([
+		[CHILD, { ...run_board_status.fold_events([LAUNCH]).get(CHILD), state: 'running' }],
+	]),
+}
+const IDLE: LocalRead = {
+	...LOCAL,
+	events: [LAUNCH],
+	lanes: [LANE],
+	lane_states: OWN,
+	idle_lanes: [LANE],
+}
 const WORKING: LocalRead = { ...IDLE, idle_lanes: [] }
 
 // The child's row in the newest frame.

@@ -1,66 +1,83 @@
 import { run_board_kind } from './run-board-kind'
 import type { BoardRow, RowRead } from './run-board-layout'
-import type { ItemState, ItemStatus } from './run-board-status'
+import type { ItemStatus } from './run-board-status'
 
-// An earlier run's lanes on `run:board` (joshuafolkken/kit#4200, #4260): each still holds a place under
-// the limit, so its row is drawn after the run's own lanes with what the stream says it is doing — its
-// phase, its time, its usage and its newest activity — and never counted as this run's.
+// The lanes on `run:board` that are not this run's (joshuafolkken/kit#4200, #4260, #4269): an earlier
+// run's lane that still holds a place under the limit, drawn after the run's own lanes with what its
+// record and the stream say it is doing — its phase, its time, its usage and its newest activity, as a
+// row of this run's is — and a lane with no lane state record, drawn unknown. Neither is ever counted
+// as this run's.
 
-// The earlier run's lanes still holding a place, and what the stream says each is doing.
+// The earlier run's lanes still holding a place, what each is doing, and the open lanes with no record.
 interface EarlierLanes {
 	lanes: ReadonlyArray<string>
 	statuses?: ReadonlyMap<number, ItemStatus> | undefined
+	unknown?: ReadonlyArray<string> | undefined
 }
 
 const NO_EARLIER: EarlierLanes = { lanes: [] }
 
-// A child working now: this run's running one, and an earlier run's lane holding a place — drawn
-// alike, the earlier one never counted as this run's.
-const LIVE_STATES: ReadonlySet<ItemState> = new Set(['running', 'earlier'])
+// What an unknown lane's row says after its title: the command that writes its record.
+const BACKFILL_TAIL = 'no lane state — pnpm josh lane:state --backfill'
 
+// A child working now — this run's, or an earlier run's lane holding a place.
 function is_live(row: BoardRow): boolean {
-	return LIVE_STATES.has(row.state)
+	return row.state === 'running'
 }
 
-// The row stays 🧳 while its lane runs, and is drawn paused as this run's own is.
-function earlier_row(number: number, status: ItemStatus | undefined, read: RowRead): BoardRow {
+function base_row(number: number, read: RowRead): Pick<BoardRow, 'number' | 'title' | 'kind'> {
 	return {
 		number,
 		title: read.titles.get(number),
 		kind: run_board_kind.kind_of(read.labels.get(number)),
-		state: status?.state === 'paused' ? 'paused' : 'earlier',
-		status,
-		waits: [],
 	}
 }
 
-// An earlier run's lane holding a place, unless this run has touched its issue since.
+// The row is drawn as its status says, marked as an earlier run's (`is_earlier`).
+function earlier_row(number: number, status: ItemStatus | undefined, read: RowRead): BoardRow {
+	return {
+		...base_row(number, read),
+		state: status?.state ?? 'running',
+		status,
+		waits: [],
+		is_earlier: true,
+	}
+}
+
+function unknown_row(number: number, read: RowRead): BoardRow {
+	return {
+		...base_row(number, read),
+		state: 'unknown',
+		status: undefined,
+		waits: [],
+		reason: { tail: BACKFILL_TAIL },
+	}
+}
+
+function apart_of(
+	lanes: ReadonlyArray<string>,
+	statuses: ReadonlyMap<number, ItemStatus>,
+): Array<number> {
+	return lanes.map(Number).filter((number) => !statuses.has(number))
+}
+
+// An earlier run's lane holding a place, then a lane with no record, unless this run has touched its
+// issue since.
 function rows_of(
 	earlier: EarlierLanes,
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: RowRead,
 ): Array<BoardRow> {
-	const numbers = earlier.lanes.map(Number).filter((number) => !statuses.has(number))
+	const lanes = apart_of(earlier.lanes, statuses)
+	const unknown = apart_of(earlier.unknown ?? [], statuses)
 
-	return numbers.map((number) => earlier_row(number, earlier.statuses?.get(number), read))
+	return [
+		...lanes.map((number) => earlier_row(number, earlier.statuses?.get(number), read)),
+		...unknown.map((number) => unknown_row(number, read)),
+	]
 }
 
-// This run's statuses without an earlier run's lane the span holds no launch of: a cut, a resume or an
-// ending its child wrote after this run began is the earlier run's, so its row stays 🧳 and is never
-// counted as this run's. A launch in the span makes the lane this run's. A child of this run whose
-// launch rolled off the stream holds a lane dispatched after the run began, so it is no earlier lane.
-function own_statuses(
-	statuses: ReadonlyMap<number, ItemStatus>,
-	earlier: ReadonlyArray<string> | undefined,
-): ReadonlyMap<number, ItemStatus> {
-	const lanes = new Set(earlier?.map(Number))
-
-	return new Map(
-		[...statuses].filter(([issue, status]) => !lanes.has(issue) || status.started_ms !== undefined),
-	)
-}
-
-const run_board_earlier = { NO_EARLIER, is_live, own_statuses, rows_of }
+const run_board_earlier = { BACKFILL_TAIL, NO_EARLIER, is_live, rows_of }
 
 export { run_board_earlier }
 export type { EarlierLanes }
