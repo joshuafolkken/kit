@@ -11,7 +11,9 @@ const show_mock = vi.hoisted(() => vi.fn<(spec: string) => Promise<string>>())
 const root_mock = vi.hoisted(() => vi.fn<() => Promise<string>>())
 const pr_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 
-vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved: base_mock } }))
+vi.mock('#scripts/git/change-base', () => ({
+	change_base: { resolved_through_merge: base_mock },
+}))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_since: changed_mock, read_held_at: held_mock },
 }))
