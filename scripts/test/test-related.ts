@@ -117,6 +117,24 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 	)
 }
 
+// **Whether a set of changed files can reach any test**, answered by the decision this command
+// narrows with, so the gate's reuse of a green unit step (`check-inputs.ts`) can never trust a change
+// this command would have run tests for. Unknown reaches: no map, or one recorded on a tree git can
+// no longer diff against. The change since the map joins the paths as it does for explicit
+// arguments, so a test added or edited after the map was recorded still reaches.
+async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promise<boolean> {
+	if (paths.length === 0) return false
+
+	const change = await explicit_change(paths, test_read_map.read_map(root))
+
+	if (change.map === undefined) return true
+
+	const recorded = await recorded_files(change)
+	const scope = related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
+
+	return scope.mode !== 'none'
+}
+
 // A change known to reach no test succeeds without starting vitest, and says why.
 async function run_scope(
 	scope: RelatedScope,
@@ -168,6 +186,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_related_tests(process.argv.slice(changed_file_scope.ARGV_START))
 }
 
-const test_related = { run_related_tests }
+const test_related = { reaches_tests, run_related_tests }
 
 export { test_related }
