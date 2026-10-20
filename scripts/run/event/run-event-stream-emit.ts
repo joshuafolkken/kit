@@ -30,14 +30,15 @@ async function stream_target(): Promise<string | undefined> {
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
+ * `at` is the caller's instant where another record must carry the same one.
  */
-async function emit(kind: string, text: string): Promise<void> {
+async function emit(kind: string, text: string, at: Date = new Date()): Promise<void> {
 	try {
 		const target = await stream_target()
 
 		if (target === undefined) return
 
-		run_event_stream.append(target, kind, text, now_iso())
+		run_event_stream.append(target, kind, text, at.toISOString())
 	} catch {
 		// Reporting is best-effort: a failed append is dropped rather than raised into the caller's work.
 	}

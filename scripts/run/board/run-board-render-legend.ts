@@ -1,5 +1,6 @@
 import { styleText } from 'node:util'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
@@ -16,7 +17,6 @@ import type { ItemState } from './run-board-status'
 // waiting row leads with among them.
 
 const {
-	EARLIER_ICON,
 	FILED_KIND_ICONS,
 	FILED_RUN_MARK,
 	KIND_WORDS,
@@ -59,7 +59,7 @@ const SETTLED_STATES: LeadWords = [
 		['paused', 'paused'],
 		['stopped', 'stopped'],
 	]),
-	[EARLIER_ICON, 'earlier'],
+	[run_board_earlier.EARLIER_ICON, 'earlier'],
 	...states_of([
 		['unknown', 'unknown'],
 		['done', 'done'],

@@ -143,9 +143,6 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	unknown: '❔',
 }
 
-// The mark an earlier run's running lane leads with in place of its phase (joshuafolkken/kit#4269).
-const EARLIER_ICON = '🧳'
-
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
 
@@ -395,7 +392,6 @@ function spinner_of(now_ms: number): string {
 }
 
 const run_board_labels = {
-	EARLIER_ICON,
 	FILED_KIND_ICONS,
 	FILED_RUN_MARK,
 	GAUGE_SHADES,

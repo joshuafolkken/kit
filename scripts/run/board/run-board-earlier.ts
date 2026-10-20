@@ -20,6 +20,10 @@ const NO_EARLIER: EarlierLanes = { lanes: [] }
 // What an unknown lane's row says after its title: the command that writes its record.
 const BACKFILL_TAIL = 'no lane state — pnpm josh lane:state --backfill'
 
+// The mark an earlier run's running lane leads with in place of its phase (joshuafolkken/kit#4269),
+// two columns wide as every row icon is (`run-board-labels.ts`, kept out of it by its size).
+const EARLIER_ICON = '🧳'
+
 // A child working now — this run's, or an earlier run's lane holding a place.
 function is_live(row: BoardRow): boolean {
 	return row.state === 'running'
@@ -77,7 +81,7 @@ function rows_of(
 	]
 }
 
-const run_board_earlier = { BACKFILL_TAIL, NO_EARLIER, is_live, rows_of }
+const run_board_earlier = { BACKFILL_TAIL, EARLIER_ICON, NO_EARLIER, is_live, rows_of }
 
 export { run_board_earlier }
 export type { EarlierLanes }

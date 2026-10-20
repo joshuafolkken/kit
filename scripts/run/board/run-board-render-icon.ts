@@ -1,3 +1,4 @@
+import { run_board_earlier } from './run-board-earlier'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
@@ -6,7 +7,8 @@ import { run_board_render_waits } from './run-board-render-waits'
 // The icon a `run:board` row leads with: its state's, its phase's while it runs, or 🚧 while its lane
 // is held.
 
-const { EARLIER_ICON, PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { EARLIER_ICON } = run_board_earlier
 
 // A row that says what it waits on leads with that wait's icon in place of its state's
 // (joshuafolkken/kit#4288).

@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_state } from './run-board-lane-state'
@@ -17,7 +18,8 @@ import type { UsageMark } from './run-board-usage'
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
 const { NO_LANES } = run_board_lane_state
-const { EARLIER_ICON, PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { PHASE_ICONS, STATE_ICONS } = run_board_labels
+const { EARLIER_ICON } = run_board_earlier
 const EARLIER = 4173
 const OWN = 4195
 const MINUTE_MS = 60_000

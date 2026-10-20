@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
@@ -13,7 +14,8 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const { EARLIER_ICON, WORDS } = run_board_labels
+const { WORDS } = run_board_labels
+const { EARLIER_ICON } = run_board_earlier
 const REPO = 'joshuafolkken/kit'
 const RUNNING = 4195
 const QUEUED = 4197

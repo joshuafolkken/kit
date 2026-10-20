@@ -31,8 +31,11 @@ function time_of(at: string | undefined): number | undefined {
 	return at === undefined ? undefined : Date.parse(at)
 }
 
+// A record `lane:state --backfill` wrote names no run, so its launch is placed against this run's start.
 function is_own(record: LaneStateRecord, started_ms: number): boolean {
-	return time_of(record.run?.started_at) === started_ms
+	if (record.run === undefined) return (time_of(record.launched_at) ?? NaN) >= started_ms
+
+	return time_of(record.run.started_at) === started_ms
 }
 
 // What the record says of the lane: running, or paused since the record last changed.

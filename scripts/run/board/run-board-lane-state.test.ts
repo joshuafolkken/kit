@@ -59,6 +59,16 @@ describe('run_board_lane_state.lanes_of — whose lane it is', () => {
 		expect(lanes.earlier.size).toBe(0)
 	})
 
+	it.each([
+		['its own', LAUNCHED, true],
+		['an earlier run’s', EARLIER_RUN, false],
+	])('sorts a backfilled record, which names no run, by its launch as %s', (_, at, is_own) => {
+		const lanes = lanes_of([{ ...record_of('running'), run: undefined, launched_at: at }])
+
+		expect(lanes.own.has(NUMBER)).toBe(is_own)
+		expect(lanes.earlier.has(NUMBER)).toBe(!is_own)
+	})
+
 	it('draws a lane with no record unknown, not guessed at', () => {
 		expect(lanes_of([])).toStrictEqual({ own: new Map(), earlier: new Map(), unknown: [ISSUE] })
 	})
@@ -100,11 +110,22 @@ describe('run_board_lane_state.lanes_of — what the lane is doing', () => {
 
 		expect(lanes.earlier.get(NUMBER)?.track?.at(-1)).toBe('implement')
 	})
+})
 
+describe('run_board_lane_state.lanes_of — an ending on the stream', () => {
 	it('lets an ending the stream holds since the launch stand', () => {
 		const events = [event_of(1, LAUNCHED, KIND.CHILD_LAUNCH), event_of(2, LATER, KIND.MERGE)]
 
 		expect(lanes_of([record_of('running')], events).own.get(NUMBER)?.state).toBe('merged')
+	})
+
+	it('lets no ending from before the record’s newest launch stand', () => {
+		const events = [
+			event_of(1, EARLIER_RUN, KIND.CHILD_LAUNCH),
+			event_of(2, EARLIER_RUN, KIND.MERGE),
+		]
+
+		expect(lanes_of([record_of('running')], events).own.get(NUMBER)?.state).toBe('running')
 	})
 })
 
