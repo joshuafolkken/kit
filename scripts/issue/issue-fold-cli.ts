@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
 import { path_decision } from '#scripts/josh/path-decision'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -15,7 +13,6 @@ import { issue_fold, type FoldVerdict } from './issue-fold'
 // `--not-separable` when the findings are really one deliverable. The verdict logic is in
 // `issue-fold.ts`; everything here is the invocation.
 
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh issue:fold "<title>" "<title>" … [--not-separable] [--json]'
 const JSON_KEY = 'fold'
 const FAILURE_EXIT_CODE = 1
@@ -91,12 +88,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return 0
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_fold_cli = { REASONS, read_arguments, size_verdict, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_fold_cli }

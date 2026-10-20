@@ -4,6 +4,7 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
+import { core_budget } from '#scripts/gate/core-budget'
 import { free_cores } from '#scripts/gate/free-cores'
 import { project_checks } from '#scripts/gate/project-checks'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
@@ -180,6 +181,10 @@ function isolated_unit_environment(
 // both count "alone" and both run uncapped. Inside the marker the number is identical — this run's own
 // record is now on disk and `is_nested_run` therefore contributes nothing — and the window is gone.
 //
+// **The share is bounded by the claim the run was admitted on** (`unit_worker_share.cap_to_claim`), so
+// a share read after admission never opens more workers than the ledger holds for it
+// (joshuafolkken/kit#4235).
+//
 // **The machine is read only when no count was typed.** The reading waits out a sample window, and a
 // caller's `--maxWorkers` — the gate's cap among them, already bounded by the same reading — wins
 // whatever it says.
@@ -188,8 +193,13 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 
 	const available_cores = availableParallelism()
 	const free = await free_cores.read({ available_cores })
+	const share = unit_worker_share.current_share(
+		available_cores,
+		unit_worker_share.live_run_count(),
+		free,
+	)
 
-	return unit_worker_share.current_share(available_cores, unit_worker_share.live_run_count(), free)
+	return unit_worker_share.cap_to_claim(share, core_budget.held_unit_claim())
 }
 
 async function execute_vitest(
@@ -296,6 +306,7 @@ const test_unit_guard = {
 	isolated_unit_environment,
 	run_guarded_unit,
 	run_guarded_vitest,
+	vitest_share,
 }
 
 export type { GuardAction }

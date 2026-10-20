@@ -259,6 +259,33 @@ function statuses_of(
 	return statuses
 }
 
+// The events naming `issue` from its newest launch on, none where the stream holds no launch of it.
+function since_launch(events: ReadonlyArray<RunEvent>, issue: string): Array<RunEvent> {
+	const named = events.filter((event) => run_event_scope.issue_named(event) === issue)
+	const launch = named.findLastIndex((event) => LAUNCH_KINDS.has(event.kind))
+
+	return launch === -1 ? [] : named.slice(launch)
+}
+
+const BARE_RUNNING: ItemStatus = { state: 'running' }
+
+function still_running(status: ItemStatus | undefined): ItemStatus {
+	return status?.state === 'running' ? status : BARE_RUNNING
+}
+
+// What each earlier run's lane is doing (#4260): the whole stream, not this run's span, folded from
+// the lane's newest launch, so its time counts from that launch. A lane the stream says nothing running
+// of still holds its place, so it reads as running with no track, as this run's own lane does.
+function earlier_of(
+	events: ReadonlyArray<RunEvent>,
+	earlier: ReadonlyArray<string>,
+): ReadonlyMap<number, ItemStatus> {
+	const statuses = fold_events(earlier.flatMap((issue) => since_launch(events, issue)))
+	const numbers = earlier.map(Number)
+
+	return new Map(numbers.map((issue) => [issue, still_running(statuses.get(issue))]))
+}
+
 // The open listing the plan was read with, and when it was read.
 interface OpenRead {
 	// `undefined` when the listing was cut short, so absence from it proves nothing.
@@ -406,7 +433,7 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 	}
 }
 
-const run_board_status = { activity_of, settle_closed, statuses_of }
+const run_board_status = { activity_of, earlier_of, settle_closed, statuses_of }
 
 export { run_board_status }
 export type { ItemState, ItemStatus, LatestEvent, OpenRead, RunActivity }

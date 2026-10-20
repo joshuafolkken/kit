@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createServer, type Server } from 'node:net'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // Whether the process a record names is still the one that wrote it.
 //
@@ -359,6 +359,9 @@ function is_own_process(pid: number | undefined, recorded_start: string | undefi
 }
 
 const process_identity = {
+	PROBE_ENVIRONMENT,
+	START_PROBES,
+	START_TIME_FORMAT,
 	close_beacon,
 	is_live_beacon,
 	is_live_pid,

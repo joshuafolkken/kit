@@ -31,8 +31,8 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    dependency scope in one report; a `new` entry runs it once filed. The comment stops, the
    `human_review` stop (`needs-human-review.md`) and the dependency decision are read off it.
 5. **Print the next action — `pnpm josh run:step <N>`** — and follow it into the command's step list.
-   Before implementing, `pnpm josh ms`, then `pnpm josh latest:scope` — update
-   dependencies only on `required` (`latest-gate.md`), never on every run. `run:step` names every later
+   Before implementing, `pnpm josh ms`, then on `run:prep`'s `latest: required`
+   `pnpm josh latest:if-required` (`latest-gate.md`) — never on every run. `run:step` names every later
    action in order, each read at the point-of-use document `SKILL.md` lists, never re-narrated here
    (`residency.md` → "順序の問い").
 
@@ -49,9 +49,9 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
   separately-mergeable deliverables over one gate: file the children (each `route:split`) and the epic,
   then **STOP** with "Please run `backlogrun #<E> --only` to execute this epic." Typing the command
   approved **one** Issue, never a batch.
-- **A prerequisite** — file it (`route:tier-a`), stash, record the dependency, and **STOP** with
-  "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single source of
-  the filing, the `-u` stash and the epic:bundle branch.
+- **A prerequisite** — file it (`route:tier-a`), `pnpm josh run:pause <M> --for <N>`, and **STOP**
+  with "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single
+  source of the filing, the pause and the epic:bundle branch.
 - **An observation** — `observation-filing.md` (ask first if interactive).
 
 **The per-run filing cap is `prerequisite.md`'s** (the `filing-cap` row); on its refusal, stop and report.

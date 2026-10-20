@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { json_format } from '#scripts/config-merge/json-format'
 import { string_array_schema, vscode_settings_schema } from '#scripts/lib/schemas'
-import { basic_path_migration } from './basic-path-migration'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import type { ProjectShape } from './project-profile'
@@ -20,9 +19,6 @@ interface FileAction {
 	dest: string
 	create: () => string
 	merge?: (existing: string) => string
-	// A merge that only migrates a kit-written line, for a file kit otherwise leaves to the project:
-	// when it changes nothing, the file is reported with the sample to add, as one with no merge is.
-	should_show_sample_when_unchanged?: boolean
 }
 
 function read_package_file(relative_path: string): string {
@@ -215,8 +211,6 @@ function build_basic_actions(shape: ProjectShape): ReadonlyArray<FileAction> {
 			dest: BASIC_PRETTIER_CONFIG,
 			create: () =>
 				"import { config } from '@joshuafolkken/kit/prettier/basic'\n\nexport default config\n",
-			merge: (existing) => basic_path_migration.migrate_basic_paths(existing),
-			should_show_sample_when_unchanged: true,
 		})
 	}
 

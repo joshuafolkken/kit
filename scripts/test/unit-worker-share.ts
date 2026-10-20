@@ -169,6 +169,26 @@ function cap_to_free(
 	return Math.max(MIN_WORKERS, Math.floor(free_cores))
 }
 
+// The core-budget claim a unit run holds: the weight it reserved, and the narrower one it was admitted
+// at past the wait cap.
+interface UnitClaim {
+	weight: number
+	granted?: number | undefined
+}
+
+// **The share never exceeds the claim the run was admitted on** (joshuafolkken/kit#4235). The share is
+// read after admission, when fewer runs may be in flight than when the weight was sized, and a share
+// wider than the claim puts workers on the machine the ledger does not hold. The claim bounds a solo
+// share too: vitest's own choice is one worker per core but one, wider than any weight the ledger
+// reserves for a unit run, so leaving it in place would open workers no claim holds.
+function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): number | undefined {
+	if (claim === undefined) return share
+
+	const bound = claim.granted ?? claim.weight
+
+	return Math.min(share ?? bound, bound)
+}
+
 // The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
 // one stays a pure function of two numbers and every test of it can pass them.
 //
@@ -250,11 +270,13 @@ const unit_worker_share = {
 	NESTED_VALUE,
 	RUN_PREFIX,
 	SOLO_RUNS,
+	cap_to_claim,
 	cap_to_free,
 	current_share,
 	has_worker_flag,
 	is_nested_run,
 	live_run_count,
+	mark_run_started,
 	marker_path,
 	read_marker,
 	resolve_unit_workers,
@@ -262,4 +284,5 @@ const unit_worker_share = {
 	worker_arguments,
 }
 
+export type { UnitClaim }
 export { unit_worker_share }

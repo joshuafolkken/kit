@@ -1,3 +1,4 @@
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit, type PlanLine, type PlanSection } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -91,7 +92,7 @@ function number_text(
 
 	if (cells === undefined) return link(number)
 
-	const figure = row.state === 'running' ? cells.usages.get(row.number) : undefined
+	const figure = run_board_earlier.is_live(row) ? cells.usages.get(row.number) : undefined
 	const drawn = column_cells(figure, cells.scale, cells.gauge)
 
 	return `${link(number)}${' '.repeat(cells.number_width - number.length)} ${drawn}`

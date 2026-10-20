@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_app_name } from './run-board-app-name'
 import {
 	run_board_process_groups,
 	type ProcessGroups,
@@ -72,9 +73,29 @@ function groups_for(roots: ProcessRoots, open: ReadonlyArray<number> = [OPEN_LAN
 describe('run_board_process_groups.app_of', () => {
 	it('names an app by its outermost bundle, else by its command', () => {
 		expect(app_of(CHROME_HELPER)).toBe(CHROME_APP)
-		expect(app_of('/usr/bin/git')).toBe('git')
-		expect(app_of('/Library/Application Support/foo/bar')).toBe('bar')
 		expect(app_of(ESLINT_D)).toBe('eslint_d')
+	})
+})
+
+// joshuafolkken/kit#4263: a redraw over the same process table names no app again.
+describe('run_board_process_groups.groups_of over the same table twice', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('names each command once, and none again on the next redraw', () => {
+		// An empty table forgets every command an earlier test named.
+		groups_of({ mark: mark_of([]), figures: new Map(), open_lanes: new Set(), roots: ROOTS })
+		const naming = vi.spyOn(run_board_app_name, 'app_of')
+
+		groups_for(ROOTS)
+		const first = naming.mock.calls.length
+
+		groups_for(ROOTS)
+
+		expect(first).toBeGreaterThan(0)
+		expect(first).toBeLessThanOrEqual(new Set(mark_of(ROWS).names.values()).size)
+		expect(naming).toHaveBeenCalledTimes(first)
 	})
 })
 

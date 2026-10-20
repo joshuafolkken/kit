@@ -1,6 +1,7 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import type { ClosedAnswer } from './run-board-closed'
+import { run_board_earlier } from './run-board-earlier'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_idle } from './run-board-idle'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
@@ -90,8 +91,9 @@ function statuses_for(
 	const in_run = lanes_in_run(plan, local)
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
 	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
+	const own = run_board_earlier.own_statuses(statuses, local.earlier_lanes)
 
-	return run_board_paused.paused_over(statuses, state.usage?.paused)
+	return run_board_paused.paused_over(own, state.usage?.paused)
 }
 
 // The children the run touched that the open listing no longer holds and the board has not read yet.

@@ -54,6 +54,7 @@ the behavior. joshuafolkken/kit#3277 moved these commands out of the automation 
 | Command                              | Issues                                                               |
 | ------------------------------------ | -------------------------------------------------------------------- |
 | `josh run:hold` / `josh run:release` | #2760, #2796, #3023                                                  |
+| `josh run:pause`                     | #4160                                                                |
 | `josh run:carry`                     | #2136, #2342, #2492, #2760                                           |
 | `josh run:cut`                       | #2346, #2354, #2382, #2484, #2489, #2760                             |
 | `josh run:ending`                    | #2240                                                                |
@@ -75,6 +76,12 @@ the behavior. joshuafolkken/kit#3277 moved these commands out of the automation 
 | `josh doc:read`                      | #1797, #2188                                                         |
 | `josh read:files`                    | #2202                                                                |
 | `josh edit:files`                    | #2162, #2165, #2202, #2366, #2493                                    |
+
+## `josh run:pause` in detail
+
+Four steps, in order: stash the work as `run:pause: #<issue> waits on #<prerequisite>` (`stash:push`); comment on `<issue>` with the `stash:pop` that recovers it (`issue:comment`); record `<issue>` blocked by `<prerequisite>` — through `epic --add <E> <prerequisite> --before <issue>` when an open epic tracks `<issue>`, directly otherwise; then `run:release <issue>`. Each step checks whether it is already done before it writes, so a rerun after a failure continues from the step that failed.
+
+**Output / exit codes:** one `<step>: <detail>` line per step done (`already` for a step an earlier run did). A failure prints the step, the steps done and the rerun to stderr and exits 1.
 
 ## `josh run:hold` / `josh run:release` in detail
 
@@ -135,11 +142,18 @@ The reason after `—` is the children running (`2 running`), else what the plan
 
 A row with a standing blocker says nothing beyond its `🔗` unless it is `untriaged`, and the reasons are read in the order above, so a row says the first that holds. A row whose lane is being opened says that lane's own stage instead, with how long the lane has stood there as a span — `opening lane 5″`, `installing 42″`, `dispatching 1′03″` — read from the newest `setup` event naming the issue, so lanes opened side by side each show their own stage; it is gone once the child launches, once the driver writes `no child launched` for a launch that left none — a refusal it waits out is followed by no hand-off — or once the run hands off or back, and a stopped run draws none. Where the pane is too narrow for a row with a reason, the title is cut further (never under 8 columns) so the reason stays on the row's one line. `run:board --chat` draws the same rows.
 
-`next free lane (n/limit)` counts every lane holding a place under the limit (`backlog-occupied.ts`), an earlier run's lane whose child still lives among them. The lanes section draws each such lane after the run's own as a `🧳 earlier run` row, so its rows holding a place number n; the row is not the run's child, so it stays out of ✅ n/m, the 🏁 estimate and 🔄, and an earlier run's lane with no child working in it draws none (joshuafolkken/kit#4200).
+`next free lane (n/limit)` counts every lane holding a place under the limit (`backlog-occupied.ts`), an earlier run's lane whose child still lives among them. The lanes section draws each such lane after the run's own as a `🧳 earlier run` row, so its rows holding a place number n; the row is not the run's child, so it stays out of ✅ n/m, the 🏁 estimate and 🔄, and an earlier run's lane with no child working in it draws none (joshuafolkken/kit#4200). The row draws what its lane is doing as a running row does — phase, elapsed time, CPU/MEM/CMPRS and newest activity — folded from the whole stream from the lane's newest launch, which precedes the run's span; a paused lane draws 🧊. A cut, resume or ending its child writes after the run began is not the run's: an earlier lane's status whose launch the span does not hold is dropped from the run's statuses, so the row stays 🧳 and uncounted. How a cut or resume folds is left alone, since a resumed child of the run whose launch has rolled off the stream must still read as running (joshuafolkken/kit#3552, #4260).
 
 Right above the legend, the terminal board (the live redraw and `--once`) names the people who helped review kit, on one line in the rows' own color, wrapped between names where the pane is too narrow, led by one 🙏 on its first line. When the pane is too short, the parts below the header give way in this order — the footer, the legend, the oldest notes until three are left, the finished rows, the rest of the notes, these names (wrapped lines and all), the rows not yet started, the parked rows and, last, the running rows — each stage stopping once the frame fits. A name with a `url` is an OSC 8 link to it. The roster is a Google spreadsheet published as CSV, whose URL is a constant in `scripts/run/board/run-board-thanks-read.ts`, so it changes apart from any kit release. It is read beside the board, never holding up a redraw, and its answer is kept in the project's record and reused for five minutes. A CSV whose header is not exactly `name,url` is not used; a row with an empty `name` or a `url` that is not `https://` is skipped, and a name loses its control characters and is cut to 40 columns. A read that fails or times out keeps the last answer and, with none, draws no line — nothing about the failure is shown. `--chat` and `--every` never read or draw it, and a frame with no run draws none.
 
 Output / exit codes: the stream, the lanes and the end of each session's log re-read at most every five seconds; the plan from GitHub at most every two minutes, keeping the previous one on a failed read. A touched child the open listing no longer holds is read from GitHub once — its title, when it closed, whether a merged pull request closed it and whether it was closed as not planned — and drawn `✅` (merged), `🚫` (not planned) or `🏁` with its time; until that read answers it is drawn `🏁` with no time. A parked child is settled by that read alone: closed, it leaves `💤` for `✅` or `🚫` (or `🏁`); still open, it stays `💤` whatever its labels say. A `💤` row ends with its newest park's reason, and a `🚫` row with the reason given to `lane:withdraw`, if one was given. Both go where a `⏳` row puts why it waits. A park whose reason its row shows is not repeated among the newest parks, unless it is a `needs-decision` park. After `run:carry --end` the board keeps the ended run — `■`, its duration as `⏰` and when it ended in the header, only that run's events — until the next run begins. An ended run asks GitHub about its unread closed children once after it ended, then reads nothing until the next run. No run here, running or ended, prints `no run` and reads no plan. Exits 0; an unknown argument, or an `--every` that is not a positive number of minutes, exits 1; Ctrl+C exits 130 and SIGTERM 143.
+
+Each read recomputes only what changed (#4263); a `git` or `ps` call inside a read freezes the spinner while it runs.
+
+- An app name is worked out once per command line.
+- The ledger and each lane's git config are parsed again only when the file's stamp (inode, mtime, ctime, size) changes.
+- The main work tree is resolved once per working directory, and again after a failed resolve.
+- Each process's start time comes from the board's one `ps` snapshot, never a `ps` call per process.
 
 ## `josh run:stranded` in detail
 

@@ -29,7 +29,7 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/issue-comments.md`,
 	},
 	{
-		marker: 'The work in progress almost always includes a',
+		marker: 'every entry sets `<M>` aside with',
 		canonical: `${SKILL_DIR}/prerequisite.md`,
 	},
 	{

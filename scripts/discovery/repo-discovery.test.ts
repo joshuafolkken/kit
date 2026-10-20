@@ -114,6 +114,15 @@ describe('repo_discovery.read_origin_url', () => {
 	it('returns nothing for a work tree that declares no origin', () => {
 		expect(repo_discovery.read_origin_url(make_repository('local-only'))).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4263: the config is remembered between reads, and read again once it changes.
+	it('reads a changed config again rather than the remembered one', () => {
+		const repository = make_repository(KIT, KIT_REMOTE)
+
+		expect(repo_discovery.read_origin_url(repository)).toBe(KIT_REMOTE)
+		make_repository(KIT, SELF_HOSTED_REMOTE)
+		expect(repo_discovery.read_origin_url(repository)).toBe(SELF_HOSTED_REMOTE)
+	})
 })
 
 // Where to look for a repository's siblings. A linked work tree is parked wherever it was created —

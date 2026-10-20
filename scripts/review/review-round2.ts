@@ -63,7 +63,7 @@ const DOCUMENTATION_PREFIX = 'docs/'
 const MARKDOWN_EXTENSION = '.md'
 const PROMPTS_PREFIX = 'prompts/'
 const BASE_MOVED_REASON =
-	'the change base moved since round 1 was recorded, so the two file maps do not cover the same set of paths and their difference is not the fix delta — the round runs rather than reading that difference as one'
+	"the change base moved since round 1 was recorded and round 1's tree could not be carried onto the new one — no recorded round-1 blobs, or the carry conflicts — so the fix delta cannot be named and the round runs"
 
 interface RoundTwoInput {
 	// **The commit the tree above is a diff against**. This decision reads the
@@ -82,6 +82,9 @@ interface RoundTwoInput {
 	// The paths whose code round 1's fixes left as it was (`review_code_tree.comment_only`). Absent is
 	// none, which is what a run without a code record pays.
 	comment_only?: ReadonlyArray<string>
+	// Asked only when the base moved: round 1's tree carried onto the current base, diffed against the
+	// tree now (`review-round-one-blobs.ts`). `undefined`, or no reader at all, is the moved-base refusal.
+	carried_delta?: (snapshot: FileMapStamp) => ReadonlyArray<string> | undefined
 }
 
 interface RoundTwoAnswer {
@@ -155,15 +158,26 @@ function required(code: RoundTwoCode, reason: string): RoundTwoDecision {
 	return { verdict: REQUIRED_VERDICT, code, reason, delta: [] }
 }
 
+// On a moved base the digest comparison is a set difference, not the fix delta, so the carried
+// reading replaces it and every later rule is the same one an unmoved base gets.
+function fix_delta(
+	input: RoundTwoInput,
+	snapshot: FileMapStamp,
+): ReadonlyArray<string> | undefined {
+	if (file_map_stamp.describes_base(snapshot, input.base)) {
+		return file_map_stamp.changed_since(snapshot, input.tree)
+	}
+
+	return input.carried_delta?.(snapshot)
+}
+
 function decide(input: RoundTwoInput): RoundTwoDecision {
 	if (!input.is_round_one_closed) return required(CODE.OPEN_FINDING, OPEN_FINDING_REASON)
 	if (input.snapshot === undefined) return required(CODE.NO_SNAPSHOT, NO_SNAPSHOT_REASON)
 
-	if (!file_map_stamp.describes_base(input.snapshot, input.base)) {
-		return required(CODE.BASE_MOVED, BASE_MOVED_REASON)
-	}
+	const delta = fix_delta(input, input.snapshot)
 
-	const delta = file_map_stamp.changed_since(input.snapshot, input.tree)
+	if (delta === undefined) return required(CODE.BASE_MOVED, BASE_MOVED_REASON)
 
 	return { ...verdict_for_delta(delta, input.snapshot.taken_at, input.comment_only), delta }
 }

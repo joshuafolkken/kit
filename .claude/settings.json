@@ -54,7 +54,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
+						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
 						"timeout": 180
 					}
 				]
@@ -66,7 +66,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
+						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
 						"timeout": 10
 					}
 				]
@@ -78,7 +78,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh pretool-guard",
+						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh pretool-guard",
 						"timeout": 20
 					}
 				]
@@ -90,7 +90,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh format-edited",
+						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh format-edited",
 						"timeout": 90
 					}
 				]
@@ -102,7 +102,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if project_root=\"$(unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null)\"; then unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; else project_root=\"$(git rev-parse --show-toplevel)\"; fi && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
+						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
 						"timeout": 20
 					}
 				]

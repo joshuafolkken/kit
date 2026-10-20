@@ -48,8 +48,8 @@ that covers the same work stops the run rather than filing a second Issue (`issu
 `<N>`. (3) `pnpm josh run:hold --adopt <N>` — re-keys the bare hold to `<N>` and applies `in-progress`;
 every later stop releases with `run:release <N>`. (4) Record the agreed plan
 in the session language: `pnpm josh issue:plan <N> --body-file <path>`. (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
-`pnpm josh run:prep <N>`; on `latest: required` run `josh latest` and load the `dependency-update` skill; on
-`skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
+`pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
+skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round
 runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether a second round is due**, once
 round 1's fixes are in and before the commit. (10) Where the tree was edited after the first gate

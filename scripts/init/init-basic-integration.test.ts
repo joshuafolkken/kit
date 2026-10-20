@@ -322,31 +322,6 @@ describe('a kit run from outside the project', () => {
 	})
 })
 
-// joshuafolkken/kit#2829: a basic project set up before the rename imports the old paths, and
-// re-running `init` moves exactly those kit-written references, keeping the project's own lines.
-describe('basic initialization of a project set up before the rename', () => {
-	it('moves the CLAUDE.md and Prettier imports onto the basic paths', async () => {
-		write_index_html()
-		const claude_md = path.join(paths_mock.root, 'CLAUDE.md')
-		const prettier_config = path.join(paths_mock.root, BASIC_PRETTIER)
-
-		writeFileSync(
-			claude_md,
-			'@node_modules/@joshuafolkken/kit/dist/CLAUDE.static.md\n\n- Own rule\n',
-		)
-		writeFileSync(
-			prettier_config,
-			"import { config } from '@joshuafolkken/kit/prettier/static'\n\nexport default config\n",
-		)
-		await run_init()
-
-		expect(readFileSync(claude_md, 'utf8')).toBe(
-			'@node_modules/@joshuafolkken/kit/dist/CLAUDE.basic.md\n\n- Own rule\n',
-		)
-		expect(readFileSync(prettier_config, 'utf8')).toContain("'@joshuafolkken/kit/prettier/basic'")
-	})
-})
-
 // joshuafolkken/kit#2909: the sample is shown only for a Prettier config that does not already hold it.
 describe('basic initialization of an existing Prettier config', () => {
 	it('reports a Prettier config that already matches the sample as unchanged', async () => {

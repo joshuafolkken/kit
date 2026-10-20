@@ -100,17 +100,21 @@ async function record(
 }
 
 // The paths whose code round 1's fixes left as it was — whose difference, if any, is in comments.
-// Nothing qualifies against a record taken on another base, for the reason the round-1 snapshot is
-// refused on one.
+// Against a record taken on another base only `unmoved` qualifies — the paths the move left alone
+// (`review_round_one_blobs.unmoved`), where the carried file is round 1's own and equal code digests
+// still mean a comment-only fix (joshuafolkken/kit#4165).
 function comment_only(
 	snapshot: FileMapStamp | undefined,
 	tree: Record<string, string>,
 	base: string | undefined,
+	unmoved: ReadonlyArray<string> = [],
 ): ReadonlyArray<string> {
-	if (snapshot === undefined || base === undefined || snapshot.base !== base) return []
+	if (snapshot === undefined || base === undefined) return []
+	const is_same_base = snapshot.base === base
 
 	return Object.keys(snapshot.files).filter(
-		(relative) => snapshot.files[relative] === tree[relative],
+		(relative) =>
+			snapshot.files[relative] === tree[relative] && (is_same_base || unmoved.includes(relative)),
 	)
 }
 

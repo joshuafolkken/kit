@@ -1,4 +1,5 @@
 import { process_identity } from '#scripts/josh/process-identity'
+import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import type { ProcessRoots } from './run-board-process-groups'
@@ -37,6 +38,17 @@ function roots_of(
 	return { supervisor: supervisor_of(repository, is_same), parent: parent_of(read, is_same) }
 }
 
-const run_board_roots = { roots_of }
+// `is_same_process` with each start time answered from the redraw's own `ps` snapshot, so the board's
+// read runs no `ps` of its own per pid (joshuafolkken/kit#4263). Without a snapshot no start is known,
+// and a recorded start reads as "cannot tell".
+async function same_in(table: TableRead | undefined): Promise<SameProcess> {
+	const rows = table === undefined ? undefined : await table()
+	const read = lane_process_table.start_reader(rows ?? [])
+
+	return (pid, start) => process_identity.is_same_process(pid, start, read)
+}
+
+const run_board_roots = { roots_of, same_in }
 
 export { run_board_roots }
+export type { SameProcess }

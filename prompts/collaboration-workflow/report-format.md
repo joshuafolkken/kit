@@ -13,7 +13,7 @@
 - 出力はコードフェンスで囲まない（空白での桁揃えと単独行の `---` も使わない）
 - ラベルに注釈を付けない。`■ 概要（平易な説明）` は誤り。注意書きはラベルの下の説明文に置く
 - 成果物の散文（Issue 本文、Issue／PR コメント、Telegram 本文）のラベルも、このコマンドが印字するラベルで書く。英語のまま残るのは「出力の言語（`JOSH_SESSION_LANG`）」が挙げた 3 つだけ
-- 区切り（hand-off）のラベル: `■ Hand-off` → `■ 区切り`、`Done` / `Remaining` / `Why it stopped` / `Next command` → `終わったこと` / `残っていること` / `止めた理由` / `次に打つコマンド`
+- 区切り（hand-off）のラベルも同じ表にあり、`pnpm josh run:report --handoff` が印字する
 
 ### 作業前サマリはいつ・どう出すか
 
@@ -58,7 +58,7 @@
 
 ### PR 本文の受け入れ条件の対応表
 
-`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）:
+`## 受け入れ条件の対応` 節の行の形（`pnpm josh pr` が識別子つきの `未記入` 行を付け、`pnpm josh followup` が照合する — `scripts/review/acceptance-map.ts`）。`pnpm josh ship --body-file` の経路では、同じ識別子つきの `未記入` 行を `pnpm josh run:prep` / `pnpm josh run:step` の ship 事前要求が出す（`scripts/run/ship/run-ship-preflight.ts`）:
 
 ```md
 - `ac-1a2b3c4d` <条件> — 満たした: <テスト名・`file:line`・実行出力のいずれか>
@@ -69,7 +69,7 @@
 
 ### 区切りの報告（完了報告と区別する・必須）
 
-`backlogrun` の区切り（hand-off）は完了報告ではない — **`原因` / `対応` / `結果` を使わない**。書式は [`.claude/skills/workflow-commands/backlogrun-handoff-report.md`](../../.claude/skills/workflow-commands/backlogrun-handoff-report.md)。
+`backlogrun` の区切り（hand-off）は完了報告ではない — **`原因` / `対応` / `結果` を使わない**。報告は `pnpm josh run:report --handoff` が印字し、手で書かない（[`.claude/skills/workflow-commands/backlogrun-handoff-report.md`](../../.claude/skills/workflow-commands/backlogrun-handoff-report.md)）。
 
 ### 概要 3 行の書き方（ここが本体）
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueReadReason } from '#scripts/gh/git-gh-issue-read'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -29,7 +27,6 @@ import { issue_state, type IssueState } from './issue-state'
 // are told apart here and neither is a state.
 
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh issue:state <issue-number> [<issue-number> ...] [--repo <owner/repo>]'
 // A blank line between the blocks of a multi-number report, so a person sees where one issue ends
 // while a reader matching `issue: ` still finds each block by its first line.
@@ -172,21 +169,14 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return issue_report_failures.report_failures(reports, FAILURE_TERMS)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_state_cli = {
 	READ_CONCURRENCY,
 	STATE_FIELDS,
 	USAGE,
-	main,
 	parse_request,
 	read_issue,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { StateRead }
 export { issue_state_cli }

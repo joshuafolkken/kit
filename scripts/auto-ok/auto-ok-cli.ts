@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
@@ -21,7 +19,6 @@ import { session_cite } from '#scripts/issue/session-cite'
 // nothing checks it. The contract is `epic:next`'s: one token on standard output, every explanation
 // on standard error, so `answer=$(pnpm josh auto-ok:next)` reads it.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const EXCLUDE_FLAG = '--exclude'
@@ -463,14 +460,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await answer(read, options.exclude)
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
-// macOS a write to a pipe is asynchronous — `process.exit()` can tear the process down before it has
-// drained, and this command's whole contract is `answer=$(pnpm josh auto-ok:next)`. The same shape
-// is already in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const auto_ok_cli = {
 	USAGE,
 	NONE_TOKEN,
@@ -491,8 +480,6 @@ const auto_ok_cli = {
 	truncation_note,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { auto_ok_cli }
 export type { NextOptions, OptedInRead, PickupContext, TrackingRead }

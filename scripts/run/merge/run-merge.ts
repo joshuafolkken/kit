@@ -1,4 +1,3 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	EPIC_LABEL,
 	has_label_name,
@@ -7,6 +6,7 @@ import {
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { CarryChange, RunCarry } from '#scripts/run/carry/run-carry'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import type { ChildOutcome } from './run-merge-outcome'
 
 // The pure core of `run:merge`, the one composite command for a `backlogrun` merge event: the parent —
@@ -192,7 +192,7 @@ function park_comment(reason: ParkReason): string {
 		`- Why: ${reason.cause}`,
 		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker or start date still ahead.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, fix the cause, then resume it with \`fullrun ${issue_cite.plain(reason.child)}\` or remove \`${RUN_STALLED_LABEL}\` to offer it again.`,
+		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child)}.`,
 	].join('\n')
 }
 

@@ -84,7 +84,9 @@ async function fill_run_command(
 	}
 }
 
-async function create_epic(input: CreateEpicInput): Promise<number> {
+// The created epic's number, or `undefined` when its URL could not be read — for a caller that writes
+// to the epic next (`epic:bundle --apply` reconciling a recorded order).
+async function create_epic_number(input: CreateEpicInput): Promise<number | undefined> {
 	await git_gh_command.label_ensure({
 		name: EPIC_LABEL,
 		color: EPIC_LABEL_COLOR,
@@ -109,6 +111,12 @@ async function create_epic(input: CreateEpicInput): Promise<number> {
 	await apply_dependencies({ children: input.children, is_ordered: input.is_ordered })
 	await fill_run_command(epic_number, input)
 	console.info(`▶ Run the children with: ${epic_body.format_run_command(epic_number)}`)
+
+	return epic_number
+}
+
+async function create_epic(input: CreateEpicInput): Promise<number> {
+	await create_epic_number(input)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -215,6 +223,7 @@ async function check_epic(epic_number: number): Promise<number> {
 
 const epic_run = {
 	create_epic,
+	create_epic_number,
 	promote_epic,
 	check_epic,
 }

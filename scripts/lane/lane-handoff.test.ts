@@ -1,4 +1,5 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
@@ -47,6 +48,43 @@ describe('lane_handoff.is_ship_running', () => {
 		const read = vi.spyOn(run_ship_detach, 'read_result')
 
 		expect(lane_handoff.is_ship_running(ISSUE, DIRECTORY)).toBe(false)
+		expect(read).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4245: the same reading for a caller that must not block, starting no process.
+function read_start(): string | undefined {
+	return undefined
+}
+
+describe('lane_handoff.ship_reader', () => {
+	it('reads the repository once, asynchronously, and each issue through the start reader given', async () => {
+		const repository = vi.spyOn(git_common_directory, 'repository')
+		const directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+		const read = vi
+			.spyOn(run_ship_detach, 'read_result')
+			.mockReturnValue({ launch_id: 'launch', result: 'running' })
+
+		const is_shipping = await lane_handoff.ship_reader(read_start)
+
+		expect([is_shipping(ISSUE), is_shipping('2963')]).toEqual([true, true])
+		expect(read).toHaveBeenCalledWith(REPOSITORY, ISSUE, read_start)
+		expect(directory).toHaveBeenCalledTimes(1)
+		expect(repository).not.toHaveBeenCalled()
+	})
+
+	it('reads a ship that is not running as not running', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+		vi.spyOn(run_ship_detach, 'read_result').mockReturnValue({ launch_id: 'l', result: 'failed' })
+
+		expect((await lane_handoff.ship_reader(read_start))(ISSUE)).toBe(false)
+	})
+
+	it('reads nothing as running where the repository could not be read', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockRejectedValue(new Error('not a repository'))
+		const read = vi.spyOn(run_ship_detach, 'read_result')
+
+		expect((await lane_handoff.ship_reader(read_start))(ISSUE)).toBe(false)
 		expect(read).not.toHaveBeenCalled()
 	})
 })

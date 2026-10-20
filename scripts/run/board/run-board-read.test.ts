@@ -1,36 +1,28 @@
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
-import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
-import { lane_vacant } from '#scripts/lane/lane-vacant'
-import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
+import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_read } from './run-board-read'
+import { run_board_read_fixture } from './run-board-read-fixture'
 
 const MINUTE_MS = 60_000
 
 // joshuafolkken/kit#3439: the board reads the running run, else the one that last ended, and keeps the
 // next run's events off an ended run's board.
 
-const REPOSITORY = '/repo/.git'
+const { AFTER, CARRY, ENDED_AT, INSIDE, LANE_LIMIT, REPOSITORY, arrange, lane } =
+	run_board_read_fixture
 const STARTED_AT = '2026-10-08T09:00:00.000Z'
-const ENDED_AT = '2026-10-08T10:00:00.000Z'
 const NONE: CarryRead = { kind: 'none' }
 const EPIC_RUN = 'backlogrun #3431 --only'
-const INSIDE: RunEvent = {
-	pos: 1,
-	at: '2026-10-08T09:30:00.000Z',
-	kind: 'merge',
-	text: '#1 merged',
-}
-const AFTER: RunEvent = { pos: 2, at: '2026-10-08T10:30:00.000Z', kind: 'merge', text: '#2 merged' }
 const STOPPED: EndedRun = {
 	invocation: EPIC_RUN,
 	started_at: STARTED_AT,
@@ -39,56 +31,10 @@ const STOPPED: EndedRun = {
 	session: 'abc',
 }
 
-const CARRY: RunCarry = {
-	invocation: 'backlogrun',
-	started_at: ENDED_AT,
-	merged: 0,
-	filed: 0,
-	cuts: 0,
-	failures: 0,
-	outages: 0,
-}
 const TRANSCRIPT = '/home/.claude/projects/kit/session.jsonl'
 const LANE_LOG = '/logs/josh-lane-dispatch-3432.log'
 // Three lanes allowed and one open: two more may open.
-const LANE_LIMIT = 3
 const FREE_LANES = 2
-
-function lane(issue: string): LaneInfo {
-	return {
-		issue,
-		branch: `${issue}-lane`,
-		directory: `/lanes/${issue}`,
-		seat: undefined,
-		development_port: undefined,
-		preview_port: undefined,
-		output: undefined,
-		is_stranded: false,
-	}
-}
-
-// The run's records, each keyed on the repository and read off the machine: never a real one from a test.
-function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
-	vi.spyOn(run_carry, 'read_carry').mockReturnValue(read)
-	vi.spyOn(run_carry_ended, 'read_ended').mockReturnValue(ended)
-	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
-	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
-}
-
-function arrange(read: CarryRead, ended: EndedRun | undefined): void {
-	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
-	arrange_records(read, ended)
-	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, AFTER])
-	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane('3432')])
-	// The limit is read off the environment and a live run's override: never a real one from a test.
-	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
-	// Every log is read off the machine: never a real one from a test.
-	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
-	// Each lane's child is probed with `pgrep`: never a real process from a test.
-	vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
-	// Each lane's branch and tree are read with git: never a real lane from a test.
-	vi.spyOn(lane_vacant, 'vacant_issues').mockResolvedValue([])
-}
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -100,6 +46,7 @@ const LANE_ROOM = {
 	lane_limit: LANE_LIMIT,
 	occupied_count: 1,
 	earlier_occupied: [],
+	earlier_statuses: new Map(),
 }
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
 const UNRECORDED = {
@@ -144,7 +91,7 @@ describe('run_board_read.read_local', () => {
 		const is_stranded_at = vi.spyOn(run_stranded_detect, 'is_stranded_at').mockReturnValue(true)
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ is_stranded: true })
-		expect(is_stranded_at).toHaveBeenCalledWith(REPOSITORY)
+		expect(is_stranded_at).toHaveBeenCalledWith(REPOSITORY, expect.any(Object))
 	})
 
 	it('reads nothing when no run has started or ended here', async () => {
@@ -292,7 +239,8 @@ describe('run_board_read.read_local idle lanes', () => {
 		const idle_lanes = vi.mocked(lane_spent.idle_lanes).mockReturnValue(['3432'])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ idle_lanes: ['3432'] })
-		expect(idle_lanes).toHaveBeenCalledWith([lane('3432')])
+		// joshuafolkken/kit#4245: traced from the board's one process snapshot, not a pgrep per lane.
+		expect(idle_lanes.mock.calls.map(([lanes]) => lanes)).toContainEqual([lane('3432')])
 	})
 })
 
@@ -309,6 +257,31 @@ describe('run_board_read.read_local earlier lanes', () => {
 		])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ earlier_lanes: ['3431'] })
+	})
+
+	// joshuafolkken/kit#4260: its launch is before the span, so the span's events alone hold none of it.
+	it('reads what an earlier lane is doing from its launch before the span', async () => {
+		const started_ms = Date.parse(STARTED_AT)
+		const launch: RunEvent = {
+			pos: 1,
+			at: '2026-10-08T08:00:00.000Z',
+			kind: 'child-launch',
+			text: '#3431 launched',
+		}
+
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		vi.mocked(run_event_stream.read_events).mockReturnValue([launch])
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
+			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
+		])
+
+		const local = await run_board_read.read_local()
+
+		expect(local?.events).toStrictEqual([])
+		expect(local?.earlier_statuses?.get(3431)).toMatchObject({
+			state: 'running',
+			started_ms: Date.parse(launch.at),
+		})
 	})
 })
 

@@ -69,7 +69,7 @@ and output path; fill a missing path with `pnpm josh lane:output <N> <path>`:
 - **`--cut` answers `capped`** (`MAX_CUTS`) — **do not `run:wake` or hand off**;
   carry this session on and re-ask at the next merge.
 
-The hand-off report's format is `backlogrun-handoff-report.md`. **This is not a failure and not a
+The hand-off report is `pnpm josh run:report --handoff` (`backlogrun-handoff-report.md`). **This is not a failure and not a
 park** — nothing is labelled, stashed or filed.
 
 ## Resuming after a cut

@@ -2,7 +2,7 @@
 
 The commands a run and its lanes call to hold, step, cut and ship, plus the session-budget and document-reading commands a run uses. Where each command came from: `docs/maintainers/josh-commands-run-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` (`scripts/josh/josh-commands-*.ts`), the rest from `scripts/josh/josh-usage-run.ts` and `scripts/josh/josh-usage-session.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
 
 ## Run lifecycle
 
@@ -48,6 +48,24 @@ The unit is the working tree, so two lanes of one repository key differently.
 **Output / exit codes:** stdout is one token; explanations go to stderr. `run:hold` answers `hold`, `busy`, `reclaim` / `resume` / `park` (leftover work found) or `unknown` (exit 1); `run:release` answers `released`, `none` or `held` (exit 1).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:hold` / `josh run:release` in detail".
+
+### `josh run:pause`
+
+<!-- usage: run:pause -->
+
+Set a run aside while its prerequisite lands first.
+
+```bash
+pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
+```
+
+**Options:**
+
+- `--for <prerequisite>` — the issue that has to land first; `<issue>` is recorded blocked by it.
+
+<!-- /usage -->
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` in detail".
 
 ### `josh run:tidy`
 
@@ -309,7 +327,7 @@ pnpm josh run:prep <N>
 
 <!-- /usage -->
 
-Its `=== ship preconditions ===` section asks, ahead of the ship, the two refusals `josh ship` would otherwise meet at the run's largest context: a missing release classification in the Issue body, and a runtime change whose open PR body has no `## 実機証跡` section. `met` when neither applies; `unmet` lists each, so they are fixed before the gate. The ship and `followup` still refuse on both.
+Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `josh ship` would otherwise meet late: a missing release classification, a runtime change whose PR body lacks `## 実機証跡`, and an unmapped acceptance criterion — printed with the `未記入` rows to copy. `met` when none applies; `unmet` lists each to fix before the gate. The ship and `followup` refuse on all.
 
 ### `josh run:entry`
 
@@ -519,7 +537,8 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in de
 Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends.
 
 ```bash
-pnpm josh run:report   # print the report; the same text josh notify sends
+pnpm josh run:report             # print the report; the same text josh notify sends
+pnpm josh run:report --handoff   # print the backlogrun hand-off report and send it as the confirmation
 ```
 
 <!-- /usage -->
@@ -632,7 +651,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), then `🧳` an earlier run's lane holding a place, the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: a row per touched child (phase icon, elapsed time, CPU and memory), then `🧳` an earlier run's lane holding a place (its phase, elapsed time, usage and newest activity drawn alike, never counted as the run's), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the reason at a row's end is what it waits on. An epic's children stay gathered under the epic.
 

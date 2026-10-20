@@ -369,6 +369,14 @@ function direct_unit_memory(): number {
 	return unit_memory(direct_unit_weight())
 }
 
+// The claim every unit run started directly declares — `josh test:unit`, `josh test:related` and the
+// pre-push hook — declared once so the three cannot drift apart.
+const DIRECT_UNIT_CLAIM = {
+	core_weight: direct_unit_weight,
+	memory_mb: direct_unit_memory,
+	is_unit_claim: true,
+} as const
+
 function unit_cap_for(
 	checks: ReadonlyArray<GateCheck>,
 	available_cores: number,
@@ -474,6 +482,7 @@ function format_gate_plan(
 }
 
 const gate_plan = {
+	DIRECT_UNIT_CLAIM,
 	EXPORTS_LABEL,
 	GATE_CHECKS,
 	LINT_LABEL,
@@ -488,7 +497,6 @@ const gate_plan = {
 	bound_by_free,
 	check_memory,
 	check_weight,
-	direct_unit_memory,
 	direct_unit_weight,
 	format_gate_plan,
 	format_machine,

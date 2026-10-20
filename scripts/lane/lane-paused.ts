@@ -10,12 +10,11 @@ import { lane_reap, type TreeProbes } from './lane-reap'
 //
 // **The tree is `lane_reap`'s** — the matched child and every descendant, as `lane:pause` stops them —
 // so a hand `kill -STOP` of the child alone, its `gate` subprocesses still running, is not paused.
-// **A lane whose states could not be read is not paused**, so the limit errs toward fewer free lanes;
-// the tree's states are read in one `ps`.
+// **A lane whose states could not be read is not paused**, so the limit errs toward fewer free lanes.
+// The probes are `lane_process_table`'s one asynchronous snapshot, never a spawn per process (#4241).
 
 const STOPPED_STATE = 'T'
 const ZOMBIE_STATE = 'Z'
-const STAT_FORMAT = ['-o', 'stat=', '-p']
 
 interface PausedProbes extends TreeProbes {
 	// Each pid's `ps` `stat`, the empty list for a read that failed.
@@ -33,19 +32,8 @@ function is_paused(stats: ReadonlyArray<string>): boolean {
 	return live.length > 0 && live.every((stat) => stat.startsWith(STOPPED_STATE))
 }
 
-function states_of(pids: ReadonlyArray<number>): Array<string> {
-	const printed = lane_reap.run_probe(lane_reap.PS_COMMAND, [...STAT_FORMAT, pids.join(',')])
-
-	return printed
-		.split('\n')
-		.map((line) => line.trim())
-		.filter((line) => line !== '')
-}
-
-const SYSTEM_PROBES: PausedProbes = { ...lane_reap.SYSTEM_PROBES, states_of }
-
 /** Whether the lane child for `issue` is paused; a lane with no process or no readable state is not. */
-function is_lane_paused(issue: string, probes: PausedProbes = SYSTEM_PROBES): boolean {
+function is_lane_paused(issue: string, probes: PausedProbes): boolean {
 	const pids = lane_reap.lane_tree(issue, probes)
 
 	if (pids.length === 0) return false
@@ -53,7 +41,7 @@ function is_lane_paused(issue: string, probes: PausedProbes = SYSTEM_PROBES): bo
 	return is_paused(probes.states_of(pids))
 }
 
-const lane_paused = { is_lane_paused, is_paused, states_of }
+const lane_paused = { is_lane_paused, is_paused }
 
 export { lane_paused }
 export type { PausedProbes }

@@ -1,6 +1,7 @@
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
@@ -273,9 +274,7 @@ function is_present(entry: LedgerEntry | undefined): entry is LedgerEntry {
 	return entry !== undefined
 }
 
-// Every entry, oldest first. A malformed line — a write cut short — is skipped rather than making the
-// whole ledger unreadable, and an absent or unowned file is an empty ledger.
-function read_entries(path: string): ReadonlyArray<LedgerEntry> {
+function parse_entries(path: string): ReadonlyArray<LedgerEntry> {
 	const raw = stamp_file.read_stamp_text(path)
 
 	if (raw === undefined) return []
@@ -284,6 +283,15 @@ function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 		.split(LINE_SEPARATOR)
 		.map((line) => parse_line(line.trim()))
 		.filter(is_present)
+}
+
+// Each ledger's entries, parsed again only once the file itself has changed (joshuafolkken/kit#4263).
+const parsed_ledgers = stamped_memo.create<ReadonlyArray<LedgerEntry>>()
+
+// Every entry, oldest first. A malformed line — a write cut short — is skipped rather than making the
+// whole ledger unreadable, and an absent or unowned file is an empty ledger.
+function read_entries(path: string): ReadonlyArray<LedgerEntry> {
+	return parsed_ledgers.of(path, stamped_memo.file_stamp(path), () => parse_entries(path))
 }
 
 const lane_ledger = {

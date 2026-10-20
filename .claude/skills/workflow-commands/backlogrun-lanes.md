@@ -46,8 +46,8 @@ are not predicted").
 
 ### Once per repository, before the first lane opens
 
-In the **primary checkout**, in order, never per lane: `pnpm josh ms`; `pnpm josh latest:scope` and the
-update on `required` (`backlogrun-child.md` → "`josh latest` runs once per session, not once per
+In the **primary checkout**, in order, never per lane: `pnpm josh ms`; `pnpm josh latest:if-required`
+(`backlogrun-child.md` → "`josh latest` runs once per session, not once per
 child"); `pnpm josh lane:prune`; `pnpm josh run:tidy`.
 
 **The rewritten lock file reaches a pull request through the first lane.** Only if the update rewrote

@@ -5,7 +5,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { core_budget } from './core-budget'
 import { gate_plan, type GatePlan } from './gate-plan'
 import type { GateStep, GateStepResult } from './gate-report'
-import { build_gate_step } from './gate-steps'
+import { build_gate_step, with_granted_workers } from './gate-steps'
 import { project_checks } from './project-checks'
 
 // Running the gate's checks: each one under its place in the machine-wide budget, a reused one
@@ -105,13 +105,14 @@ async function run_reserved_step(
 	return await core_budget.with_core_reservation(
 		reserved.weight,
 		async (admission) => ({
-			...(await run_gate_step(reserved.step)),
+			...(await run_gate_step(with_granted_workers(reserved.step, admission.granted))),
 			budget_note: core_budget.describe_overflow(admission),
 		}),
 		{
 			budget: budget.available_cores,
 			memory_mb: reserved.memory_mb,
 			command: `gate ${reserved.step.label}`,
+			is_unit: reserved.step.label === gate_plan.UNIT_LABEL,
 		},
 	)
 }

@@ -16,9 +16,8 @@ entry sequence and the stop branches are `entry-sequence.md`.
 ## The step list
 
 `halfrun #<N>`: read Issue #N and its comments → **record the agreed plan**, normalizing
-the title (`pnpm josh issue:plan`, same as `fullrun`) → `pnpm josh ms`, then `pnpm
-josh latest:scope` and update dependencies only on `required` (`latest-gate.md`; the
-`dependency-update` skill) → implement → run the **full verification gate** (refactor →
+the title (`pnpm josh issue:plan`, same as `fullrun`) → `pnpm josh ms`, then on `run:prep`'s
+`latest: required` `pnpm josh latest:if-required` (`latest-gate.md`; the `dependency-update` skill) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
 join the gate before the stop, iterate to no high/medium findings, within the round cap (`prompts/review.md`) → `pnpm josh
 test:e2e`, run by **you**, because `halfrun` opens no pull request and there is no CI E2E job; a printed
@@ -38,6 +37,6 @@ mirror `fullrun new` (1)–(8): derive an English title (or use the provided one
 `prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:hold --adopt <N>` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `pnpm josh stash:push "halfrun new: pre-existing changes"`, popped
 after `stashed` with `pnpm josh stash:pop "halfrun new: pre-existing changes"` →
-`pnpm josh ms` → `pnpm josh latest:scope` → implement → run the gate (as above, `pnpm
+`pnpm josh ms` → `pnpm josh run:prep <N>`, and on `latest: required` `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
 → **stop**.

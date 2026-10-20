@@ -2,12 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
-import { free_cores } from '#scripts/gate/free-cores'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { execa } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
 import { test_unit_guard } from './test-unit-guard'
+import { unit_share_fixture } from './unit-share-fixture'
 import { unit_worker_share } from './unit-worker-share'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -75,24 +75,13 @@ function expect_isolated_environment(options: Record<string, unknown>): void {
 
 const ctx = { project_directory: '' }
 
-// **Pinned rather than left real, because the real answer is what else is running on the machine**
-// (joshuafolkken/kit#1515). `run_vitest` asks for this run's share of the workers and appends
-// `--maxWorkers` when there is one, so a suite asserting the exact argument list would pass alone and
-// fail beside a second lane — the class of flake this whole issue is about. Only the share is stubbed;
-// the marker lifecycle around the spawn stays real, so the wrapper is still exercised.
-function stub_share(share: number | undefined): void {
-	vi.spyOn(unit_worker_share, 'current_share').mockReturnValue(share)
-}
-
-// The free cores are the machine's too, so they are pinned for the share's reason.
-function stub_free(free: number | undefined): MockInstance<typeof free_cores.read> {
-	return vi.spyOn(free_cores, 'read').mockResolvedValue(free)
-}
+const { stub_claim, stub_free, stub_share } = unit_share_fixture
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	stub_share(undefined)
 	stub_free(undefined)
+	stub_claim(undefined)
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-'))
 })
 

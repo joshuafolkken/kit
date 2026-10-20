@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # `git rm --ignore-unmatch`, with which a release prunes the merged metrics approvals (#4187).
+  - unmatch
   # `top`'s compressed-memory column and its size units, read for `run:board`'s usage columns (#4171).
   - CMPRS
   - cmprs

@@ -1,0 +1,7 @@
+{
+	"reason": "#4222: waves start with running issues closed, ask past an empty first wave, and carry the running issues so run:board still holds their lanes",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

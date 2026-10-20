@@ -56,7 +56,8 @@ interface CommandFlag {
 }
 
 // What `josh help <command>` prints and what the reference pages render between their usage
-// markers — one source for both, so the page and the terminal cannot disagree (#3932).
+// markers — one source for both, so the page and the terminal cannot disagree (#3932). Each command's
+// entry carries its own, so a command cannot be registered without one (#4185).
 interface CommandUsage {
 	examples: ReadonlyArray<CommandExample>
 	flags?: ReadonlyArray<CommandFlag>
@@ -68,6 +69,7 @@ interface CommandEntry {
 	description: string
 	category: CommandCategory
 	reference: CommandReference
+	usage: CommandUsage
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
@@ -93,6 +95,8 @@ interface CommandEntry {
 	// The memory the command's tools hold, claimed with its cores; read like
 	// `core_weight`, and none declared is none waited for.
 	memory_mb?: number | (() => number)
+	// A unit suite's claim, whose weight is its worker count (`gate_plan.DIRECT_UNIT_CLAIM`).
+	is_unit_claim?: boolean
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a

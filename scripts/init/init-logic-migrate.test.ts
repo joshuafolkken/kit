@@ -1,54 +1,27 @@
+import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
 import { describe, expect, it } from 'vitest'
-import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
+import { init_logic_migrate } from './init-logic-migrate'
 
-describe('apply_jf_migrations', () => {
-	it('renames jf- prefixed values to josh prefix', () => {
-		expect(apply_jf_migrations({ build: 'jf-build', test: 'jf-test' })).toEqual({
-			build: 'josh build',
-			test: 'josh test',
+const { migrate_scripts } = init_logic_migrate
+
+describe('init_logic_migrate.migrate_scripts', () => {
+	it('replaces a safe-chain preinstall an earlier kit wrote', () => {
+		const scripts = { preinstall: 'pnpm dlx @aikidosec/safe-chain setup-ci', dev: 'vite dev' }
+
+		expect(migrate_scripts(scripts)).toStrictEqual({
+			preinstall: safe_chain_preinstall.SAFE_CHAIN_CMD,
+			dev: 'vite dev',
 		})
 	})
 
-	it('leaves non-jf values unchanged', () => {
-		expect(apply_jf_migrations({ dev: 'vite dev' })).toEqual({ dev: 'vite dev' })
-	})
+	// joshuafolkken/kit#4187: no consumer carries these any longer, so they are the project's own.
+	it('keeps a jf- value, a pre-josh value and a retired script name as they are', () => {
+		const scripts = {
+			build: 'jf-build',
+			lint: 'pnpm lint:prettier && pnpm lint:eslint',
+			git: 'josh git',
+		}
 
-	it('returns empty object for empty input', () => {
-		expect(apply_jf_migrations({})).toEqual({})
-	})
-})
-
-describe('remove_retired_scripts', () => {
-	it('removes retired keys whose value runs kit', () => {
-		const result = remove_retired_scripts({ lint: 'josh lint', dev: 'vite dev' })
-
-		expect(result).not.toHaveProperty('lint')
-		expect(result).toHaveProperty('dev')
-	})
-
-	it('removes a retired key still holding a jf- value', () => {
-		expect(remove_retired_scripts({ format: 'jf-format' })).toEqual({})
-	})
-
-	it('removes a retired key still holding the plain value kit wrote before #80', () => {
-		const scripts = Object.fromEntries([
-			['test:unit', 'vitest run'],
-			['dev', 'vite dev'],
-		])
-
-		expect(remove_retired_scripts(scripts)).toEqual({ dev: 'vite dev' })
-	})
-
-	it('keeps a retired key whose value the project wrote itself (regression #3069)', () => {
-		const sv_check = 'svelte-kit sync && svelte-check --tsconfig ./tsconfig.json'
-
-		expect(remove_retired_scripts({ check: sv_check, lint: 'eslint .' })).toEqual({
-			check: sv_check,
-			lint: 'eslint .',
-		})
-	})
-
-	it('preserves non-retired keys unchanged', () => {
-		expect(remove_retired_scripts({ dev: 'vite dev' })).toEqual({ dev: 'vite dev' })
+		expect(migrate_scripts(scripts)).toStrictEqual(scripts)
 	})
 })

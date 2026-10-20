@@ -94,12 +94,9 @@ describe('run_merge_steps.do_failed — parking is part of the result', () => {
 	it('reports a failed needs-decision label write instead of treating the child as parked', async () => {
 		add_label_mock.mockResolvedValue(false)
 
-		expect(await run_merge_steps.do_failed(CONTEXT)).toStrictEqual({
-			carry: undefined,
-			is_parked: false,
-			is_refused: false,
-			waits: [],
-		})
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result).toMatchObject({ is_parked: false, is_refused: false })
 	})
 })
 

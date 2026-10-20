@@ -26,25 +26,21 @@ judgement that the dependencies are probably still fresh.
 ## What runs when the answer is `required`
 
 ```bash
-pnpm josh stash:push "josh latest"    # `clean` when nothing changed
-pnpm josh ms
-pnpm josh latest     # on `required` only
-pnpm josh stash:pop "josh latest"     # only after `stashed` above
+pnpm josh latest:if-required   # stash → josh latest → pop by message; nothing on `skip`
 ```
 
-A positional pop is refused (the `worktree-mutation` row).
+It asks `latest:scope` itself, so a run reads `run:prep`'s `latest:` line and never asks again. A
+failed update or a conflicted pop stops with the stash kept and names the pop to run.
 
 Then **load the `dependency-update` skill and follow its procedure** — the overrides in **both**
 `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines` pnpm bump — in every run in
 which `josh latest` actually ran; never report the pins intact without having run it.
 
-**On `skip`, one line of that block goes away and no more.** `pnpm josh latest` does not run, and
-the `dependency-update` skill is not read, because nothing rewrote a pin for it to check.
+**On `skip`, the command does nothing** and the `dependency-update` skill is not read, because
+nothing rewrote a pin for it to check.
 
-**Two of those steps are not this gate's, and making either conditional breaks something.**
-`pnpm josh ms` runs per issue and per child either way — it brings the previous merge into the tree.
-The stash before it is the branch switch's, not the update's, so it is conditional on the **tree**,
-never on the answer.
+**`pnpm josh ms` is not this gate's** — it runs per issue and per child either way, bringing the
+previous merge into the tree, before the update.
 
 ## The vulnerability net is not what moved
 

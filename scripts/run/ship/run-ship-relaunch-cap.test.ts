@@ -88,7 +88,7 @@ describe('run_ship_relaunch_cap.park', () => {
 
 		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, 'run:stalled')
 		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(`pnpm josh ship --log ${ISSUE}`)
-		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (ship-stop cap)`)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (run:stalled: ship-stop cap)`)
 		expect(warn_mock).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining('round-2') as unknown }),
 		)

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { styleText } from 'node:util'
 import { core_budget } from '#scripts/gate/core-budget'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
@@ -53,6 +54,7 @@ function on_exit(leave: () => void): void {
 
 const LIVE_PORTS: BoardPorts = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
+	read_table: lane_process_table.read_table,
 	read_local: run_board_read.read_local,
 	read_machine: machine_capacity.read_sample,
 	read_waits: () => core_budget.budget_waits(),

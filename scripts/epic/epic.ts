@@ -8,11 +8,13 @@
  *        tsx scripts/epic/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
  *                                                      [--decision-file <path|->]
  *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
+ *        tsx scripts/epic/epic.ts --decide <E> <N1> <N2> ... --decision-file <path|->
  */
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
+import { epic_decide } from './epic-decide'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
@@ -26,6 +28,7 @@ const USAGE = [
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
 	'       josh epic --reconcile <E>',
+	'       josh epic --decide <E> <N1> <N2> ... --decision-file <path|->',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
 
@@ -134,6 +137,26 @@ async function run_removal(argv: ReadonlyArray<string>): Promise<number> {
 	})
 }
 
+// A decision about children the epic already tracks — the half `--add --decision-file` cannot write,
+// since an insertion with nothing to add is refused.
+async function run_decision(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli.parse_decide_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(
+			`✖ An epic number, at least one child issue number, and exactly one readable \`--decision-file\` path (\`-\` reads stdin) are required.\n${USAGE}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await epic_decide.decide({
+		epic_number: parsed.epic_number,
+		children: parsed.children,
+		decision: epic_cli.read_decision(parsed.decision_path) ?? '',
+	})
+}
+
 // Reconcile an epic's declaration with its recorded relations. No decision file and no children: the
 // repair reads what the epic already records rather than being told an order.
 async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> {
@@ -166,15 +189,26 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 	})
 }
 
-// `--add` is checked before `--promote`: both name an existing issue first, and only the flag
-// distinguishes "insert into this epic" from "turn this issue into one".
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (epic_cli.is_reconciliation(argv)) return await run_reconciliation(argv)
-	if (epic_cli.is_removal(argv)) return await run_removal(argv)
-	if (epic_cli.is_addition(argv)) return await run_addition(argv)
-	if (epic_cli.is_promotion(argv)) return await run_promotion(argv)
+type EpicForm = readonly [
+	(argv: ReadonlyArray<string>) => boolean,
+	(argv: ReadonlyArray<string>) => Promise<number>,
+]
 
-	return await run_creation(argv)
+// Checked in this order. `--add` comes before `--promote`: both name an existing issue first, and only
+// the flag distinguishes "insert into this epic" from "turn this issue into one".
+const FLAGGED_FORMS: ReadonlyArray<EpicForm> = [
+	[epic_cli.is_reconciliation, run_reconciliation],
+	[epic_cli.is_removal, run_removal],
+	[epic_cli.is_decision_entry, run_decision],
+	[epic_cli.is_addition, run_addition],
+	[epic_cli.is_promotion, run_promotion],
+]
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const form = FLAGGED_FORMS.find(([is_form]) => is_form(argv))
+	const run_form = form === undefined ? run_creation : form[1]
+
+	return await run_form(argv)
 }
 
 async function main(): Promise<void> {
