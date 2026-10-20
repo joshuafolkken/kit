@@ -40,7 +40,7 @@ function free_blocker(): void {
 
 // The blocker fills every core, so the claim waits two polls, reading the board's view at each.
 async function records_and_prints_once(): Promise<void> {
-	write_blocker({ weight: CORES })
+	write_blocker({ weight: CORES, admitted_at: 0 })
 	const report = vi.fn<(line: string) => void>()
 	const seen: Array<ReturnType<typeof core_budget.budget_waits>> = []
 	const sleep = vi.fn(async () => {
