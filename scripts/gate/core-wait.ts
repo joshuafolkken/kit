@@ -79,6 +79,22 @@ function wait_reason(
 	return budget.memory_pressured === true ? 'pressure' : 'memory'
 }
 
+// Why a claim is not admitted yet, or `undefined` once it is: a unit claim the budget admits only too
+// narrow (`core_admission.is_too_narrow`) still waits, on the CPU — admitted, it fits what the ledger
+// declares, so only busy load beyond the ledger narrowed it (`core_reason`).
+function hold_reason(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+	granted: number | undefined,
+): WaitReason | undefined {
+	if (!core_admission.is_admitted(key, reservations, budget)) {
+		return wait_reason(key, reservations, budget)
+	}
+
+	return core_admission.is_too_narrow(key, reservations, granted) ? 'cpu' : undefined
+}
+
 // The line a waiting command prints once, when its wait starts.
 function wait_line(command: string | undefined, reason: WaitReason): string {
 	return `⏳ ${command ?? 'a step'} waits for the core budget — ${REASON_TEXT[reason]}`
@@ -135,6 +151,7 @@ function waits_of(
 
 const core_wait = {
 	WAIT_REASONS,
+	hold_reason,
 	wait_line,
 	wait_reason,
 	waits_of,
