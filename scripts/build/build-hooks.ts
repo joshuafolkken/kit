@@ -199,4 +199,4 @@ async function main(): Promise<void> {
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 export type { HookBundle }
-export { build_hooks, HOOK_BUNDLES, OUT_DIR, outfile_for }
+export { build_hooks, HOOK_BUNDLES, OUT_DIR, outfile_for, STAGING_PREFIX }
