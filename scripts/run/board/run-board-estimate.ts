@@ -1,3 +1,4 @@
+import { run_board_estimate_schedule, type Lanes } from './run-board-estimate-schedule'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
@@ -7,9 +8,9 @@ import type { UsualTimes } from './run-board-usual'
 // How long the run has left, from how long each phase usually takes (`run-board-usual.ts`,
 // joshuafolkken/kit#4044). A running child has left what remains of its phase and every phase it has
 // not reached; a waiting child the plan's waves hold takes one child's usual time, stacked onto the
-// lane that frees first. A parked child, and one the plan has not reached — a start date or a blocker
-// ahead of it — wait on something no usual time measures, so they are left out. Without a usual time
-// nothing is estimated.
+// lane that frees first once what it waits on has ended (`run-board-estimate-schedule.ts`). A parked
+// child, and one the plan has not reached — a start date or a blocker ahead of it — wait on something
+// no usual time measures, so they are left out. Without a usual time nothing is estimated.
 
 const { HEADER_ICONS, WORDS, minute_span_of } = run_board_labels
 const LEGEND = `${HEADER_ICONS.estimate} ${WORDS.estimate}`
@@ -51,25 +52,21 @@ function running_left(row: BoardRow, read: EstimateRead, usual: UsualTimes): num
 }
 
 // The queued rows a lane will take, a decision a person owes left out.
-function waiting_count(layout: BoardLayout): number {
+function waiting_rows(layout: BoardLayout): Array<BoardRow> {
 	const queued: BoardLayout = { ...run_board_layout.EMPTY_LAYOUT, queued: layout.queued }
 
-	return run_board_layout.rows_of(queued).filter((row) => row.state === 'waiting').length
+	return run_board_layout.rows_of(queued).filter((row) => row.state === 'waiting')
 }
 
-// Each lane's time to its end: a running child's, then each waiting child's onto the lane free first.
-function lanes_end(running: ReadonlyArray<number>, waiting: number, read: EstimateRead): number {
-	const lanes = Math.max(read.lane_limit ?? running.length, running.length, MIN_LANES)
-	const ends = [...running, ...Array.from({ length: lanes - running.length }, () => 0)]
-	const per_child = read.usual === undefined ? 0 : usual_sum(PATH, read.usual)
+// The lanes as the running children leave them: each running child's end, the free lanes at zero, and
+// a running `run:solo` child's end as the floor no waiting child starts before.
+function lanes_of(running: ReadonlyArray<BoardRow>, read: EstimateRead, usual: UsualTimes): Lanes {
+	const ends = new Map(running.map((row) => [row.number, running_left(row, read, usual)]))
+	const count = Math.max(read.lane_limit ?? running.length, running.length, MIN_LANES)
+	const free = [...ends.values(), ...Array.from({ length: count - ends.size }, () => 0)]
+	const solo = running.filter((row) => row.is_solo === true).map((row) => ends.get(row.number) ?? 0)
 
-	for (let index = 0; index < waiting; index++) {
-		const first = ends.indexOf(Math.min(...ends))
-
-		ends[first] = (ends[first] ?? 0) + per_child
-	}
-
-	return Math.max(...ends)
+	return { free, ends, floor: Math.max(0, ...solo), per_child: usual_sum(PATH, usual) }
 }
 
 // How long the run has left, `undefined` where nothing is left to run or no usual time is known.
@@ -78,11 +75,12 @@ function left_ms(read: EstimateRead): number | undefined {
 
 	if (layout === undefined || usual === undefined || usual.size === 0) return undefined
 
-	const rows = layout.active.filter((row) => row.state === 'running')
-	const running = rows.map((row) => running_left(row, read, usual))
-	const waiting = waiting_count(layout)
+	const running = layout.active.filter((row) => row.state === 'running')
+	const waiting = waiting_rows(layout)
 
-	return running.length + waiting === 0 ? undefined : lanes_end(running, waiting, read)
+	if (running.length + waiting.length === 0) return undefined
+
+	return run_board_estimate_schedule.end_of(waiting, lanes_of(running, read, usual))
 }
 
 // `🏁 ~25′`, `undefined` for an ended run or one with nothing to estimate.

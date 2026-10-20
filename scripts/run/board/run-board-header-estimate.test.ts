@@ -60,6 +60,20 @@ describe('run_board_header.header_lines estimated finish', () => {
 		expect(start_of(first, '✅')).toBe(start_of(second, '💪'))
 	})
 
+	// joshuafolkken/kit#4319: a 🔗 child waits for its blocker however many lanes are free.
+	it('draws a dependency chain end to end', () => {
+		const chain: BoardLayout = {
+			...EMPTY_LAYOUT,
+			queued: [
+				{ kind: 'row', row: row(2, 'waiting') },
+				{ kind: 'row', row: { ...row(3, 'waiting'), waits: ['2'] } },
+			],
+		}
+		const [first] = lines_with({ layout: chain, lane_limit: 2 })
+
+		expect(first).toContain('🏁 ~40′')
+	})
+
 	it('draws no 🏁 without a usual time', () => {
 		expect(lines_with({ usual: undefined })[0]).not.toContain('🏁')
 	})

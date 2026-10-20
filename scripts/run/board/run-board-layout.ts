@@ -7,6 +7,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	has_label_name,
 	NEEDS_DECISION_LABEL,
+	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
@@ -74,6 +75,8 @@ interface BoardRow {
 	reason?: RowReason | undefined
 	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳.
 	is_earlier?: boolean | undefined
+	// A touched child carrying `run:solo`, which nothing else starts beside while it runs.
+	is_solo?: boolean | undefined
 }
 
 type QueuedEntry =
@@ -226,6 +229,10 @@ function is_decision(reason: string | undefined): boolean {
 	return reason?.includes(NEEDS_DECISION_LABEL) === true
 }
 
+function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'> {
+	return has_label_name(labels, RUN_SOLO_LABEL) ? { is_solo: true } : {}
+}
+
 // A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
 // child does, and the section it is drawn in already says why, so its row draws no reason.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
@@ -234,6 +241,7 @@ function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRo
 
 	return {
 		...(!is_asked && ending_reason(number, status, labels)),
+		...solo_flag(labels),
 		number,
 		title: read.titles.get(number),
 		kind: run_board_kind.kind_of(labels),
