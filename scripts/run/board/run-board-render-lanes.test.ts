@@ -4,14 +4,16 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
+import { run_board_render_lead } from './run-board-render-lead'
 import type { UsageFigure } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
-// joshuafolkken/kit#4171: each lane row draws its CPU, MEM and CMPRS cells after its number, under a
-// rule whose labels stand over them.
+// joshuafolkken/kit#4171, #4292: each lane row draws its CPU, MEM and CMPRS cells after its lead and
+// before its number, under a rule whose labels stand over them.
 
 const { COLUMN_LABELS, LANES_LABEL, lane_cells_of, lanes_section, number_text } =
 	run_board_render_lanes
+const { ELAPSED_START, USAGE_START } = run_board_render_lead
 const { GB, board_usage, header } = run_board_render_fixture
 const { GAUGE_SHADES, bar_of } = run_board_labels
 const LANE = 42
@@ -25,12 +27,15 @@ const CELLS: LaneCells = {
 	gauge: 0,
 	number_width: 8,
 }
-// Where the lanes rule leaves the CPU label room over the first cell: `── 🧵 lanes ─ `.
-const LEAD_ROOM = 8
 const LONG_LANE = 123_456_789
 
 function row_of(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: 'Title', kind: undefined, state, status: undefined, waits: [] }
+}
+
+// How many columns the rule draws before `mark`.
+function column_of(rule: string, mark: string): number {
+	return run_board_fit.width_of(rule.slice(0, rule.indexOf(mark)))
 }
 
 function plain(text: string): string {
@@ -44,16 +49,15 @@ function bracketed(text: string): string {
 describe('run_board_render_lanes.number_text', () => {
 	it('pads the number and draws the running row its figures, each right-aligned in its column', () => {
 		expect(number_text(row_of(LANE, 'running'), CELLS, plain)).toBe(
-			'42           18.0      0.7        0.6',
+			'    18.0      0.7        0.6 42      ',
 		)
 	})
 
-	it('draws blanks of the same width for a row that is not running', () => {
+	it('draws blanks of the same width before the number for a row that is not running', () => {
 		const running = number_text(row_of(LANE, 'running'), CELLS, plain)
+		const waiting = number_text(row_of(LANE, 'waiting'), CELLS, plain)
 
-		expect(number_text(row_of(LANE, 'waiting'), CELLS, plain)).toBe(
-			`42${' '.repeat(running.length - 2)}`,
-		)
+		expect(waiting).toBe(`${' '.repeat(running.length - '42      '.length)}42      `)
 	})
 
 	it('draws the linked number alone where no cells are drawn', () => {
@@ -94,20 +98,23 @@ describe('run_board_render_lanes.lanes_section', () => {
 		expect(lanes_section([], CELLS)).toStrictEqual([])
 	})
 
-	it('heads the lines with a blank line where no cells are drawn', () => {
-		expect(lanes_section([LINE], undefined)).toStrictEqual([
-			{ head: [''], lines: [LINE], label: LANES_LABEL, key: 'lanes' },
-		])
+	it('heads the lines with a rule with ⏰ over the elapsed column where no cells are drawn', () => {
+		const [section] = lanes_section([LINE], undefined)
+		const rule = section?.head[1] ?? ''
+
+		expect(section).toMatchObject({ label: LANES_LABEL, key: 'lanes', lines: [LINE] })
+		expect(section?.head[0]).toBe('')
+		expect(column_of(rule, '⏰')).toBe(ELAPSED_START)
+		expect(rule).not.toContain('CPU')
 	})
 
 	it('heads the lines with a rule whose labels stand over the cells', () => {
 		const [section] = lanes_section([LINE], CELLS)
 		const rule = section?.head[1] ?? ''
-		const cpu = run_board_fit.width_of('  🔄 ') + CELLS.number_width + 1
-		const before_cpu = rule.slice(0, rule.indexOf('💪 CPU'))
 
 		expect(rule.startsWith('── 🧵 lanes ')).toBe(true)
-		expect(run_board_fit.width_of(before_cpu)).toBe(cpu)
+		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START)
+		expect(column_of(rule, '⏰')).toBe(ELAPSED_START)
 	})
 
 	// joshuafolkken/kit#4223: a text-default icon is counted one column wide but drawn two.
@@ -123,12 +130,12 @@ describe('run_board_render_lanes.lane_cells_of', () => {
 		expect(lane_cells_of(header(), [row_of(LANE, 'running')])).toBeUndefined()
 	})
 
-	it('draws figures alone where the frame draws no spinner, the numbers padded to the rule', () => {
+	it('draws figures alone where the frame draws no spinner, the numbers padded to the widest', () => {
 		const board = header({ usages: board_usage(new Map()) })
 
 		expect(lane_cells_of(board, [row_of(LANE, 'running'), row_of(7, 'waiting')])).toMatchObject({
 			gauge: 0,
-			number_width: LEAD_ROOM,
+			number_width: String(LANE).length,
 		})
 	})
 

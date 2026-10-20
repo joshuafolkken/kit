@@ -7,7 +7,9 @@ import type { BoardRow } from './run-board-layout'
 
 const { STATE_ICONS, WORDS } = run_board_labels
 const GAP = '  '
-const INDENT = '  '
+// A row's indent under a rule whose icon stands in the second column, so the row's icon stands clear of
+// it (joshuafolkken/kit#4292); a lane row leads with its progress column two columns further left.
+const ROW_INDENT = `${GAP}${GAP}`
 const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
@@ -37,11 +39,6 @@ function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string
 	}
 
 	return `${rule}${RULE.repeat(Math.max(RULE_LEAD.length, RULE_WIDTH - run_board_fit.width_of(rule)))}`
-}
-
-// The column a rule labeled `label` lets its first column's label start at.
-function label_room(label: string): number {
-	return run_board_fit.width_of(`${RULE_LEAD} ${label} ${RULE} `)
 }
 
 function heading_lines(heading: string | undefined): Array<string> {
@@ -88,7 +85,7 @@ function done_fold(withdrawn: ReadonlySet<PlanLine>): (cut: ReadonlyArray<PlanLi
 		const count = `${STATE_ICONS.merged} ${String(cut.length)} ${WORDS.more}`
 		const marks = gone === 0 ? [] : [`${STATE_ICONS.withdrawn} ${String(gone)}`]
 
-		return `${INDENT}${[count, ...marks].join(GAP)}`
+		return `${ROW_INDENT}${[count, ...marks].join(GAP)}`
 	}
 }
 
@@ -108,12 +105,12 @@ function done_section(
 }
 
 const run_board_render_section = {
+	ROW_INDENT,
 	columns_rule,
 	done_section,
 	folded_head,
 	heading_lines,
 	keyed,
-	label_room,
 	open_head,
 	plan_section,
 }

@@ -71,7 +71,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 		const line = line_of(waiting({ reason: HELD }))
 		const title_column = line.indexOf(SHORT_TITLE)
 
-		expect(line).toMatch(/^ {2}📂 3701 {8}3720 {4}Short title {2}package\.json$/u)
+		expect(line).toMatch(/^ {4}📂 3701 {8}3720 {4}Short title {2}package\.json$/u)
 		expect(line.indexOf(PATH)).toBe(title_column + SHORT_TITLE.length + 2)
 	})
 
@@ -79,7 +79,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 		const waits = [BLOCKER, OTHER_BLOCKER]
 		const line = line_of(waiting({ waits, reason: { icon: '🔗', issues: waits } }))
 
-		expect(line).toMatch(/^ {2}🔗 3409\+1 {6}3720 {4}Short title {2}3410$/u)
+		expect(line).toMatch(/^ {4}🔗 3409\+1 {6}3720 {4}Short title {2}3410$/u)
 	})
 
 	it('keeps a running row’s columns where they are beside a waiting row', () => {
@@ -98,7 +98,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 	})
 
 	it('draws a lane’s stage with how long the lane has stood at it before the number', () => {
-		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/^ {2}📥 42″ {9}3720 {4}Short title$/u)
+		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/^ {4}📥 42″ {9}3720 {4}Short title$/u)
 	})
 
 	it('draws no Japanese in what it adds to the row', () => {

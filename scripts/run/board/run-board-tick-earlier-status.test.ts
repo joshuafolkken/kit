@@ -67,7 +67,9 @@ async function frame_of(
 }
 
 function row_of(lines: ReadonlyArray<string>, issue: number): string {
-	return lines.find((line) => new RegExp(String.raw`\s${String(issue)}\s`, 'u').test(line)) ?? ''
+	return (
+		lines.find((line) => new RegExp(String.raw`\s${String(issue)}(\s|$)`, 'u').test(line)) ?? ''
+	)
 }
 
 function header(lines: ReadonlyArray<string>): Array<string> {

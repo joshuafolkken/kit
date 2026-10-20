@@ -139,6 +139,26 @@ describe('run_board_plan.read_plan running issues', () => {
 	})
 })
 
+// joshuafolkken/kit#4292: the issues the classifier withholds for a person, whose rows lead with 🙋.
+// The pool's classification withholds every issue it classifies, the named plan's none.
+async function withholding(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<Plan> {
+	const plan = plan_of(opted_in, exclude)
+	const people = opted_in.issues.length === POOL.length ? plan.result.waiting : []
+
+	return { ...plan, result: { ...plan.result, blocked_on_people: people } }
+}
+
+describe('run_board_plan.read_plan withheld issues', () => {
+	it('carries the classifier’s withheld issues, the named plan’s own verdict winning', async () => {
+		const read = { ...ports(), classify: vi.fn(withholding) }
+		const pool = await run_board_plan.read_plan({ issues: [], only: false }, read)
+		const joined = await run_board_plan.read_plan({ issues: [EPIC], only: false }, read)
+
+		expect(pool?.withheld).toStrictEqual(new Set(POOL))
+		expect(joined?.withheld).toStrictEqual(new Set([3412]))
+	})
+})
+
 // joshuafolkken/kit#3750: the paths each body declares, which a waiting row is checked against.
 describe('run_board_plan.read_plan declared paths', () => {
 	const NAMED_PATHS = new Set(['named.ts'])

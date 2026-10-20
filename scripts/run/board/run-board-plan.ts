@@ -3,6 +3,7 @@ import type { OptedIn } from '#scripts/backlog/backlog-next'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
+import { epic_classify } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
@@ -21,10 +22,20 @@ interface PlanPorts {
 	classify: (opted_in: OptedIn, exclude: ReadonlyArray<number>) => Promise<Plan | undefined>
 }
 
+// The board leads a row withheld for a person with 🙋, so classifying says no ❗ notice over it.
+async function classify_quietly(
+	opted_in: OptedIn,
+	exclude: ReadonlyArray<number>,
+): Promise<Plan | undefined> {
+	epic_classify.mute_notices()
+
+	return await backlog_plan_read.classify(opted_in, exclude)
+}
+
 const LIVE_PORTS: PlanPorts = {
 	fetch_open: backlog_plan_read.fetch_open,
 	fetch_opted_in: auto_ok_cli.fetch_opted_in,
-	classify: backlog_plan_read.classify,
+	classify: classify_quietly,
 }
 
 // One classified plan, against the listing it was read with.
@@ -57,6 +68,7 @@ async function board_of(
 		context: backlog_plan_read.context_of(plan, read.listing),
 		labels: labels_of(read.listing.rows),
 		declared: plan.scope.declared,
+		withheld: new Set(plan.result.blocked_on_people.map((child) => child.number)),
 	}
 }
 
@@ -80,6 +92,13 @@ function not_held(children: ReadonlyArray<EpicChild>, held: ReadonlySet<number>)
 	return children.filter((child) => !held.has(child.number))
 }
 
+// The named plan's withheld issues, and the pool's it does not hold.
+function withheld_of(lead: BoardPlan, pool: BoardPlan, held: ReadonlySet<number>): Set<number> {
+	const from_pool = [...(pool.withheld ?? [])].filter((number) => !held.has(number))
+
+	return new Set([...(lead.withheld ?? []), ...from_pool])
+}
+
 // The named waves lead and the pool's follow, a child the named plan already holds left out of the pool
 // so a named epic's children are not drawn twice.
 function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
@@ -95,6 +114,7 @@ function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
 		context: pool.context,
 		labels: pool.labels,
 		declared: new Map([...(pool.declared ?? []), ...(lead.declared ?? [])]),
+		withheld: withheld_of(lead, pool, held),
 	}
 }
 

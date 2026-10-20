@@ -117,8 +117,16 @@ function reset_reported(): void {
 	reported.clear()
 }
 
+// Silenced for a process that draws the withheld blocker itself: `run:board` leads its row with 🙋
+// (joshuafolkken/kit#4292), so the notice would only scribble over the board.
+const silence = { is_muted: false }
+
+function mute_notices(): void {
+	silence.is_muted = true
+}
+
 function report_notice(notice: OutsideNotice): void {
-	if (reported.has(notice.key)) return
+	if (silence.is_muted || reported.has(notice.key)) return
 
 	reported.add(notice.key)
 	console.warn(notice.message)
@@ -282,6 +290,7 @@ function classify_children(
 
 const epic_classify = {
 	resolve_by_state,
+	mute_notices,
 	reset_reported,
 	local_category,
 	classify_children,

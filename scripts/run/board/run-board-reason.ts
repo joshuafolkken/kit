@@ -28,7 +28,7 @@ import type { ItemStatus } from './run-board-status'
 // judging it is what a person can do meanwhile.
 
 const { LANE_STAGE } = run_event_setup
-const { HEADER_ICONS, STAGE_ICONS, WAIT_ICONS } = run_board_labels
+const { HEADER_ICONS, STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
 const FIRST_ONLY = 1
 
@@ -63,6 +63,8 @@ interface Pool {
 	// The untriaged issue nothing blocks that withholds every candidate (`epic-triage.ts`), if any.
 	held_by: number | undefined
 	running: ReadonlyArray<number>
+	// The issues the classifier withholds for a person (`epic-outside-blocker.ts`'s `human`).
+	withheld: ReadonlySet<number>
 	// The row the run's planning is for, while the run plans (`run-board-planning.ts`).
 	planning: Planning | undefined
 	// The first `run:solo` candidate and the candidates behind it (`epic-solo.ts`), if any.
@@ -115,6 +117,7 @@ function pool_of(read: ReasonRead): Pool {
 	return {
 		held_by: waiting.find((child) => is_untriaged_candidate(child, read))?.number,
 		running,
+		withheld: read.plan.withheld ?? new Set(),
 		planning: run_board_planning.planning_of(read, running),
 		solo: epic_solo.queue_of(candidates),
 	}
@@ -229,6 +232,12 @@ function not_before_of(child: EpicChild): RowReason | undefined {
 	}
 }
 
+// `🔗 4183` for a blocker the run finishes, `🙋 4183` where the classifier withholds the row for a
+// person: the run will not finish a blocker it waits on (joshuafolkken/kit#4292).
+function blocker_icon(child: EpicChild, pool: Pool): string {
+	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
+}
+
 // `❓ 4183`: an issue nobody has judged, naming its first standing blocker where it has one.
 function untriaged_of(waits: ReadonlyArray<string>): RowReason {
 	return { icon: WAIT_ICONS.untriaged, issues: waits.slice(0, FIRST_ONLY) }
@@ -241,7 +250,7 @@ function wait_of(
 	pool: Pool,
 ): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return untriaged_of(waits)
-	if (waits.length > 0) return { icon: WAIT_ICONS.blocker, issues: waits }
+	if (waits.length > 0) return { icon: blocker_icon(child, pool), issues: waits }
 
 	return not_before_of(child) ?? offer_wait(child, read, pool)
 }

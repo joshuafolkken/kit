@@ -8,8 +8,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // lane row passes its share.
 
 const { GAUGE_SHADES, bar_of } = run_board_labels
-const { cell_widths, cells_of, finish_of, lane_limits, lane_thresholds, plain_of } =
-	run_board_usage_text
+const { cell_widths, cells_of, lane_limits, lane_thresholds, plain_of } = run_board_usage_text
 const GB = 1024 * 1024 * 1024
 const GAUGE = 5
 const SCALE: UsageScale = { cores: 10, total_bytes: 20 * GB }
@@ -113,22 +112,5 @@ describe('run_board_usage_text.plain_of', () => {
 
 		expect(plain_of(figure(6.2, 2.7, 1.5), eleven)).toBe('56.4%/2.7G/1.5G')
 		expect(plain_of(figure(undefined, 0.7, 0.6), eleven)).toBe('-/0.7G/0.6G')
-	})
-})
-
-// joshuafolkken/kit#3554: a settled row's finish time, dated on another day.
-describe('run_board_usage_text.finish_of', () => {
-	const NOW = new Date(2026, 9, 9, 16, 30).getTime()
-
-	it('draws a finish time of the board’s own day as `🔚 HH:MM`', () => {
-		expect(finish_of(new Date(2026, 9, 9, 14, 5).getTime(), NOW)).toBe('🔚 14:05')
-	})
-
-	it('dates a finish time of another day', () => {
-		expect(finish_of(new Date(2026, 9, 8, 23, 59).getTime(), NOW)).toBe('🔚 10/8 23:59')
-	})
-
-	it('draws nothing for a row settled with no recorded end', () => {
-		expect(finish_of(undefined, NOW)).toBeUndefined()
 	})
 })

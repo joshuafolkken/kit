@@ -3,18 +3,22 @@ import { run_board_fit, type PlanLine, type PlanSection } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
+import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_section, type RuleColumn } from './run-board-render-section'
 import type { LaneUsages, UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 
-// The run's own rows' CPU, MEM and CMPRS cells, right after each row's number, under a rule whose
-// labels stand over them: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ─ 🤏 CMPRS ───`. A running row draws its
-// lane's figures; every other row blanks of the same width, so every kind icon and title after them
-// starts in one column. Drawn with gauges on a terminal and as figures alone anywhere else.
+// The run's own rows' CPU, MEM and CMPRS cells, right after each row's lead and before its number,
+// under a rule whose labels stand over them and over the run's time: `── 🧵 lanes ── ⏰ ── 💪 CPU ─
+// 🧠 MEM ─ 🤏 CMPRS ───`. The cells start at `USAGE_START`, as the processes rows' do, so the two
+// sections' figures stand in one column (joshuafolkken/kit#4292). A running row draws its lane's
+// figures; every other row blanks of the same width, so every number and title after them starts in
+// one column. Drawn with gauges on a terminal and as figures alone anywhere else.
 
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
-const { columns_rule, label_room } = run_board_render_section
+const { columns_rule } = run_board_render_section
+const { ELAPSED_START, USAGE_START } = run_board_render_lead
 const { width_of } = run_board_fit
 const GAUGE = 5
 const CELL_GAP = ' '
@@ -24,8 +28,6 @@ const LABEL_TAIL = 2
 // terminal draws them: 🛤 and 🗜, text symbols drawn as emoji, overlapped the blank after them.
 const LANES_LABEL = `${run_board_labels.LANES_ICON} lanes`
 const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🤏 CMPRS']
-// What a row draws before its number: the indent and the state icon, then a blank.
-const NUMBER_START = '  🔄 '
 
 // What one frame's lane cells are drawn with.
 interface LaneCells {
@@ -34,7 +36,7 @@ interface LaneCells {
 	// Each live row's share of the header's yellow thresholds, counted once a frame.
 	limits: CellLimits
 	gauge: number
-	// The widest row number of the section, so the cells after it start in one column.
+	// The widest row number of the section, so the kind icon and title after it start in one column.
 	number_width: number
 }
 
@@ -67,19 +69,12 @@ function column_cells(
 	return cells.join(CELL_GAP)
 }
 
-// The width a section's lead — what is drawn before its first column — is padded to: its widest, or
-// wider where the rule's own label would otherwise push the first column's label past its cells.
-function lead_width(widest: number, label: string, lead_start: number): number {
-	return Math.max(widest, label_room(label) - lead_start - CELL_GAP.length)
-}
-
 // `undefined` where the frame read no usage, which draws no cells.
 function lane_cells_of(header: BoardHeader, rows: ReadonlyArray<BoardRow>): LaneCells | undefined {
 	const { usages } = header
 
 	if (usages === undefined) return undefined
 
-	const widest = Math.max(0, ...rows.map((row) => String(row.number).length))
 	const running = rows.filter((row) => run_board_earlier.is_live(row)).length
 
 	return {
@@ -87,12 +82,11 @@ function lane_cells_of(header: BoardHeader, rows: ReadonlyArray<BoardRow>): Lane
 		scale: usages.scale,
 		limits: lane_limits(running),
 		gauge: gauge_of(header),
-		number_width: lead_width(widest, LANES_LABEL, width_of(NUMBER_START)),
+		number_width: Math.max(0, ...rows.map((row) => String(row.number).length)),
 	}
 }
 
-// A row's number as linked, then — where cells are drawn — padded to the section's widest and
-// followed by its cells.
+// A row's number as linked — where cells are drawn, after them and padded to the section's widest.
 function number_text(
 	row: BoardRow,
 	cells: LaneCells | undefined,
@@ -105,7 +99,7 @@ function number_text(
 	const figure = run_board_earlier.is_live(row) ? cells.usages.get(row.number) : undefined
 	const drawn = column_cells(figure, cells.scale, cells.gauge, cells.limits)
 
-	return `${link(number)}${' '.repeat(cells.number_width - number.length)} ${drawn}`
+	return `${drawn} ${link(number)}${' '.repeat(cells.number_width - number.length)}`
 }
 
 // Each column's label, placed at the column its cells start at, the first at `first`.
@@ -121,21 +115,19 @@ function label_columns(first: number, gauge: number): Array<RuleColumn> {
 	})
 }
 
-// The run's own rows under the lanes rule where cells are drawn, under a blank line where not.
+// The run's own rows under the lanes rule, ⏰ over the run's time and the usage labels over their
+// cells where they are drawn.
 function lanes_section(
 	lines: ReadonlyArray<PlanLine>,
 	cells: LaneCells | undefined,
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	const section = { lines, label: LANES_LABEL, key: 'lanes' as const }
+	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START }
+	const usage = cells === undefined ? [] : label_columns(USAGE_START, cells.gauge)
+	const rule = columns_rule(LANES_LABEL, [elapsed, ...usage])
 
-	if (cells === undefined) return [{ head: [''], ...section }]
-
-	const first = width_of(NUMBER_START) + cells.number_width + CELL_GAP.length
-	const rule = columns_rule(LANES_LABEL, label_columns(first, cells.gauge))
-
-	return [{ head: ['', rule], ...section }]
+	return [{ head: ['', rule], lines, label: LANES_LABEL, key: 'lanes' }]
 }
 
 const run_board_render_lanes = {
@@ -145,7 +137,6 @@ const run_board_render_lanes = {
 	label_columns,
 	lane_cells_of,
 	lanes_section,
-	lead_width,
 	number_text,
 }
 

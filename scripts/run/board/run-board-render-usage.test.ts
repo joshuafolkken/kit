@@ -10,7 +10,7 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 // joshuafolkken/kit#3489: each running lane's CPU and memory at the end of its row, on no row where the pane is too narrow for it on any.
 
 const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_board_render_fixture
-const USAGE = /🔨 1 +20\.0 +1\.6 +0\.2 +Issue 1/u
+const USAGE = /🔨 +0″ +0″ +20\.0 +1\.6 +0\.2 1 +Issue 1/u
 const FIGURE = /\d\.\d/u
 const WIDE = 200
 const NARROW = 80
@@ -73,7 +73,7 @@ describe('run_board_render.render usage cells', () => {
 		const lines = lines_of(board())
 
 		expect(row_line(lines, 'Issue 1')).toMatch(USAGE)
-		expect(row_line(lines, 'Issue 1')).toMatch(/ {2}🔨 0″ {2}🔗 3$/u)
+		expect(row_line(lines, 'Issue 1')).toMatch(/Issue 1 +🔗 3$/u)
 		expect(row_line(lines, 'Issue 1')).not.toContain('🧠')
 	})
 
@@ -111,7 +111,7 @@ describe('run_board_render.render usage cells', () => {
 })
 
 // A running row's tail, after the head its cells are drawn in.
-const TAIL = '  🔨 0″'
+const TAIL = '  🔗 3'
 
 // joshuafolkken/kit#3769: a row with cells narrows its title, so its head stays on one line.
 describe('run_board_render.render usage cells in a narrow pane', () => {
@@ -124,10 +124,10 @@ describe('run_board_render.render usage cells in a narrow pane', () => {
 	})
 })
 
-// joshuafolkken/kit#3554: the usage column on every row, a finished row's filled with its finish time,
-// so every running row's tail starts in one column.
+// joshuafolkken/kit#3554, #4292: the usage column on every lane row, a finished row's condition column
+// filled with its finish time, so every running row's phase time stands in one column.
 const TRACK: Array<Phase> = ['investigate', 'plan', 'ship']
-const FINISH = /🔚 (?:\d+\/\d+ )?\d{2}:\d{2}/u
+const FINISH = /\d{2}-\d{2} \d{2}:\d{2}/u
 const PHASE_TIME = '30″'
 
 function tracked(number: number, state: BoardRow['state'], ended_ms?: number): BoardRow {
@@ -169,7 +169,7 @@ function mixed_lines(extra: Partial<BoardHeader> = {}, columns = WIDE): Array<st
 }
 
 describe('run_board_render.render usage column on every row', () => {
-	it('starts every running row’s tail in one column whatever each row draws in the column', () => {
+	it('starts every running row’s phase time in one column whatever each row draws in the usage column', () => {
 		const lines = mixed_lines()
 		const columns = ['Issue 1', 'Issue 4', 'Issue 6'].map((title) =>
 			column_of(row_line(lines, title), PHASE_TIME),
@@ -179,10 +179,10 @@ describe('run_board_render.render usage column on every row', () => {
 		expect(new Set(columns).size).toBe(1)
 	})
 
-	it('ends a settled row on its usage column, with no tail after it', () => {
+	it('ends a settled row on its duration, with no tail after it', () => {
 		const lines = mixed_lines()
 
-		expect(row_line(lines, 'Issue 3')).toMatch(/🔚 [\d/ :]+$/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/Issue 3 +0″$/u)
 		expect(row_line(lines, 'Issue 7')).not.toContain(PHASE_TIME)
 	})
 
@@ -191,14 +191,15 @@ describe('run_board_render.render usage column on every row', () => {
 
 		expect(row_line(lines, 'Issue 3')).toMatch(FINISH)
 		expect(row_line(lines, 'Issue 5')).toMatch(FINISH)
-		expect(row_line(lines, 'Issue 7')).not.toContain('🔚')
-		expect(row_line(lines, 'Issue 8')).not.toContain('🔚')
+		expect(row_line(lines, 'Issue 7')).not.toMatch(FINISH)
+		expect(row_line(lines, 'Issue 8')).not.toMatch(FINISH)
+		expect(lines.join('\n')).not.toContain('🔚')
 	})
 
 	it('draws no usage on a finished row', () => {
 		const lines = mixed_lines()
 
-		expect(row_line(lines, 'Issue 3')).toMatch(/^ {2}✅ 3 {4}Issue 3/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/^ {4}✅ \d{2}-\d{2} \d{2}:\d{2} 3 {4}Issue 3/u)
 		expect(row_line(lines, 'Issue 5')).not.toMatch(FIGURE)
 	})
 
@@ -210,14 +211,14 @@ describe('run_board_render.render usage column on every row', () => {
 	})
 })
 
-// Too narrow for a settled row with its finish time, wide enough for the row without it.
 const FINISH_NARROW = 70
 
 describe('run_board_render.render finish column on a narrow pane', () => {
-	it('drops the finish time from every row where the column does not fit', () => {
+	it('keeps the finish time in its own column on a narrow pane, and draws no 🔚', () => {
 		const lines = mixed_lines({}, FINISH_NARROW)
 
 		expect(lines.join('\n')).not.toContain('🔚')
+		expect(row_line(lines, 'Issue 3')).toMatch(FINISH)
 		expect(row_line(lines, 'Issue 3')).toMatch(/\d″$/u)
 	})
 })

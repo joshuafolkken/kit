@@ -35,6 +35,19 @@ function osc_link(reference: string): string {
 	return `\u{1B}]8;;https://example.test/${reference}\u{7}${reference}\u{1B}]8;;\u{7}`
 }
 
+describe('run_board_render_condition.condition_of — a finished row', () => {
+	it('draws its end where its reason carries only a tail', () => {
+		const ended_ms = NOW - STOOD_SECONDS * SECOND
+		const withdrawn = {
+			...row(1, { tail: 'withdrawn' }),
+			state: 'withdrawn' as const,
+			status: { state: 'withdrawn' as const, ended_ms },
+		}
+
+		expect(condition_of(withdrawn, header())).toContain(day_minute_of(ended_ms))
+	})
+})
+
 describe('run_board_render_condition.condition_of', () => {
 	it('is as wide as a 📅 row’s start time, the widest value', () => {
 		expect(CONDITION_WIDTH).toBe(day_minute_of(0).length)
@@ -107,8 +120,8 @@ describe('run_board_render.render — the condition column across sections', () 
 	const lines = lines_of(header({ layout }))
 
 	it('starts every queued and waiting row’s number in one column', () => {
-		const queued_line = lines.find((line) => line.startsWith(`  ${WAIT_ICONS.lane} `)) ?? ''
-		const waiting_line = lines.find((line) => line.startsWith(`  ${WAIT_ICONS.blocker} `)) ?? ''
+		const queued_line = lines.find((line) => line.startsWith(`    ${WAIT_ICONS.lane} `)) ?? ''
+		const waiting_line = lines.find((line) => line.startsWith(`    ${WAIT_ICONS.blocker} `)) ?? ''
 
 		expect(queued_line.indexOf(' 5')).toBe(waiting_line.indexOf(' 1234'))
 		expect(queued_line).not.toBe('')
@@ -120,8 +133,8 @@ describe('run_board_render.render — the condition column across sections', () 
 		const behind = row(4269, { icon: WAIT_ICONS.solo_ahead, issues: ['4287'] })
 		const rows = [solo, behind].map((entry) => ({ kind: 'row' as const, row: entry }))
 		const drawn = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: rows } }))
-		const solo_line = drawn.find((line) => line.startsWith(`  ${WAIT_ICONS.solo} `)) ?? ''
-		const behind_line = drawn.find((line) => line.startsWith(`  ${WAIT_ICONS.solo_ahead} `)) ?? ''
+		const solo_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo} `)) ?? ''
+		const behind_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo_ahead} `)) ?? ''
 
 		expect(solo_line).toContain(`4288+1${' '.repeat(CONDITION_WIDTH - '4288+1'.length)} 4287`)
 		expect(solo_line.endsWith('4268')).toBe(true)

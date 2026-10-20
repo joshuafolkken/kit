@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_processes } from './run-board-render-processes'
 import type { UsageFigure } from './run-board-usage'
 
@@ -10,6 +11,9 @@ import type { UsageFigure } from './run-board-usage'
 
 const { processes_part } = run_board_render_processes
 const { GB, board_usage, header } = run_board_render_fixture
+const { USAGE_START } = run_board_render_lead
+const GROUP_INDENT = 4
+const DETAIL_INDENT = 6
 const SPINNER = '⠋'
 const RULE_START = '── 💻 processes '
 
@@ -83,6 +87,25 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 		const lines = texts(part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER))
 
 		expect(new Set(lines.map((line) => cells_start(line))).size).toBe(1)
+	})
+})
+
+describe('run_board_render_processes.processes_part columns', () => {
+	// joshuafolkken/kit#4292: groups stand at indent 4, parts at 6, cells at USAGE_START whatever the names.
+	it('indents groups by 4 and parts by 6, and starts the cells at USAGE_START', () => {
+		const name = 'A Rather Long Application Name'
+		const long: ProcessGroups['apps'] = {
+			total: figure(0.5, 1, 0.1),
+			top: [{ name, instances: 1, figure: figure(0.5, 1, 0.1) }],
+		}
+		const lines = part_of({ backlogrun: BACKLOGRUN, apps: long }, SPINNER)?.lines ?? []
+
+		for (const line of lines) {
+			expect(line.text.search(/\S/u)).toBe(line.is_detail ? DETAIL_INDENT : GROUP_INDENT)
+			expect(line.text.slice(USAGE_START - 1, USAGE_START)).toBe(' ')
+		}
+
+		expect(new Set(lines.map((line) => cells_start(line.text))).size).toBe(1)
 	})
 })
 

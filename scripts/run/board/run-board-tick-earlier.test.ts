@@ -57,11 +57,11 @@ function header(lines: ReadonlyArray<string>): Array<string> {
 	return lines.slice(0, lines.indexOf(''))
 }
 
-// The lanes section: the block after the header — with no usage read, it draws no rule of its own.
+// The lane rows: the block after the header, below the lanes rule that is always drawn.
 function lane_rows(lines: ReadonlyArray<string>): Array<string> {
 	const start = lines.indexOf('') + 1
 
-	return lines.slice(start, lines.indexOf('', start))
+	return lines.slice(start + 1, lines.indexOf('', start))
 }
 
 describe('run_board_tick.tick — an earlier run’s lanes holding a place', () => {
@@ -70,7 +70,7 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 		const lanes = `${String(LANE_LIMIT)}/${String(LANE_LIMIT)}`
 		// joshuafolkken/kit#4288: the count fills the condition column; a row with no title ends at its
 		// number.
-		const queued = new RegExp(`^ {2}🧵 ${lanes} +${String(QUEUED)}$`, 'u')
+		const queued = new RegExp(`^ {4}🧵 ${lanes} +${String(QUEUED)}$`, 'u')
 
 		expect(lines).toContainEqual(expect.stringMatching(queued))
 		expect(lane_rows(lines)).toHaveLength(LANE_LIMIT)
@@ -98,7 +98,7 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 
 	it('draws the earlier run’s lanes before the plan is read', async () => {
 		const lines = await frame_of(FULL, [])
-		const row = new RegExp(String.raw`^\s*${STATE_ICONS.earlier} \d`, 'u')
+		const row = new RegExp(String.raw`^\s*${STATE_ICONS.earlier} +\d`, 'u')
 
 		expect(lines.filter((line) => row.test(line))).toHaveLength(EARLIER.length)
 	})

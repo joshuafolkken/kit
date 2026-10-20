@@ -94,6 +94,8 @@ describe('run_board_render.render an earlier run’s lane row', () => {
 		)
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, earlier: [EARLIER_ROW] }, usages }))
 
-		expect(lines.find((line) => line.includes('Earlier'))).toMatch(/20\.0 +1\.6 +0\.2 +Earlier/u)
+		expect(lines.find((line) => line.includes('Earlier'))).toMatch(
+			/20\.0 +1\.6 +0\.2 4173 +Earlier/u,
+		)
 	})
 })
