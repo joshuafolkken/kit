@@ -13,7 +13,7 @@ const ISSUE = { arguments: '<N>' }
 // order.
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
-const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-cli.ts'
+const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-main.ts'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const RUN_COMMANDS: Record<string, CommandEntry> = {
@@ -82,7 +82,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	...PAUSE_COMMANDS,
 	'run:tidy': {
-		script: 'scripts/run/tidy/run-tidy-cli.ts',
+		script: 'scripts/run/tidy/run-tidy-main.ts',
 		description: 'Close merged lanes and drop stashes whose issues are all merged',
 		category: 'AI tools',
 		reference: ['', 'automation', ['git', 'network', 'files']],
@@ -260,7 +260,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	...PROGRESS_COMMANDS,
 	'run:prep': {
-		script: 'scripts/run/run-prep-cli.ts',
+		script: 'scripts/run/run-prep-main.ts',
 		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['network']],

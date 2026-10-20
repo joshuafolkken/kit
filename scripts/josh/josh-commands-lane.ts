@@ -130,7 +130,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'lane:launch': {
-		script: 'scripts/lane/lane-launch-cli.ts',
+		script: 'scripts/lane/lane-launch-main.ts',
 		description:
 			'Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child',
 		category: 'AI tools',

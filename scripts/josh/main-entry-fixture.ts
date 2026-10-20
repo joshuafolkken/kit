@@ -42,7 +42,9 @@ async function expect_pass_through(entry_case: EntryCase): Promise<void> {
 	const { entry, run, called_with = [ARGUMENTS] } = entry_case
 
 	run.mockReset()
-	run.mockResolvedValue(EXIT_CODE)
+	// A plain value rather than a resolved one: an async entry awaits it the same, and a sync `run`
+	// (`backlog:budget`) assigns it to `process.exitCode` as it is.
+	run.mockReturnValue(EXIT_CODE)
 
 	expect(await run_entry(entry, ARGUMENTS)).toBe(EXIT_CODE)
 	expect(run).toHaveBeenCalledWith(...called_with)

@@ -1,4 +1,3 @@
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
@@ -337,14 +336,6 @@ describe('epic_bundle_cli.build_epic_index', () => {
 		const index = epic_bundle_cli.build_epic_index([{ number: 900, body: '- [ ] #1' }])
 
 		expect(index.get(2)).toBeUndefined()
-	})
-})
-
-describe('josh epic:bundle registration', () => {
-	it('is registered as a command', () => {
-		const entry = COMMAND_MAP['epic:bundle']
-
-		expect(entry?.script).toBe('scripts/epic/epic-bundle-cli.ts')
 	})
 })
 

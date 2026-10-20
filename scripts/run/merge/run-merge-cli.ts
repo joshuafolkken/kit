@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
@@ -30,7 +28,6 @@ import { run_merge_token, type MergeToken } from './run-merge-token'
 // (stop — the child's own ending), `stop` (the consecutive-failure guard tripped, or a failed child could not be parked) and `retry` (the
 // child's state could not be read; re-read before deciding).
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const FIRST = 0
@@ -424,10 +421,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return result.code
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_merge_cli = {
 	merge_child,
 	parse,
@@ -435,8 +428,6 @@ const run_merge_cli = {
 	record_merged,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { MergeResult }
 export { run_merge_cli }

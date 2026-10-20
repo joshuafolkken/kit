@@ -12,7 +12,6 @@ import {
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -21,7 +20,6 @@ import { backlog_next } from './backlog-next'
 
 const { issue, console_streams } = auto_ok_fixture
 
-const COMMAND_NAME = 'backlog:next'
 const CHILD = 901
 const SECOND_EPIC = 810
 const FOREIGN_NUMBER = 903
@@ -160,13 +158,5 @@ describe('a read that failed is not an answer', () => {
 		expect(await backlog_next.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stdout()).toBe('')
 		expect(stderr()).toContain(backlog_next.REPO_UNREADABLE_MESSAGE)
-	})
-})
-
-describe(`josh ${COMMAND_NAME} registration`, () => {
-	it('is registered as a command', () => {
-		const entry = COMMAND_MAP[COMMAND_NAME]
-
-		expect(entry?.script).toBe('scripts/backlog/backlog-next.ts')
 	})
 })

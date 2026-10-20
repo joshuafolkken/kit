@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -21,7 +19,6 @@ import { execa } from 'execa'
 // warning. Their explanations stream through to stderr; the child's pid is the one thing on stdout.
 // A lane a park kept is the one `already-open` it steps past — `lane_directory` below.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
@@ -171,13 +168,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await launch(context)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const lane_launch_cli = { launch_lane, read_context, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { LaunchContext, LaunchOutcome }
 export { lane_launch_cli }

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { json_value } from '#scripts/lib/json-value'
@@ -21,7 +19,6 @@ import { backlog_offer, type OfferAnswer } from './backlog-offer'
 // and in the `--json` object; every explanation `backlog:next` and `backlog:budget` print is streamed
 // straight through to stderr.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'offer'
@@ -230,10 +227,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await decide(values, counts)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const backlog_offer_cli = {
 	JSON_KEY,
 	budget_argv,
@@ -242,8 +235,6 @@ const backlog_offer_cli = {
 	read_values,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_offer_cli }
 export type { ParsedValues }
