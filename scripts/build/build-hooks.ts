@@ -28,11 +28,11 @@ const ANY_PATH = /.*/
 //
 // **`splitting: true` is load-bearing, not an optimization.** Every hook module decides whether to
 // run its main from `process.argv[1] === fileURLToPath(import.meta.url)`. A single-file bundle would
-// collapse every imported module's `import.meta.url` to the one output path, so a call to
-// `node dist/hooks/pretool-guard.js` would fire the self-invoke of `batch-guard` and
-// `investigation-guard` too — each reads stdin, and the second read gets an empty payload. Code
-// splitting keeps every entry in its own file with its own `import.meta.url`, so an imported guard's
-// `import.meta.url` never equals `argv[1]` and only the file actually launched runs its main.
+// collapse every imported module's `import.meta.url` to the one output path, so a call to one hook
+// would fire the self-invoke of every other entry it carries — each reads stdin, and the second read
+// gets an empty payload. Code splitting keeps every entry in its own file with its own
+// `import.meta.url`, so only the file actually launched runs its main. The guards `pretool-guard`
+// composes carry no self-invoke: theirs live in `*-main.ts` entries no module imports.
 //
 // **The flip side: an entry another entry imports loses its main**. Splitting
 // moves a module two entries share into a chunk, so a launched hook whose own module is imported
@@ -48,20 +48,15 @@ interface HookBundle {
 	out: string
 }
 
-// The settings.json hooks (the session-start audit provisioner among them), the Codex input adapter, and the three guards `pretool-guard`
-// composes: `batch-guard`, `investigation-guard` and `duplicate-read-guard` each self-invoke, so they
-// must be their own entries to keep their `import.meta.url` out of `pretool-guard`'s file.
-// `delivered-rules` (the fourth guard) has no self-invoke, so it stays inlined.
+// The settings.json hooks (the session-start audit provisioner among them) and the Codex input
+// adapter — every hook a hook config launches, and nothing else.
 const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/codex-hook-adapter.ts', out: 'codex-hook-adapter' },
 	{ source: 'scripts/hooks/pretool-guard-cli.ts', out: 'pretool-guard' },
 	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
 	{ source: 'scripts/hooks/format-edited-cli.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-cli.ts', out: 'session-lang' },
-	{ source: 'scripts/security/security-audit-provision.ts', out: 'audit-provision' },
-	{ source: 'scripts/hooks/batch-guard.ts', out: 'batch-guard' },
-	{ source: 'scripts/delegation/investigation-guard.ts', out: 'investigation-guard' },
-	{ source: 'scripts/delegation/duplicate-read-guard.ts', out: 'duplicate-read-guard' },
+	{ source: 'scripts/security/security-audit-provision-main.ts', out: 'audit-provision' },
 ]
 
 function entry_point(bundle: HookBundle): { in: string; out: string } {

@@ -40,7 +40,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	lint: {
-		script: 'scripts/lint/lint-parallel.ts',
+		script: 'scripts/lint/lint-parallel-main.ts',
 		description: 'Check code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
 		reference: ['[--changed]', 'developer', ['processes']],
@@ -174,7 +174,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:unit': {
-		script: 'scripts/test/test-unit-guard.ts',
+		script: 'scripts/test/test-unit-guard-main.ts',
 		description:
 			'Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests)',
 		category: 'Development',
@@ -211,7 +211,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'test:red': {
-		script: 'scripts/test/test-red.ts',
+		script: 'scripts/test/test-red-main.ts',
 		description:
 			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only',
 		category: 'Development',

@@ -1,3 +1,4 @@
+import { text } from 'node:stream/consumers'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
@@ -481,6 +482,15 @@ function report_no_payload(command: string): void {
 	)
 }
 
+// A guard entry's whole main: the payload on stdin judged by `outcome`, or the hand-run notice.
+async function respond_from_stdin(
+	command: string,
+	outcome: (raw: string) => GuardOutcome,
+): Promise<void> {
+	if (process.stdin.isTTY) report_no_payload(command)
+	else write_outcome(await text(process.stdin), outcome)
+}
+
 const hook_decision = {
 	DISABLED_VALUES,
 	ENABLED_VALUES,
@@ -497,6 +507,7 @@ const hook_decision = {
 	notice_envelope,
 	parse_hook_payload,
 	report_no_payload,
+	respond_from_stdin,
 	rewrite_envelope,
 	stamp_fault,
 	write_decision,

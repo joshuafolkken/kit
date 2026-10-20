@@ -16,9 +16,9 @@ const REFERENCE = 'docs/environment-variables.md'
 // whose examples must not be counted.
 const LIST_START = 'Only these load `.env` themselves'
 const LIST_END = 'Every other command'
-// `write_outcome` and `write_decision` are `hook-decision.ts`'s wrappers that load the file before
-// running a guard, so a guard calling either loads it without naming the loader.
-const LOADER_CALL = /\b(?:load_environment_file|write_outcome|write_decision)\(/u
+// `write_outcome`, `write_decision` and `respond_from_stdin` are `hook-decision.ts`'s wrappers that
+// load the file before running a guard, so a guard calling one loads it without naming the loader.
+const LOADER_CALL = /\b(?:load_environment_file|write_outcome|write_decision|respond_from_stdin)\(/u
 
 // Each line that must name `prrun` beside the commands whose gate, chain and CI E2E steps it shares,
 // found by a phrase the line opens with rather than a line number.

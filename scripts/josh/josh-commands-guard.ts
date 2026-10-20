@@ -15,7 +15,7 @@ const IN_PRETOOL_GUARD = 'run inside pretool:guard, not wired on its own'
 /* eslint-disable @typescript-eslint/naming-convention */
 const GUARD_COMMANDS: Record<string, CommandEntry> = {
 	'investigation:guard': {
-		script: 'scripts/delegation/investigation-guard.ts',
+		script: 'scripts/delegation/investigation-guard-main.ts',
 		description:
 			'Claude Code hook: refuse a read once the unedited-read threshold is reached again (reads the tool call on stdin)',
 		category: 'AI tools',
@@ -23,7 +23,7 @@ const GUARD_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: PRE_TOOL_USE }] },
 	},
 	'duplicate-read:guard': {
-		script: 'scripts/delegation/duplicate-read-guard.ts',
+		script: 'scripts/delegation/duplicate-read-guard-main.ts',
 		description:
 			'Claude Code hook: refuse a second whole-file read of a path whose content has not changed since the run last read it (reads the tool call on stdin)',
 		category: 'AI tools',

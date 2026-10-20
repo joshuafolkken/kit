@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
@@ -35,7 +34,6 @@ import { review_tree } from './review-tree'
 // so "still running" is the usual answer at this point), how this project runs its unit tests, and —
 // on round 2 — which files the first round's fixes touched.
 
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
 
 // The rubric's absolute path, resolved against the kit package rather than the review checkout root.
@@ -368,10 +366,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_review(round, await read_change())
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const review_brief_cli = {
 	FIRST_ROUND,
 	format_reason,
@@ -382,7 +376,5 @@ const review_brief_cli = {
 	report_error,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { review_brief_cli }

@@ -1,6 +1,3 @@
-#!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
-import { fileURLToPath } from 'node:url'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
@@ -59,11 +56,6 @@ const investigation_refusal = GUARD.refusal
 const investigation_outcome = GUARD.outcome
 const { is_enabled, refusal_path } = GUARD
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('investigation:guard')
-	else hook_decision.write_outcome(await text(process.stdin), investigation_outcome)
-}
 
 export {
 	deny_envelope,

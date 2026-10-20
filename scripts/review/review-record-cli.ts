@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -24,7 +22,6 @@ import { review_record, type RecordVerdict } from './review-record'
 // merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
 // merge is refused until the round is recorded. It mirrors `josh review:attest --check`.
 
-const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE =
 	'Usage: josh review:record --issue <N> [--comment] [<category>:<severity>:<file> ...] | josh review:record --check --issue <N>'
@@ -252,10 +249,6 @@ async function run(
 	return await run_record(parsed, now, root)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv, new Date())
-}
-
 const review_record_cli = {
 	accepted_values,
 	build_lines,
@@ -263,7 +256,5 @@ const review_record_cli = {
 	run,
 	usage_text,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { review_record_cli }
