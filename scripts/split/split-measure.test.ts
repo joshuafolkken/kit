@@ -1,5 +1,5 @@
 import { mkdtempSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -63,6 +63,20 @@ describe('read_branch', () => {
 		expect(await split_measure.read_branch()).toStrictEqual({
 			files: 1,
 			lines: 5,
+			verdict: 'single',
+		})
+	})
+})
+
+describe('read_branch with an unreadable untracked entry', () => {
+	it('counts it as a zero-line file instead of failing', async () => {
+		await symlink(path.join(fixture.root, 'missing.ts'), path.join(fixture.root, 'dangling.ts'))
+		await mkdir(path.join(fixture.root, 'nested-repo'))
+		vi.mocked(git_command.untracked_names).mockResolvedValue('dangling.ts\nnested-repo/')
+
+		expect(await split_measure.read_branch()).toStrictEqual({
+			files: 2,
+			lines: 0,
 			verdict: 'single',
 		})
 	})

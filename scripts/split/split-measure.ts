@@ -11,9 +11,12 @@ import { split_assess } from './split-assess'
 // when it measures, so the diff alone counted every new file a branch created as absent. Each
 // untracked file is added as a numstat row of its line count, so a branch made of new modules
 // measures as large as it is. A file holding a NUL byte is binary and counts zero lines, as
-// `git diff --numstat` counts it.
+// `git diff --numstat` counts it. An entry with no readable content — a dangling symlink, a nested
+// repository's directory — still counts as a file, of zero lines, so one such entry cannot reject
+// the whole measurement.
 
 const NUL_BYTE = 0
+const NO_CONTENT = Buffer.alloc(0)
 const NEWLINE = '\n'
 
 function line_count(content: Buffer): number {
@@ -25,8 +28,16 @@ function line_count(content: Buffer): number {
 	return text === '' || text.endsWith(NEWLINE) ? newlines : newlines + 1
 }
 
+async function read_content(file_path: string): Promise<Buffer> {
+	try {
+		return await readFile(file_path)
+	} catch {
+		return NO_CONTENT
+	}
+}
+
 async function untracked_row(root: string, file: string): Promise<string> {
-	const lines = line_count(await readFile(path.join(root, file)))
+	const lines = line_count(await read_content(path.join(root, file)))
 
 	return `${String(lines)}\t0\t${file}`
 }

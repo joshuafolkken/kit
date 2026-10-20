@@ -1,8 +1,8 @@
 {
-	"reason": "Review round 1: split measurement now counts untracked new files (split-measure.ts, shared by split:assess, issue:fold and main:merge) and the notice section names the run:cut boundary",
+	"reason": "Split measurement now reads untracked files itself (git diff never lists them), including a guard that counts an unreadable untracked entry as a zero-line file so one dangling symlink cannot reject the measurement",
 	"date": "2026-10-20",
 	"growth": {
-		"scripts.code_lines": 56,
+		"scripts.code_lines": 64,
 		"ai_cost.on_demand_bytes": 646
 	}
 }
