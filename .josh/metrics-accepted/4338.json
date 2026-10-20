@@ -1,0 +1,7 @@
+{
+	"reason": "fresh-machine-run now refuses an unanswered registry query explicitly; the async execa call used to throw implicitly",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 1
+	}
+}

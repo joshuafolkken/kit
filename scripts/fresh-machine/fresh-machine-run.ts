@@ -11,6 +11,7 @@ import {
 import os from 'node:os'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { npm_registry } from '#scripts/version/npm-registry'
 import { execa, type Options } from 'execa'
 import { z } from 'zod'
 import { fresh_machine_docker, type ContainerRun } from './fresh-machine-docker'
@@ -140,12 +141,13 @@ function package_name(): string {
 
 // The published version is always written out in the log and the install command, so a run can be
 // repeated against the same release; without `--package-version` it is the registry's latest.
-async function published_version(requested: string | undefined): Promise<string> {
+function published_version(requested: string | undefined): string {
 	if (requested !== undefined) return requested
 
-	const { stdout } = await execa(PNPM, ['view', package_name(), 'version'], { cwd: PROJECT_ROOT })
+	const answer = npm_registry.view(package_name(), 'version')
+	if (answer.exit_code !== 0) throw new Error('the registry did not answer the latest version')
 
-	return stdout.trim()
+	return answer.stdout.trim()
 }
 
 async function container_run(
@@ -163,7 +165,7 @@ async function container_run(
 		seed_directory: staged.seed_directory,
 		pack_directory: staged.pack_directory,
 		tarball: is_tarball ? await pack(staged.pack_directory, write) : undefined,
-		package_version: is_tarball ? undefined : await published_version(request.package_version),
+		package_version: is_tarball ? undefined : published_version(request.package_version),
 		secret_names: Object.keys(request.secrets),
 	}
 }

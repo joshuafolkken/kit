@@ -16,15 +16,18 @@ beforeEach(() => {
 })
 
 describe('safe_chain_version_update.fetch_latest_version', () => {
-	it('passes a timeout option to execaSync', () => {
+	// joshuafolkken/kit#4338: `npm view` fails with EBADDEVENGINES in a project whose devEngines
+	// names pnpm, so the release was never fetched; the query goes through `npm_registry.view`.
+	it('asks the registry through pnpm, never npm', () => {
 		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '1.5.1\n' })
-		safe_chain_version_update.fetch_latest_version()
 
+		expect(safe_chain_version_update.fetch_latest_version()).toBe('1.5.1')
 		expect(execa_sync_mock).toHaveBeenCalledWith(
-			'npm',
+			'pnpm',
 			['view', '@aikidosec/safe-chain', 'version'],
 			{ reject: false, timeout: 30_000 },
 		)
+		expect(execa_sync_mock).not.toHaveBeenCalledWith('npm', expect.anything(), expect.anything())
 	})
 
 	it('returns the trimmed version', () => {
@@ -50,7 +53,7 @@ describe('safe_chain_version_update.sync', () => {
 		expect(ci_pin_sync_mock).toHaveBeenCalledWith('2.0.0')
 	})
 
-	it('warns and skips the CI pin when npm view fails', () => {
+	it('warns and skips the CI pin when the registry query fails', () => {
 		execa_sync_mock.mockReturnValue({ exitCode: 1, stdout: '' })
 		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => {
 			/* suppress */

@@ -1,20 +1,15 @@
-import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { ci_installer_pin } from '#scripts/safe-chain/ci-installer-pin'
 import { npm_registry } from '#scripts/version/npm-registry'
-import { execaSync } from 'execa'
 
 const SAFE_CHAIN_PKG = '@aikidosec/safe-chain'
 
 // The registry's answer is trusted only as an exact semver version: it ends up in workflow files and
 // in the installer URL.
 function fetch_latest_version(): string | undefined {
-	const result = execaSync('npm', ['view', SAFE_CHAIN_PKG, 'version'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if (result.exitCode !== 0 || !result.stdout) return undefined
+	const answer = npm_registry.view(SAFE_CHAIN_PKG, 'version')
+	if (answer.exit_code !== 0 || !answer.stdout) return undefined
 
-	return npm_registry.valid_version(result.stdout.trim())
+	return npm_registry.valid_version(answer.stdout.trim())
 }
 
 // The hash-verified installer pinned in the workflows is the one place a safe-chain release is

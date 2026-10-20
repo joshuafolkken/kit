@@ -42,10 +42,10 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { json_value } from '#scripts/lib/json-value'
-import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
+import { npm_registry } from './npm-registry'
 import { package_manager_version } from './package-manager-version'
 import { release_age } from './release-age'
 
@@ -133,13 +133,10 @@ function extract_times_json(stdout: string): Record<string, string> | undefined 
 // The registry's publish timestamps for every pnpm release (version → ISO date, plus the
 // created/modified bookkeeping keys the selector ignores).
 function query_release_times(): Record<string, string> | undefined {
-	const result = execaSync('pnpm', ['view', 'pnpm', 'time', '--json'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
+	const answer = npm_registry.view('pnpm', 'time', 'json')
+	if (answer.exit_code !== 0) return undefined
 
-	return extract_times_json(result.stdout)
+	return extract_times_json(answer.stdout)
 }
 
 function to_resolution(
@@ -179,13 +176,10 @@ function parse_latest_version(stdout: string): string | undefined {
 }
 
 function query_latest_version(): string | undefined {
-	const result = execaSync('pnpm', ['view', 'pnpm', 'version', '--json'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
+	const answer = npm_registry.view('pnpm', 'version', 'json')
+	if (answer.exit_code !== 0) return undefined
 
-	return parse_latest_version(result.stdout)
+	return parse_latest_version(answer.stdout)
 }
 
 // The target handed to pnpm self-update: an exact registry-resolved version on the pinned major, or
@@ -274,13 +268,10 @@ function extract_encoded_integrity(stdout: string): string | undefined {
 }
 
 function query_integrity(target: string): string | undefined {
-	const result = execaSync('pnpm', ['view', target, 'dist.integrity', '--json'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
+	const answer = npm_registry.view(target, 'dist.integrity', 'json')
+	if (answer.exit_code !== 0) return undefined
 
-	const encoded = extract_encoded_integrity(result.stdout)
+	const encoded = extract_encoded_integrity(answer.stdout)
 	if (encoded === undefined) return undefined
 
 	return decode_integrity(encoded)
