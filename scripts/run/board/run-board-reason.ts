@@ -9,12 +9,13 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
+import { run_board_planning, type Planning } from './run-board-planning'
 import { run_board_setup } from './run-board-setup'
 import type { ItemStatus } from './run-board-status'
 
 // Why each waiting row waits — pure, so the words are tested apart from the screen. A row whose lane is
 // being opened says the stage that lane is at; any other says what `backlog:next` would answer for it,
-// read off the same rules: the driver's declared order for a named run's issue, `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
+// read off the same rules — after the row a planning run is for, which says so (`run-board-planning.ts`): the driver's declared order for a named run's issue, `epic_triage` for an untriaged issue, `backlog_overlap` for a declared path a
 // running issue holds, the lane limit for a full pool. A start time the body declares and the clock has
 // not reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers
 // the row until then; it reads in the local time every other time on the board does (#4017). A blocker stays the row's `🔗`; only a row that nobody has judged says so beside
@@ -67,6 +68,8 @@ interface Pool {
 	// An untriaged issue nothing blocks withholds every candidate (`epic-triage.ts`).
 	is_held: boolean
 	running: ReadonlyArray<number>
+	// The row the run's planning is for, while the run plans (`run-board-planning.ts`).
+	planning: Planning | undefined
 }
 
 function stage_word(text: string): string | undefined {
@@ -97,11 +100,17 @@ function running_of(read: ReasonRead): Array<number> {
 
 function pool_of(read: ReasonRead): Pool {
 	const waiting = run_board_layout.waiting_children(read)
+	const running = running_of(read)
 
 	return {
 		is_held: waiting.some((child) => is_untriaged_candidate(child, read)),
-		running: running_of(read),
+		running,
+		planning: run_board_planning.planning_of(read, running),
 	}
+}
+
+function planned_of(child: EpicChild, pool: Pool): RowReason | undefined {
+	return pool.planning?.issue === child.number ? pool.planning.reason : undefined
 }
 
 function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
@@ -209,7 +218,7 @@ function reader(read: ReasonRead): ReasonOf {
 	const pool = pool_of(read)
 
 	return function reason_of(child: EpicChild): RowReason | undefined {
-		return stage_of(child, read) ?? wait_of(child, read, pool)
+		return stage_of(child, read) ?? planned_of(child, pool) ?? wait_of(child, read, pool)
 	}
 }
 
