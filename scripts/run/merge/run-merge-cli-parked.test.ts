@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const read_issue_mock = vi.hoisted(() => vi.fn())
 const release_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
+const record_change_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
@@ -31,6 +32,10 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 
 vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_merge: record_merge_mock },
+}))
+
+vi.mock('#scripts/lane/lane-state', () => ({
+	lane_state: { record_change: record_change_mock },
 }))
 
 vi.mock('./run-merge-steps', () => ({
@@ -69,6 +74,7 @@ beforeEach(() => {
 	read_issue_mock.mockReset()
 	release_mock.mockReset().mockResolvedValue(true)
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
+	record_change_mock.mockReset().mockResolvedValue({ kind: 'skipped', reason: 'test' })
 	do_failed_mock.mockReset()
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	events_mock.mockReset().mockResolvedValue([])
@@ -175,5 +181,28 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 		await run_merge_cli.merge_child(context())
 
 		expect(record_merge_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4268: a merged child's lane is ended on its state record.
+describe('run_merge_cli.merge_child — the lane state record', () => {
+	it('records a merged child’s lane as ended by run:merge', async () => {
+		read_issue_mock.mockResolvedValue(CLOSED_STATE)
+
+		await run_merge_cli.merge_child(context())
+
+		expect(record_change_mock).toHaveBeenCalledExactlyOnceWith({
+			issue: CHILD,
+			state: 'ended',
+			command: 'run:merge',
+		})
+	})
+
+	it('records no state for a parked child', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS, NEEDS_DECISION]))
+
+		await run_merge_cli.merge_child(context())
+
+		expect(record_change_mock).not.toHaveBeenCalled()
 	})
 })

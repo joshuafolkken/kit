@@ -149,6 +149,10 @@ const EVENT_KIND = {
 	// is the dedup marker for the one idle Telegram. A trace: a drain's retrospective is read off the
 	// position beneath it, so the marker must not stand over it.
 	IDLE_NOTICE: 'idle-notice',
+	// A person paused or resumed a lane child (`lane:pause` / `lane:resume`), so who halted a lane and
+	// when is on the stream rather than only in a shell history (joshuafolkken/kit#4268). A trace: it
+	// says what a lane's processes were told, not where the run is.
+	LANE_STATE: 'lane-state',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -169,6 +173,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
 	EVENT_KIND.IDLE_NOTICE,
+	EVENT_KIND.LANE_STATE,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

@@ -20,6 +20,7 @@ import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
+import { lane_state } from './lane-state'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 // `josh lane:dispatch <issue-number>` — start a lane's child as an operating-system process of its own.
@@ -333,13 +334,20 @@ async function mark_in_progress(issue: string): Promise<LabelWrite> {
 // removal warns and never throws, so it cannot turn a launch failure into a thrown error.
 //
 // The lane ledger takes the same instant: `lane:stats` times a lane's implementation from it, and the
-// stream is capped, so a period's earlier dispatches would be gone from there.
-async function record_started(issue: string): Promise<void> {
+// stream is capped, so a period's earlier dispatches would be gone from there. The lane's state record
+// takes it as the launch, stamped with the run that made it.
+async function record_started(issue: string, start: DispatchStart): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 		`${issue_cite.plain(issue)} dispatched`,
 	)
 	await lane_ledger.record_dispatch(Number(issue))
+	await lane_state.record_change({
+		issue,
+		state: 'running',
+		command: start === RESTART_START ? 'lane:restart' : 'lane:dispatch',
+		is_launch: true,
+	})
 }
 
 // How a dispatch begins. A `resumable` one claims the marker itself and resumes an `outage` session; a
@@ -365,7 +373,7 @@ async function finish_dispatch(
 
 	const is_failed = outcome.kind === 'failed'
 
-	await (is_failed ? run_label.unmark(issue) : record_started(issue))
+	await (is_failed ? run_label.unmark(issue) : record_started(issue, start))
 
 	return outcome
 }

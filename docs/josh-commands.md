@@ -949,7 +949,7 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 <!-- usage: lane:pause -->
 
-Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched.
+Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream.
 
 ```bash
 pnpm josh lane:pause 4198
@@ -969,11 +969,30 @@ pnpm josh lane:resume --all   # every open lane
 
 <!-- /usage -->
 
-- Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch, Issue and event stream are untouched; the child keeps its memory.
+- Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch and Issue are untouched; the child keeps its memory.
+- A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record.
 - A pause ends the lane's detached `eslint_d` (titled `eslint_d - <lane directory>`) rather than stopping it: a resume would not reach it, and the next lint starts it again. `lane:close`, `lane:withdraw` and `lane:restart` end it too.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
 
 **Output / exit codes:** one line per lane (`, ended N daemon(s)` when a pause ended any), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
+
+### `josh lane:state`
+
+<!-- usage: lane:state -->
+
+Give every open lane opened before the lane state record existed a record of its own, read off what its child is doing now.
+
+```bash
+pnpm josh lane:state --backfill
+```
+
+<!-- /usage -->
+
+- Each lane has one state record, `josh-lane-state-<key>-<N>.json` in the temp directory, keyed on the common git directory like the carry record (`JOSH_TEMP_ROOT` moves it): the Issue, the run that launched it (the carry's start and owner), the state (`open` / `running` / `paused` / `ended`), the last launch time, and when and by which command the state last changed. It outlives `lane:close`.
+- Only the lane commands write it: `lane:open` (`open`), `lane:dispatch` / `lane:launch` / `lane:restart` (`running`, a launch), `lane:pause` / `lane:resume`, `lane:withdraw` / `lane:close` and `run:merge` (`ended`). The write is atomic; a transition the lifecycle lacks (an `ended` lane paused) is warned about and not written, and a failed write never fails the command.
+- `--backfill` is a one-off migration: a lane with no record gets `paused` (every process stopped), `running` (a live process, launched at its `.env` time) or `open`; a lane with a record keeps it.
+
+**Output / exit codes:** one line per lane, exit 0; bad arguments exit 1.
 
 ### `josh rule:value`
 

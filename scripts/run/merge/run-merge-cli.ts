@@ -7,6 +7,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_state } from '#scripts/lane/lane-state'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -216,6 +217,7 @@ async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 		`${issue_cite.plain(ctx.child)} merged`,
 	)
 	await lane_ledger.record_merge(Number(ctx.child))
+	await lane_state.record_change({ issue: ctx.child, state: 'ended', command: 'run:merge' })
 
 	return undefined
 }

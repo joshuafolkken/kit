@@ -48,6 +48,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	setup: { ja: '準備', en: 'setup' },
 	'pr-checks': { ja: 'PR のチェック', en: 'PR checks' },
 	'idle-notice': { ja: '待機の通知', en: 'idle notice' },
+	'lane-state': { ja: 'レーンの状態', en: 'lane state' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))

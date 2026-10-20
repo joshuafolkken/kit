@@ -1,7 +1,10 @@
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_pause } from './lane-pause'
 import { lane_pause_cli } from './lane-pause-cli'
 import { lane_registry } from './lane-registry'
+import { lane_state } from './lane-state'
 
 // joshuafolkken/kit#4198: `josh lane:pause` / `lane:resume` take one issue or `--all`, and a named lane
 // with nothing to signal exits non-zero.
@@ -25,11 +28,15 @@ const open_lanes = vi.spyOn(lane_pause, 'open_lanes')
 const lane_of = vi.spyOn(lane_registry, 'lane_location')
 const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
+const record_change = vi.spyOn(lane_state, 'record_change')
+const emit = vi.spyOn(run_event_stream_emit, 'emit')
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
+	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })
+	emit.mockResolvedValue(undefined)
 	pause_lane.mockReturnValue(TREE)
 	resume_lane.mockReturnValue(TREE)
 	lane_of.mockResolvedValue(LANE)
@@ -73,6 +80,42 @@ describe('lane_pause_cli.run — the lane’s daemon', () => {
 		expect(info).toHaveBeenCalledWith(
 			'lane:pause #4198: no child process running — nothing paused, ended 1 daemon(s)',
 		)
+	})
+})
+
+// joshuafolkken/kit#4268: a lane whose processes were signalled has the change on its state record and
+// on the run's event stream.
+describe('lane_pause_cli.run — the record', () => {
+	it('records a paused lane and emits who paused it', async () => {
+		await lane_pause_cli.run(['pause', ISSUE])
+
+		expect(record_change).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'paused',
+			command: 'lane:pause',
+		})
+		expect(emit).toHaveBeenCalledExactlyOnceWith(
+			run_event_stream.EVENT_KIND.LANE_STATE,
+			'#4198 paused by lane:pause',
+		)
+	})
+
+	it('records a resumed lane as running', async () => {
+		await lane_pause_cli.run(['resume', ISSUE])
+
+		expect(record_change).toHaveBeenCalledWith({
+			issue: ISSUE,
+			state: 'running',
+			command: 'lane:resume',
+		})
+	})
+
+	it('records nothing when no process was signalled', async () => {
+		pause_lane.mockReturnValue(NOTHING)
+		await lane_pause_cli.run(['pause', ISSUE])
+
+		expect(record_change).not.toHaveBeenCalled()
+		expect(emit).not.toHaveBeenCalled()
 	})
 })
 
