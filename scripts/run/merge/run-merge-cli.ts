@@ -13,6 +13,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
+import { run_merge_auth } from './run-merge-auth'
 import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
@@ -296,6 +297,14 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
+// A child whose session could not authenticate: the run stops with nothing counted or parked
+// (`run-merge-auth.ts`).
+async function on_unauthenticated(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_auth.stop(ctx.child)
+
+	return emit(MERGE_TOKEN.ENVIRONMENT, SUCCESS_EXIT_CODE)
+}
+
 // A child that ended its session with a cut no successor adopted: its successor is relaunched,
 // nothing is counted and nothing is parked, and `resumed` tells the parent to await the same lane
 // again rather than dispatch into it. A successor that could not be started — or a cut the
@@ -372,6 +381,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	'human-review': on_human_review,
 	merged: on_merged,
 	outage: on_outage,
+	unauthenticated: on_unauthenticated,
 	parked: on_parked,
 	split: on_skipped,
 	unresolved: on_unresolved,

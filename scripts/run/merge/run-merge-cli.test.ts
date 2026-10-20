@@ -32,7 +32,7 @@ vi.mock('./run-merge-ship')
 vi.mock('#scripts/agent/api-outage', () => ({ api_outage: { is_outage: is_outage_mock } }))
 
 vi.mock('#scripts/run/run-ending', () => ({
-	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn() },
+	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn(), read_transcript: vi.fn() },
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({

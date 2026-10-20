@@ -46,6 +46,9 @@ const ONE = 1
 // - `cut`         — OPEN and carrying neither, but its lane holds a declared cut no successor adopted;
 //                   the child ended its session on purpose, so it is resumed rather than parked and
 //                   counts nothing.
+// - `unauthenticated` — OPEN and carrying neither, but the exit record shows the session could not
+//                   authenticate; no child can run until a person runs `/login`, so the run stops with
+//                   the child left `in-progress` and nothing counted (joshuafolkken/kit#4216).
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
 //                   GitHub state: closed as not planned, or about to be, it is neither merged nor failed.
@@ -64,6 +67,8 @@ interface EndingSignals {
 	is_withdrawn?: boolean | undefined
 	// The outage is a ship stop no relaunch answered, not an API the child could not reach.
 	is_unanswered?: boolean | undefined
+	// The exit record shows the session could not authenticate (`api-auth.ts`).
+	is_auth_failure?: boolean | undefined
 }
 
 const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }
@@ -90,6 +95,8 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 	if (signals.merged_pr !== undefined) return 'merged'
 
 	if (signals.is_cut) return 'cut'
+
+	if (signals.is_auth_failure === true) return 'unauthenticated'
 
 	return signals.is_outage ? 'outage' : 'failed'
 }

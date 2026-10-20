@@ -26,7 +26,7 @@ the lane and comments itself; act on the token.
 | `complete` | Record the root done (`backlogrun-steps.md` → "The session cut is inside the invocation") and post the epic summary |
 | `over` | Hand the lanes over and take the cut — "The hand-off" below |
 | `human-review` | Stop, leave `in-progress` on; send a `confirmation` only where the child ran in this session's own context (`needs-human-review.md`) |
-| `stop` / `environment` | Report the parked children (or the outage) and stop |
+| `stop` / `environment` | Report the parked children (or the outage, or the `/login` an authentication failure needs) and stop |
 | `resumed` | `lane:await <N>` it again |
 | `retry` / `busy` | Re-read the child |
 

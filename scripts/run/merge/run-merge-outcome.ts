@@ -9,6 +9,7 @@ const CHILD_OUTCOMES = [
 	'split',
 	'cut',
 	'outage',
+	'unauthenticated',
 	'failed',
 	'unresolved',
 	'shipping',

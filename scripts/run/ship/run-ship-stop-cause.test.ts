@@ -1,3 +1,4 @@
+import { api_auth } from '#scripts/agent/api-auth'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { describe, expect, it } from 'vitest'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -42,6 +43,19 @@ describe('run_ship_stop_cause.cause_of — every stop that is not the infrastruc
 
 	it.each(['review', 'round-2'] as const)('reads a %s stop as a finding', (stage) => {
 		expect(cause_of(stage, RATE_LIMITED)).toBe(CAUSE.FINDING)
+	})
+
+	it.each([
+		`isolated reviewer failed: the broker answered a failure: ${api_auth.AUTH_FAILURE_NOTE}: the reviewer exited with code 1`,
+		`${api_auth.AUTH_FAILURE_NOTE}: reviewer failed — log: /tmp/review.log`,
+	])('reads a review stop on a reviewer that could not authenticate as auth', (output) => {
+		expect(cause_of('review', output)).toBe(CAUSE.AUTH)
+	})
+
+	it('keeps a finding that quotes the authentication note mid-line a finding', () => {
+		expect(cause_of('review', `High: the text ${api_auth.AUTH_FAILURE_NOTE} is wrong`)).toBe(
+			CAUSE.FINDING,
+		)
 	})
 
 	it('reads a stop with conflicts as a conflict before the infrastructure', () => {

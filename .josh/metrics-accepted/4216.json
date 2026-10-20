@@ -1,0 +1,8 @@
+{
+	"reason": "#4216 adds the authentication-failure read (api-auth.ts), its ends-on-exit-record guard for appended logs (agent-exit-record.ts) and run:merge's unauthenticated stop (run-merge-auth.ts); the reference lists run:merge among the commands that load .env",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 80,
+		"ai_cost.on_demand_bytes": 49
+	}
+}

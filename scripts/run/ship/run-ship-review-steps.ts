@@ -1,5 +1,6 @@
 import { agent_argv, type AgentArgv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { api_auth } from '#scripts/agent/api-auth'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -79,6 +80,16 @@ function note(text: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
+// A reviewer that could not authenticate is named as such (`api-auth.ts`), so the stop is not booked as
+// a review finding (joshuafolkken/kit#4216).
+function exited_note(log_path: string): string {
+	const exited = `reviewer failed — log: ${log_path}`
+
+	if (!api_auth.is_auth_failed_transcript(stamp_file.read_stamp_text(log_path))) return exited
+
+	return `${api_auth.AUTH_FAILURE_NOTE}: ${exited}`
+}
+
 // Under the round's reviewer profile — the same model and effort (`JOSH_REVIEWER_*` included) the
 // chain's subagent is given — and waited on, so the join below runs only once the review has finished.
 // Each call is its own process, so round 2 is a fresh session by construction.
@@ -94,7 +105,7 @@ async function run_direct_session(
 	const result = await detached_launch.launch_attached(request, note)
 
 	if (result.kind === 'failed') return failure(`reviewer could not start: ${result.note}`)
-	if (result.exit_code !== SUCCESS_EXIT_CODE) return failure(`reviewer failed — log: ${log_path}`)
+	if (result.exit_code !== SUCCESS_EXIT_CODE) return failure(exited_note(log_path))
 
 	return { code: SUCCESS_EXIT_CODE, out: '' }
 }
