@@ -37,7 +37,9 @@ const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条�
 
 // A body the lint accepts, with `declarations` under its background.
 function body_of(...declarations: ReadonlyArray<string>): string {
-	return ['## 背景', '', '- 種別: 不具合', ...declarations, '', SECTIONS].join('\n')
+	return ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ...declarations, '', SECTIONS].join(
+		'\n',
+	)
 }
 
 const VALID_BODY = body_of('- 人の判断: 要（目視確認）')

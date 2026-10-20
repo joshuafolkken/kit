@@ -1,0 +1,9 @@
+{
+	"reason": "#4272 adds josh defect:origin and defect:report (code), the bug-body origin line in issue-template.md, and its pointer in observation-filing.md; review fixes added 4 more code lines",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 488,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 200
+	}
+}

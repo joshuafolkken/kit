@@ -95,6 +95,24 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'defect:origin': {
+		script: 'scripts/issue/defect-origin-main.ts',
+		description:
+			'List the merged pull requests that last changed what a defect issue names, as candidates for its origin line',
+		category: 'AI tools',
+		reference: ['<N>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '4241', note: 'newest first, merged before the issue was filed' }],
+		},
+	},
+	'defect:report': {
+		script: 'scripts/issue/defect-report-main.ts',
+		description:
+			'Count defects by the origin pull request their issue declares, by change kind and by area',
+		category: 'AI tools',
+		reference: ['', 'automation', ['network']],
+		usage: { examples: [{ arguments: '', note: 'every issue labelled bug, open or closed' }] },
+	},
 	'issue:fold': {
 		script: 'scripts/issue/issue-fold-main.ts',
 		description:
