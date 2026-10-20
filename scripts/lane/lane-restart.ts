@@ -89,7 +89,7 @@ async function relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 // A child that ended on its own during the claim (say, right after merging its PR) is a finished child
 // for `run:merge` to collect — relaunching it would re-run a done issue inside the re-confirm window.
 async function stop_and_relaunch(lane: LaneInfo): Promise<RestartOutcome> {
-	if (lane_reap.reap_child(lane.issue).length === 0) return { kind: NOT_RUNNING_KIND }
+	if (lane_reap.reap_child(lane).length === 0) return { kind: NOT_RUNNING_KIND }
 
 	return await relaunch(lane)
 }

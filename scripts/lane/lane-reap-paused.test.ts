@@ -7,7 +7,7 @@ import { lane_reap } from './lane-reap'
 // closing or restarting it left the tree stopped for good. A real process, since the pending signal is
 // the kernel's behavior, not the reaper's.
 
-const ISSUE = '4198'
+const LANE = { issue: '4198', directory: '/w/.kit-lanes/4198' }
 const HANDLES_TERM =
 	'process.on("SIGTERM", () => process.exit(0)); console.log("ready"); setInterval(() => {}, 1000)'
 
@@ -43,7 +43,7 @@ describe('lane_reap.reap_child — a paused lane', () => {
 		const exited = exit_code_of(child)
 		const probes = { ...lane_reap.SYSTEM_PROBES, matching: () => [pid], parent_of: () => undefined }
 
-		expect(lane_reap.reap_child(ISSUE, { ...probes, children_of: () => [] })).toStrictEqual([pid])
+		expect(lane_reap.reap_child(LANE, { ...probes, children_of: () => [] })).toStrictEqual([pid])
 		await expect(exited).resolves.toBe(0)
 	})
 })
