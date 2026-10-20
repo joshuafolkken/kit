@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
-import { run_board_state } from './run-board-state'
+import { run_board_gather } from './run-board-gather'
 import type { UsageMark } from './run-board-usage'
 import { run_board_usage_board } from './run-board-usage-board'
 
@@ -8,7 +8,7 @@ import { run_board_usage_board } from './run-board-usage-board'
 
 const { board_usage_of, read_usages } = run_board_usage_board
 const { LOCAL, harness } = run_board_fixture
-const { FRESH_STATE } = run_board_state
+const { FRESH_GATHER } = run_board_gather
 const SUPERVISOR = 10
 const CHILD = 20
 const LEFT = 30
@@ -73,12 +73,12 @@ describe('run_board_usage_board.board_usage_of', () => {
 
 describe('run_board_usage_board.read_usages', () => {
 	it('keeps the last reading, and with it a paused lane, when a reading fails', async () => {
-		const { ports, read_usage } = harness(LOCAL, [])
+		const { gathering, read_usage, read_table } = harness(LOCAL, [])
 		const last = { ...mark(0, 0), paused: new Map([[String(LANE), 0]]) }
 
 		read_usage.mockResolvedValueOnce(undefined)
 
-		const read = await read_usages({ ...FRESH_STATE, usage: last }, ports, ports.read_table)
+		const read = await read_usages({ ...FRESH_GATHER, usage: last }, gathering, read_table)
 
 		expect(read).toStrictEqual({ usage: last, usages: undefined })
 	})

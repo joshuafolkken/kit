@@ -93,7 +93,7 @@ function statuses_for(
 	const statuses = run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
 	const own = run_board_earlier.own_statuses(statuses, local.earlier_lanes)
 
-	return run_board_paused.paused_over(own, state.usage?.paused)
+	return run_board_paused.paused_over(own, state.paused)
 }
 
 // The children the run touched that the open listing no longer holds and the board has not read yet.

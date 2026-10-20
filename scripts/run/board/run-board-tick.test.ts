@@ -4,6 +4,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_gather } from './run-board-gather'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts, BoardState } from './run-board-state'
@@ -14,8 +15,8 @@ import { run_board_tick } from './run-board-tick'
 // the plan no more often than the retry interval.
 
 const { LOCAL, START, WORDS, harness, plan_titled } = run_board_fixture
-const { FRESH_STATE, LOCAL_READ_MS, MACHINE_SAMPLE_MS, PLAN_RETRY_MS, REDRAW_MS, tick } =
-	run_board_tick
+const { FRESH_STATE, PLAN_RETRY_MS, REDRAW_MS, tick } = run_board_tick
+const { LOCAL_READ_MS, MACHINE_SAMPLE_MS } = run_board_gather
 const SLOW_READ_MS = 2 * MACHINE_SAMPLE_MS
 const SWAPPED_MB = 3
 const { spinner_of } = run_board_labels
@@ -110,13 +111,13 @@ describe('run_board_tick.tick machine', () => {
 		expect(second_machine).toContain('💾')
 	})
 
-	it('times a sample when it is taken, so a slow plan read does not skew the swap rate', async () => {
-		const { ports, frames, read_plan, read_machine, clock } = harness(LOCAL, [])
+	it('times a sample when it is taken, so a slow lane read does not skew the swap rate', async () => {
+		const { ports, frames, read_local, read_machine, clock } = harness(LOCAL, [plan_titled('a')])
 
-		read_plan.mockImplementationOnce(async () => {
+		read_local.mockImplementationOnce(async () => {
 			clock.now_ms += SLOW_READ_MS
 
-			return plan_titled('a')
+			return LOCAL
 		})
 		read_machine.mockResolvedValueOnce(swapped(0)).mockResolvedValueOnce(swapped(SWAPPED_MB))
 		const first = await tick(FRESH_STATE, ports)

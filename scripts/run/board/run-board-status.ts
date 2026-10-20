@@ -211,6 +211,28 @@ function fold_events(events: ReadonlyArray<RunEvent>): Map<number, ItemStatus> {
 	return statuses
 }
 
+// joshuafolkken/kit#4267: the board redraws every second but rereads the stream every few, and a read
+// hands over a new `events` array, so a fold keyed on the array is folded once per read, not per redraw.
+type EventsMemo<Value> = WeakMap<ReadonlyArray<RunEvent>, Value>
+
+function remembered<Value>(
+	memo: EventsMemo<Value>,
+	events: ReadonlyArray<RunEvent>,
+	fold: (events: ReadonlyArray<RunEvent>) => Value,
+): Value {
+	const kept = memo.get(events)
+
+	if (kept !== undefined) return kept
+
+	const value = fold(events)
+
+	memo.set(events, value)
+
+	return value
+}
+
+const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
+
 // A lane is this run's only when its issue is on the run's stream or in `in_run`, so a lane left over
 // from an earlier day is not drawn as this run's child. `in_run` leaves out a planned issue whose lane
 // an earlier run dispatched (`run-board-github.ts`).
@@ -245,7 +267,7 @@ function statuses_of(
 	in_run: ReadonlySet<number>,
 	idle: ReadonlyArray<string> = [],
 ): ReadonlyMap<number, ItemStatus> {
-	const statuses = fold_events(events)
+	const statuses = new Map(remembered(FOLDED, events, fold_events))
 
 	for (const lane of lanes) {
 		const issue = Number(lane)
@@ -416,9 +438,7 @@ function idle_of(events: ReadonlyArray<RunEvent>): number | undefined {
 	return own === undefined ? undefined : moment(own)
 }
 
-// `is_ended` is a run `run:carry --end` closed: its record says it stopped, whatever its last event
-// was.
-function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
+function stream_activity(events: ReadonlyArray<RunEvent>): RunActivity {
 	const last = events.at(-1)
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
 
@@ -429,8 +449,18 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 		idle_ms: idle_of(events),
 		lane_events: run_board_lane_event.newest_of(events),
 		pr_checks: run_board_checks.newest_of(events),
-		is_stopped: is_ended || is_run_stop(position),
+		is_stopped: is_run_stop(position),
 	}
+}
+
+const ACTIVITIES: EventsMemo<RunActivity> = new WeakMap()
+
+// `is_ended` is a run `run:carry --end` closed: its record says it stopped, whatever its last event
+// was.
+function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
+	const activity = remembered(ACTIVITIES, events, stream_activity)
+
+	return is_ended ? { ...activity, is_stopped: true } : activity
 }
 
 const run_board_status = { activity_of, earlier_of, settle_closed, statuses_of }

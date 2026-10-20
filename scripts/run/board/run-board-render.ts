@@ -392,8 +392,15 @@ function render(view: BoardView): Array<string> {
 	return bounded(parts, view)
 }
 
-function render_no_run(now_ms: number, bounds: FrameBounds = {}): Array<string> {
-	const above = [`■ backlogrun${GAP}${WORDS.no_run}${GAP}${clock_of(now_ms)}`]
+// No run read here — or no read answered, which the line says beside it.
+function render_no_run(
+	now_ms: number,
+	bounds: FrameBounds = {},
+	read_failed_ms?: number,
+): Array<string> {
+	const warning = run_board_header.warning_of(WORDS.read, read_failed_ms)
+	const parts = ['■ backlogrun', WORDS.no_run, clock_of(now_ms), warning]
+	const above = [parts.filter((part) => part !== undefined).join(GAP)]
 	const notes = { head: [], lines: [], hidden: 0 }
 
 	return bounded({ above, plan: [], notes, legend: [], footer: bounds.footer ?? [] }, bounds)
