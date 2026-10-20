@@ -276,6 +276,7 @@ const unit_worker_share = {
 	has_worker_flag,
 	is_nested_run,
 	live_run_count,
+	mark_run_started,
 	marker_path,
 	read_marker,
 	resolve_unit_workers,

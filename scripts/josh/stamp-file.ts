@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
-import { PLATFORM_TEMP_ROOT } from './platform-temporary'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 
 // A small record one josh command writes and another reads, kept per checkout in the temp directory.
 //
