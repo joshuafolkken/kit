@@ -38,6 +38,12 @@ interface SoloSelection {
 	notice?: string
 }
 
+interface SoloQueue {
+	solo: EpicChild
+	index: number
+	behind: ReadonlyArray<EpicChild>
+}
+
 interface SoloGate {
 	result: EpicNextResult
 	notice?: string
@@ -75,6 +81,15 @@ function none_of(children: ReadonlyArray<EpicChild>, notice: string): SoloSelect
 	return { offered: [], withheld: [...children], notice }
 }
 
+// The first `run:solo` candidate, where it sits, and the candidates ranked behind it, which nothing
+// offers past it. `run:board` draws the same reading on its queued rows (joshuafolkken/kit#4294).
+function queue_of(children: ReadonlyArray<EpicChild>): SoloQueue | undefined {
+	const index = children.findIndex((child) => is_solo(child))
+	const solo = children[index]
+
+	return solo === undefined ? undefined : { solo, index, behind: children.slice(index + 1) }
+}
+
 // Where the first `run:solo` candidate sits decides what starts: everything when there is none, the
 // candidates ahead of it when it is not first, and it alone once it heads an idle repository's ranking.
 function select_candidates(
@@ -82,14 +97,13 @@ function select_candidates(
 	read: BusyRead,
 	repo: string,
 ): SoloSelection {
-	const index = children.findIndex((child) => is_solo(child))
-	const solo = children[index]
+	const queue = queue_of(children)
 
-	if (solo === undefined) return first_of(children, children.length)
-	if (index > 0) return first_of(children, index)
+	if (queue === undefined) return first_of(children, children.length)
+	if (queue.index > 0) return first_of(children, queue.index)
 	if (read.kind === 'idle') return first_of(children, 1)
 
-	return none_of(children, waiting_message(solo.number, repo))
+	return none_of(children, waiting_message(queue.solo.number, repo))
 }
 
 // An unreadable or truncated listing keeps nothing: without it a running `run:solo` issue cannot be
@@ -143,7 +157,7 @@ function gate(
 		: { result: gated, notice: selection.notice }
 }
 
-const epic_solo = { gate, is_solo, select }
+const epic_solo = { gate, is_solo, queue_of, select }
 
-export type { SoloGate, SoloSelection, SoloSelector }
+export type { SoloGate, SoloQueue, SoloSelection, SoloSelector }
 export { epic_solo }

@@ -206,3 +206,22 @@ describe('run_board_labels.day_minute_of', () => {
 		expect(day_minute_of(Date.parse('2026-12-31T20:30Z'))).toBe('01-01 03:30')
 	})
 })
+
+// joshuafolkken/kit#4294: a waiting row's icon is its own two-column emoji, named in the legend once.
+describe('run_board_labels.WAIT_ICONS', () => {
+	const { WAIT_ICONS, WAIT_WORDS } = run_board_labels
+	const icons = Object.values(WAIT_ICONS)
+
+	it('draws every wait as its own two-column emoji, 🚧 left to a held check', () => {
+		expect(new Set(icons).size).toBe(icons.length)
+		expect(icons.every((icon) => /^\p{Emoji_Presentation}$/u.test(icon))).toBe(true)
+		expect(icons).not.toContain('🚧')
+	})
+
+	it('names 🧍 and 🙅 with a word of the legend', () => {
+		const words = new Map(WAIT_WORDS.map(([icon, word]) => [icon, WORDS[word]]))
+
+		expect(words.get(WAIT_ICONS.solo)).toBe('runs alone')
+		expect(words.get(WAIT_ICONS.solo_ahead)).toBe('behind solo')
+	})
+})
