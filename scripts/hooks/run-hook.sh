@@ -24,8 +24,9 @@
 #   a missing bundle and run the hook twice.
 
 location_variables='GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
-if [ -n "$GIT_ALTERNATE_OBJECT_DIRECTORIES$GIT_COMMON_DIR$GIT_DIR$GIT_INDEX_FILE$GIT_NAMESPACE$GIT_OBJECT_DIRECTORY$GIT_WORK_TREE" ]; then
-	if (unset $location_variables && git rev-parse --show-toplevel >/dev/null 2>&1); then unset $location_variables; fi
+if [ -n "$GIT_ALTERNATE_OBJECT_DIRECTORIES$GIT_COMMON_DIR$GIT_DIR$GIT_INDEX_FILE$GIT_NAMESPACE$GIT_OBJECT_DIRECTORY$GIT_WORK_TREE" ] &&
+	(unset $location_variables && git rev-parse --show-toplevel >/dev/null 2>&1); then
+	unset $location_variables
 fi
 
 hook_name=$1
