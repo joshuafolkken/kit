@@ -1,0 +1,7 @@
+{
+	"reason": "#4238 adds the busy-core moving average and the CPU-saturation admission and wait reason the issue requires",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}

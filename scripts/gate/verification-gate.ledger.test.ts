@@ -4,6 +4,7 @@ import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_ledger } from './gate-ledger'
 import { gate_test_fixture } from './gate-test-fixture'
 import { machine_capacity } from './machine-capacity'
 
@@ -87,7 +88,7 @@ describe('run_verification_gate — the lane ledger', () => {
 	// joshuafolkken/kit#3501: the gate reads the machine before its first check and after its last.
 	it('records the external cores the machine was busy with around the checks', async () => {
 		const ledger_path = path.join(scratch, 'gate-external.jsonl')
-		const busy_cores = machine_capacity.BASELINE_CORES + EXTERNAL_CORES
+		const busy_cores = gate_ledger.BACKGROUND_CORES + EXTERNAL_CORES
 
 		vi.spyOn(machine_capacity, 'read_machine').mockResolvedValue({
 			busy_cores,
@@ -113,7 +114,7 @@ describe('run_verification_gate — the lane ledger', () => {
 describe('run_verification_gate — the load reading and the run count', () => {
 	it('reads the machine before it counts the concurrent runs', async () => {
 		const read_machine = vi.spyOn(machine_capacity, 'read_machine').mockResolvedValue({
-			busy_cores: machine_capacity.BASELINE_CORES,
+			busy_cores: gate_ledger.BACKGROUND_CORES,
 			available_mb: undefined,
 		})
 

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
 import { free_cores } from './free-cores'
 import { gate_plan } from './gate-plan'
-import { machine_capacity, type MachineReading } from './machine-capacity'
+import type { MachineReading } from './machine-capacity'
 
 // joshuafolkken/kit#3945: the unit suite's worker count is bounded by what the machine has free, the
 // core count less the load from outside the core budget's ledger.
@@ -14,9 +14,9 @@ import { machine_capacity, type MachineReading } from './machine-capacity'
 const CORES = 11
 const UNREAD: MachineReading = { busy_cores: undefined, available_mb: undefined }
 const LEDGER_WEIGHT = 4
-// The ledger's claim, the baseline the weights were measured beside, and five cores from outside.
+// The ledger's claim and five cores from outside it.
 const OUTSIDE_LOAD = 5
-const BUSY_CORES = LEDGER_WEIGHT + machine_capacity.BASELINE_CORES + OUTSIDE_LOAD
+const BUSY_CORES = LEDGER_WEIGHT + OUTSIDE_LOAD
 const SCARCE_FREE = 3
 const PAIRED_RUNS = 2
 
@@ -48,7 +48,7 @@ describe('free_cores.read', () => {
 	it('subtracts the busy cores no ledger claim accounts for', async () => {
 		const free = await free_cores.read({
 			available_cores: CORES,
-			read_machine: reading_of(OUTSIDE_LOAD + machine_capacity.BASELINE_CORES),
+			read_machine: reading_of(OUTSIDE_LOAD),
 			directory: ctx.directory,
 		})
 
@@ -65,7 +65,7 @@ describe('free_cores.read', () => {
 					read_machine: reading_of(BUSY_CORES),
 					directory: ctx.directory,
 				}),
-			{ directory: ctx.directory },
+			{ directory: ctx.directory, read_machine: reading_of(undefined) },
 		)
 
 		expect(free).toBe(CORES - OUTSIDE_LOAD)
@@ -91,7 +91,7 @@ describe('free_cores.read — inside the claim its own command holds', () => {
 			async () =>
 				await free_cores.read({
 					available_cores: CORES,
-					read_machine: reading_of(OUTSIDE_LOAD + machine_capacity.BASELINE_CORES),
+					read_machine: reading_of(OUTSIDE_LOAD),
 					directory: ctx.directory,
 				}),
 			{ directory: ctx.directory, budget: CORES, read_machine: reading_of(undefined) },

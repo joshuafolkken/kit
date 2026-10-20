@@ -94,7 +94,13 @@ async function names_pressure(): Promise<void> {
 async function prints_nothing_solo(): Promise<void> {
 	const report = vi.fn<(line: string) => void>()
 
-	await core_budget.reserve(1, { directory: probe.directory, budget: CORES, report, now: () => 1 })
+	await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		report,
+		read_machine: async () => UNREAD,
+		now: () => 1,
+	})
 
 	expect(report).not.toHaveBeenCalled()
 	expect(core_budget.budget_waits(probe.directory, 1)).toStrictEqual([])

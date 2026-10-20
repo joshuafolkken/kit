@@ -32,12 +32,6 @@ import { execa } from 'execa'
 // The window the busy cores are measured over: long enough that one scheduler tick does not dominate it,
 // short enough that a solo admission is not visibly delayed.
 const SAMPLE_WINDOW_MS = 250
-// **The background a developer machine always carries, which the gate's weights were measured beside.**
-// On 2026-10-07 the 11-core machine idled at about 1.5 cores outside `josh` — Claude sessions 0.55, the
-// window server 0.47, a browser 0.5. The solo gate's weights sum to exactly the core count and were
-// measured with that load present, so only what exceeds it is load the budget must give way to;
-// counting the baseline would defer a solo gate's unit suite on every run.
-const BASELINE_CORES = 2
 const BYTES_PER_MB = 1_048_576
 const KB_PER_MB = 1024
 const PERCENT = 100
@@ -106,10 +100,13 @@ interface LedgerLoad {
 	memory_mb: number
 }
 
+// `busy_excess` is the measured cores beyond what the ledger declares — what `cores` gave up to load the
+// ledger does not hold, so a claim that waits on it can name the CPU as saturated.
 interface MachineBudget {
 	cores: number
 	memory_mb: number
 	memory_pressured?: boolean | undefined
+	busy_excess?: number | undefined
 }
 
 interface CpuTimes {
@@ -330,31 +327,37 @@ async function read_sample(): Promise<MachineSample> {
 	return { cpu: cpu_times(), memory: await read_memory(), total_mb: totalmem() / BYTES_PER_MB }
 }
 
-// The busy cores the ledger does not account for, beyond the baseline the weights were measured beside,
-// in whole cores — the budget is in whole cores, and a fraction of a core is not a core to give up.
+// The busy cores the ledger does not account for, in whole cores — the budget is in whole cores, and a
+// fraction of a core is not a core to give up.
+//
+// **Every busy core counts, the background included** (joshuafolkken/kit#4238). A baseline of two cores
+// used to be exempt, so with 10 cores reserved and all 11 busy the reading saw no excess and admitted
+// another claim onto a saturated CPU.
 function external_cores(busy_cores: number | undefined, ledger_cores: number): number {
 	if (busy_cores === undefined) return 0
 
-	return Math.floor(Math.max(0, busy_cores - ledger_cores - BASELINE_CORES))
+	return Math.floor(Math.max(0, busy_cores - ledger_cores))
 }
 
-// **The budget the ledger admits against: what is free plus what the ledger itself already holds.**
-// The admitted reservations' load is inside the reading, and the admission walk counts their declared
-// weight again, so it is added back — what is subtracted is only the load from outside the ledger. The
-// caller passes every admitted claim's cores but only the memory of claims past
-// `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
+// **The budget the ledger admits against: `cores − max(ledger, busy)` free, plus what the ledger itself
+// already holds.** The admission walk counts the ledger's declared weight again, so it is added back —
+// what is subtracted is only the busy load beyond it. A claim admitted moments ago is not busy yet, and
+// the ledger's declared cores cover it. The caller passes every admitted claim's cores but only the
+// memory of claims past `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
 // Memory that could not be read is no limit at all, the behavior before memory was read.
 function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLoad): MachineBudget {
+	const busy_excess = external_cores(reading.busy_cores, ledger.cores)
+
 	return {
-		cores: cores - external_cores(reading.busy_cores, ledger.cores),
+		cores: Math.max(0, cores - busy_excess),
 		memory_mb:
 			reading.available_mb === undefined ? Infinity : reading.available_mb + ledger.memory_mb,
 		memory_pressured: reading.memory_pressured,
+		busy_excess,
 	}
 }
 
 const machine_capacity = {
-	BASELINE_CORES,
 	busy_cores_between,
 	busy_share_between,
 	COMPRESSION_PRESSURE_MB,
