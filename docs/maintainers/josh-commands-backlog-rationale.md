@@ -21,6 +21,8 @@ the behavior. joshuafolkken/kit#3280 moved these commands out of the automation 
 | `josh pkg:scout`          | #2216                                    |
 | `josh issue:lint`         | #2123, #2212, #2353                      |
 | `josh defect:rate`        | #2449, #2455                             |
+| `josh defect:origin`      | #4272                                    |
+| `josh defect:report`      | #4272                                    |
 | `josh report:lint`        | #2123                                    |
 | `josh stash:push`         | #4131                                    |
 | `josh stash:pop`          | #2050                                    |
@@ -61,7 +63,7 @@ Post one comment to an issue (a PR comment is an issue comment over REST) with t
 
 ## `josh issue:lint` in detail
 
-Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1. [`josh issue:file`](../josh-commands-backlog.md#josh-issuefile) runs this check as a filing step and applies the labels it prints; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples.
+Prints `ok` and required labels when headings and either `## 背景` declaration — `- 種別: 不具合` or `- 種別: 非不具合` — are present. Missing or conflicting declarations exit 1, as does a `- 種別: 不具合` body whose `## 背景` lacks a `- 原因: #<PR>` or `- 原因: 不明（<理由>）` origin line. [`josh issue:file`](../josh-commands-backlog.md#josh-issuefile) runs this check as a filing step and applies the labels it prints; a non-bug issue without other labels prints `labels: none`. Headings and declarations must stand alone outside code examples.
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現`. The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](../josh-commands-automation.md#josh-measurererun) re-runs the baseline.
 

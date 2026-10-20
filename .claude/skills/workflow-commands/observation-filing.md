@@ -29,6 +29,7 @@ File with `pnpm josh issue:file` (`issue-scout.md`): it lints the body, applies 
 labels, scans for duplicates and runs `epic:bundle` (an `auto-ok` epic adds it to the backlog pool —
 `backlogrun-steps.md` → "What one invocation approves"). On the second filing of the run it asks the fold
 question and holds a `fold` (`split-assessment.md` → "The same two questions decide the filing-time fold").
+A bug filing's origin line: `prompts/collaboration-workflow/issue-template.md` (`- 原因:`).
 
 ### The depth test — a discretionary filing cites the product work it blocked
 

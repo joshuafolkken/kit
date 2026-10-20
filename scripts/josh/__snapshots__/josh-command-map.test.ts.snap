@@ -249,8 +249,22 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "defect:origin": [
+      "<N>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
     "defect:rate": [
       "[--days <n>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "defect:report": [
+      "",
       "automation",
       [
         "network",

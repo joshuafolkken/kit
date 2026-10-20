@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { defect_origin_line } from './defect-origin-line'
 import { issue_classification } from './issue-classification'
 import { BREAKING_CHANGE_LABEL, ENHANCEMENT_LABEL } from './issue-labels'
 
@@ -10,6 +11,8 @@ const BUG_CLASSIFICATION_CONFLICT = 'conflicting bug classifications'
 const MISSING_BUG_CLASSIFICATION = 'missing bug classification'
 const FEATURE_IMPROVEMENT = '- 目的: 機能改善'
 const BREAKING_CHANGE = '- 互換性: 破壊的変更'
+const BUG = '- 種別: 不具合'
+const ORIGIN = '- 原因: #4201'
 
 describe('issue classification', () => {
 	it.each([
@@ -44,7 +47,7 @@ describe('issue classification', () => {
 	})
 
 	it('rejects conflicting bug and enhancement declarations', () => {
-		const body = `${BODY}- 種別: 不具合\n- 目的: 機能改善\n`
+		const body = `${BODY}- 種別: 不具合\n${ORIGIN}\n- 目的: 機能改善\n`
 
 		expect(issue_classification.problems(body)).toEqual([BUG_ENHANCEMENT_CONFLICT])
 	})
@@ -77,12 +80,24 @@ describe('explicit bug classification', () => {
 	})
 
 	it('reports both conflicts in one check', () => {
-		const body = `${BODY}- 種別: 不具合\n${NON_BUG}\n- 目的: 機能改善\n`
+		const body = `${BODY}- 種別: 不具合\n${ORIGIN}\n${NON_BUG}\n- 目的: 機能改善\n`
 
 		expect(issue_classification.problems(body)).toEqual([
 			BUG_CLASSIFICATION_CONFLICT,
 			BUG_ENHANCEMENT_CONFLICT,
 		])
+	})
+})
+
+describe('defect origin line', () => {
+	it('refuses a bug body that names no origin', () => {
+		expect(issue_classification.problems(`${BODY}${BUG}\n`)).toEqual([
+			defect_origin_line.MISSING_ORIGIN,
+		])
+	})
+
+	it('accepts a bug body that declares its origin', () => {
+		expect(issue_classification.problems(`${BODY}${BUG}\n${ORIGIN}\n`)).toEqual([])
 	})
 })
 
@@ -110,14 +125,14 @@ describe('fenced classification examples', () => {
 	})
 
 	it('uses real declarations when a fenced example disagrees', () => {
-		const body = `${BODY}- 種別: 不具合\n~~~md\n${NON_BUG}\n~~~\n`
+		const body = `${BODY}- 種別: 不具合\n${ORIGIN}\n~~~md\n${NON_BUG}\n~~~\n`
 
 		expect(issue_classification.problems(body)).toEqual([])
 		expect(issue_classification.required_labels(body)).toEqual(['bug'])
 	})
 
 	it('keeps a fence open when a closing marker has an info string', () => {
-		const body = `${BODY}\`\`\`md\n\`\`\`md\n${NON_BUG}\n\`\`\`\n- 種別: 不具合\n`
+		const body = `${BODY}\`\`\`md\n\`\`\`md\n${NON_BUG}\n\`\`\`\n- 種別: 不具合\n${ORIGIN}\n`
 
 		expect(issue_classification.problems(body)).toEqual([])
 		expect(issue_classification.required_labels(body)).toEqual(['bug'])
