@@ -21,6 +21,8 @@ interface EntryCase {
 	run: Mock
 	// What `run` receives, when the entry hands it something other than the whole argument list.
 	called_with?: ReadonlyArray<unknown>
+	// A `run` that assigns `process.exitCode` itself (`josh init`, `josh sync`) rather than answering it.
+	has_own_exit_code?: boolean
 }
 
 type NamedCase = readonly [string, () => Promise<void> | void]
@@ -38,13 +40,26 @@ async function run_entry(entry: string, argv: ReadonlyArray<string>): Promise<nu
 	}
 }
 
-async function expect_pass_through(entry_case: EntryCase): Promise<void> {
-	const { entry, run, called_with = [ARGUMENTS] } = entry_case
-
+function answer_exit_code(run: Mock, has_own_exit_code: boolean): void {
 	run.mockReset()
+
+	if (has_own_exit_code) {
+		run.mockImplementation(() => {
+			process.exitCode = EXIT_CODE
+		})
+
+		return
+	}
+
 	// A plain value rather than a resolved one: an async entry awaits it the same, and a sync `run`
 	// (`backlog:budget`) assigns it to `process.exitCode` as it is.
 	run.mockReturnValue(EXIT_CODE)
+}
+
+async function expect_pass_through(entry_case: EntryCase): Promise<void> {
+	const { entry, run, called_with = [ARGUMENTS], has_own_exit_code = false } = entry_case
+
+	answer_exit_code(run, has_own_exit_code)
 
 	expect(await run_entry(entry, ARGUMENTS)).toBe(EXIT_CODE)
 	expect(run).toHaveBeenCalledWith(...called_with)

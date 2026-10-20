@@ -1,7 +1,5 @@
-#!/usr/bin/env tsx
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { error_text } from '#scripts/lib/error-message'
 import { json_object_schema, package_with_version_schema } from '#scripts/lib/schemas'
 import semver from 'semver'
@@ -9,7 +7,10 @@ import semver from 'semver'
 const VALID_BUMP_TYPES = ['major', 'minor', 'patch'] as const
 type BumpType = (typeof VALID_BUMP_TYPES)[number]
 
+const BUMP_TYPE_NAMES: ReadonlySet<string> = new Set(VALID_BUMP_TYPES)
 const PACKAGE_JSON_INDENT = '\t'
+const USAGE = 'Usage: josh bump [major|minor|patch]'
+const FAILURE_EXIT_CODE = 1
 
 function compute_new_version(version: string, bump_type: BumpType): string {
 	const new_version = semver.inc(version, bump_type)
@@ -50,23 +51,29 @@ function bump_version(bump_type: BumpType): void {
 	console.info(new_version)
 }
 
-function main(): void {
-	const ARGV_INDEX = 2
-	const bump_type = process.argv[ARGV_INDEX] ?? 'minor'
+function is_bump_type(value: string): value is BumpType {
+	return BUMP_TYPE_NAMES.has(value)
+}
 
-	if (!VALID_BUMP_TYPES.includes(bump_type as BumpType)) {
-		console.error(`Usage: tsx scripts/version/bump-version.ts [major|minor|patch]`)
-		process.exit(1)
+// `josh bump`'s body, answering its exit code to `bump-version-main.ts`.
+function run_bump_version(args: ReadonlyArray<string>): number {
+	const [bump_type = 'minor'] = args
+
+	if (!is_bump_type(bump_type)) {
+		console.error(USAGE)
+
+		return FAILURE_EXIT_CODE
 	}
 
 	try {
-		bump_version(bump_type as BumpType)
+		bump_version(bump_type)
 	} catch (error) {
 		console.error(error_text.message_of(error))
-		process.exit(1)
+
+		return FAILURE_EXIT_CODE
 	}
+
+	return 0
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
-
-export { bump_version, compute_new_version, write_version }
+export { bump_version, compute_new_version, run_bump_version, USAGE, write_version }

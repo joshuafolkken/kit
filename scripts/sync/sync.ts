@@ -1,7 +1,5 @@
-#!/usr/bin/env tsx
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { dependabot_cooldown } from '#scripts/dependabot/dependabot-cooldown'
 import { project_checks } from '#scripts/gate/project-checks'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
@@ -280,18 +278,16 @@ function sync_basic_artifacts(is_force: boolean): void {
 //
 // Only a recorded basic profile switches the file set; an unrecorded one stays full, as every
 // project initialized before the profile was recorded was set up.
-function main(): void {
+function main(args: ReadonlyArray<string> = []): void {
 	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
 
-	const is_force = process.argv.includes('--force')
+	const is_force = args.includes('--force')
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	if (project_checks.is_basic(PROJECT_ROOT)) sync_basic_artifacts(is_force)
 	else sync_project_artifacts(is_force)
 	console.info('\n✅ Done.\n')
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const sync = {
 	should_skip_hook_file: sync_ai_files.should_skip_hook_file,

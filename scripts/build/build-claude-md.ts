@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,12 +38,6 @@ function build_claude_md(): string {
 
 	return DIST_CLAUDE_MD
 }
-
-function main(): void {
-	console.info(`  ✔ ${build_claude_md()} built`)
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 export {
 	build_claude_md,
