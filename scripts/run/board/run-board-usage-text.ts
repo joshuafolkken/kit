@@ -4,12 +4,19 @@ import type { UsageFigure, UsageScale } from './run-board-usage'
 
 // The CPU, memory and compressed-memory cells a lane row and a processes row draw: each a figure and a
 // gauge, `16.4 ■─────` / ` 0.7 ■────`, the gauge's full width the whole machine — the header's 💪 and
-// 🧠 scale — and its color the header gauges' own `GAUGE_SHADES` at the header's thresholds, so a
-// row reads against the same machine the header does. CPU is a percentage of the whole machine, the
-// header's 💪 unit, and memory is in GB; the column labels name neither unit.
+// 🧠 scale — and its color the header gauges' own `GAUGE_SHADES`. CPU is a percentage of the whole
+// machine, the header's 💪 unit, and memory is in GB; the column labels name neither unit.
+//
+// **A processes row is shaded at the header's thresholds; a lane row at its share of what the running
+// lanes may use together** (joshuafolkken/kit#3612): the header's yellow threshold (`CPU_YELLOW` /
+// `MEMORY_YELLOW`), never the whole machine — the OS, the IDE and the browser always hold some of it —
+// divided by the running rows the frame draws. A lane turns yellow at three quarters of its share and
+// red past the share itself — with one lane running at 52.5% and 70% of the machine, with two at
+// 26.25% and 35%. A lane that ends widens the others' shares, and their colors may turn back.
 
 const { GAUGE_SHADES, HEADER_ICONS, bar_of, minute_of } = run_board_labels
 const { CPU_RED, CPU_YELLOW, MEMORY_RED, MEMORY_YELLOW, threshold_alert } = run_board_machine
+const YELLOW_OF_SHARE = 0.75
 const BYTES_PER_KB = 1024
 const BYTES_PER_GB = BYTES_PER_KB * BYTES_PER_KB * BYTES_PER_KB
 const PERCENT = 100
@@ -21,11 +28,27 @@ const CELL_GAP = ' '
 const PLAIN_GAP = '/'
 const NO_CORES = '-'
 
+interface Thresholds {
+	yellow: number
+	red: number
+}
+
+// Where a row's cells turn yellow and red, in percent of the machine: the CPU's, then both memories'.
+interface CellLimits {
+	cpu: Thresholds
+	memory: Thresholds
+}
+
+const MACHINE_LIMITS: CellLimits = {
+	cpu: { yellow: CPU_YELLOW, red: CPU_RED },
+	memory: { yellow: MEMORY_YELLOW, red: MEMORY_RED },
+}
+
 interface Cell {
 	text: string | undefined
 	value: number
 	full: number
-	thresholds: { yellow: number; red: number }
+	thresholds: Thresholds
 }
 
 function gigabytes(bytes: number): string {
@@ -63,8 +86,22 @@ function cell_text(cell: Cell, width: number, gauge: number): string {
 	return `${figure}${CELL_GAP}${bar_of(cell.value, cell.full, gauge, shade)}`
 }
 
-function cells_from(figure: UsageFigure, scale: UsageScale): Array<Cell> {
-	const memory = { yellow: MEMORY_YELLOW, red: MEMORY_RED }
+// A running lane's thresholds, in percent of the machine: its share of `pool_percent` among `running`.
+function lane_thresholds(pool_percent: number, running: number): Thresholds {
+	const share = pool_percent / Math.max(1, running)
+
+	return { yellow: share * YELLOW_OF_SHARE, red: share }
+}
+
+// A lane row's limits with `running` lanes drawn: each its share of the header's yellow threshold.
+function lane_limits(running: number): CellLimits {
+	return {
+		cpu: lane_thresholds(CPU_YELLOW, running),
+		memory: lane_thresholds(MEMORY_YELLOW, running),
+	}
+}
+
+function cells_from(figure: UsageFigure, scale: UsageScale, limits: CellLimits): Array<Cell> {
 	const { cpu_cores, memory_bytes, compressed_bytes } = figure
 
 	return [
@@ -72,19 +109,19 @@ function cells_from(figure: UsageFigure, scale: UsageScale): Array<Cell> {
 			text: cpu_text(cpu_cores, scale),
 			value: cpu_cores ?? 0,
 			full: scale.cores,
-			thresholds: { yellow: CPU_YELLOW, red: CPU_RED },
+			thresholds: limits.cpu,
 		},
 		{
 			text: gigabytes(memory_bytes),
 			value: memory_bytes,
 			full: scale.total_bytes,
-			thresholds: memory,
+			thresholds: limits.memory,
 		},
 		{
 			text: gigabytes(compressed_bytes),
 			value: compressed_bytes,
 			full: scale.total_bytes,
-			thresholds: memory,
+			thresholds: limits.memory,
 		},
 	]
 }
@@ -102,16 +139,20 @@ function cell_widths(gauge: number): Array<number> {
 // The CPU, MEM and CMPRS cells, each `gauge` columns of bar after its figure — the figure alone at a
 // `gauge` of 0, where a frame is not drawn on a terminal; a row with no figure, or
 // a figure from the first sample with no CPU yet, draws blanks of the same width in the cell it lacks.
+// Shaded at `limits`, the whole machine's unless a lane row passes its share.
 function cells_of(
 	figure: UsageFigure | undefined,
 	scale: UsageScale,
 	gauge: number,
+	limits: CellLimits = MACHINE_LIMITS,
 ): Array<string> {
 	if (figure === undefined) return cell_widths(gauge).map((width) => CELL_GAP.repeat(width))
 
 	const widths = text_widths()
 
-	return cells_from(figure, scale).map((cell, index) => cell_text(cell, widths[index] ?? 0, gauge))
+	return cells_from(figure, scale, limits).map((cell, index) =>
+		cell_text(cell, widths[index] ?? 0, gauge),
+	)
 }
 
 // A figure on one line where no gauge is drawn, and so no column label names the units:
@@ -143,6 +184,14 @@ function finish_of(ended_ms: number | undefined, now_ms: number): string | undef
 	return `${HEADER_ICONS.ended} ${day_of(ended_ms, now_ms)}${minute_of(ended_ms)}`
 }
 
-const run_board_usage_text = { cell_widths, cells_of, finish_of, plain_of }
+const run_board_usage_text = {
+	cell_widths,
+	cells_of,
+	finish_of,
+	lane_limits,
+	lane_thresholds,
+	plain_of,
+}
 
 export { run_board_usage_text }
+export type { CellLimits }
