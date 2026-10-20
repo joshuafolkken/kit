@@ -2,13 +2,17 @@
 import { fileURLToPath } from 'node:url'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_pause, type LaneSignalled } from './lane-pause'
 import type { LaneProcesses } from './lane-reap'
 import { lane_registry } from './lane-registry'
+import { lane_state } from './lane-state'
 
 // `josh lane:pause <issue> | --all` and `josh lane:resume <issue> | --all` — one script told apart by
 // the verb the registry passes first. A named lane with no child process to signal exits non-zero, so a
-// caller never takes a pause that stopped nothing as done.
+// caller never takes a pause that stopped nothing as done. A lane whose processes were signalled has
+// the change written to its state record and to the run's event stream, so who halted it is on record.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -20,8 +24,8 @@ const USAGE = [
 ].join('\n')
 
 const VERBS = {
-	pause: { act: 'pause_lane', done: 'paused' },
-	resume: { act: 'resume_lane', done: 'resumed' },
+	pause: { act: 'pause_lane', done: 'paused', state: 'paused' },
+	resume: { act: 'resume_lane', done: 'resumed', state: 'running' },
 } as const
 
 type Verb = keyof typeof VERBS
@@ -56,14 +60,31 @@ function report(verb: Verb, issue: string, result: LaneSignalled): void {
 	console.info(`lane:${verb} ${issue_cite.plain(issue)}: ${outcome_of(verb, result)}`)
 }
 
-function apply(verb: Verb, lanes: ReadonlyArray<LaneProcesses>, is_named: boolean): number {
-	const signalled = lanes.map((lane) => {
-		const result = lane_pause[VERBS[verb].act](lane)
+async function record(verb: Verb, issue: string): Promise<void> {
+	const command = `lane:${verb}`
 
-		report(verb, lane.issue, result)
+	await lane_state.record_change({ issue, state: VERBS[verb].state, command })
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.LANE_STATE,
+		`${issue_cite.plain(issue)} ${VERBS[verb].done} by ${command}`,
+	)
+}
 
-		return result.signalled.length
-	})
+async function settle(verb: Verb, lane: LaneProcesses): Promise<number> {
+	const result = lane_pause[VERBS[verb].act](lane)
+
+	report(verb, lane.issue, result)
+	if (result.signalled.length > 0) await record(verb, lane.issue)
+
+	return result.signalled.length
+}
+
+async function apply(
+	verb: Verb,
+	lanes: ReadonlyArray<LaneProcesses>,
+	is_named: boolean,
+): Promise<number> {
+	const signalled = await Promise.all(lanes.map(async (lane) => await settle(verb, lane)))
 
 	return is_named && signalled.includes(0) ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
@@ -79,7 +100,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (!is_verb(verb)) return report_usage()
 	const lanes = await lanes_of(target)
 
-	return lanes === undefined ? report_usage() : apply(verb, lanes, target[0] !== ALL_FLAG)
+	return lanes === undefined ? report_usage() : await apply(verb, lanes, target[0] !== ALL_FLAG)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

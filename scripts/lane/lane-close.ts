@@ -6,6 +6,7 @@ import { lane_paths } from './lane-paths'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_spent, type KeptLane } from './lane-spent'
+import { lane_state } from './lane-state'
 
 // Closing a lane: no work tree, no branch, no directory.
 //
@@ -13,7 +14,8 @@ import { lane_spent, type KeptLane } from './lane-spent'
 // every step here is written to run over a subject that is already gone or that still holds
 // uncommitted work. A close that refused either would leave exactly the debris it exists to remove,
 // and the next lane for that issue would then fail on a directory nobody could account for. There
-// is no ledger entry to remove: the lane's seat lived in the `.env` that goes with the work tree.
+// is no ledger entry to remove: the lane's seat lived in the `.env` that goes with the work tree. The
+// lane's state record outlives it, marked `ended`, so its last state stays readable.
 
 interface LaneTargets {
 	directory: string
@@ -137,8 +139,13 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	await remove_lane(targets)
 
 	const left_behind = await residue(targets)
+	const kind = close_kind(did_exist, left_behind)
 
-	return { issue, kind: close_kind(did_exist, left_behind), left_behind, reaped }
+	if (kind === 'closed') {
+		await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
+	}
+
+	return { issue, kind, left_behind, reaped }
 }
 
 // A lane that could not be closed is recorded rather than thrown: a sweep has to attempt every lane,

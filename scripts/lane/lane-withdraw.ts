@@ -10,6 +10,7 @@ import { lane_close, type CloseKind } from './lane-close'
 import { lane_preserve, type KeptWork } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_state } from './lane-state'
 
 // `josh lane:withdraw <N> --reason <text>` — a person takes a running lane child's issue out of the run
 // for good: the child is stopped, its work stashed, the Issue closed as not planned and the lane closed.
@@ -114,6 +115,9 @@ async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawO
 	if (saved.kind === 'unsaved') return saved
 	const settled = await close_issue(lane.issue, reason, saved.stash)
 	const closed = await lane_close.close_lane(lane.issue)
+
+	// After the close, so the record names the withdrawal rather than the close it ran.
+	await lane_state.record_change({ issue: lane.issue, state: 'ended', command: 'lane:withdraw' })
 
 	return { kind: 'withdrawn', reaped, stash: saved.stash, ...settled, lane: closed.kind }
 }

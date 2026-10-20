@@ -39,6 +39,11 @@ vi.mock('./lane-spent', () => ({
 	lane_spent: { sort_lanes: vi.fn(async () => ({ spent: [], kept: [] })) },
 }))
 
+vi.mock('./lane-state', () => ({
+	lane_state: { record_change: vi.fn() },
+}))
+
+const { lane_state } = await import('./lane-state')
 const { lane_spent } = await import('./lane-spent')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_reap } = await import('./lane-reap')
@@ -184,6 +189,33 @@ describe('judging a close by what is left', () => {
 
 		expect(outcome.kind).toBe('incomplete')
 		expect(outcome.left_behind).toStrictEqual([LANE_BRANCH])
+	})
+})
+
+// joshuafolkken/kit#4268: the lane's state record outlives the lane, marked `ended` — only by a close
+// that left nothing behind.
+describe('ending the lane state record', () => {
+	beforeEach(() => {
+		vi.mocked(lane_state.record_change).mockClear()
+	})
+
+	it('records a closed lane as ended by lane:close', async () => {
+		lanes_are([open_on_disk(ISSUE, SEED)])
+		await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_state.record_change)).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'ended',
+			command: 'lane:close',
+		})
+	})
+
+	it('records nothing when the close left something behind', async () => {
+		lanes_are([open_on_disk(ISSUE, SEED)])
+		vi.mocked(git_command.branch_exists).mockResolvedValue(true)
+		await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_state.record_change)).not.toHaveBeenCalled()
 	})
 })
 

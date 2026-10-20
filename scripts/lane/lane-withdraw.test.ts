@@ -11,6 +11,7 @@ import { lane_close, type CloseOutcome } from './lane-close'
 import { lane_preserve } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_state } from './lane-state'
 import { lane_withdraw } from './lane-withdraw'
 
 // joshuafolkken/kit#3908: a person withdraws a running lane child's issue for good. Every side effect is
@@ -50,6 +51,7 @@ const close_not_planned = vi.spyOn(git_gh_issue_write, 'issue_close_not_planned'
 const announce = vi.spyOn(lane_preserve, 'announce')
 const unmark = vi.spyOn(run_label, 'unmark')
 const close_lane = vi.spyOn(lane_close, 'close_lane')
+const record_change = vi.spyOn(lane_state, 'record_change')
 
 function first_call(spy: { mock: { invocationCallOrder: Array<number> } }): number {
 	return spy.mock.invocationCallOrder[0] ?? 0
@@ -60,6 +62,7 @@ function expect_nothing_written(): void {
 	expect(reap_child).not.toHaveBeenCalled()
 	expect(close_not_planned).not.toHaveBeenCalled()
 	expect(close_lane).not.toHaveBeenCalled()
+	expect(record_change).not.toHaveBeenCalled()
 }
 
 function arrange_open_lane(): void {
@@ -76,6 +79,7 @@ function arrange_close(): void {
 	announce.mockResolvedValue()
 	unmark.mockResolvedValue(true)
 	close_lane.mockResolvedValue(CLOSED_LANE)
+	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })
 }
 
 beforeEach(() => {
@@ -143,6 +147,20 @@ describe('lane_withdraw.withdraw — the work and the child', () => {
 		expect(close_not_planned).not.toHaveBeenCalled()
 		expect(close_lane).toHaveBeenCalledWith(ISSUE)
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('already closed')
+	})
+})
+
+// joshuafolkken/kit#4268: the state record names the withdrawal, not the close it ran.
+describe('lane_withdraw.withdraw — the lane state record', () => {
+	it('records the lane as ended by lane:withdraw after the close', async () => {
+		await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(record_change).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'ended',
+			command: 'lane:withdraw',
+		})
+		expect(first_call(record_change)).toBeGreaterThan(first_call(close_lane))
 	})
 })
 

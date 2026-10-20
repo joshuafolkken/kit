@@ -14,6 +14,7 @@ import { lane_dispatch } from './lane-dispatch'
 import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_state, type RecordOutcome } from './lane-state'
 
 // joshuafolkken/kit#2464: the stall detector ages the last dispatch from the stream's `child-launch`, and
 // nothing wrote one — so minutes after a launch every stall read "hours since the last dispatch". This
@@ -24,6 +25,7 @@ const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`
 const LOG_PATH = path.join(os.tmpdir(), `josh-lane-dispatch-${ISSUE}.log`)
 const PID = 2464
 const SPAWN_FAILURE = 'spawn claude ENOENT'
+const SKIPPED: RecordOutcome = { kind: 'skipped', reason: 'test' }
 
 const launch = vi.spyOn(detached_launch, 'launch')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
@@ -97,6 +99,36 @@ describe('lane_dispatch.dispatch_child — the dispatch the implementation is ti
 
 	it('records no dispatch when the launch started no child', async () => {
 		const record = vi.spyOn(lane_ledger, 'record_dispatch').mockResolvedValue()
+
+		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4268: the lane's state record takes the start as a launch, named by the command that
+// made it.
+describe('lane_dispatch.dispatch_child — the lane state record', () => {
+	it.each([
+		['resumable', 'lane:dispatch'],
+		['restart', 'lane:restart'],
+	] as const)('records a %s start as a running launch by %s', async (start, command) => {
+		const record = vi.spyOn(lane_state, 'record_change').mockResolvedValue(SKIPPED)
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE, start)
+
+		expect(record).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'running',
+			command,
+			is_launch: true,
+		})
+	})
+
+	it('records no state when the launch started no child', async () => {
+		const record = vi.spyOn(lane_state, 'record_change').mockResolvedValue(SKIPPED)
 
 		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
 		await lane_dispatch.dispatch_child(ISSUE)
