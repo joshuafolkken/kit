@@ -11,7 +11,8 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 budget allowed the run, and `run:release <N>` takes it back off → read the Issue and its comments off
 `run:entry`'s `run:prep` report (`issue-comments.md`) → **record the agreed plan** with `pnpm josh issue:plan <N> --body-file
 <path>`, adding `--title "<title>"` when the title is not in English or can be phrased more clearly
-(a blank body takes the plan, otherwise it becomes a comment) → implement (the `plan` event `run:board` draws 📝 from is written by code — by
+(a blank body takes the plan, otherwise it becomes a comment; its `### 影響を受ける既存の利用者`
+section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4) → implement (the `plan` event `run:board` draws 📝 from is written by code — by
 `run:entry` for a `run:planned` issue, else at the first implementation edit — never by hand; no cut
 follows the plan — a lane child's context is bounded by the
 threshold-gated implementation cut alone) → run the **verification gate** (the full procedure is `chain-rule.md`;
@@ -47,7 +48,8 @@ with the labels `kickoff.md` → "Words typed after `new`" maps (per
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
 `<N>`. (3) `pnpm josh run:hold --adopt <N>` — re-keys the bare hold to `<N>` and applies `in-progress`;
 every later stop releases with `run:release <N>`. (4) Record the agreed plan
-in the session language: `pnpm josh issue:plan <N> --body-file <path>`. (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
+in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers section as in
+`kickoff.md` step 4). (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
 `pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
 skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round

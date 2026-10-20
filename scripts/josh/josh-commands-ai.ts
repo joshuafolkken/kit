@@ -74,7 +74,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	...EPIC_COMMANDS,
 	...BACKLOG_COMMANDS,
 	cost: {
-		script: 'scripts/cost-runtime/cost-cli.ts',
+		script: 'scripts/cost-runtime/cost-main.ts',
 		description:
 			'Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over)',
 		category: 'AI tools',

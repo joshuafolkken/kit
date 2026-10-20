@@ -18,6 +18,8 @@ const RAMP_UP_MS = 30_000
 const BYPASS_WINDOW_MS = 30_000
 // A narrowed unit claim still runs one worker: zero would run no test and report the suite green.
 const MIN_GRANT = 1
+// A unit claim narrowed to less than its asked weight over this waits rather than starts (`is_too_narrow`).
+const NARROW_DIVISOR = 2
 
 // What admission reads from a marker. `memory_mb` and `admitted_at` are optional because a marker an
 // older `josh` wrote has neither: it declares no memory, and it counts as load from outside the ledger.
@@ -229,6 +231,24 @@ function narrowed_weight(
 	return room >= own.weight ? undefined : room
 }
 
+// **A unit claim narrowed below half its asked width waits for room instead, until the wait cap**
+// (joshuafolkken/kit#4167). vitest fixes its pool at start, so a width read off one busy instant holds for
+// the whole suite after the cores come back: over seven days a run at three workers or fewer took a
+// median 197 s against 76–90 s at seven, and 14 of the 18 slowest unit runs started that narrow. The
+// wait costs at most the cap, past which the claim narrows as before; a narrowing to half or more — a
+// core of editor load beside a solo gate — still starts at once (joshuafolkken/kit#4313).
+function is_too_narrow(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	granted: number | undefined,
+): boolean {
+	if (granted === undefined) return false
+
+	const own = reservations.find((entry) => entry.key === key)?.reservation
+
+	return own !== undefined && granted * NARROW_DIVISOR < own.weight
+}
+
 // The ledger as it stands once `key` is admitted at `granted`, so the overflow it reports counts the
 // narrowed weight rather than the one the claim asked for.
 function with_grant<T extends LedgerEntry>(
@@ -278,6 +298,7 @@ const core_admission = {
 	admitted_load,
 	describe_overflow,
 	is_admitted,
+	is_too_narrow,
 	ledger_load,
 	narrowed_weight,
 	sum_load,

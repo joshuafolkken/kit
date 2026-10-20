@@ -4,6 +4,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_body_or_comment } from '#scripts/issue/issue-body-or-comment'
 import { PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
@@ -38,7 +39,9 @@ const OPTIONS = {
 	repo: { type: 'string' },
 } as const
 
-// The plan is read last, from the path the flags named; an empty plan refuses like a missing one.
+// The plan is read last, from the path the flags named; an empty plan refuses like a missing one. A
+// plan without its existing-consumers section throws its refusal, printed as-is like a read failure,
+// before any write (`plan-consumers-section.ts`).
 function with_plan(
 	flags: Omit<PlanRequest, 'plan'>,
 	file_path: string | undefined,
@@ -46,7 +49,12 @@ function with_plan(
 	if (file_path === undefined) return undefined
 	const plan = cli_body.read_file_or_stdin(file_path)
 
-	return plan.trim().length === 0 ? undefined : { ...flags, plan }
+	if (plan.trim().length === 0) return undefined
+	const refusal = plan_consumers_section.refusal_of(plan)
+
+	if (refusal !== undefined) throw new Error(refusal)
+
+	return { ...flags, plan }
 }
 
 // An optional string flag, trimmed; given blank it is `''`, which the caller refuses.

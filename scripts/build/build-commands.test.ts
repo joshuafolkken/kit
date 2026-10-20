@@ -10,7 +10,7 @@ import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 const BUILD_TIMEOUT = 60_000
 const PACKAGE_DIR = path.join(SCRIPTS_DIR, '..')
 const DIST_DIR = path.join(PACKAGE_DIR, 'dist')
-const DOC_SECTION_SCRIPT = 'scripts/document/document-section-cli.ts'
+const DOC_SECTION_SCRIPT = 'scripts/document/document-section-main.ts'
 const SECTION_ARGUMENTS = ['CLAUDE.md', 'Communication']
 const SECTION_HEADING = '## Communication'
 const MAIN_GUARD = 'process.argv[1]'

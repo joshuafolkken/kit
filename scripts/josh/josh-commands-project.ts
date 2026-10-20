@@ -118,7 +118,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	init: {
-		script: 'scripts/init/init.ts',
+		script: 'scripts/init/init-main.ts',
 		description: 'Initialize config in a new project',
 		category: 'Project',
 		reference: [
@@ -136,7 +136,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	sync: {
-		script: 'scripts/sync/sync.ts',
+		script: 'scripts/sync/sync-main.ts',
 		description: 'Sync config files',
 		category: 'Project',
 		reference: ['', 'developer', ['files']],

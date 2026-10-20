@@ -8,7 +8,8 @@ vi.mock('node:fs', () => ({
 }))
 
 const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-const { bump_version, compute_new_version } = await import('./bump-version')
+const { bump_version, compute_new_version, run_bump_version, USAGE } =
+	await import('./bump-version')
 
 const import_time_write_calls = vi.mocked(write_file_sync).mock.calls.length
 
@@ -16,6 +17,7 @@ const BASE_VERSION = '1.2.3'
 const PATCH = 'patch'
 const MINOR = 'minor'
 const MAJOR = 'major'
+const MINOR_BUMPED = '"version": "1.3.0"'
 const MOCK_PKG = JSON.stringify({ name: 'kit', version: BASE_VERSION }, undefined, '\t')
 
 beforeEach(() => {
@@ -56,7 +58,7 @@ describe('bump_version — version increment', () => {
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
-			expect.stringContaining('"version": "1.3.0"'),
+			expect.stringContaining(MINOR_BUMPED),
 		)
 	})
 
@@ -90,6 +92,35 @@ describe('bump_version — JSON-safe write', () => {
 		if (typeof written_content !== 'string') throw new TypeError('Expected string content')
 
 		expect(JSON.parse(written_content)).toMatchObject({ version: '1.2.4' })
+	})
+})
+
+describe('run_bump_version — the josh bump body', () => {
+	it('bumps minor when no type is given and answers 0', () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(run_bump_version([])).toBe(0)
+		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.stringContaining(MINOR_BUMPED),
+		)
+	})
+
+	it('refuses an unknown type with the usage line, writing nothing', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(run_bump_version(['huge'])).toBe(1)
+		expect(error).toHaveBeenCalledWith(USAGE)
+		expect(vi.mocked(write_file_sync)).not.toHaveBeenCalled()
+	})
+
+	it('answers 1 with the message when the version cannot be read', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		vi.mocked(read_file_sync).mockReturnValue('{}')
+
+		expect(run_bump_version([PATCH])).toBe(1)
+		expect(error).toHaveBeenCalledOnce()
 	})
 })
 

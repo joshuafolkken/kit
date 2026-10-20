@@ -14,6 +14,11 @@ import { test_titles } from './test-titles'
 // at the base and in the working tree, and the pull request body. Kept apart so the comparison stays
 // pure.
 //
+// **The base is the tree's, through a merge in progress** (`change_base.resolved_through_merge`): the
+// head side is the work tree, so a stopped merge of the default branch has already removed whatever
+// tests the default branch removed, and measuring from `HEAD`'s older merge-base would list them as
+// this change's own.
+//
 // **A base that cannot be resolved is a refusal, not a pass** — the tests it would have held are
 // exactly what this gate exists to see. A file is read at the base only where the base holds it, so a
 // failed `git show` throws rather than reading as a file that had no tests. TypeScript is an optional
@@ -47,7 +52,7 @@ function tree_texts(root: string, paths: ReadonlyArray<string>): ReadonlyArray<s
 }
 
 async function read(): Promise<ReadonlyArray<string> | undefined> {
-	const base = await change_base.resolved()
+	const base = await change_base.resolved_through_merge()
 
 	if (base === undefined) return undefined
 	const root = await git_command.repository_root()

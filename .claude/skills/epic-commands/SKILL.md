@@ -76,9 +76,10 @@ The two `orphan search` findings are about the search, not the children:
 - `⚠ orphan search: The open-issue scan hit its …` — the audit passes. Look further by hand if an
   orphan is expected.
 
-**It cannot check** that when a child introduces a new label, command, state or artifact, some child
-owns updating the existing code referencing that concept — do that at planning. Label names live in
-`scripts/issue/issue-labels.ts`.
+**That a child introducing a new label, command, state or artifact updates the existing code
+referencing it is checked at planning**, not here: each plan's `### 影響を受ける既存の利用者` section,
+drafted by `pnpm josh plan:consumers` and required by `issue:plan`, names every consumer and which
+issue fixes it. Label names live in `scripts/issue/issue-labels.ts`.
 
 ## `josh epic:next <E…>` — what is runnable
 

@@ -10,7 +10,9 @@
      `ja`), then `pnpm josh issue:plan <N> --body-file <path> --title "<title>" --planned`: it renames
      the issue, fills a blank body or comments otherwise, and applies `run:planned`, so the next
      command's `run:entry` starts at the implementation. A target named in front of the reference
-     adds `--repo <owner/name>`.
+     adds `--repo <owner/name>`. Before writing the plan, run `pnpm josh plan:consumers
+     <identifier...>` on what it adds or changes and finish the `### 影響を受ける既存の利用者` draft it
+     prints; `issue:plan` refuses a plan without it (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
   5. Send the Telegram notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` →
      **stop** (do not implement).
 

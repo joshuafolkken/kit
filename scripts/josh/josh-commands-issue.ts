@@ -170,6 +170,19 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	...ISSUE_WRITE_COMMANDS,
+	'plan:consumers': {
+		script: 'scripts/issue/plan-consumers-main.ts',
+		description:
+			"List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section",
+		category: 'AI tools',
+		reference: ['<identifier...>', 'automation', ['none']],
+		usage: {
+			examples: [
+				{ arguments: 'lane:pause' },
+				{ arguments: 'lane:pause run:paused', note: 'one block per identifier, one draft' },
+			],
+		},
+	},
 	'issue:release': {
 		script: 'scripts/issue/issue-release-main.ts',
 		description:

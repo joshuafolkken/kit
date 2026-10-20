@@ -1,7 +1,5 @@
-#!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { error_text } from '#scripts/lib/error-message'
 import { build } from 'esbuild'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -21,17 +19,5 @@ async function build_bin(): Promise<void> {
 		banner: { js: NODE_BANNER },
 	})
 }
-
-async function main(): Promise<void> {
-	try {
-		await build_bin()
-		console.info(`  ✔ ${OUTFILE} built`)
-	} catch (error) {
-		console.error(error_text.message_of(error))
-		process.exit(1)
-	}
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 export { build_bin, NODE_BANNER, OUTFILE }

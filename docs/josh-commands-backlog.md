@@ -259,6 +259,21 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 <!-- /usage -->
 
+A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
+
+### `josh plan:consumers`
+
+<!-- usage: plan:consumers -->
+
+List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section.
+
+```bash
+pnpm josh plan:consumers lane:pause
+pnpm josh plan:consumers lane:pause run:paused   # one block per identifier, one draft
+```
+
+<!-- /usage -->
+
 ### `josh issue:already-done`
 
 <!-- usage: issue:already-done -->

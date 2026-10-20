@@ -13,7 +13,7 @@ const ROUND_1_CLOSED = '--round-1-closed'
 /* eslint-disable @typescript-eslint/naming-convention */
 const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	'review:brief': {
-		script: 'scripts/review/review-brief-cli.ts',
+		script: 'scripts/review/review-brief-main.ts',
 		description:
 			'Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone)',
 		category: 'AI tools',
