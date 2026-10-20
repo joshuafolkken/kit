@@ -26,6 +26,13 @@ const READER_FILE = path.join('scripts', 'docs-reader.ts')
 const WALKER_FILE = path.join('scripts', 'docs-walker.ts')
 const DATA_SOURCE_FILE = path.join('lib', 'read-as-data.ts')
 const DATA_READER_FILE = path.join('lib', 'source-reader.test.ts')
+const PROBED_FILE = path.join('data', 'kept.json')
+const PROBER_FILE = path.join('scripts', 'data-prober.ts')
+// Files added since the recorded tree: beside the unread note, beside a file a test read, and in a
+// directory the tree did not hold.
+const NEW_UNREAD_FILE = path.join('notes', 'added.md')
+const NEW_PROBED_FILE = path.join('data', 'added.json')
+const NEW_DIRECTORY_FILE = path.join('drafts', 'added.md')
 
 // How many files the listing has to leave unnamed for the "and N more" line to be exercised.
 const UNLISTED_FILE_COUNT = 2
@@ -34,11 +41,12 @@ const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
 	dirty: [],
-	directories: ['docs', 'lib', 'notes', 'scripts'],
+	directories: ['data', 'docs', 'lib', 'notes', 'scripts'],
 	readers: {
 		[DOCUMENT_FILE]: [READER_FILE],
 		[path.join('docs', '*')]: [WALKER_FILE],
 		[DATA_SOURCE_FILE]: [DATA_READER_FILE],
+		[PROBED_FILE]: [PROBER_FILE],
 	},
 }
 
@@ -112,20 +120,20 @@ describe('related_scope.resolve_scope — non-code files through the map', () =>
 		expect(scope.files).toEqual([at(WALKER_FILE)])
 	})
 
-	it('falls back to the whole suite on a non-code file no recorded test read', () => {
-		const scope = related_scope.resolve_scope(request([SOURCE_FILE, UNREAD_FILE]))
+	it('falls back on a file added beside one a recorded test read, which may be read by name', () => {
+		const scope = related_scope.resolve_scope(request([SOURCE_FILE, NEW_PROBED_FILE]))
 
 		expect(scope.mode).toBe('all')
-		expect(scope.reason).toContain(UNREAD_FILE)
+		expect(scope.reason).toBe(`${NEW_PROBED_FILE} is read by no recorded test`)
 	})
 
-	it('falls back on an unread non-code file added since the recorded tree', () => {
+	it('falls back on a file added in a directory the recorded tree did not hold', () => {
 		const scope = related_scope.resolve_scope(
-			request([UNREAD_FILE], { recorded: new Set([DOCUMENT_FILE]) }),
+			request([NEW_DIRECTORY_FILE], { recorded: new Set([DOCUMENT_FILE]) }),
 		)
 
 		expect(scope.mode).toBe('all')
-		expect(scope.reason).toContain(UNREAD_FILE)
+		expect(scope.reason).toContain(NEW_DIRECTORY_FILE)
 	})
 
 	it('falls back to the whole suite on a non-code file when there is no map', () => {
@@ -168,6 +176,35 @@ describe('related_scope.resolve_scope — files known to reach no test', () => {
 
 		expect(description).toContain('1 changed file(s) no test reads — running no tests')
 		expect(description).toContain(UNREAD_FILE)
+	})
+})
+
+// joshuafolkken/kit#4303: a lane's own new record — `.josh/observations/<N>.md` — lands in a
+// directory the recorded tree held and no test read inside, and must not run the whole suite.
+describe('related_scope.resolve_scope — files added to a directory no test reads inside', () => {
+	it('runs no test for a file added since the recorded tree beside the unread note', () => {
+		const scope = related_scope.resolve_scope(request([NEW_UNREAD_FILE]))
+
+		expect(scope.mode).toBe('none')
+		expect(scope.files).toEqual([at(NEW_UNREAD_FILE)])
+	})
+
+	it('says so with the same line a file the recorded tree held gets', () => {
+		const description = related_scope.describe_scope(
+			related_scope.resolve_scope(request([NEW_UNREAD_FILE])),
+			ROOT,
+		)
+
+		expect(description).toBe(
+			`${related_scope.COMMAND_LABEL}: 1 changed file(s) no test reads — running no tests.\n  - ${NEW_UNREAD_FILE}`,
+		)
+	})
+
+	it('narrows to the changed code beside it rather than running the whole suite', () => {
+		const scope = related_scope.resolve_scope(request([SOURCE_FILE, NEW_UNREAD_FILE]))
+
+		expect(scope.mode).toBe('related')
+		expect(scope.files).toEqual([at(SOURCE_FILE)])
 	})
 })
 
