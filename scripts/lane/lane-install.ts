@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
-import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process } from '#scripts/lib/buffered-process'
+import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
 // Filling the lane, which is the other half of opening one.
@@ -26,16 +26,9 @@ import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 // exactly the lock committed there. A lock the install would rather rewrite is a finding, not
 // something to absorb silently into six parallel lanes.
 const INSTALL_ARGUMENTS = ['install', '--frozen-lockfile']
-// The manifest whose absence is the whole skip condition. A lane cut from a repository that has no
-// `package.json` has nothing to install, so running `pnpm install` there could only fail on a
-// manifest that was never there — which is exactly the fixture a cross-process lane test needs.
-// The condition is strictly "the file does not exist": a manifest that is
-// present but unreadable or broken still runs the install and still fails as before, so a genuinely
-// broken repository is never passed silently.
-const MANIFEST_FILE_NAME = 'package.json'
 // The lane opens with no dependencies installed, and that is the reported state rather than a
 // failure — there was nothing to install, so nothing failed.
-const NO_MANIFEST_OUTPUT = `No ${MANIFEST_FILE_NAME} in the lane, so the dependency install was skipped.`
+const NO_MANIFEST_OUTPUT = `No ${PACKAGE_JSON} in the lane, so the dependency install was skipped.`
 
 interface InstallResult {
 	is_installed: boolean
@@ -51,7 +44,7 @@ interface InstallResult {
 // `existsSync` answers only whether the path is there, never whether its contents parse, so a
 // present-but-broken manifest falls through to the real install and fails there.
 function has_manifest(directory: string): boolean {
-	return existsSync(path.join(directory, MANIFEST_FILE_NAME))
+	return existsSync(package_manifest.manifest_path(directory))
 }
 
 /**
@@ -87,4 +80,4 @@ async function install_dependencies(directory: string): Promise<InstallResult> {
 const lane_install = { install_dependencies }
 
 export type { InstallResult }
-export { lane_install, INSTALL_ARGUMENTS, MANIFEST_FILE_NAME, NO_MANIFEST_OUTPUT }
+export { lane_install, INSTALL_ARGUMENTS, NO_MANIFEST_OUTPUT }

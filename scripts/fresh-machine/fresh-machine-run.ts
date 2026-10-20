@@ -4,13 +4,13 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { npm_registry } from '#scripts/version/npm-registry'
 import { execa, type Options } from 'execa'
 import { z } from 'zod'
@@ -134,9 +134,7 @@ async function pack(pack_directory: string, write: Write): Promise<string> {
 }
 
 function package_name(): string {
-	const manifest = readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8')
-
-	return MANIFEST_SCHEMA.parse(JSON.parse(manifest)).name
+	return package_manifest.read_manifest(PROJECT_ROOT, MANIFEST_SCHEMA).name
 }
 
 // The published version is always written out in the log and the install command, so a run can be

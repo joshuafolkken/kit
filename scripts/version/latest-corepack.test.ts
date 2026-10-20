@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
 	fake_sync_result,
-	PACKAGE_JSON_PATH,
 	QUARANTINED_PUBLISH,
 	WORKSPACE_AGE_1440,
 } from './latest-corepack-fixture'
@@ -177,10 +177,7 @@ describe('latest_corepack.restore_package_json', () => {
 
 		latest_corepack.restore_package_json(PACKAGE_JSON_WITH_ENGINES)
 
-		expect(mocked_write_file_sync).toHaveBeenCalledWith(
-			PACKAGE_JSON_PATH,
-			PACKAGE_JSON_WITH_ENGINES,
-		)
+		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON, PACKAGE_JSON_WITH_ENGINES)
 
 		vi.restoreAllMocks()
 	})
@@ -193,7 +190,7 @@ const PACKAGE_JSON_WITH_INTEGRITY = build_package_manager_manifest(
 	`pnpm@11.5.2+${PINNED_INTEGRITY}`,
 	`11.5.2+${PINNED_INTEGRITY}`,
 )
-const RESTORE_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WITH_ENGINES]
+const RESTORE_CALL = [PACKAGE_JSON, PACKAGE_JSON_WITH_ENGINES]
 // 11.5.2 aged past any window; 11.6.0 published in the far future stays quarantined, so the
 // selection exercises the native age filter on the main path too.
 const VIEW_STDOUT = `{"11.5.2":"${AGED_PUBLISH}","11.6.0":"${QUARANTINED_PUBLISH}"}\n`
@@ -254,7 +251,7 @@ describe('latest_corepack.main without packageManager', () => {
 
 		latest_corepack.main()
 
-		expect(mocked_write_file_sync).toHaveBeenLastCalledWith(PACKAGE_JSON_PATH, PACKAGE_JSON_NO_PM)
+		expect(mocked_write_file_sync).toHaveBeenLastCalledWith(PACKAGE_JSON, PACKAGE_JSON_NO_PM)
 		vi.restoreAllMocks()
 	})
 })
@@ -284,10 +281,7 @@ describe('latest_corepack.main', () => {
 		expect(invocation_order(mocked_execa_sync, 1)).toBeLessThan(
 			invocation_order(mocked_execa_sync, 2),
 		)
-		expect(mocked_write_file_sync).toHaveBeenCalledWith(
-			PACKAGE_JSON_PATH,
-			PACKAGE_JSON_WITH_INTEGRITY,
-		)
+		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON, PACKAGE_JSON_WITH_INTEGRITY)
 
 		vi.restoreAllMocks()
 	})
@@ -314,7 +308,7 @@ describe('latest_corepack.main alignment', () => {
 
 		latest_corepack.main()
 
-		expect(mocked_write_file_sync.mock.calls[1]).toEqual([PACKAGE_JSON_PATH, PACKAGE_JSON_ALIGNED])
+		expect(mocked_write_file_sync.mock.calls[1]).toEqual([PACKAGE_JSON, PACKAGE_JSON_ALIGNED])
 
 		vi.restoreAllMocks()
 	})

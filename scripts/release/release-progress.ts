@@ -1,11 +1,8 @@
-import path from 'node:path'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { json_value } from '#scripts/lib/json-value'
+import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { poll } from '#scripts/lib/poll'
-import { file_reader } from '#scripts/lib/read-file'
 import { npm_registry } from '#scripts/version/npm-registry'
-import { version_targets } from '#scripts/version/version-targets'
 import { z } from 'zod'
 import { release_publish_run } from './release-publish-run'
 import { release_tag } from './release-tag'
@@ -19,7 +16,6 @@ import { release_tag } from './release-tag'
 // when every stage has — a stage that times out, or whose Publish run fails first, is named with ❌
 // and the run exits non-zero.
 
-const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NPM_TIMEOUT_ENV = 'JOSH_RELEASE_NPM_TIMEOUT_SECONDS'
@@ -39,15 +35,8 @@ const manifest_schema = z.looseObject({
 type ReleaseManifest = { is_private: true } | { is_private: false; name: string }
 type NpmState = { kind: 'published' } | { kind: 'failed'; run_id: number } | { kind: 'pending' }
 
-function parse_manifest(cwd: string): z.infer<typeof manifest_schema> {
-	const raw = file_reader.read_optional(path.join(cwd, PACKAGE_JSON)) ?? ''
-	const parsed = manifest_schema.safeParse(json_value.parse_or_undefined(raw))
-
-	return parsed.success ? parsed.data : {}
-}
-
 function read_manifest(cwd: string): ReleaseManifest {
-	const manifest = parse_manifest(cwd)
+	const manifest = package_manifest.read_manifest_if_valid(cwd, manifest_schema) ?? {}
 
 	if (manifest.private === true) return { is_private: true }
 	if (manifest.name === undefined) throw new Error(`${PACKAGE_JSON} in ${cwd} has no package name.`)

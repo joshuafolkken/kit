@@ -6,6 +6,7 @@ import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { project_profile } from '#scripts/init/project-profile'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { project_config } from '#scripts/safe-chain/project-config'
@@ -17,8 +18,7 @@ import { file_content } from './file-content'
 import { sync_ai_files } from './sync-ai-files'
 import { sync_configs } from './sync-configs'
 
-const PACKAGE_JSON = 'package.json'
-const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
+const PACKAGE_JSON_UNCHANGED_MSG = `  ✔ unchanged ${PACKAGE_JSON}`
 
 function did_migrate_prettierrc(destination_path: string): boolean {
 	const legacy_path = path.join(path.dirname(destination_path), '.prettierrc')

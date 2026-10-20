@@ -1,9 +1,11 @@
-import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs'
+import { existsSync, readdirSync, type Dirent } from 'node:fs'
 import path from 'node:path'
 import { repo_origin } from '#scripts/discovery/repo-origin'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { z } from 'zod'
 import { kit_written_paths } from './kit-written-paths'
 import { own_formatter } from './own-formatter'
 import { workflow_mark } from './workflow-mark'
@@ -76,9 +78,8 @@ function requested_profile(
 }
 
 function read_manifest(root: string): Record<string, unknown> | undefined {
-	const filename = path.join(root, 'package.json')
-	if (!existsSync(filename)) return undefined
-	const parsed: unknown = JSON.parse(readFileSync(filename, 'utf8'))
+	if (!existsSync(package_manifest.manifest_path(root))) return undefined
+	const parsed = package_manifest.read_manifest(root, z.unknown())
 
 	if (!json_value.is_record(parsed)) throw new Error('package.json must contain an object')
 
