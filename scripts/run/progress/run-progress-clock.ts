@@ -2,6 +2,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { z } from 'zod'
 
 // The report clock `josh run:progress` keeps, in the one form both of its readers can use.
@@ -48,7 +49,6 @@ const LOG_SUFFIX = '.log'
 // A few hours of heartbeats at the twenty-minute interval — enough to read the run's recent shape, and
 // bounded so an unattended run cannot grow the file without limit.
 const LOG_KEEP = 12
-const MS_PER_MINUTE = 60_000
 // Longer than any heartbeat interval and shorter than any gap between two runs. Heartbeats land at most
 // one interval apart while a run is live (twenty minutes by default, well under this), so a newest block
 // older than this belongs to a previous run: past it the log is reset rather than extended, and a fresh

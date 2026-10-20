@@ -5,6 +5,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2769: the driver's park is explained on the issue, and a child GitHub merged but
@@ -102,12 +103,12 @@ describe('run_merge_steps.do_failed — the stale in-progress goes through the s
 
 describe('run_merge_steps.do_failed — the park is explained on the issue', () => {
 	it('comments the reason when it parks the child with run:stalled', async () => {
-		await run_merge_steps.do_failed(CONTEXT, run_merge_steps.CUT_RELAUNCH_CAUSE)
+		await run_merge_steps.do_failed(CONTEXT, run_stalled.CUT_NOT_RELAUNCHED)
 
 		expect(comment_mock).toHaveBeenCalledOnce()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`- Why: ${run_merge_steps.CUT_RELAUNCH_CAUSE}`),
+			expect.stringContaining(`- Why: ${run_stalled.CUT_NOT_RELAUNCHED.why}`),
 		)
 		expect(comment_mock).toHaveBeenCalledWith(CHILD, expect.stringContaining(`fullrun #${CHILD}`))
 	})
@@ -123,26 +124,31 @@ describe('run_merge_steps.do_failed — the park is explained on the issue', () 
 
 // joshuafolkken/kit#3808: the ship's stop is the reason a person needs, not the ended session.
 describe('run_merge_steps.do_failed — a child whose detached ship ended', () => {
-	const SHIP_CAUSE = 'its detached ship stopped and was not fixed: #2761 review.'
+	const SHIP_CAUSE = {
+		short: 'review failed',
+		why: 'its detached ship stopped and was not fixed: #2761 review.',
+	}
 
 	it('parks it for the ship’s stop', async () => {
 		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
 
-		await run_merge_steps.do_failed(CONTEXT)
+		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(ship_cause_mock).toHaveBeenCalledWith(CHILD)
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`- Why: ${SHIP_CAUSE}`),
+			expect.stringContaining(`- Why: ${SHIP_CAUSE.why}`),
 		)
+		expect(result.cause).toBe(SHIP_CAUSE.short)
 	})
 
 	it('keeps the caller’s cause over the ship’s', async () => {
-		ship_cause_mock.mockReturnValue('ship cause')
+		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
 
-		await run_merge_steps.do_failed(CONTEXT, run_merge_steps.CUT_RELAUNCH_CAUSE)
+		const result = await run_merge_steps.do_failed(CONTEXT, run_stalled.CUT_NOT_RELAUNCHED)
 
 		expect(ship_cause_mock).not.toHaveBeenCalled()
+		expect(result.cause).toBe(run_stalled.CUT_NOT_RELAUNCHED.short)
 	})
 
 	it('falls back to the ended session when no ship ended', async () => {

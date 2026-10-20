@@ -14,7 +14,9 @@ const DAY_MINUTES = 1440
 const THREE_DAYS = 3
 const MAX_DAYS = 90
 const LONG_MINUTES = 1_000_000
-const DEPENDABOT_PATH = path.join('.github', 'dependabot.yml')
+const DEPENDABOT_FILE = 'dependabot.yml'
+const DEPENDABOT_PATH = path.join('.github', DEPENDABOT_FILE)
+const TEMPLATE_PATH = path.join('templates', DEPENDABOT_FILE)
 const WORKSPACE_FILE = 'pnpm-workspace.yaml'
 const TYPES_NODE = '@types/node'
 const VERSION_LINE = 'version: 2'
@@ -188,10 +190,13 @@ describe('kit release window', () => {
 		expect(release_age.parse_minimum_release_age(workspace)).toBe(DEFAULT_RELEASE_AGE_MINUTES)
 	})
 
-	it('keeps the distributed dependabot.yml cooldown in step with the workspace', () => {
-		const config = read_kit_file(DEPENDABOT_PATH)
-		const window = release_window.parse_release_window(workspace)
+	it.each([DEPENDABOT_PATH, TEMPLATE_PATH])(
+		'keeps the %s cooldown in step with the workspace',
+		(config_path) => {
+			const config = read_kit_file(config_path)
+			const window = release_window.parse_release_window(workspace)
 
-		expect(dependabot_cooldown.merge_cooldown(config, window)).toBe(config)
-	})
+			expect(dependabot_cooldown.merge_cooldown(config, window)).toBe(config)
+		},
+	)
 })

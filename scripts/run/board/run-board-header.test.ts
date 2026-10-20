@@ -1,5 +1,6 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import string_width from 'string-width'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -12,7 +13,7 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // joshuafolkken/kit#3692: three columns — the name, the time, then the progress over the machine.
 
 const { minute_of } = run_board_labels
-const { WORDS } = run_board_labels
+const { HEADER_ICONS, WORDS } = run_board_labels
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 // The second line's first two columns where nothing is drawn in them: no repository, no heartbeat.
 const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
@@ -24,7 +25,7 @@ const NOW_BLANK = ''
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const STALE_BEAT = '💓 40′00″'
 const EMPTY_BAR = '─'.repeat(10)
-const MINUTE = backlog_budget.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
@@ -199,13 +200,18 @@ describe('run_board_header.header_lines chat', () => {
 
 describe('run_board_header.header_lines plan warning', () => {
 	it('says nothing about a plan read that succeeded', () => {
-		expect(title_of(header({ plan_fetched_ms: NOW }))).not.toContain('⚠')
+		expect(title_of(header({ plan_fetched_ms: NOW }))).not.toContain(HEADER_ICONS.warning)
 	})
 
 	it('warns with the minute of a failed plan read', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(new RegExp(`💤 0  ⚠ ${WORDS.plan} ${minute_of(NOW)}$`, 'u'))
+		expect(title_of(board)).toMatch(new RegExp(`💤 0  ❗ ${WORDS.plan} ${minute_of(NOW)}$`, 'u'))
+	})
+
+	// joshuafolkken/kit#4223: ⚠ is counted one column wide but drawn two, over the blank after it.
+	it('warns with an icon two columns wide', () => {
+		expect(string_width(HEADER_ICONS.warning)).toBe(2)
 	})
 })
 

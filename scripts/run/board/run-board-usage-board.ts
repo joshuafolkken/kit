@@ -1,15 +1,16 @@
-import { run_progress } from '#scripts/run/progress/run-progress'
+import type { TableRead } from '#scripts/lane/lane-process-table'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { BoardUsage } from './run-board-header'
 import { run_board_process_groups } from './run-board-process-groups'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_usage, type UsageMark } from './run-board-usage'
 
-// What a reading draws: each lane's CPU/MEM/CMPRS and the 🖥 section's groups, both from the same
+// What a reading draws: each lane's CPU/MEM/CMPRS and the 💻 section's groups, both from the same
 // differences between this reading and the last. A frame drawn once has no last reading, so it reads
 // twice a second apart; otherwise its CPU would be blank.
 
-const PRIME_MS = run_progress.MS_PER_SECOND
+const PRIME_MS = MS_PER_SECOND
 
 type UsageRead = Pick<BoardState, 'usage' | 'usages'>
 
@@ -29,21 +30,32 @@ function board_usage_of(
 	}
 }
 
-async function primed(state: BoardState, ports: BoardPorts): Promise<UsageMark | undefined> {
-	if (ports.is_tty || state.usage !== undefined) return state.usage
+// A primed frame's two readings each take a snapshot of their own: the redraw's was taken before the
+// lane read's confirmation wait and the GitHub reads, so it would stretch the first second.
+async function primed(
+	state: BoardState,
+	ports: BoardPorts,
+	table: TableRead,
+): Promise<{ before: UsageMark | undefined; table: TableRead }> {
+	if (ports.is_tty || state.usage !== undefined) return { before: state.usage, table }
 
-	const first = await ports.read_usage(undefined)
+	const first = await ports.read_usage(undefined, ports.read_table)
 
 	if (first !== undefined) await ports.sleep(PRIME_MS)
 
-	return first
+	return { before: first, table: ports.read_table }
 }
 
 // Read on the machine's second; a reading that failed draws no usage but keeps the last reading, so a
 // paused lane stays paused through a `ps` timed out under load and the next reading spans the gap.
-async function read_usages(state: BoardState, ports: BoardPorts): Promise<UsageRead> {
-	const before = await primed(state, ports)
-	const usage = await ports.read_usage(before)
+async function read_usages(
+	state: BoardState,
+	ports: BoardPorts,
+	table: TableRead,
+): Promise<UsageRead> {
+	const primer = await primed(state, ports, table)
+	const { before } = primer
+	const usage = await ports.read_usage(before, primer.table)
 
 	if (usage === undefined) return { usage: before, usages: undefined }
 

@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { StreamRead } from './run-event-stream'
 
 // The follow read behind `josh run:event --follow` and `--watch`. A reader
@@ -24,10 +25,8 @@ import type { StreamRead } from './run-event-stream'
 // The follow's quiet-tick cadence and how promptly it notices an arrival. The interval only bounds a
 // wait that found nothing — an arrival returns within a tick of landing — so it can be as long as the
 // heartbeat without making an arrival late, and the tick is a cheap `stat` of one file.
-const MS_PER_SECOND = 1000
-const SECONDS_PER_MINUTE = 60
 const FOLLOW_INTERVAL_MINUTES = 20
-const FOLLOW_INTERVAL_MS = FOLLOW_INTERVAL_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND
+const FOLLOW_INTERVAL_MS = FOLLOW_INTERVAL_MINUTES * MS_PER_MINUTE
 const FOLLOW_TICK_MS = MS_PER_SECOND
 
 interface FollowPorts {

@@ -4,7 +4,7 @@ import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
-import type { UsageFigure } from './run-board-usage'
+import type { UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
 // What is loading the machine, by who started it: the backlogrun's own processes — its supervisor, the
@@ -12,7 +12,7 @@ import { run_board_usage_text } from './run-board-usage-text'
 // one row each with gauges under a rule whose labels stand over them, the parts of each group indented
 // under it so a short pane can drop them first; anywhere else one line of figures.
 
-const { column_cells, label_columns, lead_width } = run_board_render_lanes
+const { LANES_LABEL, column_cells, label_columns, lead_width } = run_board_render_lanes
 const { columns_rule, heading_lines } = run_board_render_section
 const { title_of } = run_board_render_title
 const { plain_of } = run_board_usage_text
@@ -21,15 +21,19 @@ const CELL_GAP = ' '
 const INDENT = '  '
 const DETAIL = '  '
 const NAME_LIMIT = 24
-const LABEL = '🖥 processes'
+// Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a terminal
+// draws them: 🖥 and 🎛, text symbols drawn as emoji, overlapped the blank after them.
+const LABEL = '💻 processes'
 const PART_GAP = ' · '
+const SUMMARY_GAP = ' ── '
+const ICONS = { backlogrun: '▶', apps: '🌐', leftover: '👻' }
 const LABELS = {
-	backlogrun: '▶ backlogrun',
+	backlogrun: `${ICONS.backlogrun} backlogrun`,
 	supervisor: '🧭 supervisor',
-	parent: '🎛 parent',
-	lanes: '🛤 lanes',
-	apps: '🌐 apps',
-	leftover: '👻 leftover',
+	parent: '🎬 parent',
+	lanes: LANES_LABEL,
+	apps: `${ICONS.apps} apps`,
+	leftover: `${ICONS.leftover} leftover`,
 }
 
 interface Labeled {
@@ -122,30 +126,48 @@ function screen_part(usage: BoardUsage): DetailPart {
 }
 
 function plain_group(
+	scale: UsageScale,
 	label: string,
 	figure: UsageFigure,
 	parts: ReadonlyArray<NamedFigure>,
 ): string {
-	const group = `${label} ${plain_of(figure)}`
-	const named_parts = parts.map((part) => `${named(part).label} ${plain_of(part.figure)}`)
+	const group = `${label} ${plain_of(figure, scale)}`
+	const named_parts = parts.map((part) => `${named(part).label} ${plain_of(part.figure, scale)}`)
 
 	return named_parts.length === 0 ? group : `${group}: ${named_parts.join(', ')}`
 }
 
-// The groups on one line: `▶ backlogrun 4.9/4.0G/3.3G · 🌐 apps 3.1/18.8G/12.4G: Chrome …`.
+// The groups on one line: `▶ backlogrun 44.5%/4.0G/3.3G · 🌐 apps 28.2%/18.8G/12.4G: Chrome …`.
 function plain_part(usage: BoardUsage): DetailPart {
-	const { backlogrun, apps, leftover } = usage.processes
+	const { processes, scale } = usage
+	const { backlogrun, apps, leftover } = processes
 	const groups = [
-		plain_group(LABELS.backlogrun, backlogrun.total, []),
-		plain_group(LABELS.apps, apps.total, apps.top),
+		plain_group(scale, LABELS.backlogrun, backlogrun.total, []),
+		plain_group(scale, LABELS.apps, apps.total, apps.top),
 	]
 	const left =
 		leftover.entries.length === 0
 			? []
-			: [plain_group(LABELS.leftover, leftover.total, leftover.entries)]
+			: [plain_group(scale, LABELS.leftover, leftover.total, leftover.entries)]
 	const text = `${INDENT}${[...groups, ...left].join(PART_GAP)}`
 
 	return { head: heading_lines(LABEL), lines: [{ text, is_detail: false }] }
+}
+
+// What the folded section says: each group's totals behind its icon,
+// `▶ 44.5%/4.0G/3.3G ── 🌐 28.2%/18.8G/12.4G`, the leftover only where a run left any.
+function summary_of(usage: BoardUsage): string {
+	const { processes, scale } = usage
+	const { backlogrun, apps, leftover } = processes
+	const left =
+		leftover.entries.length === 0 ? [] : [`${ICONS.leftover} ${plain_of(leftover.total, scale)}`]
+	const groups = [
+		`${ICONS.backlogrun} ${plain_of(backlogrun.total, scale)}`,
+		`${ICONS.apps} ${plain_of(apps.total, scale)}`,
+		...left,
+	]
+
+	return groups.join(SUMMARY_GAP)
 }
 
 // `undefined` where the frame read no usage.
@@ -154,7 +176,9 @@ function processes_part(header: BoardHeader): DetailPart | undefined {
 
 	if (usages === undefined) return undefined
 
-	return header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+
+	return { ...part, label: LABEL, summary: summary_of(usages) }
 }
 
 const run_board_render_processes = { processes_part }

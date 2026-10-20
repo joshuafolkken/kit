@@ -22,8 +22,7 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: pnpm josh cost:audit [--period <days>]'
 const OPTIONS = { period: { type: 'string' } } as const
-// A positive whole number of days, at most ten years — `0`, `1.5` and an empty string are refused.
-const DAYS_PATTERN = /^[1-9]\d*$/u
+// A positive whole number of days (`cli_flags.to_positive`), at most ten years.
 const MAX_PERIOD_DAYS = 3650
 // GitHub's search qualifier takes an ISO instant without the milliseconds `toISOString` writes.
 const MILLISECONDS_PATTERN = /\.\d{3}Z$/u
@@ -37,9 +36,9 @@ function read_period(argv: ReadonlyArray<string>): number | undefined {
 	if (values === undefined) return undefined
 
 	const raw = values.period ?? String(cost_audit.DEFAULT_PERIOD_DAYS)
-	const days = Number(raw)
+	const days = cli_flags.to_positive(raw)
 
-	return DAYS_PATTERN.test(raw) && days <= MAX_PERIOD_DAYS ? days : undefined
+	return days !== undefined && days <= MAX_PERIOD_DAYS ? days : undefined
 }
 
 function instant(ms: number): string {

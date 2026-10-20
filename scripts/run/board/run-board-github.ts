@@ -1,4 +1,4 @@
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
@@ -16,7 +16,7 @@ import { run_board_status, type ItemStatus } from './run-board-status'
 // keeps the previous plan on screen and says when it failed. A run that ended keeps its plan as it
 // last read.
 
-const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
+const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * MS_PER_SECOND
 // A rejected closed read answers nothing closed and not whole, so it is asked again.
 const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state

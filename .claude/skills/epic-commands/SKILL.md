@@ -29,9 +29,8 @@ Recording a decision removes that child's `needs-decision` label (Tier A; `backl
 
 - **Decided as a child joins the epic**: `pnpm josh epic --add … --decision-file` writes both
   (`epic-bundle.md`).
-- **About a child the epic already tracks**: that flag refuses an insertion with nothing to add.
-  Comment on each child with `pnpm josh issue:comment <N> --body-file <path>`, and **say in the report
-  that the epic's `## Decisions` entry is still pending**.
+- **About a child the epic already tracks**: `pnpm josh epic --decide <E> <N...> --decision-file
+  <path|->` writes the entry, the comments and the label removal; a rerun writes nothing twice.
 
 ```md
 ## Decisions
@@ -118,7 +117,8 @@ learn their state** — only to implement.
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
 Runs right after any filing; **`pnpm josh issue:file` runs it as its last step** — run it by hand only
-when that step printed `⚠`. **It recommends; it writes nothing.**
+when that step printed `⚠`. **It recommends and writes nothing; `--apply` writes an `add_to_epic` /
+`create_epic` answer.**
 
 | Candidates | Do | Tier |
 | --- | --- | --- |

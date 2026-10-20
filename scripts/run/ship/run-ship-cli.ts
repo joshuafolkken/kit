@@ -110,7 +110,7 @@ function body_arguments(path: string | undefined): ReadonlyArray<string> {
 	return path === undefined ? [] : [`--${BODY_FILE_OPTION}`, path]
 }
 
-const { PHASE } = run_ship_stage
+const { PHASE, STAGE } = run_ship_stage
 
 function issue_number(title: string): string | undefined {
 	return TRAILING_ISSUE_PATTERN.exec(title)?.[NUMBER_GROUP]
@@ -250,6 +250,12 @@ async function settle(
 	})
 }
 
+// A function of its own so the write does not sit after an `await`, where `require-atomic-updates`
+// reads it as a possible race — the reason `held-mark.ts` gives `set_held_mark`.
+function set_state(context: ShipContext, state: ShipState): void {
+	context.state = state
+}
+
 // One stage: passed over when the record and the state say it is done, run and recorded otherwise.
 async function run_stage(
 	step: Step,
@@ -270,6 +276,8 @@ async function run_stage(
 	const section = await run_step(step, args, context.state)
 
 	await settle(step, args, context, section.code)
+	// A review may fix the tree and refreshes the brief, so the stages after it read the state anew.
+	if (step.stage === STAGE.REVIEW) set_state(context, await run_ship_probe.read_state())
 
 	return section
 }

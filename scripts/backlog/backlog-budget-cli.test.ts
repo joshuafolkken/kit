@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_budget } from './backlog-budget'
 import { backlog_budget_cli } from './backlog-budget-cli'
@@ -47,7 +48,7 @@ describe('backlog_budget_cli.build_input — what a readable invocation carries'
 			String(MERGED),
 		])
 
-		expect(input?.idle_budget_ms).toBe(IDLE_MINUTES * backlog_budget.MS_PER_MINUTE)
+		expect(input?.idle_budget_ms).toBe(IDLE_MINUTES * MS_PER_MINUTE)
 		expect(input?.max_issues).toBe(MAX_ISSUES)
 		expect(input?.merged).toBe(MERGED)
 	})

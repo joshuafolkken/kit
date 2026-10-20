@@ -1,4 +1,5 @@
-import { cost_format } from '#scripts/cost-runtime/cost-format'
+import { figure_format } from '#scripts/lib/figure-format'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
 import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -22,7 +23,6 @@ import { investigation_payback } from './investigation-payback'
 // ledger, opening the stream — is the CLI's; this shapes what they return and nothing else, so the
 // digest is unit-tested against fixed inputs rather than against a live store.
 
-const MS_PER_MINUTE = 60_000
 const PERCENT = 100
 // A role whose share of the run's wall clock runs this far ahead of its share of the cost is time the
 // run spent waiting rather than working — the disparity the retrospective exists to surface (the wake
@@ -79,7 +79,7 @@ function role_line(role: RoleTotals): string {
 function cost_lines(cost: RunCostReport | undefined): Array<string> {
 	if (cost === undefined) return ['Run cost & time: no run transcripts found']
 
-	const totals = `${String(cost.session_count)} session(s), ${minutes(cost.total_elapsed_ms)} min, ${cost_format.format_usd(cost.total_usd)}`
+	const totals = `${String(cost.session_count)} session(s), ${minutes(cost.total_elapsed_ms)} min, ${figure_format.format_usd(cost.total_usd)}`
 
 	return [`Run cost & time: ${totals}`, ...cost.roles.map((role) => role_line(role))]
 }

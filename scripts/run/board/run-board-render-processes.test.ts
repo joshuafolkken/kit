@@ -5,13 +5,13 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_processes } from './run-board-render-processes'
 import type { UsageFigure } from './run-board-usage'
 
-// joshuafolkken/kit#4171: the 🖥 section draws what is loading the machine by who started it — the
+// joshuafolkken/kit#4171: the 💻 section draws what is loading the machine by who started it — the
 // backlogrun's own processes, the apps outside it and whatever a run left behind.
 
 const { processes_part } = run_board_render_processes
 const { GB, board_usage, header } = run_board_render_fixture
 const SPINNER = '⠋'
-const RULE_START = '── 🖥 processes '
+const RULE_START = '── 💻 processes '
 
 function figure(cpu_cores: number, memory_gb: number, compressed_gb: number): UsageFigure {
 	return { cpu_cores, memory_bytes: memory_gb * GB, compressed_bytes: compressed_gb * GB }
@@ -71,8 +71,8 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 		expect(lines.map((line) => [label_of(line.text), line.is_detail])).toStrictEqual([
 			['▶ backlogrun', false],
 			['🧭 supervisor', true],
-			['🎛 parent', true],
-			['🛤 lanes ×3', true],
+			['🎬 parent', true],
+			['🧵 lanes ×3', true],
 			['🌐 apps', false],
 			['Google Chrome ×2', true],
 			['WindowServer', true],
@@ -83,6 +83,23 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 		const lines = texts(part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER))
 
 		expect(new Set(lines.map((line) => cells_start(line))).size).toBe(1)
+	})
+})
+
+function icon_of(text: string): string {
+	return text.trim().split(' ', 1)[0] ?? ''
+}
+
+// joshuafolkken/kit#4223: a text-default icon is counted one column wide but drawn two, so it
+// overlapped the blank after it and the cells after it stood a column off on screen.
+describe('run_board_render_processes.processes_part icons', () => {
+	it('marks the heading and the backlogrun parts with icons two columns wide', () => {
+		const part = part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER)
+		const rule = (part?.head[1] ?? '').replace(/^─+/u, '')
+		const parts = (part?.lines.slice(1, 4) ?? []).map((line) => line.text)
+		const icons = [rule, ...parts].map((text) => icon_of(text))
+
+		expect(icons.map((icon) => run_board_fit.width_of(icon))).toStrictEqual([2, 2, 2, 2])
 	})
 })
 
@@ -107,14 +124,27 @@ describe('run_board_render_processes.processes_part off a terminal', () => {
 
 		expect(part?.head[1]?.startsWith(RULE_START)).toBe(true)
 		expect(texts(part)).toStrictEqual([
-			'  ▶ backlogrun 4.9/4.0G/3.3G · 🌐 apps 3.1/18.8G/12.4G: Google Chrome ×2 0.2/8.9G/8.1G, ' +
-				'WindowServer 0.5/0.6G/0.2G · 👻 leftover 0.4/0.3G/0.1G: node ×2 0.4/0.3G/0.1G',
+			'  ▶ backlogrun 49.0%/4.0G/3.3G · 🌐 apps 31.0%/18.8G/12.4G: Google Chrome ×2 2.0%/8.9G/8.1G, ' +
+				'WindowServer 5.0%/0.6G/0.2G · 👻 leftover 4.0%/0.3G/0.1G: node ×2 4.0%/0.3G/0.1G',
 		])
 	})
 
 	it('draws a group with no parts as its figures alone', () => {
 		expect(texts(part_of({}))).toStrictEqual([
-			'  ▶ backlogrun 0.0/0.0G/0.0G · 🌐 apps 0.0/0.0G/0.0G',
+			'  ▶ backlogrun 0.0%/0.0G/0.0G · 🌐 apps 0.0%/0.0G/0.0G',
 		])
+	})
+})
+
+describe('run_board_render_processes.processes_part summary', () => {
+	it('labels the section and sums each group for its folded heading', () => {
+		const part = part_of({ backlogrun: BACKLOGRUN, apps: APPS, leftover: LEFTOVER }, SPINNER)
+
+		expect(part?.label).toBe('💻 processes')
+		expect(part?.summary).toBe('▶ 49.0%/4.0G/3.3G ── 🌐 31.0%/18.8G/12.4G ── 👻 4.0%/0.3G/0.1G')
+	})
+
+	it('sums the groups alone where no run left anything behind', () => {
+		expect(part_of({})?.summary).toBe('▶ 0.0%/0.0G/0.0G ── 🌐 0.0%/0.0G/0.0G')
 	})
 })

@@ -1,0 +1,7 @@
+{
+	"reason": "Named icon constants (HEADER_ICONS.warning, NOTICE_ICON) and exporting LANES_LABEL/COLUMN_LABELS so the lanes label is single-sourced and its width is testable #4223",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}

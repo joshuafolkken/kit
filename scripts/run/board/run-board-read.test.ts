@@ -102,7 +102,20 @@ const LANE_ROOM = {
 	earlier_occupied: [],
 }
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
-const UNRECORDED = { resume: undefined, roots: { supervisor: undefined, parent: undefined } }
+const UNRECORDED = {
+	resume: undefined,
+	roots: { supervisor: undefined, parent: undefined },
+	carry: undefined,
+}
+
+// joshuafolkken/kit#4206: the declared order a queued row waits on is read off the running run's record.
+describe('run_board_read.read_local — the run’s record', () => {
+	it('reads the running run’s record beside it', async () => {
+		arrange({ kind: 'carried', carry: CARRY }, undefined)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ carry: CARRY })
+	})
+})
 
 describe('run_board_read.read_local', () => {
 	it('reads the ended run with its end, its scope and only the events inside it', async () => {
@@ -279,7 +292,8 @@ describe('run_board_read.read_local idle lanes', () => {
 		const idle_lanes = vi.mocked(lane_spent.idle_lanes).mockReturnValue(['3432'])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ idle_lanes: ['3432'] })
-		expect(idle_lanes).toHaveBeenCalledWith([lane('3432')])
+		// joshuafolkken/kit#4245: traced from the board's one process snapshot, not a pgrep per lane.
+		expect(idle_lanes.mock.calls.map(([lanes]) => lanes)).toContainEqual([lane('3432')])
 	})
 })
 

@@ -1,4 +1,5 @@
 import { machine_capacity, type MachineSample } from '#scripts/gate/machine-capacity'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_labels, type Paint } from './run-board-labels'
 
 // The machine line of `run:board`: whether a quiet run is stuck or only slow on a machine that has
@@ -18,7 +19,6 @@ import { run_board_labels, type Paint } from './run-board-labels'
 
 const { GAUGE_SHADES, HEADER_ICONS, bar_of, painted } = run_board_labels
 const PERCENT = 100
-const MS_PER_SECOND = 1000
 const PERCENT_WIDTH = '100%'.length
 const RATE_WIDTH = '3.1M/s'.length
 // Below this a rate keeps one decimal, so `0.4M/s` is not drawn as `0M/s`.

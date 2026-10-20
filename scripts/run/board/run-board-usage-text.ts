@@ -3,9 +3,10 @@ import { run_board_machine } from './run-board-machine'
 import type { UsageFigure, UsageScale } from './run-board-usage'
 
 // The CPU, memory and compressed-memory cells a lane row and a processes row draw: each a figure and a
-// gauge, `1.8 ■─────` / ` 0.7G ■────`, the gauge's full width the whole machine — the header's 💪 and
+// gauge, `16.4 ■─────` / ` 0.7 ■────`, the gauge's full width the whole machine — the header's 💪 and
 // 🧠 scale — and its color the header gauges' own `GAUGE_SHADES` at the header's thresholds, so a
-// row reads against the same machine the header does.
+// row reads against the same machine the header does. CPU is a percentage of the whole machine, the
+// header's 💪 unit, and memory is in GB; the column labels name neither unit.
 
 const { GAUGE_SHADES, HEADER_ICONS, bar_of, minute_of } = run_board_labels
 const { CPU_RED, CPU_YELLOW, MEMORY_RED, MEMORY_YELLOW, threshold_alert } = run_board_machine
@@ -13,8 +14,9 @@ const BYTES_PER_KB = 1024
 const BYTES_PER_GB = BYTES_PER_KB * BYTES_PER_KB * BYTES_PER_KB
 const PERCENT = 100
 const DECIMALS = 1
-const CORES_WIDTH = '99.9'.length
-const BYTES_WIDTH = '99.9G'.length
+const FIGURE_WIDTH = '99.9'.length
+const GB_UNIT = 'G'
+const PERCENT_UNIT = '%'
 const CELL_GAP = ' '
 const PLAIN_GAP = '/'
 const NO_CORES = '-'
@@ -27,11 +29,21 @@ interface Cell {
 }
 
 function gigabytes(bytes: number): string {
-	return `${(bytes / BYTES_PER_GB).toFixed(DECIMALS)}G`
+	return (bytes / BYTES_PER_GB).toFixed(DECIMALS)
 }
 
-function cores_text(cores: number | undefined): string | undefined {
-	return cores?.toFixed(DECIMALS)
+function share_of(value: number, full: number): number {
+	return full === 0 ? 0 : (value / full) * PERCENT
+}
+
+// The cores as a percentage of the machine's, `56.4`; a full machine is `100`, so the figure stays as
+// wide as `99.9`.
+function cpu_text(cores: number | undefined, scale: UsageScale): string | undefined {
+	if (cores === undefined) return undefined
+
+	const text = share_of(cores, scale.cores).toFixed(DECIMALS)
+
+	return Number(text) >= PERCENT ? String(PERCENT) : text
 }
 
 // The columns a gauge takes after its figure — none where no gauge is drawn.
@@ -46,8 +58,7 @@ function cell_text(cell: Cell, width: number, gauge: number): string {
 
 	if (gauge === 0) return figure
 
-	const percent = cell.full === 0 ? 0 : (cell.value / cell.full) * PERCENT
-	const shade = GAUGE_SHADES[threshold_alert(percent, cell.thresholds)]
+	const shade = GAUGE_SHADES[threshold_alert(share_of(cell.value, cell.full), cell.thresholds)]
 
 	return `${figure}${CELL_GAP}${bar_of(cell.value, cell.full, gauge, shade)}`
 }
@@ -58,7 +69,7 @@ function cells_from(figure: UsageFigure, scale: UsageScale): Array<Cell> {
 
 	return [
 		{
-			text: cores_text(cpu_cores),
+			text: cpu_text(cpu_cores, scale),
 			value: cpu_cores ?? 0,
 			full: scale.cores,
 			thresholds: { yellow: CPU_YELLOW, red: CPU_RED },
@@ -78,9 +89,9 @@ function cells_from(figure: UsageFigure, scale: UsageScale): Array<Cell> {
 	]
 }
 
-// Each cell's width before its gauge: the cores' text, then the two memories'.
+// Each cell's width before its gauge: the CPU's text, then the two memories'.
 function text_widths(): Array<number> {
-	return [CORES_WIDTH, BYTES_WIDTH, BYTES_WIDTH]
+	return [FIGURE_WIDTH, FIGURE_WIDTH, FIGURE_WIDTH]
 }
 
 // Each cell's width in columns, so a heading can put a column's label over it.
@@ -103,11 +114,15 @@ function cells_of(
 	return cells_from(figure, scale).map((cell, index) => cell_text(cell, widths[index] ?? 0, gauge))
 }
 
-// A figure on one line where no gauge is drawn: `1.8/0.7G/0.6G`, `-` for cores not read yet.
-function plain_of(figure: UsageFigure): string {
-	const cores = cores_text(figure.cpu_cores) ?? NO_CORES
+// A figure on one line where no gauge is drawn, and so no column label names the units:
+// `56.4%/0.7G/0.6G`, `-` for cores not read yet.
+function plain_of(figure: UsageFigure, scale: UsageScale): string {
+	const cpu = cpu_text(figure.cpu_cores, scale)
+	const memories = [figure.memory_bytes, figure.compressed_bytes].map(
+		(bytes) => `${gigabytes(bytes)}${GB_UNIT}`,
+	)
 
-	return [cores, gigabytes(figure.memory_bytes), gigabytes(figure.compressed_bytes)].join(PLAIN_GAP)
+	return [cpu === undefined ? NO_CORES : `${cpu}${PERCENT_UNIT}`, ...memories].join(PLAIN_GAP)
 }
 
 // The day a settled row finished, `10/8 `, where that is not the board's own day.

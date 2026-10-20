@@ -29,6 +29,8 @@ PR コメントも `pnpm josh issue:comment <N> --body-file <path>` で投稿す
 
 ### コメント投稿は `pnpm josh issue:comment` の 1 綴りだけ（joshuafolkken/kit#2304）
 
+自リポジトリへの `gh issue comment` / `gh api` コメント投稿 → `direct-issue-comment` 行が拒否する（`scripts/rules/direct-issue-comment.ts`）。
+
 `-f body=@<path>` は `@<path>` というリテラルを投稿するので、`raw-field-body` 行が拒否する。Issue body 書き換えの `--field body=@<path>` は安全なのでそのまま使う。
 
 `--body-file` / `--notify-message-file` は `-` で標準入力を読む（実装は `scripts/josh/cli-body.ts`）。`--body` と `--body-file` の同時指定は拒否される。

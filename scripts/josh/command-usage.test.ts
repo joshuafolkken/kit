@@ -54,6 +54,16 @@ describe('command usage', () => {
 	})
 })
 
+describe('command entry usage', () => {
+	it('gives every command at least one example for its usage block', () => {
+		const empty = Object.entries(COMMAND_MAP)
+			.filter(([, entry]) => entry.usage.examples.length === 0)
+			.map(([name]) => name)
+
+		expect(empty).toEqual([])
+	})
+})
+
 describe('command help', () => {
 	it('resolves an alias and prints the synopsis, description and usage', () => {
 		const help = command_usage.format_command_help('ga') ?? ''

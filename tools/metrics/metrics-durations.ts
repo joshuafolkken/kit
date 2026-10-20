@@ -1,6 +1,7 @@
 import type { GateEntry, LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { json_value } from '#scripts/lib/json-value'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { z } from 'zod'
 
 // The duration half of `josh metrics`: the gate, the unit suite, and the
@@ -29,7 +30,6 @@ const RECENT_GATES = 5
 // The gates after a fix that still read slow: until the fixed gates are the window's majority.
 const HALVES = 2
 const TRAILING_GATES = Math.floor(RECENT_GATES / HALVES) + 1
-const MS_PER_SECOND = 1000
 const SECONDS_DIGITS = 1
 const NEWLINE = '\n'
 const JSON_INDENT = '\t'

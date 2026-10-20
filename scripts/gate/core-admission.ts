@@ -1,10 +1,10 @@
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { LedgerLoad, MachineBudget } from './machine-capacity'
 
 // The ledger's admission arithmetic, kept apart from the markers `core-budget.ts` reads and writes so
 // that file stays under its line ceiling as the budget grew a memory side.
 // Everything here is a pure function of the ledger it is handed.
 
-const MS_PER_SECOND = 1000
 // **How long an admitted claim's tool takes to reach its declared peak.** The machine reading holds only
 // what a tool has already allocated, so a claim admitted moments ago is not in it yet: adding its
 // declared memory back would admit the next claim into memory about to be taken — the concurrent start

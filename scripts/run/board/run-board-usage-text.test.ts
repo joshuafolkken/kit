@@ -25,10 +25,24 @@ describe('run_board_usage_text.cells_of', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(cells_of(figure(1.8), SCALE, GAUGE)).toStrictEqual([
-			` 1.8 ${bar_of(1.8, 10, GAUGE)}`,
-			` 1.6G ${bar_of(1.6, 20, GAUGE)}`,
-			` 0.5G ${bar_of(0.5, 20, GAUGE)}`,
+			`18.0 ${bar_of(1.8, 10, GAUGE)}`,
+			` 1.6 ${bar_of(1.6, 20, GAUGE)}`,
+			` 0.5 ${bar_of(0.5, 20, GAUGE)}`,
 		])
+	})
+
+	// joshuafolkken/kit#4220: CPU in the header's 💪 unit, a percentage of the whole machine.
+	it('draws the CPU as a percentage of the machine’s cores, to one decimal', () => {
+		const eleven: UsageScale = { cores: 11, total_bytes: 20 * GB }
+
+		expect(cells_of(figure(6.2), eleven, 0)[0]).toBe('56.4')
+		expect(cells_of(figure(0), eleven, 0)[0]).toBe(' 0.0')
+	})
+
+	it('draws a full machine as `100`, as wide as `99.9`', () => {
+		expect(cells_of(figure(10), SCALE, 0)[0]).toBe(' 100')
+		expect(cells_of(figure(9.9999), SCALE, 0)[0]).toBe(' 100')
+		expect(cells_of(figure(9.99), SCALE, 0)[0]).toBe('99.9')
 	})
 
 	it('draws blanks of the cell’s width for cores not read yet and for a row with no figure', () => {
@@ -46,27 +60,29 @@ describe('run_board_usage_text.cells_of', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const [cpu, memory] = cells_of(figure(9.5, 15), SCALE, GAUGE)
 
-		expect(cpu).toBe(` 9.5 ${bar_of(9.5, 10, GAUGE, GAUGE_SHADES.red)}`)
-		expect(memory).toBe(`15.0G ${bar_of(15, 20, GAUGE, GAUGE_SHADES.yellow)}`)
+		expect(cpu).toBe(`95.0 ${bar_of(9.5, 10, GAUGE, GAUGE_SHADES.red)}`)
+		expect(memory).toBe(`15.0 ${bar_of(15, 20, GAUGE, GAUGE_SHADES.yellow)}`)
 	})
 })
 
 describe('run_board_usage_text.cell_widths', () => {
 	it('counts the figure, the gap and the gauge', () => {
-		expect(cell_widths(GAUGE)).toStrictEqual([10, 11, 11])
+		expect(cell_widths(GAUGE)).toStrictEqual([10, 10, 10])
 	})
 
-	it('draws the figure alone at a gauge of 0', () => {
-		expect(cell_widths(0)).toStrictEqual([4, 5, 5])
-		expect(cells_of(figure(1.8), SCALE, 0)).toStrictEqual([' 1.8', ' 1.6G', ' 0.5G'])
+	it('draws the figure alone at a gauge of 0, the memories in GB with no unit', () => {
+		expect(cell_widths(0)).toStrictEqual([4, 4, 4])
+		expect(cells_of(figure(1.8), SCALE, 0)).toStrictEqual(['18.0', ' 1.6', ' 0.5'])
 		expect(cells_of(figure(undefined), SCALE, 0)[0]).toBe(' '.repeat(4))
 	})
 })
 
 describe('run_board_usage_text.plain_of', () => {
-	it('joins the three figures, and a dash for cores not read yet', () => {
-		expect(plain_of(figure(1.8, 0.7, 0.6))).toBe('1.8/0.7G/0.6G')
-		expect(plain_of(figure(undefined, 0.7, 0.6))).toBe('-/0.7G/0.6G')
+	it('joins the three figures with their units, and a dash for cores not read yet', () => {
+		const eleven: UsageScale = { cores: 11, total_bytes: 20 * GB }
+
+		expect(plain_of(figure(6.2, 2.7, 1.5), eleven)).toBe('56.4%/2.7G/1.5G')
+		expect(plain_of(figure(undefined, 0.7, 0.6), eleven)).toBe('-/0.7G/0.6G')
 	})
 })
 

@@ -1,4 +1,4 @@
-import { run_board_fit, type PlanLine, type PlanSection } from './run-board-fit'
+import { run_board_fit, type PlanLine, type PlanSection, type SectionKey } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
@@ -11,6 +11,8 @@ const INDENT = '  '
 const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
 const RULE_WIDTH = 50
+const OPEN_MARK = '▾'
+const FOLDED_MARK = '▸'
 
 function rule_of(label: string): string {
 	return `${RULE_LEAD} ${label} `.padEnd(RULE_WIDTH, RULE)
@@ -22,7 +24,7 @@ interface RuleColumn {
 	start: number
 }
 
-// A rule whose column labels stand over their cells: `── 🛤 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
+// A rule whose column labels stand over their cells: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ───`, each label at
 // its column's start where the rule before it leaves room, and one rule character after the label
 // before it where it does not.
 function columns_rule(label: string, columns: ReadonlyArray<RuleColumn>): string {
@@ -52,7 +54,31 @@ function plan_section(
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	return [{ head: heading_lines(heading), lines }]
+	return [{ head: heading_lines(heading), lines, label: heading }]
+}
+
+// The sections a person folds with the key named `key`.
+function keyed(key: SectionKey, sections: ReadonlyArray<PlanSection>): Array<PlanSection> {
+	return sections.map((section) => ({ ...section, key }))
+}
+
+// An unfolded section's rule led by ▾ in place of its first rule characters, so every column label after
+// its own still stands over its cells; a section drawn under a blank line alone gets a rule of its own.
+function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
+	const rule = head.at(-1) ?? ''
+	const lead = `${RULE_LEAD} ${label} `
+
+	if (!rule.startsWith(lead)) return ['', `${OPEN_MARK} ${label} `.padEnd(RULE_WIDTH, RULE)]
+
+	return [...head.slice(0, -1), `${OPEN_MARK} ${label} ${RULE}${rule.slice(lead.length)}`]
+}
+
+// A folded section's one line: `▸ ⏳ queued ── 3 ───`, ending on a rule however long its summary.
+function folded_head(label: string, summary: string): Array<string> {
+	return [
+		'',
+		`${FOLDED_MARK} ${label} ${RULE_LEAD} ${summary} ${RULE_LEAD}`.padEnd(RULE_WIDTH, RULE),
+	]
 }
 
 // The finished rows' cut ones counted on one line, the withdrawn among them beside it.
@@ -75,14 +101,20 @@ function done_section(
 	const withdrawn = new Set(lines.filter((_, index) => rows[index]?.state === 'withdrawn'))
 	const heading = `${STATE_ICONS.merged} ${WORDS.done}`
 
-	return plan_section(heading, lines).map((section) => ({ ...section, fold: done_fold(withdrawn) }))
+	return keyed('done', plan_section(heading, lines)).map((section) => ({
+		...section,
+		fold: done_fold(withdrawn),
+	}))
 }
 
 const run_board_render_section = {
 	columns_rule,
 	done_section,
+	folded_head,
 	heading_lines,
+	keyed,
 	label_room,
+	open_head,
 	plan_section,
 }
 

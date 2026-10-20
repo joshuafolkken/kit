@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { lane_ledger, type GateCheckRecord, type GateEntry, type LedgerEntry } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -9,7 +10,6 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // **A reused check is counted, never timed.** It started no process, so its zero would pull the median
 // toward a check that never ran; a check with only reused rows prints `not measured`.
 
-const MS_PER_SECOND = 1000
 const DECIMALS = 1
 const COLUMNS = ['check', 'median (s)', 'max (s)', 'runs', 'reused'] as const
 

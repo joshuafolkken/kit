@@ -1,5 +1,12 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
+const BARE = { arguments: '' }
+// `lane:pause` and `lane:resume` take the same target.
+const LANE_SIGNAL_EXAMPLES = [
+	{ arguments: '4198' },
+	{ arguments: '--all', note: 'every open lane' },
+]
+
 // The `lane:*` command registry, split out of `josh-commands-ai.ts` so that file stays under its line
 // limit. One script answers `lane:open` / `lane:close` / `lane:list` /
 // `lane:prune` / `lane:output` / `lane:dispatch` / `lane:await`, told apart by the verb below;
@@ -29,6 +36,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: [ISSUE_WITH_OPTIONS, 'automation', ['files', 'git']],
 		default_script_arguments: ['open'],
+		usage: { examples: [{ arguments: '1490', note: 'prints the lane directory on stdout' }] },
 	},
 	'lane:close': {
 		...LANE_ARGUMENTS,
@@ -36,6 +44,10 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue>', 'automation', ['files', 'git']],
 		default_script_arguments: ['close'],
+		usage: {
+			examples: [{ arguments: '1490' }, { arguments: '--all' }],
+			flags: [{ names: ['--all'], description: 'closes every lane.' }],
+		},
 	},
 	'lane:list': {
 		...LANE_ARGUMENTS,
@@ -43,6 +55,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 		default_script_arguments: ['list'],
+		usage: { examples: [BARE] },
 	},
 	'lane:prune': {
 		...LANE_ARGUMENTS,
@@ -51,6 +64,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['', 'automation', ['files', 'git']],
 		default_script_arguments: ['prune'],
+		usage: { examples: [BARE] },
 	},
 	'lane:output': {
 		...LANE_ARGUMENTS,
@@ -58,6 +72,12 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> [path]', 'automation', ['files']],
 		default_script_arguments: ['output'],
+		usage: {
+			examples: [
+				{ arguments: '1713 /abs/path/to/agent-7.jsonl', note: 'record it; prints the path back' },
+				{ arguments: '1713', note: 'read it; prints the path, or `none`' },
+			],
+		},
 	},
 	'lane:dispatch': {
 		...LANE_ARGUMENTS,
@@ -65,6 +85,31 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> <prompt>', 'automation', ['processes']],
 		default_script_arguments: ['dispatch'],
+		usage: {
+			examples: [
+				{
+					arguments: '1749',
+					note: "prints the child's pid; a refusal is an empty capture and exit 1",
+				},
+			],
+			flags: [
+				{
+					names: ['JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL'],
+					description:
+						'Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.',
+				},
+				{
+					names: ['JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT'],
+					description:
+						'role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.',
+				},
+				{
+					names: ['JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}'],
+					description:
+						'review round 2 and later (the verification pass); Anthropic defaults are `claude-sonnet-5-5` / `high`, falling back to `JOSH_REVIEWER_*`.',
+				},
+			],
+		},
 	},
 	'lane:await': {
 		...LANE_ARGUMENTS,
@@ -73,6 +118,15 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['<issue> [<issue>...] [--owner <pid>]', 'automation', ['files', 'processes']],
 		default_script_arguments: ['await'],
+		usage: {
+			examples: [
+				{ arguments: '1749 1750', note: 'block until either lane completes' },
+				{
+					arguments: '1749 1750 --owner "$PPID"',
+					note: 'reclaim the carry record for a resumed conversation first',
+				},
+			],
+		},
 	},
 	'lane:launch': {
 		script: 'scripts/lane/lane-launch-cli.ts',
@@ -80,6 +134,15 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			'Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child',
 		category: 'AI tools',
 		reference: ['<issue> [--stash <message>]', 'automation', ['files', 'git', 'processes']],
+		usage: {
+			examples: [
+				{ arguments: '1749', note: 'every lane after the first' },
+				{
+					arguments: '1749 --stash "backlogrun: josh latest before lanes"',
+					note: 'the first lane only',
+				},
+			],
+		},
 	},
 	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so the lane is found.
 	'lane:restart': {
@@ -89,6 +152,9 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			'Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure',
 		category: 'AI tools',
 		reference: ['<issue>', 'developer', ['files', 'git', 'processes', 'network']],
+		usage: {
+			examples: [{ arguments: '3769', note: "prints the fresh child's pid" }],
+		},
 	},
 	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so the lane is found.
 	'lane:withdraw': {
@@ -98,6 +164,9 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			'Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure',
 		category: 'AI tools',
 		reference: ['<issue> --reason <text>', 'developer', ['files', 'git', 'processes', 'network']],
+		usage: {
+			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
+		},
 	},
 	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so `--all` finds the lanes.
 	'lane:pause': {
@@ -105,11 +174,13 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched',
 		default_script_arguments: ['pause'],
+		usage: { examples: LANE_SIGNAL_EXAMPLES },
 	},
 	'lane:resume': {
 		...PAUSE_ARGUMENTS,
 		description: 'Let a paused lane child carry on from where it stopped (SIGCONT)',
 		default_script_arguments: ['resume'],
+		usage: { examples: LANE_SIGNAL_EXAMPLES },
 	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.
@@ -120,6 +191,13 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			'Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes',
 		category: 'AI tools',
 		reference: ['[<limit>] [--reset]', 'developer', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '8', note: "raise or lower the live run's limit to 8" },
+				{ arguments: '', note: 'print the limit, the lanes in use and the free lanes' },
+				{ arguments: '--reset', note: 'clear the override; JOSH_LANE_LIMIT applies again' },
+			],
+		},
 	},
 	// The lane-limit measurement: `.env` is read so `lane:stats` labels the row
 	// with the `JOSH_LANE_LIMIT` a person set there.
@@ -130,6 +208,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[--every <seconds>]', 'maintainer', ['files']],
 		default_script_arguments: ['sample'],
+		usage: { examples: [{ arguments: '', note: 'one machine-load reading' }] },
 	},
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
@@ -138,6 +217,9 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
 		default_script_arguments: ['stats'],
+		usage: {
+			examples: [{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" }],
+		},
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

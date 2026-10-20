@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { CategoryCount } from '#scripts/review/review-finding-ledger'
 import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
@@ -10,7 +11,6 @@ import { guard_friction_fixture } from './guard-friction-fixture'
 import { retrospective, type RetrospectiveInputs } from './retrospective'
 
 const MINUTES = 12
-const MS_PER_MINUTE = 60_000
 // The invocation this digest covers begins here; the fixture's own events all carry this `at`, and the
 // scope tests below add earlier ones to prove they are not counted (joshuafolkken/kit#2395).
 const RUN_START = '2026-09-22T00:00:00.000Z'

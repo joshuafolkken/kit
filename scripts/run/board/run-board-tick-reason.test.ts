@@ -67,6 +67,24 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/lane/u)
 	})
 
+	// joshuafolkken/kit#4206: the declared order is read off the local read's own record.
+	it('draws the declared issue a named run starts a row after', async () => {
+		const carry = {
+			invocation: `backlogrun #${String(OPENING)} #${String(HELD)} --only`,
+			started_at: OPENED_AT,
+			merged: 0,
+			filed: 0,
+			cuts: 0,
+			failures: 0,
+			outages: 0,
+		}
+		const named = { ...LOCAL, lanes: [String(OPENING)], carry }
+		const plan = plan_of([child(OPENING), child(HELD)])
+
+		expect(await row_of(HELD, named, plan)).toMatch(/ {2}after 3720 · named order$/u)
+		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/named order/u)
+	})
+
 	it('draws the stage of the lane the run is opening, and none once the run has stopped', async () => {
 		const opening = { ...LOCAL, events: [OPENING_EVENT] }
 		const plan = plan_of([child(OPENING)])

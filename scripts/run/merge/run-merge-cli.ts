@@ -11,6 +11,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
@@ -34,8 +35,6 @@ const FIRST = 0
 const MIN_PID = 1
 const { MERGE_TOKEN } = run_merge_token
 const PARK_FAILURE_NOTE = `The failed child could not be parked with ${RUN_STALLED_LABEL}; stopping.`
-// The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
-const DIGITS = /^\d+$/u
 // A GitHub `owner/repo` slug: an owner and a repository name around a single slash, each starting with
 // an alphanumeric so neither half can begin with `-`. `epic` and `repo` flow into `pnpm josh`
 // subprocess arguments, so a value shaped like an option (`--foo`, or `--evil/x`) would be read as a
@@ -67,11 +66,10 @@ interface ParsedArguments {
 function to_owner(raw: string | undefined): CarryOwner | undefined {
 	if (raw === undefined) return run_carry.NO_OWNER
 
-	if (!DIGITS.test(raw)) return undefined
+	// The same count shape `run-carry-args.ts` reads an owner pid under.
+	const pid = cli_flags.to_count(raw)
 
-	const pid = Number(raw)
-
-	return pid < MIN_PID ? undefined : run_carry.owner_of(pid)
+	return pid === undefined || pid < MIN_PID ? undefined : run_carry.owner_of(pid)
 }
 
 // The epic form needs a repository (`epic:next --lanes` refuses without one), so an epic named with
@@ -120,7 +118,7 @@ function has_invalid_offer(values: ParsedArguments['values']): boolean {
 function has_invalid_legacy_over(raw: string | undefined): boolean {
 	if (raw === undefined) return false
 
-	return !DIGITS.test(raw) || !Number.isSafeInteger(Number(raw))
+	return cli_flags.to_count(raw) === undefined
 }
 
 function valid_child(parsed: ParsedArguments): string | undefined {
@@ -254,9 +252,11 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 		return emit(MERGE_TOKEN.STOP, FAILURE_EXIT_CODE)
 	}
 
+	const cause = result.cause ?? run_stalled.SESSION_UNFINISHED.short
+
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} parked (${RUN_STALLED_LABEL})`,
+		run_stalled.park_event(ctx.child, cause),
 	)
 
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
@@ -266,7 +266,7 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 	return await offered(ctx)
 }
 
-async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdict> {
+async function on_failed(ctx: MergeContext, cause?: StallCause): Promise<MergeVerdict> {
 	const result = await run_merge_steps.do_failed(ctx, cause)
 
 	if (result.is_refused) return report_count_refused(result.carry)
@@ -307,7 +307,7 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 	if (refused !== undefined) return report_count_refused(refused)
 
 	if (!(await run_merge_steps.resume_cut(ctx.child))) {
-		return await on_failed(ctx, run_merge_steps.CUT_RELAUNCH_CAUSE)
+		return await on_failed(ctx, run_stalled.CUT_NOT_RELAUNCHED)
 	}
 
 	await run_event_stream_emit.emit(

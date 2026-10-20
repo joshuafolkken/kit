@@ -6,6 +6,7 @@ import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_args, type ParsedValues } from './run-progress-args'
@@ -78,7 +79,7 @@ const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_WAIT
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.
 const REPO_LOOKUP_TIMEOUT_SECONDS = 10
-const REPO_LOOKUP_TIMEOUT_MS = REPO_LOOKUP_TIMEOUT_SECONDS * run_progress.MS_PER_SECOND
+const REPO_LOOKUP_TIMEOUT_MS = REPO_LOOKUP_TIMEOUT_SECONDS * MS_PER_SECOND
 // A lookup that timed out or failed is not an argument the caller got wrong, so it is told apart from
 // the usage error — read as one, it would send a person to fix arguments that were correct.
 const REPO_UNRESOLVED_NOTICE = `The repository could not be resolved (\`gh\` did not answer within ${String(REPO_LOOKUP_TIMEOUT_SECONDS)}s or failed), so the progress watcher did not start. Pass \`--repo <owner/repo>\` and start it again.`
@@ -215,7 +216,7 @@ async function emit(options: WatchOptions, context: EmitContext): Promise<EmitRe
 function decline(loop: WatchLoop, now_ms: number, notice: string): WatchLoop {
 	if (loop.said !== notice) console.error(notice)
 
-	const cooldown_ms = DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
+	const cooldown_ms = DECLINE_RETRY_SECONDS * MS_PER_SECOND
 
 	return { ...loop, retry_at_ms: now_ms + cooldown_ms, said: notice }
 }
@@ -442,7 +443,7 @@ function to_options(values: ParsedValues): WatchOptions | undefined {
 		max_ms: run_progress_args.to_max_ms(values.hours, values.wait === true),
 		output_paths: values.output ?? [],
 		repo,
-		tick_ms: TICK_SECONDS * run_progress.MS_PER_SECOND,
+		tick_ms: TICK_SECONDS * MS_PER_SECOND,
 	}
 }
 

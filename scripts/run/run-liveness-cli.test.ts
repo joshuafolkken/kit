@@ -1,9 +1,8 @@
 import { lane_await } from '#scripts/lane/lane-await'
+import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	ALIVE_VERDICT,
-	MS_PER_MINUTE,
-	MS_PER_SECOND,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,

@@ -36,7 +36,6 @@ const EXHAUSTED_ANSWER = 'exhausted'
 const NO_RUNNING = 0
 const DRAIN_TEXT = 'backlog drained'
 const should_forward_stderr = true
-const COUNT_PATTERN = /^\d+$/u
 
 const USAGE =
 	'Usage: josh backlog:offer --started <ISO-8601> [--active <ISO-8601>] [--merged <n>] [--running <n>] [--max <n>] [--idle <minutes>] [--retries <n>] [--exclude <n>[,<n>...]]... [--repo <owner/repo>] [--json]'
@@ -65,18 +64,10 @@ function read_values(argv: ReadonlyArray<string>): ParsedValues | undefined {
 	return cli_flags.values_of(argv, OPTIONS)
 }
 
-function to_count(raw: string | undefined): number | undefined {
-	if (raw === undefined || !COUNT_PATTERN.test(raw)) return undefined
-
-	const parsed = Number(raw)
-
-	return Number.isSafeInteger(parsed) ? parsed : undefined
-}
-
 // A count flag that was given but unreadable makes the invocation unreadable rather than defaulted —
 // the contract `backlog:budget` follows for its own counts.
 function count_of(raw: string | undefined): number | undefined {
-	return raw === undefined ? DEFAULT_COUNT : to_count(raw)
+	return raw === undefined ? DEFAULT_COUNT : cli_flags.to_count(raw)
 }
 
 interface OfferCounts {

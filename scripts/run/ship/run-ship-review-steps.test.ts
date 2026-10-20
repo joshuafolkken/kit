@@ -74,8 +74,8 @@ function answer_with(failing: string | undefined): void {
 	})
 }
 
-async function stage_code(): Promise<number> {
-	const result = await run_ship_review_steps.review_stage(ISSUE)
+async function stage_code(is_stale = false): Promise<number> {
+	const result = await run_ship_review_steps.review_stage(ISSUE, is_stale)
 
 	return result.code
 }
@@ -116,10 +116,12 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(launch).not.toHaveBeenCalled()
 	})
 
-	it.each(['missing', 'not-required'])('runs the review when the record is %s', async (status) => {
+	// joshuafolkken/kit#4221: an `ok` record is no skip once the review is stale — it read the issue
+	// before its update — so that case runs stale.
+	it.each(['missing', 'not-required', 'ok'])('runs the review on a %s record', async (status) => {
 		record_check_mock.mockResolvedValueOnce({ status })
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage_code(status === 'ok')).toBe(OK)
 		expect(commands()).toContain(OPEN)
 	})
 })

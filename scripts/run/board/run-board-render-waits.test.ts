@@ -81,7 +81,7 @@ describe('run_board_render_waits.held_text', () => {
 
 describe('run_board_render.render — a held lane on its row', () => {
 	it('leads the row with 🚧 and ends it on the wait, keeping the phase’s icon', () => {
-		expect(lane_line([wait()])).toMatch(/🚧 4039 {4}Issue 4039 .*🔨 11′00″ · 🧠 9″ lint$/u)
+		expect(lane_line([wait()])).toMatch(/🚧 4039 {4}Issue 4039 .*🔨 11′00″ {2}🧠 9″ lint$/u)
 	})
 
 	it('draws the phase icon and the newest activity again once the wait is gone', () => {
@@ -155,7 +155,7 @@ describe('run_board_render.render — the held check’s legend', () => {
 })
 
 function draw({ title_limit }: RowCut): string {
-	return `${'x'.repeat(title_limit)} · 🧠 9″ lint`
+	return `${'x'.repeat(title_limit)}  🧠 9″ lint`
 }
 
 describe('run_board_render_title.fitted — a held row on a narrow pane', () => {
@@ -163,7 +163,7 @@ describe('run_board_render_title.fitted — a held row on a narrow pane', () => 
 		const row = running(LANE)
 		const { fitted } = run_board_render_title
 
-		expect(run_board_fit.width_of(fitted(row, NARROW_COLUMNS, draw, { is_held: true }))).toBe(
+		expect(run_board_fit.width_of(fitted(row, NARROW_COLUMNS, draw, { is_line_kept: true }))).toBe(
 			NARROW_COLUMNS,
 		)
 		expect(fitted(row, NARROW_COLUMNS, draw)).toBe(draw(run_board_render_title.WHOLE))

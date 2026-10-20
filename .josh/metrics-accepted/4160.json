@@ -1,0 +1,7 @@
+{
+	"reason": "New josh run:pause command (#4160): four idempotent pause steps, its CLI and registry entry, and the guard that refuses a cut-short epic listing as no epic",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 208
+	}
+}

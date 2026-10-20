@@ -1,0 +1,7 @@
+{
+	"reason": "run:report --handoff: new hand-off report builder and CLI path that replace the hand-filled template (#4161)",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 209
+	}
+}

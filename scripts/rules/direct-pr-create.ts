@@ -128,12 +128,17 @@ function judged_segments(segment: string): Array<string> {
 }
 
 // The cut is quote-aware, so `grep -E "a|gh pr create|b"` stays one `grep` call rather than yielding
-// a `gh pr create` segment from inside its pattern (joshuafolkken/kit#4091).
-function is_direct_pr_create(command: string): boolean {
+// a `gh pr create` segment from inside its pattern (joshuafolkken/kit#4091). Shared with the
+// `direct-issue-comment` row, which judges a `gh` call by the same cut.
+function has_run_segment(command: string, is_match: (segment: string) => boolean): boolean {
 	return shell_segments
 		.quote_aware_commands_of(command)
 		.flatMap((segment) => judged_segments(segment))
-		.some((segment) => is_pr_create_segment(segment))
+		.some((segment) => is_match(segment))
+}
+
+function is_direct_pr_create(command: string): boolean {
+	return has_run_segment(command, is_pr_create_segment)
 }
 
 const DIRECT_PR_CREATE_REASON =
@@ -159,8 +164,12 @@ const ROW = {
 const direct_pr_create = {
 	API_VALUE_TAKING_FLAGS,
 	DIRECT_PR_CREATE_REASON,
+	GH_COMMAND,
 	ROW,
+	VALUE_TAKING_FLAGS,
+	has_run_segment,
 	is_direct_pr_create,
+	is_help_call,
 	positional_words,
 }
 

@@ -15,13 +15,13 @@ The labels you put on an Issue to steer the agent, the labels a run puts on it f
 
 ## Labels a run applies
 
-| Label            | What it means                                                                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)). |
-| `needs-decision` | The run parked the Issue: it waits for your answer and the backlog skips it until you give one.                                                 |
-| `run:stalled`    | The run parked the Issue on a mechanical failure: fix the cause, then remove the label; the backlog skips it until then.                        |
-| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                  |
-| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                       |
+| Label            | What it means                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)).         |
+| `needs-decision` | The run parked the Issue: it waits for your answer and the backlog skips it until you give one.                                                         |
+| `run:stalled`    | The run parked the Issue on a mechanical failure: fix the cause, then resume it with `fullrun #N` or remove the label; the backlog skips it until then. |
+| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                          |
+| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                               |
 
 ### `needs-human-review` — the opposite label
 

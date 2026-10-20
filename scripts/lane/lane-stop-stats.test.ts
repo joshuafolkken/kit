@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
@@ -10,7 +11,6 @@ import { lane_stop_stats } from './lane-stop-stats'
 
 const NOW = Date.parse('2026-10-14T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
-const MS_PER_MINUTE = 60_000
 const ISSUE = 3789
 const OTHER_ISSUE = 3790
 const REVIEW = 'review'

@@ -67,6 +67,7 @@ async function read_epic(epic_number: number): Promise<EpicReading | { error: st
 }
 
 const epic_read = {
+	read_subject,
 	read_epic,
 }
 

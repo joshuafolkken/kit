@@ -1,8 +1,9 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import { backlog_budget, type BacklogAnswer, type BudgetInput } from './backlog-budget'
 
 const NOW_MS = Date.parse('2026-09-09T12:00:00Z')
-const MINUTE_MS = backlog_budget.MS_PER_MINUTE
+const MINUTE_MS = MS_PER_MINUTE
 const IDLE_BUDGET_MINUTES = 30
 const IDLE_HALFWAY_MINUTES = 15
 const RUN_AGE_MINUTES = 60

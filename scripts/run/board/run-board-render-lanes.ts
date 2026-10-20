@@ -7,7 +7,7 @@ import type { LaneUsages, UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
 // The run's own rows' CPU, MEM and CMPRS cells, right after each row's number, under a rule whose
-// labels stand over them: `── 🛤 lanes ── 💪 CPU ─ 🧠 MEM ─ 🗜 CMPRS ───`. A running row draws its
+// labels stand over them: `── 🧵 lanes ── 💪 CPU ─ 🧠 MEM ─ 🤏 CMPRS ───`. A running row draws its
 // lane's figures; every other row blanks of the same width, so every kind icon and title after them
 // starts in one column. Drawn with gauges on a terminal and as figures alone anywhere else.
 
@@ -19,8 +19,10 @@ const GAUGE = 5
 const CELL_GAP = ' '
 // What a column needs past its label so the next label still has a rule before it: ` ─`.
 const LABEL_TAIL = 2
-const LANES_LABEL = '🛤 lanes'
-const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🗜 CMPRS']
+// Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a
+// terminal draws them: 🛤 and 🗜, text symbols drawn as emoji, overlapped the blank after them.
+const LANES_LABEL = '🧵 lanes'
+const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🤏 CMPRS']
 // What a row draws before its number: the indent and the state icon, then a blank.
 const NUMBER_START = '  🔄 '
 
@@ -115,15 +117,19 @@ function lanes_section(
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	if (cells === undefined) return [{ head: [''], lines }]
+	const section = { lines, label: LANES_LABEL, key: 'lanes' as const }
+
+	if (cells === undefined) return [{ head: [''], ...section }]
 
 	const first = width_of(NUMBER_START) + cells.number_width + CELL_GAP.length
 	const rule = columns_rule(LANES_LABEL, label_columns(first, cells.gauge))
 
-	return [{ head: ['', rule], lines }]
+	return [{ head: ['', rule], ...section }]
 }
 
 const run_board_render_lanes = {
+	COLUMN_LABELS,
+	LANES_LABEL,
 	column_cells,
 	label_columns,
 	lane_cells_of,

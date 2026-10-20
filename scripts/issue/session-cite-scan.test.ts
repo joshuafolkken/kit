@@ -35,6 +35,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// GitHub renders it: a commit message, a PR or Issue title or body, a comment, a search query.
 	['epic/epic-audit-orphans.ts', 1],
 	['epic/epic-body.ts', 1],
+	['epic/epic-bundle-apply.ts', 1],
 	['epic/epic-close-comment.ts', 2],
 	['followup/git-followup-flush.ts', 1],
 	['gh/git-pr.ts', 2],
@@ -53,6 +54,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],
+	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
 	// The detached driver's stderr, which the supervisor tails into the hand-off; the read that would
 	// resolve the link is the one that just failed.
@@ -83,10 +85,13 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/event/run-event-setup.ts', 3],
 	// The halfrun / prrun stop confirmation: copy-out commands.
 	['run/hold/run-stop-notify.ts', 1],
-	['run/merge/run-merge-cli.ts', 7],
-	['run/merge/run-merge.ts', 1],
+	['run/merge/run-merge-cli.ts', 6],
+	// The `run:stalled` park event, and the resume command a park comment and a board row name.
+	['run/park/run-stalled.ts', 2],
+	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.
+	['run/pause/run-pause.ts', 5],
 	['run/ship/run-ship-detach.ts', 1],
-	// The park event and its Telegram warning.
+	// The ship-stop cap's Telegram warning.
 	['run/ship/run-ship-relaunch-cap.ts', 1],
 	// The reviewer child's prompt, which an agent reads.
 	['run/ship/run-ship-review.ts', 1],
@@ -94,7 +99,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/ship/run-ship-stop-text.ts', 1],
 	// Printed through `session_cite.text` or `issue_citation.linkify` by the caller that prints it.
 	['epic/epic-audit-checks.ts', 1],
-	['epic/epic-bundle-cli.ts', 1],
+	['epic/epic-bundle-format.ts', 1],
 	['epic/epic-bundle-evidence.ts', 2],
 	['epic/epic-bundle.ts', 3],
 	['epic/epic-next-views.ts', 1],
@@ -102,6 +107,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['epic/epic-solo-stale.ts', 1],
 	['epic/epic-solo.ts', 2],
 	['epic/epic-triage.ts', 1],
+	// The hand-off report body, which `run-report-cli.ts` links before printing and sending.
+	['run/run-report-handoff.ts', 1],
 	['run/run-stage.ts', 2],
 ]
 

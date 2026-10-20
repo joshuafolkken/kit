@@ -240,3 +240,32 @@ describe('cost_cli.session_verdict', () => {
 		expect(output()).toContain(cost_cli.USAGE)
 	})
 })
+
+// joshuafolkken/kit#4161: the hand-off report quotes the figures the verdict was decided on.
+describe('cost_cli.session_figures', () => {
+	it('carries the newest request and the shared threshold beside the verdict', () => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			billed_input_per_request: [1, CONTEXT_CUT_THRESHOLD + 1],
+		})
+
+		expect(cost_cli.session_figures(CWD, OPENAI_ENV)).toStrictEqual({
+			verdict: 'over',
+			cost: CONTEXT_CUT_THRESHOLD + 1,
+			threshold: CONTEXT_CUT_THRESHOLD,
+		})
+	})
+
+	it('quotes no cost for a session with no requests', () => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({ billed_input_per_request: [] })
+
+		expect(cost_cli.session_figures(CWD, OPENAI_ENV)).toStrictEqual({
+			verdict: cost_cli.UNMEASURABLE_VERDICT,
+			cost: undefined,
+			threshold: CONTEXT_CUT_THRESHOLD,
+		})
+	})
+
+	it('quotes no cost outside a session', () => {
+		expect(cost_cli.session_figures(CWD, {}).cost).toBeUndefined()
+	})
+})

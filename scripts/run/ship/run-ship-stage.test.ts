@@ -246,4 +246,13 @@ describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, COMMITTED)).toBe(true)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, MERGED)).toBe(true)
 	})
+
+	it('runs again on a committed tree once the issue changed after its brief (joshuafolkken/kit#4221)', () => {
+		const stale = { ...COMMITTED, is_review_stale: true }
+
+		expect(run_ship_stage.is_done(STAGE.REVIEW, new Set([STAGE.REVIEW]), stale)).toBe(false)
+		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, { ...MERGED, is_review_stale: true })).toBe(
+			true,
+		)
+	})
 })

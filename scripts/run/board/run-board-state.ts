@@ -1,11 +1,13 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
-import type { TerminalSize } from './run-board-fit'
+import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { BoardForm, BoardUsage } from './run-board-header'
 import { run_board_idle, type IdleSince } from './run-board-idle'
+import type { KeyInput } from './run-board-keys'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { MachineGauges, MachineMark } from './run-board-machine'
@@ -19,13 +21,16 @@ import type { UsageMark } from './run-board-usage'
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
+	// Every process on the machine, one `ps` (`lane-process-table.ts`); a redraw reads it at most once
+	// and hands it to both readers below, so the lane count and the usage columns read one instant.
+	read_table: TableRead
 	// `undefined` when no run has started here.
-	read_local: () => Promise<LocalRead | undefined>
+	read_local: (table: TableRead) => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
 	// The claims waiting in the core budget, read on the machine's second; none where it is not given.
 	read_waits?: (() => Array<BudgetWait>) | undefined
 	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
-	read_usage: (before: UsageMark | undefined) => Promise<UsageMark | undefined>
+	read_usage: (before: UsageMark | undefined, table: TableRead) => Promise<UsageMark | undefined>
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
 	now: () => number
@@ -39,6 +44,10 @@ interface BoardPorts {
 	size?: (() => TerminalSize) | undefined
 	// The lines a live frame ends on, the first to give way to a short pane.
 	footer?: ReadonlyArray<string> | undefined
+	// The keyboard a live board folds its sections from (`run-board-keys.ts`); none where nobody types.
+	keys?: KeyInput | undefined
+	// The sections a person folded, read at every redraw; none where the frame folds nothing.
+	folded?: (() => ReadonlySet<SectionKey>) | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here.
@@ -84,7 +93,7 @@ interface BoardState {
 	sampled_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
-	// The last process reading, which the next one is compared against, and the lanes' and the 🖥
+	// The last process reading, which the next one is compared against, and the lanes' and the 💻
 	// section's usage drawn from them.
 	usage: UsageMark | undefined
 	usages: BoardUsage | undefined

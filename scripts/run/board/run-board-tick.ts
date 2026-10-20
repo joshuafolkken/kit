@@ -1,6 +1,8 @@
 import { lane_await } from '#scripts/lane/lane-await'
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { ClosedIssue } from './run-board-closed'
+import type { FrameBounds } from './run-board-fold'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_idle } from './run-board-idle'
@@ -13,7 +15,7 @@ import { run_board_paused } from './run-board-paused'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
-import { run_board_render, type FrameBounds } from './run-board-render'
+import { run_board_render } from './run-board-render'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import { run_board_status, type ItemStatus, type RunActivity } from './run-board-status'
@@ -31,18 +33,28 @@ import { run_board_usage_board } from './run-board-usage-board'
 // and its gauges are the differences between consecutive samples.
 
 const { REDRAW_MS, SPOT } = run_board_spin
-const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
+const MACHINE_SAMPLE_MS = MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
-const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
+const LOCAL_READ_MS = LOCAL_READ_SECONDS * MS_PER_SECOND
 const { FRESH_STATE, is_due } = run_board_state
 const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
 const { gather_thanks } = run_board_thanks
 
-async function read_at(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
-	const local = await ports.read_local()
-	const idle_since = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], now_ms)
+// The redraw's process snapshot and the pace it is drawn at, shared by its reads.
+interface TickRead {
+	pace: Pace
+	table: TableRead
+}
 
-	return { ...state, local, read_ms: now_ms, idle_since }
+interface TickAt extends TickRead {
+	now_ms: number
+}
+
+async function read_at(state: BoardState, ports: BoardPorts, at: TickAt): Promise<BoardState> {
+	const local = await ports.read_local(at.table)
+	const idle_since = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], at.now_ms)
+
+	return { ...state, local, read_ms: at.now_ms, idle_since }
 }
 
 // A single frame has no earlier read to confirm an idle lane against (`run-board-idle.ts`).
@@ -50,33 +62,46 @@ function is_unconfirmed(before: BoardState, read: BoardState, pace: Pace): boole
 	return pace === 'settled' && before.read_ms === undefined && read.idle_since.size > 0
 }
 
-async function reread(state: BoardState, ports: BoardPorts, pace: Pace): Promise<BoardState> {
+// The redraw's reads over a snapshot taken now.
+function fresh_read(ports: BoardPorts, pace: Pace): TickRead {
+	return { pace, table: lane_process_table.shared(ports.read_table) }
+}
+
+// The lane read and the reads after it share one snapshot; a confirmation taken after the wait reads
+// a snapshot of its own and hands it on, so no lane is counted from the state before the wait.
+async function reread(
+	state: BoardState,
+	ports: BoardPorts,
+	tick_read: TickRead,
+): Promise<{ read: BoardState; reads: TickRead }> {
 	const now_ms = ports.now()
 
-	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
+	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return { read: state, reads: tick_read }
 
-	const read = await read_at(state, ports, now_ms)
+	const read = await read_at(state, ports, { now_ms, ...tick_read })
 
-	if (!is_unconfirmed(state, read, pace)) return read
+	if (!is_unconfirmed(state, read, tick_read.pace)) return { read, reads: tick_read }
 
 	await ports.sleep(lane_await.RECONFIRM_MS)
 
-	return await read_at(read, ports, ports.now())
+	const reads = fresh_read(ports, tick_read.pace)
+
+	return { read: await read_at(read, ports, { now_ms: ports.now(), ...reads }), reads }
 }
 
 // The sample is timed when it is taken, not when the tick began: a plan read between the two would put
 // its seconds on the wrong side of the rate's interval. It is due by the tick's clock, so a sample
 // taken a few milliseconds into its tick does not slip to the redraw after the second.
-async function resample(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
-	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, now_ms)) return state
+async function resample(state: BoardState, ports: BoardPorts, at: TickAt): Promise<BoardState> {
+	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, at.now_ms)) return state
 
 	const at_ms = ports.now()
 	const machine = { sample: await ports.read_machine(), at_ms }
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
 	const budget_waits = ports.read_waits?.() ?? []
-	const usages = await run_board_usage_board.read_usages(state, ports)
+	const usages = await run_board_usage_board.read_usages(state, ports, at.table)
 
-	return { ...state, ...usages, machine, gauges, budget_waits, sampled_ms: now_ms }
+	return { ...state, ...usages, machine, gauges, budget_waits, sampled_ms: at.now_ms }
 }
 
 // The state of the run on screen; a different run starts its plan state from nothing, so no row, count
@@ -157,6 +182,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		statuses,
 		events: local.events,
 		...room_of(state, local),
+		carry: local.carry,
 		is_stopped: activity_here(local).is_stopped,
 	})
 
@@ -231,7 +257,7 @@ function header_of(
 
 // The pane a live frame is kept within and the footer it ends on, read at every redraw.
 function bounds_of(ports: BoardPorts): FrameBounds {
-	return { size: ports.size?.(), footer: ports.footer }
+	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
 // The frame with its spinners drawn at this moment's frame, and where they are on screen.
@@ -272,13 +298,14 @@ function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardSta
 }
 
 // One redraw. No run reads nothing from GitHub and keeps the plan it had for when one starts. A live
-// board redraws at the `background` pace; one plain frame waits for the GitHub reads.
+// board redraws at the `background` pace; one plain frame waits for the GitHub reads. The process
+// snapshot is read once, by whichever of the lane read and the sample asks first.
 async function tick(
 	state: BoardState,
 	ports: BoardPorts,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
-	const read = await reread(state, ports, pace)
+	const { read, reads } = await reread(state, ports, fresh_read(ports, pace))
 	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
 	const { local } = read
@@ -292,7 +319,7 @@ async function tick(
 	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
 	const thanked = await gather_thanks(gathered, ports, now_ms, pace)
 
-	return draw_run(await resample(thanked, ports, now_ms), local, { ports, now_ms })
+	return draw_run(await resample(thanked, ports, { now_ms, ...reads }), local, { ports, now_ms })
 }
 
 const run_board_tick = {

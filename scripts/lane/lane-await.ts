@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import {
 	PROCESS_ALIVE,
 	PROCESS_NONE,
@@ -28,7 +28,6 @@ import { process_tools } from './process-tools'
 const RECONFIRM_MS = 15_000
 const DEFAULT_POLL_MS = 5000
 const NEVER_APPEARED_TIMEOUT_MS = 600_000
-const MS_PER_SECOND = 1000
 const PROCESS_FOUND = 0
 const PROCESS_NOT_FOUND = 1
 const PGREP_COMMAND = 'pgrep'

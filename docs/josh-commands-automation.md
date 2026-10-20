@@ -2,7 +2,7 @@
 
 The commands a person rarely types: the ones Claude Code hooks, git hooks, the issue-driven workflow runs (`fullrun`, `backlogrun`, …) and lanes call, plus the `maintainer` commands kit's own maintainers run. Where each command came from: `docs/maintainers/josh-commands-automation-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` (`scripts/josh/josh-commands-*.ts`), the rest from `scripts/josh/josh-usage-automation.ts`, `josh-usage-workflow.ts` and `josh-usage-hooks.ts` by `tsx tools/document/generate-command-usage.ts` — edit the table, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
 
 ## Development
 
@@ -844,11 +844,21 @@ pnpm josh latest:scope --json     # the verdict and the reason as JSON
 
 <!-- /usage -->
 
-The update itself — [`josh latest`](josh-commands.md#josh-latest) — is a command you type.
-
-Read it with `$(pnpm josh latest:scope)`. A completion record younger than **12 hours** (`JOSH_LATEST_MAX_AGE_HOURS`) answers `skip`.
+A completion record younger than **12 hours** (`JOSH_LATEST_MAX_AGE_HOURS`) answers `skip`.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh latest:scope` in detail".
+
+### `josh latest:if-required`
+
+<!-- usage: latest:if-required -->
+
+Run josh latest only when latest:scope answers required, stashing around it.
+
+```bash
+pnpm josh latest:if-required   # stash, update, pop on required
+```
+
+<!-- /usage -->
 
 ### `josh latest:guard`
 
