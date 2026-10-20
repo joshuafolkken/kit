@@ -10,6 +10,7 @@ import { lane_close, type CloseKind } from './lane-close'
 import { lane_preserve, type KeptWork } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 import { lane_state } from './lane-state'
 
 // `josh lane:withdraw <N> --reason <text>` — a person takes a running lane child's issue out of the run
@@ -46,6 +47,8 @@ interface Withdrawn {
 	// The issue had closed on its own — merged — before the withdrawal reached it, so it was left as is.
 	had_closed: boolean
 	lane: CloseKind
+	// What else the close ended from the checkout; `undefined` where it could not be read.
+	residents: ReadonlyArray<number> | undefined
 }
 
 type IssueSettled = Pick<Withdrawn, 'had_closed' | 'is_closed'>
@@ -119,7 +122,14 @@ async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawO
 	// After the close, so the record names the withdrawal rather than the close it ran.
 	await lane_state.record_change({ issue: lane.issue, state: 'ended', command: 'lane:withdraw' })
 
-	return { kind: 'withdrawn', reaped, stash: saved.stash, ...settled, lane: closed.kind }
+	return {
+		kind: 'withdrawn',
+		reaped,
+		stash: saved.stash,
+		...settled,
+		lane: closed.kind,
+		residents: closed.residents,
+	}
 }
 
 /** Stop `#<N>`'s lane child, stash its work, close the Issue as not planned and close the lane. */
@@ -141,11 +151,19 @@ function stash_sentence(stash: string | undefined): string {
 	return `Its uncommitted work was stashed — recover with \`pnpm josh stash:pop "${stash}"\`.`
 }
 
+// What the lane's close left or ended, as a suffix.
+function lane_suffix(outcome: Withdrawn, cited: string): string {
+	const removed = outcome.lane === 'incomplete' ? ' The lane could not be fully removed.' : ''
+	const residents = lane_residents.residents_sentence(outcome.residents, cited)
+
+	return residents === undefined ? removed : `${removed} ${residents}`
+}
+
 function withdrawn_text(outcome: Withdrawn, issue: string): string {
 	const cited = session_cite.issue(issue)
 	const stopped = outcome.reaped === 0 ? 'Its child had already ended.' : 'Stopped its child.'
 	const head = `Withdrew ${cited}. ${stopped} ${stash_sentence(outcome.stash)}`
-	const lane = outcome.lane === 'incomplete' ? ' The lane could not be fully removed.' : ''
+	const lane = lane_suffix(outcome, cited)
 
 	if (outcome.had_closed) return `${head} The Issue had already closed and was left as is.${lane}`
 

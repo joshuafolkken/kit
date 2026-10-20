@@ -20,6 +20,7 @@ const OPEN_ISSUE = '2701'
 const HOLD_PATH = '/state/josh-run-hold-lane'
 const MERGED_DIRECTORY = '/lanes/2583'
 const GIT_DIRECTORY = '/repo/.git/worktrees/2583'
+const RESIDENT_PID = 4242
 
 function lane(issue: string, is_stranded = false): LaneInfo {
 	return {
@@ -56,6 +57,7 @@ beforeEach(() => {
 		kind: 'closed',
 		left_behind: [],
 		reaped: [],
+		residents: [],
 	})
 	git_answers('0')
 })
@@ -123,6 +125,7 @@ describe('run_tidy_lanes.tidy_lanes — lanes it leaves to others', () => {
 			kind: 'incomplete',
 			left_behind: [MERGED_DIRECTORY],
 			reaped: [],
+			residents: [],
 		})
 
 		const outcomes = await run_tidy_lanes.tidy_lanes(is_merged)
@@ -135,5 +138,24 @@ describe('run_tidy_lanes.tidy_lanes — lanes it leaves to others', () => {
 		vi.mocked(git_spawn.read).mockRejectedValue(new Error('no HEAD'))
 
 		expect(await run_tidy_lanes.has_unpushed(MERGED_DIRECTORY)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4304: the sweep dropped what the close ended from the checkout.
+describe('run_tidy_lanes.tidy_lanes — processes still running from the checkout', () => {
+	it('reports the processes the close ended', async () => {
+		const report = vi.spyOn(console, 'error').mockReturnValue()
+
+		vi.mocked(lane_close.close_lane).mockResolvedValue({
+			issue: MERGED_ISSUE,
+			kind: 'closed',
+			left_behind: [],
+			reaped: [],
+			residents: [RESIDENT_PID],
+		})
+
+		await run_tidy_lanes.tidy_lanes(is_merged)
+
+		expect(report).toHaveBeenCalledWith(expect.stringContaining(String(RESIDENT_PID)))
 	})
 })

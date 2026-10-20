@@ -118,3 +118,18 @@ describe('run_merge_steps — a child that ended without a merge', () => {
 		expect(comment_mock).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#4304: the captured `lane:close` stderr — what the close terminated — was dropped.
+describe('run_merge_steps — what the lane close says', () => {
+	it('passes on the stderr of lane:close', async () => {
+		const said = 'Terminated 1 process(es) still running from the lane checkout'
+		const report = vi.spyOn(console, 'error').mockReturnValue()
+
+		is_vacant_mock.mockResolvedValue(true)
+		vi.mocked(josh_command.josh_run).mockResolvedValue({ code: 0, out: '', err: `${said}\n` })
+
+		await run_merge_steps.release_child(CHILD)
+
+		expect(report).toHaveBeenCalledWith(said)
+	})
+})
