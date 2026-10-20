@@ -5,8 +5,11 @@
 # A hook command in `.claude/settings.json` / `.codex/hooks.json` only moves to the project root
 # (`scripts/init/hook-launch.ts`) and calls this script, so everything every hook shares lives here once:
 #
-# - The root prefix has already cleared the git location variables a git hook exports, or kept them
-#   when the checkout needs them; this script starts no `git` of its own (joshuafolkken/kit#3946).
+# - The git location variables a git hook exports are cleared when the checkout resolves without
+#   them, so the hook's own git calls act on the checkout it stands in, and kept when the git metadata
+#   lives outside the work tree. `git` starts only when one of them is set — a hook runs on every tool
+#   call (joshuafolkken/kit#3946, joshuafolkken/kit#4187). The list is `GIT_LOCATION_VARIABLES`
+#   (`scripts/git/git-location-environment.ts`), held to it by `run-hook.test.ts`.
 # - The pre-built bundle `dist/hooks/<name>.js` runs once its gate passes; otherwise the live source
 #   runs through josh, whose command is the name with its first `-` turned into `:`
 #   (`pretool-guard` → `pretool:guard`).
@@ -19,6 +22,12 @@
 #   `dirname`, and `node` replaces this shell through `exec` rather than running beside it.
 # - An `if`/`else`, never `&&`/`||`: a guard's refusal is a non-zero exit, and a chain would read it as
 #   a missing bundle and run the hook twice.
+
+location_variables='GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
+if [ -n "$GIT_ALTERNATE_OBJECT_DIRECTORIES$GIT_COMMON_DIR$GIT_DIR$GIT_INDEX_FILE$GIT_NAMESPACE$GIT_OBJECT_DIRECTORY$GIT_WORK_TREE" ] &&
+	(unset $location_variables && git rev-parse --show-toplevel >/dev/null 2>&1); then
+	unset $location_variables
+fi
 
 hook_name=$1
 shift

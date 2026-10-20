@@ -205,6 +205,22 @@ describe('metrics_ratchet approval files', () => {
 	})
 })
 
+// A release removes every merged approval (joshuafolkken/kit#4187): a branch that merged it lost them
+// on both sides, and one that did not still holds them as its merge-base does.
+describe('metrics_ratchet approval files across a release', () => {
+	it('counts only the branch’s own approval on either side of a release that pruned the rest', () => {
+		const own = metrics_ratchet.approval_text(approval_of({ [GUARDS]: 3 }))
+		const merged = new Map([
+			['1.json', metrics_ratchet.approval_text(approval_of({ [GUARDS]: 1 }))],
+		])
+		const after_release = new Map([['2.json', own]])
+		const before_release = new Map([...merged, ['2.json', own]])
+
+		expect(metrics_ratchet.fresh_approvals(after_release, new Map())).toHaveLength(1)
+		expect(metrics_ratchet.fresh_approvals(before_release, merged)).toHaveLength(1)
+	})
+})
+
 describe('metrics_ratchet.parse_metrics', () => {
 	it('reads the totals the --json form prints', () => {
 		expect(metrics_ratchet.parse_metrics(JSON.stringify(BASE))).toStrictEqual(BASE)

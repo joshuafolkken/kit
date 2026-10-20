@@ -259,29 +259,13 @@ describe('get_suggested_scripts', () => {
 	})
 })
 
+// joshuafolkken/kit#4187: no consumer carries a retired script any longer, so one is the project's own.
 describe('merge_package_scripts retired scripts', () => {
-	it('removes retired script keys from existing package.json content', () => {
-		const content = JSON.stringify({
-			scripts: { lint: 'pnpm lint:prettier && pnpm lint:eslint', josh: 'josh' },
-		})
-		const result = init_logic.merge_package_scripts(content, {})
-
-		expect(result).not.toContain('"lint"')
-		expect(result).toContain('"josh"')
-	})
-
-	it('removes all retired managed scripts', () => {
+	it('keeps a script under a retired name', () => {
 		const existing = Object.fromEntries(RETIRED_SCRIPTS.map((k) => [k, `josh ${k}`]))
 		const content = JSON.stringify({ scripts: { ...existing, josh: 'josh' } })
-		const result = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
-			scripts: Record<string, string>
-		}
 
-		for (const key of RETIRED_SCRIPTS) {
-			expect(result.scripts).not.toHaveProperty(key)
-		}
-
-		expect(result.scripts).toHaveProperty('josh')
+		expect(init_logic.merge_package_scripts(content, {})).toBe(content)
 	})
 })
 

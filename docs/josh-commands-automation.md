@@ -82,10 +82,10 @@ pnpm josh batch:guard   # run inside pretool:guard, not wired on its own
 
 Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/init/hook-launch.ts`):
 
-- **`<project-root prefix>`** — `cd`s to `git rev-parse --show-toplevel` (git location variables a git hook exports cleared first), so a hook fired from a subdirectory finds its relative paths.
-- **The launcher** (`scripts/hooks/run-hook.sh <name>`) hands the hook to the ready gate, falling back to `pnpm josh <command>`.
-- **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its recorded digest matches the source, and rebuilds it in-process when stale.
-- A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on the installed `dist/hooks/` (published bundles have no source to go stale against) and whose fallback is the `dist/josh.js` dispatcher.
+- **`<project-root prefix>`** — `cd`s to `CLAUDE_PROJECT_DIR`, else (Codex) `git rev-parse --show-toplevel`, so a hook run in a subdirectory finds its paths.
+- **The launcher** (`scripts/hooks/run-hook.sh <name>`) clears a git hook's location variables when git resolves without them, then runs the ready gate, falling back to `pnpm josh <command>`.
+- **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its digest matches the source, and rebuilds it in-process when stale.
+- A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on `dist/hooks/` (published bundles have no source to be stale against) and whose fallback is the `dist/josh.js` dispatcher.
 
 - The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **Silent in a dispatched lane child** (`JOSH_LANE_CHILD`): the notice is `off` there (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".

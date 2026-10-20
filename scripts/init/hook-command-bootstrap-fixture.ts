@@ -7,6 +7,8 @@ import { git_location_environment } from '#scripts/git/git-location-environment'
 import { hook_launch } from './hook-launch'
 
 const GIT_INIT_TIMEOUT_MS = 10_000
+// Where Claude Code names the project root for a hook command (`hook-launch.ts`).
+const PROJECT_DIRECTORY_VARIABLE = 'CLAUDE_PROJECT_DIR'
 const { RUN_HOOK_SCRIPT } = hook_launch
 const RUN_HOOK_SOURCE = fileURLToPath(new URL(`../../${RUN_HOOK_SCRIPT}`, import.meta.url))
 
@@ -19,6 +21,8 @@ interface HookResult {
 interface CheckoutOptions {
 	git_overrides?: Record<string, string>
 	is_external_git?: boolean
+	// Name the checkout's root as Claude Code does; left out, the command runs as Codex runs it.
+	is_project_directory_named?: boolean
 }
 
 // The installed package as a hook command finds it: the real launcher, and one stub bundle in place of
@@ -67,14 +71,23 @@ function initialize_repository(
 }
 
 // A hook exports `GIT_DIR` and friends, so the fixture's own `git init` would otherwise act on the
-// checkout the gate is running in rather than on the temporary directory.
+// checkout the gate is running in rather than on the temporary directory. A Claude Code session's
+// `CLAUDE_PROJECT_DIR` would likewise send a fixture's hook command to that session's checkout.
 function fresh_git_environment(): NodeJS.ProcessEnv {
-	return { ...process.env, ...git_location_environment.location_free_environment() }
+	return {
+		...process.env,
+		...git_location_environment.location_free_environment(),
+		[PROJECT_DIRECTORY_VARIABLE]: undefined,
+	}
 }
 
 function checkout_environment(temporary_root: string, options: CheckoutOptions): NodeJS.ProcessEnv {
 	const metadata_root = path.join(temporary_root, 'metadata')
-	const git_environment = fresh_git_environment()
+	const project_directory = options.is_project_directory_named ? temporary_root : undefined
+	const git_environment = {
+		...fresh_git_environment(),
+		[PROJECT_DIRECTORY_VARIABLE]: project_directory,
+	}
 	const git_arguments = options.is_external_git
 		? ['init', '--bare', '-q', metadata_root]
 		: ['init', '-q']
@@ -114,6 +127,7 @@ function run_in_temporary_checkout(
 }
 
 const hook_command_bootstrap = {
+	PROJECT_DIRECTORY_VARIABLE,
 	fresh_git_environment,
 	initialize_repository,
 	run_in_temporary_checkout,
