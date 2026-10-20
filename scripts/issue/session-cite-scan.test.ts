@@ -49,6 +49,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// A person reads it on Telegram.
 	['notify/git-notify.ts', 1],
 	['backlog/backlog-drive-idle.ts', 1],
+	['run/merge/run-merge-auth.ts', 1],
 	// A program reads it back: the run event stream, a process pattern, a child prompt, a parse key.
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],

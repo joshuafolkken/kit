@@ -100,6 +100,22 @@ describe('classify_child — is_outage is ignored outside the failed case', () =
 	})
 })
 
+// joshuafolkken/kit#4216: an authentication failure is read before the outage and the failure, and
+// counts nothing.
+describe('classify_child — a child that could not authenticate', () => {
+	it('reads an OPEN unparked child that could not authenticate as unauthenticated', () => {
+		const signals = { ...OUTAGE, is_auth_failure: true }
+
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), signals)).toBe(
+			'unauthenticated',
+		)
+	})
+
+	it('counts nothing for an unauthenticated child', () => {
+		expect(run_merge.change_of('unauthenticated')).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#2484: a child that ended its session with a declared cut its successor never adopted
 // is resumed, not parked — and only an OPEN, unparked child is read that way.
 describe('classify_child — a declared cut', () => {

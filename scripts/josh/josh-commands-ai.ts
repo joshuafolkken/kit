@@ -178,6 +178,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child',
 		category: 'AI tools',
 		reference: [ISSUE_WITH_OPTIONS, 'automation', ['git', 'network']],
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	'run:review': {
 		script: 'scripts/run/review/run-review-cli.ts',

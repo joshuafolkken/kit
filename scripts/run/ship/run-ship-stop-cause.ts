@@ -1,3 +1,4 @@
+import { api_auth } from '#scripts/agent/api-auth'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import type { StopRecord } from '#scripts/lane/lane-ledger'
 import { run_ship_stage, type Stage } from './run-ship-stage'
@@ -15,6 +16,7 @@ const CAUSE = {
 	INFRA: 'infra',
 	CONFLICT: 'conflict',
 	CHECK: 'check',
+	AUTH: 'auth',
 } as const
 
 type Cause = (typeof CAUSE)[keyof typeof CAUSE]
@@ -40,11 +42,23 @@ function is_infra(output: string): boolean {
 	return INFRA_PATTERNS.some((pattern) => pattern.test(output))
 }
 
+// A reviewer that could not authenticate is no finding: the review steps put `AUTH_FAILURE_NOTE` at the
+// head of a stop line (`isolated reviewer failed: <note>` or `<note>`), and only there is it read — a
+// finding that quotes the note mid-line stays a finding (joshuafolkken/kit#4216).
+const AUTH_LINE = new RegExp(
+	`^(?:isolated reviewer failed: (?:the broker answered a failure: )?)?${api_auth.AUTH_FAILURE_NOTE}`,
+	'mu',
+)
+
+function finding_cause(output: string): Cause {
+	return AUTH_LINE.test(output) ? CAUSE.AUTH : CAUSE.FINDING
+}
+
 function cause_of(stage: Stage, output: string, conflicts?: ReadonlyArray<string>): Cause {
 	const reason = run_ship_stage.stop_reason(stage, conflicts)
 
 	if (reason === run_ship_stage.CONFLICT) return CAUSE.CONFLICT
-	if (FINDING_STAGES.has(stage)) return CAUSE.FINDING
+	if (FINDING_STAGES.has(stage)) return finding_cause(output)
 
 	return INFRA_STAGES.has(stage) && is_infra(output) ? CAUSE.INFRA : CAUSE.CHECK
 }

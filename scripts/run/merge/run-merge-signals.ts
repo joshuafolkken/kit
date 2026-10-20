@@ -1,3 +1,4 @@
+import { api_auth } from '#scripts/agent/api-auth'
 import { api_outage } from '#scripts/agent/api-outage'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_merged } from '#scripts/issue/issue-merged'
@@ -23,6 +24,15 @@ function read_is_outage(output: string | undefined): boolean {
 	if (output === undefined) return false
 
 	return api_outage.is_outage(run_ending.read_exit(output)) || run_ending.ended_mid_turn(output)
+}
+
+// Whether the child's session ended because it could not authenticate — off without `--output`, as the
+// outage read is. The lane's log is appended across launches, so it is read as the reviewer's is
+// (`api_auth.is_auth_failed_transcript`).
+function read_is_auth_failure(output: string | undefined): boolean {
+	if (output === undefined) return false
+
+	return api_auth.is_auth_failed_transcript(run_ending.read_transcript(output))
 }
 
 async function child_outages(child: string): Promise<number> {
@@ -83,7 +93,9 @@ async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingS
 		read_is_withdrawn(ctx.child, read),
 	])
 
-	return { ...retryable, is_cut, merged_pr, is_withdrawn }
+	const is_auth_failure = read_is_auth_failure(ctx.output)
+
+	return { ...retryable, is_cut, merged_pr, is_withdrawn, is_auth_failure }
 }
 
 // An unread state is `unresolved` unless a withdrawal already settled the child, which is read locally;
