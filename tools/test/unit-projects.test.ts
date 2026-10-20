@@ -8,9 +8,11 @@ import { VITEST_INCLUDE_GLOBS } from '#tools/test/vitest-include-globs'
 import { describe, expect, it } from 'vitest'
 
 const {
+	DEPENDENCY_OPTIMIZER,
 	ISOLATED_PROJECT,
 	MACHINE_GUARD,
 	MAIN_EXCLUDE,
+	OPTIMIZED_DEPENDENCIES,
 	PURE_PROJECT,
 	READ_RECORDER,
 	STATE_GUARD,
@@ -105,6 +107,24 @@ describe('each project carries the per-run environment and timeout', () => {
 	// cut-guard delivery fixture, which then stands down where the refusal is expected.
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
 		expect(project(name).env[agent_session_role.KEY]).toBe('')
+	})
+})
+
+// joshuafolkken/kit#4301: execa and zod were the suite's two largest import costs, paid again by every
+// isolated file; an optimizer without them would silently pay them again.
+describe('the dependency optimizer pre-bundles the packages most test files load', () => {
+	it('pre-bundles execa and zod', () => {
+		const { ssr } = DEPENDENCY_OPTIMIZER.optimizer
+
+		expect(ssr.enabled).toBe(true)
+		expect(ssr.include).toEqual([...OPTIMIZED_DEPENDENCIES])
+		expect(ssr.include).toEqual(expect.arrayContaining(['execa', 'zod']))
+	})
+
+	// A project carrying `deps` (the optimizer) resolves a Vite server of its own instead of sharing the
+	// root's, so the optimizer belongs to the root config alone.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('leaves deps off the %s project', (name) => {
+		expect(Object.hasOwn(project(name), 'deps')).toBe(false)
 	})
 })
 
