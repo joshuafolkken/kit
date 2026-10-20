@@ -109,16 +109,21 @@ async function main_root(): Promise<string> {
 	}
 }
 
-// Every process the run's record names is asked of `table`, the redraw's own `ps` snapshot.
+// Every process the run's record names is asked of `table`, the redraw's own `ps` snapshot — only once
+// a run is found, so a repository with no run waits on no `ps`.
 async function span_here(repository: string, table: TableRead | undefined): Promise<SpanHere> {
-	const same_process = await run_board_roots.same_in(table)
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
 	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
 	const launch = backlogrun_launch.pending_launch(repository)
+	const span = run_board_span.span_of(read, ended, launch)
+
+	if (span === undefined) return NO_SPAN
+
+	const same_process = await run_board_roots.same_in(table)
 	const stranded_ports = run_stranded_detect.ports_with(same_process)
 
 	return {
-		span: run_board_span.span_of(read, ended, launch),
+		span,
 		resume: run_board_span.resume_of(read, ended, launch),
 		transcript: read.kind === 'carried' ? read.carry.owner_transcript : undefined,
 		roots: run_board_roots.roots_of(repository, read, same_process),
