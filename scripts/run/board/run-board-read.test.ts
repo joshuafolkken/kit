@@ -100,6 +100,7 @@ const LANE_ROOM = {
 	lane_limit: LANE_LIMIT,
 	occupied_count: 1,
 	earlier_occupied: [],
+	earlier_statuses: new Map(),
 }
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
 const UNRECORDED = {
@@ -310,6 +311,31 @@ describe('run_board_read.read_local earlier lanes', () => {
 		])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ earlier_lanes: ['3431'] })
+	})
+
+	// joshuafolkken/kit#4260: its launch is before the span, so the span's events alone hold none of it.
+	it('reads what an earlier lane is doing from its launch before the span', async () => {
+		const started_ms = Date.parse(STARTED_AT)
+		const launch: RunEvent = {
+			pos: 1,
+			at: '2026-10-08T08:00:00.000Z',
+			kind: 'child-launch',
+			text: '#3431 launched',
+		}
+
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		vi.mocked(run_event_stream.read_events).mockReturnValue([launch])
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
+			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
+		])
+
+		const local = await run_board_read.read_local()
+
+		expect(local?.events).toStrictEqual([])
+		expect(local?.earlier_statuses?.get(3431)).toMatchObject({
+			state: 'running',
+			started_ms: Date.parse(launch.at),
+		})
 	})
 })
 

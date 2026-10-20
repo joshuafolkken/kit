@@ -20,6 +20,7 @@ import type { ProcessRoots } from './run-board-process-groups'
 import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
+import { run_board_status, type ItemStatus } from './run-board-status'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
 
 // What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
@@ -48,6 +49,9 @@ interface LocalRead {
 	// The earlier run's lanes that still hold a place under the limit — counted in `occupied_count`, so
 	// the lanes section draws them beside this run's own.
 	earlier_occupied?: ReadonlyArray<string> | undefined
+	// What each earlier run's lane is doing, folded from the whole stream since its newest launch
+	// (`run_board_status.earlier_of`) — the span's events alone hold none of its launch.
+	earlier_statuses?: ReadonlyMap<number, ItemStatus> | undefined
 	// How many more lanes the limit allows beside the live ones, as `lane:limit` counts them;
 	// `undefined` where the limit could not be read, so nothing is said about it.
 	free_lanes?: number | undefined
@@ -182,6 +186,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		is_stranded: run_stranded_detect.is_stranded_at(repository),
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
 		earlier_lanes: earlier,
+		earlier_statuses: run_board_status.earlier_of(events, earlier),
 		...(await lane_room_of(lanes, earlier, table)),
 		...ledger_here(repository),
 	}

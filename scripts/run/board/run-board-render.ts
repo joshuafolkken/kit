@@ -1,3 +1,4 @@
+import { run_board_earlier } from './run-board-earlier'
 import {
 	run_board_fit,
 	type FrameParts,
@@ -40,6 +41,7 @@ import type { Thanks } from './run-board-thanks-csv'
 
 const { FILED_KIND_ICONS, KIND_BLANK, STATE_ICONS, WAITS_ICON, WORDS, clock_of } = run_board_labels
 const { time_of, time_width } = run_board_render_time
+const { is_live } = run_board_earlier
 const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
 const { cell_of, column_width, slot_of } = run_board_render_slot
@@ -107,7 +109,7 @@ function running_fresh(
 	at_ms: number | undefined,
 	header: BoardHeader,
 ): string {
-	return row.state === 'running' ? run_board_fresh.since(text, at_ms, header) : text
+	return is_live(row) ? run_board_fresh.since(text, at_ms, header) : text
 }
 
 // A row the run filed leads its title with ✚ (joshuafolkken/kit#4099), cut by as many columns, so every

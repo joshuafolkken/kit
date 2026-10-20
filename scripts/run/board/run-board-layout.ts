@@ -11,6 +11,7 @@ import {
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_kind } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -308,29 +309,11 @@ function waiting_children(overlay: Overlay): Array<EpicChild> {
 	)
 }
 
-// An earlier run's lane holding a place, unless this run has touched its issue since.
-function earlier_rows(
-	earlier: ReadonlyArray<string>,
-	statuses: ReadonlyMap<number, ItemStatus>,
-	read: RowRead,
-): Array<BoardRow> {
-	const numbers = earlier.map(Number).filter((number) => !statuses.has(number))
-
-	return numbers.map((number) => ({
-		number,
-		title: read.titles.get(number),
-		kind: run_board_kind.kind_of(read.labels.get(number)),
-		state: 'earlier',
-		status: undefined,
-		waits: [],
-	}))
-}
-
 function layout_of(
 	plan: BoardPlan,
 	statuses: ReadonlyMap<number, ItemStatus>,
 	reason_of?: ReasonOf,
-	earlier: ReadonlyArray<string> = [],
+	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
 ): BoardLayout {
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
@@ -341,7 +324,7 @@ function layout_of(
 		queued: queued_entries(queue, overlay),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
-		earlier: earlier_rows(earlier, statuses, read),
+		earlier: run_board_earlier.rows_of(earlier, statuses, read),
 	}
 }
 
@@ -352,14 +335,14 @@ const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreache
 // and every issue the run has not touched wait for the plan.
 function local_layout_of(
 	statuses: ReadonlyMap<number, ItemStatus>,
-	earlier: ReadonlyArray<string> = [],
+	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
 ): BoardLayout {
 	const read = { titles: new Map(), labels: new Map() }
 
 	return {
 		...EMPTY_LAYOUT,
 		active: active_rows(statuses, read),
-		earlier: earlier_rows(earlier, statuses, read),
+		earlier: run_board_earlier.rows_of(earlier, statuses, read),
 	}
 }
 
@@ -425,4 +408,4 @@ const run_board_layout = {
 }
 
 export { run_board_layout }
-export type { BoardLayout, BoardPlan, BoardRow, Overlay, QueuedEntry, ReasonOf, RowReason }
+export type { BoardLayout, BoardPlan, BoardRow, Overlay, QueuedEntry, ReasonOf, RowRead, RowReason }
