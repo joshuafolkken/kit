@@ -1,11 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
-import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_named_version_schema } from '#scripts/lib/schemas'
-
-const PACKAGE_JSON = 'package.json'
 
 // Options for `resolve_effective_upstream_version`. `resolve_marker` is a subpath specifier used for
 // `createRequire().resolve()` when the package root itself is not directly resolvable — e.g. kit does
@@ -18,21 +15,18 @@ interface EffectiveUpstreamOptions {
 // Read the `version` from a package.json only when its `name` matches the target package — undefined
 // when the file is missing, malformed, or belongs to a different (e.g. nested) package. Matching by
 // name is what lets the walk-up skip intermediate package.json files and land on the true root.
-function read_matching_version(manifest_path: string, package_name: string): string | undefined {
-	if (!existsSync(manifest_path)) return undefined
-	const parsed = package_named_version_schema.safeParse(
-		json_value.parse_or_undefined(readFileSync(manifest_path, 'utf8')),
-	)
-	if (!parsed.success || parsed.data.name !== package_name) return undefined
+function read_matching_version(directory: string, package_name: string): string | undefined {
+	const manifest = package_manifest.read_manifest_if_valid(directory, package_named_version_schema)
+	if (manifest?.name !== package_name) return undefined
 
-	return parsed.data.version
+	return manifest.version
 }
 
 // Walk up from a resolved file's directory to the package root, returning the version of the first
 // ancestor package.json whose `name` matches the target — or undefined when no matching root exists.
 function walk_up_for_version(start_directory: string, package_name: string): string | undefined {
 	for (const directory of ancestor_directories.list(start_directory)) {
-		const version = read_matching_version(path.join(directory, PACKAGE_JSON), package_name)
+		const version = read_matching_version(directory, package_name)
 		if (version !== undefined) return version
 	}
 

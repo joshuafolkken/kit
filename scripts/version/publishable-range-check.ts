@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { adopt_toolkits } from '#scripts/adopt/adopt-toolkits'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { npm_registry } from './npm-registry'
 import { peer_floor } from './peer-floor'
 import {
@@ -18,7 +19,6 @@ import {
 	type RangeProbe,
 } from './publishable-range'
 
-const PACKAGE_JSON_PATH = 'package.json'
 const FAILURE_EXIT_CODE = 1
 const NODE_MODULES = 'node_modules'
 
@@ -79,14 +79,14 @@ function check_peer_floors(
 function read_installed_toolkit_manifests(project_root: string): Array<string> {
 	return adopt_toolkits
 		.all_declared_toolkits(project_root)
-		.map((package_name) => path.join(project_root, NODE_MODULES, package_name, PACKAGE_JSON_PATH))
+		.map((package_name) => path.join(project_root, NODE_MODULES, package_name, PACKAGE_JSON))
 		.filter((manifest_path) => existsSync(manifest_path))
 		.map((manifest_path) => readFileSync(manifest_path, 'utf8'))
 }
 
 // Both checks always run, so one invocation reports everything there is to fix.
 function main(): void {
-	const package_json_content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const package_json_content = readFileSync(PACKAGE_JSON, 'utf8')
 	const range_exit_code = check(package_json_content, probe_range)
 	const toolkit_json_contents = read_installed_toolkit_manifests(process.cwd())
 	const peer_exit_code = check_peer_floors(package_json_content, toolkit_json_contents)

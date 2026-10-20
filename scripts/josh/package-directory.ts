@@ -1,8 +1,6 @@
 import { existsSync } from 'node:fs'
-import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
-
-const PACKAGE_JSON = 'package.json'
+import { package_manifest } from '#scripts/lib/package-manifest'
 
 // Resolve the kit package root by ascending to the nearest package.json. This works both
 // from the bundled dist/josh.js (one level under the root) and from the tsx source at
@@ -12,7 +10,7 @@ const PACKAGE_JSON = 'package.json'
 function find_package_directory(start_directory: string): string {
 	return (
 		ancestor_directories.nearest(start_directory, (directory) =>
-			existsSync(path.join(directory, PACKAGE_JSON)),
+			existsSync(package_manifest.manifest_path(directory)),
 		) ?? start_directory
 	)
 }

@@ -16,7 +16,6 @@ import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_hook_safety } from './sync-hook-safety'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
-const PACKAGE_JSON = 'package.json'
 const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
 const CODEX_HOOKS_FILE = '.codex/hooks.json'
@@ -37,7 +36,7 @@ function should_skip_hook_file(filename: string): boolean {
 	if (filename !== CLAUDE_SETTINGS_FILE && filename !== CODEX_HOOKS_FILE) return false
 	const warning = sync_hook_safety.hook_write_warning(
 		PROJECT_ROOT,
-		sync_hook_safety.read_version_at(path.join(PACKAGE_DIR, PACKAGE_JSON)),
+		sync_hook_safety.read_version_at(PACKAGE_DIR),
 		filename,
 	)
 	if (warning === undefined) return false

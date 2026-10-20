@@ -6,6 +6,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { file_reader } from '#scripts/lib/read-file'
 import { lockfile_overrides } from '#scripts/overrides/lockfile-overrides'
 import { overrides_files } from '#scripts/overrides/overrides-files'
@@ -16,7 +17,6 @@ import { latest_regression, type VersionRegression } from './latest-regression'
 import { playwright_browsers } from './playwright-browsers'
 import { safe_chain_version_update } from './safe-chain-version-update'
 
-const PACKAGE_JSON_PATH = 'package.json'
 const LOCKFILE_PATH = 'pnpm-lock.yaml'
 
 interface TreeSnapshot {
@@ -44,7 +44,7 @@ function run_update_stages(stages: Array<Array<string>>): number {
 
 function take_snapshot(): TreeSnapshot {
 	return {
-		package_json: readFileSync(PACKAGE_JSON_PATH, 'utf8'),
+		package_json: readFileSync(PACKAGE_JSON, 'utf8'),
 		lockfile: file_reader.read_file_or_empty(LOCKFILE_PATH),
 	}
 }
@@ -54,7 +54,7 @@ function take_snapshot(): TreeSnapshot {
 // "the latest release is <older>". The captured lockfile still carries the resolved URL and
 // integrity, which installs fine.
 function restore_snapshot(snapshot: TreeSnapshot): void {
-	writeFileSync(PACKAGE_JSON_PATH, snapshot.package_json)
+	writeFileSync(PACKAGE_JSON, snapshot.package_json)
 	if (snapshot.lockfile.length > 0) writeFileSync(LOCKFILE_PATH, snapshot.lockfile)
 }
 
@@ -71,7 +71,7 @@ function report_kept_back(regressions: ReadonlyArray<VersionRegression>): void {
 const PNPM_UPDATE_ALL_TIERS = ['pnpm', 'update']
 
 function build_update_commands(): Array<Array<string>> {
-	const content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const content = readFileSync(PACKAGE_JSON, 'utf8')
 	const latest = overrides_check.build_update_command(
 		overrides_files.read_current_overrides(),
 		content,
@@ -87,7 +87,7 @@ interface UpdateOutcome {
 }
 
 function find_regressions_after_update(snapshot: TreeSnapshot): Array<VersionRegression> {
-	const after = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const after = readFileSync(PACKAGE_JSON, 'utf8')
 
 	return latest_regression.find_regressions(snapshot.package_json, after)
 }

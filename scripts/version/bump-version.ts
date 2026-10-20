@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
+import { writeFileSync } from 'node:fs'
 import { error_text } from '#scripts/lib/error-message'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { json_object_schema, package_with_version_schema } from '#scripts/lib/schemas'
 import semver from 'semver'
 
@@ -20,28 +20,21 @@ function compute_new_version(version: string, bump_type: BumpType): string {
 	return new_version
 }
 
-function package_json_path(): string {
-	return path.join(process.cwd(), 'package.json')
-}
-
 // **Set the version to an already-decided number.** `bump_version` below is this plus the decision;
 // `pnpm josh release` supplies its own, because a release raises the version by as many minors as
 // main has taken merges rather than by one. Written once so the two agree
 // on the file's shape and indentation.
 function write_version(new_version: string): void {
-	const package_path = package_json_path()
-	const package_json = json_object_schema.parse(JSON.parse(readFileSync(package_path, 'utf8')))
+	const package_json = package_manifest.read_manifest(process.cwd(), json_object_schema)
 
 	writeFileSync(
-		package_path,
+		package_manifest.manifest_path(process.cwd()),
 		`${JSON.stringify({ ...package_json, version: new_version }, undefined, PACKAGE_JSON_INDENT)}\n`,
 	)
 }
 
 function read_current_version(): string {
-	const file_content = readFileSync(package_json_path(), 'utf8')
-
-	return package_with_version_schema.parse(JSON.parse(file_content)).version
+	return package_manifest.read_manifest(process.cwd(), package_with_version_schema).version
 }
 
 function bump_version(bump_type: BumpType): void {

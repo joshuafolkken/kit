@@ -20,7 +20,7 @@ const DEFAULT_NPM_TIMEOUT_SECONDS = '1800'
 const MISSED_NPM = '❌ Not published to npm'
 
 function given_manifest(manifest: object): void {
-	vi.spyOn(file_reader, 'read_optional').mockReturnValue(JSON.stringify(manifest))
+	vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(JSON.stringify(manifest))
 }
 
 function given_npm(is_published: boolean): void {

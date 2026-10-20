@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { file_content } from '#scripts/sync/file-content'
 import { z } from 'zod'
 import { init_basic } from './init-basic'
@@ -9,7 +10,6 @@ import { project_profile } from './project-profile'
 
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const NODE_MODULES = 'node_modules'
-const PACKAGE_JSON = 'package.json'
 // The basic template lists exactly the build scripts kit's own dependency tree carries, which is
 // what installing kit alone needs approved.
 const KIT_BUILDS_TEMPLATE = 'templates/pnpm-workspace.basic.yaml'
@@ -46,10 +46,8 @@ function kit_build_flags(template: string): Array<string> {
 }
 
 function has_kit_dependency(project_root: string): boolean {
-	const manifest_path = path.join(project_root, PACKAGE_JSON)
-	if (!existsSync(manifest_path)) return false
-	const parsed: unknown = JSON.parse(readFileSync(manifest_path, 'utf8'))
-	const manifest = dependency_fields_schema.parse(parsed)
+	if (!existsSync(package_manifest.manifest_path(project_root))) return false
+	const manifest = package_manifest.read_manifest(project_root, dependency_fields_schema)
 	const names = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
 
 	return names.includes(KIT_PACKAGE_NAME)
@@ -78,7 +76,7 @@ function handoff_step(args: ReadonlyArray<string>): InstallStep {
 // pnpm walks up to the nearest `package.json`, so without one here it installs kit into whatever
 // project an ancestor directory holds and rewrites that project's files.
 function ensure_project_manifest(project_root: string): void {
-	const manifest_path = path.join(project_root, PACKAGE_JSON)
+	const manifest_path = package_manifest.manifest_path(project_root)
 
 	if (existsSync(manifest_path)) return
 

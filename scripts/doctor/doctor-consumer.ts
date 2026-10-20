@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { file_reader } from '#scripts/lib/read-file'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
@@ -37,11 +38,7 @@ const STATE_MISSING = 'missing'
 type ClaudeMdState = typeof STATE_OK | typeof STATE_TARGET_MISSING | typeof STATE_MISSING
 
 function parse_manifest(root: string): ManifestShape | undefined {
-	const content = file_reader.read_if_readable(path.join(root, 'package.json'))
-	if (content === undefined) return undefined
-	const parsed = manifest_schema.safeParse(json_value.parse_or_undefined(content))
-
-	return parsed.success ? parsed.data : undefined
+	return package_manifest.read_manifest_if_valid(root, manifest_schema)
 }
 
 function lists_kit_dependency(manifest: ManifestShape | undefined): boolean {

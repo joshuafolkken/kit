@@ -4,6 +4,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { comment_ranges, type TypeScriptApi } from './comment-ranges'
 import { review_stamps } from './review-stamps'
 
@@ -26,7 +27,6 @@ const SCRIPT_EXTENSIONS: ReadonlyArray<string> = ['.ts', '.js']
 const SVELTE_EXTENSION = '.svelte'
 const EXCLUDED_PREFIX = '.claude/'
 const TYPESCRIPT_MODULE = 'typescript'
-const PACKAGE_JSON = 'package.json'
 
 function is_svelte(relative: string): boolean {
 	return relative.endsWith(SVELTE_EXTENSION)
