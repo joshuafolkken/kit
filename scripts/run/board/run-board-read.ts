@@ -200,11 +200,12 @@ async function lane_room_of(
 // The repository's lane ledger, read once for the usual times and the driver's open hold.
 function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_held'> {
 	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
+	const now_ms = Date.now()
 
 	return {
-		usual: run_board_usual.usual_of(entries),
+		usual: run_board_usual.usual_of(entries, now_ms),
 		is_memory_held:
-			lane_held_stats.open_reason(entries, Date.now()) === backlog_drive_memory.HOLD_REASON,
+			lane_held_stats.open_reason(entries, now_ms) === backlog_drive_memory.HOLD_REASON,
 	}
 }
 

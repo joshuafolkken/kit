@@ -147,6 +147,21 @@ describe('run_board_layout.layout_of release kinds', () => {
 		])
 		expect(run_board_layout.local_layout_of(statuses).active[0]?.kind).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4319: the estimate starts nothing beside a running `run:solo` child.
+	it('marks an active row its labels carry run:solo on', () => {
+		const statuses = new Map<number, ItemStatus>([
+			[1, { state: 'running', started_ms: 100 }],
+			[2, { state: 'running', started_ms: 200 }],
+		])
+		const plan = { ...plan_of([]), labels: new Map([[1, ['run:solo']]]) }
+		const layout = run_board_layout.layout_of(plan, statuses)
+
+		expect(layout.active.map((row) => [row.number, row.is_solo])).toStrictEqual([
+			[1, true],
+			[2, undefined],
+		])
+	})
 })
 
 function issues_of(_child: EpicChild, waits: ReadonlyArray<string>): RowReason {

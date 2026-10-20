@@ -1,0 +1,7 @@
+{
+	"reason": "#4319 schedules waiting rows after the solo, blocker and path-holder ends they wait on, keeps a placed run:solo child alone on the lanes, and windows the usual-time medians with a fallback: a new scheduling module the estimate needs",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 78
+	}
+}
