@@ -9,7 +9,7 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: 'run by the pre-commit hook' }] },
 	},
 	'check-commit-message': {
-		script: 'scripts/hooks/check-commit-message.ts',
+		script: 'scripts/hooks/check-commit-message-main.ts',
 		description: 'Git hook: validate commit message',
 		category: 'Git hooks',
 		reference: ['[<message-file>]', 'automation', ['none']],

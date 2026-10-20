@@ -21,7 +21,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'batch:guard': {
-		script: 'scripts/hooks/batch-guard.ts',
+		script: 'scripts/hooks/batch-guard-main.ts',
 		description:
 			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
 		category: 'Development',

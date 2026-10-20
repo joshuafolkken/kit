@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { codex_usage } from './codex-usage'
@@ -20,7 +18,6 @@ import { transcript_cwd } from './transcript-cwd'
 // `backlogrun` / `halfrun` / `pre-gate-cut` ask, and the `josh time` run-timing report keeps the
 // hand-off aggregates used to compare the shared context-cut threshold.
 
-const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh cost (--cut | --over <tokens-per-request>) [--path <dir>]'
 // The read-only verdict's third answer, beside `cost_verdict`'s over/under: a session that cannot be
@@ -319,10 +316,6 @@ function run(
 	return run_over(target, context.over, context.provider, environment)
 }
 
-function main(argv: ReadonlyArray<string>): void {
-	process.exitCode = run(argv)
-}
-
 const cost_cli = {
 	UNMEASURABLE_VERDICT,
 	USAGE,
@@ -332,8 +325,6 @@ const cost_cli = {
 	session_figures,
 	session_verdict,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
 export type { CostVerdict, Options, SessionFigures }
 export { cost_cli }

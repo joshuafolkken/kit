@@ -170,7 +170,7 @@ describe('COMMAND_MAP — new dev commands', () => {
 	it('routes test:unit through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_UNIT_COMMAND)
 
-		expect(entry?.script).toBe('scripts/test/test-unit-guard.ts')
+		expect(entry?.script).toBe('scripts/test/test-unit-guard-main.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})

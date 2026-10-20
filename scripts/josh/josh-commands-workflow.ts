@@ -104,7 +104,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	notify: {
-		script: 'scripts/notify/telegram-test.ts',
+		script: 'scripts/notify/telegram-test-main.ts',
 		description: 'Send Telegram notification',
 		category: 'Workflow',
 		reference: [
@@ -184,7 +184,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// line per finding — or one zero-finding line for a clean round — to the observation ledger, so
 	// `observations:flush` commits them and the recurrence count survives the run.
 	'review:record': {
-		script: 'scripts/review/review-record-cli.ts',
+		script: 'scripts/review/review-record-main.ts',
 		description: 'Record a review round’s findings, or check a round was recorded',
 		category: 'Workflow',
 		reference: [
@@ -225,7 +225,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
 	// linked work tree it would hijack the default branch from every other one.
 	'main:sync': {
-		script: 'scripts/git/main-sync.ts',
+		script: 'scripts/git/main-sync-main.ts',
 		description:
 			'Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane)',
 		category: 'Workflow',
@@ -241,7 +241,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	// hooks — its regenerated catalog's commit runs them — which reserve themselves, and a weight here
 	// would set the held mark they inherit, folding the parallel hook tools into this one place.
 	'main:merge': {
-		script: 'scripts/git/main-merge.ts',
+		script: 'scripts/git/main-merge-main.ts',
 		description: 'Merge origin default branch into the current branch',
 		category: 'Workflow',
 		reference: ['', 'developer', ['git', 'network']],

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
@@ -32,7 +30,6 @@ import { main_merge_regenerate } from './main-merge-regenerate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const COMMAND_NAME = 'main:merge'
 const SPLIT_UNMEASURED =
 	'split notice: the diff could not be measured — run `pnpm josh split:assess`'
@@ -179,13 +176,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const main_merge = { merge, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { main_merge }
 export type { MergeOutcome }

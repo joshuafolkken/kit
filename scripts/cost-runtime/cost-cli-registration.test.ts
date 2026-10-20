@@ -9,6 +9,6 @@ describe('josh cost registration', () => {
 	it('is registered as a josh command', () => {
 		const { cost } = COMMAND_MAP
 
-		expect(cost?.script).toBe('scripts/cost-runtime/cost-cli.ts')
+		expect(cost?.script).toBe('scripts/cost-runtime/cost-main.ts')
 	})
 })

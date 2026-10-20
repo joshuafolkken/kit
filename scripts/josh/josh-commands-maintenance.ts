@@ -68,7 +68,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	audit: {
-		script: 'scripts/security/security-audit.ts',
+		script: 'scripts/security/security-audit-main.ts',
 		description: 'Run security audit',
 		category: 'Maintenance',
 		reference: ['', 'developer', ['processes']],
@@ -86,7 +86,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'audit:provision': {
-		script: 'scripts/security/security-audit-provision.ts',
+		script: 'scripts/security/security-audit-provision-main.ts',
 		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',
 		category: 'Maintenance',
 		reference: ['', 'automation', ['files', 'network']],

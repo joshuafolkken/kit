@@ -12,7 +12,7 @@ import { epic_next } from './epic-next'
 // seconds for the whole life of a run (`josh-environment-file.ts` records the measurement). Inside the
 // guard, so a developer's own `.env` cannot decide what the unit tests see.
 //
-// `process.exitCode` rather than `process.exit()`, for the reason `scripts/cost-runtime/cost-cli.ts`
+// `process.exitCode` rather than `process.exit()`, for the reason `scripts/cost-runtime/cost-main.ts`
 // records: the answer goes to standard output and a write to a pipe is asynchronous on macOS, so
 // exiting can tear the process down before it drains. This command's contract is
 // `answer=$(pnpm josh epic:next <E>)`, which is exactly that pipe.
