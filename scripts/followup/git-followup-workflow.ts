@@ -9,6 +9,7 @@ import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
+import { removed_tests_check } from '#scripts/review/removed-tests-check'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_record } from '#scripts/review/review-record'
 import { parse_issue_number_from_text } from './followup-issue-number'
@@ -210,6 +211,20 @@ async function assert_acceptance_mapped(
 	if (refusal !== undefined) throw new Error(refusal)
 }
 
+// Every test the change removes is disposed of in the pull request body — `removed_tests` carries the
+// why. It reads this checkout's diff, which `assert_live_evidence` has already refused to read for a
+// branch other than the one checked out.
+async function assert_removed_tests_disposed(
+	should_merge: boolean,
+	branch_name: string,
+): Promise<void> {
+	if (!should_merge) return
+
+	const refusal = await removed_tests_check.refusal(branch_name)
+
+	if (refusal !== undefined) throw new Error(refusal)
+}
+
 // Every pre-merge refusal, in order — each one throws, so nothing merges past the first that fails.
 async function assert_merge_gates(
 	should_merge: boolean,
@@ -220,6 +235,7 @@ async function assert_merge_gates(
 	await assert_review_recorded(should_merge, issue_number)
 	await assert_live_evidence(should_merge, branch_name)
 	await assert_acceptance_mapped(should_merge, issue_number, branch_name)
+	await assert_removed_tests_disposed(should_merge, branch_name)
 }
 
 // After the gates, before the CI wait: a line appended since the run's commit rides the pull request
@@ -280,6 +296,7 @@ try {
 const git_followup_workflow = {
 	assert_acceptance_mapped,
 	assert_live_evidence,
+	assert_removed_tests_disposed,
 	assert_review_attested,
 	assert_review_recorded,
 	parse_issue_number_from_text,

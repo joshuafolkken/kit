@@ -118,6 +118,6 @@ function comment_only(
 	)
 }
 
-const review_code_tree = { comment_only, read, record, tree_of }
+const review_code_tree = { comment_only, load_typescript, read, record, tree_of }
 
 export { review_code_tree }
