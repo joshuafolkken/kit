@@ -8,7 +8,7 @@ import type { TopReadings } from './run-board-usage-top'
 // joshuafolkken/kit#3489: how the board reads each process and its lane — `ps` every second, the
 // working directory only for a process not seen before, and nothing where the platform has no way to it.
 
-const { lane_of, parse_lsof, sample, usage_reader } = run_board_usage_read
+const { lane_of, sample, usage_reader } = run_board_usage_read
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/3423`
@@ -22,19 +22,6 @@ const NO_TABLE = vi.fn(async () => undefined)
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-describe('run_board_usage_read.parse_lsof', () => {
-	it('reads each process’s working directory from lsof’s fields', () => {
-		const output = ['p12', 'fcwd', `n${LANE}/packages/app`, 'p13', 'fcwd', 'n/tmp'].join('\n')
-
-		expect(parse_lsof(output)).toStrictEqual(
-			new Map([
-				[12, `${LANE}/packages/app`],
-				[13, '/tmp'],
-			]),
-		)
-	})
 })
 
 describe('run_board_usage_read.lane_of', () => {

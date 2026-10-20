@@ -34,6 +34,10 @@ vi.mock('./lane-reap', () => ({
 	lane_reap: { reap_child: vi.fn() },
 }))
 
+vi.mock('./lane-residents', () => ({
+	lane_residents: { end_residents: vi.fn(() => []) },
+}))
+
 // Nothing is spent unless a test says so: a live lane is kept, as it was before spent lanes were swept.
 vi.mock('./lane-spent', () => ({
 	lane_spent: { sort_lanes: vi.fn(async () => ({ spent: [], kept: [] })) },
@@ -47,6 +51,7 @@ const { lane_state } = await import('./lane-state')
 const { lane_spent } = await import('./lane-spent')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_reap } = await import('./lane-reap')
+const { lane_residents } = await import('./lane-residents')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
@@ -174,6 +179,29 @@ describe('ending the lane child with its lane', () => {
 			directory: lane.directory,
 		})
 		expect(outcome.reaped).toStrictEqual([hung_child])
+	})
+
+	// joshuafolkken/kit#4304: a process started from the checkout and re-parented to pid 1 outlived the
+	// merged lane — no tree reaches it, so its working directory is what finds it.
+	it('ends what still runs from the checkout before removing it, sparing what the reap ended', async () => {
+		const lane = open_on_disk(ISSUE, SEED)
+		const hung_child = 48_848
+		const detached = [66_330, 79_739]
+
+		lanes_are([lane])
+		vi.mocked(lane_reap.reap_child).mockReturnValue([hung_child])
+		vi.mocked(lane_residents.end_residents).mockImplementationOnce(() => {
+			expect(existsSync(lane.directory)).toBe(true)
+
+			return detached
+		})
+
+		const outcome = await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_residents.end_residents)).toHaveBeenCalledWith(lane.directory, [
+			hung_child,
+		])
+		expect(outcome.residents).toStrictEqual(detached)
 	})
 })
 

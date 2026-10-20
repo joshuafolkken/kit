@@ -35,7 +35,13 @@ const LANE: LaneInfo = {
 	is_stranded: false,
 }
 
-const CLOSED_LANE: CloseOutcome = { issue: ISSUE, kind: 'closed', left_behind: [], reaped: [] }
+const CLOSED_LANE: CloseOutcome = {
+	issue: ISSUE,
+	kind: 'closed',
+	left_behind: [],
+	reaped: [],
+	residents: [],
+}
 
 function state_read(state: string): StateRead {
 	return { kind: 'state', state: { state, labels: [], is_human_review: false } }
@@ -103,6 +109,7 @@ describe('lane_withdraw.withdraw — the order of the steps', () => {
 			is_closed: true,
 			had_closed: false,
 			lane: 'closed',
+			residents: [],
 		})
 	})
 
@@ -147,6 +154,25 @@ describe('lane_withdraw.withdraw — the work and the child', () => {
 		expect(close_not_planned).not.toHaveBeenCalled()
 		expect(close_lane).toHaveBeenCalledWith(ISSUE)
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('already closed')
+	})
+})
+
+// joshuafolkken/kit#4304: a withdrawal closes the lane, so it says what the close ended from the checkout.
+describe('lane_withdraw.withdraw — processes still running from the checkout', () => {
+	it('names the processes the close ended', async () => {
+		close_lane.mockResolvedValue({ ...CLOSED_LANE, residents: [PID] })
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain(
+			`Terminated 1 process(es) still running from the lane checkout`,
+		)
+	})
+
+	it('says a reading that failed rather than reading it as none', async () => {
+		close_lane.mockResolvedValue({ ...CLOSED_LANE, residents: undefined })
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('lsof failed')
 	})
 })
 

@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # `ps -o pgid=`, the process group `lane:close` spares when it ends a lane's leftovers (#4304).
+  - pgid
   # `git rm --ignore-unmatch`, with which a release prunes the merged metrics approvals (#4187).
   - unmatch
   # `top`'s compressed-memory column and its size units, read for `run:board`'s usage columns (#4171).

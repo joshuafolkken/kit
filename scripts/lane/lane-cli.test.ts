@@ -75,6 +75,7 @@ function closes_as(kind: CloseKind, left_behind: ReadonlyArray<string> = []): vo
 		kind,
 		left_behind: [...left_behind],
 		reaped: [],
+		residents: [],
 	})
 }
 

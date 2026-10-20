@@ -25,6 +25,7 @@ function withdrawn(is_closed: boolean): WithdrawOutcome {
 		is_closed,
 		had_closed: false,
 		lane: 'closed',
+		residents: [],
 	}
 }
 
