@@ -125,6 +125,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
+        id: setup-node
         uses: ./.github/actions/setup-node
 
       - name: Configure GitHub Packages authentication for existing projects
@@ -144,11 +145,14 @@ jobs:
           # save nothing back under the key it already hit — a cold lint on every later run.
           # joshuafolkken/kit#2054: the commit sha makes each run save its warmed cache under a fresh
           # key, while the sha-less prefix restores the newest entry from an earlier run.
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
+          # joshuafolkken/kit#4346: ESLint hashes `process.version` into every entry, and runner
+          # images carry different Node.js patch releases for `'24'`, so a restore across two of them
+          # lints cold. The resolved version leads every key: each release keeps its own lineage.
+          key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
-            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-eslint-cache-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-
 
       - name: Setup cspell cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
