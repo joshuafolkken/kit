@@ -79,10 +79,10 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 //
 // **The two zero weights are measured, and they stay zero.** These are warm runs on the 11-core
 // machine. `behavior` took 0.6s of wall for 0.7s of CPU, which
-// is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Floored,
-// that would be one core, but a reservation lasts the whole gate's plan, not the check's five seconds.
-// It would lower `RESERVED_CORES` from 4 to 5 and cut the solo unit cap from 7 workers to 6 for the
-// full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
+// is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Rounded
+// up, that would be two cores, but a reservation lasts the whole gate's plan, not the check's five
+// seconds. It would raise `RESERVED_CORES` from 6 to 8 and cut the solo unit cap from 5 workers to 3
+// for the full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
 // that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// **The lint reads the branch's changed files, not the whole tree** (joshuafolkken/kit#4085), and
@@ -166,7 +166,7 @@ function has_unit_check(checks: ReadonlyArray<GateCheck>): boolean {
 	return checks.some((check) => check.label === UNIT_LABEL)
 }
 
-// What the non-elastic checks hold between them: 2 + 1 + 1. Reduced over `STATIC_CHECKS`
+// What the non-elastic checks hold between them: 2 + 2 + 2. Reduced over `STATIC_CHECKS`
 // rather than over every check, because that is the set the sentence above names: `resolve_unit_worker_cap`
 // spends this as the cores the unit suite must leave to its siblings, so summing the unit check into
 // it would have the suite subtract its own reservation from its own budget the day that reservation
@@ -233,7 +233,7 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 
 // Admit checks in declaration order while the running set's reserved cores still fit **this run's
 // share** of the machine. On a machine running one gate that share is the machine, so this bites
-// only below four cores — the three reserving checks want four between them — and there it is the
+// only below six cores — the three reserving checks want six between them — and there it is the
 // difference between two checks sharing a core and four fighting over it.
 //
 // **Under concurrency it is the only lever there is, and that is a measurement rather than a
@@ -323,8 +323,8 @@ function solo_unit_weight(available_cores: number): number {
 // once**: no second set of weights is introduced, so a change to the measured reservation moves the
 // admission with it.
 //
-// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 1 + 1) +
-// unit_cap(cores - 4)` is `cores` — which is what lets every check of a lone gate on a machine with room
+// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 2 + 2) +
+// unit_cap(cores - 6)` is `cores` — which is what lets every check of a lone gate on a machine with room
 // (its busy cores within what the ledger holds, `core-budget.ts`) be admitted at once,
 // its concurrency unchanged. A machine below the measured one leaves the unit suite uncapped and reads
 // its weight from the same identity, `cores - RESERVED_CORES` clamped at zero, so the sum is the core
@@ -354,18 +354,21 @@ function check_memory(check: GateCheck, plan: GatePlan, available_cores: number)
 // and hold every later claim behind it. One weight for the suite however it is started. **Floored at one
 // worker**: on a machine the static checks fill, a four-core CI runner among them, the gate's solo
 // weight is zero because its siblings hold every core — a direct run has no siblings, and vitest still
-// occupies a core.
+// occupies a core. **Plus vitest's own process** (joshuafolkken/kit#4362): the workers are the share,
+// and the claim holds the process that drives them on top (`unit_worker_share.cap_to_claim` takes it
+// back off).
 function direct_unit_weight(
 	available_cores: number = availableParallelism(),
 	live_runs: number = unit_worker_share.live_run_count(),
 ): number {
-	const weight =
+	const workers =
 		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
 
-	return Math.max(unit_worker_share.MIN_WORKERS, weight)
+	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
 }
 
-// What a unit run started directly holds: one worker's peak for each worker `direct_unit_weight` gives it.
+// What a unit run started directly holds: one worker's peak for each core `direct_unit_weight` gives
+// it, vitest's own process counted as one more.
 function direct_unit_memory(): number {
 	return unit_memory(direct_unit_weight())
 }

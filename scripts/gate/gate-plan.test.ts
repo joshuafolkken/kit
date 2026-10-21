@@ -1,4 +1,5 @@
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { describe, expect, it } from 'vitest'
 import { core_budget } from './core-budget'
 import { gate_plan, type GateCheck } from './gate-plan'
@@ -18,6 +19,8 @@ function unit_check(): GateCheck {
 const { MEASURED_CORES } = gate_plan
 // GitHub-hosted `ubuntu-latest`, which is what `.github/workflows/ci.yml` runs `josh gate` on.
 const CI_CORES = 4
+// Lint, the type check and the spell check at two cores each, their measurements rounded up.
+const MEASURED_RESERVED_CORES = 6
 // The band a fixed four-core reservation would hurt most: half an eight-core machine, against a
 // third of the measured one.
 const MID_SIZED_CORES = 8
@@ -30,6 +33,8 @@ const LANE_COUNT = 6
 // Two lanes still leave every check a core of the measured machine, so this is the boundary the
 // narrowing must not cross: the point where sharing is real and the fan-out is still affordable.
 const PAIRED_LANES = 2
+// Half the measured machine, five cores, fits lint and the type check at two cores each.
+const PAIRED_WIDTH = 2
 // More lanes than the machine has cores, which is the arithmetic `MIN_SHARED_CORES` exists for.
 const OVERSUBSCRIBED_LANES = 99
 
@@ -38,18 +43,20 @@ describe('gate_plan.resolve_concurrency', () => {
 		expect(gate_plan.resolve_concurrency(MEASURED_CORES)).toBe(gate_plan.GATE_CHECKS.length)
 	})
 
-	// The three reserving checks want four cores between them, so a four-core runner is the smallest
-	// machine that still fans out to all four. CI sits exactly here, which is what makes this change
-	// a no-op there.
-	it('still runs every check at once on a four-core runner', () => {
-		expect(gate_plan.resolve_concurrency(CI_CORES)).toBe(gate_plan.GATE_CHECKS.length)
+	// The three reserving checks want six cores between them (joshuafolkken/kit#4362), so that is the
+	// smallest machine that still fans out to every check.
+	it('runs every check at once on a machine with the reserved cores', () => {
+		expect(gate_plan.resolve_concurrency(gate_plan.RESERVED_CORES)).toBe(
+			gate_plan.GATE_CHECKS.length,
+		)
 	})
 
 	// Below that the checks queue instead of fighting: this is the half of the plan that keeps a
-	// small machine working rather than thrashing.
+	// small machine working rather than thrashing. CI's four-core runner is in this band.
 	it.each([
-		[3, 2],
-		[2, 1],
+		[5, 2],
+		[CI_CORES, 2],
+		[3, 1],
 		[1, 1],
 	])('admits %i cores worth of checks as %i at a time', (available, expected) => {
 		expect(gate_plan.resolve_concurrency(available)).toBe(expected)
@@ -81,12 +88,13 @@ describe('gate_plan.resolve_concurrency under concurrency', () => {
 		expect(gate_plan.resolve_concurrency(MEASURED_CORES, LANE_COUNT)).toBe(1)
 	})
 
-	// The narrowing is proportional rather than a switch: two lanes still fit every check, so a pair
-	// of gates keeps the fan-out that was measured faster than running them back to back.
-	it('leaves a pair of lanes the whole fan-out', () => {
-		expect(gate_plan.resolve_concurrency(MEASURED_CORES, PAIRED_LANES)).toBe(
-			gate_plan.GATE_CHECKS.length,
-		)
+	// The narrowing is proportional rather than a switch: two lanes each keep the reserving checks
+	// their half of the machine fits, between the solo fan-out and six lanes' one at a time.
+	it('leaves a pair of lanes the checks half the machine fits', () => {
+		const width = gate_plan.resolve_concurrency(MEASURED_CORES, PAIRED_LANES)
+
+		expect(width).toBe(PAIRED_WIDTH)
+		expect(width).toBeLessThan(gate_plan.resolve_concurrency(MEASURED_CORES))
 	})
 
 	// The property the whole change rests on: at one run the division is `cores / 1`, so a solo gate
@@ -182,7 +190,7 @@ describe('gate_plan.GATE_CHECKS', () => {
 	})
 
 	it('reserves what the other three were measured to hold', () => {
-		expect(gate_plan.RESERVED_CORES).toBe(4)
+		expect(gate_plan.RESERVED_CORES).toBe(MEASURED_RESERVED_CORES)
 	})
 })
 
@@ -251,12 +259,12 @@ describe('gate_plan.check_memory — the memory a check holds', () => {
 // until the ledger emptied and every later claim from other lanes queued behind it.
 describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves', () => {
 	it.each([MEASURED_CORES, MID_SIZED_CORES])(
-		'weighs a lone run on %i cores as the gate weighs its own unit step',
+		'weighs a lone run on %i cores as the gate weighs its workers, plus vitest itself',
 		(cores) => {
 			const plan = gate_plan.resolve_gate_plan(cores)
 
 			expect(gate_plan.direct_unit_weight(cores, 0)).toBe(
-				gate_plan.check_weight(unit_check(), plan, cores),
+				gate_plan.check_weight(unit_check(), plan, cores) + unit_worker_share.MAIN_PROCESS_CORES,
 			)
 		},
 	)
@@ -265,8 +273,11 @@ describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves'
 		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBeLessThan(MEASURED_CORES)
 	})
 
-	it('claims at least one core on a runner the static checks fill', () => {
-		expect(gate_plan.direct_unit_weight(CI_CORES, 0)).toBe(1)
+	// joshuafolkken/kit#4362: the claim held the workers alone, not the vitest process driving them.
+	it('claims one worker and vitest itself on a runner the static checks fill', () => {
+		expect(gate_plan.direct_unit_weight(CI_CORES, 0)).toBe(
+			unit_worker_share.MIN_WORKERS + unit_worker_share.MAIN_PROCESS_CORES,
+		)
 	})
 })
 
@@ -275,7 +286,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 8 of 8 checks at once, test:unit at 7 workers (11 cores)',
+			'plan: 8 of 8 checks at once, test:unit at 5 workers (11 cores)',
 		)
 	})
 
@@ -346,10 +357,10 @@ describe('gate_plan without the unit suite', () => {
 		expect(gate_plan.GATE_CHECKS.slice(0, -1)).toEqual(gate_plan.STATIC_CHECKS)
 	})
 
-	it('runs all three at once on the four-core runner CI gives it', () => {
+	it('runs the static checks two at a time on the four-core runner CI gives it', () => {
 		const plan = gate_plan.resolve_gate_plan(CI_CORES, 1, false)
 
-		expect(plan.concurrency).toBe(gate_plan.STATIC_CHECKS.length)
+		expect(plan.concurrency).toBe(PAIRED_WIDTH)
 		expect(plan.checks).toEqual(gate_plan.STATIC_CHECKS)
 	})
 

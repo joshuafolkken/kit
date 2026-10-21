@@ -38,6 +38,9 @@ const WORKER_FLAG = '--maxWorkers'
 const WORKER_FLAGS: ReadonlyArray<string> = [WORKER_FLAG, '--max-workers']
 // Never below one: a share of zero would run no test at all and report the suite green.
 const MIN_WORKERS = 1
+// The core vitest's own process — the pool, the reporter and Vite's transforms — keeps busy beside its
+// workers (joshuafolkken/kit#4362). A direct run's claim holds it above its worker count.
+const MAIN_PROCESS_CORES = 1
 // One run in flight is this run alone, which is the case that changes nothing.
 const SOLO_RUNS = 1
 
@@ -180,11 +183,12 @@ interface UnitClaim {
 // read after admission, when fewer runs may be in flight than when the weight was sized, and a share
 // wider than the claim puts workers on the machine the ledger does not hold. The claim bounds a solo
 // share too: vitest's own choice is one worker per core but one, wider than any weight the ledger
-// reserves for a unit run, so leaving it in place would open workers no claim holds.
+// reserves for a unit run, so leaving it in place would open workers no claim holds. The claim holds
+// vitest's own process as well, so its workers are the claim less that core.
 function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): number | undefined {
 	if (claim === undefined) return share
 
-	const bound = claim.granted ?? claim.weight
+	const bound = Math.max(MIN_WORKERS, (claim.granted ?? claim.weight) - MAIN_PROCESS_CORES)
 
 	return Math.min(share ?? bound, bound)
 }
@@ -265,6 +269,7 @@ async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
 }
 
 const unit_worker_share = {
+	MAIN_PROCESS_CORES,
 	MIN_WORKERS,
 	NESTED_KEY,
 	NESTED_VALUE,

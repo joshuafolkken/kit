@@ -55,6 +55,9 @@ const check_schema = z.object({
 	elapsed_ms: z.number(),
 	is_passed: z.boolean(),
 	is_reused: z.boolean().optional(),
+	// The CPU milliseconds the check's process tree spent, so a core weight can be re-measured from
+	// the ledger (joshuafolkken/kit#4362). Absent where the gate could not read it (off macOS).
+	cpu_ms: z.number().optional(),
 	// Why the unit leg ran the whole suite instead of the related tests — a stable kind, never the
 	// file it names (joshuafolkken/kit#4397). Absent when it narrowed, and on every other check.
 	fallback: z.string().optional(),

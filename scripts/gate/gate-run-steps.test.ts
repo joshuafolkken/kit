@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { check_cpu } from './check-cpu'
 import { core_budget } from './core-budget'
 import { gate_plan } from './gate-plan'
 import { UNIT_WORKER_FLAG } from './gate-steps'
@@ -77,5 +78,27 @@ describe('run_gate_steps — a unit claim admitted narrowed', () => {
 		expect(marks).toContainEqual([`gate ${gate_plan.UNIT_LABEL}`, true])
 		expect(marks.filter(([, is_unit]) => is_unit === true)).toHaveLength(1)
 		expect(unit_args).toContain(`${UNIT_WORKER_FLAG}=${String(GRANTED)}`)
+	})
+})
+
+// joshuafolkken/kit#4362: the gate ledger records each check's CPU from what the run returns.
+describe('run_gate_steps — each check CPU', () => {
+	const CHECK_CPU_MS = 1234
+
+	beforeEach(() => {
+		vi.restoreAllMocks()
+		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
+	})
+
+	it('returns the CPU each check that ran spent, and none for a reused one', async () => {
+		vi.spyOn(check_cpu, 'check_cpu_reader').mockReturnValue(() => CHECK_CPU_MS)
+		const reused = new Map([[gate_plan.LINT_LABEL, TAKEN_AT]])
+
+		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET, reused)
+		const ran = results.filter((result) => result.label !== gate_plan.LINT_LABEL)
+		const lint = results.find((result) => result.label === gate_plan.LINT_LABEL)
+
+		expect(ran.map((result) => result.cpu_ms)).toStrictEqual(ran.map(() => CHECK_CPU_MS))
+		expect(lint?.cpu_ms).toBeUndefined()
 	})
 })
