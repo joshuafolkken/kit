@@ -24,6 +24,7 @@ import {
 	type LoopPorts,
 	type OfferRead,
 } from './backlog-drive'
+import { backlog_drive_adopt } from './backlog-drive-adopt'
 import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_carried } from './backlog-drive-carried'
 import { backlog_drive_finish } from './backlog-drive-finish'
@@ -136,7 +137,7 @@ async function merge(issue: string, owner: string): Promise<MergeResult> {
 // a restart after it ended — is read as having appeared, so it is collected after the re-confirm window
 // rather than waited on until the never-appeared timeout. One that never appeared is collected too:
 // `run:merge` reads its state rather than this loop guessing.
-function finished_checker(seeded: ReadonlyArray<string>): (issue: string) => boolean {
+function finished_checker(seeded: ReadonlySet<string>): (issue: string) => boolean {
 	const states = new Map<string, AwaitState>()
 	const config = {
 		is_running: lane_await.is_process_running_default,
@@ -146,7 +147,7 @@ function finished_checker(seeded: ReadonlyArray<string>): (issue: string) => boo
 
 	return (issue: string): boolean => {
 		const state = states.get(issue) ?? {
-			appeared: seeded.includes(issue),
+			appeared: seeded.has(issue),
 			disappeared_at: undefined,
 			first_polled_at: undefined,
 		}
@@ -208,6 +209,27 @@ function room_ports(): Pick<LoopPorts, 'free_lanes' | 'has_lane' | 'limit_room' 
 	}
 }
 
+// The children's ports. An adopted lane was dispatched like a seeded one, so a child already gone is
+// collected rather than waited on until the never-appeared timeout.
+function child_ports(
+	seeded: ReadonlyArray<string>,
+	owner: string,
+): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
+	const known = new Set(seeded)
+
+	return {
+		is_finished: finished_checker(known),
+		merge: async (issue) => await merge(issue, owner),
+		adoptable: async (in_flight) => {
+			const adopting = await backlog_drive_adopt.adoptable(in_flight)
+
+			for (const issue of adopting) known.add(issue)
+
+			return adopting
+		},
+	}
+}
+
 function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
@@ -215,8 +237,7 @@ function ports_of(
 	holds: HoldRecorder,
 ): LoopPorts {
 	return {
-		is_finished: finished_checker(seeded),
-		merge: async (issue) => await merge(issue, context.owner),
+		...child_ports(seeded, context.owner),
 		offer: async (state) => await read_offer(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		...room_ports(),

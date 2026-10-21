@@ -71,6 +71,7 @@ function merge(world_state: World, issue: string): void {
 function ports(world_state: World): LoopPorts {
 	return {
 		is_finished: () => true,
+		adoptable: async () => [],
 		merge: async (issue) => {
 			merge(world_state, issue)
 

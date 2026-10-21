@@ -20,8 +20,10 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
+import { backlog_drive_adopt } from './backlog-drive-adopt'
 import { backlog_drive_hold } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
+import { backlog_drive_judge } from './backlog-drive-judge'
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_seats } from './backlog-drive-seats'
@@ -97,6 +99,9 @@ interface DrivePorts {
 	is_finished: (issue: string) => boolean
 	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
 	merge: (issue: string) => Promise<Collected>
+	// The lanes on a child this run launched and never settled that the loop does not hold — one the
+	// parent dispatched itself with `lane:launch` (`backlog_drive_adopt.adoptable` in production).
+	adoptable: (in_flight: ReadonlyArray<string>) => Promise<ReadonlyArray<string>>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
 	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
@@ -319,18 +324,6 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	return { kind: 'continue', state }
 }
 
-// **A free lane with nothing opted in is the open backlog's turn to be judged**
-// (joshuafolkken/kit#3854): a watch over an exhausted pool hands back `judge` while an open issue
-// lacking `auto-ok` still owes a judgement, ahead of the drain it would otherwise be. Once every one
-// carries its judgement comment the count is zero and the watch is the driver's again.
-async function is_judgement_owed(read: OfferRead, ports: DrivePorts): Promise<boolean> {
-	const is_exhausted = read.verdict === WATCH_VERDICT && read.answer === EXHAUSTED_ANSWER
-
-	if (!is_exhausted || (await ports.free_lanes()) <= NO_FREE_LANES) return false
-
-	return (await ports.judgement_owed()) > 0
-}
-
 // An offer answered `run`: launched while the machine has memory to spare, held until it does otherwise.
 async function run_offered(
 	issues: ReadonlyArray<string>,
@@ -351,7 +344,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	const next = { ...state, retries: read.retries, is_memory_held: false }
 
 	if (read.verdict === RUN_VERDICT) return await run_offered(read.issues, next, ports)
-	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
+	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
 	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
 	const result = await backlog_drive_paused.noticed(idle, read, ports)
@@ -382,10 +375,11 @@ async function run_pass(
 	should_offer: boolean,
 	ports: DrivePorts,
 ): Promise<PassResult> {
-	const collected = await collect_finished(state, ports)
+	const held = await backlog_drive_adopt.held(state, should_offer, ports)
+	const collected = await collect_finished(held, ports)
 
 	if (collected.kind === 'end') return collected
-	if (!is_offering(state, collected.state, should_offer)) return settle(collected)
+	if (!is_offering(held, collected.state, should_offer)) return settle(collected)
 
 	return settle(await ask_offer(collected.state, ports))
 }
