@@ -11,8 +11,9 @@ import { lane_state } from './lane-state'
 
 // `josh lane:pause <issue> | --all` and `josh lane:resume <issue> | --all` — one script told apart by
 // the verb the registry passes first. A named lane with no child process to signal exits non-zero, so a
-// caller never takes a pause that stopped nothing as done. A lane whose processes were signalled has
-// the change written to its state record and to the run's event stream, so who halted it is on record.
+// caller never takes a pause that stopped nothing as done — a detached resident signalled alone counts
+// as nothing. A lane whose child was signalled has the change written to its state record and to the
+// run's event stream, so who halted it is on record.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -46,10 +47,15 @@ async function lanes_of(target: ReadonlyArray<string>): Promise<Array<LaneProces
 
 function outcome_of(verb: Verb, result: LaneSignalled): string {
 	const { done } = VERBS[verb]
+	const count = String(result.signalled.length)
 
 	if (result.signalled.length === 0) return `no child process running — nothing ${done}`
 
-	return `${done} ${String(result.signalled.length)} process(es)`
+	if (result.child.length === 0) {
+		return `no child process running — ${done} ${count} detached process(es), state unchanged`
+	}
+
+	return `${done} ${count} process(es)`
 }
 
 // One line per lane: how many of its processes were signalled.
@@ -71,9 +77,9 @@ async function settle(verb: Verb, lane: LaneProcesses): Promise<number> {
 	const result = lane_pause[VERBS[verb].act](lane)
 
 	report(verb, lane.issue, result)
-	if (result.signalled.length > 0) await record(verb, lane.issue)
+	if (result.child.length > 0) await record(verb, lane.issue)
 
-	return result.signalled.length
+	return result.child.length
 }
 
 async function apply(

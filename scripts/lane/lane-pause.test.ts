@@ -64,7 +64,10 @@ describe('lane_pause.pause_lane — the tree', () => {
 		const signalled: Array<Signalled> = []
 		const probes = probes_over({ matching: [CHILD], children: { [CHILD]: [SHELL] } }, signalled)
 
-		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [CHILD, SHELL] })
+		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({
+			signalled: [CHILD, SHELL],
+			child: [CHILD, SHELL],
+		})
 		expect(signalled).toStrictEqual([
 			{ pid: CHILD, name: 'SIGSTOP' },
 			{ pid: SHELL, name: 'SIGSTOP' },
@@ -87,7 +90,7 @@ describe('lane_pause.pause_lane — the tree', () => {
 	it('answers the empty list when the lane has no child running', () => {
 		const probes = probes_over({ matching: [], children: {} }, [])
 
-		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [] })
+		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [], child: [] })
 	})
 })
 
@@ -101,6 +104,7 @@ describe('lane_pause — the lane’s residents', () => {
 
 		expect(lane_pause.pause_lane(TARGET, probes_over(tree, signalled))).toStrictEqual({
 			signalled: [CHILD, RESIDENT],
+			child: [CHILD],
 		})
 		expect(signalled.every(({ name }) => name === 'SIGSTOP')).toBe(true)
 	})
@@ -110,6 +114,16 @@ describe('lane_pause — the lane’s residents', () => {
 
 		expect(lane_pause.resume_lane(TARGET, probes_over(tree, []))).toStrictEqual({
 			signalled: [RESIDENT],
+			child: [],
+		})
+	})
+
+	it('names no child when only a resident outlived it', () => {
+		const tree: FakeTree = { matching: [], children: {}, residents: [RESIDENT] }
+
+		expect(lane_pause.pause_lane(TARGET, probes_over(tree, []))).toStrictEqual({
+			signalled: [RESIDENT],
+			child: [],
 		})
 	})
 })
@@ -155,7 +169,7 @@ describe('lane_pause.resume_lane', () => {
 		const tree = { matching: [OWN_PARENT, CHILD], children: { [CHILD]: [SHELL] } }
 		const resumed = lane_pause.resume_lane(TARGET, probes_over(tree, signalled))
 
-		expect(resumed).toStrictEqual({ signalled: [CHILD, SHELL] })
+		expect(resumed).toStrictEqual({ signalled: [CHILD, SHELL], child: [CHILD, SHELL] })
 		expect(signalled.every(({ name }) => name === 'SIGCONT')).toBe(true)
 	})
 })

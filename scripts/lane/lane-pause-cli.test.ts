@@ -15,8 +15,9 @@ const LANE = { issue: ISSUE, directory: '/w/.kit-lanes/4198' }
 const OTHER_LANE = { issue: OTHER, directory: '/w/.kit-lanes/4197' }
 const SUCCESS = 0
 const FAILURE = 1
-const TREE = { signalled: [101, 102] }
-const NOTHING = { signalled: [] }
+const TREE = { signalled: [101, 102], child: [101, 102] }
+const NOTHING = { signalled: [], child: [] }
+const RESIDENT_ONLY = { signalled: [103], child: [] }
 const USAGE = [
 	'Usage: josh lane:pause <issue-number> | josh lane:pause --all',
 	'       josh lane:resume <issue-number> | josh lane:resume --all',
@@ -61,6 +62,19 @@ describe('lane_pause_cli.run — one lane', () => {
 
 		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('lane:pause #4198: no child process running — nothing paused')
+	})
+
+	// joshuafolkken/kit#4300: a detached resident (`eslint_d`) outlives the child, so signalling it alone
+	// pauses no lane.
+	it('exits non-zero and records nothing when only a detached resident was signalled', async () => {
+		pause_lane.mockReturnValue(RESIDENT_ONLY)
+
+		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(FAILURE)
+		expect(info).toHaveBeenCalledWith(
+			'lane:pause #4198: no child process running — paused 1 detached process(es), state unchanged',
+		)
+		expect(record_change).not.toHaveBeenCalled()
+		expect(emit).not.toHaveBeenCalled()
 	})
 })
 

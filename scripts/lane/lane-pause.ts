@@ -32,9 +32,18 @@ interface PauseProbes extends ReapProbes {
 	residents: (lane: LaneProcesses) => ReadonlyArray<number>
 }
 
-// What a pause or a resume reached: the lane's processes signalled.
+// What a pause or a resume reached: the lane's processes signalled, and those of them in the child's
+// tree. Only `child` says the lane is running — a resident outlives the child it served (`eslint_d`
+// idles on), so signalling it alone pauses no lane.
 interface LaneSignalled {
 	signalled: Array<number>
+	child: Array<number>
+}
+
+// One read of the lane: the child's tree, and the tree with what runs from the lane outside it.
+interface LaneRead {
+	tree: Array<number>
+	all: Array<number>
 }
 
 function signal(pid: number, name: LaneSignal): boolean {
@@ -54,19 +63,29 @@ const SYSTEM_PROBES: PauseProbes = {
 }
 
 // The lane child's tree and what runs from the lane outside it, each once.
-function lane_processes(lane: LaneProcesses, probes: PauseProbes): Array<number> {
-	return [...new Set([...lane_reap.lane_tree(lane.issue, probes), ...probes.residents(lane)])]
+function lane_processes(lane: LaneProcesses, probes: PauseProbes): LaneRead {
+	const tree = lane_reap.lane_tree(lane.issue, probes)
+
+	return { tree, all: [...new Set([...tree, ...probes.residents(lane)])] }
+}
+
+function signalled_of(signalled: Array<number>, tree: ReadonlySet<number>): LaneSignalled {
+	return { signalled, child: signalled.filter((pid) => tree.has(pid)) }
 }
 
 // Every pid read is `seen`, so a process the signal could not reach is not retried each round; only the
-// ones the signal reached are `stopped`.
+// ones the signal reached are `stopped`. Every tree pid read is `tree`.
 interface PauseProgress {
 	seen: Set<number>
+	tree: Set<number>
 	stopped: Array<number>
 }
 
 function stop_unseen(lane: LaneProcesses, progress: PauseProgress, probes: PauseProbes): number {
-	const unseen = lane_processes(lane, probes).filter((pid) => !progress.seen.has(pid))
+	const read = lane_processes(lane, probes)
+	const unseen = read.all.filter((pid) => !progress.seen.has(pid))
+
+	for (const pid of read.tree) progress.tree.add(pid)
 
 	for (const pid of unseen) {
 		progress.seen.add(pid)
@@ -78,20 +97,21 @@ function stop_unseen(lane: LaneProcesses, progress: PauseProgress, probes: Pause
 
 /** SIGSTOP every process of the lane; returns the pids stopped. */
 function pause_lane(lane: LaneProcesses, probes: PauseProbes = SYSTEM_PROBES): LaneSignalled {
-	const progress: PauseProgress = { seen: new Set(), stopped: [] }
+	const progress: PauseProgress = { seen: new Set(), tree: new Set(), stopped: [] }
 
 	for (let round = 0; round < PAUSE_ROUNDS; round += 1) {
 		if (stop_unseen(lane, progress, probes) === 0) break
 	}
 
-	return { signalled: progress.stopped }
+	return signalled_of(progress.stopped, progress.tree)
 }
 
 /** SIGCONT every process of the lane; returns the pids continued. */
 function resume_lane(lane: LaneProcesses, probes: PauseProbes = SYSTEM_PROBES): LaneSignalled {
-	const processes = lane_processes(lane, probes)
+	const read = lane_processes(lane, probes)
+	const continued = read.all.filter((pid) => probes.signal(pid, CONTINUE_SIGNAL))
 
-	return { signalled: processes.filter((pid) => probes.signal(pid, CONTINUE_SIGNAL)) }
+	return signalled_of(continued, new Set(read.tree))
 }
 
 // Only what a pause reads: a lane is matched by its issue and its directory, nothing else.
