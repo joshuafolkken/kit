@@ -1,8 +1,6 @@
 # Target repository prefix — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/target-repository.md`: the
-reasons and history behind the `owner/repo#` prefix. It is never read during a run — every rule and
-refusal an agent acts on stays in the procedure document, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/target-repository.md`.
 
 ## Why the prefix reads as it does
 

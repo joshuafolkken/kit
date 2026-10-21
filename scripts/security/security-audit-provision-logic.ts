@@ -14,7 +14,6 @@ const RELEASE_BASE_URL = 'https://github.com/google/osv-scanner/releases/downloa
 
 const WINDOWS_PLATFORM = 'win32'
 const WINDOWS_ASSET_SUFFIX = '.exe'
-const STAGING_SUFFIX = '.download'
 
 // The asset is ~55 MB, and a link delivering it at 300 KB/s — measured, not hypothetical — takes
 // over three minutes. A `SessionStart` hook is waited on, so a single bound generous enough to
@@ -89,15 +88,6 @@ function build_asset_name(platform: string, architecture: string): string | unde
 
 function build_download_url(asset_name: string): string {
 	return `${RELEASE_BASE_URL}/v${SCANNER_VERSION}/${asset_name}`
-}
-
-// The staging file the download is written to before it is renamed onto the target. The process id
-// is what keeps two sessions of one project apart — the `SessionStart` matcher is empty, so a
-// `clear` during a startup's download is exactly that — and without it their writes interleave into
-// one file that both then rename into place, which the checksum cannot catch because each verified
-// its own buffer.
-function build_staging_path(target_path: string, process_id: number): string {
-	return `${target_path}.${String(process_id)}${STAGING_SUFFIX}`
 }
 
 // The whole "where do we fetch from" decision in one pure call, so the table above is testable
@@ -198,7 +188,6 @@ const security_audit_provision_logic = {
 	build_asset_name,
 	build_download_timeout,
 	build_download_url,
-	build_staging_path,
 	format_already_present,
 	format_below_floor,
 	format_checksum_mismatch,

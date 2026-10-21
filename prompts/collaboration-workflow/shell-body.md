@@ -1,18 +1,6 @@
 ## 本文をシェルの二重引用符に載せない（joshuafolkken/kit#1198）
 
-`CLAUDE.md` からは [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」を経て届く。[`file-edits.md`](./file-edits.md) が防ぐのはコストの二重払い、こちらが防ぐのは**テキストが実行されること**である。
-
-### 何が起きるのか
-
-二重引用符の中のバッククォートと `$` は実行前に評価される。次の呼び出しは `pnpm josh ms` を実行し、その出力を本文に埋め込む。
-
-```bash
-gh api repos/{owner}/{repo}/issues/1535/comments -f body="… `pnpm josh ms` は …"
-```
-
-`pnpm josh followup --notify-message "…"` も同じく壊れる。
-
-発火するのは `` ` `` と `$` で、`!` ではない。
+防ぐのは本文の**テキストが実行されること**である。二重引用符の中の `` ` `` と `$` は実行前に評価される（`!` は評価されない）。
 
 ### 安全な書き方
 

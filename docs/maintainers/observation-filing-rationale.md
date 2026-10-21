@@ -1,9 +1,7 @@
 # Observation filing — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/observation-filing.md`: the
-measurements, the history and the arguments that justify the depth test; the
-ledger's are in `observation-ledger-rationale.md`. It is never read during a run — every trigger, command, verdict and bound an agent
-acts on stays in the procedure document, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/observation-filing.md`; the ledger's is in
+`observation-ledger-rationale.md`.
 
 ## Why depth gates a discretionary filing
 

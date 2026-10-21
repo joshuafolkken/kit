@@ -34,8 +34,9 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 
 ## Why the rules and commands are the way they are
 
-The history behind a procedure, kept off every run's read path. Each one is cited section by section
-from the page it explains.
+Each `*-rationale.md` opens by naming the procedure it explains and holds the measurements, history
+and arguments behind it. No run reads one: every trigger, command and bound an agent acts on stays in
+the procedure, so a change to a rationale page changes no rule.
 
 - [claude-md-history.md](./claude-md-history.md) — `CLAUDE.md`
 - [overview-rationale.md](./overview-rationale.md) — the workflow overview and session language

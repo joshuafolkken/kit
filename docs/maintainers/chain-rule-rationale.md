@@ -1,9 +1,6 @@
 # Review-to-merge chain rule — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/chain-rule.md`: where each
-step and orchestration fact came from, and the reasons behind them. It is never read during a run —
-every rule, step and refusal an agent acts on stays in the procedure document, and a change to this
-file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/chain-rule.md`.
 
 ## Where each rule came from
 

@@ -1,8 +1,6 @@
 # Split assessment — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/split-assessment.md`. It is
-never read during a run — the two questions, the size guide and what each entry point does with the
-answer stay in the procedure document, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/split-assessment.md`.
 
 ## Why the default is not to split
 

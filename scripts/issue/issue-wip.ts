@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './issue-labels'
 
 // The WIP cap at the call that files. `josh issue:file` reads the count and asks the exemption
@@ -55,13 +56,7 @@ function count_line(count: number, repo: string, verdict: WipVerdict): string {
 // The listing's JSON is an array of rows; anything else is unreadable rather than zero, because zero
 // would pass every filing as within the cap.
 function count_of(json: string): number | undefined {
-	try {
-		const parsed: unknown = JSON.parse(json)
-
-		return Array.isArray(parsed) ? parsed.length : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_array(json)?.length
 }
 
 const issue_wip = { WIP_CAP, HELD, HELD_MESSAGE, UNREAD_MESSAGE, verdict_of, count_line, count_of }

@@ -1,8 +1,6 @@
 # Workflow commands manifest — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/SKILL.md`: where its
-manifest shape and its point-of-use rows came from. It is never read during a run — every trigger,
-table and pointer an agent acts on stays in the skill, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/SKILL.md`.
 
 ## Where each rule came from
 

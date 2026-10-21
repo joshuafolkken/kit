@@ -1,8 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { lstatSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { atomic_write } from '#scripts/lib/atomic-write'
 
 // A small record one josh command writes and another reads, kept per checkout in the temp directory.
 //
@@ -121,8 +122,8 @@ function is_foreign_file(target: string): boolean {
 }
 
 // Mutable coordination state cannot disappear between an unlink and its replacement: a reader that
-// mistakes that gap for "no child" can start the same generation twice. The temporary file lives
-// beside the target, uses the same exclusive/symlink-safe create, and rename publishes it atomically.
+// mistakes that gap for "no child" can start the same generation twice. `atomic-write.ts` stages the
+// text beside the target with the same exclusive create and renames it over the target.
 // `rename` replaces the path itself rather than following a symlink planted there, so the write still
 // never lands somewhere else; a regular file another account owns is refused before it is replaced,
 // the same answer the unlink gives on a sticky temp directory.
@@ -131,16 +132,9 @@ function replace_text_stamp(target: string, text: string): string {
 		throw new Error(`refusing to replace another account's file: ${target}`)
 	}
 
-	const temporary = `${target}.${String(process.pid)}.${randomUUID()}`
+	atomic_write.replace_file(target, text, { mode: STAMP_FILE_MODE })
 
-	try {
-		writeFileSync(temporary, text, { flag: STAMP_CREATE_FLAG, mode: STAMP_FILE_MODE })
-		renameSync(temporary, target)
-
-		return target
-	} finally {
-		rmSync(temporary, { force: true })
-	}
+	return target
 }
 
 function replace_stamp(target: string, payload: unknown): string {

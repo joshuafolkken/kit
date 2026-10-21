@@ -2,6 +2,7 @@ import { cpSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { error_text } from '#scripts/lib/error-message'
+import { file_reader } from '#scripts/lib/read-file'
 import { file_content } from './file-content'
 
 // `josh init` and `josh sync` both copy a distributed directory with `cpSync`, and both have to
@@ -20,17 +21,11 @@ type DestinationKind = 'absent' | 'directory' | 'other'
 // says the opposite — something is there and cannot be inspected — and ENOTDIR says a component of
 // the path is a file, which is also something rather than nothing. Reading either as absent would
 // send the caller into the `cpSync` that then throws uncaught, the abort this module exists to stop.
-const ABSENT_CODE = 'ENOENT'
-
-function error_code_of(error: unknown): string {
-	return error instanceof Error && 'code' in error ? String(error.code) : ''
-}
-
 function classify_path(candidate_path: string): DestinationKind {
 	try {
 		return lstatSync(candidate_path).isDirectory() ? 'directory' : 'other'
 	} catch (error) {
-		return error_code_of(error) === ABSENT_CODE ? 'absent' : 'other'
+		return file_reader.is_absent(error) ? 'absent' : 'other'
 	}
 }
 

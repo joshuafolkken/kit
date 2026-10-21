@@ -1,9 +1,6 @@
 # Observation ledger — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/observation-ledger.md`: why
-the ledger exists, why it has a commit path and why a second sighting files. It is never read during a
-run, and a change to this file changes no rule. It was split out of `observation-filing-rationale.md`
-with the procedure it explains (joshuafolkken/kit#3176).
+Rationale behind `.claude/skills/workflow-commands/observation-ledger.md`.
 
 ## Why the ledger exists
 

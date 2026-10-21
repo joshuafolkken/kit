@@ -1,10 +1,6 @@
 # `josh epic:*` commands — rationale
 
-This is maintainer-only rationale behind `.claude/skills/epic-commands/SKILL.md`: the history and the
-measurements that justify `epic:audit`, cross-repository epics and `epic:bundle`. It is never read
-during a run — every trigger, command, verdict and bound an agent acts on stays in the skill, and a
-change to this file changes no rule. It used to live, in Japanese, in the three epic topic files
-under `prompts/collaboration-workflow/`, which now point at the skill (joshuafolkken/kit#2892).
+Rationale behind `.claude/skills/epic-commands/SKILL.md`.
 
 ## `epic:audit` — why the children are read across
 

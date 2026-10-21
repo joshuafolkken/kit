@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 
 const ABSENT_CODE = 'ENOENT'
 
+// Whether a filesystem error says "there is nothing here" — ENOENT and nothing else. A permission
+// error or ENOTDIR says something is there, so neither reads as absent.
 function is_absent(error: unknown): boolean {
 	return error instanceof Error && 'code' in error && error.code === ABSENT_CODE
 }
@@ -35,6 +37,6 @@ function read_if_readable(path: string): string | undefined {
 	}
 }
 
-const file_reader = { read_optional, read_file_or_empty, read_if_readable }
+const file_reader = { is_absent, read_optional, read_file_or_empty, read_if_readable }
 
 export { file_reader }

@@ -1,8 +1,6 @@
 # Into-target suffix — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/into-target.md`: the reasons
-and history behind the `into <target>` suffix. It is never read during a run — every rule and refusal an
-agent acts on stays in the procedure document, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/into-target.md`.
 
 ## Why the suffix reads as it does
 

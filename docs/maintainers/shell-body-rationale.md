@@ -1,15 +1,18 @@
 # Never put a body in shell double quotes — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/shell-body.md` — the
-incidents, measurements and arguments that justify the procedure's boundaries, trigger and blind
-spots. No run reads it. Every trigger, command, verdict and boundary an agent follows stays in the
-procedure, and a change to this file changes no rule.
+Rationale behind `prompts/collaboration-workflow/shell-body.md`.
 
 ## The incidents — two kinds of damage, one cause
 
-In the joshuafolkken/kit#1535 run late on 2026-09-07, the call under the procedure's "何が起きるのか"
-heading (a `gh api ... -f body="…"` whose body held the backticked word `pnpm josh ms`) **switched the
-lane's work tree to `main` and stopped the run**. Recovery was manual.
+A backtick and a `$` inside double quotes are evaluated before the command runs. In the
+joshuafolkken/kit#1535 run late on 2026-09-07, this call ran `pnpm josh ms` and embedded its output
+in the body:
+
+```bash
+gh api repos/{owner}/{repo}/issues/1535/comments -f body="… `pnpm josh ms` は …"
+```
+
+It **switched the lane's work tree to `main` and stopped the run**. Recovery was manual.
 
 The same root reaches a second mouth. A backticked word (`` `owner/repo#` ``) in a body passed to
 `pnpm josh followup --notify-message "…"` was replaced by an empty string, and the word vanished from

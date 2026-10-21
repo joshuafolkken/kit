@@ -1,7 +1,6 @@
 import { pr_classification, type ReleaseClassification } from '#scripts/ci/pr-classification'
 import { git_command } from '#scripts/git/git-command'
 import { poll } from '#scripts/lib/poll'
-import { z } from 'zod'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
@@ -53,24 +52,24 @@ const MERGE_READ_BACK_INTERVAL_MS = 1000
 // `PUT pulls/{N}/merge` with a `sha` that is no longer the branch head.
 const HEAD_MOVED_STATUS = 409
 const PR_NUMBER_PATTERN = /\/pull\/([1-9]\d*)$/u
-const LABELS_SEGMENT = '/labels'
-const PR_LABELS = z.array(z.object({ name: z.string() }))
 
+// A pull request is an issue to the labels endpoint, so the write is the issue one: a failed answer
+// is confirmed by reading the labels back before it is reported as a failed write.
 async function add_pr_classification(number: string, label: ReleaseClassification): Promise<void> {
-	await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.issue_api_path(number)}${LABELS_SEGMENT}`,
-		body: JSON.stringify({ labels: [label] }),
-	})
+	const write = await git_gh_issue_write.issue_apply_label(number, label)
+
+	if (!write.is_applied) throw new Error(write.reason)
 }
 
+// Labels that could not be read are not "no classification": answering that would add a second
+// classification beside the one a person already put on the pull request.
 async function pr_get_classification(
 	branch_name: string,
 ): Promise<ReleaseClassification | undefined> {
 	const number = await require_pr_number(branch_name)
-	const response = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.issue_api_path(String(number))}${LABELS_SEGMENT}`,
-	})
-	const names = PR_LABELS.parse(JSON.parse(response)).map((label) => label.name.toLowerCase())
+	const labels = await git_gh_issue_write.read_label_names(String(number))
+	if (labels === undefined) throw new Error(`Unreadable labels on branch ${branch_name}`)
+	const names = labels.map((name) => name.toLowerCase())
 	const selected = names.filter((name) => pr_classification.is_classification(name))
 	if (selected.length === 0) return undefined
 

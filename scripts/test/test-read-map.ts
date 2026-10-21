@@ -1,14 +1,8 @@
-import {
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	statSync,
-	writeFileSync,
-} from 'node:fs'
+import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { atomic_write } from '#scripts/lib/atomic-write'
+import { json_value } from '#scripts/lib/json-value'
 import { test_read_trace, type ReadRecords } from './test-read-trace'
 
 // The test-read map: for every repository path a full unit run read, the modules that read it.
@@ -117,22 +111,14 @@ function changed_since_tree(
 	return [...new Set([...fresh, ...moved])]
 }
 
-function parse_json(text: string): unknown {
-	try {
-		return JSON.parse(text)
-	} catch {
-		return undefined
-	}
-}
-
 function parse_map(text: string): ReadMap | undefined {
-	const value = parse_json(text)
+	const value = json_value.parse_or_undefined(text)
 
 	return is_read_map(value) ? value : undefined
 }
 
 function parse_records(text: string): ReadRecords {
-	const value = parse_json(text)
+	const value = json_value.parse_or_undefined(text)
 
 	return is_read_records(value) ? value : {}
 }
@@ -203,7 +189,7 @@ function map_path(root: string, version: number = MAP_VERSION): string | undefin
 }
 
 // Every version's map, the unversioned one kits before joshuafolkken/kit#4423 wrote included; a
-// staging file ends in a process id, not the extension.
+// staging file ends in `.tmp`, not the extension.
 function is_map_file(name: string): boolean {
 	return name.startsWith(MAP_FILE_STEM) && name.endsWith(RECORD_EXTENSION)
 }
@@ -249,11 +235,7 @@ function write_map(root: string, map: ReadMap): void {
 
 	if (file_path === undefined) return
 
-	const staging = `${file_path}.${String(process.pid)}`
-
-	mkdirSync(path.dirname(file_path), { recursive: true })
-	writeFileSync(staging, JSON.stringify(map))
-	renameSync(staging, file_path)
+	atomic_write.replace_file(file_path, JSON.stringify(map))
 	prune_stale_maps(path.dirname(file_path))
 }
 

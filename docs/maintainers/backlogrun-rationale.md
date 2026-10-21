@@ -1,9 +1,6 @@
 # `backlogrun` manifest — rationale
 
-This is the maintainer-only rationale behind `.claude/skills/workflow-commands/backlogrun.md`: the
-reasons and history behind the manifest's shape. It is never read during a run — the manifest carries
-the ordered flow and the guards; this file holds only why they are what they are.
-A change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/backlogrun.md`.
 
 ## Why the loop's position is computed
 

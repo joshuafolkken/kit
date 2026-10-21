@@ -1,10 +1,6 @@
 # Principles — rationale
 
-This is maintainer-only history behind `prompts/collaboration-workflow/principles.md`, the single
-source of the principles `CLAUDE.md`'s Communication section points at. It is never read during
-a run, and a change to this file changes no rule. The original seven used to be separate topic files, each
-closed by the same boilerplate line naming its `CLAUDE.md` bullet; they were merged into one file and
-the history below moved here (joshuafolkken/kit#2894).
+Rationale behind `prompts/collaboration-workflow/principles.md`.
 
 ## Why AGENTS and GEMINI are pointers
 

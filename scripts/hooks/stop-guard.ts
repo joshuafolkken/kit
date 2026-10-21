@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
@@ -102,7 +101,7 @@ function is_cut_stop(tail: string): boolean {
 	)
 }
 
-// The session language the refusal is written for — `write_stop_decision` has already loaded the `.env`.
+// The session language the refusal is written for — `respond_from_stdin` has already loaded the `.env`.
 function session_lang(): string {
 	return session_language.resolve_session_lang().lang
 }
@@ -220,8 +219,6 @@ async function decided_envelope(raw_payload: string): Promise<string | undefined
 // notify line — and text ahead of the envelope makes the harness drop the refusal, as the #4091 child's
 // lane-background block was (joshuafolkken/kit#4101), so everything before the write goes to stderr.
 async function write_stop_decision(raw_payload: string): Promise<void> {
-	hook_decision.load_environment_file()
-
 	const envelope = await stdout_on_stderr.run(async () => await decided_envelope(raw_payload))
 
 	if (envelope === undefined) return
@@ -232,8 +229,7 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 const stop_guard = { outcome_of, stop_outcome_for_payload }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('stop:guard')
-	else await write_stop_decision(await text(process.stdin))
+	await hook_decision.respond_from_stdin('stop:guard', write_stop_decision)
 }
 
 export { stop_guard, write_stop_decision }

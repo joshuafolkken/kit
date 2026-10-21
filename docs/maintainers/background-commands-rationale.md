@@ -1,9 +1,6 @@
 # Background commands — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/background-commands.md`:
-the measurements and history behind backgrounding the gate and the push. It is never read during a run
-— every rule, table and refusal an agent acts on stays in the procedure document, and a change to this
-file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/background-commands.md`.
 
 The procedure is read at its point of use, not at the entry: it binds only after the first edit — at
 the gate, the push, the CI wait and `pnpm josh followup` — so it is fetched in full, in the turn that

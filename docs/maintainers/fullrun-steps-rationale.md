@@ -1,9 +1,6 @@
 # `fullrun` step lists — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/fullrun-steps.md`: where its
-steps came from and why a lane child skips one of them. It is never read during a run — every step,
-stop and command an agent acts on stays in the procedure document, and a change to this file changes
-no rule.
+Rationale behind `.claude/skills/workflow-commands/fullrun-steps.md`.
 
 ## Where each rule came from
 

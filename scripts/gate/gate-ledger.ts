@@ -93,6 +93,17 @@ async function start(ledger_path: string | undefined): Promise<GateLedgerStart> 
 	return { ledger_path, readings, sampler: start_sampler(readings) }
 }
 
+// The unit leg's own facts: the whole-suite fallback it took, or the since-green no-op that ran no
+// test (joshuafolkken/kit#4457) — the two `josh lane:stats` must not time as an ordinary run.
+function unit_facts(result: GateStepResult): Pick<GateCheckRecord, 'fallback' | 'is_unmoved'> {
+	if (result.label !== gate_plan.UNIT_LABEL) return {}
+
+	return {
+		fallback: related_scope.fallback_kind(result.output),
+		...(related_scope.is_unmoved(result.output) && { is_unmoved: true }),
+	}
+}
+
 function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckRecord> {
 	return results.map((result) => ({
 		label: result.label,
@@ -100,10 +111,7 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 		is_passed: !gate_report.is_gate_step_failed(result),
 		is_reused: result.reused_at !== undefined,
 		...(result.cpu_ms !== undefined && { cpu_ms: Math.round(result.cpu_ms) }),
-		fallback:
-			result.label === gate_plan.UNIT_LABEL
-				? related_scope.fallback_kind(result.output)
-				: undefined,
+		...unit_facts(result),
 		claim: result.claim,
 	}))
 }

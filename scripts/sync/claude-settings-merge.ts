@@ -1,5 +1,6 @@
 import { json_format } from '#scripts/config-merge/json-format'
 import { hook_command_rewrite } from '#scripts/init/hook-command-rewrite'
+import { json_value } from '#scripts/lib/json-value'
 
 // `josh sync` used to replace a project's `.claude/settings.json` with the distributed file, which
 // deleted every hook and permission the project had added — and `.claude/settings.local.json` is
@@ -29,10 +30,6 @@ const WITHDRAWN_KIT_PERMISSIONS: ReadonlySet<unknown> = new Set([
 	'Bash(git commit --all*)',
 ])
 
-function is_json_object(value: unknown): value is JsonObject {
-	return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function as_array(value: unknown): Array<unknown> {
 	return Array.isArray(value) ? value : []
 }
@@ -46,7 +43,7 @@ function merge_objects(kit: JsonObject, own: JsonObject, merge_entry: EntryMerge
 }
 
 function merge_kit_value(kit: unknown, own: unknown): unknown {
-	if (!is_json_object(kit) || !is_json_object(own)) return kit
+	if (!json_value.is_record(kit) || !json_value.is_record(own)) return kit
 
 	return merge_objects(kit, own, (_key, kit_entry, own_entry) =>
 		merge_kit_value(kit_entry, own_entry),
@@ -68,7 +65,7 @@ function without_withdrawn(value: unknown): unknown {
 // The withdrawn entries are taken out of every list first, so one goes even when kit no longer ships
 // the list it sat in.
 function merge_permissions(kit: unknown, own: unknown): unknown {
-	if (!is_json_object(kit) || !is_json_object(own)) return kit
+	if (!json_value.is_record(kit) || !json_value.is_record(own)) return kit
 	const kept = Object.entries(own).map(([key, value]) => [key, without_withdrawn(value)] as const)
 
 	return merge_objects(kit, Object.fromEntries(kept), (_key, kit_entry, own_entry) =>
@@ -77,7 +74,7 @@ function merge_permissions(kit: unknown, own: unknown): unknown {
 }
 
 function is_kit_handler(handler: unknown): boolean {
-	if (!is_json_object(handler)) return false
+	if (!json_value.is_record(handler)) return false
 	const { command } = handler
 
 	return typeof command === 'string' && hook_command_rewrite.is_kit_hook_command(command)
@@ -85,7 +82,7 @@ function is_kit_handler(handler: unknown): boolean {
 
 // A matcher group left with no handler of the project's own was kit's alone, and goes with them.
 function without_kit_handlers(group: unknown): unknown {
-	if (!is_json_object(group)) return group
+	if (!json_value.is_record(group)) return group
 	const handlers = as_array(group[HOOKS_KEY]).filter((handler) => !is_kit_handler(handler))
 
 	return handlers.length === 0 ? undefined : { ...group, [HOOKS_KEY]: handlers }
@@ -104,7 +101,7 @@ function own_hook_events(own: JsonObject): JsonObject {
 }
 
 function merge_hooks(kit: unknown, own: unknown): unknown {
-	if (!is_json_object(kit) || !is_json_object(own)) return kit
+	if (!json_value.is_record(kit) || !json_value.is_record(own)) return kit
 
 	return merge_objects(kit, own_hook_events(own), (_event, kit_groups, groups) => [
 		...as_array(kit_groups),
@@ -120,13 +117,9 @@ function merge_top_level(key: string, kit: unknown, own: unknown): unknown {
 }
 
 function parse_object(content: string): JsonObject | undefined {
-	try {
-		const parsed: unknown = JSON.parse(content)
+	const parsed = json_value.parse_or_undefined(content)
 
-		return is_json_object(parsed) ? parsed : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.is_record(parsed) ? parsed : undefined
 }
 
 // A file that does not parse as a JSON object has nothing the merge can keep, so it is replaced with

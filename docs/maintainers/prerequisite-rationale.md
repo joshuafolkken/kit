@@ -1,8 +1,6 @@
 # Prerequisite discovered mid-run — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/prerequisite.md`. It is never
-read during a run — every table row, command and stop an agent acts on stays in the procedure document,
-and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/prerequisite.md`.
 
 ## Where each rule came from
 

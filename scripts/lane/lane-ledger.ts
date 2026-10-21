@@ -62,6 +62,8 @@ const check_schema = z.object({
 	// Why the unit leg ran the whole suite instead of the related tests — a stable kind, never the
 	// file it names (joshuafolkken/kit#4397). Absent when it narrowed, and on every other check.
 	fallback: z.string().optional(),
+	// The unit leg's since-green no-op: nothing moved, so it ran no test (joshuafolkken/kit#4457).
+	is_unmoved: z.boolean().optional(),
 	// The width the check asked the core budget for, the width it ran at and how long it waited, so a
 	// unit claim's wait for room is read per run (joshuafolkken/kit#4451). Absent on a check that
 	// claimed none — a reused one, or one inside another gate's claim.

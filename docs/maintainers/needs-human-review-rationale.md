@@ -1,9 +1,6 @@
 # `needs-human-review` — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/needs-human-review.md`: why
-the label exists and why it is kept apart from `needs-decision`. It is never read during a run — every
-step, stop and command an agent acts on stays in the procedure document, and a change to this file
-changes no rule.
+Rationale behind `.claude/skills/workflow-commands/needs-human-review.md`.
 
 ## Why the label exists
 
