@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { availableParallelism, cpus, totalmem } from 'node:os'
+import { availableParallelism, cpus, loadavg, totalmem } from 'node:os'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
@@ -32,6 +32,12 @@ import { execa } from 'execa'
 // The window the busy cores are measured over: long enough that one scheduler tick does not dominate it,
 // short enough that a solo admission is not visibly delayed.
 const SAMPLE_WINDOW_MS = 250
+// **Run-queue load outside the ledger past this many times the cores holds the first waiter too**
+// (joshuafolkken/kit#4361). The first waiter ignores outside load (joshuafolkken/kit#4313), and lanes took
+// the 11-core machine to a load average of 25–34. Twice the cores is loose on purpose: the one-core
+// editor load #4313 stopped holding a solo gate stays far below it, so neither its starvation nor the
+// lanes' speed comes back, while a machine whose queue beyond the ledger passes two per core waits.
+const OVERLOAD_FACTOR = 2
 const BYTES_PER_MB = 1_048_576
 const KB_PER_MB = 1024
 const PERCENT = 100
@@ -78,10 +84,13 @@ const SYSCTL_ARGUMENTS = [
 const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 
 // `memory_pressured` says why `available_mb` read none, so a claim that waits can name the pressure.
+// `run_queue` is the one-minute load average: the busy cores stop at the core count, so only the queue
+// tells a machine at twice its cores from one at once (`is_overloaded`).
 interface MachineReading {
 	busy_cores: number | undefined
 	available_mb: number | undefined
 	memory_pressured?: boolean | undefined
+	run_queue?: number | undefined
 }
 
 // The memory half of a reading. `swapped_mb` is a counter — every page swapped in or out since boot —
@@ -101,12 +110,14 @@ interface LedgerLoad {
 }
 
 // `busy_excess` is the measured cores beyond what the ledger declares — what `cores` gave up to load the
-// ledger does not hold, so a claim that waits on it can name the CPU as saturated.
+// ledger does not hold, so a claim that waits on it can name the CPU as saturated. `is_overloaded` lifts
+// the first waiter's exemption from that load (`core_admission.is_admitted`).
 interface MachineBudget {
 	cores: number
 	memory_mb: number
 	memory_pressured?: boolean | undefined
 	busy_excess?: number | undefined
+	is_overloaded?: boolean | undefined
 }
 
 interface CpuTimes {
@@ -311,12 +322,12 @@ async function read_machine(
 	const before = cpu_times()
 	const [memory_before] = await Promise.all([read_memory(), sleep(SAMPLE_WINDOW_MS)])
 	const memory_after = await read_memory()
-	const busy_cores = is_unquoted()
-		? busy_cores_between(before, cpu_times(), cpus().length)
-		: undefined
+	const is_host = is_unquoted()
+	const busy_cores = is_host ? busy_cores_between(before, cpu_times(), cpus().length) : undefined
 
 	return {
 		busy_cores,
+		run_queue: is_host ? loadavg()[0] : undefined,
 		available_mb: pressured_available(memory_after),
 		memory_pressured: is_pressured(memory_before, memory_after),
 	}
@@ -338,6 +349,20 @@ function external_cores(busy_cores: number | undefined, ledger_cores: number): n
 	return Math.floor(Math.max(0, busy_cores - ledger_cores))
 }
 
+// The run queue beyond what the ledger declares, past `OVERLOAD_FACTOR` times the cores. The ledger's own
+// claims running past their weight count as outside load. The load average trails by a minute, so a
+// first waiter held here waits out the decay — only at a load already this far past the machine. A queue
+// that could not be read, and Windows' constant zero, never hold.
+function is_overloaded(
+	run_queue: number | undefined,
+	ledger_cores: number,
+	cores: number,
+): boolean {
+	if (run_queue === undefined) return false
+
+	return run_queue - ledger_cores > cores * OVERLOAD_FACTOR
+}
+
 // **The budget the ledger admits against: `cores − max(ledger, busy)` free, plus what the ledger itself
 // already holds.** The admission walk counts the ledger's declared weight again, so it is added back —
 // what is subtracted is only the busy load beyond it. A claim admitted moments ago is not busy yet, and
@@ -353,6 +378,7 @@ function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLo
 			reading.available_mb === undefined ? Infinity : reading.available_mb + ledger.memory_mb,
 		memory_pressured: reading.memory_pressured,
 		busy_excess,
+		is_overloaded: is_overloaded(reading.run_queue, ledger.cores, cores),
 	}
 }
 

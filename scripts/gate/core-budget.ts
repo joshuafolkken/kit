@@ -223,7 +223,8 @@ function resolve_timing(options: ReserveOptions): TimingConfig {
 // **A claim alone in the ledger reads the machine too** (joshuafolkken/kit#4238): load outside the
 // ledger saturates the CPU whether or not another claim is in it. The busy cores are the mean of this
 // wait's recent readings of load outside the ledger (`busy-average.ts`). That load holds every claim but
-// the first waiter, which it narrows instead (`core_admission.is_admitted`, joshuafolkken/kit#4313).
+// the first waiter, which it narrows instead (`core_admission.is_admitted`, joshuafolkken/kit#4313) unless
+// the run queue reads the machine overloaded (`machine_capacity.machine_budget`, joshuafolkken/kit#4361).
 async function current_budget(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
