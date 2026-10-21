@@ -90,6 +90,12 @@ function commit_status_api_path(commit_sha: string, repo?: string): string {
 	return `${commit_api_path(commit_sha, repo)}/status`
 }
 
+// The rules that apply to one branch, from every ruleset that targets it — readable without the
+// admin access the classic branch protection endpoint needs.
+function branch_rules_api_path(branch_name: string, repo?: string): string {
+	return `${repo_api_path(repo)}/rules/branches/${branch_name}`
+}
+
 // A single tag reference. REST answers 404 when the tag does not exist, which is the whole of the
 // question the release command's tag watch asks.
 function tag_reference_api_path(tag: string, repo?: string): string {
@@ -119,6 +125,7 @@ const git_gh_api_path = {
 	commit_api_path,
 	commit_check_runs_api_path,
 	commit_status_api_path,
+	branch_rules_api_path,
 }
 
 export { git_gh_api_path, FULL_PAGE_QUERY }

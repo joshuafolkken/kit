@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { forget_branch_rules } from './git-gh-branch-rules'
 import { git_gh_exec } from './git-gh-exec'
 import {
 	check_runs_pages,
@@ -69,6 +71,7 @@ async function read_snapshot(
 beforeEach(() => {
 	vi.clearAllMocks()
 	forget_pr_numbers()
+	forget_branch_rules()
 })
 
 describe('pr_get_state_snapshot — the three fields', () => {
@@ -127,6 +130,29 @@ describe('pr_get_state_snapshot — mergeable_state is upper-cased', () => {
 			pull: { mergeable_state: 'unstable' },
 			statuses: status_pages([{ context: CODE_RABBIT, state: 'pending' }]),
 		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
+	})
+})
+
+// joshuafolkken/kit#4351 end to end: the required CI has passed and default-setup CodeQL is still
+// running — `conclusion: null`, GitHub's `unstable` — and the snapshot reaches the merge.
+describe('pr_get_state_snapshot — an optional check still running', () => {
+	it('reaches success once the base branch rules are read', async () => {
+		const rules_path = `${git_gh_api_path.branch_rules_api_path('main')}${FULL_PAGE_QUERY}`
+		const rule = {
+			type: 'required_status_checks',
+			parameters: { required_status_checks: [{ context: SONAR_QUBE }] },
+		}
+		const passing = JSON.stringify(PASSING_RUN)
+		const running = '{"name":"CodeQL","status":"in_progress","conclusion":null}'
+		const check_runs = `[{"check_runs":[${passing},${running}]}]`
+		const pull = { mergeable_state: 'unstable', base: { ref: 'main' } }
+		const answers = { ...routes({ pull, check_runs }), [rules_path]: JSON.stringify([rule]) }
+
+		mocked_api.mockImplementation(gh_api_routes(answers))
+
+		const snapshot = parse_pr_state_snapshot(await pr_get_state_snapshot(PR_BRANCH))
 
 		expect(evaluate_pr_state(snapshot)).toBe('success')
 	})

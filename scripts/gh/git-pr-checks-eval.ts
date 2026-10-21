@@ -2,6 +2,7 @@ import {
 	CHECK_STATUS_FAIL,
 	CHECK_STATUS_MISSING,
 	CHECK_STATUS_PASS,
+	CHECK_STATUS_PENDING,
 	type PrStateSnapshot,
 	type RollupCheck,
 } from './git-pr-checks-parse'
@@ -12,7 +13,7 @@ import {
 // to restore the old behavior. Revert once the fresh-context review subagent replaces it.
 const DEFAULT_REQUIRED_CHECKS = ['SonarQube']
 // The single source of the check name every CodeRabbit exemption is keyed on — the merge gate's
-// `is_unstable_only_from_coderabbit`, the look-ahead's `is_awaited_check`, and the fixtures the two
+// `is_unstable_only_from_optional`, the look-ahead's `is_awaited_check`, and the fixtures the two
 // are tested from. A second literal spelling of it anywhere is how one of them silently stops
 // matching after CodeRabbit renames its context.
 const CODERABBIT_CHECK_NAME = 'CodeRabbit'
@@ -131,15 +132,46 @@ function is_coderabbit_rate_limited(check: RollupCheck): boolean {
 	)
 }
 
-// Temporary: a pending or failing CodeRabbit check makes GitHub report UNSTABLE even
-// though CodeRabbit is not required. Accept that state only when CodeRabbit checks are the
-// sole non-passing ones — any other non-passing check keeps the gate strict.
-function is_unstable_only_from_coderabbit(snapshot: PrStateSnapshot): boolean {
+function matches_any(check_name: string, required_names: ReadonlyArray<string>): boolean {
+	return required_names.some((required) => is_required_match(check_name, required))
+}
+
+// A check still running that the base branch's rules do not require — GitHub's default-setup
+// `CodeQL`, which runs for about thirty minutes beside a six-minute CI (joshuafolkken/kit#4351).
+// With no required context known nothing qualifies, so the gate waits for `CLEAN` as it always did.
+function is_optional_pending(
+	check: RollupCheck,
+	required_contexts: ReadonlyArray<string>,
+): boolean {
+	if (required_contexts.length === 0 || check.status !== CHECK_STATUS_PENDING) return false
+
+	return !matches_any(check.name, required_contexts)
+}
+
+function is_every_context_passing(
+	checks: ReadonlyArray<RollupCheck>,
+	contexts: ReadonlyArray<string>,
+): boolean {
+	return contexts.every(
+		(context) => find_required_check(checks, context)?.status === CHECK_STATUS_PASS,
+	)
+}
+
+// GitHub reports UNSTABLE for a pull request whose required checks are green while a check outside
+// them is pending or failing. Accept that state when every non-passing check is CodeRabbit's
+// (temporary: CodeRabbit is not required) or an optional one still running, and every context the
+// base branch requires has passed in the rollup itself — any other non-passing check keeps the gate
+// strict. A failed optional check never reaches here: `collect_blocking_failures` ends the wait first.
+function is_unstable_only_from_optional(snapshot: PrStateSnapshot): boolean {
 	if (snapshot.merge_state_status !== MERGE_STATE_UNSTABLE) return false
+	const required_contexts = snapshot.required_contexts ?? []
 	const non_passing = snapshot.rollup.filter((check) => check.status !== CHECK_STATUS_PASS)
 	if (non_passing.length === 0) return false
+	const is_tolerated = non_passing.every(
+		(check) => is_coderabbit_check(check.name) || is_optional_pending(check, required_contexts),
+	)
 
-	return non_passing.every((check) => is_coderabbit_check(check.name))
+	return is_tolerated && is_every_context_passing(snapshot.rollup, required_contexts)
 }
 
 function is_required_check(check_name: string): boolean {
@@ -169,7 +201,7 @@ function collect_blocking_failures(snapshot: PrStateSnapshot): Array<string> {
 function is_mergeable_state(snapshot: PrStateSnapshot): boolean {
 	if (is_merge_state_clean(snapshot.merge_state_status)) return true
 
-	return is_unstable_only_from_coderabbit(snapshot)
+	return is_unstable_only_from_optional(snapshot)
 }
 
 // The wait's own error text: naming the checks that failed is what turns a red `followup` into
