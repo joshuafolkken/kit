@@ -6,10 +6,15 @@ import { run_board_idle } from './run-board-idle'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
-import { run_board_status, type ItemStatus } from './run-board-status'
+import {
+	run_board_status,
+	type ItemState,
+	type ItemStatus,
+	type OpenRead,
+} from './run-board-status'
 
 // The GitHub reads a `run:board` redraw draws over: the plan, and the run's children that left the
-// open listing. Each is taken no more often than `run:progress` re-reads after a decline. **A live
+// open listing or are drawn stopped. Each is taken no more often than `run:progress` re-reads after a decline. **A live
 // board never waits on them**: each read is launched and folded in on the redraw after it lands, so
 // the clock keeps moving while GitHub answers; one plain frame waits for them. A failed plan read
 // keeps the previous plan on screen and says when it failed. A run that ended keeps its plan as it
@@ -19,6 +24,7 @@ const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * MS_PER_SECOND
 // A rejected closed read answers nothing closed and not whole, so it is asked again.
 const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state
+const STOPPED_STATE: ItemState = 'stopped'
 
 // What a step of the GitHub reads works against.
 interface Gather {
@@ -79,16 +85,36 @@ function statuses_for(state: BoardState, local: LocalRead): ReadonlyMap<number, 
 	return run_board_status.statuses_of(local.events, local.lane_states, stopped)
 }
 
-// The children the run touched that the open listing no longer holds and the board has not read yet.
-// A listing cut short proves nothing missing, so it asks about none.
+// The open listing the statuses are settled against — none before a plan has landed.
+function open_read_of(state: BoardState, plan: BoardPlan | undefined): OpenRead {
+	return {
+		open_numbers: plan?.context.open_numbers,
+		read_ms: state.fetched_ms,
+		closed: state.closed,
+		labels: plan?.labels ?? new Map(),
+	}
+}
+
+// A child still drawn stopped holds no closed read of this launch — any it holds closed before it
+// relaunched — so it is asked again.
+function is_closed_candidate(issue: number, status: ItemStatus, read: OpenRead): boolean {
+	if (status.state === STOPPED_STATE) return true
+
+	const open = read.open_numbers
+
+	return open !== undefined && !open.has(issue) && !read.closed.has(issue)
+}
+
+// The children the board has not read closed yet that the open listing no longer holds, or that it
+// draws stopped: a child that merged itself and left its lane is drawn stopped until GitHub says it
+// merged (joshuafolkken/kit#4401), and a listing cut short proves nothing missing.
 function unread_closed(state: BoardState, local: LocalRead): Array<number> {
-	const open = state.plan?.context.open_numbers
+	const read = open_read_of(state, state.plan)
+	const drawn = run_board_status.settle_closed(statuses_for(state, local), read)
 
-	if (open === undefined || state.plan === undefined) return []
-
-	const touched = [...statuses_for(state, local).keys()]
-
-	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
+	return [...drawn]
+		.filter(([issue, status]) => is_closed_candidate(issue, status, read))
+		.map(([issue]) => issue)
 }
 
 // An ended run asks until one ask after it ended has answered whole, then holds what it has, as its
@@ -101,18 +127,25 @@ function has_asked_since_end(state: BoardState, local: LocalRead): boolean {
 	return closed_answered_ms >= local.ended_ms
 }
 
-function is_closed_due(state: BoardState, gather: Gather): boolean {
+function has_new_child(state: BoardState, unread: ReadonlyArray<number>): boolean {
+	return unread.some((issue) => !state.closed_asked.has(issue))
+}
+
+function is_closed_due(state: BoardState, gather: Gather, unread: ReadonlyArray<number>): boolean {
 	if (state.closed_fetch !== undefined || has_asked_since_end(state, gather.local)) return false
 
-	return is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	return (
+		has_new_child(state, unread) || is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	)
 }
 
 // A closed child is read once and its answer kept; one that has not answered closed is asked again no
-// sooner than the plan is, and an ended run's not again once an ask after the end has answered whole.
+// sooner than the plan is — unless a child the last ask did not hold has joined it — and an ended
+// run's not again once an ask after the end has answered whole.
 function launch_closed(state: BoardState, gather: Gather): BoardState {
 	const unread = unread_closed(state, gather.local)
 
-	if (unread.length === 0 || !is_closed_due(state, gather)) return state
+	if (unread.length === 0 || !is_closed_due(state, gather, unread)) return state
 
 	async function read(): Promise<ClosedAnswer> {
 		return await gather.ports.read_closed(unread)
@@ -120,7 +153,12 @@ function launch_closed(state: BoardState, gather: Gather): BoardState {
 
 	const closed_fetch = run_board_fetch.launch(read, UNANSWERED)
 
-	return { ...state, closed_fetch, closed_attempted_ms: gather.now_ms }
+	return {
+		...state,
+		closed_fetch,
+		closed_attempted_ms: gather.now_ms,
+		closed_asked: new Set(unread),
+	}
 }
 
 // A whole answer counts as of the moment it was asked.
@@ -159,7 +197,7 @@ async function gather_github(state: BoardState, gather: Gather): Promise<BoardSt
 	return fold_closed(closing)
 }
 
-const run_board_github = { PLAN_RETRY_MS, gather_github, statuses_for }
+const run_board_github = { PLAN_RETRY_MS, gather_github, open_read_of, statuses_for }
 
 export { run_board_github }
 export type { Gather }
