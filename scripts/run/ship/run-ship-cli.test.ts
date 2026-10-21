@@ -1,5 +1,6 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_overlap } from './run-ship-overlap'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
@@ -63,6 +64,8 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 // No lane overlaps (pinned in `run-ship-overlap.test.ts`), so no test lists this repository's work trees.
 vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
+// No ship body draft (pinned in `run-ship-body-draft.test.ts`), so no test reads this checkout's own.
+vi.spyOn(run_ship_body_draft, 'with_draft').mockImplementation(async (args) => args)
 
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
 const { run_ship_cli } = await import('./run-ship-cli')

@@ -12,6 +12,7 @@ import { acceptance_map } from '#scripts/review/acceptance-map'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_scoped } from './run-ship-scoped'
 
@@ -20,7 +21,8 @@ import { run_ship_scoped } from './run-ship-scoped'
 // **Every precondition decidable before the review is asked here, and all of them are reported at
 // once.** No check is new: the classification, issue and branch answers
 // are `git_preflight.problems_of`, and the evidence answer is `live_evidence.verdict_for` over the same
-// changed paths and the body this ship will deliver — `--body-file` when given, else the open PR's.
+// changed paths and the body this ship will deliver — `--body-file` when given, else the ship body
+// draft, else the open PR's.
 //
 // The scoped pair runs last, met rather than stopped on (`run-ship-scoped.ts`), so the review and the
 // gate start on a tree both checks are green on.
@@ -39,9 +41,13 @@ const PRECONDITION = {
 	SCOPED: 'scoped',
 	UNREADABLE: 'unreadable',
 } as const
-const EVIDENCE_PROBLEM = `This change touches runtime code, but the PR body has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
-const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section to a file and hand it to josh ship with --body-file <path>, or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
-const ACCEPTANCE_PENDING = `Put this ${acceptance_map.MAP_HEADING} section into the --body-file josh ship is handed, replacing each pending row's ending with what met or deferred it (format: ${report_format_reference.pointer(report_format_reference.ACCEPTANCE_MAP_HEADING)}), or the ship refuses:`
+const EVIDENCE_PROBLEM = `This change touches runtime code, but the body this ship delivers has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and write it into the ship body draft run:prep wrote (josh ship reads it when --body-file is omitted), or pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
+const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section into the ship body draft run:prep wrote (or a file handed to josh ship with --body-file <path>), or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
+
+// The draft `josh ship` reads when `--body-file` is omitted, named so the run fills that file in.
+function acceptance_pending_text(draft_path: string): string {
+	return `Fill in this ${acceptance_map.MAP_HEADING} section in the ship body draft ${draft_path} — josh ship reads it when --body-file is omitted — replacing each pending row's ending with what met or deferred it (format: ${report_format_reference.pointer(report_format_reference.ACCEPTANCE_MAP_HEADING)}), and write ${live_evidence.EVIDENCE_HEADING} there before the ship, or the ship refuses:`
+}
 
 interface PreflightRequest {
 	title: string
@@ -53,10 +59,16 @@ interface PreflightResult extends JoshResult {
 	preconditions?: ReadonlyArray<string>
 }
 
+// The body the next ship delivers: `--body-file`, else the run's ship body draft, else the open PR's.
 async function body_text(body_path: string | undefined): Promise<string | undefined> {
 	if (body_path !== undefined) return await readFile(body_path, 'utf8')
+	const branch = await git_branch.current()
+	const issue = git_issue.branch_number(branch)
+	const draft = issue === undefined ? undefined : await run_ship_body_draft.existing(issue)
 
-	return await git_gh_command.pr_get_body(await git_branch.current())
+	if (draft !== undefined) return await readFile(draft, 'utf8')
+
+	return await git_gh_command.pr_get_body(branch)
 }
 
 function of_kind(kind: string, problems: ReadonlyArray<string>): Array<Unmet> {
@@ -169,27 +181,44 @@ async function classification_problems(issue_number: string): Promise<Array<Unme
 	return []
 }
 
-// Only a body still to be written is handed every row as pending: an open PR's body keeps the refusal,
-// which names just the rows missing, stale or deferred to an issue that does not exist.
+// Only a body still to be written is handed every row as pending: a draft or an open PR's body keeps
+// the refusal, which names just the rows missing, stale or deferred to an issue that does not exist.
 async function pending_map(
 	issue_number: string,
-	pr_body: string | undefined,
+	body: string | undefined,
 ): Promise<string | undefined> {
-	if (pr_body !== undefined) return undefined
+	if (body !== undefined) return undefined
 
 	return acceptance_map.skeleton(await git_gh_command.issue_get_body(issue_number))
+}
+
+// The rows land in the ship body draft as well as in the report (joshuafolkken/kit#4168).
+async function pending_text(issue_number: string, map: string): Promise<string> {
+	const draft = await run_ship_body_draft.prepare(issue_number, map)
+
+	return `${acceptance_pending_text(draft)}\n${map}`
+}
+
+// A refusal of a draft already written names it again, so a later `run:step` still points at the file.
+async function draft_refusal_text(issue_number: string, problem: string): Promise<string> {
+	const draft = await run_ship_body_draft.existing(issue_number)
+
+	return draft === undefined ? problem : `${acceptance_pending_text(draft)}\n${problem}`
 }
 
 // The acceptance-map refusal asked early carries the rows to write, identifiers included, built by
 // `acceptance_map.skeleton` — the one builder `josh pr` uses too (joshuafolkken/kit#4244). An Issue
 // with no criteria to build rows from keeps the refusal's own wording.
 async function acceptance_pending(issue_number: string): Promise<Array<Unmet>> {
-	const pr_body = await body_text(undefined)
-	const problem = await acceptance_map_check.body_refusal(issue_number, pr_body)
+	const body = await body_text(undefined)
+	const problem = await acceptance_map_check.body_refusal(issue_number, body)
 
 	if (problem === undefined) return []
-	const map = await pending_map(issue_number, pr_body)
-	const pending = map === undefined ? problem : `${ACCEPTANCE_PENDING}\n${map}`
+	const map = await pending_map(issue_number, body)
+	const pending =
+		map === undefined
+			? await draft_refusal_text(issue_number, problem)
+			: await pending_text(issue_number, map)
 
 	return of_kind(PRECONDITION.ACCEPTANCE_MAP, [pending])
 }
@@ -212,9 +241,9 @@ async function ahead(issue_number: string): Promise<Array<string>> {
 }
 
 const run_ship_preflight = {
-	ACCEPTANCE_PENDING,
 	EVIDENCE_PENDING,
 	EVIDENCE_PROBLEM,
+	acceptance_pending_text,
 	ahead,
 	stage,
 }

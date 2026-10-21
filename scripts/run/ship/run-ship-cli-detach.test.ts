@@ -1,5 +1,6 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
@@ -76,6 +77,9 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_lane_child_mock },
 }))
 
+// No ship body draft unless a test hands one (the draft itself: `run-ship-body-draft.test.ts`).
+const with_draft_spy = vi.spyOn(run_ship_body_draft, 'with_draft')
+
 const { run_ship_cli } = await import('./run-ship-cli')
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
 const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
@@ -90,6 +94,7 @@ const TITLE = 'Hand the region over #2428'
 const NUMBER = '2428'
 const REPOSITORY = '/repo/.git'
 const STOPPED_REPORT = '=== gate ===\nred'
+const DRAFT = '/repo/.git/worktrees/2428/josh-ship-body-2428.md'
 const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
 
 const info_lines: Array<string> = []
@@ -114,6 +119,21 @@ beforeEach(() => {
 	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
 	pre_detach_mock.mockReset().mockResolvedValue({ code: OK, out: 'passed' })
 	merge_mock.mockReset().mockResolvedValue({ kind: 'current', branch: 'main' })
+	with_draft_spy.mockReset().mockImplementation(async (args) => args)
+})
+
+// joshuafolkken/kit#4168: with `--body-file` omitted, the run's ship body draft is the body — the
+// preflight asks it and the supervisor is handed it.
+describe('run_ship_cli.run — the ship body draft', () => {
+	it('hands the draft to the preflight and the supervisor', async () => {
+		const body = run_ship_body_draft.body_arguments(DRAFT)
+
+		with_draft_spy.mockImplementation(async (args) => ({ ...args, body, body_path: DRAFT }))
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
+		expect(preflight_mock).toHaveBeenCalledWith({ title: TITLE, body_path: DRAFT })
+		expect(detach_mock).toHaveBeenCalledWith(expect.objectContaining({ body, body_path: DRAFT }))
+	})
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {

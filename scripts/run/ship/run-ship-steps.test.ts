@@ -1,6 +1,7 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship } from './run-ship'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -36,8 +37,10 @@ const review_spy = vi.spyOn(run_ship_review_steps, 'review_stage')
 const round_two_spy = vi.spyOn(run_ship_review_steps, 'round_two_stage')
 const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
 const followup_spy = vi.spyOn(run_ship_sync, 'followup_stage')
+const remove_draft_spy = vi.spyOn(run_ship_body_draft, 'remove')
 
 beforeEach(() => {
+	remove_draft_spy.mockReset().mockResolvedValue(undefined)
 	josh_spy.mockReset().mockResolvedValue(OK)
 	preflight_spy.mockReset().mockResolvedValue(OK)
 	scoped_gate_spy.mockReset().mockResolvedValue(OK)
@@ -165,5 +168,23 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		expect(await step_for(STAGE.SYNC).run(ARGS, FRESH)).toBe(OK)
 		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(OK)
 		expect(followup_spy).toHaveBeenCalledWith(TITLE, ARGS.notify)
+	})
+})
+
+describe('run_ship_steps — the ship body draft after the merge', () => {
+	// joshuafolkken/kit#4168: a draft left behind would hand a reopened issue's ship the old body.
+	it('removes the ship body draft once the merge succeeded', async () => {
+		followup_spy.mockResolvedValue(OK)
+
+		await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)
+
+		expect(remove_draft_spy).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('keeps the ship body draft when the merge stopped', async () => {
+		followup_spy.mockResolvedValue(FAILED)
+
+		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(FAILED)
+		expect(remove_draft_spy).not.toHaveBeenCalled()
 	})
 })
