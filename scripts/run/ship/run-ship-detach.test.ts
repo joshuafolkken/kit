@@ -264,13 +264,15 @@ describe('run_ship_detach.claim_identity', () => {
 
 	it('lets the supervisor claim a bare pid record with its own identity', async () => {
 		const target = request()
+		const launched_at = Date.now() - EXPIRED_OFFSET_MS
 
-		write_bare_pid(target.repository, Date.now() - EXPIRED_OFFSET_MS)
+		write_bare_pid(target.repository, launched_at)
 		vi.stubEnv(run_ship_detach.LAUNCH_ID_KEY, 'bare')
 		await run_ship_detach.claim_identity(target.repository, NUMBER)
 
 		expect(run_ship_detach.read_result(target.repository, NUMBER)).toEqual({
 			launch_id: 'bare',
+			launched_at,
 			result: 'running',
 		})
 	})

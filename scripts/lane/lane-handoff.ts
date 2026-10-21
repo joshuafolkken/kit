@@ -27,6 +27,17 @@ function is_ship_running(issue: string, directory: string): boolean {
 	)
 }
 
+// A detached ship for `issue` launched at or after `since_ms` ended in success — it merged, so no cut
+// hand-off follows it. The record outlives its run until the next `ship --detach` replaces it, so a
+// success launched earlier belongs to a past dispatch of the issue and never counts.
+function is_ship_succeeded(issue: string, directory: string, since_ms: number): boolean {
+	const repository = git_common_directory.repository(directory)
+	const reading =
+		repository === undefined ? undefined : run_ship_detach.read_result(repository, issue)
+
+	return reading?.result === 'success' && (reading.launched_at ?? since_ms - 1) >= since_ms
+}
+
 async function read_repository(): Promise<string | undefined> {
 	try {
 		return await run_carry.repository_directory()
@@ -62,6 +73,12 @@ function is_handed_off(directory: string, source: MarkerSource = process.env): b
 	return is_ship_running(issue, directory)
 }
 
-const lane_handoff = { is_handed_off, is_ship_running, ship_reader, ship_running_since }
+const lane_handoff = {
+	is_handed_off,
+	is_ship_running,
+	is_ship_succeeded,
+	ship_reader,
+	ship_running_since,
+}
 
 export { lane_handoff }

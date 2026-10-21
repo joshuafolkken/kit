@@ -35,8 +35,13 @@ const PGREP_COMMAND = 'pgrep'
 // `is_settled` is read once, when the wait starts: a child that ended between two `lane:await` calls
 // never appears in the second one, and only its settled issue tells it apart from one not yet
 // launched.
+//
+// `alive_since` is when this run of the child was first seen alive: a ship it launched is no older, so
+// a ship record launched earlier is a past dispatch's (joshuafolkken/kit#4395). A child already alive
+// when the watch began has none, and its ship is never read as its own.
 interface AwaitState {
 	appeared: boolean
+	alive_since?: number | undefined
 	disappeared_at: number | undefined
 	first_polled_at: number | undefined
 	is_settled?: boolean
@@ -55,6 +60,7 @@ interface RawAwaitArguments {
 // Injectable for testing -- the CLI never overrides these.
 interface AwaitOptions {
 	is_running?: (issue: string) => boolean
+	is_shipped?: (issue: string, since_ms: number) => boolean
 	is_settled?: (issue: string) => Promise<boolean>
 	poll_ms?: number
 	reconfirm_ms?: number
@@ -63,8 +69,11 @@ interface AwaitOptions {
 	sleep?: (ms: number) => Promise<void>
 }
 
+// `is_shipped` is the one disappearance the re-confirm window never has to cover: a ship that ended in
+// success merged the child's work, so no cut hand-off can follow it (joshuafolkken/kit#4395).
 interface CheckConfig {
 	is_running: (issue: string) => boolean
+	is_shipped?: (issue: string, since_ms: number) => boolean
 	reconfirm_ms: number
 	never_appeared_timeout_ms: number
 }
@@ -97,6 +106,10 @@ function process_trace_default(issue: string): ProcessTrace {
 
 function is_process_running_default(issue: string): boolean {
 	return process_trace_default(issue) === PROCESS_ALIVE
+}
+
+function is_shipped_default(issue: string, since_ms: number): boolean {
+	return lane_handoff.is_ship_succeeded(issue, process.cwd(), since_ms)
 }
 
 // The same positive evidence `run:liveness` answers `settled` on: the issue closed, or it was parked.
@@ -163,9 +176,16 @@ function resolve_timing(
 	}
 }
 
-function resolve_options(options: AwaitOptions): RunConfig {
+function resolve_probes(options: AwaitOptions): Pick<RunConfig, 'is_running' | 'is_shipped'> {
 	return {
 		is_running: options.is_running ?? is_process_running_default,
+		is_shipped: options.is_shipped ?? is_shipped_default,
+	}
+}
+
+function resolve_options(options: AwaitOptions): RunConfig {
+	return {
+		...resolve_probes(options),
 		is_settled: options.is_settled ?? is_settled_default,
 		now: options.now ?? Date.now,
 		sleep: options.sleep ?? sleep,
@@ -173,8 +193,10 @@ function resolve_options(options: AwaitOptions): RunConfig {
 	}
 }
 
-function update_liveness(state: AwaitState, is_live: boolean): void {
+function update_liveness(state: AwaitState, is_live: boolean, now_ms: number): void {
 	if (!is_live) return
+
+	if (!state.appeared || state.disappeared_at !== undefined) state.alive_since = now_ms
 
 	state.appeared = true
 	state.disappeared_at = undefined
@@ -202,6 +224,28 @@ function check_not_appeared(
 	return undefined
 }
 
+// The ship this run of the child launched succeeded.
+function is_own_ship_done(issue: string, state: AwaitState, config: CheckConfig): boolean {
+	const { alive_since } = state
+
+	return alive_since !== undefined && config.is_shipped?.(issue, alive_since) === true
+}
+
+// A child that appeared and is gone: done at once when its ship succeeded, else once it stayed gone
+// past the re-confirm window.
+function check_gone(
+	issue: string,
+	state: AwaitState,
+	now_ms: number,
+	config: CheckConfig,
+): string | undefined {
+	if (is_own_ship_done(issue, state, config)) return issue
+
+	state.disappeared_at ??= now_ms
+
+	return now_ms - state.disappeared_at >= config.reconfirm_ms ? issue : undefined
+}
+
 // Returns the issue that has confirmed-completed this tick, `undefined` if none yet.
 // The `appeared` guard prevents a process that never showed up from being declared done, unless its
 // issue had already settled when the wait started.
@@ -213,7 +257,7 @@ function check_issue(
 ): string | undefined {
 	const is_live = config.is_running(issue)
 
-	update_liveness(state, is_live)
+	update_liveness(state, is_live, now_ms)
 
 	if (is_live) return undefined
 
@@ -221,13 +265,7 @@ function check_issue(
 		return check_not_appeared(issue, state, now_ms, config.never_appeared_timeout_ms)
 	}
 
-	if (state.disappeared_at === undefined) {
-		state.disappeared_at = now_ms
-
-		return undefined
-	}
-
-	return now_ms - state.disappeared_at >= config.reconfirm_ms ? issue : undefined
+	return check_gone(issue, state, now_ms, config)
 }
 
 function check_any(
@@ -266,6 +304,7 @@ const lane_await = {
 	RECONFIRM_MS,
 	check_issue,
 	is_process_running_default,
+	is_shipped_default,
 	parse_arguments,
 	process_trace_default,
 	wait_for_any,

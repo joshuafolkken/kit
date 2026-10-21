@@ -141,6 +141,7 @@ function finished_checker(seeded: ReadonlySet<string>): (issue: string) => boole
 	const states = new Map<string, AwaitState>()
 	const config = {
 		is_running: lane_await.is_process_running_default,
+		is_shipped: lane_await.is_shipped_default,
 		reconfirm_ms: lane_await.RECONFIRM_MS,
 		never_appeared_timeout_ms: lane_await.NEVER_APPEARED_TIMEOUT_MS,
 	}

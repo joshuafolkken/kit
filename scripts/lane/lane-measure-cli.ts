@@ -8,13 +8,14 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
+import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_round_two_stats } from './lane-round-two-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
-import { lane_stats } from './lane-stats'
+import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stop_stats } from './lane-stop-stats'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
@@ -114,6 +115,24 @@ async function read_events(context: MeasureContext): Promise<ReadonlyArray<RunEv
 	return await run_event_stream_emit.all_events()
 }
 
+// The tables under the period's row, in the order `lane:stats` prints them.
+function tables_of(
+	entries: ReturnType<typeof lane_ledger.read_entries>,
+	window: StatsWindow,
+	events: ReadonlyArray<RunEvent>,
+): Array<string> {
+	return [
+		lane_stage_stats.table(entries, window),
+		lane_stop_stats.table(entries, window, events),
+		lane_gap_stats.table(entries, window, events),
+		lane_round_two_stats.table(entries, window),
+		lane_held_stats.table(entries, window),
+		lane_core_wait_stats.table(entries, window),
+		lane_process_stats.table(entries, window),
+		lane_check_stats.table(entries, window),
+	]
+}
+
 async function stats_command(
 	rest: ReadonlyArray<string>,
 	context: MeasureContext,
@@ -131,13 +150,7 @@ async function stats_command(
 	console.info(
 		[
 			`${lane_stats.header()}\n${row}`,
-			lane_stage_stats.table(entries, window),
-			lane_stop_stats.table(entries, window, await read_events(context)),
-			lane_round_two_stats.table(entries, window),
-			lane_held_stats.table(entries, window),
-			lane_core_wait_stats.table(entries, window),
-			lane_process_stats.table(entries, window),
-			lane_check_stats.table(entries, window),
+			...tables_of(entries, window, await read_events(context)),
 		].join('\n\n'),
 	)
 

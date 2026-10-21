@@ -174,12 +174,16 @@ function read_result(
 	repository: string,
 	number: string,
 	read: StartRead = process_identity.read_start,
-): { launch_id: string; result: ShipResult } | undefined {
+): { launch_id: string; launched_at?: number | undefined; result: ShipResult } | undefined {
 	const record = read_record(repository, number)
 
 	return record === undefined
 		? undefined
-		: { launch_id: record.launch_id, result: result_of(record, read) }
+		: {
+				launch_id: record.launch_id,
+				launched_at: record.launched_at,
+				result: result_of(record, read),
+			}
 }
 
 function current_record(repository: string, number: string): ShipRecord | undefined {
