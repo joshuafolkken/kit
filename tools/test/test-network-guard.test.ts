@@ -2,10 +2,12 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GIT_BINARY_KEY } from '#scripts/git/constants'
+import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { test_network_guard } from '#tools/test/test-network-guard'
+import { test_repository_guard } from '#tools/test/test-repository-guard'
 import { GUARD_LOG_KEY } from '#tools/test/unit-guard-environment'
 import { execaSync } from 'execa'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -60,6 +62,7 @@ const ARMED_KEYS: ReadonlyArray<string> = [
 	GIT_BINARY_KEY,
 	GUARD_LOG_KEY,
 	platform_temporary.TEMP_ROOT_KEY,
+	...GIT_LOCATION_VARIABLES,
 ]
 
 function snapshot_environment(): Record<string, string | undefined> {
@@ -269,6 +272,54 @@ describe('test_network_guard.arm — what the workers inherit', () => {
 		} finally {
 			restore_environment(original)
 		}
+	})
+})
+
+// joshuafolkken/kit#4394: under the pre-push hook git exports `GIT_DIR`, and a run armed with it still
+// set refused the workers' reads of their own checkout and failed at teardown.
+const PROJECT_ROOT = path.join(import.meta.dirname, '..', '..')
+
+interface HookRun {
+	directory: string
+	inherited: Array<string>
+}
+
+// Armed as `globalSetup` arms it with the hook's `GIT_DIR` set, then one spawn the way a worker makes
+// it — the armed `PATH` and whatever environment `arm` left behind — from the checkout itself.
+function run_under_hook(args: ReadonlyArray<string>): HookRun {
+	const original = snapshot_environment()
+	const directory = temporary_directory()
+
+	try {
+		process.env['GIT_DIR'] = execaSync('git', ['rev-parse', '--absolute-git-dir']).stdout
+		test_network_guard.arm(directory, scratch_temporary_root())
+		execaSync(test_network_guard.GIT_SHIM_NAME, args, { cwd: PROJECT_ROOT, reject: false })
+
+		return {
+			directory,
+			inherited: GIT_LOCATION_VARIABLES.filter((name) => process.env[name] !== undefined),
+		}
+	} finally {
+		restore_environment(original)
+	}
+}
+
+describe('test_network_guard.arm — under a git hook that exported GIT_DIR', () => {
+	it('lets a read of the checkout pass, so the teardown stays clean', () => {
+		const run = run_under_hook(['worktree', 'list', '--porcelain'])
+
+		expect(run.inherited).toStrictEqual([])
+		expect(() => {
+			test_network_guard.disarm(run.directory)
+		}).not.toThrow()
+	})
+
+	it('still refuses a write into the checkout', () => {
+		const run = run_under_hook(['add', '--dry-run', '.'])
+
+		expect(() => {
+			test_network_guard.disarm(run.directory)
+		}).toThrow(test_repository_guard.WRITE_VIOLATION_HEADING)
 	})
 })
 

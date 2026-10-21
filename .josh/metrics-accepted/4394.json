@@ -1,0 +1,7 @@
+{
+	"reason": "kit#4394: arm clears the pre-push hook's git location variables before forking workers (forget_hook_location)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}
