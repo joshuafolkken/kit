@@ -30,7 +30,7 @@ function legend_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<
 	if (layout === undefined) return []
 
 	const rows = run_board_layout.drawn_rows(layout)
-	const leads = new Set(rows.map((row) => run_board_render_icon.state_icon(row, header)))
+	const leads = new Set(rows.map((row) => run_board_render_icon.state_icon(row)))
 	const drawn = run_board_render_drawn.drawn_of(header, rows, leads)
 
 	return run_board_render_legend.legend_of(rows, drawn, notes)

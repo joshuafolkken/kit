@@ -87,6 +87,6 @@ describe('run_board_render.render a full findings section', () => {
 	})
 
 	it('names ✚ for the filed row, and in the findings only the kinds drawn', () => {
-		expect(lines.at(-1)).toBe('✚ filed this run  🆕 filed  💤 parked  💬 note')
+		expect(lines.at(-1)).toBe('⏰ elapsed  ✚ filed this run  🆕 filed  💤 parked  💬 note')
 	})
 })

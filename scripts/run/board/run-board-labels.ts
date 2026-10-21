@@ -70,10 +70,14 @@ const WORDS = {
 	untriaged: 'untriaged',
 	solo: 'runs alone',
 	solo_ahead: 'behind solo',
-	// A check held back by the machine-wide core budget, and why.
-	held_check: 'held check',
-	memory: 'memory',
-	cores: 'cores',
+	// A blocker this run will not finish, which a person has to move (joshuafolkken/kit#4292).
+	on_human: 'needs a person',
+	// A lane held back by the machine-wide core budget, and why.
+	held_check: 'held',
+	memory: 'waits for memory',
+	cores: 'waits for CPU',
+	// How long a lane has run, which the lanes rule's ⏰ stands over.
+	elapsed: 'elapsed',
 	investigate: 'investigate',
 	implement: 'implement',
 	ship: 'ship',
@@ -120,12 +124,6 @@ interface Shade {
 }
 
 type Paint = TextColor | Shade
-
-// One unit of a length: its count and the mark it is drawn with.
-interface SpanField {
-	value: number
-	unit: string
-}
 
 // Every row icon is an emoji a terminal draws two columns wide by default (Emoji_Presentation), so the
 // number after it lines up whichever state a row is in: 🅿 and ☑ are text symbols a terminal such as
@@ -286,6 +284,7 @@ const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
 	[WAIT_ICONS.memory, 'headroom'],
 	[WAIT_ICONS.untriaged, 'untriaged'],
 	[WAIT_ICONS.blocker, 'waits'],
+	[STATE_ICONS.human, 'on_human'],
 	[WAIT_ICONS.not_before, 'not_before'],
 ]
 
@@ -309,9 +308,9 @@ function day_minute_of(ms: number): string {
 	return `${day.join('-')} ${minute_of(ms)}`
 }
 
-// A length as its hours, and its minutes and seconds within the hour, each with its unit; a negative
-// span reads as zero.
-function span_fields(ms: number): Array<SpanField> {
+// A length as its hours, and its minutes and seconds within the hour, each its count with the mark it
+// is drawn with; a negative span reads as zero.
+function span_fields(ms: number): Array<{ value: number; unit: string }> {
 	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
 	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
 	const hours = Math.floor(minutes / MINUTES_PER_HOUR)

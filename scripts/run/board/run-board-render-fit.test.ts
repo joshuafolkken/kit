@@ -77,7 +77,7 @@ describe('run_board_render.render in a short pane', () => {
 		expect(has(lines, 'Issue 4')).toBe(false)
 		expect(kept.map((text) => has(lines, text))).toStrictEqual([true, true, true, true, true])
 		expect(lines[newest - 1]).toBe(rule('✅ done'))
-		expect(lines[newest + 1]).toBe('  ✅ 2 more  🚫 1')
+		expect(lines[newest + 1]).toBe('    ✅ 2 more  🚫 1')
 		expect(has(lines, '  more')).toBe(false)
 	})
 

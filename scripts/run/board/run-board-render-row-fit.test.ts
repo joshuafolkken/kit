@@ -54,9 +54,7 @@ function lane_lines(
 		.render({ header: board(waits), notes: [], size })
 		.map((line) => stripVTControlCharacters(line))
 
-	return [HELD, PLAIN].map(
-		(number) => lines.find((line) => line.includes(String(number)) && line.includes(ELAPSED)) ?? '',
-	)
+	return [HELD, PLAIN].map((number) => lines.find((line) => line.includes(String(number))) ?? '')
 }
 
 // The columns before `marker` on a line, as the terminal counts them.
@@ -64,9 +62,9 @@ function column_of(line: string, marker: string): number {
 	return run_board_fit.width_of(line.slice(0, line.indexOf(marker)))
 }
 
-// A line from its elapsed time on: what a row keeps whole however narrow its pane.
+// A line from its title's cut on: what a row keeps whole however narrow its pane.
 function tail_of(line: string): string {
-	return line.slice(line.indexOf(ELAPSED))
+	return line.slice(line.indexOf('…'))
 }
 
 describe('run_board_render.render — a running lane row on a narrow pane', () => {
@@ -75,17 +73,17 @@ describe('run_board_render.render — a running lane row on a narrow pane', () =
 
 		for (const line of lines) {
 			expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
-			expect(line).toMatch(/…\s+15′00″/u)
+			expect(line).toContain(ELAPSED)
+			expect(line).toMatch(/…$/u)
 		}
 	})
 
-	it('cuts a held row and a running row to one title column, their times ending in one', () => {
+	it('cuts a held row and a running row to one title column, their numbers starting in one', () => {
 		const [held = '', plain = ''] = lane_lines(NARROW, [wait])
-		const ends = [held, plain].map((line) => column_of(line, ELAPSED) + ELAPSED.length)
 
 		expect(held).toContain('🚧')
 		expect(column_of(held, '…')).toBe(column_of(plain, '…'))
-		expect(ends[0]).toBe(ends[1])
+		expect(column_of(held, String(HELD))).toBe(column_of(plain, String(PLAIN)))
 		expect(run_board_fit.width_of(held)).toBeLessThanOrEqual(NARROW)
 	})
 

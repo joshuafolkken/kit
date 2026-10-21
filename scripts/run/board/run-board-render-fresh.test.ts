@@ -6,7 +6,6 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
-import { run_board_usage_text } from './run-board-usage-text'
 
 // joshuafolkken/kit#3784: an issue row's part that just changed — the phase it entered, the time it
 // started counting, the finish time it ended at — is emphasized for about three seconds, as the
@@ -66,13 +65,13 @@ describe('run_board_render.render fresh rows', () => {
 		expect(running).toContain(paint(PHASE_ICONS.implement, 'bold-color'))
 	})
 
-	it('emphasizes a settled row by its finish time alone', () => {
+	it('emphasizes a settled row by its MM-DD HH:MM finish time alone', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const merged = row_of(raw_lines(), 'Issue 2')
-		const finish = run_board_usage_text.finish_of(ENDED, NOW) ?? ''
+		const finish = run_board_labels.day_minute_of(ENDED)
 
 		expect(merged).toContain(paint(finish, 'bold'))
-		expect(merged).toContain(`${STATE_ICONS.merged} 2`)
+		expect(merged).toContain(`${STATE_ICONS.merged} ${paint(finish, 'bold')} 2`)
 		expect(merged).not.toContain(paint(span_of(ENDED - SETTLED_START), 'bold'))
 	})
 

@@ -72,14 +72,16 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 	])('draws it %s and leaves it out of the parked count', async (_label, closed, icon) => {
 		const lines = await frame_after(answer_of(closed))
 
-		expect(row_of(lines)).toMatch(new RegExp(`${icon} ${String(ISSUE)} +${TITLE} +57′00″$`, 'u'))
+		expect(row_of(lines)).toMatch(
+			new RegExp(String.raw`${icon} \d\d-\d\d \d\d:\d\d ${String(ISSUE)} +${TITLE} +57′00″$`, 'u'),
+		)
 		expect(lines[0]).toContain('💤 0')
 	})
 
 	it('draws it without a time when its close time could not be read', async () => {
 		const lines = await frame_after(answer_of({ is_not_planned: true, closed_ms: undefined }))
 
-		expect(row_of(lines)).toMatch(new RegExp(`🚫 ${String(ISSUE)} +${TITLE}$`, 'u'))
+		expect(row_of(lines)).toMatch(new RegExp(`🚫 {13}${String(ISSUE)} +${TITLE}$`, 'u'))
 	})
 
 	// joshuafolkken/kit#4099: its park waits on a decision, so its row is drawn 🙋 and counted with the

@@ -1,4 +1,5 @@
 import type { BudgetWait, WaitReason } from '#scripts/gate/core-wait'
+import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
@@ -10,7 +11,7 @@ import { run_board_layout, type BoardRow } from './run-board-layout'
 // checkout's, another repository's — is one line right before the legend, which gives way with it,
 // so nothing is added under the header.
 
-const { HEADER_ICONS, WORDS, span_of } = run_board_labels
+const { HEADER_ICONS, WORDS, minute_span_of, span_of } = run_board_labels
 // 🚧 rather than ⏳, which a waiting row already draws, or 🚦, the gate stage's; an emoji a terminal
 // draws two columns wide.
 const BUDGET_ICON = '🚧'
@@ -37,9 +38,24 @@ function check_of(wait: BudgetWait): string {
 	return word === undefined || word === '' ? UNNAMED_CHECK : word.replace(RELATED_SUFFIX, '')
 }
 
-// Why, how long — right-aligned to `width` — and which check.
-function held_text(wait: BudgetWait, width: number): string {
-	return `${REASON_ICONS[wait.reason]} ${span_of(wait.waited_ms).padStart(width)} ${check_of(wait)}`
+// How long, to the minute where the seconds would not fit `room` (`10′05″` → `11′`).
+function held_span(wait: BudgetWait, room: number): string {
+	const span = span_of(wait.waited_ms)
+
+	return run_board_fit.width_of(span) <= room ? span : minute_span_of(wait.waited_ms)
+}
+
+// Why and how long, the two filling `width` columns with the time right-aligned (joshuafolkken/kit#4292).
+function held_time(wait: BudgetWait, width: number): string {
+	const lead = `${REASON_ICONS[wait.reason]} `
+	const room = width - run_board_fit.width_of(lead)
+
+	return `${lead}${held_span(wait, room).padStart(room)}`
+}
+
+// Why, how long and which check.
+function held_text(wait: BudgetWait): string {
+	return `${REASON_ICONS[wait.reason]} ${span_of(wait.waited_ms)} ${check_of(wait)}`
 }
 
 function is_lane_row(row: BoardRow, wait: BudgetWait): boolean {
@@ -81,7 +97,7 @@ function drawn_of(header: BoardHeader): Array<BudgetWait> {
 // One line for each wait no running row draws, nothing while none waits.
 function stray_lines(header: BoardHeader): Array<string> {
 	return stray_of(header).map(
-		(wait) => `${INDENT}${BUDGET_ICON} ${held_text(wait, 0)} ${place_text(wait, header.link)}`,
+		(wait) => `${INDENT}${BUDGET_ICON} ${held_text(wait)} ${place_text(wait, header.link)}`,
 	)
 }
 
@@ -97,6 +113,13 @@ function legend_of(header: BoardHeader): Array<string> {
 	return [`${BUDGET_ICON} ${WORDS.held_check}`, ...reasons.map(([icon, word]) => `${icon} ${word}`)]
 }
 
-const run_board_render_waits = { BUDGET_ICON, held_of, held_text, legend_of, stray_lines }
+const run_board_render_waits = {
+	BUDGET_ICON,
+	check_of,
+	held_of,
+	held_time,
+	legend_of,
+	stray_lines,
+}
 
 export { run_board_render_waits }

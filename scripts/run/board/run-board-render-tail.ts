@@ -10,19 +10,16 @@ import type { Phase } from './run-board-phase'
 import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_waits } from './run-board-render-waits'
 
-// The end of a running row (joshuafolkken/kit#3769, #4043): the icon of the phase its row leads with
-// and how long the child has stood at it, then two spaces — the gap between the row's other fields
-// (#4224) — and the kind and the age of the newest thing it did, both the board's own length
-// (`1°01′05″`). Each time is right-aligned to the widest its column draws on any running row, so
-// a `2°05′30″` and a `40″` end in one column and every icon stands in one column whichever row it
-// is on. The event that entered the phase is not drawn again after the phase's own time. A settled
-// or a waiting row draws neither. A lane held in the core budget draws its wait in the newest
-// activity's place, in the same columns (#4052).
+// The end of a running row (joshuafolkken/kit#3769, #4043, #4292): the kind and the age of the newest
+// thing the child did, the board's own length (`1°01′05″`), right-aligned to the widest any running
+// row draws, so a `2°05′30″` and a `40″` end in one column. The phase's icon and how long the child has
+// stood at it lead the row (`run-board-render-lead.ts`), so the event that entered the phase is not
+// drawn again here. A settled or a waiting row draws none. A lane held in the core budget draws the
+// check it holds in the newest activity's place (#4052), its reason and time leading the row.
 
-const { KIND_BLANK, PHASE_ICONS, span_of } = run_board_labels
+const { PHASE_ICONS, span_of } = run_board_labels
 const { is_live } = run_board_earlier
-const { held_of, held_text } = run_board_render_waits
-const GAP = '  '
+const { check_of, held_of } = run_board_render_waits
 // A phase past twice its usual time is drawn as long, past three times as alarming.
 const LONG_FACTOR = 2
 const ALARM_FACTOR = 3
@@ -70,26 +67,17 @@ function column_width(header: BoardHeader, age_of: (row: BoardRow) => number | u
 	return Math.max(span_of(0).length, ...spans)
 }
 
-function phase_age(row: BoardRow, header: BoardHeader): number | undefined {
-	const current = current_of(row)
+// How long the child has stood at its phase, right-aligned to `width` and colored against the phase's
+// usual time; blanks where no event said when it got there, so what follows still starts in its column.
+function phase_time(row: BoardRow, header: BoardHeader, width: number): string {
+	const current = is_live(row) ? current_of(row) : undefined
 
-	return current === undefined ? undefined : header.now_ms - current.since_ms
-}
-
-// The phase's icon and how long the child has stood at it, the time colored against the phase's usual
-// time; blanks where no event said when it got there, so the activity after it still starts in its
-// column.
-function phase_part(row: BoardRow, header: BoardHeader): string {
-	const current = current_of(row)
-	const width = column_width(header, (other) => phase_age(other, header))
-
-	if (current === undefined) return `${KIND_BLANK} ${' '.repeat(width)}`
+	if (current === undefined) return ' '.repeat(width)
 
 	const elapsed = header.now_ms - current.since_ms
 	const text = span_of(elapsed).padStart(width)
-	const color = phase_color(elapsed, header.usual?.get(current.phase))
 
-	return `${PHASE_ICONS[current.phase]} ${tinted(text, color)}`
+	return tinted(text, phase_color(elapsed, header.usual?.get(current.phase)))
 }
 
 // The icon of the phase a running row's end draws, `undefined` where it draws blanks — named by the
@@ -150,33 +138,23 @@ function drawn_activity(row: BoardRow, header: BoardHeader): TimedActivity | und
 	return newest
 }
 
-// The age the activity column draws: a held lane's wait, else its newest activity's.
 function activity_age(row: BoardRow, header: BoardHeader): number | undefined {
-	const held = held_of(row, header)
-
-	if (held !== undefined) return held.waited_ms
-
 	const newest = drawn_activity(row, header)
 
 	return newest === undefined ? undefined : header.now_ms - newest.since_ms
 }
 
-// The gap and the newest activity as its kind's icon and its age, aged as the `💓` is, or a held lane's
-// wait; nothing where the row draws neither.
+// The newest activity as its kind's icon and its age, aged as the `💓` is; nothing where the row draws
+// none.
 function activity_part(row: BoardRow, header: BoardHeader): string {
-	const width = column_width(header, (other) => activity_age(other, header))
-	const held = held_of(row, header)
-
-	if (held !== undefined) return `${GAP}${held_text(held, width)}`
-
 	const newest = drawn_activity(row, header)
 
 	if (newest === undefined) return ''
 
+	const width = column_width(header, (other) => activity_age(other, header))
 	const age = header.now_ms - newest.since_ms
-	const text = `${newest.icon} ${span_of(age).padStart(width)}`
 
-	return `${GAP}${run_board_header.aged(text, age)}`
+	return run_board_header.aged(`${newest.icon} ${span_of(age).padStart(width)}`, age)
 }
 
 // Whether a row ends on a tail: a running row and an earlier run's lane only.
@@ -184,17 +162,20 @@ function is_tailed(row: BoardRow): boolean {
 	return is_live(row)
 }
 
-// A running row's end, nothing for any other; a followup row's checks follow its phase part as a part
-// of their own.
-function tail_of(row: BoardRow, header: BoardHeader): Array<string | undefined> {
+// A running row's end — the check its held lane waits to run, its pull request's checks in followup,
+// or its newest activity — and nothing for any other row.
+function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
 	if (!is_tailed(row)) return []
 
+	const held = held_of(row, header)
+
+	if (held !== undefined) return [check_of(held)]
+
 	const checks = checks_of(row, header)
-	const phase = phase_part(row, header)
 
-	if (checks !== undefined) return [phase, run_board_render_checks.checks_part(checks)]
+	if (checks !== undefined) return [run_board_render_checks.checks_part(checks)]
 
-	return [`${phase}${activity_part(row, header)}`]
+	return [activity_part(row, header)]
 }
 
 // The icon a row's end draws for its newest activity, so the legend names it — none where the row
@@ -203,6 +184,12 @@ function activity_icon(row: BoardRow, header: BoardHeader): string | undefined {
 	return drawn_activity(row, header)?.icon
 }
 
-const run_board_render_tail = { activity_icon, checks_of, is_tailed, phase_icon, tail_of }
+const run_board_render_tail = {
+	activity_icon,
+	checks_of,
+	phase_icon,
+	phase_time,
+	tail_of,
+}
 
 export { run_board_render_tail }

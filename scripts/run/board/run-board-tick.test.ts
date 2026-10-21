@@ -264,6 +264,6 @@ describe('run_board_tick.tick spinner', () => {
 		const frame = stripVTControlCharacters(frames.at(-1) ?? '')
 
 		expect(frame).toMatch(/^▶ backlogrun/u)
-		expect(frame).toContain(`\n  🔍 ${String(SINGLE)}`)
+		expect(frame).toMatch(new RegExp(String.raw`\n {5}🔍 .*${String(SINGLE)}`, 'u'))
 	})
 })

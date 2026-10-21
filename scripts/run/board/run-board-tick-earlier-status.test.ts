@@ -24,6 +24,8 @@ const EARLIER = 4173
 const OWN = 4195
 const MINUTE_MS = 60_000
 const LAUNCHED_MINUTES = 12
+// An earlier row leads with the spinner and 🧳, its issue after the time columns (joshuafolkken/kit#4292).
+const EARLIER_ROW = new RegExp(String.raw`^\s*\S +${EARLIER_ICON} .* ${String(EARLIER)}\b`, 'u')
 const LAUNCHED_MS = LOCAL.started_ms - LAUNCHED_MINUTES * MINUTE_MS
 const LATER = '2026-10-08T09:05:00.000Z'
 
@@ -74,7 +76,9 @@ async function frame_of(
 }
 
 function row_of(lines: ReadonlyArray<string>, issue: number): string {
-	return lines.find((line) => new RegExp(String.raw`\s${String(issue)}\s`, 'u').test(line)) ?? ''
+	return (
+		lines.find((line) => new RegExp(String.raw`\s${String(issue)}(\s|$)`, 'u').test(line)) ?? ''
+	)
 }
 
 function header(lines: ReadonlyArray<string>): Array<string> {
@@ -86,7 +90,7 @@ describe('run_board_tick.tick — what an earlier run’s lane is doing', () => 
 		const status: ItemStatus = { ...EARLIER_STATUS, track: ['implement'], phase_ms: LAUNCHED_MS }
 		const row = row_of(await frame_of(held(status)), EARLIER)
 
-		expect(row).toContain(`${EARLIER_ICON} ${String(EARLIER)}`)
+		expect(row).toMatch(EARLIER_ROW)
 		expect(row).toContain(`${String(LAUNCHED_MINUTES)}′00″`)
 	})
 
@@ -119,7 +123,7 @@ describe('run_board_tick.tick — an earlier run’s lane its child cut and resu
 		const lines = await frame_of({ ...HELD, events: CUT_RESUME }, undefined, plans)
 		const quiet = await frame_of(HELD, undefined, plans)
 
-		expect(row_of(lines, EARLIER)).toContain(`${EARLIER_ICON} ${String(EARLIER)}`)
+		expect(row_of(lines, EARLIER)).toMatch(EARLIER_ROW)
 		expect(header(lines)[0]).toBe(header(quiet)[0])
 	})
 

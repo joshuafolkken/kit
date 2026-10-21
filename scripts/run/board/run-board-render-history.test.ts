@@ -11,11 +11,12 @@ import type { ItemState } from './run-board-status'
 // stood at its phase and its newest activity, a settled row on its finish time.
 
 const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_board_render_fixture
-const { minute_of } = run_board_labels
-// Each figure right-aligned in a column as wide as its label, the first after the number padded so the
-// lanes rule leaves the CPU label room over it.
+const { day_minute_of } = run_board_labels
+// Each figure right-aligned in a column as wide as its label, so the lanes rule leaves the label room
+// over it.
 const CELLS = '     5.0      0.5        0.0'
-const NUMBER_PAD = ' '.repeat(8)
+// The width of a time column in a lane row's lead.
+const TIME_WIDTH = 8
 const TITLE_WIDTH = 48
 
 const PLANNED: ReadonlyArray<Phase> = ['investigate', 'plan']
@@ -79,9 +80,9 @@ describe('run_board_render.render running rows', () => {
 	it('leads every running row with the last phase it reached, and draws no track after it', () => {
 		const lines = board_lines()
 
-		expect(row_line(lines, 1)).toMatch(/^ {2}📝 1 .* 2′00″$/u)
-		expect(row_line(lines, 3)).toMatch(/^ {2}💥 3 .* 2′00″$/u)
-		expect(row_line(lines, 4)).toMatch(/^ {2}📣 4 .* 2′00″$/u)
+		expect(row_line(lines, 1)).toMatch(/^ {5}📝 +2′00″ +5′00″ /u)
+		expect(row_line(lines, 3)).toMatch(/^ {5}💥 +2′00″ +5′00″ /u)
+		expect(row_line(lines, 4)).toMatch(/^ {5}📣 +2′00″ +5′00″ /u)
 		expect(lines.join('\n')).not.toContain('🔍📝')
 	})
 
@@ -99,11 +100,11 @@ describe('run_board_render.render running rows', () => {
 		expect(new Set(columns).size).toBe(1)
 	})
 
-	it('draws a row as the reference does: lead, number, usage, title, time, phase time, activity', () => {
+	it('draws a row as the reference does: lead, phase time, run time, usage, number, title, activity', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2${NUMBER_PAD}${CELLS}    ${title}  5′00″  🚦 2′00″  🚦 1′00″`,
+			`     🚦    2′00″    5′00″ ${CELLS} 2    ${title}  🚦 1′00″`,
 		)
 	})
 })
@@ -118,17 +119,17 @@ function settled_line(state: ItemState, track: ReadonlyArray<Phase>): string {
 
 // joshuafolkken/kit#3535: a settled row leads with its own state icon — it runs no process, so it draws
 // no CPU or memory; a finished one draws its finish time in their place (joshuafolkken/kit#3554), and
-// nothing after it (joshuafolkken/kit#3769).
+// nothing after it (joshuafolkken/kit#3769). joshuafolkken/kit#4292: it leads with `MM-DD HH:MM`, no 🔚.
 describe('run_board_render.render settled rows', () => {
 	const title = 'Sample 1'.padEnd(TITLE_WIDTH)
 
 	it.each<[ItemState, string]>([
 		['merged', '✅'],
 		['done', '🏁'],
-	])('ends a %s row on its finish time', (state, icon) => {
-		const finish = `🔚 ${minute_of(NOW)}`
+	])('leads a %s row with its finish time and ends it on its duration', (state, icon) => {
+		const finish = day_minute_of(NOW)
 
-		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  5′00″  ${finish}`)
+		expect(settled_line(state, FAILED)).toBe(`    ${icon} ${finish} 1    ${title}  5′00″`)
 	})
 
 	// joshuafolkken/kit#4171: a lane no child works in blanks its CPU, MEM and CMPRS.
@@ -137,7 +138,8 @@ describe('run_board_render.render settled rows', () => {
 		['parked', '💤'],
 	])('ends a %s row on its time, its usage blank', (state, icon) => {
 		const blank = ' '.repeat(CELLS.length)
+		const lead = `     ${icon} ${' '.repeat(TIME_WIDTH)} ${'5′00″'.padStart(TIME_WIDTH)}`
 
-		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1${NUMBER_PAD}${blank}    ${title}  5′00″`)
+		expect(settled_line(state, FAILED)).toBe(`${lead} ${blank} 1    Sample 1`)
 	})
 })
