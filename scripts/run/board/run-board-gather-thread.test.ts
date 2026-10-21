@@ -54,7 +54,11 @@ describe('run_board_gather_thread.worker_gatherer', () => {
 
 		spawned[0]?.emit('message', post_of(FRESH_GATHER, READ))
 
-		await expect(first).resolves.toStrictEqual({ ...read_of(READ), read_failed_ms: undefined })
+		await expect(first).resolves.toStrictEqual({
+			...read_of(READ),
+			read_failed_ms: undefined,
+			read_error: undefined,
+		})
 		expect(spawned[0]?.unref).toHaveBeenCalledOnce()
 	})
 
@@ -76,11 +80,12 @@ describe('run_board_gather_thread.worker_gatherer', () => {
 
 		spawned[0]?.emit('message', post_of(FRESH_GATHER, READ))
 		await first
-		spawned[0]?.emit('error', new Error('read failed'))
+		spawned[0]?.emit('error', new Error('read failed\n    at stack'))
 
 		await expect(gather('background')).resolves.toMatchObject({
 			local: LOCAL,
 			read_failed_ms: FAILED_MS,
+			read_error: 'read failed',
 		})
 		expect(spawned).toHaveLength(2)
 	})
@@ -93,7 +98,11 @@ describe('run_board_gather_thread.worker_gatherer before a first round', () => {
 
 		spawned[0]?.emit('exit', 1)
 
-		await expect(first).resolves.toMatchObject({ local: undefined, read_failed_ms: FAILED_MS })
+		await expect(first).resolves.toMatchObject({
+			local: undefined,
+			read_failed_ms: FAILED_MS,
+			read_error: 'exit 1',
+		})
 	})
 })
 

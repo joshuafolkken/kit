@@ -12,6 +12,7 @@ import type { SessionOperations } from './run-board-operation-read'
 import { run_board_priority } from './run-board-priority'
 import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_slot } from './run-board-render-slot'
+import { run_board_render_title } from './run-board-render-title'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
@@ -32,6 +33,9 @@ import type { UsualTimes } from './run-board-usual'
 
 const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
+const { title_of } = run_board_render_title
+// The columns a failed read's reason is cut to, so the header keeps its line.
+const REASON_LIMIT = 40
 const { padded } = run_board_fresh
 const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
@@ -74,6 +78,8 @@ interface BoardHeader {
 	plan_failed_ms: number | undefined
 	// When the reads off this machine last failed (`run-board-gather-thread.ts`); none once they answer.
 	read_failed_ms?: number | undefined
+	// Why they failed, drawn beside the failure.
+	read_error?: string | undefined
 	// Whether a plan read is in flight.
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
@@ -268,11 +274,13 @@ function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined
 	]
 }
 
-// A read is said only when it failed — the board otherwise keeps quiet about a routine read.
-function warning_of(word: string, failed: number | undefined): string | undefined {
+// A read is said only when it failed — the board otherwise keeps quiet about a routine read — and why,
+// where that is known, cut so it never pushes the line past its pane.
+function warning_of(word: string, failed: number | undefined, reason?: string): string | undefined {
 	if (failed === undefined) return undefined
+	const why = reason === undefined || reason === '' ? '' : ` ${title_of(reason, REASON_LIMIT)}`
 
-	return styleText('yellow', `${HEADER_ICONS.warning} ${word} ${minute_of(failed)}`)
+	return styleText('yellow', `${HEADER_ICONS.warning} ${word} ${minute_of(failed)}${why}`)
 }
 
 // A plan read in flight turns the spinner after ⏳ and says nothing more; a
@@ -354,7 +362,7 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		...progress_parts(counts, header),
 		loading_part(header),
 		warning_of(WORDS.plan, header.plan_failed_ms),
-		warning_of(WORDS.read, header.read_failed_ms),
+		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
 	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)

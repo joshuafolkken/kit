@@ -683,7 +683,7 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, it prints `no run`.
+**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 

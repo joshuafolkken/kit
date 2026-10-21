@@ -61,6 +61,9 @@ interface BoardView extends FrameBounds {
 	link?: Link | undefined
 }
 
+// When the reads off this machine last failed, and why.
+type ReadFailure = Pick<BoardHeader, 'read_error' | 'read_failed_ms'>
+
 // What every row of one frame is drawn with: the header, how wide the time column is, so a
 // `2°05′30″` and a `42″` end in the same column, and the lane cells after a row's lead where its
 // section draws them.
@@ -335,14 +338,17 @@ function render(view: BoardView): Array<string> {
 	return bounded(parts, view)
 }
 
-// No run read here — or no read answered, which the line says beside it.
+// No run read here — or the reads failed, which the line says, and why, in place of `no run`: a read
+// that failed cannot tell whether a run is there.
 function render_no_run(
 	now_ms: number,
 	bounds: FrameBounds = {},
-	read_failed_ms?: number,
+	failure: ReadFailure = {},
 ): Array<string> {
-	const warning = run_board_header.warning_of(WORDS.read, read_failed_ms)
-	const parts = ['■ backlogrun', WORDS.no_run, clock_of(now_ms), warning]
+	const { read_failed_ms, read_error } = failure
+	const warning = run_board_header.warning_of(WORDS.read, read_failed_ms, read_error)
+	const said = warning === undefined ? WORDS.no_run : undefined
+	const parts = ['■ backlogrun', said, clock_of(now_ms), warning]
 	const above = [parts.filter((part) => part !== undefined).join(GAP)]
 	const notes = { head: [], lines: [], hidden: 0 }
 

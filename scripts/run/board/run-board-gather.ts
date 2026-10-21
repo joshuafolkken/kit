@@ -54,6 +54,8 @@ interface GatherRead {
 	budget_waits: ReadonlyArray<BudgetWait>
 	// When the reads last failed; `undefined` once a read has answered since.
 	read_failed_ms?: number | undefined
+	// Why they failed, the first line of the error; cleared with `read_failed_ms`.
+	read_error?: string | undefined
 }
 
 interface GatherState extends GatherRead {
@@ -161,9 +163,10 @@ async function gather(state: GatherState, ports: GatherPorts, pace: Pace): Promi
 
 // What a frame draws, without the marks the next reads compare against.
 function read_of(state: GatherState): GatherRead {
-	const { local, read_ms, idle_since, gauges, usages, budget_waits, read_failed_ms } = state
+	const { local, read_ms, idle_since, gauges, usages, budget_waits } = state
+	const { read_failed_ms, read_error } = state
 
-	return { local, read_ms, idle_since, gauges, usages, budget_waits, read_failed_ms }
+	return { local, read_ms, idle_since, gauges, usages, budget_waits, read_failed_ms, read_error }
 }
 
 // A single frame's reads, taken afresh each time it is drawn.
