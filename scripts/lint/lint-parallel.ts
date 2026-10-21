@@ -13,6 +13,7 @@ import {
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
+import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_daemon } from './eslint-daemon'
 import { lint_gate_scope } from './lint-gate-scope'
 
@@ -55,12 +56,17 @@ async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessRes
 }
 
 // The finished report is re-read before it is returned, inside the lane's cache sharing, because
-// the re-reading uses that same cache file.
+// the re-reading uses that same cache file. Both run between dropping the entries whose imports
+// changed and recording what the fresh ones read (`eslint-cache-dependencies.ts`).
 async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
-	return await lane_cache_run.run(eslint.recheck.cache_file, async () => {
-		const result = await run_eslint_process(eslint)
+	const { cache_file } = eslint.recheck
 
-		return await cross_file_recheck.verify(result, eslint.recheck)
+	return await lane_cache_run.run(cache_file, async () => {
+		return await eslint_cache_dependencies.guard(cache_file, async () => {
+			const result = await run_eslint_process(eslint)
+
+			return await cross_file_recheck.verify(result, eslint.recheck)
+		})
 	})
 }
 

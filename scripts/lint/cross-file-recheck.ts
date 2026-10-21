@@ -17,8 +17,9 @@ import type { ESLint } from 'eslint'
 // whose rules a hand-authored `.js` file keeps — as `import-x`.
 //
 // Only a stale red is re-read. A stale green — the other file broke, the untouched one still
-// answers clean — is not something a report can point at, and the type check does not report the
-// `no-unsafe-*` rules; invalidating it is joshuafolkken/kit#4415.
+// answers clean — is not something a report can point at; the entry is dropped before the run
+// instead, once the files its imports reach no longer hash as recorded
+// (`eslint-cache-dependencies.ts`, joshuafolkken/kit#4415).
 //
 // That holds for a run narrowed to one change's files as much as for the whole tree: the change can
 // hold both files, and the one a later edit leaves alone keeps its cached report.

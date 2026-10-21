@@ -18,6 +18,11 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 vi.mock('./cross-file-recheck', () => ({
 	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
 }))
+vi.mock('./eslint-cache-dependencies', () => ({
+	eslint_cache_dependencies: {
+		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
+}))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)

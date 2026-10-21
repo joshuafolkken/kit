@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
@@ -111,5 +113,17 @@ describe('josh format without Web files', () => {
 		expect(console.info).toHaveBeenCalledWith(
 			expect.stringContaining('josh prettier: no HTML, CSS or JavaScript files were found'),
 		)
+	})
+})
+
+// joshuafolkken/kit#4415: `eslint --fix` writes the gate's cache file, so it is guarded as the gate's
+// lint is — entries whose imports changed are dropped before it reads them.
+describe('josh format — the dependency guard', () => {
+	it('runs eslint --fix inside the guard of the gate cache file', async () => {
+		const root = write_project({ josh: { profile: 'full' } })
+		const guard = vi.spyOn(eslint_cache_dependencies, 'guard')
+
+		expect(await format.run_format(root)).toBe(0)
+		expect(guard).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function), root)
 	})
 })

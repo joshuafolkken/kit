@@ -248,6 +248,7 @@
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
 		"execa": "^10.1.1",
+		"flatted": "^3.4.4",
 		"js-yaml": "^5.5.0",
 		"jsonc-parser": "^3.3.1",
 		"ora": "^9.4.1",

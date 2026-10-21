@@ -14,6 +14,11 @@ vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi
 vi.mock('#scripts/lint/cross-file-recheck', () => ({
 	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
 }))
+vi.mock('#scripts/lint/eslint-cache-dependencies', () => ({
+	eslint_cache_dependencies: {
+		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
+}))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -21,6 +26,8 @@ const { eslint_daemon } = await import('#scripts/lint/eslint-daemon')
 const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
 const { cross_file_recheck } = await import('#scripts/lint/cross-file-recheck')
 const mocked_verify = vi.mocked(cross_file_recheck.verify)
+const { eslint_cache_dependencies } = await import('#scripts/lint/eslint-cache-dependencies')
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
 const { pre_commit_lint } = await import('./pre-commit-lint')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -158,5 +165,19 @@ describe('pre_commit_lint.run — the re-read eslint report', () => {
 		})
 		expect(rule_filter?.(ERROR_RULE)).toBe(true)
 		expect(rule_filter?.(WARNING_RULE)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4415: an entry whose imports changed is dropped from the hook's cache file before
+// the run reads it — the stale green the re-reading cannot point at.
+describe('pre_commit_lint.run — the dependency guard', () => {
+	it('runs eslint and its re-reading inside the guard of the hook cache file', async () => {
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
+
+		await pre_commit_lint.run(['eslint', ...STAGED])
+
+		expect(mocked_guard).toHaveBeenCalledWith(ESLINT_COMMIT_CACHE_FILE, expect.any(Function))
+		expect(mocked_verify).toHaveBeenCalledOnce()
 	})
 })

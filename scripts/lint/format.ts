@@ -1,9 +1,14 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
-import { ESLINT_CACHE_FLAGS, PRETTIER_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import {
+	ESLINT_CACHE_FILE,
+	ESLINT_CACHE_FLAGS,
+	PRETTIER_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { execa } from 'execa'
+import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 
 const COMMAND_NAME = 'format'
 const ARGV_OFFSET = 2
@@ -43,7 +48,11 @@ async function run_format(directory: string): Promise<number> {
 	if (prettier_exit_code !== 0) return prettier_exit_code
 	const eslint_reason = project_checks.eslint_skip_reason(directory)
 
-	return await run_unless_skipped('eslint', eslint_reason, ESLINT_FIX_ARGS, directory)
+	return await eslint_cache_dependencies.guard(
+		ESLINT_CACHE_FILE,
+		async () => await run_unless_skipped('eslint', eslint_reason, ESLINT_FIX_ARGS, directory),
+		directory,
+	)
 }
 
 // The argument refusal survives leaving the `sh -c` composite shape: both tools run over the whole

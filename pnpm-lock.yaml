@@ -181,6 +181,9 @@ importers:
       execa:
         specifier: ^10.1.1
         version: 10.1.1
+      flatted:
+        specifier: ^3.4.4
+        version: 3.4.4
       js-yaml:
         specifier: ^5.5.0
         version: 5.5.0
