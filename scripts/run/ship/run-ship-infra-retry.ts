@@ -6,7 +6,8 @@ import { run_ship_stop_cause } from './run-ship-stop-cause'
 // A stage that stopped on the infrastructure is run again in place, a bounded number of times, before
 // the ship stops (joshuafolkken/kit#3998). Re-running a stage is what a resumed ship does already, so
 // a retry repeats nothing a relaunched lane would not; it only skips the stop, the relaunch and the
-// wait in between. Any other stop — a finding, a red check, a conflict — returns at once.
+// wait in between. Any other stop — a finding, a red check, a conflict — returns at once, and so does a
+// review round's, a reviewer that did not finish included: a review is never re-run in place.
 
 const MAX_INFRA_RETRIES = 2
 const RETRY_DELAY_MS = 60_000
@@ -29,11 +30,9 @@ const DEFAULT_HOOKS: RetryHooks = {
 }
 
 function is_retryable(stage: Stage, section: ShipSection): boolean {
-	if (section.code === 0) return false
+	if (section.code === 0 || run_ship_stop_cause.is_review(stage)) return false
 
-	const cause = run_ship_stop_cause.cause_of(stage, section.body, section.conflicts)
-
-	return cause === run_ship_stop_cause.CAUSE.INFRA
+	return run_ship_stop_cause.cause_of(stage, section) === run_ship_stop_cause.CAUSE.INFRA
 }
 
 async function retried(

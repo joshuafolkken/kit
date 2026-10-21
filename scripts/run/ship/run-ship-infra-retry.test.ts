@@ -76,3 +76,13 @@ describe('run_ship_infra_retry.retried', () => {
 		expect(attempt).toHaveBeenCalledTimes(1)
 	})
 })
+
+// joshuafolkken/kit#4431: a reviewer that did not finish is the infrastructure, yet never re-run.
+describe('run_ship_infra_retry.retried — a review round tagged infra', () => {
+	it('never re-runs a review its reviewer did not finish', async () => {
+		const attempt = attempts({ ...RATE_LIMITED, header: 'review', cause: 'infra' }, GREEN)
+
+		await retried('review', attempt, hooks())
+		expect(attempt).toHaveBeenCalledTimes(1)
+	})
+})

@@ -6,6 +6,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_overlap } from './run-ship-overlap'
 import { run_ship_scoped } from './run-ship-scoped'
+import type { Cause } from './run-ship-stop-cause'
 
 // `josh ship` keeps the branch current with the default branch itself: a default branch that moves
 // while the pull request opens and CI runs would otherwise stop the followup as `interrupted`, though
@@ -30,11 +31,13 @@ const MERGED_PREFIX = 'merged '
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
 // `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
 // that reused a green record — so its few seconds are not timed as a run of it. `preconditions` names
-// the kinds of the preconditions a stopped preflight found unmet (`run-ship-preflight.ts`).
+// the kinds of the preconditions a stopped preflight found unmet (`run-ship-preflight.ts`). `cause` is the
+// one a stopped review round tagged its stop with (`run-ship-stop-cause.ts`).
 interface StepResult extends JoshResult {
 	is_skipped?: boolean
 	conflicts?: ReadonlyArray<string>
 	preconditions?: ReadonlyArray<string>
+	cause?: Cause
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {

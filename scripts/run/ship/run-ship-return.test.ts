@@ -47,6 +47,16 @@ const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: tru
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
 const CONTEXT = { excerpt: [OUTPUT], changed: [CHANGED_FILE], more_changed: 0 }
+const ARGS = {
+	number: ISSUE,
+	title: TITLE,
+	notify: [],
+	body: [],
+	body_path: undefined,
+	cites: [],
+	is_review: true,
+	is_detach: true,
+}
 const SERVER = 'server-1'
 const NEW_SERVER = 'server-2'
 const STOPPED = { is_success: false, reason: 'the broker stopped serving before it answered' }
@@ -252,16 +262,6 @@ describe('run_ship_return.return_control on a merge conflict', () => {
 // joshuafolkken/kit#3923: the failed output and the changed files ride in the prompt itself.
 describe('run_ship_return — the stop context in the relaunched prompt', () => {
 	const conflicted = 'scripts/conflicted.ts'
-	const args = {
-		number: ISSUE,
-		title: TITLE,
-		notify: [],
-		body: [],
-		body_path: undefined,
-		cites: [],
-		is_review: true,
-		is_detach: true,
-	}
 
 	it('puts the failed output and the changed files in the relaunched prompt', async () => {
 		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
@@ -275,7 +275,7 @@ describe('run_ship_return — the stop context in the relaunched prompt', () => 
 	it('hands the failed section body and its conflicts to the relaunched prompt', async () => {
 		const failed = { body: OUTPUT, conflicts: [conflicted] }
 
-		expect(await run_ship_return.hand_back(args, 'followup', failed)).toBe('relaunched')
+		expect(await run_ship_return.hand_back(ARGS, 'followup', failed)).toBe('relaunched')
 
 		const invocation = String(relaunch_mock.mock.calls[0]?.[1])
 
@@ -283,8 +283,18 @@ describe('run_ship_return — the stop context in the relaunched prompt', () => 
 		expect(invocation).toContain(OUTPUT)
 	})
 
+	// joshuafolkken/kit#4431: the ship-stop position names the cause the review round tagged.
+	it('records a review stop under the cause its round tagged', async () => {
+		await run_ship_return.hand_back(ARGS, 'review', { body: OUTPUT, cause: 'attest' })
+
+		expect(emit_mock).toHaveBeenCalledWith(
+			'ship-stop',
+			`#${ISSUE} review failed (attest) — pnpm josh ship --log ${ISSUE}`,
+		)
+	})
+
 	it('relaunches with no excerpt when no section failed', async () => {
-		expect(await run_ship_return.hand_back(args, 'gate', undefined)).toBe('relaunched')
+		expect(await run_ship_return.hand_back(ARGS, 'gate', undefined)).toBe('relaunched')
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(`pnpm josh ship --log ${ISSUE}`)
 	})
 
@@ -292,7 +302,7 @@ describe('run_ship_return — the stop context in the relaunched prompt', () => 
 	it('carries a stale review onto the relaunch', async () => {
 		stale_mock.mockResolvedValue(true)
 
-		expect(await run_ship_return.hand_back(args, 'followup', undefined)).toBe('relaunched')
+		expect(await run_ship_return.hand_back(ARGS, 'followup', undefined)).toBe('relaunched')
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain('pnpm josh ship --detach --review')
 	})
 })

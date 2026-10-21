@@ -1,5 +1,6 @@
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
+import type { Cause } from './run-ship-stop-cause'
 
 // The command a relaunched lane child runs once it has fixed what stopped its detached ship.
 // The stopped stage decides the command mechanically, so it is decided here, once, and the prompt
@@ -43,6 +44,8 @@ interface ShipResume {
 	is_review: boolean
 	// The paths a merge of the default branch left unmerged.
 	conflicts?: ReadonlyArray<string>
+	// The cause a stopped review round tagged its stop with (`run-ship-stop-cause.ts`).
+	cause?: Cause
 	// The issue changed after the recorded review's brief (`run-ship-probe.ts`).
 	is_review_stale?: boolean
 }

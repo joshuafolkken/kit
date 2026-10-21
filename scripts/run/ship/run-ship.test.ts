@@ -39,6 +39,14 @@ describe('run_ship.section_of — a stage result under its header', () => {
 		})
 	})
 
+	// joshuafolkken/kit#4431: a review round's tagged cause reaches the stop record.
+	it('carries the cause a review round tagged its stop with', () => {
+		expect(run_ship.section_of('h', { code: FAILED, out: 'red', cause: 'attest' })).toStrictEqual({
+			...section('h', 'red', FAILED),
+			cause: 'attest',
+		})
+	})
+
 	it('adds neither key to a result that has none', () => {
 		expect(run_ship.section_of('h', { code: OK, out: 'ok' })).toStrictEqual(section('h', 'ok'))
 	})

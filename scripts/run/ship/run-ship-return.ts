@@ -43,7 +43,7 @@ type ReturnOutcome = 'relaunched' | 'recorded' | 'parked' | 'redispatch'
 
 function stop_text(issue: string, stage: Stage, resume: ShipResume, output: string): string {
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
-	const cause = run_ship_stop_cause.cause_of(stage, output, resume.conflicts)
+	const cause = run_ship_stop_cause.cause_of(stage, { ...resume, body: output })
 
 	return run_ship_stop_text.format(issue, reason, cause)
 }
@@ -159,20 +159,36 @@ async function return_control(
 	return server === undefined ? relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
+type FailedSection = Pick<ShipSection, 'body' | 'conflicts' | 'cause'>
+
+// The section's conflicts and the cause its review round tagged, only where it has them.
+function stopped_resume(resume: ShipResume, failed: FailedSection | undefined): ShipResume {
+	const { conflicts, cause } = failed ?? {}
+
+	return {
+		...resume,
+		...(conflicts !== undefined && { conflicts }),
+		...(cause !== undefined && { cause }),
+	}
+}
+
 // The stopped ship's arguments and its failed section, as `return_control` takes them: the section's
-// conflicts ride on the resume, its body is the output the prompt carries. A stale review rides on it
-// too, so the relaunched child re-detaches with `--review` (joshuafolkken/kit#4221).
+// conflicts and tagged cause ride on the resume, its body is the output the prompt carries. A stale
+// review rides on it too, so the relaunched child re-detaches with `--review` (joshuafolkken/kit#4221).
 async function hand_back(
 	args: ShipArguments,
 	stage: Stage,
-	failed: Pick<ShipSection, 'body' | 'conflicts'> | undefined,
+	failed: FailedSection | undefined,
 ): Promise<ReturnOutcome> {
 	const is_review_stale = await run_ship_probe.read_review_stale()
 	const resume = { ...run_ship_next.resume_of(args), is_review_stale }
-	const conflicts = failed?.conflicts
-	const stopped = conflicts === undefined ? resume : { ...resume, conflicts }
 
-	return await return_control(args.number, stage, stopped, failed?.body ?? '')
+	return await return_control(
+		args.number,
+		stage,
+		stopped_resume(resume, failed),
+		failed?.body ?? '',
+	)
 }
 
 const run_ship_return = { hand_back, return_control }

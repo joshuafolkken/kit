@@ -279,6 +279,11 @@ describe('test_network_guard.arm — what the workers inherit', () => {
 // set refused the workers' reads of their own checkout and failed at teardown.
 const PROJECT_ROOT = path.join(import.meta.dirname, '..', '..')
 
+// The `GIT_DIR` a hook firing in this checkout exports.
+function hook_git_directory(): string {
+	return execaSync('git', ['rev-parse', '--absolute-git-dir']).stdout
+}
+
 interface HookRun {
 	directory: string
 	inherited: Array<string>
@@ -291,7 +296,7 @@ function run_under_hook(args: ReadonlyArray<string>): HookRun {
 	const directory = temporary_directory()
 
 	try {
-		process.env['GIT_DIR'] = execaSync('git', ['rev-parse', '--absolute-git-dir']).stdout
+		process.env['GIT_DIR'] = hook_git_directory()
 		test_network_guard.arm(directory, scratch_temporary_root())
 		execaSync(test_network_guard.GIT_SHIM_NAME, args, { cwd: PROJECT_ROOT, reject: false })
 
@@ -312,6 +317,26 @@ describe('test_network_guard.arm — under a git hook that exported GIT_DIR', ()
 		expect(() => {
 			test_network_guard.disarm(run.directory)
 		}).not.toThrow()
+	})
+
+	// joshuafolkken/kit#4439: `test-state-guard` is torn down after this guard and reads `GIT_DIR` back.
+	it('hands back a restore that puts the exported GIT_DIR back', () => {
+		const original = snapshot_environment()
+		const exported = hook_git_directory()
+
+		try {
+			process.env['GIT_DIR'] = exported
+			const restore_hook_location = test_network_guard.arm(
+				temporary_directory(),
+				scratch_temporary_root(),
+			)
+
+			restore_hook_location()
+
+			expect(process.env['GIT_DIR']).toBe(exported)
+		} finally {
+			restore_environment(original)
+		}
 	})
 
 	it('still refuses a write into the checkout', () => {

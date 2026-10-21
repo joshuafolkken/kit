@@ -74,16 +74,8 @@ function answer_with(failing: string | undefined): void {
 	})
 }
 
-async function stage_code(is_stale = false): Promise<number> {
-	const result = await run_ship_review_steps.review_stage(ISSUE, is_stale)
-
-	return result.code
-}
-
-async function stage_out(): Promise<string> {
-	const result = await run_ship_review_steps.review_stage(ISSUE)
-
-	return result.out
+async function stage(is_stale = false): Promise<unknown> {
+	return await run_ship_review_steps.review_stage(ISSUE, is_stale)
 }
 
 beforeEach(() => {
@@ -121,14 +113,14 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 	it.each(['missing', 'not-required', 'ok'])('runs the review on a %s record', async (status) => {
 		record_check_mock.mockResolvedValueOnce({ status })
 
-		expect(await stage_code(status === 'ok')).toBe(OK)
+		expect(await stage(status === 'ok')).toHaveProperty('code', OK)
 		expect(commands()).toContain(OPEN)
 	})
 })
 
 describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('opens, reviews, joins, attests and records a clean round without stopping', async () => {
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, RECORD])
 		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)
 		expect(launch.mock.calls[0]?.[0]).toMatchObject({ argv: ARGV })
@@ -137,7 +129,7 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('records Low findings and ships on', async () => {
 		stamps.read_stamp_text.mockReturnValue(`${LOW}\n`)
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toContain(`${RECORD} ${LOW}`)
 	})
 
@@ -165,28 +157,33 @@ describe('run_ship_review_steps.review_stage — a finding or a refusal stops it
 
 		stamps.read_stamp_text.mockReturnValue(described)
 
-		expect(await stage_out()).toContain(described)
+		expect(await stage()).toHaveProperty('out', expect.stringContaining(described))
 		expect(commands()).toContain(`${RECORD} ${HIGH}`)
 	})
 
-	it.each([JOIN, ATTEST])('stops at a failed `%s` without recording', async (failing) => {
+	// joshuafolkken/kit#4431: a stop on no finding is tagged with its step's own cause.
+	it.each([
+		[JOIN, 'check'],
+		[ATTEST, 'attest'],
+		[RECORD, 'check'],
+	])('stops at a failed `%s` without recording, tagged %s', async (failing, cause) => {
 		answer_with(failing)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', cause)
 		expect(commands().at(-1)).toBe(failing)
 	})
 
 	it('stops when the brief is refused, launching no reviewer', async () => {
 		answer_with(OPEN)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'check')
 		expect(launch).not.toHaveBeenCalled()
 	})
 
 	it('stops on an unfinished review (no findings file) without recording', async () => {
 		stamps.read_stamp_text.mockReturnValue(undefined)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'infra')
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST])
 	})
 })
@@ -195,20 +192,20 @@ describe('run_ship_review_steps.review_stage — a reviewer error stops it', () 
 	it('stops when the reviewer exits non-zero, before the join', async () => {
 		launch.mockResolvedValue({ ...COMPLETED, exit_code: FAILED })
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'infra')
 		expect(commands()).toStrictEqual([OPEN])
 	})
 
 	it('stops when the reviewer could not start', async () => {
 		launch.mockResolvedValue({ kind: 'failed', note: SPAWN_NOTE })
 
-		expect(await stage_out()).toContain(SPAWN_NOTE)
+		expect(await stage()).toHaveProperty('out', expect.stringContaining(SPAWN_NOTE))
 	})
 
 	it('stops when the reviewer profile is rejected', async () => {
 		review_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
 
-		expect(await stage_out()).toContain(PROFILE_NOTE)
+		expect(await stage()).toHaveProperty('out', expect.stringContaining(PROFILE_NOTE))
 		expect(launch).not.toHaveBeenCalled()
 	})
 })
@@ -222,7 +219,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
 		answer_with(JOIN)
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM}`])
 	})
 
@@ -230,7 +227,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		stamps.read_stamp_text.mockReturnValue(LOW)
 		answer_with(JOIN)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'check')
 		expect(commands().at(-1)).toBe(JOIN)
 	})
 
@@ -240,7 +237,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		stamps.read_stamp_text.mockReturnValue(`${FIXED_MEDIUM}\n${MEDIUM_UNFIXED}`)
 		answer_with(JOIN)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'finding')
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`])
 	})
 })
@@ -251,14 +248,14 @@ describe('run_ship_review_steps.review_stage — the scoped pair before the revi
 	it('runs the checks the tree has no green record for, then reviews without stopping', async () => {
 		missing_mock.mockReturnValue([LINT, TEST])
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([LINT, TEST, OPEN, JOIN, ATTEST, RECORD])
 	})
 
 	it('runs only the check whose record is stale', async () => {
 		missing_mock.mockReturnValueOnce([TEST])
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([TEST, OPEN, JOIN, ATTEST, RECORD])
 	})
 
@@ -266,7 +263,7 @@ describe('run_ship_review_steps.review_stage — the scoped pair before the revi
 		missing_mock.mockReturnValue([LINT, TEST])
 		answer_with(LINT)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'check')
 		expect(commands()).toStrictEqual([LINT])
 		expect(launch).not.toHaveBeenCalled()
 	})
@@ -279,7 +276,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
 		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${MEDIUM}`])
 	})
 
@@ -359,7 +356,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 	it('stops on a decision it cannot parse, recording nothing and launching no reviewer', async () => {
 		josh_run_mock.mockResolvedValue({ code: OK, out: 'skip\n' })
 
-		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('code', FAILED)
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('cause', 'check')
 		expect(record_round_two_mock).not.toHaveBeenCalled()
 		expect(launch).not.toHaveBeenCalled()
 	})

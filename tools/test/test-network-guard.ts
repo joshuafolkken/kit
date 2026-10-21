@@ -375,22 +375,37 @@ function read_log(log_file: string): string | undefined {
 // failing the run at teardown, so the suite's answer depended on whether a hook launched it. Cleared
 // when the checkout resolves without them, as `scripts/hooks/run-hook.sh` does for the agent hooks;
 // a write into the checkout is still refused by the working-directory finding, and a test that hands
-// git a location variable itself is still refused by the environment one.
-function forget_hook_location(guarded_directory: string | undefined): void {
-	if (guarded_directory !== undefined) git_location_environment.clear_git_location_variables()
+// git a location variable itself is still refused by the environment one. The restore goes to the
+// teardown: vitest tears the root's `globalSetup` down before a project's, so `test-state-guard` reads
+// the variables back as the hook exported them (joshuafolkken/kit#4439).
+function keep_hook_location(): void {
+	// Nothing was cleared, so nothing comes back.
+}
+
+function forget_hook_location(guarded_directory: string | undefined): () => void {
+	if (guarded_directory === undefined) return keep_hook_location
+
+	return git_location_environment.clear_git_location_variables()
 }
 
 // `globalSetup` runs before any worker is forked, so the workers inherit this `PATH` and every `gh`
 // and `git` they spawn — directly or through a CLI subprocess of their own — resolves to a shim. They
 // inherit the record's path for the in-process Telegram guard and the redirected temp root with it.
-function arm(directory: string = GUARD_DIRECTORY, temporary_root: string = TEMPORARY_ROOT): void {
+// Answers the restore of the hook's git location variables.
+function arm(
+	directory: string = GUARD_DIRECTORY,
+	temporary_root: string = TEMPORARY_ROOT,
+): () => void {
 	install_shim(directory)
-	forget_hook_location(GUARDED_GIT_DIRECTORY)
+	const restore_hook_location = forget_hook_location(GUARDED_GIT_DIRECTORY)
+
 	mkdirSync(temporary_root, { recursive: true })
 	process.env['PATH'] = `${directory}${path.delimiter}${process.env['PATH'] ?? ''}`
 	if (GIT_BINARY !== undefined) process.env[GIT_BINARY_KEY] = path.join(directory, GIT_SHIM_NAME)
 	process.env[GUARD_LOG_KEY] = log_in(directory)
 	process.env[platform_temporary.TEMP_ROOT_KEY] = temporary_root
+
+	return restore_hook_location
 }
 
 // Thrown rather than logged: a warning on a suite that already exited 0 is a warning nobody reads,
@@ -420,9 +435,15 @@ function teardown(): void {
 }
 
 function setup(): () => void {
-	arm()
+	const restore_hook_location = arm()
 
-	return teardown
+	return function teardown_and_restore(): void {
+		try {
+			teardown()
+		} finally {
+			restore_hook_location()
+		}
+	}
 }
 
 const test_network_guard = {
