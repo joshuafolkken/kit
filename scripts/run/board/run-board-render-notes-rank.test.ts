@@ -38,7 +38,7 @@ describe('run_board_render.render findings without repeated words', () => {
 	it('draws a note that opens with its own number once', () => {
 		const lines = lines_of(header(), notes_of([event(KIND.NOTE, '#4073 auto-ok applied')]))
 
-		expect(lines).toContain(`  💬 ${minute_of(NOW)} 4073  auto-ok applied`)
+		expect(lines).toContain(`    💬 ${minute_of(NOW)} 4073  auto-ok applied`)
 	})
 
 	// joshuafolkken/kit#4099: the child is a 🙋 decision row while it stays parked, and once it resumes
@@ -55,7 +55,7 @@ describe('run_board_render.render findings without repeated words', () => {
 		const lines = lines_of(header({ repo: REPO }), notes_of([event(KIND.NOTE, text)]))
 
 		expect(lines).toContain(
-			`  💬 ${minute_of(NOW)} 4095  waiting on #4085 and joshuafolkken/app-kit#12`,
+			`    💬 ${minute_of(NOW)} 4095  waiting on #4085 and joshuafolkken/app-kit#12`,
 		)
 	})
 })
@@ -71,16 +71,16 @@ describe('run_board_render.render a full findings section', () => {
 	const lines = lines_of(listing([4100]), [listed, ...seen, park, filed])
 	const drawn = lines
 		.slice(lines.indexOf(rule(NOTES_HEADING)) + 1)
-		.filter((line) => line.startsWith('  ') && !line.startsWith('  more'))
+		.filter((line) => line.startsWith(' '.repeat(4)))
 
 	it('keeps 💤, then a filed Issue with no row, then notes, and draws no line for a filed row', () => {
 		expect(drawn.slice(0, 2)).toStrictEqual([
-			`  💤 ${minute_of(park.at_ms)} 4095  Measure`,
-			`  🆕 ${minute_of(filed.at_ms)} 4096  Fix`,
+			`    💤 ${minute_of(park.at_ms)} 4095  Measure`,
+			`    🆕 ${minute_of(filed.at_ms)} 4096  Fix`,
 		])
 		expect(drawn.slice(2)).toStrictEqual(
 			[0, 1, 2, 3].map(
-				(index) => `  💬 ${minute_of(NOW - index * MINUTE)} 3415  seen ${String(index)}`,
+				(index) => `    💬 ${minute_of(NOW - index * MINUTE)} 3415  seen ${String(index)}`,
 			),
 		)
 		expect(lines).toContain('  more 2')
