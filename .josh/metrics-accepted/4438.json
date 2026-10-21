@@ -1,0 +1,7 @@
+{
+	"reason": "#4438 adds the issue:lint check that refuses a standalone start-condition heading (new behavior, 18 lines)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

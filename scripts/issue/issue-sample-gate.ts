@@ -18,7 +18,9 @@ import { markdown_section } from './markdown-section'
 const BACKGROUND_HEADING = '## 背景'
 const PREFIX = '- 実施可能条件:'
 const CONDITION_PATTERN = /^#(?<pr>[1-9]\d*) のマージ後 (?<count>[1-9]\d*) マージ$/u
-const MALFORMED = `\`${PREFIX}\` must read \`#<PR> のマージ後 <K> マージ\` with K at least 1`
+const VALUE_FORMAT = '#<PR> のマージ後 <K> マージ'
+const DECLARATION = `${PREFIX} ${VALUE_FORMAT}`
+const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` with K at least 1`
 
 interface Condition {
 	pr: number
@@ -171,7 +173,7 @@ function reset(): void {
 	ledger.path = undefined
 }
 
-const issue_sample_gate = { prime, problems, reason_of, reset, wait_of }
+const issue_sample_gate = { DECLARATION, prime, problems, reason_of, reset, wait_of }
 
 export type { PrimePorts, SampleWait }
 export { issue_sample_gate }
