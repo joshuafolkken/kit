@@ -276,6 +276,25 @@ describe('related_scope.fallback_kind', () => {
 	})
 })
 
+// joshuafolkken/kit#4457: the gate ledger tells the since-green no-op apart from a run that tested.
+describe('related_scope.is_unmoved', () => {
+	it('reads the since-green no-op off the line the run printed', () => {
+		const scope = { mode: 'none' as const, files: [], reason: related_scope.UNMOVED_REASON }
+
+		expect(related_scope.is_unmoved(`$ x\n${related_scope.describe_scope(scope, ROOT)}`)).toBe(true)
+	})
+
+	it.each([
+		['a run that narrowed', [SOURCE_FILE]],
+		['a run that narrowed to nothing', []],
+		['a full-suite fallback', undefined],
+	])('reads no no-op off %s', (_name, changed) => {
+		const scope = related_scope.resolve_scope(request(changed))
+
+		expect(related_scope.is_unmoved(related_scope.describe_scope(scope, ROOT))).toBe(false)
+	})
+})
+
 describe('related_scope.describe_scope', () => {
 	it('names each file the run was narrowed by, relative to the root', () => {
 		const scope = related_scope.resolve_scope(request([SOURCE_FILE, OTHER_SOURCE_FILE]))

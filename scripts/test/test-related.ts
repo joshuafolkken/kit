@@ -37,8 +37,6 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 // reading's positive fact that nothing moved since this command was last green on this checkout.
 type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'> & { is_unmoved?: true }
 
-const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
-
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
 // `resolve_scope`, and only one of them means "could not tell".
 async function read_or_undefined(
@@ -207,6 +205,8 @@ async function read_scope(
 	command_arguments: ReadonlyArray<string>,
 ): Promise<RelatedScope> {
 	const change = await read_change(root, command_arguments)
+
+	const { UNMOVED_REASON } = related_scope
 
 	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
 

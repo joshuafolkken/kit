@@ -4,20 +4,22 @@ import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // Which check a gate waited on: one period's per-check rows reduced to one row per check — median,
-// maximum, runs, reuses and whole-suite fallbacks — printed last by `josh lane:stats`.
+// maximum, runs, reuses, no-ops and whole-suite fallbacks — printed last by `josh lane:stats`.
 //
 // The whole gate is the first row, since its reuse started no check (joshuafolkken/kit#4397); the
 // checks follow in the order they first appear.
 //
 // **A reused check is counted, never timed.** It started no process, so its zero would pull the median
-// toward a check that never ran; a check with only reused rows prints `not measured`.
+// toward a check that never ran; a check with only reused rows prints `not measured`. **The unit leg's
+// since-green no-op is counted the same way** (joshuafolkken/kit#4457): it ran no test, so its second
+// would stand for a run that tested nothing.
 //
 // **The fallbacks are broken down by why** in a second table, one row per reason kind, so a slow unit
 // leg can be read as the full suite it ran and the reason it had to.
 
 const DECIMALS = 1
 const WHOLE_GATE_LABEL = 'gate (whole)'
-const COLUMNS = ['check', 'median (s)', 'max (s)', 'runs', 'reused', 'fallback'] as const
+const COLUMNS = ['check', 'median (s)', 'max (s)', 'runs', 'reused', 'no-op', 'fallback'] as const
 const FALLBACK_COLUMNS = ['fallback reason', 'runs'] as const
 
 function is_gate(entry: LedgerEntry): entry is GateEntry {
@@ -34,18 +36,26 @@ function header(columns: ReadonlyArray<string>): Array<string> {
 	return [lane_stats.to_row(columns), lane_stats.to_row(columns.map(() => '---'))]
 }
 
+function count(
+	runs: ReadonlyArray<GateCheckRecord>,
+	is_counted: (check: GateCheckRecord) => boolean,
+): string {
+	return String(runs.filter((check) => is_counted(check)).length)
+}
+
 function check_row(label: string, checks: ReadonlyArray<GateCheckRecord>): string {
 	const runs = checks.filter((check) => check.label === label)
-	const timed = runs.filter((check) => check.is_reused !== true).map((check) => check.elapsed_ms)
-	const fallbacks = runs.filter((check) => check.fallback !== undefined)
+	const timed = runs.filter((check) => check.is_reused !== true && check.is_unmoved !== true)
+	const elapsed = timed.map((check) => check.elapsed_ms)
 
 	return lane_stats.to_row([
 		label,
-		cell(lane_stats.median(timed)),
-		cell(lane_stats.peak(timed)),
+		cell(lane_stats.median(elapsed)),
+		cell(lane_stats.peak(elapsed)),
 		String(runs.length),
-		String(runs.length - timed.length),
-		String(fallbacks.length),
+		count(runs, (check) => check.is_reused === true),
+		count(runs, (check) => check.is_unmoved === true),
+		count(runs, (check) => check.fallback !== undefined),
 	])
 }
 
