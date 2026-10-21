@@ -89,6 +89,18 @@ describe('lane_held_stats.table — a memory hold', () => {
 	})
 })
 
+// joshuafolkken/kit#4396: the lanes a `run:solo` wait left empty are their own row.
+describe('lane_held_stats.table — a run:solo wait', () => {
+	it('rows a run:solo hold apart from the other blocked offers', () => {
+		const solo = 'offer:watch:solo'
+		const blocked = 'offer:watch:blocked'
+		const entries = [held(blocked, 30), held(solo, 25), held(blocked, 20), dispatch(10)]
+
+		expect(row_of(entries, solo)).toBe(`| ${solo} | 5.0 | 5.0 | 5.0 | 1 | 0 |`)
+		expect(row_of(entries, blocked)).toBe(`| ${blocked} | 15.0 | 7.5 | 10.0 | 2 | 0 |`)
+	})
+})
+
 // joshuafolkken/kit#4084: `run:board` reads the driver's memory hold off the hold still open.
 describe('lane_held_stats.open_reason', () => {
 	it('reads the reason of the last hold nothing ended', () => {

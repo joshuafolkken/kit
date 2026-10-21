@@ -302,7 +302,13 @@ const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
 	{
 		doc: LANES_DOC,
 		marker:
-			'Does it, on `main` now, make unrelated PRs answer wrongly (a false green or a false red)?',
+			'Does it, on `main` now, make unrelated PRs answer wrongly (a false green or a false red) **on every run**?',
+	},
+	// joshuafolkken/kit#4396: a wrong answer that comes only some of the time leads the offer instead.
+	{
+		doc: LANES_DOC,
+		marker:
+			'A wrong answer that only comes some of the time — a flaky test, a timeout under load — is not a solo run.** It carries `run:lane` and `priority:critical`',
 	},
 ]
 

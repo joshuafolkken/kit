@@ -70,18 +70,29 @@ function solo_holder(read: BusyRead): number | undefined {
 	return holder_of(running)
 }
 
+// The words each of the gate's wait notices carries, so `backlog:offer` tells a `run:solo` wait from any
+// other `wait` off the notice `backlog:next` printed (joshuafolkken/kit#4396). Each names its verb:
+// `epic_solo_stale`'s release notice also opens "carries `run:solo` and", and is no wait.
+const HELD_MARK = `carries \`${RUN_SOLO_LABEL}\` and is running in`
+const WAITING_MARK = `carries \`${RUN_SOLO_LABEL}\` and waits for`
+
 function held_message(holder: number, repo: string): string {
 	return issue_citation.linkify(
-		`${issue_cite.plain(holder)} carries \`${RUN_SOLO_LABEL}\` and is running in ${repo}; nothing else starts until it merges or is parked.`,
+		`${issue_cite.plain(holder)} ${HELD_MARK} ${repo}; nothing else starts until it merges or is parked.`,
 		repo,
 	)
 }
 
 function waiting_message(solo: number, repo: string): string {
 	return issue_citation.linkify(
-		`${issue_cite.plain(solo)} carries \`${RUN_SOLO_LABEL}\` and waits for ${repo}'s running lanes to finish; nothing ranked below it is offered past it.`,
+		`${issue_cite.plain(solo)} ${WAITING_MARK} ${repo}'s running lanes to finish; nothing ranked below it is offered past it.`,
 		repo,
 	)
+}
+
+// Whether `text` — what an offer printed on stderr — says the `run:solo` gate held the candidates.
+function is_solo_wait(text: string): boolean {
+	return text.includes(HELD_MARK) || text.includes(WAITING_MARK)
 }
 
 function first_of(children: ReadonlyArray<EpicChild>, keep: number): SoloSelection {
@@ -168,7 +179,7 @@ function gate(
 		: { result: gated, notice: selection.notice }
 }
 
-const epic_solo = { gate, holder_of, is_solo, queue_of, select }
+const epic_solo = { gate, holder_of, is_solo, is_solo_wait, queue_of, select }
 
 export type { Labelled, SoloGate, SoloQueue, SoloSelection, SoloSelector }
 export { epic_solo }

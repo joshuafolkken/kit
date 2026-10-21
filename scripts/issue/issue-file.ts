@@ -168,7 +168,7 @@ function triage_problem(labels: ReadonlyArray<string>): string | undefined {
 
 	if (!is_owed) return undefined
 
-	return `an \`${AUTO_OK_LABEL}\` filing needs \`--label ${RUN_LANE_LABEL}\` or \`--label ${RUN_SOLO_LABEL}\` — \`${RUN_SOLO_LABEL}\` only for a defect in kit's own verification that makes unrelated PRs answer wrongly on main now (\`backlogrun-lanes.md\`), else \`${RUN_LANE_LABEL}\``
+	return `an \`${AUTO_OK_LABEL}\` filing needs \`--label ${RUN_LANE_LABEL}\` or \`--label ${RUN_SOLO_LABEL}\` — \`${RUN_SOLO_LABEL}\` only for a defect in kit's own verification that makes unrelated PRs answer wrongly on main on every run (\`backlogrun-lanes.md\`), else \`${RUN_LANE_LABEL}\` — a flaky one takes \`${RUN_LANE_LABEL}\` and \`priority:critical\``
 }
 
 function is_same_repository(target: string, current: string): boolean {

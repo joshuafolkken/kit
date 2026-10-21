@@ -62,6 +62,34 @@ describe('backlog_offer.answer_of — the verdict words map per the loop table',
 	})
 })
 
+// joshuafolkken/kit#4396: a `wait` the `run:solo` gate caused is marked, so `lane:stats` rows it apart.
+const SOLO_NOTICE =
+	'#12 carries `run:solo` and waits for joshuafolkken/kit’s running lanes to finish.'
+
+function wait_with(error: string, running: number): ReturnType<typeof backlog_offer.answer_of> {
+	return backlog_offer.answer_of(
+		{ code: OK_EXIT, tokens: [TOKENS.wait], err: error },
+		running,
+		NO_RETRIES,
+	)
+}
+
+describe('backlog_offer.answer_of — the run:solo cause', () => {
+	it('marks a blocked wait whose stderr carries the run:solo notice as solo', () => {
+		expect(wait_with(SOLO_NOTICE, SOME_RUNNING)).toStrictEqual({
+			answer: 'blocked',
+			issues: [],
+			retries: NO_RETRIES,
+			cause: 'solo',
+		})
+	})
+
+	it('leaves a blocked wait for any other reason, and an exhausted one, without a cause', () => {
+		expect(wait_with('#12 is blocked by #11.', SOME_RUNNING).cause).toBeUndefined()
+		expect(wait_with(SOLO_NOTICE, NO_RUNNING).cause).toBeUndefined()
+	})
+})
+
 describe('backlog_offer.answer_of — retry is blocked until the third consecutive one', () => {
 	it('maps a retry below the limit to blocked and advances the count', () => {
 		expect(offer_of([TOKENS.retry], NO_RUNNING, NO_RETRIES)).toStrictEqual({

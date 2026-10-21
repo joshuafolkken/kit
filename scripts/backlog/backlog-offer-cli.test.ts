@@ -30,6 +30,7 @@ const CANDIDATES = 'candidates'
 interface JoshResult {
 	code: number
 	out: string
+	err?: string
 }
 
 const info_lines: Array<string> = []
@@ -221,5 +222,17 @@ describe('backlog_offer_cli — the argv it builds for each underlying command',
 		const values = backlog_offer_cli.read_values([...BASE, '--running', 'lots'])
 
 		expect(backlog_offer_cli.counts_of(values ?? {})).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4396: the `run:solo` wait `backlog:next` printed on stderr reaches the driver.
+describe('backlog_offer_cli.run --json — the cause', () => {
+	it('prints the solo cause of a wait the run:solo gate caused', async () => {
+		const error =
+			'#12 carries `run:solo` and waits for joshuafolkken/kit’s running lanes to finish.'
+
+		await answer_for({ code: OK, out: 'wait', err: error }, 'watch', [...RUNNING, '--json'])
+
+		expect(info_lines.at(-1)).toContain('"cause":"solo"')
 	})
 })
