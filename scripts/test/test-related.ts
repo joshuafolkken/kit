@@ -6,6 +6,7 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
@@ -54,19 +55,29 @@ async function branch_change(): Promise<ReadonlyArray<string> | undefined> {
 	return await read_or_undefined(async () => await changed_paths.read_changed_paths(false))
 }
 
-// **The change a map answers for is the change since the tree it was recorded on**, plus what
-// already differed from that tree then. A commit git can no longer resolve — a pruned or foreign
-// map — leaves the branch change with no map, which runs the whole suite on any non-code file.
-async function change_since(map: ReadMap): Promise<ReadonlyArray<string> | undefined> {
+// **The change a map answers for is the change since the tree it was recorded on** — its commit and
+// the content its dirty files held then (`test_read_map.changed_since_tree`). A commit git can no
+// longer resolve — a pruned or foreign map — leaves the branch change with no map, which runs the
+// whole suite on any non-code file.
+async function change_since(
+	root: string,
+	map: ReadMap,
+): Promise<ReadonlyArray<string> | undefined> {
 	const since = await read_or_undefined(
 		async () => await changed_paths.read_changed_since(map.commit),
 	)
 
-	return since === undefined ? undefined : [...new Set([...since, ...map.dirty])]
+	if (since === undefined) return undefined
+
+	return test_read_map.changed_since_tree(
+		map,
+		since,
+		review_tree.tree_of(root, Object.keys(map.dirty)),
+	)
 }
 
-async function map_change(map: ReadMap): Promise<ChangeReading> {
-	const changed = await change_since(map)
+async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
+	const changed = await change_since(root, map)
 
 	if (changed === undefined) return { changed: await branch_change(), map: undefined }
 
@@ -78,10 +89,11 @@ async function map_change(map: ReadMap): Promise<ChangeReading> {
 // only for the change since its tree**, so that change joins the arguments: a test added since the
 // map was recorded is in no entry, and only its own appearance in the change runs it.
 async function explicit_change(
+	root: string,
 	explicit: ReadonlyArray<string>,
 	map: ReadMap | undefined,
 ): Promise<ChangeReading> {
-	const since = map === undefined ? undefined : await change_since(map)
+	const since = map === undefined ? undefined : await change_since(root, map)
 
 	if (since === undefined) return { changed: explicit, map: undefined }
 
@@ -93,13 +105,16 @@ async function explicit_change(
 // entries hold no module that started reading it after the map's tree; the change since that tree
 // joins the list, so such a module runs the tests importing it. Nothing moved runs nothing; no map,
 // or one git can no longer diff against, answers `undefined`, which reads the whole branch change.
-async function since_green_change(map: ReadMap | undefined): Promise<ChangeReading | undefined> {
+async function since_green_change(
+	root: string,
+	map: ReadMap | undefined,
+): Promise<ChangeReading | undefined> {
 	const moved = await since_green.read_moved(review_stamps.test_related_stamp)
 
 	if (moved === undefined) return undefined
 	if (moved.length === 0) return { changed: [], map, is_unmoved: true }
 
-	const change = await explicit_change(moved, map)
+	const change = await explicit_change(root, moved, map)
 
 	if (change.map === undefined) return undefined
 
@@ -108,12 +123,12 @@ async function since_green_change(map: ReadMap | undefined): Promise<ChangeReadi
 	return change
 }
 
-async function whole_change(map: ReadMap | undefined): Promise<ChangeReading> {
-	const since = await since_green_change(map)
+async function whole_change(root: string, map: ReadMap | undefined): Promise<ChangeReading> {
+	const since = await since_green_change(root, map)
 
 	if (since !== undefined) return since
 
-	return map === undefined ? { changed: await branch_change(), map } : await map_change(map)
+	return map === undefined ? { changed: await branch_change(), map } : await map_change(root, map)
 }
 
 async function read_change(
@@ -125,7 +140,9 @@ async function read_change(
 		.filter((argument) => !changed_file_scope.is_flag(argument))
 		.map((file) => path.relative(root, path.resolve(file)))
 
-	return explicit.length > 0 ? await explicit_change(explicit, map) : await whole_change(map)
+	return explicit.length > 0
+		? await explicit_change(root, explicit, map)
+		: await whole_change(root, map)
 }
 
 // **The changed non-code files the map's tree held and that did not already differ from it** — the
@@ -137,7 +154,7 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 
 	if (changed === undefined || map === undefined) return new Set()
 
-	const dirty = new Set(map.dirty)
+	const dirty = new Set(Object.keys(map.dirty))
 	const candidates = changed.filter((file) => !related_scope.is_relatable(file) && !dirty.has(file))
 
 	return new Set(
@@ -153,7 +170,7 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promise<boolean> {
 	if (paths.length === 0) return false
 
-	const change = await explicit_change(paths, test_read_map.read_map(root))
+	const change = await explicit_change(root, paths, test_read_map.read_map(root))
 
 	if (change.map === undefined) return true
 

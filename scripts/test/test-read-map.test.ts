@@ -22,6 +22,8 @@ const DEEP_DOCUMENT = path.join('.josh', 'observations', 'c.md')
 const READER = 'reader.ts'
 const WALKER = 'walker.ts'
 const LISTER = 'lister.ts'
+const DIRTY = 'notes.md'
+const DIGEST_THEN = 'digest-then'
 const ROOT_WALKER = 'root-walker.ts'
 const ROOT_LISTER = 'root-lister.ts'
 const ROOT_PROBER = 'root-prober.ts'
@@ -31,7 +33,7 @@ const { ROOT_ENTRY } = test_read_trace
 const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'abc',
-	dirty: ['notes.md'],
+	dirty: { [DIRTY]: DIGEST_THEN },
 	directories: [
 		'.josh',
 		path.dirname(DEEP_DOCUMENT),
@@ -92,8 +94,34 @@ describe('test_read_map.parse_map', () => {
 		['another version', JSON.stringify({ ...MAP, version: test_read_map.MAP_VERSION + 1 })],
 		['a reader list that is not strings', JSON.stringify({ ...MAP, readers: { a: [1] } })],
 		['no commit', JSON.stringify({ ...MAP, commit: undefined })],
+		['a dirty list without digests', JSON.stringify({ ...MAP, dirty: [DIRTY] })],
+		['a dirty digest that is not a string', JSON.stringify({ ...MAP, dirty: { [DIRTY]: 1 } })],
 	])('reads %s as no map', (_case, text) => {
 		expect(test_read_map.parse_map(text)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4425: a file dirty when the map was recorded is changed only when its content
+// moved, so a lane's own unchanged change no longer reaches every test on each later gate.
+describe('test_read_map.changed_since_tree', () => {
+	const FRESH = 'fresh.ts'
+
+	it('leaves out a file dirty then whose content has not moved', () => {
+		expect(test_read_map.changed_since_tree(MAP, [DIRTY], { [DIRTY]: DIGEST_THEN })).toEqual([])
+	})
+
+	it('counts a file dirty then whose content moved, even back to the commit’s', () => {
+		expect(test_read_map.changed_since_tree(MAP, [], { [DIRTY]: 'digest-now' })).toEqual([DIRTY])
+	})
+
+	it('counts a file dirty then that no digest can be read for', () => {
+		expect(test_read_map.changed_since_tree(MAP, [DIRTY], {})).toEqual([DIRTY])
+	})
+
+	it('counts every file that differs from the commit and was not dirty then', () => {
+		expect(test_read_map.changed_since_tree(MAP, [FRESH, DIRTY], { [DIRTY]: DIGEST_THEN })).toEqual(
+			[FRESH],
+		)
 	})
 })
 
@@ -111,7 +139,7 @@ describe('test_read_map.readers_of', () => {
 	})
 
 	it('reaches a file at the top level through the listing of the root', () => {
-		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, 'notes.md')).toEqual([ROOT_LISTER])
+		expect(test_read_map.readers_of(SHALLOW_ROOT_MAP, DIRTY)).toEqual([ROOT_LISTER])
 	})
 
 	it('leaves out the listing above a directory that existed though no test read it', () => {

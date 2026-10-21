@@ -60,7 +60,7 @@ const DIRTY_DOCUMENT = 'CHANGELOG.md'
 const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: MAP_COMMIT,
-	dirty: [DIRTY_DOCUMENT],
+	dirty: { [DIRTY_DOCUMENT]: 'digest-then' },
 	directories: [],
 	readers: { [DOCUMENT]: [CHANGED_SOURCE], [DIRTY_DOCUMENT]: [CHANGED_SOURCE] },
 }
@@ -277,7 +277,7 @@ describe('test_related.run_related_tests — a change no test reads', () => {
 	const UNREAD_DOCUMENT = 'LICENSE'
 
 	beforeEach(() => {
-		vi.mocked(test_read_map.read_map).mockReturnValue({ ...MAP, dirty: [] })
+		vi.mocked(test_read_map.read_map).mockReturnValue({ ...MAP, dirty: {} })
 		mocked_since.mockResolvedValue([UNREAD_DOCUMENT])
 		mocked_held.mockResolvedValue([UNREAD_DOCUMENT])
 	})
