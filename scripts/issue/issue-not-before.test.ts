@@ -87,3 +87,44 @@ describe('the start-time declaration in issue:lint', () => {
 		expect(found).toEqual([expect.stringContaining('YYYY-MM-DDTHH:MMZ')])
 	})
 })
+
+describe('a start condition written as its own heading in issue:lint', () => {
+	// The body #4430 was filed with: a free-text condition under its own heading, never read.
+	const ISSUE_4430_BODY = `${body_with('')}\n## 実施可能条件\n\n#4426 のマージ後に、マージが 30 件以上ある\n`
+	const CONDITION_LINE = '`- 実施可能条件: #<PR> のマージ後 <K> マージ`'
+	const DATE_LINE = '`- 実施可能日: YYYY-MM-DDTHH:MMZ`'
+
+	it('refuses the condition heading and shows the background declaration', () => {
+		expect(issue_lint_cli.problems(ISSUE_4430_BODY)).toEqual([
+			expect.stringContaining(CONDITION_LINE),
+		])
+	})
+
+	it.each([
+		['### 実施可能日', DATE_LINE],
+		['## 実施可能日（UTC）', DATE_LINE],
+		['# 実施可能条件', CONDITION_LINE],
+	])('refuses the heading %j and shows the background declaration', (heading, declaration) => {
+		const body = `${body_with('')}\n${heading}\n\n${DATE}\n`
+
+		expect(issue_lint_cli.problems(body)).toEqual([expect.stringContaining(declaration)])
+	})
+
+	it('reads a line that only starts with a hash as no heading', () => {
+		const body = `${body_with('')}\n#実施可能条件\n`
+
+		expect(issue_lint_cli.problems(body)).toEqual([])
+	})
+
+	it('accepts the declaration lines under the background heading alone', () => {
+		const body = body_with(`- 実施可能日: ${DATE}\n- 実施可能条件: #4426 のマージ後 30 マージ`)
+
+		expect(issue_lint_cli.problems(body)).toEqual([])
+	})
+
+	it('ignores the heading inside a code fence', () => {
+		const body = `${body_with('')}\n\`\`\`md\n## 実施可能条件\n\`\`\`\n`
+
+		expect(issue_lint_cli.problems(body)).toEqual([])
+	})
+})

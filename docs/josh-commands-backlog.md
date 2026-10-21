@@ -328,6 +328,8 @@ The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## �
 
 Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1, as does a `- 種別: 不具合` body without a well-formed `- 原因:` origin line ([`josh defect:origin`](#josh-defectorigin) lists candidates). [`josh issue:file`](#josh-issuefile) runs it as a filing step.
 
+A `実施可能条件` or `実施可能日` heading exits 1 and shows the `## 背景` declaration line to write instead.
+
 A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".

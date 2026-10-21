@@ -14,6 +14,13 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u
 // What `toISOString` writes after the minutes the declaration spells.
 const ISO_TAIL = ':00.000Z'
 const MALFORMED = `\`${PREFIX}\` must be a UTC time written YYYY-MM-DDTHH:MMZ`
+const HEADING_MARKS = /^#{1,6}\s+/u
+// joshuafolkken/kit#4438: a start condition written as its own heading is never read — every reader
+// sees only the declaration line under the background heading — so the issue is offered at once.
+const STRAY_HEADINGS = [
+	{ name: '実施可能日', declaration: `${PREFIX} YYYY-MM-DDTHH:MMZ` },
+	{ name: '実施可能条件', declaration: issue_sample_gate.DECLARATION },
+]
 
 // The value after the declaration under the background heading, or `undefined` when the body declares none.
 function declared_value(body: string): string | undefined {
@@ -79,11 +86,24 @@ function waiting_reason(body: string | undefined, now: number = Date.now()): str
 	return wait === undefined ? undefined : issue_sample_gate.reason_of(wait)
 }
 
+function stray_heading_problems(body: string): ReadonlyArray<string> {
+	const headings = markdown_section
+		.unfenced_lines(body)
+		.map((line) => line.trim())
+		.filter((line) => HEADING_MARKS.test(line))
+		.map((line) => line.replace(HEADING_MARKS, ''))
+
+	return STRAY_HEADINGS.filter(({ name }) => headings.some((text) => text.startsWith(name))).map(
+		({ name, declaration }) =>
+			`heading \`${name}\` is not read — declare it under \`${BACKGROUND_HEADING}\` as \`${declaration}\``,
+	)
+}
+
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
 	const date_problems = value === undefined || is_valid(value) ? [] : [MALFORMED]
 
-	return [...date_problems, ...issue_sample_gate.problems(body)]
+	return [...stray_heading_problems(body), ...date_problems, ...issue_sample_gate.problems(body)]
 }
 
 const issue_not_before = { is_due, problems, waiting_date, waiting_ms, waiting_reason }
