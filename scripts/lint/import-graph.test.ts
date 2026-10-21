@@ -202,6 +202,22 @@ describe('import_graph.closure_hash — what a file reads without importing it',
 	})
 })
 
+describe('import_graph.closure_hash — a global augmentation outside a declaration file', () => {
+	it('changes when a global augmentation in a .ts module the project includes changes', async () => {
+		const augmentation = 'augmentation.ts'
+		const [before, after] = await hashes_around(
+			[
+				[augmentation, GLOBALS_SOURCE],
+				[LOCALS_USER, LOCALS_USER_SOURCE],
+			],
+			LOCALS_USER,
+			[augmentation, GLOBALS_SOURCE.replace('string', 'any')],
+		)
+
+		expect(after).not.toBe(before)
+	})
+})
+
 describe('import_graph.closure_hash — a file named but not resolved as a module', () => {
 	it('changes when a file a reference directive names changes', async () => {
 		const [before, after] = await hashes_around(

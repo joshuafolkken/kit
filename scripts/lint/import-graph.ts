@@ -15,7 +15,6 @@ import type ts from 'typescript'
 const TSCONFIG = 'tsconfig.json'
 const HASH_ALGORITHM = 'sha256'
 const MISSING = 'missing'
-const DECLARATION_FILE = /\.d\.[cm]?ts$/u
 const MODULE_STATEMENT = /^(?:import|export)\b/mu
 const GLOBAL_DECLARATION = /^declare (?:global|module|namespace)\b/mu
 
@@ -149,11 +148,10 @@ function direct_dependencies(context: GraphContext, file: string): ReadonlyArray
 	return found
 }
 
-// A declaration file reaches files that never import it when it is a script or declares a global or
-// a module — SvelteKit's `src/app.d.ts` `App.Locals`, say; one that only exports is read through its
-// imports like any other module.
+// A file reaches files that never import it when it is a script or declares a global or a module —
+// SvelteKit's `src/app.d.ts` `App.Locals`, say, or a `.ts` module's `declare global` augmentation;
+// one that only exports is read through its imports like any other module.
 function is_ambient(file: string): boolean {
-	if (!DECLARATION_FILE.test(file)) return false
 	const content = file_reader.read_if_readable(file) ?? ''
 
 	return GLOBAL_DECLARATION.test(content) || !MODULE_STATEMENT.test(content)
