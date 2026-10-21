@@ -309,6 +309,22 @@ function run_under_hook(args: ReadonlyArray<string>): HookRun {
 	}
 }
 
+// Arms a scratch run with the hook's `GIT_DIR` set, calls what arming answered, and reads `GIT_DIR`.
+function git_directory_after_undo(
+	arm_scratch: (directory: string, temporary_root: string) => () => void,
+): string | undefined {
+	const original = snapshot_environment()
+
+	try {
+		process.env['GIT_DIR'] = hook_git_directory()
+		arm_scratch(temporary_directory(), scratch_temporary_root())()
+
+		return process.env['GIT_DIR']
+	} finally {
+		restore_environment(original)
+	}
+}
+
 describe('test_network_guard.arm — under a git hook that exported GIT_DIR', () => {
 	it('lets a read of the checkout pass, so the teardown stays clean', () => {
 		const run = run_under_hook(['worktree', 'list', '--porcelain'])
@@ -321,22 +337,11 @@ describe('test_network_guard.arm — under a git hook that exported GIT_DIR', ()
 
 	// joshuafolkken/kit#4439: `test-state-guard` is torn down after this guard and reads `GIT_DIR` back.
 	it('hands back a restore that puts the exported GIT_DIR back', () => {
-		const original = snapshot_environment()
-		const exported = hook_git_directory()
+		expect(git_directory_after_undo(test_network_guard.arm)).toBe(hook_git_directory())
+	})
 
-		try {
-			process.env['GIT_DIR'] = exported
-			const restore_hook_location = test_network_guard.arm(
-				temporary_directory(),
-				scratch_temporary_root(),
-			)
-
-			restore_hook_location()
-
-			expect(process.env['GIT_DIR']).toBe(exported)
-		} finally {
-			restore_environment(original)
-		}
+	it('puts the exported GIT_DIR back from the teardown setup answers', () => {
+		expect(git_directory_after_undo(test_network_guard.arm_for_run)).toBe(hook_git_directory())
 	})
 
 	it('still refuses a write into the checkout', () => {

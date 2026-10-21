@@ -425,25 +425,31 @@ function disarm(directory: string = GUARD_DIRECTORY): void {
 	}
 }
 
-// Vitest's `globalSetup` contract: a named `setup` whose return value becomes the teardown.
-function teardown(): void {
+function teardown(directory: string, temporary_root: string): void {
 	try {
-		disarm()
+		disarm(directory)
 	} finally {
-		rmSync(TEMPORARY_ROOT, { recursive: true, force: true })
+		rmSync(temporary_root, { recursive: true, force: true })
 	}
 }
 
-function setup(): () => void {
-	const restore_hook_location = arm()
+// Arms the run and answers its teardown, which puts the hook's git location variables back last.
+// Directories are parameters so a test can arm a scratch run; `setup` passes the real ones.
+function arm_for_run(directory: string, temporary_root: string): () => void {
+	const restore_hook_location = arm(directory, temporary_root)
 
 	return function teardown_and_restore(): void {
 		try {
-			teardown()
+			teardown(directory, temporary_root)
 		} finally {
 			restore_hook_location()
 		}
 	}
+}
+
+// Vitest's `globalSetup` contract: a named `setup` whose return value becomes the teardown.
+function setup(): () => void {
+	return arm_for_run(GUARD_DIRECTORY, TEMPORARY_ROOT)
 }
 
 const test_network_guard = {
@@ -455,6 +461,7 @@ const test_network_guard = {
 	UNREADABLE_LOG_HEADING,
 	VIOLATION_HEADING,
 	arm,
+	arm_for_run,
 	calls_of,
 	describe_violations,
 	disarm,
