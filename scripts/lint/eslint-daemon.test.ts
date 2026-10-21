@@ -169,6 +169,26 @@ describe('eslint_daemon.run — nothing to reach', () => {
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
+	it('reaches no daemon for a project that borrows its node_modules through a symlink', async () => {
+		const lender = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-lender-'))
+
+		try {
+			symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
+
+			expect(eslint_daemon.resolve_daemon_cli(project_root)).toBeUndefined()
+			expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toBeUndefined()
+			expect(mocked_execa).not.toHaveBeenCalled()
+		} finally {
+			rmSync(lender, { recursive: true, force: true })
+		}
+	})
+
+	it('reaches the daemon for a project with a node_modules of its own', () => {
+		mkdirSync(path.join(project_root, 'node_modules'))
+
+		expect(eslint_daemon.resolve_daemon_cli(project_root)).toBe(CLI)
+	})
+
 	it('spawns nothing for a run of another tool', async () => {
 		expect(await eslint_daemon.run(PNPM_PRETTIER, { project_root })).toBeUndefined()
 		expect(mocked_execa).not.toHaveBeenCalled()
