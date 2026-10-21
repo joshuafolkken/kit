@@ -4,6 +4,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_solo, type SoloQueue } from '#scripts/epic/epic-solo'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
@@ -124,8 +125,18 @@ function planned_of(child: EpicChild, pool: Pool): RowReason | undefined {
 	return pool.planning?.issue === child.number ? pool.planning.reason : undefined
 }
 
+// ` — paused since 01:28 by lane:pause` for a holder whose lane is paused (joshuafolkken/kit#4270):
+// only a paused lane's status carries who paused it, and its end is when.
+function paused_tail(status: ItemStatus | undefined): string {
+	const { ended_ms, paused_by } = status ?? {}
+
+	if (paused_by === undefined || ended_ms === undefined) return ''
+
+	return ` — ${lane_state.paused_text(ended_ms, paused_by)}`
+}
+
 // `📂 4238 … scripts/gate/machine-capacity.ts`: the running issue holding a path this row declares,
-// and the path after the title.
+// and the path after the title — with when and by what the holder was paused, where it is.
 function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	const { declared = new Map(), context } = read.plan
 	const holding = { holders: pool.running, repo: context.repo }
@@ -133,7 +144,9 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason |
 
 	if (clash === undefined) return undefined
 
-	return { icon: WAIT_ICONS.path, issues: [String(clash.holder)], tail: clash.path }
+	const tail = `${clash.path}${paused_tail(read.statuses.get(clash.holder))}`
+
+	return { icon: WAIT_ICONS.path, issues: [String(clash.holder)], tail }
 }
 
 // `🧵 4/4`: how many lanes hold a place against the limit the row starts after a free one of. Every

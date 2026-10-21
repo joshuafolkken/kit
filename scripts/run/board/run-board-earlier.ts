@@ -1,3 +1,4 @@
+import { lane_state } from '#scripts/lane/lane-state'
 import { run_board_kind } from './run-board-kind'
 import type { BoardRow, RowRead } from './run-board-layout'
 import type { ItemStatus } from './run-board-status'
@@ -18,7 +19,7 @@ interface EarlierLanes {
 const NO_EARLIER: EarlierLanes = { lanes: [] }
 
 // What an unknown lane's row says after its title: the command that writes its record.
-const BACKFILL_TAIL = 'no lane state — pnpm josh lane:state --backfill'
+const BACKFILL_TAIL = lane_state.BACKFILL_HINT
 
 // The mark an earlier run's running lane leads with in place of its phase (joshuafolkken/kit#4269),
 // two columns wide as every row icon is (`run-board-labels.ts`, kept out of it by its size).

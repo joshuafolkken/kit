@@ -4,7 +4,7 @@ import path from 'node:path'
 import { session_cite } from '#scripts/issue/session-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PausedProbes } from './lane-paused'
+import type { TableProbes } from './lane-process-table'
 import { lane_reap } from './lane-reap'
 import type { LaneInfo } from './lane-registry'
 import { lane_state } from './lane-state'
@@ -22,11 +22,12 @@ const PAUSED_PID = 101
 const RUNNING_PID = 102
 const STOPPED_STAT = 'T'
 const RUNNING_STAT = 'S'
+const ZOMBIE_STAT = 'Z'
 const FAILURE = 1
 
 const TREES: Record<string, Array<number>> = { [PAUSED]: [PAUSED_PID], [RUNNING]: [RUNNING_PID] }
 
-const PROBES: PausedProbes = {
+const PROBES: TableProbes = {
 	matching: () => [],
 	children_of: () => [],
 	parent_of: () => undefined,
@@ -81,6 +82,36 @@ describe('lane_state_cli.backfill — the state read off the lane', () => {
 			launched_at: new Date(DISPATCHED_MS).toISOString(),
 		})
 		expect(await lane_state.read_state(IDLE, state.directory)).not.toHaveProperty('launched_at')
+	})
+})
+
+// joshuafolkken/kit#4270: the `ps` read of a paused lane is the backfill's alone now — a zombie stops
+// nothing, and one running subprocess keeps the lane running.
+describe('lane_state_cli.backfill — a lane with a subprocess', () => {
+	const CHILD_PID = 201
+	const SUBPROCESS_PID = 202
+
+	async function backfilled(subprocess_stat: string): Promise<string | undefined> {
+		vi.mocked(lane_reap.lane_tree).mockReturnValue([CHILD_PID, SUBPROCESS_PID])
+
+		const probes: TableProbes = {
+			...PROBES,
+			states_of: (pids) => pids.map((pid) => (pid === CHILD_PID ? STOPPED_STAT : subprocess_stat)),
+		}
+
+		await lane_state_cli.backfill([lane_of(PAUSED)], probes, state.directory)
+
+		const record = await lane_state.read_state(PAUSED, state.directory)
+
+		return record?.state
+	}
+
+	it('records a stopped child whose subprocess is a zombie paused', async () => {
+		expect(await backfilled(ZOMBIE_STAT)).toBe('paused')
+	})
+
+	it('records a stopped child whose subprocess still runs running', async () => {
+		expect(await backfilled(RUNNING_STAT)).toBe('running')
 	})
 })
 

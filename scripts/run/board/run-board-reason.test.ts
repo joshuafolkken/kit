@@ -1,5 +1,6 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { figure_format } from '#scripts/lib/figure-format'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
@@ -160,6 +161,20 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 		expect(reasons([blocked])).toStrictEqual([
 			{ icon: WAIT_ICONS.untriaged, issues: [String(BLOCKER)] },
 		])
+	})
+})
+
+// joshuafolkken/kit#4270: a paused lane held five rows back for 1 h 40 min with no word of why.
+describe('run_board_reason.reader — a paused holder', () => {
+	it('names when and by what the holder was paused after the path', () => {
+		const plan = plan_of([child(HELD)], DECLARED)
+		const ended_ms = Date.parse('2026-10-20T01:28:00.000Z')
+		const lane = `lane ${String(RUNNING)}`
+		const status: ItemStatus = { state: 'paused', lane, ended_ms, paused_by: 'lane:pause' }
+		const tail = `${SHARED} — paused since ${figure_format.minute_of(ended_ms)} by lane:pause`
+		const statuses = new Map([[RUNNING, status]])
+
+		expect(reasons([child(HELD)], { plan, statuses })).toStrictEqual([{ ...OVERLAP, tail }])
 	})
 })
 

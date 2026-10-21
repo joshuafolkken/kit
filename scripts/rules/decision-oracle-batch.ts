@@ -66,7 +66,7 @@ const BATCH_ORACLES: ReadonlyArray<DecisionOracle> = [
 		name: 'run:liveness',
 		decision: 'Whether a delegated unit is still working or has stopped without reporting',
 		args: `${ISSUE_N_ARG} --output <path>`,
-		vocabulary: ['alive', 'stopped', 'settled', 'undetermined'],
+		vocabulary: ['alive', 'paused', 'stopped', 'settled', 'undetermined'],
 		single_source: RUN_LIVENESS_REFERENCE,
 	},
 	{

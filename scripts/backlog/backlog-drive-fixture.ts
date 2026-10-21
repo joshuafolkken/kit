@@ -27,6 +27,7 @@ interface Harness {
 	states: Array<DriveState>
 	holds: Array<string | undefined>
 	idles: Array<DriveState>
+	pauses: Array<string>
 }
 
 interface Script {
@@ -172,13 +173,17 @@ function loop_ports(
 function report_ports(
 	holds: Array<string | undefined>,
 	idles: Array<DriveState>,
-): Pick<LoopPorts, 'hold' | 'idle'> {
+	pauses: Array<string>,
+): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
 	return {
 		hold: async (reason) => {
 			holds.push(reason)
 		},
 		idle: async (idle_state) => {
 			idles.push(idle_state)
+		},
+		paused: async () => {
+			pauses.push('paused')
 		},
 	}
 }
@@ -189,6 +194,7 @@ function harness(script: Script): Harness {
 	const states: Array<DriveState> = []
 	const holds: Array<string | undefined> = []
 	const idles: Array<DriveState> = []
+	const pauses: Array<string> = []
 
 	return {
 		calls,
@@ -196,13 +202,14 @@ function harness(script: Script): Harness {
 		states,
 		holds,
 		idles,
+		pauses,
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
 			...room_ports(script),
 			...memory_port(script),
 			...loop_ports(calls, states),
-			...report_ports(holds, idles),
+			...report_ports(holds, idles, pauses),
 		},
 	}
 }

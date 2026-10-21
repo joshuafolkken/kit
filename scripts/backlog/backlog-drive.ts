@@ -23,6 +23,7 @@ import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_hold } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_memory } from './backlog-drive-memory'
+import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 
@@ -120,6 +121,9 @@ interface DrivePorts {
 	// A watch with nothing in flight — the one idle notification (`backlog-drive-idle.ts`), deduplicated
 	// per episode by the port itself.
 	idle: (state: DriveState) => Promise<void>
+	// A holding offer with nothing in flight — the paused-lane notice (`backlog-drive-paused.ts`), which
+	// reads the lane records itself and is deduplicated per pause episode by the port.
+	paused: () => Promise<void>
 	now: () => Date
 }
 
@@ -349,7 +353,8 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	if (read.verdict === RUN_VERDICT) return await run_offered(read.issues, next, ports)
 	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	const result = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const result = await backlog_drive_paused.noticed(idle, read, ports)
 
 	return await backlog_drive_hold.held(result, read, ports)
 }

@@ -1,4 +1,5 @@
 import type { LaneInfo } from '#scripts/lane/lane-registry'
+import type { LaneRecords } from '#scripts/lane/lane-state'
 
 // The open lanes that hold a place under the lane limit — the one count `lane:limit`, the drive and
 // `run:board` all subtract from it.
@@ -9,35 +10,43 @@ import type { LaneInfo } from '#scripts/lane/lane-registry'
 // #4028). Its tree, branch and port seat stay; when its issue is picked up again the drive seats it
 // ahead of a fresh launch, inside the free lanes (`backlog-drive-seats.ts`).
 //
-// **A paused lane holds no place either** (joshuafolkken/kit#4201): a child whose every process is
-// suspended (`lane:pause`, `kill -STOP`) puts no load on the machine until it is resumed. Its memory
-// stays held, which the free-memory check reads as measured (`backlog-drive-memory.ts`); `lane:prune`
-// still keeps it, since a child is there (`lane-spent.ts`).
+// **A paused lane holds no place either** (joshuafolkken/kit#4201): a child `lane:pause` suspended
+// puts no load on the machine until it is resumed. **Paused is the lane state record's answer alone**
+// (joshuafolkken/kit#4270) — the `ps` state is not read — so a lane only `lane:pause` paused is
+// uncounted. Its memory stays held, which the free-memory check reads as measured
+// (`backlog-drive-memory.ts`); `lane:prune` still keeps it, since a child is there (`lane-spent.ts`).
 //
-// **A lane whose probe did not answer keeps its place, so the count errs toward fewer free lanes**:
-// only pgrep's own "no match" (`PROCESS_NONE`, `lane_spent.idle_lanes`) clears one, and only states
-// read as all stopped (`lane_paused.is_lane_paused`) clear a paused one. A stranded lane has no tree
-// to work in and holds no place either. The read stays local — no issue label is read — because the
-// count gates the network read behind it (`backlog-ready.ts`).
+// **A lane with no record is unknown, and keeps its place**, so the count errs toward fewer free lanes
+// until `lane:state --backfill` writes one. **Whether a child is there at all is not the record's**:
+// a child that parks or dies writes nothing, so only pgrep's own "no match" (`PROCESS_NONE`,
+// `lane_spent.idle_lanes`) clears a lane, and a probe that did not answer keeps it. A stranded lane has
+// no tree to work in and holds no place either. The reads stay local — no issue label is read —
+// because the count gates the network read behind it (`backlog-ready.ts`).
 
 // The issues whose lane has no child working in it (`lane_spent.idle_lanes`).
 type IdleRead = (lanes: ReadonlyArray<LaneInfo>) => ReadonlyArray<string>
 
-// Whether the lane child for an issue is paused (`lane_paused.is_lane_paused`).
-type PausedRead = (issue: string) => boolean
-
 function occupied_lanes(
 	lanes: ReadonlyArray<LaneInfo>,
 	idle: IdleRead,
-	is_paused: PausedRead,
+	records: LaneRecords,
 ): Array<LaneInfo> {
 	const live = lanes.filter((lane) => !lane.is_stranded)
 	const idle_issues = new Set(idle(live))
 
-	return live.filter((lane) => !idle_issues.has(lane.issue) && !is_paused(lane.issue))
+	return live.filter(
+		(lane) => !idle_issues.has(lane.issue) && records.get(lane.issue)?.state !== 'paused',
+	)
 }
 
-const backlog_occupied = { occupied_lanes }
+/** The issues of the live lanes in `lanes` that have no state record. */
+function unknown_lanes(lanes: ReadonlyArray<LaneInfo>, records: LaneRecords): Array<string> {
+	return lanes
+		.filter((lane) => !lane.is_stranded && !records.has(lane.issue))
+		.map((lane) => lane.issue)
+}
+
+const backlog_occupied = { occupied_lanes, unknown_lanes }
 
 export { backlog_occupied }
-export type { IdleRead, PausedRead }
+export type { IdleRead }
