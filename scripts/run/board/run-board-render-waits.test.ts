@@ -107,7 +107,7 @@ describe('run_board_render_waits.held_time', () => {
 
 describe('run_board_render.render — a held lane on its row', () => {
 	it('leads the row with 🚧, keeps the phase’s icon, holds the elapsed column and ends on the check', () => {
-		expect(lane_line([wait()])).toMatch(/^ {2}🚧 🔨 +11′00″ 🧠 +9″ 4039 {4}Issue 4039 +lint$/u)
+		expect(lane_line([wait()])).toMatch(/^ {2}🚧 🔨 +11′00″ 🧠 +9″ 4039 {7}Issue 4039 +lint$/u)
 	})
 
 	it('draws the phase icon and the run’s time again once the wait is gone', () => {

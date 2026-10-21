@@ -98,14 +98,14 @@ Waiting on a person, Out of scope) in the session language, with any truncated-l
 - **Order and isolate** — a native `blocked-by` where one must land first; `run:solo` on all three
   `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**, commenting the
   reason.
-- **`priority:high`** only on a cited ground (a stated deadline, a person's written policy), commented;
-  **never remove it**.
+- **`priority:critical` / `priority:high`** are applied at filing by `pnpm josh issue:file` from the
+  body's `- 優先度:` declaration (`issue-template.md`); **only a person removes them**.
 - **Report `pnpm josh backlog:plan --waves`** with the plan, never an order derived by hand; then start
   the loop, leaving whatever is still labelled parked.
 
-**`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the only workflow labels a run
-applies by hand** — never `needs-human-review` (`needs-human-review.md`), and `auto-ok` only through
-`pnpm josh issue:file` or `pnpm josh auto-ok:judge`.
+**`needs-decision`, `run:solo` and `run:lane` are the only workflow labels a run applies by hand** —
+never `needs-human-review` (`needs-human-review.md`), the priority labels only through
+`pnpm josh issue:file`, and `auto-ok` only through it or `pnpm josh auto-ok:judge`.
 
 ## The loop
 

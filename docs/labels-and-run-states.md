@@ -8,7 +8,8 @@ The labels you put on an Issue to steer the agent, the labels a run puts on it f
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `auto-ok`            | Opts the Issue in to unattended work. On an epic's root it opts in every descendant. See [Run the backlog](./how-to/run-backlog.md). |
 | `needs-human-review` | Implement and verify, then stop before the commit — [below](#needs-human-review--the-opposite-label).                                |
-| `priority:high`      | Puts the Issue first in the backlog's order. Only you remove it.                                                                     |
+| `priority:critical`  | Puts the Issue first in the backlog's order. Applied at filing from the body's `- 優先度:` declaration; only you remove it.          |
+| `priority:high`      | Puts the Issue next, after `priority:critical`. Applied at filing the same way; only you remove it.                                  |
 | `deferred`           | Sets the Issue aside for now: it never gets `auto-ok` at filing or from the agent's judgement.                                       |
 | `run:solo`           | Runs the Issue alone, with nothing else started beside it. The agent applies it to a defect in kit's own verification.               |
 | `run:lane`           | Lets the Issue run in a parallel lane beside others. The agent applies it to every other opted-in Issue.                             |

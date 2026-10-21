@@ -13,7 +13,7 @@ import {
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
-import { run_board_kind } from './run-board-kind'
+import { run_board_kind, type BoardPriority } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
 // The plan with each issue's status laid over it — pure, so the order the board
@@ -69,6 +69,8 @@ interface BoardRow {
 	title: string | undefined
 	// The release category its labels place it in (joshuafolkken/kit#3577), none for an Other Change.
 	kind: FiledKind | undefined
+	// The priority label it carries (joshuafolkken/kit#4383), none for a normal one.
+	priority?: BoardPriority | undefined
 	state: ItemState
 	status: ItemStatus | undefined
 	// The standing blockers this row still waits on, as the plan names them.
@@ -167,6 +169,7 @@ function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow 
 		number: child.number,
 		title: context.titles.get(child.number),
 		kind: run_board_kind.kind_of(child.labels),
+		priority: run_board_kind.priority_of(child.labels),
 		state,
 		status: undefined,
 		waits,
@@ -248,6 +251,7 @@ function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRo
 		number,
 		title: read.titles.get(number),
 		kind: run_board_kind.kind_of(labels),
+		priority: run_board_kind.priority_of(labels),
 		state: is_asked ? 'human' : status.state,
 		status,
 		waits: [],

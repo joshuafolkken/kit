@@ -29,6 +29,8 @@ const STAGE_SECONDS = 42
 const INSTALLING: RowReason = { icon: '📥', since_ms: NOW - STAGE_SECONDS * SECOND }
 // A pane the condition column's 12 columns (joshuafolkken/kit#4288) leave 40 in.
 const NARROW = 52
+// The priority column (joshuafolkken/kit#4383) and its blank: the columns a row's head gained.
+const PRIORITY_WIDTH = 3
 const TALL = 100
 const JAPANESE = /[぀-ヿ一-鿿]/u
 
@@ -71,7 +73,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 		const line = line_of(waiting({ reason: HELD }))
 		const title_column = line.indexOf(SHORT_TITLE)
 
-		expect(line).toMatch(/^ {4}📂 3701 {8}3720 {4}Short title {2}package\.json$/u)
+		expect(line).toMatch(/^ {4}📂 3701 {8}3720 {7}Short title {2}package\.json$/u)
 		expect(line.indexOf(PATH)).toBe(title_column + SHORT_TITLE.length + 2)
 	})
 
@@ -79,7 +81,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 		const waits = [BLOCKER, OTHER_BLOCKER]
 		const line = line_of(waiting({ waits, reason: { icon: '🔗', issues: waits } }))
 
-		expect(line).toMatch(/^ {4}🔗 3409\+1 {6}3720 {4}Short title {2}3410$/u)
+		expect(line).toMatch(/^ {4}🔗 3409\+1 {6}3720 {7}Short title {2}3410$/u)
 	})
 
 	it('keeps a running row’s columns where they are beside a waiting row', () => {
@@ -98,7 +100,7 @@ describe('run_board_render.render — why a waiting row waits', () => {
 	})
 
 	it('draws a lane’s stage with how long the lane has stood at it before the number', () => {
-		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/^ {4}📥 42″ {9}3720 {4}Short title$/u)
+		expect(line_of(waiting({ reason: INSTALLING }))).toMatch(/^ {4}📥 42″ {9}3720 {7}Short title$/u)
 	})
 
 	it('draws no Japanese in what it adds to the row', () => {
@@ -124,10 +126,11 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 	})
 
 	it('leaves a title that already fits the pane whole', () => {
-		const line = line_of(waiting({ reason: ENDED_REASON }), NARROW)
+		const pane = NARROW + PRIORITY_WIDTH
+		const line = line_of(waiting({ reason: ENDED_REASON }), pane)
 
 		expect(line).toMatch(/Short title {2}superseded$/u)
-		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
+		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(pane)
 	})
 
 	it('cuts a title shorter than the title column by just the columns the line runs over', () => {

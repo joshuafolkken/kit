@@ -36,6 +36,7 @@ describe('kickoff.md — the multi-issue split of a `new` entry', () => {
 describe('kickoff.md — the words typed after `new`', () => {
 	it.each([
 		['auto ok', /\| `auto ok` \| nothing — `issue:file` judges it\s*\|/u],
+		['critical', /\| `critical` \s*\| `--label priority:critical`\s*\|/u],
 		['high', /\| `high` \s*\| `--label priority:high`\s*\|/u],
 	])('maps `%s` in the table', (_word, row) => {
 		expect(read_unwrapped(`${WORKFLOW_SKILL}/kickoff.md`)).toMatch(row)

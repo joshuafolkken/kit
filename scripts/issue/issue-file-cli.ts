@@ -20,6 +20,7 @@ import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_lint_cli } from './issue-lint-cli'
+import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
@@ -78,6 +79,7 @@ function refusals_of(filing: Filing): ReadonlyArray<string> {
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
+		issue_priority.problem(filing.body, filing.args.labels),
 		issue_file.origin_problem(filing.body, filing.target, filing.current),
 	]
 

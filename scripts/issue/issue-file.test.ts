@@ -130,6 +130,25 @@ describe('issue_file.labels_of — a filing that declares a start time', () => {
 	})
 })
 
+// joshuafolkken/kit#4383: the body's priority declaration becomes its label; a typed one wins.
+describe('issue_file.labels_of — a filing that declares a priority', () => {
+	const CRITICAL = 'priority:critical'
+	const urgent = `${ENHANCEMENT_BODY}- 優先度: 緊急（条件 1）\n`
+
+	it('carries the declared priority label', () => {
+		expect(issue_file.labels_of(args_of(), urgent)).toStrictEqual(['enhancement', CRITICAL])
+	})
+
+	it('keeps a typed priority label rather than adding the declared one', () => {
+		const typed = ['priority:high']
+
+		expect(issue_file.labels_of(args_of({ labels: typed }), urgent)).toStrictEqual([
+			...typed,
+			'enhancement',
+		])
+	})
+})
+
 describe('issue_file.triage_problem — the run label an auto-ok filing owes', () => {
 	it('refuses auto-ok with neither run:lane nor run:solo', () => {
 		expect(issue_file.triage_problem(['auto-ok'])).toContain('--label run:lane')

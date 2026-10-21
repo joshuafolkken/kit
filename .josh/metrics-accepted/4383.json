@@ -1,0 +1,10 @@
+{
+	"reason": "Review round 1: refuse a run-time-shortening Issue whose reduction-per-merge line is missing or states no percentage, so the priority floor cannot be skipped",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 207,
+		"rules.lines": 15,
+		"ai_cost.on_demand_bytes": 1933,
+		"prose.excess_bold": 1
+	}
+}

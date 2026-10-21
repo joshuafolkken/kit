@@ -265,7 +265,7 @@ describe('run_board_render.render tail column', () => {
 	it('starts a waiting row’s other blockers two blanks after its title', () => {
 		const line = tail_lines().find((text) => text.includes('Waiting'))
 
-		expect(line).toMatch(/^ {4}🔗 9\+1 {9}3 {4}Waiting {2}10$/u)
+		expect(line).toMatch(/^ {4}🔗 9\+1 {9}3 {7}Waiting {2}10$/u)
 	})
 
 	// The header's third line says the run has ended, so only the row's tail draws 🔧.

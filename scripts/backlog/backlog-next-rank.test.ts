@@ -9,6 +9,7 @@ import {
 	AUTO_OK_LABEL,
 	BUG_LABEL,
 	IN_PROGRESS_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_SOLO_LABEL,
 } from '#scripts/issue/issue-labels'
@@ -116,5 +117,19 @@ describe('backlog:next ranking keys', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(offered()).toStrictEqual([SEVENTH])
+	})
+
+	// joshuafolkken/kit#4383: priority:critical is offered ahead of priority:high.
+	it('offers priority:critical ahead of priority:high', async () => {
+		stub(
+			new Map([
+				[SIXTH, [PRIORITY_HIGH_LABEL]],
+				[SEVENTH, [PRIORITY_CRITICAL_LABEL]],
+			]),
+			false,
+		)
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()[0]).toBe(SEVENTH)
 	})
 })

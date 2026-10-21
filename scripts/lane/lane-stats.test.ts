@@ -110,6 +110,30 @@ describe('lane_stats.row beside the stage entries', () => {
 	})
 })
 
+// joshuafolkken/kit#4383: a priority judgement weighs a reduction against the median lane time per
+// merge — dispatch to merge of the same issue, the dispatch looked up before the window too.
+describe('lane_stats.row — the lane median', () => {
+	const LANE_MEDIAN = 'lane median (min)'
+	const OTHER_ISSUE = 8
+
+	it('takes the median of each merge minus the latest dispatch of its issue before it', () => {
+		const entries: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'dispatch', at: hours_before_now(30), issue: MERGE_ISSUE },
+			{ kind: 'dispatch', at: hours_before_now(3), issue: MERGE_ISSUE },
+			{ kind: 'merge', at: hours_before_now(2), issue: MERGE_ISSUE },
+			{ kind: 'dispatch', at: hours_before_now(26), issue: OTHER_ISSUE },
+			{ kind: 'merge', at: hours_before_now(1), issue: OTHER_ISSUE },
+			{ kind: 'dispatch', at: hours_before_now(0), issue: MERGE_ISSUE },
+		]
+
+		expect(cell_of(entries, LANE_MEDIAN)).toBe('780.0')
+	})
+
+	it('skips a merge no dispatch preceded and prints the missing mark when none remains', () => {
+		expect(cell_of(MERGES, LANE_MEDIAN)).toBe(lane_stats.MISSING)
+	})
+})
+
 describe('lane_stats.row', () => {
 	it('labels the row with the limit and the period', () => {
 		expect(cells([]).slice(0, 2)).toStrictEqual(['4', '1'])
