@@ -38,15 +38,34 @@ function implementation_cuts(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
 	return events.filter((event) => event.text.endsWith(IMPLEMENTATION_CUT))
 }
 
+// The issue's next cut of any kind closes the window: a resume after it belongs to that later cut,
+// so a cut never resumed stays not ended rather than borrowing a later run's resume.
+function next_cut_ms(
+	cuts: ReadonlyArray<{ issue: number | undefined; at_ms: number }>,
+	issue: number | undefined,
+	from_ms: number,
+): number {
+	const later = cuts.filter((other) => other.issue === issue && other.at_ms > from_ms)
+
+	return Math.min(...later.map((other) => other.at_ms))
+}
+
 function relaunch_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
 	const resumes = lane_stop_stats.events_of(events, EVENT_KIND.RESUME)
+	const all_cuts = lane_stop_stats.events_of(events, EVENT_KIND.CUT)
 	const cuts = lane_stop_stats.events_of(implementation_cuts(events), EVENT_KIND.CUT)
 
-	return cuts.map((cut) => ({
-		from_ms: cut.at_ms,
-		end_ms: resumes.find((resume) => resume.issue === cut.issue && resume.at_ms >= cut.at_ms)
-			?.at_ms,
-	}))
+	return cuts.map((cut) => {
+		const until_ms = next_cut_ms(all_cuts, cut.issue, cut.at_ms)
+
+		return {
+			from_ms: cut.at_ms,
+			end_ms: resumes.find(
+				(resume) =>
+					resume.issue === cut.issue && resume.at_ms >= cut.at_ms && resume.at_ms < until_ms,
+			)?.at_ms,
+		}
+	})
 }
 
 function offer_times(entries: ReadonlyArray<LedgerEntry>): Array<number> {

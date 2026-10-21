@@ -38,7 +38,8 @@ const PGREP_COMMAND = 'pgrep'
 //
 // `alive_since` is when this run of the child was first seen alive: a ship it launched is no older, so
 // a ship record launched earlier is a past dispatch's (joshuafolkken/kit#4395). A child already alive
-// when the watch began has none, and its ship is never read as its own.
+// when the watch began gets the first poll's time, so a ship it launched before that is not read as
+// its own and its disappearance waits out the re-confirm window.
 interface AwaitState {
 	appeared: boolean
 	alive_since?: number | undefined

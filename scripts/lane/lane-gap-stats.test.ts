@@ -73,6 +73,17 @@ describe('lane_gap_stats.table -- cut → resume', () => {
 		expect(row_of([], events, RELAUNCH)).toBe(`| ${RELAUNCH} | 1 | ${UNMEASURED} | 1 |`)
 	})
 
+	// The first cut was never resumed; the resume after the issue's later cut is that cut's alone.
+	it('ends a cut no later than the same issue next cut', () => {
+		const events = [
+			event('cut', CUT_TEXT, 300),
+			event('cut', CUT_TEXT, 100),
+			event('resume', `#${String(ISSUE)} resumed`, 90),
+		]
+
+		expect(row_of([], events, RELAUNCH)).toBe(`| ${RELAUNCH} | 2 | 10 | 10 | 1 |`)
+	})
+
 	// A pre-gate resume appends no `resume` event, so its cut has no end to time.
 	it('leaves out a pre-gate cut', () => {
 		const events = [event('cut', `#${String(ISSUE)} cut (pre-gate)`, 100)]

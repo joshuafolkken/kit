@@ -1,7 +1,7 @@
 {
-	"reason": "New lane:stats hand-off gap table (lane-gap-stats.ts), the shipped-child early collection in lane_await, and the launch-time anchor that keeps a past dispatch's ship success from collecting the child of a later dispatch, all required by #4395",
+	"reason": "Round-2 review fix: bound each cut → resume span by the issue's next cut so a never-resumed cut stays not ended",
 	"date": "2026-10-21",
 	"growth": {
-		"scripts.code_lines": 160
+		"scripts.code_lines": 174
 	}
 }
