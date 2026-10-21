@@ -2,9 +2,11 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
+import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { test_declared_logic } from './test-declared-logic'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
@@ -31,8 +33,11 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 	return test_unit_guard.is_running(process.cwd()) ? before : undefined
 }
 
-// The change a narrowing reads, and the map it reads it against.
-type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'>
+// The change a narrowing reads, and the map it reads it against. `is_unmoved` is the since-green
+// reading's positive fact that nothing moved since this command was last green on this checkout.
+type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'> & { is_unmoved?: true }
+
+const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
 
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
 // `resolve_scope`, and only one of them means "could not tell".
@@ -84,6 +89,42 @@ async function explicit_change(
 	return { changed: [...new Set([...explicit, ...since])], map }
 }
 
+// **A moved non-code file is never narrowed by**: it reaches tests through the map alone, and a
+// branch source that started reading it after the map's tree is in no entry, so an untouched test
+// reading it through that source would be missed. The whole branch change runs it.
+function is_map_read(moved: ReadonlyArray<string>): boolean {
+	return moved.some((file) => !related_scope.is_relatable(file))
+}
+
+// **What moved since this command's last green run, plus the branch's own test files**
+// (`since-green.ts`). A branch test is in no map entry for a file it started reading on the branch, so
+// a file it reads that moved since would otherwise reach no test; listing it runs it, as the change
+// since the map does. Nothing moved runs nothing; `undefined` reads the whole branch change instead.
+async function since_green_change(map: ReadMap | undefined): Promise<ChangeReading | undefined> {
+	const moved = await since_green.read_moved(review_stamps.test_related_stamp)
+
+	if (moved === undefined || is_map_read(moved)) return undefined
+	if (moved.length === 0) return { changed: [], map, is_unmoved: true }
+
+	const branch = await branch_change()
+
+	if (branch === undefined) return undefined
+
+	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
+
+	const tests = branch.filter((file) => test_declared_logic.is_test_file(file))
+
+	return { changed: [...new Set([...moved, ...tests])], map }
+}
+
+async function whole_change(map: ReadMap | undefined): Promise<ChangeReading> {
+	const since = await since_green_change(map)
+
+	if (since !== undefined) return since
+
+	return map === undefined ? { changed: await branch_change(), map } : await map_change(map)
+}
+
 async function read_change(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -93,9 +134,7 @@ async function read_change(
 		.filter((argument) => !changed_file_scope.is_flag(argument))
 		.map((file) => path.relative(root, path.resolve(file)))
 
-	if (explicit.length > 0) return await explicit_change(explicit, map)
-
-	return map === undefined ? { changed: await branch_change(), map } : await map_change(map)
+	return explicit.length > 0 ? await explicit_change(explicit, map) : await whole_change(map)
 }
 
 // **The changed non-code files the map's tree held and that did not already differ from it** — the
@@ -155,11 +194,22 @@ async function run_scope(
 	)
 }
 
+async function read_scope(
+	root: string,
+	command_arguments: ReadonlyArray<string>,
+): Promise<RelatedScope> {
+	const change = await read_change(root, command_arguments)
+
+	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
+
+	const recorded = await recorded_files(change)
+
+	return related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
+}
+
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const change = await read_change(root, command_arguments)
-	const recorded = await recorded_files(change)
-	const scope = related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
+	const scope = await read_scope(root, command_arguments)
 
 	// A non-code argument is resolved through the map rather than handed to vitest, so only the
 	// code arguments can be ones vitest was not given.
