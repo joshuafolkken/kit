@@ -76,6 +76,10 @@
   - fires: `pnpm josh rule:guard` — a dispatched lane child switching to the default branch or running `josh main:sync`. Every occurrence
   - silent: not a lane child — `pnpm josh main:merge` brings the default in at the gate
   - not automated: the right act is another command, whose arguments the call does not carry
+- **Timed re-run** (`timed-rerun`, `measurement.md`)
+  - fires: `pnpm josh rule:guard` — a command timed with `time` / `/usr/bin/time` / `hyperfine`
+  - silent: the duration is read from the Actions jobs or `pnpm josh lane:stats`
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child running a heavy tool directly** (`lane-direct-tool`, `docs/josh-commands-automation.md` → `josh reserved-run`)
   - fires: `pnpm josh rule:guard` — a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`). Every occurrence
   - silent: not a lane child, or the run goes through `pnpm josh`

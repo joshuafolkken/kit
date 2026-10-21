@@ -31,6 +31,7 @@ import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
+import { timed_rerun } from './timed-rerun'
 import { worktree_guard } from './worktree-guard'
 
 // The rules delivered by a `PreToolUse` refusal at the moment they bind, rather than carried resident
@@ -213,6 +214,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	agent_model.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
+	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
+	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
+	timed_rerun.ROW,
 	lane_direct_tool.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.
 	josh_git_bare.ROW,
