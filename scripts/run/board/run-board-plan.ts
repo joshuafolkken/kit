@@ -1,6 +1,6 @@
 import { auto_ok_cli, type OptedInRead } from '#scripts/auto-ok/auto-ok-cli'
 import type { OptedIn } from '#scripts/backlog/backlog-next'
-import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import { backlog_plan, type NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import { epic_classify } from '#scripts/epic/epic-classify'
@@ -92,11 +92,39 @@ function not_held(children: ReadonlyArray<EpicChild>, held: ReadonlySet<number>)
 	return children.filter((child) => !held.has(child.number))
 }
 
-// The named plan's withheld issues, and the pool's it does not hold.
+// The issues the pool runs: its waves and its running issues, not what it leaves unreached.
+function runs_of(pool: BoardPlan): ReadonlySet<number> {
+	const running = pool.waves.running ?? []
+
+	return new Set([...pool.waves.waves.flat(), ...running].map((child) => child.number))
+}
+
+// The named plan is classified alone, so a blocker only the pool holds reads as outside it; the
+// child still waits on a person only while a standing blocker is one the pool does not run.
+function waits_outside(child: EpicChild, pool: BoardPlan, runs: ReadonlySet<number>): boolean {
+	const { context } = pool
+
+	return child.blocked_by.some(
+		(edge) =>
+			backlog_plan.is_standing(edge, context) &&
+			!(edge.repo === context.repo && runs.has(edge.number)),
+	)
+}
+
+function lead_withheld(lead: BoardPlan, pool: BoardPlan): Array<number> {
+	const runs = runs_of(pool)
+	const children = [...lead.waves.waves.flat(), ...lead.waves.unreached]
+	const freed = children.filter((child) => !waits_outside(child, pool, runs))
+	const freed_numbers = new Set(freed.map((child) => child.number))
+
+	return [...(lead.withheld ?? [])].filter((number) => !freed_numbers.has(number))
+}
+
+// The named plan's withheld issues the pool does not free, and the pool's the named plan does not hold.
 function withheld_of(lead: BoardPlan, pool: BoardPlan, held: ReadonlySet<number>): Set<number> {
 	const from_pool = [...(pool.withheld ?? [])].filter((number) => !held.has(number))
 
-	return new Set([...(lead.withheld ?? []), ...from_pool])
+	return new Set([...lead_withheld(lead, pool), ...from_pool])
 }
 
 // The named waves lead and the pool's follow, a child the named plan already holds left out of the pool
