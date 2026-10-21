@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -166,8 +166,19 @@ describe('test_read_map.read_map and write_map', () => {
 
 		expect(test_read_map.read_map(ROOT)).toEqual(MAP)
 		expect(test_read_map.map_path(ROOT)).toBe(
-			path.join(common.directory, 'josh', 'test-read-map.json'),
+			path.join(common.directory, 'josh', `test-read-map.v${String(MAP.version)}.json`),
 		)
+	})
+
+	// joshuafolkken/kit#4423: a lane on another kit writes its own version's file beside this one.
+	it('still reads its own version once another version’s map is written', () => {
+		const other: ReadMap = { ...MAP, version: MAP.version + 1, commit: 'def' }
+
+		test_read_map.write_map(ROOT, MAP)
+		test_read_map.write_map(ROOT, other)
+
+		expect(test_read_map.read_map(ROOT)).toEqual(MAP)
+		expect(existsSync(test_read_map.map_path(ROOT, other.version) ?? '')).toBe(true)
 	})
 
 	it('reads no map where none was written', () => {
@@ -179,6 +190,47 @@ describe('test_read_map.read_map and write_map', () => {
 		test_read_map.write_map(ROOT, MAP)
 
 		expect(test_read_map.read_map(ROOT)).toBeUndefined()
+	})
+})
+
+const EIGHT_DAYS_S = 691_200
+const LEGACY_MAP = 'test-read-map.json'
+const STALE_MAP = 'test-read-map.v2.json'
+const FRESH_MAP = 'test-read-map.v3.json'
+const STALE_OTHER = 'other.json'
+
+function seed(name: string, stale: boolean): void {
+	const file_path = path.join(common.directory, 'josh', name)
+	const seconds = Date.now() / 1000 - (stale ? EIGHT_DAYS_S : 0)
+
+	mkdirSync(path.dirname(file_path), { recursive: true })
+	writeFileSync(file_path, '{}')
+	utimesSync(file_path, seconds, seconds)
+}
+
+function survives(name: string): boolean {
+	return existsSync(path.join(common.directory, 'josh', name))
+}
+
+// joshuafolkken/kit#4423: the per-version files must not pile up in the shared directory.
+describe('test_read_map.write_map pruning', () => {
+	beforeEach(() => {
+		seed(LEGACY_MAP, true)
+		seed(STALE_MAP, true)
+		seed(FRESH_MAP, false)
+		seed(STALE_OTHER, true)
+		test_read_map.write_map(ROOT, MAP)
+	})
+
+	it('removes another version’s map no lane has written for a week, the unversioned one included', () => {
+		expect(survives(LEGACY_MAP)).toBe(false)
+		expect(survives(STALE_MAP)).toBe(false)
+	})
+
+	it('keeps a map another lane wrote recently, its own map and every other file', () => {
+		expect(survives(FRESH_MAP)).toBe(true)
+		expect(test_read_map.read_map(ROOT)).toEqual(MAP)
+		expect(survives(STALE_OTHER)).toBe(true)
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "Per-version test-read map files plus their stale-file prune (#4423)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}
