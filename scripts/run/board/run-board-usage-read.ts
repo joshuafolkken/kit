@@ -1,5 +1,4 @@
 import { cpus, totalmem } from 'node:os'
-import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -7,6 +6,7 @@ import { process_directories } from '#scripts/lane/process-directories'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import type { ProcessReading, UsageMark } from './run-board-usage'
+import { run_board_usage_lanes, type DirectoryRead, type LaneLookup } from './run-board-usage-lanes'
 import { run_board_usage_listing, type ProcessListing } from './run-board-usage-listing'
 import {
 	run_board_usage_rusage,
@@ -19,9 +19,9 @@ import { run_board_usage_top, type TopReading, type TopReadings } from './run-bo
 // **One `ps` a second, and `lsof` only for a process not seen before.** `ps` — the snapshot the lane
 // count reads in the same refresh (`lane-process-table.ts`), never one of its own — lists every process's
 // cumulative CPU time and resident memory in about 15 ms; a process is put in the lane its working
-// directory sits under (`.kit-lanes/<N>`), looked up once and remembered, so a full `lsof` (about
-// 220 ms) is paid on the first sample alone. The working directory rather than the parent chain: a
-// process detached with `josh ship --detach` is re-parented and no longer traceable to its lane.
+// directory sits under (`.kit-lanes/<N>`), else its nearest ancestor's. A directory is looked up once
+// and remembered — asked again only when an `lsof` cut short left it out — so a full `lsof` (about
+// 220 ms) is paid on the first sample alone (`run-board-usage-lanes.ts`).
 // **Only this repository's lanes root counts** — another repository's lane of the same number is a
 // different lane. **macOS alone:** Linux's `ps` prints `time` in whole seconds, too coarse for a
 // one-second difference, so there the board draws no column rather than a figure flickering to 0.
@@ -39,19 +39,17 @@ const PID_SEPARATOR = ','
 const { load_builtin, rusage_reader } = run_board_usage_rusage
 const { list_top, top_reader } = run_board_usage_top
 const { listings_of } = run_board_usage_listing
+const { lanes_for } = run_board_usage_lanes
 
-interface UsagePorts {
+// The working directories and the lanes root come with `LaneLookup`.
+interface UsagePorts extends LaneLookup {
 	// The process snapshot the lane count reads too (`lane-process-table.ts`).
 	list: TableRead
 	// Each process's CPU time with its reaped children's and its footprint, where `node:ffi` reaches it.
 	rusage: RusageReader | undefined
 	// `top`'s last memory and compressed-memory reading.
 	top: () => Promise<TopReadings>
-	// The working directory of each process that answered.
-	directories: (pids: ReadonlyArray<number>) => Promise<ReadonlyMap<number, string>>
 	now: () => number
-	// The board's own lanes root.
-	root: string
 }
 
 // What one reading is made from: `ps`'s line, `node:ffi`'s reading and `top`'s — `ps`'s resident set
@@ -117,36 +115,6 @@ function readings_of(
 	return { processes, parents, names, folded }
 }
 
-// The lane of `root` a directory sits under — itself or a directory above it, the outermost first.
-function lane_of(directory: string, root: string): string | undefined {
-	const parts = directory.split(path.sep)
-	const ancestors = parts.map((_, index) => parts.slice(0, index + 1).join(path.sep)).slice(1)
-	const environment = { [lane_paths.LANE_ROOT_KEY]: root }
-
-	return ancestors.map((ancestor) => lane_paths.lane_issue_of(ancestor, environment)).find(Boolean)
-}
-
-function directory_lane(directory: string | undefined, root: string): string | undefined {
-	return directory === undefined ? undefined : lane_of(directory, root)
-}
-
-// The lanes of the processes still listed: a gone one dropped, and one not seen before looked up.
-async function lanes_for(
-	known: ReadonlyMap<number, string | undefined>,
-	processes: ReadonlyMap<number, ProcessReading>,
-	ports: UsagePorts,
-): Promise<Map<number, string | undefined>> {
-	const kept = new Map([...known].filter(([pid]) => processes.has(pid)))
-	const fresh = [...processes.keys()].filter((pid) => !kept.has(pid))
-
-	if (fresh.length === 0) return kept
-
-	const directories = await ports.directories(fresh)
-	const found = fresh.map((pid) => [pid, directory_lane(directories.get(pid), ports.root)] as const)
-
-	return new Map([...kept, ...found])
-}
-
 // The snapshot's listings and `top`'s reading, read together; a snapshot `ps` did not answer fails the
 // sample.
 async function listed_of(
@@ -164,26 +132,33 @@ async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise
 	const { listed, top } = await listed_of(ports)
 	const earlier = before?.processes ?? new Map()
 	const readings = readings_of(listed, { rusage: ports.rusage, top, earlier })
-	const lanes = await lanes_for(before?.lanes ?? new Map(), readings.processes, ports)
+	const lanes = await lanes_for(before, readings.parents, ports)
 
-	return { at_ms, ...readings, lanes, cores: cpus().length, total_bytes: totalmem() }
+	return { at_ms, ...readings, ...lanes, cores: cpus().length, total_bytes: totalmem() }
 }
 
-async function darwin_directories(
-	pids: ReadonlyArray<number>,
-): Promise<ReadonlyMap<number, string>> {
-	// `lsof` exits non-zero when any one process is gone, and still lists the rest. A budget kill is
-	// not that: it lists nothing, and `lanes_for` never asks again about a process it read as being in
-	// no lane, so the sample fails instead of pinning every live process to none.
+// The answers of an `lsof` cut short, its last dropped: that one may end on a directory missing its
+// tail, `.kit-lanes/43` for `.kit-lanes/4346`.
+function whole_answers(directories: Map<number, string>): Map<number, string> {
+	return new Map([...directories].slice(0, -1))
+}
+
+async function darwin_directories(pids: ReadonlyArray<number>): Promise<DirectoryRead> {
+	// `lsof` exits non-zero when any one process is gone, and still lists the rest. One killed on its
+	// budget or by a signal, or one that never started — a spawn failing under load has no exit code —
+	// did not run to its end, and every process it did not answer for is asked again on the next sample
+	// (`run-board-usage-lanes.ts`).
 	const lsof_arguments = [...LSOF_ARGUMENTS, pids.join(PID_SEPARATOR)]
 	const result = await execa('lsof', lsof_arguments, { reject: false, timeout: PROBE_TIMEOUT_MS })
+	const is_cut_short = result.isTerminated || (result.failed && result.exitCode === undefined)
+	const directories = process_directories.parse(result.stdout)
 
-	if (result.timedOut) throw new Error('lsof timed out')
+	if (is_cut_short) return { directories: whole_answers(directories), is_complete: false }
 
-	return process_directories.parse(result.stdout)
+	return { directories, is_complete: true }
 }
 
-const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, UsagePorts['directories']>>> =
+const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, LaneLookup['directories']>>> =
 	{ darwin: darwin_directories }
 
 async function board_lane_root(): Promise<string> {
@@ -244,7 +219,7 @@ function usage_reader(platform: NodeJS.Platform = process.platform): UsageReader
 	return read
 }
 
-const run_board_usage_read = { lane_of, sample, usage_reader }
+const run_board_usage_read = { sample, usage_reader }
 
 export { run_board_usage_read }
 export type { UsagePorts, UsageReader }

@@ -40,7 +40,11 @@ describe('hanging_execa.spawn with a timeout', () => {
 
 		await vi.advanceTimersByTimeAsync(BUDGET_MS)
 
-		await expect(pending).resolves.toStrictEqual({ stdout: '', timedOut: true })
+		await expect(pending).resolves.toStrictEqual({
+			stdout: '',
+			timedOut: true,
+			isTerminated: true,
+		})
 	})
 
 	it('stays open until the budget is spent', async () => {
@@ -71,6 +75,7 @@ describe('hanging_execa.answer_with', () => {
 		await expect(hanging_execa.spawn(BINARY, ARGUMENTS)).resolves.toStrictEqual({
 			stdout: ANSWER,
 			timedOut: false,
+			isTerminated: false,
 		})
 		expect(await settle_or_pending(other)).toBe(PENDING)
 	})

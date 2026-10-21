@@ -16,8 +16,11 @@ interface ProcessReading {
 interface UsageMark {
 	at_ms: number
 	processes: ReadonlyMap<number, ProcessReading>
-	// Every listed process's lane, `undefined` for one under none — kept so each is looked up once.
+	// Every listed process's lane — its working directory's, else its nearest ancestor's — `undefined`
+	// for one under none; kept so each directory is looked up once (`run-board-usage-lanes.ts`).
 	lanes: ReadonlyMap<number, string | undefined>
+	// The processes an `lsof` cut short was asked about, asked again on the next sample.
+	unread: ReadonlySet<number>
 	// Each process's command, which names the app it belongs to.
 	names: ReadonlyMap<number, string>
 	// Each process's parent: the ancestry the processes section groups by, and the way to the ancestor
@@ -167,7 +170,7 @@ function lane_number(lane: string | undefined): number | undefined {
 	return lane === undefined ? undefined : Number(lane)
 }
 
-// Each lane's processes' sum, by the lane each process's working directory sits under.
+// Each lane's processes' sum, by each process's lane in `mark.lanes`.
 function usage_of(mark: UsageMark, figures: ProcessFigures): LaneUsages {
 	return grouped_sums(figures, (pid) => lane_number(mark.lanes.get(pid)))
 }

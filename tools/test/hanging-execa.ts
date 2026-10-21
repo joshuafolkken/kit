@@ -15,9 +15,11 @@ interface SpawnCall {
 	options: SpawnOptions
 }
 
+// execa kills a spawn on its budget with a signal, so one that timed out is terminated too.
 interface SpawnResult {
 	stdout: string
 	timedOut: boolean
+	isTerminated: boolean
 }
 
 interface HangState {
@@ -27,7 +29,7 @@ interface HangState {
 }
 
 const state: HangState = { answers: new Map(), calls: [] }
-const TIMED_OUT: SpawnResult = { stdout: '', timedOut: true }
+const TIMED_OUT: SpawnResult = { stdout: '', timedOut: true, isTerminated: true }
 
 // What execa throws for a spawn it killed on its budget: `timedOut` is the field callers read.
 function create_timeout_error(file: string, timeout_ms: number): Error {
@@ -59,7 +61,9 @@ async function spawn(
 
 	const answer = state.answers.get(file)
 
-	return answer === undefined ? await hang(file, options) : { stdout: answer, timedOut: false }
+	return answer === undefined
+		? await hang(file, options)
+		: { stdout: answer, timedOut: false, isTerminated: false }
 }
 
 function answer_with(file: string, stdout: string): void {

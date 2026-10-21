@@ -8,7 +8,7 @@ import type { TopReadings } from './run-board-usage-top'
 // joshuafolkken/kit#3489: how the board reads each process and its lane — `ps` every second, the
 // working directory only for a process not seen before, and nothing where the platform has no way to it.
 
-const { lane_of, sample, usage_reader } = run_board_usage_read
+const { sample, usage_reader } = run_board_usage_read
 const KB = 1024
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/3423`
@@ -22,18 +22,6 @@ const NO_TABLE = vi.fn(async () => undefined)
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-describe('run_board_usage_read.lane_of', () => {
-	it('finds the lane a directory sits under at any depth, and none outside a lane', () => {
-		expect(lane_of(LANE, ROOT)).toBe('3423')
-		expect(lane_of(`${LANE}/packages/app/src`, ROOT)).toBe('3423')
-		expect(lane_of('/Users/me/Development/kit', ROOT)).toBeUndefined()
-	})
-
-	it('finds no lane under another repository’s lanes root of the same number', () => {
-		expect(lane_of('/Users/me/Development/.app-kit-lanes/3423/src', ROOT)).toBeUndefined()
-	})
 })
 
 interface PortsOptions {
@@ -50,7 +38,10 @@ function ports_of(
 		list: vi.fn(async () => lane_process_table.parse(listings.shift() ?? '')),
 		rusage: options.rusage,
 		top: vi.fn(async () => options.top ?? new Map()),
-		directories: vi.fn(async (_pids: ReadonlyArray<number>) => directories),
+		directories: vi.fn(async (_pids: ReadonlyArray<number>) => ({
+			directories,
+			is_complete: true,
+		})),
 		now: () => 0,
 		root: ROOT,
 	}

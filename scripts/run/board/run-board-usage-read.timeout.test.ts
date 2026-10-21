@@ -71,9 +71,9 @@ describe('run_board_usage_read.usage_reader against a probe that never answers',
 		expect(hanging_execa.timeouts()).toStrictEqual([PROBE_TIMEOUT_MS, TOP_TIMEOUT_MS])
 	})
 
-	// A mark that read the listed processes as being in no lane would keep them there for as long as
-	// they live — a lane is asked for once per process — so the sample fails and the next one asks again.
-	it('reads nothing once the lsof budget is spent', async () => {
+	// joshuafolkken/kit#4359: the sample is read without lanes, and the processes `lsof` did not answer
+	// for are asked again on the next one rather than kept in no lane for as long as they live.
+	it('reads the sample once the lsof budget is spent, with every process left to ask again', async () => {
 		hanging_execa.answer_with(lane_reap.PS_COMMAND, PARENT_AND_CHILD)
 
 		const pending = run_board_usage_read.usage_reader('darwin')(
@@ -83,7 +83,9 @@ describe('run_board_usage_read.usage_reader against a probe that never answers',
 
 		await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS)
 
-		await expect(pending).resolves.toBeUndefined()
+		const mark = await pending
+
+		expect(mark?.unread).toStrictEqual(new Set([1, 2]))
 		expect(hanging_execa.timeouts()).toStrictEqual([
 			PROBE_TIMEOUT_MS,
 			TOP_TIMEOUT_MS,
