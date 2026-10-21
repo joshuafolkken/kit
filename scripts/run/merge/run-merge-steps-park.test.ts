@@ -1,5 +1,6 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
@@ -265,12 +266,12 @@ describe('run_merge_steps.do_failed — a child waiting on its declared start da
 
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
-		expect(result.waits).toStrictEqual([`start date ${String(date)}`])
+		expect(result.waits).toStrictEqual([`not before ${String(date)}`])
 		expect(add_label_mock).not.toHaveBeenCalled()
 		expect(apply_spy).not.toHaveBeenCalled()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`waits on: start date ${String(date)}`),
+			expect.stringContaining(`waits on: not before ${String(date)}`),
 		)
 	})
 
@@ -285,6 +286,21 @@ describe('run_merge_steps.do_failed — a child waiting on its declared start da
 
 		expect(result.waits).toStrictEqual([])
 		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
+	})
+})
+
+describe('run_merge_steps.do_failed — a child waiting on its declared samples', () => {
+	it('releases the child to wait, naming the pull request it waits on', async () => {
+		const body = '## 背景\n\n- 種別: 不具合\n- 実施可能条件: #4313 のマージ後 10 マージ\n'
+
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
+		vi.spyOn(issue_sample_gate, 'prime').mockResolvedValue()
+		spy_carry(OWN_CARRY)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual(['until the merge of #4313 is read'])
+		expect(add_label_mock).not.toHaveBeenCalled()
 	})
 })
 

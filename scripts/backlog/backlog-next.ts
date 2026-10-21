@@ -132,15 +132,18 @@ function warn_gaps(context: PoolContext, has_answer: boolean): void {
 	warn_epic_gap(context)
 }
 
-// Why a row on the time side is not offered yet, when the reason is a declared start time — the one
-// wait a reader cannot see from the labels or the blockers.
+// Why a row on the time side is not offered yet, when the reason is a declared start time or sample
+// condition — the waits a reader cannot see from the labels or the blockers. A sample condition names
+// its pull request as `#N`, linkified like the explanation.
 function warn_not_before(context: PoolContext): void {
 	for (const issue of context.opted_in.issues) {
 		const reason = issue_not_before.waiting_reason(issue.body)
 
-		if (reason !== undefined) {
-			console.error(`${session_cite.issue(issue.number, undefined, context.repo)} ${reason}`)
-		}
+		if (reason === undefined) continue
+
+		const cited = session_cite.issue(issue.number, undefined, context.repo)
+
+		console.error(`${cited} ${issue_citation.linkify(reason, context.repo)}`)
 	}
 }
 

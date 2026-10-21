@@ -625,7 +625,8 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Ranks `priority:critical`, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on, then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived; `backlog:next` prints `#N not before <time>`.
+Read-only. Ranks `priority:critical`, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on, then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
+or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read`.
 
 `josh start` creates the `auto-ok` label, and `josh sync` adds it to a repository that lacks it. stdout is the issue number, `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
 

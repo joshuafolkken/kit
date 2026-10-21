@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
@@ -132,6 +133,8 @@ async function fetch_child_read(
 	}
 
 	const parsed = epic_issue.parse_epic_issue(read.json)
+
+	await issue_sample_gate.prime([parsed?.body])
 
 	return { child: parsed === undefined ? undefined : to_child(parsed, repo), is_unreachable: false }
 }

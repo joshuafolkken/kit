@@ -16,6 +16,13 @@
 
 - 手元の gate とチェックごとの所要時間: `pnpm josh lane:stats --period <days>`（gate の記録、`docs/josh-commands-run.md`）。
 
+## 効果を測る後続 Issue
+
+PR の効果を測る後続 Issue を起票するとき:
+
+- 開始条件は日数でなく標本数で書く: `## 背景` に `- 実施可能条件: #<PR> のマージ後 <K> マージ`（`issue-template.md`）。
+- 受け入れ条件の集計は固定日数でなく `pnpm josh lane:stats --period <days>` とし、`<days>` は元 PR のマージからの経過日数（小数可）にする。
+
 ## 手元で再実行してよいとき
 
 記録で答えられない問い（記録の無い変更前後の比較など）に限る。

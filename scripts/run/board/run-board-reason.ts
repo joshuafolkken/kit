@@ -5,6 +5,7 @@ import { epic_solo, type Labelled, type SoloQueue } from '#scripts/epic/epic-sol
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -257,12 +258,23 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason |
 	)
 }
 
+// `📅 3/10`: the merges the ledger recorded after the declared pull request merged, of those the body
+// waits on; `📅 4313` while that pull request has not merged or its merge is unread.
+function sample_wait_of(child: EpicChild): RowReason | undefined {
+	const wait = issue_sample_gate.wait_of(child.body)
+
+	if (wait === undefined) return undefined
+	if (wait.kind !== 'short') return { icon: WAIT_ICONS.not_before, issues: [String(wait.pr)] }
+
+	return { icon: WAIT_ICONS.not_before, value: `${String(wait.counted)}/${String(wait.needed)}` }
+}
+
 // `📅 10-20 16:30`: the start time the body declares and the clock has not reached, in the board's
 // local time.
 function not_before_of(child: EpicChild): RowReason | undefined {
 	const ms = issue_not_before.waiting_ms(child.body)
 
-	if (ms === undefined) return undefined
+	if (ms === undefined) return sample_wait_of(child)
 
 	return {
 		icon: WAIT_ICONS.not_before,

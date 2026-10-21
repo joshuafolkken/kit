@@ -1,9 +1,12 @@
+import { issue_sample_gate } from './issue-sample-gate'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#4007: a follow-up measurement filed with `auto-ok` ("measure three days after #N
 // merges") was offered by `backlog:next` the day it was filed, and its lane could only hand the hold
 // back. The body now names the earliest time the work can start, and the pickup holds the issue until
 // then. One UTC spelling only — a date a reader has to guess the zone of is not a deadline.
+// A body may instead wait on samples recorded after a pull request merged (`issue-sample-gate.ts`);
+// this module answers for both, so every reader holds an issue back the same way.
 
 const BACKGROUND_HEADING = '## 背景'
 const PREFIX = '- 実施可能日:'
@@ -41,36 +44,46 @@ function date_of(body = ''): string | undefined {
 	return value !== undefined && is_valid(value) ? value : undefined
 }
 
-function is_due(body: string | undefined, now: number = Date.now()): boolean {
+function is_date_due(body: string | undefined, now: number): boolean {
 	const date = date_of(body)
 
 	return date === undefined || Date.parse(date) <= now
 }
 
-// The declared time as epoch milliseconds while it is still ahead, or `undefined` when the issue is due —
+// Whether the issue may start: its declared time has arrived and its declared samples are recorded.
+function is_due(body: string | undefined, now: number = Date.now()): boolean {
+	return is_date_due(body, now) && issue_sample_gate.wait_of(body) === undefined
+}
+
+// The declared time as epoch milliseconds while it is still ahead, or `undefined` when it has arrived —
 // for a reader that spells the time its own way (`run:board` in the local zone).
 function waiting_ms(body: string | undefined, now: number = Date.now()): number | undefined {
-	if (is_due(body, now)) return undefined
+	if (is_date_due(body, now)) return undefined
 
 	return Date.parse(String(date_of(body)))
 }
 
-// The declared time as written while it is still ahead, or `undefined` when the issue is due.
+// The declared time as written while it is still ahead, or `undefined` when it has arrived.
 function waiting_date(body: string | undefined, now: number = Date.now()): string | undefined {
-	return is_due(body, now) ? undefined : date_of(body)
+	return is_date_due(body, now) ? undefined : date_of(body)
 }
 
 // Why `backlog:next` holds an issue back, or `undefined` when it is due. The caller cites the issue.
 function waiting_reason(body: string | undefined, now: number = Date.now()): string | undefined {
 	const date = waiting_date(body, now)
 
-	return date === undefined ? undefined : `not before ${date}`
+	if (date !== undefined) return `not before ${date}`
+
+	const wait = issue_sample_gate.wait_of(body)
+
+	return wait === undefined ? undefined : issue_sample_gate.reason_of(wait)
 }
 
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
+	const date_problems = value === undefined || is_valid(value) ? [] : [MALFORMED]
 
-	return value === undefined || is_valid(value) ? [] : [MALFORMED]
+	return [...date_problems, ...issue_sample_gate.problems(body)]
 }
 
 const issue_not_before = { is_due, problems, waiting_date, waiting_ms, waiting_reason }
