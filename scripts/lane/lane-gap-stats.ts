@@ -10,9 +10,12 @@ import { lane_stop_stats } from './lane-stop-stats'
 // (joshuafolkken/kit#4395). Three hand-offs, each timed from the moment the slot's next step could run:
 //
 // - `cut → resume`: a child's session cut until the relaunched session resumed the lane.
-// - `park → offer`: a park until the driver's next offer answered — a `held` or a `dispatch` entry.
-//   The driver writes one per offered pass, so the gap is the slot's hand-over, never the wait for
-//   runnable work after it. The ship's cap park and the driver's collection of it are each timed.
+// - `outage → relaunch`: a child that ended with no result, collected as an `outage`, until its next
+//   `child-launch` (joshuafolkken/kit#4410).
+// - `park → offer`: a park until the driver's next offer answered — a `held`, `released` or `dispatch`
+//   entry. A pool that stays full writes no line after its one `released`, and a driver handed back
+//   writes none, so a gap over the offer interval is a full pool or no driver, never the hand-over
+//   (joshuafolkken/kit#4410). The ship's cap park and the driver's collection of it are each timed.
 // - `followup → merge`: the ship's last `followup` stage before the merge until the parent wrote the
 //   `merge` line, the step that releases the slot. A merge with no `followup` stage has no start.
 //
@@ -20,16 +23,33 @@ import { lane_stop_stats } from './lane-stop-stats'
 
 const COLUMNS = ['gap', 'count', 'median (s)', 'max (s)', 'not ended'] as const
 const RELAUNCH = 'cut → resume'
+const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const MERGE = 'followup → merge'
 const FOLLOWUP_STAGE = 'followup'
 const IMPLEMENTATION_CUT = `cut (${agent_role_profile.IMPLEMENTATION_PHASE})`
 const { NOT_MEASURED, is_dispatch, is_number, is_stage } = lane_stage_stats
 const { EVENT_KIND } = run_event_stream
+// The offer answers that are not a dispatch: a free lane held, or the pool found full.
+const OFFER_ANSWERS: ReadonlySet<string> = new Set([
+	lane_ledger.KIND.HELD,
+	lane_ledger.KIND.RELEASED,
+])
 
 interface Span {
 	from_ms: number
 	end_ms: number | undefined
+}
+
+interface IssueAt {
+	issue: number | undefined
+	at_ms: number
+}
+
+interface IssuePair {
+	starts: ReadonlyArray<IssueAt>
+	bounds: ReadonlyArray<IssueAt>
+	ends: ReadonlyArray<IssueAt>
 }
 
 // Only an implementation cut appends a `resume` when it is adopted; a pre-gate resume appends nothing,
@@ -38,39 +58,55 @@ function implementation_cuts(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
 	return events.filter((event) => event.text.endsWith(IMPLEMENTATION_CUT))
 }
 
-// The issue's next cut of any kind closes the window: a resume after it belongs to that later cut,
-// so a cut never resumed stays not ended rather than borrowing a later run's resume.
-function next_cut_ms(
-	cuts: ReadonlyArray<{ issue: number | undefined; at_ms: number }>,
+// The issue's next start of any kind closes the window: an end after it belongs to that later start,
+// so a start never ended stays not ended rather than borrowing a later run's end.
+function next_start_ms(
+	starts: ReadonlyArray<IssueAt>,
 	issue: number | undefined,
 	from_ms: number,
 ): number {
-	const later = cuts.filter((other) => other.issue === issue && other.at_ms > from_ms)
+	const later = starts.filter((other) => other.issue === issue && other.at_ms > from_ms)
 
 	return Math.min(...later.map((other) => other.at_ms))
 }
 
-function relaunch_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
-	const resumes = lane_stop_stats.events_of(events, EVENT_KIND.RESUME)
-	const all_cuts = lane_stop_stats.events_of(events, EVENT_KIND.CUT)
-	const cuts = lane_stop_stats.events_of(implementation_cuts(events), EVENT_KIND.CUT)
-
-	return cuts.map((cut) => {
-		const until_ms = next_cut_ms(all_cuts, cut.issue, cut.at_ms)
+// Each start until the first end of its own issue, before that issue's next start in `bounds`.
+function issue_spans(pair: IssuePair): Array<Span> {
+	return pair.starts.map((start) => {
+		const until_ms = next_start_ms(pair.bounds, start.issue, start.at_ms)
 
 		return {
-			from_ms: cut.at_ms,
-			end_ms: resumes.find(
-				(resume) =>
-					resume.issue === cut.issue && resume.at_ms >= cut.at_ms && resume.at_ms < until_ms,
+			from_ms: start.at_ms,
+			end_ms: pair.ends.find(
+				(end) => end.issue === start.issue && end.at_ms >= start.at_ms && end.at_ms < until_ms,
 			)?.at_ms,
 		}
 	})
 }
 
+function relaunch_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
+	return issue_spans({
+		starts: lane_stop_stats.events_of(implementation_cuts(events), EVENT_KIND.CUT),
+		bounds: lane_stop_stats.events_of(events, EVENT_KIND.CUT),
+		ends: lane_stop_stats.events_of(events, EVENT_KIND.RESUME),
+	})
+}
+
+// A child that ended with no result is collected as an `outage`, re-dispatchable; its next launch is
+// the relaunch.
+function outage_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
+	const outages = lane_stop_stats.events_of(events, EVENT_KIND.OUTAGE)
+
+	return issue_spans({
+		starts: outages,
+		bounds: outages,
+		ends: lane_stop_stats.events_of(events, EVENT_KIND.CHILD_LAUNCH),
+	})
+}
+
 function offer_times(entries: ReadonlyArray<LedgerEntry>): Array<number> {
 	return entries
-		.filter((entry) => is_dispatch(entry) || entry.kind === lane_ledger.KIND.HELD)
+		.filter((entry) => is_dispatch(entry) || OFFER_ANSWERS.has(entry.kind))
 		.map((entry) => Date.parse(entry.at))
 		.toSorted((left, right) => left - right)
 }
@@ -150,6 +186,7 @@ function table(
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
 		gap_row(RELAUNCH, relaunch_spans(events), window),
+		gap_row(OUTAGE, outage_spans(events), window),
 		gap_row(PARK, park_spans(entries, events), window),
 		gap_row(MERGE, merge_spans(entries), window),
 	].join('\n')
