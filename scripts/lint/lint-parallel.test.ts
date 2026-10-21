@@ -19,8 +19,15 @@ vi.mock('./cross-file-recheck', () => ({
 	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
 }))
 vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('./eslint-cache-dependencies', () => ({
+	eslint_cache_dependencies: {
+		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
+}))
 
 const { cross_file_recheck } = await import('./cross-file-recheck')
+const { eslint_cache_dependencies } = await import('./eslint-cache-dependencies')
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
 const { eslint_daemon } = await import('./eslint-daemon')
 const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
 const mocked_verify = vi.mocked(cross_file_recheck.verify)
@@ -154,6 +161,22 @@ describe('run_lint_checks', () => {
 		expect(mocked_verify).toHaveBeenCalledWith(expect.objectContaining({ exit_code: 1 }), RECHECK)
 		expect(mocked_cache_run).toHaveBeenCalledWith(RECHECK.cache_file, expect.any(Function))
 		expect(code).toBe(0)
+	})
+
+	// joshuafolkken/kit#4415: the entries whose imports changed are dropped from the cache file the
+	// run reads, and the recheck runs inside that same guard.
+	it('runs eslint and its recheck inside the dependency guard of the run cache file', async () => {
+		mock_exit_codes(0, 1)
+		mocked_guard.mockImplementationOnce(async (_cache_file, work) => {
+			expect(mocked_verify).not.toHaveBeenCalled()
+
+			return await work()
+		})
+
+		await run_lint_checks(['exec', 'prettier', TARGET], ['exec', 'eslint', TARGET], RECHECK)
+
+		expect(mocked_guard).toHaveBeenCalledWith(RECHECK.cache_file, expect.any(Function))
+		expect(mocked_verify).toHaveBeenCalledOnce()
 	})
 })
 

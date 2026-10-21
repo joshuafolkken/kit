@@ -18,10 +18,11 @@ import { lint_related_scope, type LintCaches } from './lint-related-scope'
 // `josh lint --changed` — the lint `josh gate` runs (joshuafolkken/kit#4085): the branch's changed
 // files rather than the whole tree.
 //
-// **Narrowing loses nothing the whole-tree run caught.** The whole-tree run is cached on each file's
-// own content, so a file the branch did not change is answered from its cache entry whatever else
-// moved — the stale green `cross-file-recheck.ts` names. The files that run actually lints are the
-// changed ones, and those are exactly the ones this run names.
+// **Narrowing gives up only the files the branch did not change.** The whole-tree run answers such a
+// file from its cache entry unless the files its imports reach changed (`eslint-cache-dependencies.ts`,
+// joshuafolkken/kit#4415); this run does not lint it at all, so an unchanged file that a changed
+// import broke is caught by the whole-tree run alone. The other files that run actually lints are
+// the changed ones, and those are exactly the ones this run names.
 //
 // What a cache entry does not see falls back to the whole tree: a toolchain or ignore file
 // (`toolchain-config.ts`), the eslint configuration and kit's own rules, the TypeScript configuration

@@ -10,6 +10,7 @@ import {
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { cross_file_recheck, type CrossFileRecheckOptions } from '#scripts/lint/cross-file-recheck'
+import { eslint_cache_dependencies } from '#scripts/lint/eslint-cache-dependencies'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { execa } from 'execa'
 
@@ -86,14 +87,18 @@ function recheck_options(staged_files: ReadonlyArray<string>): CrossFileRecheckO
 // argument list and the same cache file, without paying the config and plugin load per commit. It
 // runs inside the tool's core-budget reservation like the cold route does.
 //
-// Its red report is re-read before it is printed (joshuafolkken/kit#4407): a merge or checkout can
-// change only the files a staged file imports, and the content cache keeps the staged file's verdict.
+// A merge or checkout can change only the files a staged file imports, and the content cache keeps
+// the staged file's verdict: its entry is dropped first when they changed (joshuafolkken/kit#4415),
+// and its red report is re-read before it is printed (joshuafolkken/kit#4407).
 async function run_eslint(
 	command_arguments: ReadonlyArray<string>,
 	staged_files: ReadonlyArray<string>,
 ): Promise<number> {
-	const result = await eslint_daemon.run_or_cold(command_arguments)
-	const verified = await cross_file_recheck.verify(result, recheck_options(staged_files))
+	const verified = await eslint_cache_dependencies.guard(ESLINT_COMMIT_CACHE_FILE, async () => {
+		const result = await eslint_daemon.run_or_cold(command_arguments)
+
+		return await cross_file_recheck.verify(result, recheck_options(staged_files))
+	})
 	if (verified.output !== '') process.stdout.write(verified.output)
 
 	return verified.exit_code ?? FAIL_EXIT_CODE
