@@ -177,9 +177,11 @@ function commit_flags(state: ShipState): ReadonlyArray<string> {
 // **The newest line carries the attempt's history**: a fourth word lists every
 // stage the attempt has started, so the one line per issue a stream full of positions keeps still
 // draws the whole track. A line with no started stage keeps the three-word form.
+// The stage is a word rather than a `Stage`: the pre-detach checks, which are not one, are written in
+// the same form (`run-ship-pre-detach-timed.ts`).
 function event_text(
 	issue: string,
-	stage: Stage,
+	stage: string,
 	phase: Phase,
 	started: ReadonlyArray<string> = [],
 ): string {

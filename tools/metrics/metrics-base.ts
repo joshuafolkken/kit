@@ -10,6 +10,7 @@ import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
 import { file_reader } from '#scripts/lib/read-file'
 import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { execa } from 'execa'
+import { metrics_base_cache, type CachedReading } from './metrics-base-cache'
 import type { Metrics } from './metrics-logic'
 import { metrics_ratchet, type Approval } from './metrics-ratchet'
 
@@ -41,6 +42,8 @@ const APPROVAL_EXTENSION = '.json'
 const TREE_PREFIX = 'josh-metrics-base-'
 const JSON_FLAG = '--json'
 const COMMAND_SCRIPT = fileURLToPath(new URL('metrics-command.ts', import.meta.url))
+// The checkout `COMMAND_SCRIPT` belongs to — the ruler the cache is keyed on.
+const RULER_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
 interface Reading {
 	metrics: Metrics
@@ -99,27 +102,53 @@ async function is_at(commit: string): Promise<boolean> {
 // `josh metrics` holds its weight while it waits on this child, and inside the gate the metrics
 // step's claim — its memory, and the zero cores `gate-plan.ts` gives it — stands for it. The held mark
 // both set reaches the child through the environment.
-async function measure_in(tree: string): Promise<Metrics> {
+async function measure_in(tree: string): Promise<string> {
 	const runner = resolve_tsx_runner()
 	const { stdout } = await execa(
 		runner.executable,
 		[...runner.leading_arguments, COMMAND_SCRIPT, JSON_FLAG],
 		{ cwd: tree, env: git_location_environment.location_free_environment(), extendEnv: true },
 	)
-	const metrics = metrics_ratchet.parse_metrics(stdout)
 
-	if (metrics === undefined) throw new Error('josh metrics: the merge-base printed no totals')
-
-	return metrics
+	return stdout
 }
 
+async function measure_base(commit: string): Promise<CachedReading> {
+	return await base_tree.with_tree(TREE_PREFIX, commit, async ({ tree }) => ({
+		stdout: await measure_in(tree),
+		approvals: [...approval_texts(tree)],
+	}))
+}
+
+function reading_of(cached: CachedReading): Reading | undefined {
+	const metrics = metrics_ratchet.parse_metrics(cached.stdout)
+
+	return metrics === undefined ? undefined : { metrics, approvals: new Map(cached.approvals) }
+}
+
+function cached_reading(commit: string): Reading | undefined {
+	const cached = metrics_base_cache.read(commit, RULER_ROOT)
+
+	return cached === undefined ? undefined : reading_of(cached)
+}
+
+// **One commit under one ruler is measured once** (`metrics-base-cache.ts`): a ship's retries, its gate
+// and an `--accept` read the first measurement back. A record that does not parse is measured again.
 async function read(commit: string, current: Reading): Promise<Reading> {
 	if (await is_at(commit)) return current
 
-	return await base_tree.with_tree(TREE_PREFIX, commit, async ({ tree }) => ({
-		metrics: await measure_in(tree),
-		approvals: approval_texts(tree),
-	}))
+	const hit = cached_reading(commit)
+
+	if (hit !== undefined) return hit
+
+	const measured = await measure_base(commit)
+	const reading = reading_of(measured)
+
+	if (reading === undefined) throw new Error('josh metrics: the merge-base printed no totals')
+
+	metrics_base_cache.write(commit, RULER_ROOT, measured)
+
+	return reading
 }
 
 const metrics_base = {

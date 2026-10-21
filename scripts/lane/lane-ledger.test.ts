@@ -231,6 +231,18 @@ describe('lane_ledger.record_held', () => {
 	})
 })
 
+// joshuafolkken/kit#4382: a claim's wait for the core budget reads back as one entry.
+describe('lane_ledger.record_core_wait', () => {
+	it('writes the command, the wait and the lane, read back as a core-wait entry', async () => {
+		const target = ledger('core-wait')
+		const wait = { command: 'lint', waited_ms: 500, issue: 4382 }
+
+		await lane_ledger.record_core_wait(wait, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'core-wait', ...wait }])
+	})
+})
+
 describe('lane_ledger.record_offerable', () => {
 	it('records whether offerable work and a free lane coexist', async () => {
 		const target = ledger('offerable')

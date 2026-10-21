@@ -156,6 +156,29 @@ describe('lane_measure_cli.run — stats holds', () => {
 	})
 })
 
+// joshuafolkken/kit#4382: and how long each lane waited for the core budget.
+describe('lane_measure_cli.run — stats core waits', () => {
+	it('prints the per-lane core-wait table', async () => {
+		const context = fresh_context()
+		const wait = {
+			kind: 'core-wait',
+			at: AT,
+			command: 'lint',
+			waited_ms: 60_000,
+			issue: 7,
+		} as const
+
+		lane_ledger.append(context.ledger_path, wait)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| lane | total (min) | median (min) | waits |')
+		expect(printed).toContain('| 7 | 1.0 | 1.0 | 1 |')
+	})
+})
+
 // joshuafolkken/kit#4064: and why round 2 ran or was skipped.
 describe('lane_measure_cli.run — stats round 2', () => {
 	it('prints the per-verdict-and-code table', async () => {

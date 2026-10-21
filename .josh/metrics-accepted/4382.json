@@ -1,0 +1,7 @@
+{
+	"reason": "Cache the merge-base metrics measurement and record core-budget waits and pre-detach time in the lane ledger, with a per-lane lane:stats table (#4382)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 220
+	}
+}
