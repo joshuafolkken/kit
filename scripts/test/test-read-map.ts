@@ -1,4 +1,12 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import {
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { test_read_trace, type ReadRecords } from './test-read-trace'
@@ -12,6 +20,8 @@ import { test_read_trace, type ReadRecords } from './test-read-trace'
 // then. A tree whose own code changed what it reads has changed that code, and `vitest related`
 // runs the tests importing it. **It lives in the git common directory**, which every lane worktree of
 // one clone shares along with the commits it names, so one lane's full run narrows the next lane's.
+// **One file per version** (joshuafolkken/kit#4423): a lane on an older kit writing its map leaves a
+// newer lane's map in place, so a version bump no longer sends either to the whole suite.
 
 interface ReadMap {
 	version: number
@@ -30,8 +40,12 @@ interface ReadMap {
 const MAP_VERSION = 4
 
 const MAP_DIRECTORY = 'josh'
-const MAP_FILE = 'test-read-map.json'
+const MAP_FILE_STEM = 'test-read-map'
 const RECORD_EXTENSION = '.json'
+
+// A map file of another version no lane has written for this long belongs to no kit still running,
+// and is removed by the next write: one week.
+const STALE_AFTER_MS = 604_800_000
 
 type ReadPair = [string, string]
 
@@ -155,10 +169,36 @@ function in_unread_directory(map: ReadMap, relative: string): boolean {
 	return Object.keys(map.readers).every((key) => path.dirname(key) !== directory)
 }
 
-function map_path(root: string): string | undefined {
+function map_path(root: string, version: number = MAP_VERSION): string | undefined {
 	const common = git_common_directory.repository(root)
+	const name = `${MAP_FILE_STEM}.v${String(version)}${RECORD_EXTENSION}`
 
-	return common === undefined ? undefined : path.join(common, MAP_DIRECTORY, MAP_FILE)
+	return common === undefined ? undefined : path.join(common, MAP_DIRECTORY, name)
+}
+
+// Every version's map, the unversioned one kits before joshuafolkken/kit#4423 wrote included; a
+// staging file ends in a process id, not the extension.
+function is_map_file(name: string): boolean {
+	return name.startsWith(MAP_FILE_STEM) && name.endsWith(RECORD_EXTENSION)
+}
+
+// A file another lane's write pruned meanwhile has no stat, and is not this write's to remove.
+function is_stale(file_path: string, now: number): boolean {
+	const modified = statSync(file_path, { throwIfNoEntry: false })?.mtimeMs ?? now
+
+	return now - modified > STALE_AFTER_MS
+}
+
+// The map just written is never stale, so it survives its own prune.
+function prune_stale_maps(directory: string): void {
+	const now = Date.now()
+	const maps = readdirSync(directory)
+		.filter((name) => is_map_file(name))
+		.map((name) => path.join(directory, name))
+
+	for (const file_path of maps) {
+		if (is_stale(file_path, now)) rmSync(file_path, { force: true })
+	}
 }
 
 function read_text(file_path: string): string | undefined {
@@ -177,9 +217,9 @@ function read_map(root: string): ReadMap | undefined {
 }
 
 // Written beside the target and renamed over it, so a lane reading the map while another lane
-// replaces it reads one whole map or the other.
+// replaces it reads one whole map or the other. It lands in its own version's file.
 function write_map(root: string, map: ReadMap): void {
-	const file_path = map_path(root)
+	const file_path = map_path(root, map.version)
 
 	if (file_path === undefined) return
 
@@ -188,6 +228,7 @@ function write_map(root: string, map: ReadMap): void {
 	mkdirSync(path.dirname(file_path), { recursive: true })
 	writeFileSync(staging, JSON.stringify(map))
 	renameSync(staging, file_path)
+	prune_stale_maps(path.dirname(file_path))
 }
 
 // Every worker writes its own files into the run's directory; this reads them all back.
