@@ -20,6 +20,8 @@ const OUTCOME = { elapsed_ms: 1000, is_passed: true }
 const live_reservations = vi.spyOn(core_budget, 'live_reservations')
 const MID_GATE_CORES = 2
 const SAMPLES = 3
+const CHECK_CPU_MS = 6812.4
+const CHECK_CPU_ROUNDED = 6812
 const OWN: ProcessOwner = process_identity.own_fields()
 const FOREIGN: ProcessOwner = { pid: process.pid + 1, process_start: 'another lane' }
 
@@ -107,6 +109,33 @@ describe('gate_ledger — the external load a gate ran beside', () => {
 
 		expect(read_machine).not.toHaveBeenCalled()
 		expect(live_reservations).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4362: without each check's CPU, a core weight could not be re-measured.
+describe('gate_ledger — each check CPU', () => {
+	it('records the CPU a check spent, in whole milliseconds, where the gate read it', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'cpu.jsonl')
+		const lint = { label: 'lint', command: 'josh lint', exit_code: 0, output: '', elapsed_ms: 5 }
+		const measured = { ...lint, cpu_ms: CHECK_CPU_MS }
+		const unread = { ...lint, label: 'check', cpu_ms: undefined }
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [measured, unread], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry?.kind === 'gate' ? entry.checks : undefined).toStrictEqual([
+			{
+				label: 'lint',
+				elapsed_ms: 5,
+				is_passed: true,
+				is_reused: false,
+				cpu_ms: CHECK_CPU_ROUNDED,
+			},
+			{ label: 'check', elapsed_ms: 5, is_passed: true, is_reused: false },
+		])
 	})
 })
 
