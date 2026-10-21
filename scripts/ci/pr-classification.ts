@@ -19,7 +19,6 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 const DECLARATION_PREFIX = '- リリース分類: '
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
 const LEGACY_LABELS: ReadonlySet<string> = new Set(['semver-major', 'semver-minor'])
-const LABELS_SEGMENT = '/labels'
 const LABEL_NAMES_FILTER = '.[].name'
 
 const LABEL = z.object({ name: z.string() })
@@ -98,7 +97,7 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 // payload, that run fails, and when it lands in the newer check suite GitHub keeps its red result —
 // a rerun replays the same payload and fails again.
 function fetch_current_labels(repository: string, pull_number: number): ReadonlyArray<string> {
-	const path = `${git_gh_api_path.issue_api_path(String(pull_number), repository)}${LABELS_SEGMENT}`
+	const path = git_gh_api_path.issue_labels_api_path(String(pull_number), repository)
 
 	try {
 		const names = git_gh_exec.exec_gh_api_sync({

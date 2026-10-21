@@ -68,12 +68,12 @@ function fails_once_then(json: string): GhApiAnswer {
 	const answers: ReadonlyArray<GhApiAnswer> = [fails_with(new Error(DETAIL_READ_FAILURE))]
 	let index = 0
 
-	async function answer(): Promise<string> {
+	async function answer(request: GhApiRequest): Promise<string> {
 		const next = answers[index] ?? json
 
 		index += 1
 
-		return typeof next === 'string' ? next : await next()
+		return typeof next === 'string' ? next : await next(request)
 	}
 
 	return answer

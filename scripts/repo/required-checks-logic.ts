@@ -89,9 +89,7 @@ function expected_checks(read_workflow: (workflow: string) => string | undefined
 	})
 }
 
-function status_check_rules(payload: unknown): Array<BranchRule> {
-	if (!Array.isArray(payload)) return []
-
+function status_check_rules(payload: ReadonlyArray<unknown>): Array<BranchRule> {
 	return payload.flatMap((entry: unknown) => {
 		const parsed = branch_rule_schema.safeParse(entry)
 

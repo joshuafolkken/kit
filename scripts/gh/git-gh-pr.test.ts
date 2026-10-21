@@ -136,6 +136,21 @@ describe('pr_create classification', () => {
 		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).rejects.toThrow(RATE_LIMITED_MESSAGE)
 	})
 
+	it('reports the pull request as classified when the label write throws after the label landed', async () => {
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[PR_LABELS_PATH]: async (request) => {
+					if (request.body !== undefined) throw new Error(RATE_LIMITED_MESSAGE)
+
+					return BUGFIX
+				},
+			}),
+		)
+
+		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).resolves.toBe(CREATED_URL)
+	})
+
 	it('refuses an unrecognized classification before posting the pull request', async () => {
 		await expect(git_gh_pr.pr_create(TITLE, BODY, 'bug' as never)).rejects.toThrow(CHOOSE_ERROR)
 
