@@ -1,0 +1,7 @@
+{
+	"reason": "#4374: run_socket_probe takes its kill timeout as a parameter so tests inject a load-independent probe",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}

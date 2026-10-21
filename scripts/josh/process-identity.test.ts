@@ -37,6 +37,15 @@ const SOCKET_TIMEOUT_STATUS = 1
 // A listener SIGKILLed while bound, which leaves its socket file behind with nobody accepting on it.
 const KILLED_LISTENER_SOURCE =
 	"require('node:net').createServer().listen(process.argv[1],()=>process.kill(process.pid,'SIGKILL'))"
+// spawnSync's `timeout: 0` sets no kill timer.
+const NO_KILL_TIMEOUT_MS = 0
+
+// joshuafolkken/kit#4374: the real socket probe without the caller's kill timeout, so what it reports
+// for a socket does not depend on how fast a loaded machine starts its process; the timeout's own
+// unknown answer is pinned by the injected-status cases.
+function probe_socket(target: string): number | undefined {
+	return process_identity.run_socket_probe(target, NO_KILL_TIMEOUT_MS)
+}
 
 function missing_socket(): string {
 	return path.join(tmpdir(), `${randomUUID()}.sock`)
@@ -218,16 +227,17 @@ describe('process_identity.is_live_beacon — an unanswered probe is unknown, no
 
 	it.skipIf(process.platform === 'win32')('answers true for a listening beacon', () => {
 		const token = process_identity.open_beacon() ?? ''
+		const target = token.slice(SOCKET_SCHEME.length)
 
 		try {
-			expect(process_identity.is_live_beacon(token.slice(SOCKET_SCHEME.length))).toBe(true)
+			expect(process_identity.is_live_beacon(target, probe_socket)).toBe(true)
 		} finally {
 			process_identity.close_beacon(token)
 		}
 	})
 
 	it.skipIf(process.platform === 'win32')('answers false for a socket that is not there', () => {
-		expect(process_identity.is_live_beacon(missing_socket())).toBe(false)
+		expect(process_identity.is_live_beacon(missing_socket(), probe_socket)).toBe(false)
 	})
 })
 
@@ -238,7 +248,7 @@ describe('process_identity.is_live_beacon — which connection errors prove the 
 
 			spawnSync(process.execPath, ['-e', KILLED_LISTENER_SOURCE, target])
 
-			expect(process_identity.is_live_beacon(target)).toBe(false)
+			expect(process_identity.is_live_beacon(target, probe_socket)).toBe(false)
 		})
 	})
 
@@ -250,7 +260,9 @@ describe('process_identity.is_live_beacon — which connection errors prove the 
 
 				writeFileSync(file, '')
 
-				expect(process_identity.is_live_beacon(path.join(file, UNUSED_TARGET))).toBeUndefined()
+				expect(
+					process_identity.is_live_beacon(path.join(file, UNUSED_TARGET), probe_socket),
+				).toBeUndefined()
 			})
 		},
 	)
