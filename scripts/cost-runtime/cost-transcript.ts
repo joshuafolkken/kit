@@ -505,6 +505,7 @@ const cost_transcript = {
 	transcript_directory,
 	transcript_directories,
 	session_cwd,
+	lane_transcript_directories,
 	unit_directory,
 	list_sessions,
 	list_sessions_across,
