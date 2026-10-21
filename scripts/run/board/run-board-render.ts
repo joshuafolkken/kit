@@ -11,6 +11,7 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
+import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
 import { run_board_render_icon } from './run-board-render-icon'
@@ -132,12 +133,14 @@ function icon_text(row: BoardRow, frame: RowFrame): string {
 	return frame.is_conditioned === true ? `${icon} ${condition_of(row, header)}` : icon
 }
 
-// The release kind's icon between the number — and its lane cells, where drawn — and the title, one
-// space either side; a row with no title ends at its icon, so what follows keeps its usual gap.
+// The priority and the release kind's icons between the number — and its lane cells, where drawn —
+// and the title, one space either side; a row with no title ends at its kind, so what follows keeps
+// its usual gap.
 function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
 	const { header } = frame
 	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
-	const lead = `${icon_text(row, frame)} ${number_text(row, frame.cells, header.link)} ${kind}`
+	const number = number_text(row, frame.cells, header.link)
+	const lead = `${icon_text(row, frame)} ${number} ${run_board_priority.cell_of(row)} ${kind}`
 
 	return title === '' ? lead : `${lead} ${title}`
 }

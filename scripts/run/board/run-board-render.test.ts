@@ -22,8 +22,8 @@ const PROGRESS_WIDTH = 2
 const LANE_LEAD = ' '.repeat(run_board_render_lead.LANE_INDENT.length + PROGRESS_WIDTH + 1)
 const { TIME_WIDTH } = run_board_render_lead
 const ZERO = '0″'
-const ISSUE_1 = '1    Issue 1'
-const ISSUE_2 = '2    Issue 2'
+const ISSUE_1 = '1       Issue 1'
+const ISSUE_2 = '2       Issue 2'
 const ENDED_AT_30 = run_board_labels.day_minute_of(STARTED + 30 * MINUTE)
 const ENDED_AT_1 = run_board_labels.day_minute_of(STARTED + MINUTE)
 
@@ -97,7 +97,7 @@ describe('run_board_render.render done rows', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(2, { state: 'merged', status })] }
 
 		expect(lines_of(header({ layout }))).toContain(
-			`    ✅ ${ENDED_AT_30} 2    ${padded('Issue 2')}  30′00″`,
+			`    ✅ ${ENDED_AT_30} 2       ${padded('Issue 2')}  30′00″`,
 		)
 	})
 
@@ -105,7 +105,7 @@ describe('run_board_render.render done rows', () => {
 		const status = { state: 'done' as const, started_ms: STARTED }
 		const layout = { ...EMPTY_LAYOUT, active: [row(3, { state: 'done', status })] }
 
-		expect(lines_of(header({ layout }))).toContain(`    🏁 ${BLANK_CONDITION} 3    Issue 3`)
+		expect(lines_of(header({ layout }))).toContain(`    🏁 ${BLANK_CONDITION} 3       Issue 3`)
 	})
 })
 
@@ -122,10 +122,10 @@ describe('run_board_render.render release kinds', () => {
 		]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: kinds } }))
 
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 1 🧨 ${padded('Issue 1')}  1′00″`)
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 2 ✨ ${padded('Issue 2')}  1′00″`)
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 3 🐛 ${padded('Issue 3')}  1′00″`)
-		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 4    ${padded('Issue 4')}  1′00″`)
+		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 1    🧨 ${padded('Issue 1')}  1′00″`)
+		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 2    ✨ ${padded('Issue 2')}  1′00″`)
+		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 3    🐛 ${padded('Issue 3')}  1′00″`)
+		expect(lines).toContain(`    ✅ ${ENDED_AT_1} 4       ${padded('Issue 4')}  1′00″`)
 	})
 
 	// joshuafolkken/kit#4026: a waiting row's title is not padded, so what it waits on follows it.
@@ -133,12 +133,12 @@ describe('run_board_render.render release kinds', () => {
 		const untitled = row(12, { kind: 'enhancement', title: undefined, waits: ['3'] })
 		const titled = row(13, { kind: 'enhancement', waits: ['3'] })
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, active: [untitled, titled] } }))
-		const columns = ['12 ✨', '13 ✨'].map(
+		const columns = ['12    ✨', '13    ✨'].map(
 			(mark) => lines.find((line) => line.includes(mark)) ?? '',
 		)
 
-		expect(columns[0]).toMatch(/^ {5}⏳ +12 ✨ {2}🔗 3$/u)
-		expect(columns[1]).toMatch(/^ {5}⏳ +13 ✨ \S.* {2}🔗 3$/u)
+		expect(columns[0]).toMatch(/^ {5}⏳ +12 {4}✨ {2}🔗 3$/u)
+		expect(columns[1]).toMatch(/^ {5}⏳ +13 {4}✨ \S.* {2}🔗 3$/u)
 	})
 
 	it('names the drawn kinds in the legend', () => {
@@ -156,7 +156,7 @@ describe('run_board_render.render a row waiting on its start time', () => {
 		const dated = { kind: 'row' as const, row: row(14, { reason }) }
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: [dated] } }))
 
-		expect(lines).toContain('    📅 01-01 09:00 14    Issue 14')
+		expect(lines).toContain('    📅 01-01 09:00 14       Issue 14')
 		expect(lines.at(-1)).toBe('📅 not before')
 	})
 })
@@ -175,9 +175,9 @@ describe('run_board_render.render sections', () => {
 		expect(lines.slice(lines.indexOf(queued_rule), -2)).toStrictEqual([
 			queued_rule,
 			'    📁 10  Epic ten',
-			`       ├ ⏳ ${BLANK_CONDITION} 11    Issue 11`,
-			`       └ ⏳ ${BLANK_CONDITION} 12    Issue 12`,
-			`    🔗 3409+1      5    ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  3410`,
+			`       ├ ⏳ ${BLANK_CONDITION} 11       Issue 11`,
+			`       └ ⏳ ${BLANK_CONDITION} 12       Issue 12`,
+			`    🔗 3409+1      5       ${'x'.repeat(run_board_render.TITLE_LIMIT - 1)}…  3410`,
 		])
 	})
 
@@ -186,7 +186,7 @@ describe('run_board_render.render sections', () => {
 		const layout = { ...EMPTY_LAYOUT, active: [row(7, { title })] }
 
 		expect(run_board_render.TITLE_LIMIT).toBe(48)
-		expect(lines_of(header({ layout }))).toContain(lane_of('⏳', '', `7    ${title}`))
+		expect(lines_of(header({ layout }))).toContain(lane_of('⏳', '', `7       ${title}`))
 	})
 
 	// joshuafolkken/kit#4173: the rule names 🙋, so no legend is drawn for it.
@@ -194,7 +194,7 @@ describe('run_board_render.render sections', () => {
 		const layout = { ...EMPTY_LAYOUT, people: [row(6, { state: 'human' })] }
 		const lines = lines_of(header({ layout }))
 		const decision_rule = rule('🙋 decision')
-		const decision_row = '    🙋 6    Issue 6'
+		const decision_row = '    🙋 6       Issue 6'
 		const start = lines.indexOf(decision_rule)
 
 		expect(lines.slice(start, start + 2)).toStrictEqual([decision_rule, decision_row])
@@ -278,8 +278,8 @@ describe('run_board_render.render running row lead', () => {
 		const queued = [{ kind: 'epic' as const, epic: 9, title: 'Epic', rows }]
 		const lines = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued }, spinner: '⠙' }))
 
-		expect(lines.join('\n')).toContain(`⠙      ├ 🚦 ${BLANK_CONDITION} 4    Issue 4`)
-		expect(lines).toContain(`       └ ⏳ ${BLANK_CONDITION} 5    Issue 5`)
+		expect(lines.join('\n')).toContain(`⠙      ├ 🚦 ${BLANK_CONDITION} 4       Issue 4`)
+		expect(lines).toContain(`       └ ⏳ ${BLANK_CONDITION} 5       Issue 5`)
 	})
 
 	it('leads a running row with its newest phase’s icon, and 🔄 before it reaches one', () => {
@@ -321,7 +321,7 @@ describe('run_board_render.render links', () => {
 		const lines = lines_of(header({ layout, link: bracketed }))
 
 		expect(lines).toContain('    📁 [10]')
-		expect(lines).toContain(`       └ ⏳ ${BLANK_CONDITION} [11]    Issue 11`)
+		expect(lines).toContain(`       └ ⏳ ${BLANK_CONDITION} [11]       Issue 11`)
 		expect(lines.join('\n')).toContain('🔗 [other/repo#7]')
 	})
 
@@ -330,10 +330,10 @@ describe('run_board_render.render links', () => {
 		const plain = lines_of(header({ layout }))
 
 		expect(linked).toContain(
-			`    ✅ ${ENDED_AT_1} [2]    ${padded('Issue 2')}  1′00″  🔗 [other/repo#7]`,
+			`    ✅ ${ENDED_AT_1} [2]       ${padded('Issue 2')}  1′00″  🔗 [other/repo#7]`,
 		)
 		expect(plain).toContain(
-			`    ✅ ${ENDED_AT_1} 2    ${padded('Issue 2')}  1′00″  🔗 other/repo#7`,
+			`    ✅ ${ENDED_AT_1} 2       ${padded('Issue 2')}  1′00″  🔗 other/repo#7`,
 		)
 	})
 })

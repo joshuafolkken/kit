@@ -68,7 +68,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 		expect(lines[2]?.trimStart()).toMatch(/^\S {6}🔄 1 running$/u)
 		expect(lines[3]).toBe('')
 		expect(lines[4]).toMatch(/^── 🧵 lanes ─+ ⏰ ─+$/u)
-		expect(lines[5]).toMatch(new RegExp(String.raw`^ {2}\S {2}🔍 .*${String(CHILD)}    …`, 'u'))
+		expect(lines[5]).toMatch(new RegExp(String.raw`^ {2}\S {2}🔍 .*${String(CHILD)}       …`, 'u'))
 	})
 
 	// The regression: the running count was the plan's, so a board still loading drew a run as waiting.
@@ -163,7 +163,7 @@ describe('run_board_tick.tick park titles', () => {
 		const lines = lines_of(frames.at(-1))
 
 		expect(park_reason_lines(lines)).toStrictEqual([
-			expect.stringMatching(/💤 +1 {4}Lead the lanes {2,}waiting on #7$/u),
+			expect.stringMatching(/💤 +1 {7}Lead the lanes {2,}waiting on #7$/u),
 		])
 	})
 })

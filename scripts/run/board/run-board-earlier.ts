@@ -30,11 +30,17 @@ function is_live(row: BoardRow): boolean {
 	return row.state === 'running'
 }
 
-function base_row(number: number, read: RowRead): Pick<BoardRow, 'number' | 'title' | 'kind'> {
+function base_row(
+	number: number,
+	read: RowRead,
+): Pick<BoardRow, 'number' | 'title' | 'kind' | 'priority'> {
+	const labels = read.labels.get(number)
+
 	return {
 		number,
 		title: read.titles.get(number),
-		kind: run_board_kind.kind_of(read.labels.get(number)),
+		kind: run_board_kind.kind_of(labels),
+		priority: run_board_kind.priority_of(labels),
 	}
 }
 

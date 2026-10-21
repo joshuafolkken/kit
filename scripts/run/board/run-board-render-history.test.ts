@@ -104,7 +104,7 @@ describe('run_board_render.render running rows', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`     🚦    2′00″    5′00″ ${CELLS} 2    ${title}  🚦 1′00″`,
+			`     🚦    2′00″    5′00″ ${CELLS} 2       ${title}  🚦 1′00″`,
 		)
 	})
 })
@@ -129,7 +129,7 @@ describe('run_board_render.render settled rows', () => {
 	])('leads a %s row with its finish time and ends it on its duration', (state, icon) => {
 		const finish = day_minute_of(NOW)
 
-		expect(settled_line(state, FAILED)).toBe(`    ${icon} ${finish} 1    ${title}  5′00″`)
+		expect(settled_line(state, FAILED)).toBe(`    ${icon} ${finish} 1       ${title}  5′00″`)
 	})
 
 	// joshuafolkken/kit#4171: a lane no child works in blanks its CPU, MEM and CMPRS.
@@ -140,6 +140,6 @@ describe('run_board_render.render settled rows', () => {
 		const blank = ' '.repeat(CELLS.length)
 		const lead = `     ${icon} ${' '.repeat(TIME_WIDTH)} ${'5′00″'.padStart(TIME_WIDTH)}`
 
-		expect(settled_line(state, FAILED)).toBe(`${lead} ${blank} 1    Sample 1`)
+		expect(settled_line(state, FAILED)).toBe(`${lead} ${blank} 1       Sample 1`)
 	})
 })

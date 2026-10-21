@@ -1,6 +1,6 @@
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
-import type { GateEntry, LedgerEntry, LoadEntry } from './lane-ledger'
+import type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry } from './lane-ledger'
 import { lane_sampler } from './lane-sampler'
 
 // The lane-limit measurement's one table row: the ledger entries of one period
@@ -40,6 +40,7 @@ const COLUMNS = [
 	'merges',
 	'merges / hour',
 	'effective lanes',
+	'lane median (min)',
 	'gate median (min)',
 	'gate max (min)',
 	'load peak',
@@ -75,6 +76,14 @@ function in_window(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): Ar
 
 function is_gate(entry: LedgerEntry): entry is GateEntry {
 	return entry.kind === 'gate'
+}
+
+function is_merge(entry: LedgerEntry): entry is MergeEntry {
+	return entry.kind === 'merge'
+}
+
+function is_dispatch(entry: LedgerEntry): entry is DispatchEntry {
+	return entry.kind === 'dispatch'
 }
 
 function is_load(entry: LedgerEntry): entry is LoadEntry {
@@ -200,6 +209,43 @@ function throughput_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	return [String(merges), cell(per_hour), cell(mean(lanes))]
 }
 
+function dispatched_before(
+	dispatches: ReadonlyArray<DispatchEntry>,
+	merge: MergeEntry,
+): number | undefined {
+	const merged_at = Date.parse(merge.at)
+	const starts = dispatches
+		.filter((dispatch) => dispatch.issue === merge.issue)
+		.map((dispatch) => Date.parse(dispatch.at))
+		.filter((at) => at <= merged_at)
+
+	return peak(starts)
+}
+
+function lane_minutes(
+	dispatches: ReadonlyArray<DispatchEntry>,
+	merge: MergeEntry,
+): number | undefined {
+	const start = dispatched_before(dispatches, merge)
+
+	return start === undefined ? undefined : (Date.parse(merge.at) - start) / MS_PER_MINUTE
+}
+
+// One merge's lane time runs from the latest dispatch of its issue — looked up in the whole ledger,
+// since a lane may start before the window — to the merge. A merge no dispatch preceded is skipped.
+function lane_cell(
+	entries: ReadonlyArray<LedgerEntry>,
+	period: ReadonlyArray<LedgerEntry>,
+): string {
+	const dispatches = entries.filter(is_dispatch)
+	const minutes = period
+		.filter((entry) => is_merge(entry))
+		.map((merge) => lane_minutes(dispatches, merge))
+		.filter(is_number)
+
+	return cell(median(minutes))
+}
+
 function gate_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	const minutes = entries.filter(is_gate).map((entry) => entry.elapsed_ms / MS_PER_MINUTE)
 
@@ -248,6 +294,7 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 		label.limit,
 		String(label.period_days),
 		...throughput_cells(period),
+		lane_cell(entries, period),
 		...gate_cells(period),
 		...load_cells(period.filter(is_load)),
 	])

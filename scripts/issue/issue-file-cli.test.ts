@@ -42,7 +42,8 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 	)
 }
 
-const VALID_BODY = body_of('- 人の判断: 要（目視確認）')
+const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
+const VALID_BODY = body_of(JUDGEMENT_NEEDED)
 
 const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-'))
 const valid_path = path.join(work, 'valid.md')
@@ -51,11 +52,13 @@ const origin_path = path.join(work, 'origin.md')
 const judged_in_path = path.join(work, 'judged-in.md')
 const breaking_path = path.join(work, 'breaking.md')
 const undeclared_path = path.join(work, 'undeclared.md')
+const baseless_path = path.join(work, 'baseless.md')
 
 writeFileSync(valid_path, VALID_BODY)
 writeFileSync(judged_in_path, body_of(JUDGEMENT_NOT_NEEDED))
 writeFileSync(breaking_path, body_of(JUDGEMENT_NOT_NEEDED, '- 互換性: 破壊的変更'))
 writeFileSync(undeclared_path, body_of())
+writeFileSync(baseless_path, body_of(JUDGEMENT_NEEDED, '- 優先度: 緊急'))
 writeFileSync(invalid_path, '## 背景\n')
 writeFileSync(origin_path, `${body_of(JUDGEMENT_NOT_NEEDED)}\n## Origin\n\n${HERE}#2808\n`)
 
@@ -311,6 +314,13 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 	it('refuses a cross-repository filing with no Origin', async () => {
 		expect(await issue_file_cli.run(argv_of(valid_path, '--repo', THERE))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('## Origin')
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4383: an urgent declaration with no basis is refused before anything is sent.
+	it('refuses a priority declaration that names no basis', async () => {
+		expect(await issue_file_cli.run(argv_of(baseless_path))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('declare at most one priority')
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 

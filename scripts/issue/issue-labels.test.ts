@@ -21,6 +21,7 @@ import {
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	PARKED_LABELS,
 	PLANNED_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_LABEL,
@@ -66,6 +67,8 @@ const TIER_A_ROUTE_SPELLING = 'route:tier-a'
 // a serious defect have to bypass the cap" answerable at all.
 const INTERRUPT_ROUTE_SPELLING = 'route:interrupt'
 const FILING_ROUTE_COUNT = 4
+// joshuafolkken/kit#4383: the rank key above priority:high, created by hand in kit before this landed.
+const PRIORITY_CRITICAL_SPELLING = 'priority:critical'
 
 describe('the label names', () => {
 	it.each([
@@ -81,6 +84,7 @@ describe('the label names', () => {
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
 		[SPLIT_ROUTE_LABEL, SPLIT_ROUTE_SPELLING],
 		[TIER_A_ROUTE_LABEL, TIER_A_ROUTE_SPELLING],
+		[PRIORITY_CRITICAL_LABEL, PRIORITY_CRITICAL_SPELLING],
 	])('%s is spelled exactly as GitHub holds it', (actual, expected) => {
 		expect(actual).toBe(expected)
 	})
@@ -119,6 +123,7 @@ describe('WORKFLOW_LABELS', () => {
 			PLANNED_LABEL,
 			RUN_SOLO_LABEL,
 			RUN_LANE_LABEL,
+			PRIORITY_CRITICAL_LABEL,
 			PRIORITY_HIGH_LABEL,
 			RELEASE_LABEL,
 			AUTO_OK_LABEL,

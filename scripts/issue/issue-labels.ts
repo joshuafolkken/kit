@@ -35,11 +35,15 @@ const RUN_SOLO_LABEL = 'run:solo'
 // Without it an issue lacking `run:solo` could mean "judged parallel" or
 // "never judged", and `backlog:next` withholds the second (`epic-triage.ts`).
 const RUN_LANE_LABEL = 'run:lane'
-// Puts an issue at the head of the backlog's ranking. A person or a run may
-// apply it — a run only where it can cite a deadline or a stated urgency, or a policy a person wrote
-// (`backlogrun-steps.md`) — and **only a person removes it**: a run that could clear it could undo
-// the person's ordering. Read by `issue-rank.ts`, the one place the ranking keys are decided.
+// Puts an issue at the head of the backlog's ranking, below `priority:critical`. `issue:file` applies
+// it from the body's priority declaration at its high level (`issue-priority.ts`), a person may apply it by
+// hand, and **only a person removes it**: a run that could clear it could undo the person's ordering.
+// Read by `issue-rank.ts`, the one place the ranking keys are decided.
 const PRIORITY_HIGH_LABEL = 'priority:high'
+// Ranks above `priority:high` — an urgent defect (one of the interrupt-filing conditions) or a lane
+// speed-up worth at least a tenth of a merge's median lane time. Applied from the urgent declaration;
+// it never interrupts a running lane, only takes the next free one. Only a person removes it.
+const PRIORITY_CRITICAL_LABEL = 'priority:critical'
 // Opts one issue outside any epic into unattended execution. **Only a
 // person applies it.** `epicrun #<E>` approves the merges inside `#<E>`; this label is the only way
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
@@ -202,6 +206,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Judged safe to run beside others in a backlogrun',
 	},
 	{
+		name: PRIORITY_CRITICAL_LABEL,
+		color: 'b60205',
+		description: 'Offered before priority:high in a backlogrun; only a person removes it',
+	},
+	{
 		name: PRIORITY_HIGH_LABEL,
 		color: 'e99695',
 		description: 'Offered first in a backlogrun; only a person removes it',
@@ -350,6 +359,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
 	DEFERRED_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_LABEL,
 	NOT_BEFORE_LABEL,
@@ -396,6 +406,7 @@ export {
 	OTHER_CHANGE_LABEL,
 	PARKED_LABELS,
 	PLANNED_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_CLASSIFICATION_NAMES,

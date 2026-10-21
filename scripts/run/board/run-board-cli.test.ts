@@ -13,7 +13,7 @@ const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ backlogrun'
-const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1    a'
+const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
 // A link as a terminal that opens one draws it, so a chat frame is seen to strip it.

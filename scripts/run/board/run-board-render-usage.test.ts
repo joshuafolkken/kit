@@ -199,7 +199,7 @@ describe('run_board_render.render usage column on every row', () => {
 	it('draws no usage on a finished row', () => {
 		const lines = mixed_lines()
 
-		expect(row_line(lines, 'Issue 3')).toMatch(/^ {4}✅ \d{2}-\d{2} \d{2}:\d{2} 3 {4}Issue 3/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/^ {4}✅ \d{2}-\d{2} \d{2}:\d{2} 3 {7}Issue 3/u)
 		expect(row_line(lines, 'Issue 5')).not.toMatch(FIGURE)
 	})
 

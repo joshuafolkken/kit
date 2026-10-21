@@ -107,7 +107,10 @@ describe('run_board_tick.tick — the release kind of a closed child', () => {
 		await tick(FRESH_STATE, ports)
 
 		expect(row_of(frames.at(-1), CHILDREN[0] ?? 0)).toMatch(
-			new RegExp(`✅ ${TIME_PATTERN} ${String(CHILDREN[0])} 🐛 Child ${String(CHILDREN[0])}`, 'u'),
+			new RegExp(
+				`✅ ${TIME_PATTERN} ${String(CHILDREN[0])} {4}🐛 Child ${String(CHILDREN[0])}`,
+				'u',
+			),
 		)
 	})
 })

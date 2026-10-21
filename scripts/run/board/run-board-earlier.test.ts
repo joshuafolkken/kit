@@ -52,6 +52,21 @@ describe('run_board_earlier.rows_of', () => {
 	})
 })
 
+// joshuafolkken/kit#4383: an earlier run's lane draws its priority as this run's rows do.
+describe('run_board_earlier.rows_of — the priority', () => {
+	it('reads the priority from the lane issue’s labels', () => {
+		const labels = new Map([
+			[EARLIER, ['priority:critical']],
+			[UNKNOWN, ['priority:high']],
+		])
+		const read = { ...READ, labels }
+		const earlier = { lanes: [String(EARLIER)], statuses: new Map([[EARLIER, LAUNCHED]]) }
+		const rows = rows_of({ ...earlier, unknown: [String(UNKNOWN)] }, new Map(), read)
+
+		expect(rows.map((row) => row.priority)).toStrictEqual(['critical', 'high'])
+	})
+})
+
 const EARLIER_ROW: BoardRow = {
 	number: EARLIER,
 	title: 'Earlier',

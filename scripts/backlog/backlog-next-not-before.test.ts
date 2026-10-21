@@ -6,6 +6,7 @@ import {
 } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { PRIORITY_CRITICAL_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -72,6 +73,16 @@ describe('backlog:next with a declared start time', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
 		expect(stderr()).toContain(`not before ${FUTURE}`)
+	})
+
+	// joshuafolkken/kit#4383: priority:critical ranks the runnable rows, never a row held on time.
+	it('still waits on a priority:critical issue before its time', async () => {
+		const critical = { ...dated(FUTURE), labels: [{ name: PRIORITY_CRITICAL_LABEL }] }
+
+		backlog_fixture.stub_backlog({ opted_in: [critical] })
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
 	})
 
 	it('offers the issue once the time has passed', async () => {

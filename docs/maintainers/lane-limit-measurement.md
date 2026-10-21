@@ -56,18 +56,19 @@ period that has to span one is closed before it and continued as a second row.
 
 ## The columns
 
-| Column                          | Source                                                          |
-| ------------------------------- | --------------------------------------------------------------- |
-| `JOSH_LANE_LIMIT`               | `--limit`, else the limit `lane:stats` reads                    |
-| `period (days)`                 | `--period`                                                      |
-| `merges`                        | `merge` entries in the period                                   |
-| `merges / hour`                 | merges per active hour — time `load` samples saw a lane working |
-| `effective lanes`               | mean of the working `load` samples' `lanes` (child running)     |
-| `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                    |
-| `load peak` / `mean`            | `load` samples' one-minute load average                         |
-| `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples  |
-| `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                  |
-| `load samples`                  | how many `load` samples the period holds                        |
+| Column                          | Source                                                           |
+| ------------------------------- | ---------------------------------------------------------------- |
+| `JOSH_LANE_LIMIT`               | `--limit`, else the limit `lane:stats` reads                     |
+| `period (days)`                 | `--period`                                                       |
+| `merges`                        | `merge` entries in the period                                    |
+| `merges / hour`                 | merges per active hour — time `load` samples saw a lane working  |
+| `effective lanes`               | mean of the working `load` samples' `lanes` (child running)      |
+| `lane median (min)`             | median per merge of the time since its issue's latest `dispatch` |
+| `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                     |
+| `load peak` / `mean`            | `load` samples' one-minute load average                          |
+| `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples   |
+| `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                   |
+| `load samples`                  | how many `load` samples the period holds                         |
 
 **A column with no samples prints `—`, never `0`** — a period no `backlogrun` ran in has no load,
 which is not an idle machine. **The swap columns need two samples between half a minute and an hour apart** — a

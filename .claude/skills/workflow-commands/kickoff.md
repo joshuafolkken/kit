@@ -81,7 +81,10 @@ An Issue a consumer can use only once it is published is filed with `--release` 
 **Words after `new`** (`kickoff new high`) are read like `into <target>`, never inferred. Each adds its
 labels to the filing; a word not in the table is asked about:
 
-| Typed     | Added to `pnpm josh issue:file` |
-| --------- | ------------------------------- |
+| Typed      | Added to `pnpm josh issue:file` |
+| ---------- | ------------------------------- |
 | `auto ok` | nothing — `issue:file` judges it |
-| `high`    | `--label priority:high`         |
+| `critical` | `--label priority:critical`     |
+| `high`     | `--label priority:high`         |
+
+A typed priority wins: `issue:file` then skips the body's `- 優先度:` judgement (`scripts/issue/issue-priority.ts`).
