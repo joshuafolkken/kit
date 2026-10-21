@@ -151,7 +151,18 @@ describe('backlog_drive_cli output', () => {
 		})
 		expect(backlog_drive_cli.to_offer('not json')).toBeUndefined()
 	})
+})
 
+// joshuafolkken/kit#4396: the `run:solo` cause reaches the hold the driver records.
+describe('backlog_drive_cli output — the offer’s cause', () => {
+	it('reads the cause an offer that started nothing names', () => {
+		const offer = { verdict: 'watch', issues: [], retries: 0, answer: 'blocked', cause: 'solo' }
+
+		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.cause).toBe('solo')
+	})
+})
+
+describe('backlog_drive_cli output — the rest', () => {
 	it('prints the hand-back with its token and child', () => {
 		expect(backlog_drive_cli.end_line({ reason: 'merge', token: 'over', issue: '2493' })).toBe(
 			'merge over #2493',

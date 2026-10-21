@@ -1,0 +1,10 @@
+{
+	"reason": "#4396 adds the flaky-vs-solo rule the owner decided to backlogrun-lanes.md and the run:solo cause through backlog:offer to lane:stats; both are the issue's acceptance criteria",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 18,
+		"ai_cost.on_demand_bytes": 441,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}

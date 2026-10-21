@@ -99,6 +99,7 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 		elapsed_ms: result.elapsed_ms,
 		is_passed: !gate_report.is_gate_step_failed(result),
 		is_reused: result.reused_at !== undefined,
+		...(result.cpu_ms !== undefined && { cpu_ms: Math.round(result.cpu_ms) }),
 		fallback:
 			result.label === gate_plan.UNIT_LABEL
 				? related_scope.fallback_kind(result.output)

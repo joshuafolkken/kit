@@ -65,6 +65,7 @@ const offer_read_schema = z.object({
 	issues: z.array(z.string()),
 	retries: z.number(),
 	answer: z.string().optional(),
+	cause: z.string().optional(),
 	reason: z.string().optional(),
 	is_finish: z.boolean().optional(),
 })

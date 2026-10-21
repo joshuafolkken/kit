@@ -55,6 +55,8 @@ interface OfferRead {
 	issues: ReadonlyArray<string>
 	retries: number
 	answer?: string | undefined
+	// Why a `blocked` answer started nothing, where the offer said — `solo` for the `run:solo` gate.
+	cause?: string | undefined
 	reason?: string | undefined
 	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent
 	// reads as not owed, so a drain with the switch off keeps the idle watch.

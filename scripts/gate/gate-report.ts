@@ -32,6 +32,8 @@ interface GateStepResult extends BufferedProcessResult {
 	// Set when the check was not started because its inputs match the record taken at this time
 	// (`check-reuse.ts`).
 	reused_at?: string | undefined
+	// The CPU milliseconds the check's process tree spent, where the gate could read it (`check-cpu.ts`).
+	cpu_ms?: number | undefined
 }
 
 function is_gate_step_failed(result: GateStepResult): boolean {

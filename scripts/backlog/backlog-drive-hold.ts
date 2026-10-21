@@ -35,11 +35,14 @@ interface HoldLedger {
 	is_open: boolean
 }
 
-// The reason an offer that started nothing holds a free lane, or `undefined` for the run's stop.
+// The reason an offer that started nothing holds a free lane, or `undefined` for the run's stop. The
+// offer's cause stands in for its answer, so a `run:solo` wait is `offer:watch:solo` rather than one
+// more `offer:watch:blocked` (joshuafolkken/kit#4396).
 function offer_reason(read: OfferRead): string | undefined {
 	if (read.verdict === STOP_VERDICT) return undefined
 
-	const parts = [OFFER_PREFIX, read.verdict, ...(read.answer === undefined ? [] : [read.answer])]
+	const detail = read.cause ?? read.answer
+	const parts = [OFFER_PREFIX, read.verdict, ...(detail === undefined ? [] : [detail])]
 
 	return parts.join(REASON_SEPARATOR)
 }

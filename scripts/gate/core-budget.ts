@@ -28,7 +28,7 @@ import { machine_capacity, type MachineBudget, type MachineReading } from './mac
 //
 // **A solo run is bit-for-bit unchanged, and that is arithmetic rather than a branch.** The gate's
 // weights are its `reserved_cores` (the static checks) and its `unit_worker_cap` (the unit suite), and
-// `reserved(2 + 1 + 1) + unit_cap(cores - 4)` is exactly `cores` — so a single gate's four claims sum
+// `reserved(2 + 2 + 2) + unit_cap(cores - 6)` is exactly `cores` — so a single gate's four claims sum
 // to the whole budget and, while the busy cores stay within what the ledger holds, every one is
 // admitted the instant it is made, with no poll and no wait. Under
 // concurrency the same weights sum past the budget and the ledger is what holds the machine down.

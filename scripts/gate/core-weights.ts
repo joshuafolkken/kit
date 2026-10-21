@@ -1,27 +1,51 @@
 // The weights heavy tools declare to the core budget (`core-budget.ts`), in their own module so the
 // ledger's file stays under its line ceiling.
 
+// One tool's measured run: its CPU seconds over its wall seconds, the cores it kept busy on average.
+interface Measurement {
+	cpu_s: number
+	wall_s: number
+}
+
+// **What each heavy tool was measured at, on the 11-core machine.** The whole-tree eslint scan behind
+// `josh lines` and `josh refactor:scan`, cold on 2026-10-06. eslint over 40 staged files
+// (`pre-commit-lint.ts`), which the gate's lint also runs beside its sibling linters, so it is the
+// lint's floor; whole runs were observed at 124–147% CPU. The type check and the spell check with
+// `/usr/bin/time -l` on 2026-10-21 under a load average of 14. `prettier --check` over 40 staged
+// files, `josh retrospective` and a fresh lane's `pnpm install --frozen-lockfile` with
+// `/usr/bin/time -l` on 2026-10-17 under a load average of 16. The gate ledger records each check's
+// CPU beside its duration (`check-cpu.ts`), so these can be re-measured from it.
+const MEASURED = {
+	lint: { cpu_s: 16.9, wall_s: 14 },
+	type_check: { cpu_s: 31.2, wall_s: 27.3 },
+	spell_check: { cpu_s: 6, wall_s: 5.6 },
+	eslint_scan: { cpu_s: 113, wall_s: 98 },
+	format: { cpu_s: 2.1, wall_s: 1.7 },
+	retrospective: { cpu_s: 16.5, wall_s: 19.8 },
+	install: { cpu_s: 1.9, wall_s: 6.1 },
+} as const satisfies Readonly<Record<string, Measurement>>
+
+// **Rounded up, never down** (joshuafolkken/kit#4362): a weight is a whole number of cores, and the
+// floored table of joshuafolkken/kit#3354 let a 1.15-core eslint scan claim one, so the budget admitted
+// more than the machine had.
+function rounded_up(measurement: Measurement): number {
+	return Math.ceil(measurement.cpu_s / measurement.wall_s)
+}
+
 // **The cores each heavy tool occupies, declared once for both places that reserve them**
 // `gate-plan.ts`'s checks and the `josh` commands that run the same tools
-// directly read these, so a direct `josh lint` claims what the gate's lint claims. The lint, type check
-// and spell check numbers are `gate-plan.ts`'s measured table, floored. The whole-tree eslint scan
-// behind `josh lines` and `josh refactor:scan` runs in one process: measured cold on the 11-core
-// machine on 2026-10-06, 113s of CPU over 98s of wall, so it gets one core.
-//
-// The rest ran outside the ledger until joshuafolkken/kit#3944, measured with `/usr/bin/time -l` on the
-// same machine on 2026-10-17 under a load average of 16. Every one stays under one core, so each takes
-// one: `prettier --check` over 40 staged files 2.1s of CPU over 1.7s of wall (`format`), `josh
-// retrospective` 16.5s over 19.8s, and a fresh lane's `pnpm install --frozen-lockfile` 1.9s over 6.1s.
-// `e2e` is the Playwright worker count `josh test:e2e` passes locally — the two-worker run CI already
-// sizes for its four-core runner — since kit has no e2e suite of its own to time.
+// directly read these, so a direct `josh lint` claims what the gate's lint claims. Each is its
+// measurement rounded up. `e2e` is the Playwright worker count `josh test:e2e` passes locally — the
+// two-worker run CI already sizes for its four-core runner — since kit has no e2e suite of its own to
+// time.
 const CORE_WEIGHTS = {
-	lint: 2,
-	type_check: 1,
-	spell_check: 1,
-	eslint_scan: 1,
-	format: 1,
-	retrospective: 1,
-	install: 1,
+	lint: rounded_up(MEASURED.lint),
+	type_check: rounded_up(MEASURED.type_check),
+	spell_check: rounded_up(MEASURED.spell_check),
+	eslint_scan: rounded_up(MEASURED.eslint_scan),
+	format: rounded_up(MEASURED.format),
+	retrospective: rounded_up(MEASURED.retrospective),
+	install: rounded_up(MEASURED.install),
 	e2e: 2,
 } as const
 
@@ -42,6 +66,6 @@ const MEMORY_MB = {
 	install: 100,
 } as const
 
-const core_weights = { CORE_WEIGHTS, MEMORY_MB }
+const core_weights = { CORE_WEIGHTS, MEASURED, MEMORY_MB }
 
 export { core_weights }
