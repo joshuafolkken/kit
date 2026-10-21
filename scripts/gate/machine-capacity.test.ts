@@ -1,3 +1,4 @@
+import { availableParallelism, cpus } from 'node:os'
 import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_admission, type LedgerEntry } from './core-admission'
@@ -65,7 +66,35 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 			cores: CORES,
 			memory_mb: Infinity,
 			busy_excess: 0,
+			is_overloaded: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#4361: lanes took the 11-core machine to a load average of 25–34 while the first
+// waiter ignored outside load. A run queue past twice the cores beyond the ledger now holds it too.
+describe('machine_capacity.machine_budget — a run queue past twice the cores', () => {
+	const cap = CORES * 2
+
+	function overloaded(run_queue: number | undefined): boolean | undefined {
+		const reading = { busy_cores: CORES, available_mb: undefined, run_queue }
+
+		return machine_capacity.machine_budget(CORES, reading, {
+			cores: LEDGER_CORES,
+			memory_mb: 0,
+		}).is_overloaded
+	}
+
+	it('is overloaded once the queue beyond the ledger passes twice the cores', () => {
+		expect(overloaded(LEDGER_CORES + cap + 1)).toBe(true)
+	})
+
+	it('is not overloaded at exactly twice the cores beyond the ledger', () => {
+		expect(overloaded(LEDGER_CORES + cap)).toBe(false)
+	})
+
+	it('is not overloaded when the queue could not be read', () => {
+		expect(overloaded(undefined)).toBe(false)
 	})
 })
 
@@ -290,5 +319,14 @@ describe('machine_capacity.read_machine — memory read at both ends of the wind
 
 		expect(reading.memory_pressured).toBe(true)
 		expect(reading.available_mb).toBeGreaterThan(0)
+	})
+
+	// joshuafolkken/kit#4361: the run queue is read on the host, and never under a CPU quota.
+	it('reads the run queue exactly where the host CPU times are this process', async () => {
+		const reading = await read_swapping_machine()
+		const is_host = cpus().length > 0 && cpus().length === availableParallelism()
+		const expected = is_host ? 'number' : 'undefined'
+
+		expect(typeof reading.run_queue).toBe(expected)
 	})
 })

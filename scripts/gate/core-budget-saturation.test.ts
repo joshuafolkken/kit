@@ -24,6 +24,7 @@ const BLOCKER = `${core_budget.RESERVED_PREFIX}reserved.json`
 const WAITER = `${core_budget.RESERVED_PREFIX}waiter.json`
 // Claimed further back than the window a later claim may pass a waiter in, so the claim queues behind it.
 const LONG_AGO = -60_000
+const CPU_SATURATED_LINE = '⏳ a step waits for the core budget — CPU saturated'
 
 const probe = { directory: '' }
 
@@ -141,9 +142,7 @@ describe('core_budget.reserve — a saturated CPU holds a claim queued behind an
 
 		const run = await claim_one(busy(CORES))
 
-		expect(run.report).toHaveBeenCalledExactlyOnceWith(
-			'⏳ a step waits for the core budget — CPU saturated',
-		)
+		expect(run.report).toHaveBeenCalledExactlyOnceWith(CPU_SATURATED_LINE)
 	})
 
 	it('admits the same claim at once when the busy cores are within the reservations', async () => {
@@ -195,6 +194,68 @@ describe('core_budget.reserve — a waiting claim admits against its recent read
 		core_budget.release(handle)
 
 		expect(handle.admission.overflow).toBeDefined()
+	})
+})
+
+// joshuafolkken/kit#4361: lanes took the machine to a load average of 25–34 on 11 cores while the first
+// waiter ignored outside load. A run queue past twice the cores beyond the ledger now holds it, read
+// afresh on every poll.
+const OVERLOADED = RESERVED + CORES * 2 + 1
+
+// Run-queue readings in turn on a saturated CPU, the last one repeated.
+function queue_in_turn(run_queue: ReadonlyArray<number>): () => Promise<MachineReading> {
+	let index = 0
+
+	return async () => {
+		const value = run_queue[Math.min(index, run_queue.length - 1)]
+
+		index += 1
+
+		return { busy_cores: CORES, available_mb: undefined, run_queue: value }
+	}
+}
+
+describe('core_budget.reserve — an overloaded machine holds the first waiter', () => {
+	it('keeps the first waiter waiting to the cap while the run queue stays past the cap', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(queue_in_turn([OVERLOADED]))
+
+		expect(run.sleep).toHaveBeenCalled()
+		expect(run.is_overflow).toBe(true)
+	})
+
+	it('names the saturated CPU as why the first waiter waits', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(queue_in_turn([OVERLOADED]))
+
+		expect(run.report).toHaveBeenCalledExactlyOnceWith(CPU_SATURATED_LINE)
+	})
+
+	it('admits the first waiter once a later poll reads the queue back under the cap', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(queue_in_turn([OVERLOADED, RESERVED]))
+
+		expect(run.sleep).toHaveBeenCalledOnce()
+		expect(run.is_overflow).toBe(false)
+	})
+
+	// The oldest claim with nothing running used to start before the overload was consulted.
+	it('keeps the oldest claim waiting on an empty ledger while the run queue stays past the cap', async () => {
+		const run = await claim_one(queue_in_turn([OVERLOADED]))
+
+		expect(run.sleep).toHaveBeenCalled()
+		expect(run.is_overflow).toBe(true)
+	})
+
+	it('admits the first waiter at once with the queue at the cap', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(queue_in_turn([OVERLOADED - 1]))
+
+		expect(run.sleep).not.toHaveBeenCalled()
 	})
 })
 

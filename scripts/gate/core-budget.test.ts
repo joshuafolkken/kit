@@ -254,7 +254,7 @@ async function reserve_admits_at_wait_cap(): Promise<void> {
 		expect(handle.admission.overflow).toEqual({
 			waited_ms: TEST_WAIT_CAP_MS,
 			ledger: { cores: MEASURED_CORES + SOLO_UNIT_WEIGHT, memory_mb: 0 },
-			budget: { cores: MEASURED_CORES, memory_mb: Infinity, busy_excess: 0 },
+			budget: { cores: MEASURED_CORES, memory_mb: Infinity, busy_excess: 0, is_overloaded: false },
 		})
 		expect(core_budget.describe_overflow(handle.admission)).toContain('past the core budget')
 	})

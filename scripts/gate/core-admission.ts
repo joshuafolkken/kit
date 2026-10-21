@@ -116,8 +116,12 @@ function place(key: string, reservations: ReadonlyArray<LedgerEntry>): Placement
 // (joshuafolkken/kit#4313). Holding it on `busy_excess` (joshuafolkken/kit#4238) made a solo gate's unit
 // claim wait out the cap behind one core of Claude sessions or editor load — work deferred, not removed.
 // It is admitted against the cores the ledger leaves, and a unit claim narrows to the room the outside
-// load leaves (`narrowed_weight`), so that load bounds its workers instead of its start.
+// load leaves (`narrowed_weight`), so that load bounds its workers instead of its start. **On an
+// overloaded machine it waits like any claim** (`is_overloaded`, joshuafolkken/kit#4361): every poll reads
+// the load afresh, so it runs once the load falls back under the cap.
 function first_waiter_limit(budget: MachineBudget): LedgerLoad {
+	if (budget.is_overloaded === true) return budget
+
 	return { cores: budget.cores + (budget.busy_excess ?? 0), memory_mb: budget.memory_mb }
 }
 
@@ -138,6 +142,12 @@ function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget
 	return fits([...running, ...ahead, own], limit)
 }
 
+// The oldest claim runs alone once nothing else does — unless the machine is overloaded, where it waits
+// like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap.
+function runs_alone({ is_oldest, running }: Placement, budget: MachineBudget): boolean {
+	return is_oldest && running.length === 0 && budget.is_overloaded !== true
+}
+
 // **Admission: the oldest claim runs once nothing else does, then claim order, then a bounded pass.**
 // The oldest runs because a single check heavier than the whole machine must not wait for room that will
 // never come; claims that passed it are still running beside it, and their room does come back, so it
@@ -152,7 +162,7 @@ function is_admitted(
 	const placement = place(key, reservations)
 
 	if (placement === undefined) return false
-	if (placement.is_oldest && placement.running.length === 0) return true
+	if (runs_alone(placement, budget)) return true
 
 	return fits_in_order(placement, budget) || may_pass(placement, budget)
 }
