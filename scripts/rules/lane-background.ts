@@ -140,18 +140,33 @@ const FOREGROUND_NOTE =
 	'foreground at the 600000 ms cap, where it detaches itself after the preflight. End the turn on ' +
 	'`launched` / `busy`.'
 
+type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
+
+// One line's word on each id: a launch opens it, a finish notice closes it.
+function apply_line(open: Set<string>, line: string, launched_ids: LaunchedIds): void {
+	const parsed = time_transcript_line.parse_line(line)
+
+	if (parsed === undefined) return
+
+	const launched = parsed.blocks.flatMap((block) => launched_ids(block))
+
+	for (const id of launched) open.add(id)
+	open.delete(parsed.finished_background)
+}
+
 // The launches `launched_ids` reads off the transcript tail that never saw their finish. A launch is
 // read off its own tool result and a finish off the harness notice, both by `time_transcript_line`.
-function unfinished_ids(
-	tail: string,
-	launched_ids: (block: TranscriptBlock) => ReadonlyArray<string>,
-): ReadonlyArray<string> {
-	const lines = tail.split('\n').map((line) => time_transcript_line.parse_line(line))
-	const finished = new Set(lines.map((line) => line?.finished_background ?? ''))
-	const blocks = lines.flatMap((line) => line?.blocks ?? [])
-	const launched = blocks.flatMap((block) => launched_ids(block))
+//
+// **Read in order, so the later word on an id wins.** A subagent resumed by `SendMessage` runs again
+// under the id its first run's notice already named; a set of every finish ever seen would read the
+// resumed run as finished (joshuafolkken/kit#4347).
+function unfinished_ids(tail: string, launched_ids: LaunchedIds): ReadonlyArray<string> {
+	const open = new Set<string>()
 
-	return launched.filter((id) => id !== '' && !finished.has(id))
+	for (const line of tail.split('\n')) apply_line(open, line, launched_ids)
+	open.delete('')
+
+	return [...open]
 }
 
 // The background tasks the tail launched and never saw finish — commands and subagents alike,

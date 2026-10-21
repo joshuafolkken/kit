@@ -93,6 +93,22 @@ describe('time_background.agent_launch_id', () => {
 		expect(time_background.agent_launch_id(body)).toBe(AGENT_ID)
 	})
 
+	// joshuafolkken/kit#4347: the #4344 child resumed its investigator with `SendMessage`, and this is
+	// the result the harness wrote for it.
+	it('reads the agent id out of a SendMessage result that resumed a subagent', () => {
+		const pin = `"pin":{"id":"${AGENT_ID}","name":"${AGENT_ID}","ref":"d632ac"}`
+		const body = `{"success":true,"message":"Resuming agent a6b97a4","resumedAgentId":"${AGENT_ID}",${pin}}`
+
+		expect(time_background.agent_launch_id(body)).toBe(AGENT_ID)
+	})
+
+	it('ignores a transcript line a command printed that carries a resume result', () => {
+		const result = `"toolUseResult":{"success":true,"resumedAgentId":"${AGENT_ID}"}`
+		const body = `{"parentUuid":"p1","type":"user",${result}}`
+
+		expect(time_background.agent_launch_id(body)).toBe(time_background.NO_BACKGROUND)
+	})
+
 	// A command launch is `launch_id`'s, so the timeline windows never see a subagent.
 	it.each([LAUNCH_BODY, 'done', `quoted: Async agent launched\nagentId: ${AGENT_ID}`])(
 		'answers with nothing for %s',
