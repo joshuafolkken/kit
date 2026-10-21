@@ -3,6 +3,7 @@ import { lane_limit_cli } from '#scripts/lane/lane-limit-cli'
 import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -40,6 +41,19 @@ async function not_parent(): Promise<boolean> {
 async function read_repo(): Promise<string | undefined> {
 	return REPO
 }
+
+// Every lane's state record reads running: never a real one from a test.
+function running_records(issues: ReadonlyArray<string>): Map<string, LaneStateRecord> {
+	const changed_at = '2026-10-20T01:28:00.000Z'
+
+	return new Map(
+		issues.map((issue) => [issue, { issue, state: 'running', changed_at, changed_by: 'lane:run' }]),
+	)
+}
+
+beforeEach(() => {
+	vi.spyOn(lane_state, 'read_states').mockImplementation(async (issues) => running_records(issues))
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -148,6 +162,7 @@ describe('backlog_ready.lane_use', () => {
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length - ['3867', '3868'].length,
 			seated: OPEN.length,
+			unknown: [],
 		})
 	})
 
@@ -157,6 +172,7 @@ describe('backlog_ready.lane_use', () => {
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length,
 			seated: OPEN.length,
+			unknown: [],
 		})
 	})
 })

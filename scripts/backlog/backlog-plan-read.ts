@@ -60,7 +60,7 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		scope: backlog_next.gate_scope(context),
+		scope: await backlog_next.gate_scope(context),
 	}
 }
 

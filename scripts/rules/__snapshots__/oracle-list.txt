@@ -116,7 +116,7 @@ decision oracles:
   run:liveness
     decision  Whether a delegated unit is still working or has stopped without reporting
     command   pnpm josh run:liveness <N> --output <path>
-    answers   alive | stopped | settled | undetermined
+    answers   alive | paused | stopped | settled | undetermined
     no firing it answers a status question and governs no action of its own to gate before
     source    docs/josh-commands-run.md → `josh run:liveness`
   stash:push

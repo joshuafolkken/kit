@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { AgentEventState } from '#scripts/agent/agent-event'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { lane_state } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -377,6 +378,7 @@ function arrange_terminal_check(
 	const issue_read = vi.spyOn(git_gh_issue_read, 'issue_view_json')
 	for (const result of issue_results) issue_read.mockResolvedValueOnce(result)
 	vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
+	vi.spyOn(lane_state, 'read_state').mockResolvedValue(undefined)
 
 	return {
 		gap_ms: 0,

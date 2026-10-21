@@ -6,8 +6,7 @@ import {
 } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
-import type { PausedProbes } from './lane-paused'
-import { lane_process_table, type ProcessTable } from './lane-process-table'
+import { lane_process_table, type ProcessTable, type TableProbes } from './lane-process-table'
 
 // `lane_await.process_trace_default` answered for many lanes from one process snapshot
 // (joshuafolkken/kit#4245). That probe starts a synchronous `pgrep` per lane and reads the ship record's
@@ -21,7 +20,7 @@ import { lane_process_table, type ProcessTable } from './lane-process-table'
 
 type TraceRead = (issue: string) => ProcessTrace
 
-function is_matched(probes: PausedProbes, issue: string): boolean {
+function is_matched(probes: TableProbes, issue: string): boolean {
 	return probes.matching(lane_child_invocation.process_pattern(issue)).length > 0
 }
 

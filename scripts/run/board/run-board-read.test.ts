@@ -262,7 +262,7 @@ function record_of(issue: string, run_started_at: string): LaneStateRecord {
 function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
 	const by_issue = new Map(records.map((record) => [record.issue, record]))
 
-	vi.mocked(lane_state.read_state).mockImplementation(async (issue) => by_issue.get(issue))
+	vi.mocked(lane_state.read_states).mockResolvedValue(by_issue)
 }
 
 // joshuafolkken/kit#3969, #4269: a lane an earlier run left behind was drawn as this run's child.

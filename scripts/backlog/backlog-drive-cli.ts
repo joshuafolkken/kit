@@ -35,6 +35,7 @@ import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_seats } from './backlog-drive-seats'
@@ -186,9 +187,15 @@ function judgement_reader(): () => Promise<number> {
 	}
 }
 
-// The two reports an offered pass leaves: why it started nothing, and the idle notice.
-function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle'> {
-	return { hold: holds.hold, idle: backlog_drive_idle.notify }
+// The reports an offered pass leaves: why it started nothing, the idle notice and the paused notice.
+function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
+	return {
+		hold: holds.hold,
+		idle: backlog_drive_idle.notify,
+		paused: async () => {
+			await backlog_drive_paused.notify()
+		},
+	}
 }
 
 // What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.

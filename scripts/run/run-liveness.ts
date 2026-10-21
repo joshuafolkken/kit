@@ -8,6 +8,7 @@ import { has_parked_label } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state } from '#scripts/issue/issue-state'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { lane_state, type LaneState } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_hold } from '#scripts/run/hold/run-hold'
 
@@ -34,13 +35,22 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 // dead. `statSync` follows the link, and the size is compared as well as the modification time,
 // because it is the two-sample size comparison that actually proves liveness.
 
+//
+// **The lane state record answers before any trace** (joshuafolkken/kit#4270): a lane `lane:pause`
+// suspended has a live process and frozen output, which the traces read as `alive` for as long as it
+// stays paused; the record says `paused`. An `ended` record is a lane done with its child. Whether a
+// child that parked or died is still there is not the record's — it writes nothing then — so the
+// traces still decide every other lane.
+
 const ALIVE_VERDICT = 'alive'
+const PAUSED_VERDICT = 'paused'
 const SETTLED_VERDICT = 'settled'
 const STOPPED_VERDICT = 'stopped'
 const UNDETERMINED_VERDICT = 'undetermined'
 
 type LivenessVerdict =
 	| typeof ALIVE_VERDICT
+	| typeof PAUSED_VERDICT
 	| typeof SETTLED_VERDICT
 	| typeof STOPPED_VERDICT
 	| typeof UNDETERMINED_VERDICT
@@ -72,6 +82,8 @@ interface Traces {
 	is_child_settled: boolean | undefined
 	is_output_frozen: boolean | undefined
 	is_tree_dirty: boolean
+	// The lane's state record's state; `undefined` where the lane has none.
+	lane_state?: LaneState | undefined
 	process_trace: ProcessTrace
 }
 
@@ -94,6 +106,8 @@ interface LivenessRequest {
 const REASONS: Record<LivenessVerdict, string> = {
 	[ALIVE_VERDICT]:
 		'The unit is still working: its output moved, or a process of the child is alive.',
+	[PAUSED_VERDICT]:
+		'The lane state record says the lane is paused: its child is suspended, not working, and nothing moves until someone resumes it.',
 	[SETTLED_VERDICT]:
 		'The child is closed, parked with `needs-decision` or `run:stalled`, or marked `already-done`, so there is nothing here to recover.',
 	[STOPPED_VERDICT]:
@@ -103,6 +117,8 @@ const REASONS: Record<LivenessVerdict, string> = {
 }
 
 const ALIVE_ADVICE = 'Keep waiting on `pnpm josh lane:await`; do not touch the child.'
+const PAUSED_ADVICE =
+	'Do not wait on it and do not recover it: tell the person the lane is paused; `pnpm josh lane:resume <N>` resumes it once they ask.'
 const SETTLED_ADVICE =
 	'Read the child with `pnpm josh issue:state <N>` and take the branch its state says.'
 // The unit stopped, but *why* it stopped — abandoned mid-implementation, or dead because it could not
@@ -133,8 +149,19 @@ function is_agent_finished(traces: Traces): boolean {
 	return is_agent_state_finished(traces.agent_state)
 }
 
+// What the lane state record answers on its own: a paused lane, or one done with its child.
+function recorded_verdict(state: LaneState | undefined): LivenessVerdict | undefined {
+	if (state === 'paused') return PAUSED_VERDICT
+
+	return state === 'ended' ? SETTLED_VERDICT : undefined
+}
+
 function definitive_verdict(traces: Traces): LivenessVerdict | undefined {
 	if (traces.is_child_settled === true) return SETTLED_VERDICT
+
+	const recorded = recorded_verdict(traces.lane_state)
+
+	if (recorded !== undefined) return recorded
 	if (is_agent_finished(traces)) return STOPPED_VERDICT
 	if (is_output_moving(traces)) return ALIVE_VERDICT
 
@@ -170,10 +197,16 @@ function to_verdict(traces: Traces): LivenessVerdict {
 	return is_check_running(traces) ? ALIVE_VERDICT : STOPPED_VERDICT
 }
 
+// The advice for every verdict but `stopped`, whose advice turns on the work left to stash.
+const ADVICE: Record<Exclude<LivenessVerdict, typeof STOPPED_VERDICT>, string> = {
+	[ALIVE_VERDICT]: ALIVE_ADVICE,
+	[PAUSED_VERDICT]: PAUSED_ADVICE,
+	[SETTLED_VERDICT]: SETTLED_ADVICE,
+	[UNDETERMINED_VERDICT]: UNDETERMINED_ADVICE,
+}
+
 function to_advice(verdict: LivenessVerdict, has_work_to_stash: boolean): string {
-	if (verdict === ALIVE_VERDICT) return ALIVE_ADVICE
-	if (verdict === SETTLED_VERDICT) return SETTLED_ADVICE
-	if (verdict === UNDETERMINED_VERDICT) return UNDETERMINED_ADVICE
+	if (verdict !== STOPPED_VERDICT) return ADVICE[verdict]
 
 	return has_work_to_stash ? STOPPED_DIRTY_ADVICE : STOPPED_CLEAN_ADVICE
 }
@@ -333,20 +366,25 @@ async function read_child_settled(issue: string, repo?: string): Promise<boolean
 	return state.state !== OPEN_STATE || carries_settled_label(state.labels)
 }
 
+function freshness_of(request: LivenessRequest): FreshnessRequest {
+	return {
+		gap_ms: request.gap_ms ?? DEFAULT_GAP_SECONDS * MS_PER_SECOND,
+		now_ms: Date.now(),
+		output_path: request.output_path,
+		silent_window_ms: request.silent_window_ms ?? DEFAULT_SILENT_MINUTES * MS_PER_MINUTE,
+	}
+}
+
 // The dirty tree is deliberately not one of the traces, so it is the one input that does not answer
 // `undetermined`. `run_hold.is_tree_dirty` reports an unreadable checkout as dirty, which here means
 // the advice offers a stash that may find nothing — the safe direction for the only question this
 // input decides, and one that cannot move the verdict.
 async function read_traces(request: LivenessRequest): Promise<Traces> {
-	const [is_initial_child_settled, is_output_frozen, is_tree_dirty] = await Promise.all([
+	const [is_initial_child_settled, is_output_frozen, is_tree_dirty, record] = await Promise.all([
 		read_child_settled(request.issue, request.repo),
-		read_output_frozen({
-			gap_ms: request.gap_ms ?? DEFAULT_GAP_SECONDS * MS_PER_SECOND,
-			now_ms: Date.now(),
-			output_path: request.output_path,
-			silent_window_ms: request.silent_window_ms ?? DEFAULT_SILENT_MINUTES * MS_PER_MINUTE,
-		}),
+		read_output_frozen(freshness_of(request)),
 		run_hold.is_tree_dirty(),
+		lane_state.read_state(request.issue),
 	])
 	const agent_state = read_agent_state(request.output_path)
 	// A child can close or park its Issue and append its terminal event after the parallel GitHub read
@@ -363,6 +401,7 @@ async function read_traces(request: LivenessRequest): Promise<Traces> {
 		is_child_settled,
 		is_output_frozen,
 		is_tree_dirty,
+		lane_state: record?.state,
 		process_trace: request.process_trace,
 	}
 }
@@ -393,6 +432,7 @@ export {
 	ALIVE_VERDICT,
 	DEFAULT_GAP_SECONDS,
 	DEFAULT_SILENT_MINUTES,
+	PAUSED_VERDICT,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,

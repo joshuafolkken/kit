@@ -1,8 +1,7 @@
 import { process_identity } from '#scripts/josh/process-identity'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
-import type { PausedProbes } from './lane-paused'
-import { lane_reap } from './lane-reap'
+import { lane_reap, type TreeProbes } from './lane-reap'
 import { process_tools } from './process-tools'
 
 // Every process on the machine at one instant, read by one asynchronous `ps`, answering the probes a
@@ -15,8 +14,8 @@ import { process_tools } from './process-tools'
 // spawn whatever the lane and process counts, and never blocks. `run:board` takes one per refresh and
 // hands it to both the lane count and the usage columns (`shared`), so the two read the same instant.
 //
-// **The walk is not re-implemented.** `lane_reap` still walks the tree and `lane_paused` still decides;
-// the snapshot only answers the questions they ask. `matching` reads the full command line the way
+// **The walk is not re-implemented.** `lane_reap` still walks the tree; the
+// snapshot only answers the questions it asks. `matching` reads the full command line the way
 // `pgrep -f` does, and `-ww` keeps `ps` from cutting it at a terminal width. The command is the full
 // line rather than `comm`: `ps` cuts any column but the last, so the two cannot share one listing.
 //
@@ -52,6 +51,11 @@ interface ProcessRow {
 type ProcessTable = ReadonlyArray<ProcessRow>
 // A snapshot read on demand, `undefined` where `ps` did not answer.
 type TableRead = () => Promise<ProcessTable | undefined>
+
+// The tree probes, and each pid's `ps` `stat` — the empty list for a read that failed.
+interface TableProbes extends TreeProbes {
+	states_of: (pids: ReadonlyArray<number>) => Array<string>
+}
 
 function is_row(row: ProcessRow): boolean {
 	const { pid, parent, rss_kb, command } = row
@@ -105,7 +109,7 @@ function children_index(rows: ProcessTable): Map<number, Array<number>> {
 }
 
 /** The probes a lane's tree and states are read through, answered from `rows` alone. */
-function probes_of(rows: ProcessTable): PausedProbes {
+function probes_of(rows: ProcessTable): TableProbes {
 	const by_pid = new Map(rows.map((row) => [row.pid, row]))
 	const children = children_index(rows)
 
@@ -146,7 +150,7 @@ async function read_table(): Promise<ProcessTable | undefined> {
 }
 
 /** The probes of `table`, `undefined` where it could not be read. */
-async function probes_from(table: TableRead): Promise<PausedProbes | undefined> {
+async function probes_from(table: TableRead): Promise<TableProbes | undefined> {
 	const rows = await table()
 
 	return rows === undefined ? undefined : probes_of(rows)
@@ -174,4 +178,4 @@ const lane_process_table = {
 }
 
 export { lane_process_table }
-export type { ProcessRow, ProcessTable, TableRead }
+export type { ProcessRow, ProcessTable, TableProbes, TableRead }

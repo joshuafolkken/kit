@@ -52,6 +52,8 @@ interface ItemStatus {
 	phase_ms?: number | undefined
 	// Why the park or withdraw that ended the child ended it, where its event gives a reason.
 	reason?: string | undefined
+	// The command that paused a paused lane, read off its lane state record (`run-board-lane-state.ts`).
+	paused_by?: string | undefined
 }
 
 interface LatestEvent {

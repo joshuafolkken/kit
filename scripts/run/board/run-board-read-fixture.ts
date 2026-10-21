@@ -52,7 +52,7 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_carry_ended, 'read_ended').mockReturnValue(ended)
 	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
 	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
-	vi.spyOn(lane_state, 'read_state').mockResolvedValue(undefined)
+	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
 }
 
 function arrange(read: CarryRead, ended: EndedRun | undefined): void {

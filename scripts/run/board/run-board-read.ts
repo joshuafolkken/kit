@@ -6,7 +6,7 @@ import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
+import { lane_state } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
@@ -146,18 +146,6 @@ function sources_of(
 	}
 }
 
-// Each open lane's lane state record, by issue; a lane with none is left out.
-async function records_of(
-	lanes: ReadonlyArray<LaneInfo>,
-	repository: string,
-): Promise<Map<string, LaneStateRecord>> {
-	const read = await Promise.all(
-		lanes.map(async (lane) => [lane.issue, await lane_state.read_state(lane.issue, repository)]),
-	)
-
-	return new Map(read.filter((entry): entry is [string, LaneStateRecord] => entry[1] !== undefined))
-}
-
 // The open lanes sorted by their records, each folded from the whole stream, not the run's span: an
 // earlier run's lane launched before the span began.
 async function lanes_here(
@@ -166,8 +154,8 @@ async function lanes_here(
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
 ): Promise<BoardLanes> {
-	const records = await records_of(lanes, repository)
 	const issues = lanes.map((lane) => lane.issue)
+	const records = await lane_state.read_states(issues, repository)
 
 	return run_board_lane_state.lanes_of({ events, lanes: issues, records, started_ms })
 }
