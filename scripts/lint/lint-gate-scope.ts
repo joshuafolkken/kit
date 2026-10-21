@@ -76,10 +76,13 @@ function is_lint_config(relative: string): boolean {
 	)
 }
 
-function configures_lint(files: ReadonlyArray<string>, root: string): boolean {
-	const relatives = files.map((file) => path.relative(root, file))
-
+// Repository-root-relative paths, as the since-green narrowing (`since-green.ts`) reads them too.
+function configures_toolchain(relatives: ReadonlyArray<string>): boolean {
 	return toolchain_config.has_config(relatives) || relatives.some((file) => is_lint_config(file))
+}
+
+function configures_lint(files: ReadonlyArray<string>, root: string): boolean {
+	return configures_toolchain(files.map((file) => path.relative(root, file)))
 }
 
 // `files` are absolute, as `changed_file_scope.read_changed_files` answers them; `undefined` is a
@@ -111,6 +114,7 @@ const lint_gate_scope = {
 	CHANGED_FLAG: '--changed',
 	CI_REASON,
 	CONFIG_REASON,
+	configures_toolchain,
 	describe_scope,
 	narrowed_run,
 	resolve_gate_scope,

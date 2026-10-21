@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { document_byte_check } from '#scripts/document/document-byte-check'
 import { scoped_green } from '#scripts/gate/scoped-green'
+import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
@@ -20,6 +21,10 @@ vi.mock('./lint-parallel', () => ({
 // and its arguments; what the recorder then does with them is `scoped-green.test.ts`.
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
+}))
+// Mocked so no case reads this checkout's real green record; unset, it answers "read the whole branch".
+vi.mock('#scripts/gate/since-green', () => ({
+	since_green: { describe: vi.fn(), read_moved: vi.fn() },
 }))
 // Mocked so the verdict is the mocked lint's alone, never this checkout's real document sizes — an
 // unrelated document over its ceiling mid-work failed the whole-tree fallback case here
@@ -225,5 +230,40 @@ describe('lint_related.run_related_lint — what it is told to narrow by', () =>
 
 		expect(written_output()).toContain(MISSING_FILE)
 		expect(mocked_whole_tree).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#4393: a ship retry re-linted the whole branch diff. A bare run now lints only what
+// moved since its last green run, and the whole branch change wherever that cannot be told.
+describe('lint_related.run_related_lint — since the last green run', () => {
+	const other_source = path.join(REPOSITORY_ROOT, 'scripts', 'lint', 'lint-related-scope.ts')
+
+	beforeEach(() => {
+		vi.mocked(since_green.describe).mockReturnValue('since its last green run')
+		mocked_changed.mockResolvedValue([CHANGED_SOURCE, path.relative(REPOSITORY_ROOT, other_source)])
+	})
+
+	it('lints only the files moved since its own green record', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue([CHANGED_SOURCE])
+
+		await lint_related.run_related_lint([])
+
+		expect(since_green.read_moved).toHaveBeenCalledWith(review_stamps.lint_related_stamp)
+		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
+		expect(eslint_arguments()).not.toContain(other_source)
+	})
+
+	it('lints the whole branch change when nothing moved is lintable', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue(['assets/logo.png'])
+
+		await lint_related.run_related_lint([])
+
+		expect(eslint_arguments()).toEqual(expect.arrayContaining([ABSOLUTE_SOURCE, other_source]))
+	})
+
+	it('never consults the record for explicit file arguments', async () => {
+		await lint_related.run_related_lint([CHANGED_SOURCE])
+
+		expect(since_green.read_moved).not.toHaveBeenCalled()
 	})
 })
