@@ -3,14 +3,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-	INSTALL_ARGUMENTS,
-	lane_install,
-	MANIFEST_FILE_NAME,
-	NO_MANIFEST_OUTPUT,
-} from './lane-install'
+import { INSTALL_ARGUMENTS, lane_install, NO_MANIFEST_OUTPUT } from './lane-install'
 
 // joshuafolkken/kit#1554: opening a lane has to leave dependencies in it, so what is asserted here is
 // what this module asks for and how it reads the answer — never pnpm itself, nor the spawning that
@@ -51,11 +47,11 @@ function process_answers(exit_code: number | undefined, output: string): void {
 }
 
 function write_manifest(): void {
-	writeFileSync(path.join(lane.directory, MANIFEST_FILE_NAME), '{}')
+	writeFileSync(path.join(lane.directory, PACKAGE_JSON), '{}')
 }
 
 function remove_manifest(): void {
-	rmSync(path.join(lane.directory, MANIFEST_FILE_NAME), { force: true })
+	rmSync(path.join(lane.directory, PACKAGE_JSON), { force: true })
 }
 
 beforeEach(() => {
@@ -191,7 +187,7 @@ describe('install_dependencies — no manifest to install', () => {
 	// still reaches the real install, which fails as before, so a genuinely broken repository is never
 	// passed silently.
 	it('runs the install for a present-but-broken manifest, which still fails', async () => {
-		writeFileSync(path.join(lane.directory, MANIFEST_FILE_NAME), '{ not valid json')
+		writeFileSync(path.join(lane.directory, PACKAGE_JSON), '{ not valid json')
 		process_answers(FAILING_EXIT_CODE, FROZEN_LOCKFILE_ERROR)
 
 		const result = await lane_install.install_dependencies(lane.directory)

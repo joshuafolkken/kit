@@ -10,8 +10,19 @@ import { core_wait, type BudgetWait } from './core-wait'
 const CORES = 4
 const MEMORY_MB = 1000
 
+// A claim past the window a lighter one may pass it in (`core_admission`'s 30 s), so `second` queues.
+const LONG_AGO = -60_000
+
+// `first` is running; every other entry is still waiting.
 function entry(key: string, weight: number, memory_mb: number): LedgerEntry {
-	return { key, reservation: { weight, memory_mb, claimed_at: key === 'first' ? 0 : 1 } }
+	const claimed_at = key === 'first' ? 0 : 1
+	const admitted_at = key === 'first' ? 0 : undefined
+
+	return { key, reservation: { weight, memory_mb, claimed_at, admitted_at } }
+}
+
+function waiter_ahead(weight: number): LedgerEntry {
+	return { key: 'ahead', reservation: { weight, memory_mb: 0, claimed_at: LONG_AGO } }
 }
 
 describe('core_wait.wait_reason — why a claim waits', () => {
@@ -23,16 +34,17 @@ describe('core_wait.wait_reason — why a claim waits', () => {
 		)
 	})
 
-	// joshuafolkken/kit#4238: the ledger's reservations fit, but busy load beyond them took the cores.
+	// joshuafolkken/kit#4238: the ledger's reservations fit, but busy load beyond them took the cores. The
+	// first waiter is not held by that load (#4313), so the claim waits behind another one.
 	it('names the CPU when the claim fits on what the ledger declares', () => {
-		const ledger = [entry('first', CORES - 1, 0), entry('second', 1, 0)]
+		const ledger = [entry('first', CORES - 2, 0), waiter_ahead(1), entry('second', 1, 0)]
 		const budget = { cores: CORES - 1, memory_mb: MEMORY_MB, busy_excess: 1 }
 
 		expect(core_wait.wait_reason('second', ledger, budget)).toBe('cpu')
 	})
 
 	it('names the cores when the claim would not fit on what the ledger declares either', () => {
-		const ledger = [entry('first', CORES, 0), entry('second', 1, 0)]
+		const ledger = [entry('first', CORES, 0), waiter_ahead(1), entry('second', 1, 0)]
 		const budget = { cores: CORES - 1, memory_mb: MEMORY_MB, busy_excess: 1 }
 
 		expect(core_wait.wait_reason('second', ledger, budget)).toBe('cores')
@@ -51,6 +63,24 @@ describe('core_wait.wait_reason — why a claim waits', () => {
 		const budget = { cores: CORES, memory_mb: 0, memory_pressured: true }
 
 		expect(core_wait.wait_reason('second', ledger, budget)).toBe('pressure')
+	})
+})
+
+// joshuafolkken/kit#4167: a unit claim the budget admits only below half its width still waits.
+describe('core_wait.hold_reason — whether an admitted claim still waits', () => {
+	const ledger: Array<LedgerEntry> = [
+		{ key: 'own', reservation: { weight: CORES, claimed_at: 0, is_unit: true } },
+	]
+	const budget = { cores: CORES, memory_mb: MEMORY_MB }
+	// Busy load beyond the ledger leaves the claim alone in it one core.
+	const busy = { cores: 1, memory_mb: MEMORY_MB, busy_excess: CORES - 1 }
+
+	it('holds a claim granted below half its width, on the CPU', () => {
+		expect(core_wait.hold_reason('own', ledger, busy, 1)).toBe('cpu')
+	})
+
+	it('admits a claim granted half its width or more', () => {
+		expect(core_wait.hold_reason('own', ledger, budget, CORES / 2)).toBeUndefined()
 	})
 })
 

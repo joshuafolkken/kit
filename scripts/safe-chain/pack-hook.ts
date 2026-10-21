@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { file_reader } from '#scripts/lib/read-file'
 import { file_content } from '#scripts/sync/file-content'
 import { z } from 'zod'
@@ -14,7 +15,6 @@ import { z } from 'zod'
 // `pnpmfileChecksum`, which fails a frozen install until the lockfile is refreshed.
 const PACK_HOOK_FILE = '.pnpmfile.mjs'
 const MANAGED_LINE = '// josh-managed-pnpmfile: @joshuafolkken/kit'
-const MANIFEST_FILE = 'package.json'
 // pnpm loads `.pnpmfile.mjs` in preference to `.pnpmfile.cjs`, and neither once a `pnpmfile` setting
 // names another file — so writing ours beside either would silently drop the project's hooks, or
 // report a hook pnpm never runs.
@@ -77,7 +77,7 @@ const MESSAGES: Readonly<Record<PackHookResult, string | undefined>> = {
 }
 
 function sync_pack_hook(project_root: string, package_directory: string): PackHookResult {
-	const manifest_text = file_reader.read_optional(path.join(project_root, MANIFEST_FILE))
+	const manifest_text = file_reader.read_optional(package_manifest.manifest_path(project_root))
 	const is_private = manifest_text === undefined || !is_published(manifest_text)
 	const result = is_private ? 'private' : apply(project_root, package_directory)
 	const message = MESSAGES[result]

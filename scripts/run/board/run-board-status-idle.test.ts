@@ -1,7 +1,8 @@
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
-import { run_board_status, type OpenRead } from './run-board-status'
+import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
+import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3893: a lane whose child had died stood at 🔄 running, its 🔧 past 80 minutes,
 // because nothing on the stream says a child died.
@@ -13,6 +14,15 @@ const ISSUE = 3409
 const LANE = '3409'
 const NONE: ReadonlySet<number> = new Set()
 const LAUNCH: RunEvent = { pos: 1, at: T0, kind: KIND.CHILD_LAUNCH, text: '#3409 launched' }
+const HELD = { lane: 'lane 3409' }
+const BARE: ItemStatus = { state: 'running' }
+
+// This run's lane as its record draws it: what the stream folds of its launch, with its lane.
+function own_lane(status: ItemStatus = BARE): BoardLanes {
+	return { ...run_board_lane_state.NO_LANES, own: new Map([[ISSUE, { ...status, ...HELD }]]) }
+}
+
+const LAUNCHED = own_lane(run_board_status.fold_events([LAUNCH]).get(ISSUE))
 
 // The listing read after the launch, still holding #3409 as in progress.
 const OPEN: OpenRead = {
@@ -24,7 +34,7 @@ const OPEN: OpenRead = {
 
 describe('run_board_status.statuses_of a lane no child is working in', () => {
 	it('draws the child stopped with its lane, its phase no longer timed', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], [LANE], NONE, [LANE])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, [LANE])
 
 		expect(statuses.get(ISSUE)).toStrictEqual({
 			state: 'stopped',
@@ -35,7 +45,7 @@ describe('run_board_status.statuses_of a lane no child is working in', () => {
 	})
 
 	it('draws a lane the stream never saw launched stopped too', () => {
-		const statuses = run_board_status.statuses_of([], [LANE], new Set([ISSUE]), [LANE])
+		const statuses = run_board_status.statuses_of([], own_lane(), [LANE])
 
 		expect(statuses.get(ISSUE)).toStrictEqual({
 			state: 'stopped',
@@ -45,7 +55,7 @@ describe('run_board_status.statuses_of a lane no child is working in', () => {
 	})
 
 	it('keeps a lane a child is working in running', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], [LANE], NONE, ['3415'])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, ['3415'])
 
 		expect(statuses.get(ISSUE)?.state).toBe('running')
 	})
@@ -53,13 +63,13 @@ describe('run_board_status.statuses_of a lane no child is working in', () => {
 
 describe('run_board_status.settle_closed a stopped lane', () => {
 	it('leaves it stopped while its issue is open and in progress', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], [LANE], NONE, [LANE])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, [LANE])
 
 		expect(run_board_status.settle_closed(statuses, OPEN).get(ISSUE)?.state).toBe('stopped')
 	})
 
 	it('draws it merged once GitHub says its issue merged after the launch', () => {
-		const statuses = run_board_status.statuses_of([LAUNCH], [LANE], NONE, [LANE])
+		const statuses = run_board_status.statuses_of([LAUNCH], LAUNCHED, [LANE])
 		const merged = {
 			title: '',
 			labels: [],

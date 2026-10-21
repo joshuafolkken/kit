@@ -1,0 +1,9 @@
+{
+	"reason": "#4345: delegation.md and the backlog reference now state delegate-before-the-first-read beside the investigation threshold, resolving the contradiction with the new run:prep entry notice",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 11,
+		"ai_cost.on_demand_bytes": 182,
+		"prose.long_paragraphs": 2
+	}
+}

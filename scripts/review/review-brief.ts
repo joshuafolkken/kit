@@ -1,5 +1,6 @@
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { removed_tests } from './removed-tests'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
 
@@ -414,6 +415,8 @@ interface BriefInput {
 	// The change written as parts under the Bash output cap. Absent when the
 	// write failed, and the target line alone then names the change.
 	diff?: { parts: DiffParts; cap: number } | undefined
+	// The tests the change removes, listed for the reviewer to account for. Absent or empty, no section.
+	removed_tests?: ReadonlyArray<string> | undefined
 }
 
 const SECOND_ROUND = 2
@@ -465,6 +468,7 @@ function compose(input: BriefInput): string {
 		'',
 		target,
 		...diff_block(input, target),
+		...removed_tests.brief_block(input.removed_tests ?? []),
 	].join('\n')
 }
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
@@ -40,7 +38,6 @@ import { run_stop_notify } from './run-stop-notify'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const RELEASE_FLAG = '--release'
 // What removes a record this run did not write. **Deliberate friction**: every release names the run
 // it belongs to, and the one act that cannot — clearing a record somebody else left behind — is
@@ -472,10 +469,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_hold_cli = {
 	BUSY_VERDICT,
 	HELD_VERDICT,
@@ -487,7 +480,5 @@ const run_hold_cli = {
 	parse_request,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { run_hold_cli }

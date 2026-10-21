@@ -437,7 +437,8 @@ describe('investigation_reads.should_block — and its second firing', () => {
 
 	it('names the count, the command and the return shape in the reason', () => {
 		expect(investigation_reads.REASON).toContain(String(THRESHOLD))
-		expect(investigation_reads.REASON).toContain('pnpm josh delegate investigation')
+		expect(investigation_reads.REASON).toContain('Dispatch the `investigator` agent')
+		expect(investigation_reads.REASON).not.toContain('pnpm josh delegate investigation')
 		expect(investigation_reads.REASON).toContain('never the file text')
 	})
 })

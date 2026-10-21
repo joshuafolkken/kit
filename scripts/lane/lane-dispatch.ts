@@ -335,19 +335,26 @@ async function mark_in_progress(issue: string): Promise<LabelWrite> {
 //
 // The lane ledger takes the same instant: `lane:stats` times a lane's implementation from it, and the
 // stream is capped, so a period's earlier dispatches would be gone from there. The lane's state record
-// takes it as the launch, stamped with the run that made it.
+// takes the stream's launch instant as its own, so `run:board`, which reads the lane's events from
+// the record's launch on, keeps the launch event that opens them (joshuafolkken/kit#4269).
 async function record_started(issue: string, start: DispatchStart): Promise<void> {
+	const now = new Date()
+
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 		`${issue_cite.plain(issue)} dispatched`,
+		now,
 	)
 	await lane_ledger.record_dispatch(Number(issue))
-	await lane_state.record_change({
-		issue,
-		state: 'running',
-		command: start === RESTART_START ? 'lane:restart' : 'lane:dispatch',
-		is_launch: true,
-	})
+	await lane_state.record_change(
+		{
+			issue,
+			state: 'running',
+			command: start === RESTART_START ? 'lane:restart' : 'lane:dispatch',
+			is_launch: true,
+		},
+		{ now },
+	)
 }
 
 // How a dispatch begins. A `resumable` one claims the marker itself and resumes an `outage` session; a

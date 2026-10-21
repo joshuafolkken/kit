@@ -4,8 +4,8 @@ import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { write_version } from '#scripts/version/bump-version'
-import { version_targets } from '#scripts/version/version-targets'
 import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
@@ -21,7 +21,6 @@ import { release_worktree } from './release-worktree'
 // weakening it for a release commit would open exactly the "merge without green CI" path the issue's
 // closing note prohibits.
 
-const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const RELEASE_LOCK_PREFIX = 'josh-release-lock-'

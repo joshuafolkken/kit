@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
@@ -27,7 +25,6 @@ import { lockfile_sync } from './lockfile-sync'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const COMMAND_NAME = 'main:sync'
 const INSTALL_FAILURE =
 	'node_modules is behind pnpm-lock.yaml and `pnpm install --frozen-lockfile` failed; run `pnpm josh ms` again, or the install here by hand.'
@@ -144,12 +141,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const main_sync = { run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { main_sync }

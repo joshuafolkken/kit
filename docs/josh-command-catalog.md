@@ -129,7 +129,9 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh clone:scan` | — | automation | files | Count code duplication across files and first-party repositories, printing each clone as file:line pairs |
 | `josh cost` | `(--cut \| --over <tokens-per-request>) [--path <dir>]` | automation | none | Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over) |
 | `josh cost:audit` · `josh ca` · **kit only** | `[--period <days>]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
+| `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
 | `josh defect:rate` | `[--days <n>]` | automation | network | Print the defect rate of merged work: defects filed per enhancement completed |
+| `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
 | `josh disposition` | `<path...>` | automation | none | Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime) |
 | `josh doc:read` | `<file>` | automation | none | Read a whole document safely: print it, or point at the Read tool when over the Bash cap |
@@ -176,6 +178,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh lane:withdraw` · `josh lwd` | `<issue> --reason <text>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure |
 | `josh oracle:list` | — | automation | none | Print the decision oracles — commands that answer a rule question mechanically |
 | `josh pkg:scout` | `<keywords> [--size <n>]` | automation | network | Rank package candidates by measured metrics so the Package-First tier decision is read, not judged |
+| `josh plan:consumers` | `<identifier...>` | automation | none | List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section |
 | `josh read:files` | `<path> [<path> ...]` | automation | none | Read several files in one call so edit targets fold into one turn |
 | `josh read:set` | `[<entry>] [--json]` | automation | none | Print what an entry point reads before it starts, and what that read costs |
 | `josh repo:party` | `[<owner/repo>]` | automation | none | Say whether a repository is first-party or third-party by owner equality (computed, not judged) |

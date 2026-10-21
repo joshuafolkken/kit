@@ -65,6 +65,15 @@
 - `ac-5e6f7a8b` <条件> — 見送り: #<切り出した Issue> <理由>
 ```
 
+### PR 本文の消えたテストの処置
+
+`## 消えたテストの処置` 節の行の形（`pnpm josh review:brief` が `Removed tests` として一覧化し、`pnpm josh ship` と `pnpm josh followup` が照合する — `scripts/review/removed-tests.ts`）:
+
+```md
+- `<describe> > <テスト名>` — 置き換え: <いまその振る舞いを守るテスト名>
+- `<describe> > <テスト名>` — 廃止: #<振る舞いの廃止を決めた Issue> <理由>
+```
+
 **`run:carry` の実行証跡は `JOSH_TEMP_ROOT` を新しい一時ディレクトリに向けて取る（必須）。** 状態レコードは本物の run と共有なので、`JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:carry --begin …` のように各コマンドの頭に付ける（`docs/environment-variables.md` → "Runs"）。`run:merge` は main の同期・lane の close・GitHub への書き込みを行うため、これでは切り離せない。
 
 ### 区切りの報告（完了報告と区別する・必須）

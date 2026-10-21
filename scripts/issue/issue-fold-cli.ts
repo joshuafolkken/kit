@@ -1,7 +1,7 @@
-import { git_command } from '#scripts/git/git-command'
 import { path_decision } from '#scripts/josh/path-decision'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
+import { split_measure } from '#scripts/split/split-measure'
 import { issue_fold, type FoldVerdict } from './issue-fold'
 
 // `josh issue:fold "<title>" "<title>" …` — before a run files a second finding, answer whether the
@@ -55,7 +55,7 @@ function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined 
 // rather than folding on no evidence. `issue:file` asks it too.
 async function size_verdict(): Promise<SplitVerdict | undefined> {
 	try {
-		const measurement = split_assess.assess(await git_command.diff_main_numstat())
+		const measurement = await split_measure.read_branch()
 
 		return measurement.files === 0 ? undefined : measurement.verdict
 	} catch {

@@ -68,7 +68,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	audit: {
-		script: 'scripts/security/security-audit.ts',
+		script: 'scripts/security/security-audit-main.ts',
 		description: 'Run security audit',
 		category: 'Maintenance',
 		reference: ['', 'developer', ['processes']],
@@ -86,7 +86,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'audit:provision': {
-		script: 'scripts/security/security-audit-provision.ts',
+		script: 'scripts/security/security-audit-provision-main.ts',
 		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',
 		category: 'Maintenance',
 		reference: ['', 'automation', ['files', 'network']],
@@ -136,7 +136,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: 'full update (update + audit + pnpm)' }] },
 	},
 	'latest:scope': {
-		script: 'scripts/version/latest-scope-cli.ts',
+		script: 'scripts/version/latest-scope-main.ts',
 		description:
 			'Say whether this run has to update dependencies, from when josh latest last finished (--record notes a run)',
 		category: 'Maintenance',
@@ -169,7 +169,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: 'stash, update, pop on required' }] },
 	},
 	'latest:guard': {
-		script: 'scripts/version/latest-lane-guard.ts',
+		script: 'scripts/version/latest-lane-guard-main.ts',
 		description: 'Refuse josh latest inside a lane (the update stamp is keyed to the project root)',
 		category: 'Maintenance',
 		reference: ['', 'automation', ['files']],

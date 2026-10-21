@@ -1,5 +1,5 @@
 import type { ClosedIssue } from './run-board-closed'
-import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
+import type { EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
 import type { GatherRead } from './run-board-gather'
 import { run_board_github } from './run-board-github'
@@ -9,7 +9,6 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import { run_board_notes, type Titles } from './run-board-notes'
-import { run_board_paused } from './run-board-paused'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
@@ -94,18 +93,17 @@ function planned_statuses(
 	}
 
 	return run_board_released.without_released(
-		run_board_status.settle_closed(statuses_for(state, plan, local), read),
+		run_board_status.settle_closed(statuses_for(state, local), read),
 		read,
 	)
 }
 
-// The earlier run's lanes still holding a place, a paused one drawn paused as this run's own is.
-function earlier_here(state: BoardState, local: LocalRead): EarlierLanes {
-	const statuses = local.earlier_statuses ?? new Map<number, ItemStatus>()
-
+// The earlier run's lanes still holding a place, and the open lanes with no record.
+function earlier_here(local: LocalRead): EarlierLanes {
 	return {
 		lanes: local.earlier_occupied ?? [],
-		statuses: run_board_paused.paused_over(statuses, state.paused),
+		statuses: local.lane_states.earlier,
+		unknown: local.lane_states.unknown,
 	}
 }
 
@@ -125,7 +123,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		with_closed(plan, state.closed),
 		statuses,
 		reason_of,
-		earlier_here(state, local),
+		earlier_here(local),
 	)
 }
 
@@ -135,13 +133,9 @@ function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
 
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
-	const statuses = run_board_status.statuses_of(local.events, local.lanes, new Set(), stopped)
-	const own = run_board_earlier.own_statuses(statuses, local.earlier_lanes)
+	const statuses = run_board_status.statuses_of(local.events, local.lane_states, stopped)
 
-	return run_board_layout.local_layout_of(
-		run_board_paused.paused_over(own, state.paused),
-		earlier_here(state, local),
-	)
+	return run_board_layout.local_layout_of(statuses, earlier_here(local))
 }
 
 // What one redraw draws with.

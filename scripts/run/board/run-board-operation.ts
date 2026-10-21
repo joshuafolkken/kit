@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { json_value } from '#scripts/lib/json-value'
+import { transcript_record, type TranscriptRecord } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 
 // The newest thing a session did, read off the end of its log — a lane child's dispatch log, the
@@ -37,28 +37,11 @@ const SPACES = /\s+/gu
 // The printable ASCII a target begins with: what follows may be the session's own language.
 const ASCII_HEAD = /^[ -~]*/u
 
-// A call names its tool; every other block of a line — its text, its thinking — is not one.
-const CALL_SCHEMA = z.looseObject({
-	type: z.literal(TOOL_USE),
-	name: z.string(),
-	input: z.unknown(),
-})
-
-function is_dated(text: string): boolean {
-	return !Number.isNaN(Date.parse(text))
-}
-
-const MESSAGE_SCHEMA = z.looseObject({ content: z.array(z.unknown()) })
-const LINE_SCHEMA = z.looseObject({
-	timestamp: z.string().refine(is_dated),
-	message: MESSAGE_SCHEMA,
-})
 // An input that is no object reads as one pointed at nothing.
 const INPUT_SCHEMA = z
 	.looseObject({ command: z.string().optional(), file_path: z.string().optional() })
 	.catch({})
 
-type Call = z.infer<typeof CALL_SCHEMA>
 type Input = z.infer<typeof INPUT_SCHEMA>
 
 function ascii_head(text: string): string {
@@ -103,26 +86,25 @@ function target_of(input: Input, root: string | undefined): string | undefined {
 	return input.file_path === undefined ? undefined : shown(path_target(input.file_path, root))
 }
 
-function is_call(block: unknown): block is Call {
-	return CALL_SCHEMA.safeParse(block).success
+// The last call a line holds, `undefined` for an undated line or one holding none. A call names its
+// tool; every other block of a line — its text, its thinking — is not one.
+function record_operation(
+	record: TranscriptRecord,
+	root: string | undefined,
+): Operation | undefined {
+	const call = transcript_record.tool_calls_of(record).at(-1)
+	const at_ms = Date.parse(record.timestamp ?? '')
+
+	if (call === undefined || Number.isNaN(at_ms)) return undefined
+
+	return { kind: call.name, target: target_of(INPUT_SCHEMA.parse(call.input), root), at_ms }
 }
 
-function last_call(content: ReadonlyArray<unknown>): Call | undefined {
-	return content.findLast((block) => is_call(block))
-}
-
-// The last call a line holds, `undefined` for a line that is cut, is not JSON, or holds none.
+// The same, `undefined` too for a line that is cut or is not JSON.
 function line_operation(line: string, root: string | undefined): Operation | undefined {
-	const parsed = json_value.parse_with(line, LINE_SCHEMA)
-	const call = last_call(parsed?.message.content ?? [])
+	const record = transcript_record.parse(line)
 
-	if (parsed === undefined || call === undefined) return undefined
-
-	return {
-		kind: call.name,
-		target: target_of(INPUT_SCHEMA.parse(call.input), root),
-		at_ms: Date.parse(parsed.timestamp),
-	}
+	return record === undefined ? undefined : record_operation(record, root)
 }
 
 // The newest operation in `tail` — the end of a log, whose first line is usually cut mid-way and so

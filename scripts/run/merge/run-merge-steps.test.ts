@@ -258,7 +258,6 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 		])
 	})
 })
-
 // A failed `main:sync` as the subprocess returns it: git's refusal on stderr, the wrapper's guard
 // statistics on stdout (joshuafolkken/kit#3323). The driver tries it three times before giving up.
 const SYNC_FAILURE = {

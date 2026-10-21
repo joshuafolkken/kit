@@ -171,8 +171,13 @@ async function sync_main(): Promise<void> {
 	if (!is_synced) throw new Error(`main:sync failed: ${error_output}`)
 }
 
+// `lane:close` says on stderr what it terminated — the child and whatever else ran from the checkout
+// (joshuafolkken/kit#4304) — so that stderr is passed on rather than dropped with the capture.
 async function close_lane(child: string): Promise<void> {
-	await josh(['lane:close', child])
+	const result = await josh(['lane:close', child])
+	const said = result.err?.trimEnd() ?? ''
+
+	if (said !== '') console.error(said)
 }
 
 async function stash_work(child: string, directory: string): Promise<void> {

@@ -3,9 +3,9 @@ import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { process_directories } from '#scripts/lane/process-directories'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
-import { run_board_paused } from './run-board-paused'
 import type { ProcessReading, UsageMark } from './run-board-usage'
 import { run_board_usage_listing, type ProcessListing } from './run-board-usage-listing'
 import {
@@ -34,14 +34,10 @@ import { run_board_usage_top, type TopReading, type TopReadings } from './run-bo
 // where it can, else `top`'s last reading (`run-board-usage-top.ts`, at most once every 30 s), else
 // `ps`'s resident set; compressed memory only `top` has, so it is 0 until `top` has answered.
 
-const LSOF_ARGUMENTS = ['-a', '-d', 'cwd', '-Fn', '-p']
+const LSOF_ARGUMENTS = [...process_directories.CWD_ARGUMENTS, '-p']
 const PID_SEPARATOR = ','
-// `lsof -F`'s field lines: `p<pid>` opens a process, `n<path>` names its directory.
-const LSOF_PROCESS = /^(?=p)/mu
-const LSOF_NAME = 'n'
 const { load_builtin, rusage_reader } = run_board_usage_rusage
 const { list_top, top_reader } = run_board_usage_top
-const { paused_lanes, paused_since } = run_board_paused
 const { listings_of } = run_board_usage_listing
 
 interface UsagePorts {
@@ -121,19 +117,6 @@ function readings_of(
 	return { processes, parents, names, folded }
 }
 
-function lsof_block(block: string): [number, string] | undefined {
-	const [process_line = '', ...rest] = block.trim().split('\n')
-	const name = rest.find((line) => line.startsWith(LSOF_NAME))
-
-	return name === undefined ? undefined : [Number(process_line.slice(1)), name.slice(1)]
-}
-
-function parse_lsof(output: string): Map<number, string> {
-	const blocks = output.split(LSOF_PROCESS).map((block) => lsof_block(block))
-
-	return new Map(blocks.filter((block) => block !== undefined))
-}
-
 // The lane of `root` a directory sits under — itself or a directory above it, the outermost first.
 function lane_of(directory: string, root: string): string | undefined {
 	const parts = directory.split(path.sep)
@@ -164,14 +147,6 @@ async function lanes_for(
 	return new Map([...kept, ...found])
 }
 
-function paused_of(
-	before: UsageMark | undefined,
-	paused: ReadonlySet<string>,
-	at_ms: number,
-): Map<string, number> {
-	return paused_since(before?.paused, paused, at_ms)
-}
-
 // The snapshot's listings and `top`'s reading, read together; a snapshot `ps` did not answer fails the
 // sample.
 async function listed_of(
@@ -190,9 +165,8 @@ async function sample(before: UsageMark | undefined, ports: UsagePorts): Promise
 	const earlier = before?.processes ?? new Map()
 	const readings = readings_of(listed, { rusage: ports.rusage, top, earlier })
 	const lanes = await lanes_for(before?.lanes ?? new Map(), readings.processes, ports)
-	const paused = paused_of(before, paused_lanes(listed, lanes), at_ms)
 
-	return { at_ms, ...readings, lanes, paused, cores: cpus().length, total_bytes: totalmem() }
+	return { at_ms, ...readings, lanes, cores: cpus().length, total_bytes: totalmem() }
 }
 
 async function darwin_directories(
@@ -206,7 +180,7 @@ async function darwin_directories(
 
 	if (result.timedOut) throw new Error('lsof timed out')
 
-	return parse_lsof(result.stdout)
+	return process_directories.parse(result.stdout)
 }
 
 const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, UsagePorts['directories']>>> =
@@ -270,7 +244,7 @@ function usage_reader(platform: NodeJS.Platform = process.platform): UsageReader
 	return read
 }
 
-const run_board_usage_read = { lane_of, parse_lsof, sample, usage_reader }
+const run_board_usage_read = { lane_of, sample, usage_reader }
 
 export { run_board_usage_read }
 export type { UsagePorts, UsageReader }

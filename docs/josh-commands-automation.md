@@ -981,6 +981,7 @@ The budget is [`josh gate`](josh-commands.md#josh-gate)'s; the pre-push install 
 - `<weight> -- <command...>`: the cores to reserve, then the command.
 - Claims a place before the command starts and waits while the budget is full, as a gate check does; the place is released when the command exits, and its exit code is forwarded.
 - A missing separator, a non-integer weight, or no command is a usage error (exit `1`).
+- A dispatched lane child that launches `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`) is refused by `pnpm josh rule:guard` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh reserved-run` in detail".
 

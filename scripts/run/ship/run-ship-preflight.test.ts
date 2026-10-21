@@ -18,6 +18,9 @@ const lock_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const acceptance_mock = vi.hoisted(() =>
 	vi.fn<(issue: string, body: string | undefined) => Promise<string | undefined>>(),
 )
+const removed_mock = vi.hoisted(() =>
+	vi.fn<(body: string | undefined) => Promise<string | undefined>>(),
+)
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -36,6 +39,9 @@ vi.mock('#scripts/git/git-branch', () => ({
 }))
 vi.mock('#scripts/review/acceptance-map-check', () => ({
 	acceptance_map_check: { body_refusal: acceptance_mock },
+}))
+vi.mock('#scripts/review/removed-tests-check', () => ({
+	removed_tests_check: { body_refusal: removed_mock },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
@@ -57,6 +63,7 @@ const DOCS_PATHS = ['docs/josh-commands.md']
 const CLASSIFICATION = 'Choose one release classification before opening the PR'
 const CLASSIFICATION_UNMET = { kind: 'classification', problem: CLASSIFICATION }
 const UNMAPPED = '`ac-12345678` has no row'
+const REMOVED_UNDISPOSED = '`board > shades by lane` has no disposition'
 const LOCK_DRIFT = 'pnpm-lock.yaml does not match its inputs'
 const ISSUE = '3154'
 const EVIDENCE_BODY =
@@ -83,7 +90,23 @@ beforeEach(() => {
 	classification_mock.mockReset().mockResolvedValue()
 	lock_mock.mockReset().mockResolvedValue([])
 	acceptance_mock.mockReset().mockResolvedValue(undefined)
+	removed_mock.mockReset().mockResolvedValue(undefined)
 	issue_body_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4287: a removed test with no disposition stops the ship before the review, named
+// by its own kind.
+describe('run_ship_preflight.stage — the removed tests', () => {
+	it('stops on an undisposed removed test, asking the body file', async () => {
+		removed_mock.mockResolvedValue(REMOVED_UNDISPOSED)
+		const body = body_file(EVIDENCE_BODY)
+
+		const result = await run_ship_preflight.stage({ title: TITLE, body_path: body })
+
+		expect(result).toMatchObject({ code: FAILED, preconditions: ['removed-tests'] })
+		expect(result.out).toContain(`  - ${REMOVED_UNDISPOSED}`)
+		expect(removed_mock).toHaveBeenCalledWith(EVIDENCE_BODY)
+	})
 })
 
 // joshuafolkken/kit#3954: the body this ship delivers maps every acceptance criterion before the review

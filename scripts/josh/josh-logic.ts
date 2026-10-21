@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
@@ -24,7 +25,6 @@ const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const TSX_PACKAGE = 'tsx'
-const PACKAGE_JSON = 'package.json'
 // Not an exit code the shell ever sees: `josh.ts` reads it as "no such command" and answers with
 // the listing on stderr. It is named because `run_command` now reports through a promise, where a
 // bare `-1` is one step further from the check that reads it.
@@ -71,9 +71,7 @@ function resolve_tsx_runner(): TsxRunner {
 }
 
 function read_package_version(): string {
-	const raw = readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')
-
-	return package_version_schema.parse(JSON.parse(raw)).version
+	return package_manifest.read_manifest(PACKAGE_DIR, package_version_schema).version
 }
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`

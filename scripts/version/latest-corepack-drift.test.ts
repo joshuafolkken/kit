@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
 	fake_sync_result,
-	PACKAGE_JSON_PATH,
 	QUARANTINED_PUBLISH,
 	WORKSPACE_AGE_1440,
 	WORKSPACE_PATH,
@@ -31,7 +31,7 @@ const TIMES_JSON_ALL_QUARANTINED = `{"11.22.0":"${QUARANTINED_PUBLISH}"}`
 // devEngines version is the bare version an older kit release wrote.
 const PACKAGE_JSON_DRIFTED = build_package_manager_manifest(`pnpm@${PINNED_PIN}`, PINNED_VERSION)
 const PACKAGE_JSON_REPAIRED = build_package_manager_manifest(`pnpm@${PINNED_PIN}`, PINNED_PIN)
-const REPAIR_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_REPAIRED]
+const REPAIR_CALL = [PACKAGE_JSON, PACKAGE_JSON_REPAIRED]
 
 // main reads package.json twice (once up front, once inside the alignment) with the
 // `pnpm-workspace.yaml` quarantine window in between; no bump happens in any case below, so the

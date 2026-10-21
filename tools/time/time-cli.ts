@@ -97,7 +97,7 @@ async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Pr
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
 // `process.exit()` tears the process down before a pipe has drained — the same idiom, for the same
-// reason, as `scripts/cost-runtime/cost-cli.ts`.
+// reason, as `scripts/cost-runtime/cost-main.ts`.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }

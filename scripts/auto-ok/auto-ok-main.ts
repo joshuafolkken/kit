@@ -9,7 +9,7 @@ import { auto_ok_cli } from './auto-ok-cli'
 // `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
 // macOS a write to a pipe is asynchronous — `process.exit()` can tear the process down before it has
 // drained, and this command's whole contract is `answer=$(pnpm josh auto-ok:next)`. The same shape
-// is already in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
+// is already in `scripts/cost-runtime/cost-main.ts`, which met the truncation first.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const ARGV_OFFSET = 2
 

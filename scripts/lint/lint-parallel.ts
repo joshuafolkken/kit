@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import {
@@ -15,6 +13,7 @@ import {
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
+import { eslint_daemon } from './eslint-daemon'
 import { lint_gate_scope } from './lint-gate-scope'
 
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
@@ -37,13 +36,37 @@ const PRETTIER_ARGS = ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CA
 interface EslintRun {
 	args: ReadonlyArray<string>
 	recheck: CrossFileRecheckOptions
+	warm_daemon: boolean
+}
+
+// Whether eslint may go through the checkout's warm daemon (`eslint-daemon.ts`). `josh lint:related`
+// asks for it; the gate's own lint does not, so its whole-tree run stays one cold process of its own.
+interface LintRunOptions {
+	warm_daemon: boolean
+}
+
+const COLD_RUN: LintRunOptions = { warm_daemon: false }
+
+// The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
+async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessResult> {
+	const started_at = performance.now()
+	const outcome = eslint.warm_daemon
+		? await eslint_daemon.run(eslint.args, { project_root: process.cwd() })
+		: undefined
+	if (outcome === undefined) return await buffered_process.run_buffered_process(eslint.args)
+
+	return {
+		output: outcome.output,
+		exit_code: outcome.exit_code,
+		elapsed_ms: performance.now() - started_at,
+	}
 }
 
 // The finished report is re-read before it is returned, inside the lane's cache sharing, because
 // the re-reading uses that same cache file.
 async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
 	return await lane_cache_run.run(eslint.recheck.cache_file, async () => {
-		const result = await buffered_process.run_buffered_process(eslint.args)
+		const result = await run_eslint_process(eslint)
 
 		return await cross_file_recheck.verify(result, eslint.recheck)
 	})
@@ -113,11 +136,12 @@ async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,
 	eslint_args: ReadonlyArray<string>,
 	recheck: CrossFileRecheckOptions,
+	options: LintRunOptions = COLD_RUN,
 ): Promise<number> {
 	const directory = process.cwd()
 	const [prettier, eslint] = await Promise.all([
 		run_prettier(directory, prettier_args),
-		run_checked_eslint(directory, { args: eslint_args, recheck }),
+		run_checked_eslint(directory, { args: eslint_args, recheck, ...options }),
 	])
 
 	write_output(with_ran_notice('prettier', prettier, eslint))
@@ -153,15 +177,6 @@ async function run_lint_command(command_arguments: ReadonlyArray<string>): Promi
 	}
 
 	return await run_lint_parallel_checks()
-}
-
-// `process.exitCode` rather than `process.exit()`: both reports are buffered and written here in
-// one go, and `process.exit()` truncates a piped stdout at its buffer size — which is exactly how
-// this command is read when `josh gate` runs it as one of four concurrent checks. Setting the code
-// lets the writes drain and the process end on its own, which it can, since both children have
-// already exited by here.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run_lint_command(process.argv.slice(changed_file_scope.ARGV_START))
 }
 
 const lint_parallel = {

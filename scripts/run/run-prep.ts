@@ -1,3 +1,4 @@
+import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
 
 // `josh run:prep <N>` — the reads a `fullrun` makes before its first edit, assembled into one report.
@@ -22,6 +23,9 @@ const CONTENT_HEADER = '=== issue ==='
 const STATE_HEADER = '=== state ==='
 const LATEST_HEADER = '=== dependency update ==='
 const LOCATIONS_HEADER = '=== code locations ==='
+const INVESTIGATION_HEADER = '=== investigation ==='
+// The step the investigation guard would otherwise name only once it refuses, mid-reading (#4345).
+const INVESTIGATION_BODY = `Delegate before the first read — the guard refuses at ${delegation_policy.INVESTIGATION_LIMIT}. ${delegation_policy.INVESTIGATION_STEP} Brief it with the code locations above; read in the main line only the files this run will edit.`
 const SHIP_HEADER = '=== ship preconditions ==='
 const SHIP_MET = 'met — nothing `josh ship` refuses on as the tree stands'
 const SHIP_UNMET =
@@ -89,12 +93,14 @@ function format_report(parts: PrepParts): string {
 		section(STATE_HEADER, state_body(parts)),
 		section(LATEST_HEADER, `${parts.latest_scope}${LATEST_JOINER}${parts.latest_reason}`),
 		section(LOCATIONS_HEADER, parts.locations),
+		section(INVESTIGATION_HEADER, INVESTIGATION_BODY),
 		section(SHIP_HEADER, ship_body(parts.ship_problems)),
 	].join(SECTION_SEPARATOR)
 }
 
 const run_prep = {
 	CONTENT_HEADER,
+	INVESTIGATION_HEADER,
 	LATEST_HEADER,
 	LOCATIONS_HEADER,
 	SHIP_HEADER,

@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { package_manifest } from '#scripts/lib/package-manifest'
+import { z } from 'zod'
 
 // `josh sync` / `josh-app sync` / `josh-game sync` all copy a distribution package's files into a
 // consumer project. Run inside the package's OWN repository the direction reverses: the source of
@@ -12,20 +13,12 @@ import path from 'node:path'
 // The check lives here rather than in each package's sync so the three distributors share one
 // implementation: a second copy would drift, and a distributor that spelled the signal differently
 // would keep exactly the hole this closes.
-const MANIFEST_NAME = 'package.json'
+const named_manifest_schema = z.object({ name: z.string() })
 
+// A missing, unreadable or malformed manifest says nothing about self-sync, and refusing to sync on
+// it would break consumers whose manifest this package is about to create.
 function read_package_name(directory: string): string | undefined {
-	try {
-		const manifest: unknown = JSON.parse(readFileSync(path.join(directory, MANIFEST_NAME), 'utf8'))
-		if (typeof manifest !== 'object' || manifest === null) return undefined
-		const { name } = manifest as { name?: unknown }
-
-		return typeof name === 'string' ? name : undefined
-	} catch {
-		// A missing, unreadable or malformed manifest says nothing about self-sync, and refusing to
-		// sync on it would break consumers whose manifest this package is about to create.
-		return undefined
-	}
+	return package_manifest.read_manifest_if_valid(directory, named_manifest_schema)?.name
 }
 
 function is_same_directory(first: string, second: string): boolean {

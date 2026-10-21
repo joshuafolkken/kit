@@ -259,6 +259,21 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 <!-- /usage -->
 
+A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
+
+### `josh plan:consumers`
+
+<!-- usage: plan:consumers -->
+
+List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section.
+
+```bash
+pnpm josh plan:consumers lane:pause
+pnpm josh plan:consumers lane:pause run:paused   # one block per identifier, one draft
+```
+
+<!-- /usage -->
+
 ### `josh issue:already-done`
 
 <!-- usage: issue:already-done -->
@@ -311,7 +326,7 @@ pnpm josh issue:lint .josh/tmp/issue-body.md
 
 The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## 受け入れ条件`, plus the bug classification (source: `prompts/collaboration-workflow/issue-template.md`). Run this before filing.
 
-Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1. [`josh issue:file`](#josh-issuefile) runs it as a filing step.
+Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1, as does a `- 種別: 不具合` body without a well-formed `- 原因:` origin line ([`josh defect:origin`](#josh-defectorigin) lists candidates). [`josh issue:file`](#josh-issuefile) runs it as a filing step.
 
 A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
 
@@ -337,6 +352,34 @@ pnpm josh defect:rate --days 30
 Defects filed in the window over enhancements completed in it; `n/a` with none completed. An unreadable search exits 1. `backlog:next` uses the rate to prioritize defects.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh defect:rate` in detail".
+
+### `josh defect:origin`
+
+<!-- usage: defect:origin -->
+
+List the merged pull requests that last changed what a defect issue names, as candidates for its origin line.
+
+```bash
+pnpm josh defect:origin 4241   # newest first, merged before the issue was filed
+```
+
+<!-- /usage -->
+
+Lists up to five merged pull requests that changed the files and names an issue cites, newest first and merged before the issue was filed. Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, or write `- 原因: 不明（<理由>）` (source: `prompts/collaboration-workflow/issue-template.md`).
+
+### `josh defect:report`
+
+<!-- usage: defect:report -->
+
+Count defects by the origin pull request their issue declares, by change kind and by area.
+
+```bash
+pnpm josh defect:report   # every issue labelled bug, open or closed
+```
+
+<!-- /usage -->
+
+Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. Unknown and undeclared origins are counted apart.
 
 ### `josh issue:backlinks`
 
@@ -941,7 +984,8 @@ Verdict to stdout, reason to stderr.
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus supporting `file:line` citations, never the file text; a throwaway probe script is written, run and deleted inside the unit.
+**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** It is where the guard refuses, not a budget: a run whose subject needs reading delegates before the first read (`run:prep` → `=== investigation ===`).
+What comes back is the conclusion plus supporting `file:line` citations, never the file text; a throwaway probe script is written, run and deleted inside the unit.
 
 **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count.
 

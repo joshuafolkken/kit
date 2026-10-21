@@ -71,7 +71,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'epic:next': {
-		script: 'scripts/epic/epic-next.ts',
+		script: 'scripts/epic/epic-next-main.ts',
 		description: "List an epic's runnable children, bundled per repository",
 		category: 'AI tools',
 		reference: ['<epic>... [--repo <owner/repo>] [--lanes]', 'automation', ['network']],
@@ -102,7 +102,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'epic:bundle': {
-		script: 'scripts/epic/epic-bundle-cli.ts',
+		script: 'scripts/epic/epic-bundle-main.ts',
 		description: 'Say whether a newly filed issue belongs with ones already in the backlog',
 		category: 'AI tools',
 		reference: ['<issue> [--apply]', 'automation', ['network']],

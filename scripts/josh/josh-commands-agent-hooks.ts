@@ -21,7 +21,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'batch:guard': {
-		script: 'scripts/hooks/batch-guard.ts',
+		script: 'scripts/hooks/batch-guard-main.ts',
 		description:
 			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
 		category: 'Development',
@@ -62,7 +62,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		// It loads `.env` through the shared `hook-decision.ts` loader.
 	},
 	'session:lang': {
-		script: 'scripts/josh/session-language-cli.ts',
+		script: 'scripts/josh/session-language-main.ts',
 		description:
 			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)',
 		category: 'Development',

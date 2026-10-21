@@ -92,6 +92,20 @@ async function drain_events(): Promise<ReadonlyArray<{ kind: string }>> {
 	return await events_of_kind(DRAIN)
 }
 
+// joshuafolkken/kit#4269: a launch event carries the instant the lane's state record takes too.
+describe('run_event_stream_emit.emit — the caller’s instant', () => {
+	it('stamps the event with the instant it is given', async () => {
+		const at = new Date('2026-10-08T09:10:00.000Z')
+
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged', at)
+
+		expect(await events_of_kind(run_event_stream.EVENT_KIND.MERGE)).toStrictEqual([
+			expect.objectContaining({ at: at.toISOString() }),
+		])
+	})
+})
+
 describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 	it('appends the first time, then skips while it is still the newest event', async () => {
 		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])

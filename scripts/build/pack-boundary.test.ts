@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { HOOK_BUNDLES } from './build-hooks'
+import { HOOK_BUNDLES, STAGING_PREFIX } from './build-hooks'
+import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
 // The pack boundary (joshuafolkken/kit#1997): the published npm package and the `kit` plugin must
@@ -26,6 +27,9 @@ const EXCLUDED_FILES = new Set(['docs/maintainers/eval.md'])
 // A per-file exclusion under `scripts/` — what the directory boundary replaces. The generic
 // test-support patterns (`!**/*.test.ts` and the rest) are not under it.
 const SCRIPTS_EXCLUSION_PREFIX = '!scripts/'
+const { VERIFIED_NAME } = hook_bundle_stamp
+const SHIPPED_HOOK = 'stop-guard.js'
+const MANIFEST_NAME = 'package.json'
 
 interface PackageManifest {
 	files?: Array<string>
@@ -96,12 +100,19 @@ function run_pack(cwd: string): string {
 	}
 }
 
-function packed_files(): Set<string> {
-	const raw = run_pack(REPO_ROOT)
+function packed_paths(raw: string): Set<string> {
 	const parsed = JSON.parse(raw) as PackReport | Array<PackReport>
 	const report = Array.isArray(parsed) ? parsed[0] : parsed
 
 	return new Set((report?.files ?? []).map((entry) => entry.path))
+}
+
+function packed_files(): Set<string> {
+	return packed_paths(run_pack(REPO_ROOT))
+}
+
+function read_manifest(): PackageManifest {
+	return JSON.parse(readFileSync(path.join(REPO_ROOT, MANIFEST_NAME), 'utf8')) as PackageManifest
 }
 
 // Every distributed (not kit-only) command's entry script, absolute, deduped across shared scripts.
@@ -177,6 +188,48 @@ describe('a failed pnpm pack', () => {
 	})
 })
 
+// The hook cache and the build staging are rewritten by every hook launch and build, so a pack that
+// lists them races their removal (joshuafolkken/kit#4243). Packed from a copy of kit's `files`, so
+// the patterns are checked without touching this checkout's own `dist/`.
+function write_hook_scratch(directory: string): void {
+	const hooks = path.join(directory, 'dist', 'hooks')
+	const staging = path.join(directory, 'dist', `${STAGING_PREFIX}abc123`)
+
+	mkdirSync(hooks, { recursive: true })
+	mkdirSync(staging)
+
+	for (const name of [SHIPPED_HOOK, VERIFIED_NAME, `${VERIFIED_NAME}.4243`]) {
+		writeFileSync(path.join(hooks, name), '{}')
+	}
+
+	writeFileSync(path.join(staging, 'chunk-ABC.js'), '')
+}
+
+function pack_with_hook_scratch(): Set<string> {
+	const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-scratch-'))
+	const package_json = { name: 'scratch', version: '0.0.0', files: read_manifest().files }
+
+	onTestFinished(() => {
+		rmSync(directory, { recursive: true, force: true })
+	})
+	writeFileSync(path.join(directory, MANIFEST_NAME), JSON.stringify(package_json))
+	write_hook_scratch(directory)
+
+	return packed_paths(run_pack(directory))
+}
+
+describe('the published package carries no per-machine hook scratch', () => {
+	it('ships the hook bundles but neither the verified-inputs cache nor the build staging', () => {
+		const packed = pack_with_hook_scratch()
+		const scratch = [...packed].filter(
+			(file) => file.includes(VERIFIED_NAME) || file.includes(STAGING_PREFIX),
+		)
+
+		expect(packed.has(`dist/hooks/${SHIPPED_HOOK}`)).toBe(true)
+		expect(scratch).toEqual([])
+	})
+})
+
 describe('the published package carries nothing kit-internal', () => {
 	const packed = packed_files()
 
@@ -194,10 +247,7 @@ describe('the published package carries nothing kit-internal', () => {
 	})
 
 	it('excludes nothing under scripts/ one file at a time — kit-only code lives in tools/', () => {
-		const manifest = JSON.parse(
-			readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'),
-		) as PackageManifest
-		const per_file = (manifest.files ?? []).filter((entry) =>
+		const per_file = (read_manifest().files ?? []).filter((entry) =>
 			entry.startsWith(SCRIPTS_EXCLUSION_PREFIX),
 		)
 

@@ -18,8 +18,11 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 vi.mock('./cross-file-recheck', () => ({
 	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
 }))
+vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run: vi.fn() } }))
 
 const { cross_file_recheck } = await import('./cross-file-recheck')
+const { eslint_daemon } = await import('./eslint-daemon')
+const mocked_daemon_run = vi.mocked(eslint_daemon.run)
 const mocked_verify = vi.mocked(cross_file_recheck.verify)
 const { lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
@@ -120,10 +123,10 @@ describe('run_lint_parallel_checks — the cross-file recheck', () => {
 	})
 })
 
-describe('run_lint_checks', () => {
-	const TARGET = 'scripts/thing.ts'
-	const RECHECK = { cache_file: '.eslintcache.related', patterns: [TARGET] }
+const TARGET = 'scripts/thing.ts'
+const RECHECK = { cache_file: '.eslintcache.related', patterns: [TARGET] }
 
+describe('run_lint_checks', () => {
 	it('runs the targets it was given instead of the whole tree', async () => {
 		const prettier_args = ['exec', 'prettier', '--check', TARGET]
 		const eslint_args = ['exec', 'eslint', TARGET]
@@ -151,6 +154,41 @@ describe('run_lint_checks', () => {
 		expect(mocked_verify).toHaveBeenCalledWith(expect.objectContaining({ exit_code: 1 }), RECHECK)
 		expect(mocked_cache_run).toHaveBeenCalledWith(RECHECK.cache_file, expect.any(Function))
 		expect(code).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#4358: only a run that asks for it reaches the warm daemon, and a daemon that
+// cannot answer falls back to the cold process.
+describe('run_lint_checks — the warm eslint daemon', () => {
+	const ESLINT = ['exec', 'eslint', TARGET]
+	const PRETTIER = ['exec', 'prettier', TARGET]
+	const WARM = { warm_daemon: true }
+
+	it('lints through the daemon when asked, spawning only prettier', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_result(0))
+		mocked_daemon_run.mockResolvedValueOnce({ exit_code: 1, stdout: 'x', output: 'x' })
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_checks(PRETTIER, ESLINT, RECHECK, WARM)).toBe(1)
+		expect(mocked_daemon_run).toHaveBeenCalledWith(ESLINT, { project_root: process.cwd() })
+		expect(mocked_execa).toHaveBeenCalledOnce()
+	})
+
+	it('falls back to the cold eslint process when the daemon cannot answer', async () => {
+		mock_exit_codes(0, 0)
+		mocked_daemon_run.mockResolvedValueOnce(undefined)
+
+		expect(await run_lint_checks(PRETTIER, ESLINT, RECHECK, WARM)).toBe(0)
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(ESLINT)
+	})
+
+	it('never reaches the daemon unless asked', async () => {
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await run_lint_checks(PRETTIER, ESLINT, RECHECK)
+		await run_lint_parallel_checks()
+
+		expect(mocked_daemon_run).not.toHaveBeenCalled()
 	})
 })
 

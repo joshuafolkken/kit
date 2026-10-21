@@ -2,13 +2,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { package_bin_schema } from '#scripts/lib/schemas'
 
 const NODE_MODULES = 'node_modules'
 const BIN_DIR = '.bin'
 const WINDOWS_PLATFORM = 'win32'
 const WINDOWS_SHIM_SUFFIX = '.cmd'
-const PACKAGE_JSON = 'package.json'
 
 // Every spawn site that reaches for a locally-installed CLI needs the same two details: pnpm
 // writes the shims under `node_modules/.bin`, and on Windows the executable one carries a

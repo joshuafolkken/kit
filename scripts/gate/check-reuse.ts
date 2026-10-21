@@ -20,7 +20,8 @@ import type { GateTree } from './gate-tree'
 // digest differs is the other half (`file_map_stamp.changed_since`).
 //
 // **A record is reuse of a result, not a check dropped**: no base, an empty changed-file map, an
-// unreadable base diff or no root answers "not reusable", and a check with no scope is never reusable. The records are written and read
+// unreadable base diff or no root answers "not reusable", and a check with no scope is never reusable
+// — the unit step's scope is the test-read map's (`check-inputs.ts`). The records are written and read
 // only where the CLI entry resolved their destination (`CheckRecords`), so a suite driving the gate
 // never plants a green record over the live tree.
 
@@ -70,6 +71,7 @@ interface ReuseContext {
 	tree: GateTree
 	records: CheckRecords
 	is_ignored: PrettierIgnored
+	root: string
 }
 
 async function is_stamp_reusable(
@@ -81,7 +83,7 @@ async function is_stamp_reusable(
 
 	if (moved === undefined) return false
 
-	return !(await check_inputs.touches_inputs(label, moved, context.is_ignored))
+	return !(await check_inputs.touches_inputs(label, moved, context.is_ignored, context.root))
 }
 
 // The time the check's record was taken, or `undefined` when the check has to run.
@@ -111,7 +113,7 @@ async function reusable_checks(
 
 	if (root === undefined) return new Map()
 
-	const context = { tree, records, is_ignored: check_inputs.prettier_ignored(root) }
+	const context = { tree, records, root, is_ignored: check_inputs.prettier_ignored(root) }
 	const answers = await Promise.all(
 		labels.map(async (label) => [label, await reused_at(label, context)] as const),
 	)

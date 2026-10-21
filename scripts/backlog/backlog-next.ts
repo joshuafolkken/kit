@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
@@ -33,7 +32,6 @@ import { backlog_rank, type GateScope } from './backlog-rank'
 // `auto-ok:next`'s own listing and runnability rules, and the verdict comes from
 // `epic_report.decide_verdict` so it cannot drift from what `epic:next` means by the same word.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
@@ -443,13 +441,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await answer(opted_in, options.exclude ?? [])
 }
 
-// `process.exitCode` rather than `process.exit()`, for the reason `auto-ok:next` records: the whole
-// contract is `answers=$(pnpm josh backlog:next)`, and exiting outright can cut the pipe before it
-// has drained.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const backlog_next = {
 	USAGE,
 	REPO_UNREADABLE_MESSAGE,
@@ -461,8 +452,6 @@ const backlog_next = {
 	context_of,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_next }
 export type { BacklogVerdict, OptedIn, PoolContext }

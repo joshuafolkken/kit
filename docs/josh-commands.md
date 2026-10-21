@@ -34,7 +34,7 @@ pnpm josh gate --no-unit   # the static checks only (CI only)
 Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
 
 - Static checks: `pnpm josh lint`, `cspell:dot`, `behavior`, `exports:unused`, `metrics` (kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
-- A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check` and `exports` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`); the header reads `reused — inputs unchanged since it passed at <time>`.
+- A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
 - The other checks always run; `--force` reuses nothing.
 - **Refuses to start when the scoped pair has not been green on this tree**: a unit-included local gate reads the record `josh review:brief` does and names `pnpm josh lint:related && pnpm josh test:related`. Not for `--no-unit` or `--force`; `JOSH_SCOPED_GREEN=0` turns it off.
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
@@ -972,6 +972,7 @@ pnpm josh lane:resume --all   # every open lane
 - Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch and Issue are untouched; the child keeps its memory.
 - A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record.
 - A pause ends the lane's detached `eslint_d` (titled `eslint_d - <lane directory>`) rather than stopping it: a resume would not reach it, and the next lint starts it again. `lane:close`, `lane:withdraw` and `lane:restart` end it too.
+- `lane:close` also ends every process still running from the lane (working directory under its checkout, or the lane's `JOSH_LANE_CHILD` mark inherited in its environment, application bundles excepted; macOS), the caller's own ancestry spared, and prints how many it ended. `lane:restart` does the same before the fresh dispatch.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
 
 **Output / exit codes:** one line per lane (`, ended N daemon(s)` when a pause ended any), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.

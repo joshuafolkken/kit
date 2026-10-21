@@ -5,6 +5,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { lane_paths } from './lane-paths'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 import { lane_spent, type KeptLane } from './lane-spent'
 import { lane_state } from './lane-state'
 
@@ -38,6 +39,9 @@ interface CloseOutcome {
 	left_behind: Array<string>
 	// The lane child's processes this close terminated — empty for a child that ended by itself.
 	reaped: Array<number>
+	// What else still ran from the lane's checkout or carried its mark and this close terminated
+	// (`lane-residents.ts`); `undefined` where the processes could not be read.
+	residents: Array<number> | undefined
 }
 
 interface SweepOutcome {
@@ -133,8 +137,9 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	const did_exist = existing !== undefined || existsSync(targets.directory)
 	// Before the removal, not after: a child still running in the tree would keep writing into a
 	// directory being deleted, and a process outliving its lane is a half-discarded state — the work
-	// tree gone, the child still answering `alive`.
+	// tree gone, the child still answering `alive`. What else still runs from the checkout goes too.
 	const reaped = lane_reap.reap_child({ issue, directory: targets.directory })
+	const residents = lane_residents.end_residents({ issue, directory: targets.directory }, reaped)
 
 	await remove_lane(targets)
 
@@ -145,7 +150,7 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 		await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
 	}
 
-	return { issue, kind, left_behind, reaped }
+	return { issue, kind, left_behind, reaped, residents }
 }
 
 // A lane that could not be closed is recorded rather than thrown: a sweep has to attempt every lane,

@@ -1,0 +1,7 @@
+{
+	"reason": "Main guards move into new *-main.ts entries (one small file per command) so imported modules carry no self-invoke; #4186 bundling needs it",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}

@@ -149,7 +149,7 @@ describe('run_board_render_lanes.lane_cells_of', () => {
 
 	it('counts the live rows a lane’s share is divided by', () => {
 		const board = header({ usages: board_usage(new Map()) })
-		const rows = [row_of(LANE, 'running'), row_of(7, 'earlier'), row_of(8, 'waiting')]
+		const rows = [row_of(LANE, 'running'), row_of(7, 'running'), row_of(8, 'waiting')]
 
 		expect(lane_cells_of(board, rows)?.limits).toStrictEqual(run_board_usage_text.lane_limits(2))
 	})

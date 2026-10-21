@@ -1,13 +1,11 @@
 import { git_command } from '#scripts/git/git-command'
 import { json_value } from '#scripts/lib/json-value'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { package_with_version_schema } from '#scripts/lib/schemas'
-import { version_targets } from '#scripts/version/version-targets'
 import { release_plan, type ReleasePlan, type VersionedCommit } from './release-plan'
 
 // Reading main's history for the two numbers a release is made of: where the version last changed,
 // and how many merges have landed since.
-
-const { PACKAGE_JSON } = version_targets
 
 // How far back the search for "the commit that last changed the version" goes, counted in commits
 // that touched `package.json`. Once children stop bumping that file still

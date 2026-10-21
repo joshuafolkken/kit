@@ -1,5 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
-import { FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { COMMAND_TIMEOUT_MS, FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { migrate_logic } from '#scripts/registry-migration/migrate-logic'
 import { execaSync } from 'execa'
 import semver from 'semver'
@@ -18,7 +18,17 @@ const SCOPE_SEPARATOR = '/'
 const ENCODED_SCOPE_SEPARATOR = '%2f'
 const SCOPE_PATTERN = /^@[^/]+(?=\/)/u
 const SCOPE_REGISTRY_SUFFIX = ':registry'
+const PNPM = 'pnpm'
+const JSON_FLAG = '--json'
+const FAILURE_EXIT_CODE = 1
 const github_scopes = new Map<string, boolean>()
+
+type ViewFormat = 'json' | 'text'
+
+interface ViewAnswer {
+	exit_code: number
+	stdout: string
+}
 
 // The version commands are synchronous end to end and exported that way to consumers, so the
 // request runs in a child Node process rather than turning the whole chain async. Node's own
@@ -61,7 +71,7 @@ function read_packument(package_name: string, accept: string): unknown {
 function is_github_scope(scope: string): boolean {
 	const is_cached_github = github_scopes.get(scope)
 	if (is_cached_github !== undefined) return is_cached_github
-	const result = execaSync('pnpm', ['config', 'get', `${scope}${SCOPE_REGISTRY_SUFFIX}`], {
+	const result = execaSync(PNPM, ['config', 'get', `${scope}${SCOPE_REGISTRY_SUFFIX}`], {
 		reject: false,
 		timeout: FETCH_TIMEOUT_MS,
 	})
@@ -106,6 +116,21 @@ function has_public_version(package_name: string, version: string): boolean {
 	return parsed.success && parsed.data.time[version] !== undefined
 }
 
+// A `pnpm view` answer, for a question that has to see what the package manager sees: the
+// checkout's own registry routing, and safe-chain's minimum-age filter when it is shimmed on PATH.
+// `pnpm` rather than `npm`, because npm refuses to run at all inside a project whose
+// `devEngines.packageManager` names pnpm with an `onFail` other than `"warn"` / `"ignore"` (kit
+// ships `"download"`), failing with EBADDEVENGINES instead of answering.
+function view(spec: string, field: string, format: ViewFormat = 'text'): ViewAnswer {
+	const format_arguments = format === 'json' ? [JSON_FLAG] : []
+	const result = execaSync(PNPM, ['view', spec, field, ...format_arguments], {
+		reject: false,
+		timeout: COMMAND_TIMEOUT_MS,
+	})
+
+	return { exit_code: result.exitCode ?? FAILURE_EXIT_CODE, stdout: result.stdout }
+}
+
 // The version itself, or nothing when it is not exactly a semver version.
 function valid_version(value: string): string | undefined {
 	return version_schema.safeParse(value).success ? value : undefined
@@ -117,6 +142,8 @@ const npm_registry = {
 	read_latest,
 	read_release_times,
 	valid_version,
+	view,
 }
 
 export { npm_registry }
+export type { ViewAnswer }

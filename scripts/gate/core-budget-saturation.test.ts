@@ -11,11 +11,19 @@ import type { MachineReading } from './machine-capacity'
 // exempted a two-core baseline and saw no excess, so the next claim was admitted onto a saturated CPU;
 // and a claim alone in the ledger never read the machine at all. Free cores are now
 // `cores − max(reserved, busy)`, read for every claim.
+//
+// joshuafolkken/kit#4313: that load held the first waiting claim too, so a solo gate's unit claim waited
+// out the cap behind one core of Claude sessions. The first waiter is now held by the ledger alone, and a
+// unit claim narrows to the room the outside load leaves; a claim queued behind another still waits.
 
 const CORES = 11
-const RESERVED = 10
+const RESERVED = 9
 const WAIT_CAP_MS = 10
+const UNIT_WEIGHT = 2
 const BLOCKER = `${core_budget.RESERVED_PREFIX}reserved.json`
+const WAITER = `${core_budget.RESERVED_PREFIX}waiter.json`
+// Claimed further back than the window a later claim may pass a waiter in, so the claim queues behind it.
+const LONG_AGO = -60_000
 
 const probe = { directory: '' }
 
@@ -37,22 +45,34 @@ function write_reserved(weight: number): void {
 	writeFileSync(path.join(probe.directory, BLOCKER), JSON.stringify(payload))
 }
 
-// A one-core claim on a machine read as `busy_cores`, its clock advanced past the wait cap by each sleep.
-async function claim_one(read_machine: () => Promise<MachineReading>): Promise<{
+// A one-core claim still waiting ahead of the next, claimed long enough ago that it is not passed.
+function write_waiter_ahead(): void {
+	const payload = { ...process_identity.own_fields(), weight: 1, claimed_at: LONG_AGO }
+
+	writeFileSync(path.join(probe.directory, WAITER), JSON.stringify(payload))
+}
+
+// A claim on a machine read as `busy_cores`, its clock advanced past the wait cap by each sleep.
+async function claim_one(
+	read_machine: () => Promise<MachineReading>,
+	weight = 1,
+): Promise<{
 	sleep: ReturnType<typeof vi.fn>
 	report: ReturnType<typeof vi.fn>
 	is_overflow: boolean
+	granted: number | undefined
 }> {
 	const clock = { value: 1 }
 	const sleep = vi.fn(async () => {
 		clock.value += WAIT_CAP_MS
 	})
 	const report = vi.fn()
-	const handle = await core_budget.reserve(1, {
+	const handle = await core_budget.reserve(weight, {
 		directory: probe.directory,
 		budget: CORES,
 		read_machine,
 		report,
+		is_unit: true,
 		wait_cap_ms: WAIT_CAP_MS,
 		now: () => clock.value,
 		sleep,
@@ -60,12 +80,54 @@ async function claim_one(read_machine: () => Promise<MachineReading>): Promise<{
 
 	core_budget.release(handle)
 
-	return { sleep, report, is_overflow: handle.admission.overflow !== undefined }
+	const { overflow, granted } = handle.admission
+
+	return { sleep, report, is_overflow: overflow !== undefined, granted }
 }
 
-describe('core_budget.reserve — a saturated CPU holds a new claim', () => {
+describe('core_budget.reserve — load outside the ledger does not hold the first waiter', () => {
+	it('admits the first waiter at once on a saturated CPU when the reservations fit', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(busy(CORES))
+
+		expect(run.sleep).not.toHaveBeenCalled()
+		expect(run.is_overflow).toBe(false)
+	})
+
+	// The outside load bounds the unit claim's workers instead of its start.
+	it('narrows a unit claim to the room the outside load leaves', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(busy(CORES), UNIT_WEIGHT)
+
+		expect(run.sleep).not.toHaveBeenCalled()
+		expect(run.granted).toBe(1)
+	})
+
+	it('admits a unit claim at full width when the busy cores are within the reservations', async () => {
+		write_reserved(RESERVED)
+
+		const run = await claim_one(busy(RESERVED), UNIT_WEIGHT)
+
+		expect(run.sleep).not.toHaveBeenCalled()
+		expect(run.granted).toBeUndefined()
+	})
+
+	it('reads the machine and admits a claim alone in the ledger at once', async () => {
+		const read_machine = vi.fn(busy(CORES + 1))
+
+		const run = await claim_one(read_machine)
+
+		expect(read_machine).toHaveBeenCalled()
+		expect(run.sleep).not.toHaveBeenCalled()
+	})
+})
+
+describe('core_budget.reserve — a saturated CPU holds a claim queued behind another', () => {
 	it('waits when the busy cores exceed what the ledger reserves, though the reservations fit', async () => {
 		write_reserved(RESERVED)
+		write_waiter_ahead()
 
 		const run = await claim_one(busy(CORES))
 
@@ -75,6 +137,7 @@ describe('core_budget.reserve — a saturated CPU holds a new claim', () => {
 
 	it('names the saturated CPU as why it waits', async () => {
 		write_reserved(RESERVED)
+		write_waiter_ahead()
 
 		const run = await claim_one(busy(CORES))
 
@@ -85,26 +148,11 @@ describe('core_budget.reserve — a saturated CPU holds a new claim', () => {
 
 	it('admits the same claim at once when the busy cores are within the reservations', async () => {
 		write_reserved(RESERVED)
+		write_waiter_ahead()
 
 		const run = await claim_one(busy(RESERVED))
 
 		expect(run.sleep).not.toHaveBeenCalled()
-	})
-
-	it('reads the machine and waits for a claim alone in the ledger', async () => {
-		const read_machine = vi.fn(busy(CORES + 1))
-
-		const run = await claim_one(read_machine)
-
-		expect(read_machine).toHaveBeenCalled()
-		expect(run.is_overflow).toBe(true)
-	})
-
-	it('admits a claim alone in the ledger at once on a machine with room', async () => {
-		const run = await claim_one(busy(1))
-
-		expect(run.sleep).not.toHaveBeenCalled()
-		expect(run.report).not.toHaveBeenCalled()
 	})
 })
 
@@ -129,6 +177,7 @@ describe('core_budget.reserve — a waiting claim admits against its recent read
 	// the mean holds the claim until the wait cap.
 	it('keeps waiting through a momentary dip in a saturated CPU', async () => {
 		write_reserved(RESERVED)
+		write_waiter_ahead()
 
 		const clock = { value: 1 }
 		const handle = await core_budget.reserve(1, {
@@ -149,7 +198,7 @@ describe('core_budget.reserve — a waiting claim admits against its recent read
 	})
 })
 
-describe('core_admission.is_admitted — a busy CPU holds the head on cores only', () => {
+describe('core_admission.is_admitted — a busy CPU does not hold the head', () => {
 	// Busy cores say nothing about memory: a head whose cores fit still runs past a memory shortfall.
 	it('keeps the head exempt from memory while the CPU is only partly busy', () => {
 		const head = { key: 'only', reservation: { weight: 1, claimed_at: 1, memory_mb: 2400 } }

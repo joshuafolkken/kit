@@ -9,8 +9,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { adopt_toolkits } from '#scripts/adopt/adopt-toolkits'
-import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { execaSync } from 'execa'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
+import { npm_registry } from './npm-registry'
 import { peer_floor } from './peer-floor'
 import {
 	publishable_range,
@@ -19,7 +19,6 @@ import {
 	type RangeProbe,
 } from './publishable-range'
 
-const PACKAGE_JSON_PATH = 'package.json'
 const FAILURE_EXIT_CODE = 1
 const NODE_MODULES = 'node_modules'
 
@@ -27,18 +26,8 @@ const NODE_MODULES = 'node_modules'
 // managers on PATH, so the answer comes back already filtered by the same minimum-age policy a
 // consumer installs under. A plain fetch would read the unfiltered registry and pass a range no
 // consumer can resolve — the exact blind spot this guard exists to close.
-//
-// `pnpm view` rather than `npm view` because npm refuses to run at all inside a project whose
-// `devEngines.packageManager` names pnpm with an `onFail` other than `"warn"` / `"ignore"` (kit
-// ships `"download"`, which npm refuses on just the same), failing every probe with
-// EBADDEVENGINES instead of answering. Both are shimmed, so the filtered view is preserved.
 function probe_range(name: string, range: string): ProbeResult {
-	const result = execaSync('pnpm', ['view', `${name}@${range}`, 'version'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-
-	return { exit_code: result.exitCode ?? FAILURE_EXIT_CODE, stdout: result.stdout }
+	return npm_registry.view(`${name}@${range}`, 'version')
 }
 
 function report(violations: ReadonlyArray<PublishedRange>, total: number): number {
@@ -90,14 +79,14 @@ function check_peer_floors(
 function read_installed_toolkit_manifests(project_root: string): Array<string> {
 	return adopt_toolkits
 		.all_declared_toolkits(project_root)
-		.map((package_name) => path.join(project_root, NODE_MODULES, package_name, PACKAGE_JSON_PATH))
+		.map((package_name) => path.join(project_root, NODE_MODULES, package_name, PACKAGE_JSON))
 		.filter((manifest_path) => existsSync(manifest_path))
 		.map((manifest_path) => readFileSync(manifest_path, 'utf8'))
 }
 
 // Both checks always run, so one invocation reports everything there is to fix.
 function main(): void {
-	const package_json_content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const package_json_content = readFileSync(PACKAGE_JSON, 'utf8')
 	const range_exit_code = check(package_json_content, probe_range)
 	const toolkit_json_contents = read_installed_toolkit_manifests(process.cwd())
 	const peer_exit_code = check_peer_floors(package_json_content, toolkit_json_contents)

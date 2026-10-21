@@ -8,9 +8,14 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_scope } from '#scripts/run/event/run-event-scope'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_occupied } from './backlog-occupied'
+import { backlog_offer_exclude } from './backlog-offer-exclude'
 import { backlog_stalled } from './backlog-stalled'
 
 // The ready line reports runnable work to the driving backlogrun parent on a watcher wake.
@@ -161,13 +166,32 @@ function drains_pool(carry: RunCarry | undefined): boolean {
 	return carry === undefined || !run_invocation.has_only(carry.invocation)
 }
 
+// The offer's own exclusion, read off this run's stream: a merged child `backlog:next` still reads OPEN,
+// or one in flight, is no ready work (joshuafolkken/kit#4349). Scoped to this invocation, as the drive's
+// list is: the stream is the repository's log, so an earlier run's merge or unsettled launch would
+// otherwise hide a reopened issue for good.
+async function stream_exclude(carry: RunCarry | undefined): Promise<ReadonlyArray<string>> {
+	const target = await run_event_stream_emit.stream_target()
+
+	if (target === undefined || carry === undefined) return []
+
+	const scope = run_event_scope.scope_of({ kind: 'carried', carry })
+	const events = run_event_scope.scoped_events(run_event_stream.read_events(target), scope) ?? []
+
+	return backlog_drive_restore.offer_exclude(events)
+}
+
 // The `backlog:next` read, or `undefined` for a `--only` run, which answers none before paying for the
 // network read. A bounded read keeps stderr piped: the arrival probe reads once
 // a minute, and a forwarded refusal would fill the watcher's output.
 async function read_backlog_next(timeout_ms?: number): Promise<JoshResult | undefined> {
-	if (!drains_pool(await run_headless.current_carry())) return undefined
+	const carry = await run_headless.current_carry()
 
-	return await josh_command.josh_run(['backlog:next'], timeout_ms === undefined, timeout_ms)
+	if (!drains_pool(carry)) return undefined
+
+	const argv = ['backlog:next', ...backlog_offer_exclude.exclude_argv(await stream_exclude(carry))]
+
+	return await josh_command.josh_run(argv, timeout_ms === undefined, timeout_ms)
 }
 
 // The runnable issues for this checkout, read the way a loop reads them: `backlog:next`'s numeric lines.

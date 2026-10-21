@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
@@ -14,6 +13,7 @@ import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { removed_tests_check } from './removed-tests-check'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -34,7 +34,6 @@ import { review_tree } from './review-tree'
 // so "still running" is the usual answer at this point), how this project runs its unit tests, and —
 // on round 2 — which files the first round's fixes touched.
 
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
 
 // The rubric's absolute path, resolved against the kit package rather than the review checkout root.
@@ -227,6 +226,16 @@ async function read_diff(
 	}
 }
 
+// **Swallowed, and the brief omits the list**: `josh ship` and `followup` read the same list again
+// and refuse on a failure, so the merge never rests on this reading.
+async function read_removed_tests(): Promise<ReadonlyArray<string>> {
+	try {
+		return (await removed_tests_check.read()) ?? []
+	} catch {
+		return []
+	}
+}
+
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile } = request
 	const contract = await open_contract()
@@ -251,6 +260,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		rubric_path: RUBRIC_PATH,
 		...contract,
 		diff: await read_diff(contract.checkout.root, base, paths),
+		removed_tests: await read_removed_tests(),
 	})
 }
 
@@ -356,10 +366,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_review(round, await read_change())
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const review_brief_cli = {
 	FIRST_ROUND,
 	format_reason,
@@ -370,7 +376,5 @@ const review_brief_cli = {
 	report_error,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { review_brief_cli }

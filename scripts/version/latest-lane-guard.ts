@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { lane_paths, type LaneEnvironment } from '#scripts/lane/lane-paths'
 
 // Refuse a dependency update inside a lane.
@@ -43,7 +41,5 @@ const latest_lane_guard = {
 	is_lane,
 	main,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 export { latest_lane_guard }

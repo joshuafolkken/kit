@@ -34,7 +34,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'backlog:next': {
-		script: 'scripts/backlog/backlog-next.ts',
+		script: 'scripts/backlog/backlog-next-main.ts',
 		description:
 			'Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics',
 		category: 'AI tools',
@@ -50,7 +50,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'backlog:offer': {
-		script: 'scripts/backlog/backlog-offer-cli.ts',
+		script: 'scripts/backlog/backlog-offer-main.ts',
 		description:
 			'Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start',
 		category: 'AI tools',
@@ -107,7 +107,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 	'backlog:budget': {
-		script: 'scripts/backlog/backlog-budget-cli.ts',
+		script: 'scripts/backlog/backlog-budget-main.ts',
 		description: 'Say whether a backlogrun may start more work, keep watching, or finish',
 		category: 'AI tools',
 		reference: ['[options]', 'automation', ['none']],

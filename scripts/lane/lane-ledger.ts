@@ -41,6 +41,7 @@ const KIND = {
 	HELD: 'held',
 	RELEASED: 'released',
 	ROUND_TWO: 'round-two',
+	OFFERABLE: 'offerable',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -144,6 +145,14 @@ const round_two_schema = z.object({
 	verdict: z.string(),
 	code: z.string(),
 })
+// A stall detector observation, written only when it changes: whether offerable backlog work and a free
+// lane coexisted, so a stall is aged from when both first held rather than from the last launch
+// (joshuafolkken/kit#4349).
+const offerable_schema = z.object({
+	kind: z.literal(KIND.OFFERABLE),
+	at: z.string(),
+	is_offerable: z.boolean(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -155,6 +164,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	held_schema,
 	released_schema,
 	round_two_schema,
+	offerable_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -167,6 +177,7 @@ type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
 type HeldEntry = z.infer<typeof held_schema>
 type RoundTwoEntry = z.infer<typeof round_two_schema>
+type OfferableEntry = z.infer<typeof offerable_schema>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
@@ -262,6 +273,10 @@ async function record_released(path?: string): Promise<void> {
 	await record({ kind: KIND.RELEASED, at: now_iso() }, path)
 }
 
+async function record_offerable(is_offerable: boolean, path?: string): Promise<void> {
+	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
+}
+
 async function record_round_two(round_two: RoundTwoRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.ROUND_TWO, at: now_iso(), ...round_two }, path)
 }
@@ -306,6 +321,7 @@ const lane_ledger = {
 	record_released,
 	record_merge,
 	record_overlap,
+	record_offerable,
 	record_round_two,
 	record_stage,
 	record_stop,
@@ -321,6 +337,7 @@ export type {
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,
+	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
 	RoundTwoEntry,

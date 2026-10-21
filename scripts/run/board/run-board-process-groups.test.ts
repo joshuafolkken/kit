@@ -55,7 +55,6 @@ function mark_of(rows: ReadonlyArray<Row>): UsageMark {
 		names: new Map(rows.map((row) => [row[0], row[2]])),
 		parents: new Map(rows.map((row) => [row[0], row[1]])),
 		folded: new Set(),
-		paused: new Map(),
 		cores: 4,
 		total_bytes: 100_000,
 	}

@@ -1,8 +1,6 @@
-#!/usr/bin/env tsx
 import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { git_command } from '#scripts/git/git-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 
@@ -122,16 +120,15 @@ async function check_commit_message(): Promise<CheckResult> {
 	}
 }
 
-async function main(): Promise<void> {
+// The `commit-msg` hook's run: the check's message, and a failure exit when it refused.
+async function run_check(): Promise<number> {
 	const result = await check_commit_message()
 
 	console.info(result.message)
 
-	if (!result.success) process.exit(1)
+	return result.success ? 0 : 1
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
-
-export { check_commit_message, extract_issue_number, is_safe_commit_message_path }
+export { check_commit_message, extract_issue_number, is_safe_commit_message_path, run_check }
 
 export type { CheckResult }

@@ -109,6 +109,6 @@ describe('the josh latest chain records the run it just made', () => {
 	})
 
 	it('registers the command that reads it', () => {
-		expect(COMMAND_MAP['latest:scope']?.script).toBe('scripts/version/latest-scope-cli.ts')
+		expect(COMMAND_MAP['latest:scope']?.script).toBe('scripts/version/latest-scope-main.ts')
 	})
 })

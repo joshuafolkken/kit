@@ -80,6 +80,7 @@ if [ "$1" = "pack" ]; then
 fi
 printf '%s\n' "$@" > "$FAKE_DIR/${VIEW_ARGV}"
 printf '%s\n' '${LATEST_VERSION}'
+exit "$FAKE_VIEW_EXIT"
 `
 const scratch = { bin: '', log: '' }
 
@@ -170,6 +171,7 @@ beforeEach(() => {
 	vi.stubEnv('FAKE_DIR', paths_mock.root)
 	vi.stubEnv('FAKE_BUILD_EXIT', '0')
 	vi.stubEnv('FAKE_RUN_EXIT', '0')
+	vi.stubEnv('FAKE_VIEW_EXIT', '0')
 	vi.spyOn(console, 'info').mockReturnValue()
 })
 
@@ -292,6 +294,15 @@ describe('fresh_machine_run.run — a published scenario', () => {
 		expect(recorded(VIEW_ARGV).split('\n')).toStrictEqual(['view', PACKAGE_NAME, 'version', ''])
 		expect(recorded(RUN_ARGV).split('\n')).toContain(`PACKAGE_VERSION=${LATEST_VERSION}`)
 		expect(log()).toContain(`# package: ${LATEST_VERSION}`)
+	})
+
+	it('fails rather than install an unknown version when the registry does not answer', async () => {
+		vi.stubEnv('FAKE_VIEW_EXIT', '1')
+
+		await expect(fresh_machine_run.run(published(undefined))).rejects.toThrow(
+			'the registry did not answer the latest version',
+		)
+		expect(has_recorded(RUN_ARGV)).toBe(false)
 	})
 
 	it('installs the version it was given without asking the registry', async () => {

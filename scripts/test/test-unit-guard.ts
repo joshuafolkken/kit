@@ -1,8 +1,6 @@
-#!/usr/bin/env tsx
 import { existsSync, globSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
 import { core_budget } from '#scripts/gate/core-budget'
 import { free_cores } from '#scripts/gate/free-cores'
@@ -16,7 +14,6 @@ import { unit_worker_share } from './unit-worker-share'
 
 const PNPM = 'pnpm'
 const FAIL_EXIT_CODE = 1
-const ARGV_START = 2
 const VITEST_PACKAGE = path.join('node_modules', 'vitest')
 const UNIT_GLOB = '**/*.{test,spec}.{ts,js}'
 const NODE_MODULES = 'node_modules'
@@ -286,13 +283,6 @@ async function run_guarded_unit(
 	extra_arguments: ReadonlyArray<string>,
 ): Promise<number> {
 	return await run_guarded_vitest(project_directory, ['run', ...extra_arguments])
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const extra_arguments = process.argv.slice(ARGV_START)
-	const exit_code = await run_guarded_unit(process.cwd(), extra_arguments)
-
-	process.exit(exit_code)
 }
 
 const test_unit_guard = {

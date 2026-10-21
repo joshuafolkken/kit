@@ -64,6 +64,31 @@ const ENV: Record<string, string> = {
 	JOSH_SHIP_SUPERVISED: '',
 }
 
+// **The packages most test files load are pre-bundled into one file each** (joshuafolkken/kit#4301).
+// An isolated file starts a fresh module graph, so each of them re-imports these from their many
+// source files: measured with `--experimental.importDurations`, execa and zod alone cost about 70ms
+// and 50ms per file across 700 and 900 isolated files — the top two import costs of the suite.
+// A bundled copy loads several times faster (execa 35ms → 9ms, zod 27ms → 10ms natively).
+const OPTIMIZED_DEPENDENCIES: ReadonlyArray<string> = [
+	'execa',
+	'zod',
+	'semver',
+	'ora',
+	'string-width',
+	'@actions/expressions',
+]
+
+interface DependencyOptimizer {
+	optimizer: { ssr: { enabled: boolean; include: Array<string> } }
+}
+
+// The optimizer is set once on the root config, never per project: the optimizer state belongs to the
+// Vite server, so a project carrying `test.deps.optimizer` resolves a server of its own instead of
+// sharing the root's (vitest's `getOwnServerReason`), and both projects would pay that startup.
+const DEPENDENCY_OPTIMIZER: DependencyOptimizer = {
+	optimizer: { ssr: { enabled: true, include: [...OPTIMIZED_DEPENDENCIES] } },
+}
+
 const PURE_PROJECT = 'pure'
 const ISOLATED_PROJECT = 'isolated'
 
@@ -124,9 +149,11 @@ const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
 
 const unit_projects = {
 	...unit_setup_files,
+	DEPENDENCY_OPTIMIZER,
 	ENV,
 	ISOLATED_PROJECT,
 	MAIN_EXCLUDE,
+	OPTIMIZED_DEPENDENCIES,
 	PURE_PROJECT,
 	UNIT_PROJECTS,
 }

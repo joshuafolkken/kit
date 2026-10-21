@@ -140,6 +140,26 @@ describe('test_read_map.readers_of', () => {
 	})
 })
 
+// joshuafolkken/kit#4303: whether a file added since the recording lands where no test reads.
+describe('test_read_map.in_unread_directory', () => {
+	it('holds a file added to a recorded directory nothing inside was read from', () => {
+		expect(test_read_map.in_unread_directory(MAP, DEEP_DOCUMENT)).toBe(true)
+	})
+
+	it('rejects a directory one of whose files a test read', () => {
+		expect(test_read_map.in_unread_directory(SHALLOW_ROOT_MAP, DEEP_DOCUMENT)).toBe(false)
+	})
+
+	it('rejects a directory a test listed or walked', () => {
+		expect(test_read_map.in_unread_directory(MAP, NESTED_DOCUMENT)).toBe(false)
+		expect(test_read_map.in_unread_directory(MAP, path.join('docs', 'x.md'))).toBe(false)
+	})
+
+	it('rejects a directory the recorded tree did not hold', () => {
+		expect(test_read_map.in_unread_directory(MAP, path.join('scratch', 'x.md'))).toBe(false)
+	})
+})
+
 describe('test_read_map.read_map and write_map', () => {
 	it('round-trips through the git common directory', () => {
 		test_read_map.write_map(ROOT, MAP)

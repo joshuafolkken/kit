@@ -7,7 +7,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 /* eslint-disable @typescript-eslint/naming-convention */
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
-		script: 'scripts/run/progress/run-progress-cli.ts',
+		script: 'scripts/run/progress/run-progress-main.ts',
 		description: 'Report an unattended run’s progress once it has gone quiet for an interval',
 		category: 'AI tools',
 		reference: [
@@ -51,7 +51,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'run:board': {
-		script: 'scripts/run/board/run-board-cli.ts',
+		script: 'scripts/run/board/run-board-main.ts',
 		// `--every` pushes its frame as a Telegram, so the credentials come from `.env` as for `run:carry`.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Draw a live board of the running backlogrun, redrawn every second',

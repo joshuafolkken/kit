@@ -19,6 +19,7 @@ function ports_of(pool: Pool, added_at: Array<number> = []): ArrivalPorts {
 		free_lane_count: vi.fn(async () => pool.free),
 		ready_issues: vi.fn(async () => [...pool.issues]),
 		is_added_since: vi.fn(async (since_ms: number) => added_at.some((at) => at >= since_ms)),
+		observe_offerable: vi.fn<ArrivalPorts['observe_offerable']>(),
 	}
 }
 
@@ -225,5 +226,27 @@ describe('backlog_arrival.start — a raised lane limit wakes the parent', () =>
 		)
 
 		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4349: the stall episode opens at the minute's reading, not at the first stop past
+// the dispatch-age gate.
+describe('backlog_arrival.start — the probe records whether work meets a free lane', () => {
+	it('records offerable work at the first probe when a lane is free', async () => {
+		const ports = ports_of({ issues: ['2445'], free: FREE })
+		const probe = await backlog_arrival.start(START_MS, ports, parent)
+
+		await probe.has_arrived(START_MS + MINUTE_MS)
+
+		expect(ports.observe_offerable).toHaveBeenCalledWith(true)
+	})
+
+	it('records no offerable work when every lane is full', async () => {
+		const ports = ports_of({ issues: ['2445'], free: NO_FREE })
+		const probe = await backlog_arrival.start(START_MS, ports, parent)
+
+		await probe.has_arrived(START_MS + MINUTE_MS)
+
+		expect(ports.observe_offerable).toHaveBeenCalledWith(false)
 	})
 })

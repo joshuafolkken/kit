@@ -35,7 +35,6 @@ function mark(at_ms: number, cpu_ms: number): UsageMark {
 		]),
 		parents: new Map(),
 		folded: new Set(),
-		paused: new Map(),
 		cores: CORES,
 		total_bytes: TOTAL_BYTES,
 	}

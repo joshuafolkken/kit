@@ -2,6 +2,7 @@ import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_state } from '#scripts/lane/lane-state'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
@@ -51,6 +52,7 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_carry_ended, 'read_ended').mockReturnValue(ended)
 	vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue(undefined)
 	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
+	vi.spyOn(lane_state, 'read_state').mockResolvedValue(undefined)
 }
 
 function arrange(read: CarryRead, ended: EndedRun | undefined): void {

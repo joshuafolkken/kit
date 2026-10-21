@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
 import { accessSync, constants, statSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { execaSync } from 'execa'
 import { security_audit_logic } from './security-audit-logic'
@@ -115,27 +113,28 @@ function warn_below_floor(scanner_path: string): void {
 	console.warn(security_audit_provision_logic.format_below_floor(version))
 }
 
-function main(): never {
+// The `josh audit` run: the scanner's exit code, or a failure when there is no scanner at all.
+function run(): number {
 	const { BINARY_NAME, format_missing_binary_error } = security_audit_logic
 	const choice = resolve_scanner(PROJECT_ROOT, process.platform)
 
 	if (choice === undefined) {
 		console.error(format_missing_binary_error(BINARY_NAME))
-		process.exit(FAILURE_EXIT_CODE)
+
+		return FAILURE_EXIT_CODE
 	}
 
 	if (choice.is_below_floor) warn_below_floor(choice.path)
 
-	process.exit(run_scanner(choice.path))
+	return run_scanner(choice.path)
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const security_audit = {
 	is_binary_available,
 	is_executable_file,
 	meets_floor,
 	resolve_scanner,
+	run,
 	run_scanner,
 }
 

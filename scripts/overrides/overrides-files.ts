@@ -1,3 +1,4 @@
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { file_reader } from '#scripts/lib/read-file'
 import { overrides_check, type OverridesSources } from './overrides-logic'
 
@@ -5,7 +6,7 @@ import { overrides_check, type OverridesSources } from './overrides-logic'
 // field at all — so a missing file reads as an empty document rather than aborting the check.
 function read_current_sources(): OverridesSources {
 	return {
-		package_json: file_reader.read_file_or_empty(overrides_check.PACKAGE_JSON_PATH),
+		package_json: file_reader.read_file_or_empty(PACKAGE_JSON),
 		workspace_yaml: file_reader.read_file_or_empty(overrides_check.WORKSPACE_YAML_PATH),
 	}
 }

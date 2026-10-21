@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { z } from 'zod'
 
 // Resolves the `max-lines` entry the project's own eslint applies, so `pnpm josh lines` explains its
@@ -28,7 +29,6 @@ import { z } from 'zod'
 // consumer's config, never by whichever copy happens to sit beside this file.
 
 const ESLINT_MODULE = 'eslint'
-const PACKAGE_JSON = 'package.json'
 const MAX_LINES_RULE = 'max-lines'
 // A rule turned off enforces nothing, so there is no limit to report and no headroom to subtract from.
 // Both spellings occur: `calculateConfigForFile` normalizes severity to a number, but a config read by

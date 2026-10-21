@@ -12,7 +12,7 @@ const { diff_main_numstat } = vi.hoisted(() => ({
 }))
 
 vi.mock('#scripts/git/git-command', () => ({
-	git_command: { diff_main_numstat },
+	git_command: { diff_main_numstat, untracked_names: vi.fn().mockResolvedValue('') },
 }))
 
 const FILE_COUNT = 11

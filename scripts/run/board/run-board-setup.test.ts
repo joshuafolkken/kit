@@ -162,33 +162,6 @@ describe('run_board_setup.read at a judgment stage after the first launch', () =
 	})
 })
 
-describe('run_board_setup.is_lane_pending', () => {
-	it('holds every lane back while the run has launched nothing', () => {
-		const events = stream(setup(STAGE.HANDING_OFF))
-
-		expect(run_board_setup.is_lane_pending(events, 278)).toBe(true)
-	})
-
-	it('holds back the lane a stage names, and no other, once a child has launched', () => {
-		const events = stream(setup(OPENING_278), LAUNCH_278, setup(OPENING_279))
-
-		expect(run_board_setup.is_lane_pending(events, 279)).toBe(true)
-		expect(run_board_setup.is_lane_pending(events, 300)).toBe(false)
-	})
-
-	it.each(LANE_STAGES_279)('holds back the lane "%s" names, and no other', (stage) => {
-		const events = stream(setup(OPENING_278), LAUNCH_278, setup(stage))
-
-		expect(run_board_setup.is_lane_pending(events, 279)).toBe(true)
-		expect(run_board_setup.is_lane_pending(events, 300)).toBe(false)
-	})
-
-	it('holds nothing back on a stream with no stage, so a restored run reads as before', () => {
-		expect(run_board_setup.is_lane_pending([], 278)).toBe(false)
-		expect(run_board_setup.is_lane_pending(stream(MERGE_278), 278)).toBe(false)
-	})
-})
-
 // joshuafolkken/kit#3750: each lane's own stage, so its row says it while another lane is elsewhere.
 describe('run_board_setup.lane_stage', () => {
 	const INSTALLING_278 = run_event_setup.installing('278')

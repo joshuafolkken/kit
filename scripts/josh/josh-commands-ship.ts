@@ -11,7 +11,7 @@ const ISSUE_WITH_OPTIONS = '<issue> [options]'
 /* eslint-disable @typescript-eslint/naming-convention */
 const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:merge': {
-		script: 'scripts/run/merge/run-merge-cli.ts',
+		script: 'scripts/run/merge/run-merge-main.ts',
 		description:
 			'Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child',
 		category: 'AI tools',
@@ -117,7 +117,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--detach'],
 					description:
-						'hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell and guard tests run before the hand-off; a stop returns to the same session.',
+						'hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell and guard tests run before the hand-off, the checks even after a preflight refusal, so one stop reports every failure; a stop returns to the same session.',
 				},
 			],
 		},

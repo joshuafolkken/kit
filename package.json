@@ -74,7 +74,9 @@
 		"!**/*.spec.ts",
 		"!**/*-fixture*.ts",
 		"!**/__snapshots__",
-		"!**/*.golden.txt"
+		"!**/*.golden.txt",
+		"!dist/hooks/.inputs-verified.json*",
+		"!dist/.hooks-staging-*"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",

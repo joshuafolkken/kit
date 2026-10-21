@@ -3,6 +3,7 @@ import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -46,7 +47,6 @@ const LANE_ROOM = {
 	lane_limit: LANE_LIMIT,
 	occupied_count: 1,
 	earlier_occupied: [],
-	earlier_statuses: new Map(),
 }
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
 const UNRECORDED = {
@@ -77,8 +77,9 @@ describe('run_board_read.read_local', () => {
 			...UNRECORDED,
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
+			// joshuafolkken/kit#4269: the open lane has no record, so it is unknown.
+			lane_states: { own: new Map(), earlier: new Map(), unknown: ['3432'] },
 			idle_lanes: [],
-			earlier_lanes: [],
 			...LANE_ROOM,
 			usual: new Map(),
 			is_memory_held: false,
@@ -244,61 +245,81 @@ describe('run_board_read.read_local idle lanes', () => {
 	})
 })
 
-// joshuafolkken/kit#3969: a lane an earlier run left behind was drawn as this run's child.
-describe('run_board_read.read_local earlier lanes', () => {
-	it('names the open lanes that last took a child before the run started', async () => {
-		const started_ms = Date.parse(STARTED_AT)
+const EARLIER_AT = '2026-10-08T08:00:00.000Z'
 
+// A lane's lane state record: running, launched by the run that started at `run_started_at`.
+function record_of(issue: string, run_started_at: string): LaneStateRecord {
+	return {
+		issue,
+		run: { started_at: run_started_at },
+		state: 'running',
+		launched_at: run_started_at,
+		changed_at: run_started_at,
+		changed_by: 'lane:dispatch',
+	}
+}
+
+function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
+	const by_issue = new Map(records.map((record) => [record.issue, record]))
+
+	vi.mocked(lane_state.read_state).mockImplementation(async (issue) => by_issue.get(issue))
+}
+
+// joshuafolkken/kit#3969, #4269: a lane an earlier run left behind was drawn as this run's child.
+describe('run_board_read.read_local lane states', () => {
+	it('sorts the open lanes by their records into this run’s, an earlier run’s and unknown', async () => {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
 		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
-			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
-			{ ...lane('3432'), dispatched_ms: started_ms + MINUTE_MS },
+			lane('3431'),
+			lane('3432'),
 			lane('3433'),
 		])
+		arrange_states([record_of('3431', EARLIER_AT), record_of('3432', STARTED_AT)])
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ earlier_lanes: ['3431'] })
+		const { lane_states } = (await run_board_read.read_local()) ?? {}
+
+		expect(lane_states?.earlier.has(3431)).toBe(true)
+		expect(lane_states?.own.has(3432)).toBe(true)
+		expect(lane_states?.unknown).toStrictEqual(['3433'])
 	})
 
 	// joshuafolkken/kit#4260: its launch is before the span, so the span's events alone hold none of it.
 	it('reads what an earlier lane is doing from its launch before the span', async () => {
-		const started_ms = Date.parse(STARTED_AT)
 		const launch: RunEvent = {
 			pos: 1,
-			at: '2026-10-08T08:00:00.000Z',
+			at: EARLIER_AT,
 			kind: 'child-launch',
 			text: '#3431 launched',
 		}
 
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
 		vi.mocked(run_event_stream.read_events).mockReturnValue([launch])
-		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
-			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
-		])
+		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3431')])
+		arrange_states([record_of('3431', EARLIER_AT)])
 
 		const local = await run_board_read.read_local()
 
 		expect(local?.events).toStrictEqual([])
-		expect(local?.earlier_statuses?.get(3431)).toMatchObject({
+		expect(local?.lane_states.earlier.get(3431)).toMatchObject({
 			state: 'running',
 			started_ms: Date.parse(launch.at),
 		})
 	})
 })
 
+function arrange_earlier(idle: Array<string>): void {
+	arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+	vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3430'), lane('3431'), lane('3432')])
+	arrange_states([
+		record_of('3430', EARLIER_AT),
+		record_of('3431', EARLIER_AT),
+		record_of('3432', STARTED_AT),
+	])
+	vi.mocked(lane_spent.idle_lanes).mockReturnValue(idle)
+}
+
 // joshuafolkken/kit#4200: an earlier run's lane that holds a place was counted but never drawn.
 describe('run_board_read.read_local earlier lanes holding a place', () => {
-	const started_ms = Date.parse(STARTED_AT)
-
-	function arrange_earlier(idle: Array<string>): void {
-		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		vi.mocked(lane_registry.list_lanes).mockResolvedValue([
-			{ ...lane('3430'), dispatched_ms: started_ms - MINUTE_MS },
-			{ ...lane('3431'), dispatched_ms: started_ms - MINUTE_MS },
-			{ ...lane('3432'), dispatched_ms: started_ms + MINUTE_MS },
-		])
-		vi.mocked(lane_spent.idle_lanes).mockReturnValue(idle)
-	}
-
 	it('names the earlier run’s lanes the limit counts, beside the count itself', async () => {
 		arrange_earlier([])
 

@@ -218,8 +218,8 @@ function resolve_timing(options: ReserveOptions): TimingConfig {
 
 // **A claim alone in the ledger reads the machine too** (joshuafolkken/kit#4238): load outside the
 // ledger saturates the CPU whether or not another claim is in it. The busy cores are the mean of this
-// wait's recent readings of load outside the ledger (`busy-average.ts`). The budget may fall to zero,
-// which only a saturated CPU does, and then even the head waits (`core_admission.is_admitted`).
+// wait's recent readings of load outside the ledger (`busy-average.ts`). That load holds every claim but
+// the first waiter, which it narrows instead (`core_admission.is_admitted`, joshuafolkken/kit#4313).
 async function current_budget(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
@@ -276,18 +276,20 @@ function mark_waiting(context: WaitContext, reason: WaitReason): void {
 async function poll_admission(context: WaitContext): Promise<Admission | undefined> {
 	const reservations = live_reservations(context.directory)
 	const budget = await current_budget(context, reservations)
+	// A unit claim is admitted at the room the budget leaves rather than at full width — the first
+	// waiter, which load outside the ledger does not hold, as well as one past the wait cap.
+	const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
+	const reason = core_wait.hold_reason(context.key, reservations, budget, granted)
 
-	if (core_admission.is_admitted(context.key, reservations, budget)) return admit(context)
+	if (reason === undefined) return admit(context, undefined, granted)
 
-	// Past the wait cap a unit claim is admitted at the room left rather than at full width.
 	if (context.now() >= context.deadline) {
-		const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
 		const held = core_admission.with_grant(context.key, reservations, granted)
 
 		return admit(context, overflow_of(context, held, budget), granted)
 	}
 
-	mark_waiting(context, core_wait.wait_reason(context.key, reservations, budget))
+	mark_waiting(context, reason)
 
 	return undefined
 }

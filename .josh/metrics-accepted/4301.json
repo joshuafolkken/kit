@@ -1,0 +1,7 @@
+{
+	"reason": "Pre-bundle six packages for the unit suite on the root vitest config so both projects keep sharing one Vite server: the package list, the root optimizer constant and their tests",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}

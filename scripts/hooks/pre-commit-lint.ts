@@ -7,6 +7,7 @@ import {
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
+import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { execa } from 'execa'
 
 // The pre-commit hook's cspell, prettier and eslint runs over the staged files. They go through here
@@ -58,7 +59,23 @@ function build_arguments(
 	return [...tool_arguments, ...staged_files]
 }
 
+// eslint goes through the lane's warm daemon when one is reachable (joshuafolkken/kit#4358): the same
+// argument list and the same cache file, without paying the config and plugin load per commit. It
+// runs inside the tool's core-budget reservation like the cold route does.
+async function run_through_daemon(
+	command_arguments: ReadonlyArray<string>,
+): Promise<number | undefined> {
+	const outcome = await eslint_daemon.run(command_arguments, { project_root: process.cwd() })
+	if (outcome === undefined) return undefined
+	if (outcome.output !== '') process.stdout.write(`${outcome.output}\n`)
+
+	return outcome.exit_code
+}
+
 async function run_tool(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const warm_exit_code = await run_through_daemon(command_arguments)
+	if (warm_exit_code !== undefined) return warm_exit_code
+
 	const result = await execa(PNPM, command_arguments, { stdio: 'inherit', reject: false })
 
 	return resolve_spawn_exit(PNPM, result)

@@ -67,6 +67,14 @@ function closure(seeds: Array<string>): Set<string> {
 	return visited
 }
 
-const import_closure = { closure, imports_of }
+// A main guard is a statement at the start of a line, so a comment or a string that only names
+// `process.argv[1]` is not one (joshuafolkken/kit#4186).
+const MAIN_GUARD = /^if \(process\.argv\[1\] ===/mu
+
+function has_main_guard(file: string): boolean {
+	return MAIN_GUARD.test(readFileSync(file, 'utf8'))
+}
+
+const import_closure = { closure, has_main_guard, imports_of }
 
 export { import_closure, SCRIPTS_DIR, TOOLS_DIR }

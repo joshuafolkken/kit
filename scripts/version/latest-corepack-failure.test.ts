@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
 	fake_sync_result,
-	PACKAGE_JSON_PATH,
 	QUARANTINED_PUBLISH,
 	WORKSPACE_AGE_1440,
 } from './latest-corepack-fixture'
@@ -64,7 +64,7 @@ describe('latest_corepack.main when pnpm self-update fails', () => {
 		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(FAILURE))
 
 		expect(latest_corepack.main()).toBe(FAILURE)
-		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON_PATH, MANIFEST)
+		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON, MANIFEST)
 		expect(printed_errors()).toContain(SELF_UPDATE_FAILURE)
 	})
 
@@ -75,7 +75,7 @@ describe('latest_corepack.main when pnpm self-update fails', () => {
 		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0))
 
 		expect(latest_corepack.main()).toBe(FAILURE)
-		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON_PATH, MANIFEST)
+		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON, MANIFEST)
 	})
 
 	it('exits non-zero without running self-update when no integrity is published', () => {

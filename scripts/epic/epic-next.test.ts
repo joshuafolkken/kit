@@ -1,5 +1,4 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -357,14 +356,6 @@ describe('epic_next.is_order_declared', () => {
 
 	it('counts the sentence declaring the children independent', () => {
 		expect(epic_next.is_order_declared(UNORDERED_BODY, [])).toBe(true)
-	})
-})
-
-describe('josh epic:next registration', () => {
-	it('is registered as a command', () => {
-		const entry = COMMAND_MAP['epic:next']
-
-		expect(entry?.script).toBe('scripts/epic/epic-next.ts')
 	})
 })
 

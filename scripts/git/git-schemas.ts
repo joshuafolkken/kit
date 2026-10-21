@@ -2,19 +2,25 @@ import { z } from 'zod'
 
 const package_name_schema = z.object({ name: z.string().min(1) })
 
+// REST answers `null` for a field it has no value for yet — a running check run's `conclusion` above
+// all — and one rejected element fails the whole snapshot, which then reads as an empty rollup until
+// the last check completes (joshuafolkken/kit#4351). Every string field is `nullish` for that reason.
 const rollup_item_schema = z.looseObject({
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- GraphQL field name from GitHub API
-	__typename: z.string().optional(),
-	state: z.string().optional(),
-	status: z.string().optional(),
-	conclusion: z.string().optional(),
-	name: z.string().optional(),
-	context: z.string().optional(),
+	__typename: z.string().nullish(),
+	state: z.string().nullish(),
+	status: z.string().nullish(),
+	conclusion: z.string().nullish(),
+	name: z.string().nullish(),
+	context: z.string().nullish(),
 	description: z.string().nullish(),
 })
 
 const pr_raw_schema = z.object({
 	statusCheckRollup: z.array(rollup_item_schema).optional(),
+	// The base branch's required status check contexts, read from its rules — empty where none are
+	// set or they could not be read (`git-gh-branch-rules.ts`).
+	requiredContexts: z.array(z.string()).optional(),
 	mergeStateStatus: z.string().optional(),
 	reviewDecision: z.string().optional(),
 	headRefOid: z.string().optional(),

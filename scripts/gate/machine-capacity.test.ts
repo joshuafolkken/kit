@@ -189,56 +189,53 @@ const CALM: MemoryReading = {
 }
 const HEAVY_MB = 2000
 
-function claim(key: string, claimed_at: number): LedgerEntry {
-	return { key, reservation: { weight: 1, memory_mb: HEAVY_MB, claimed_at } }
+function claim(key: string, claimed_at: number, admitted_at?: number): LedgerEntry {
+	return { key, reservation: { weight: 1, memory_mb: HEAVY_MB, claimed_at, admitted_at } }
 }
 
+// `first` is running and in the reading, so the budget adds its memory back.
 function admits_second_claim(after: MemoryReading): boolean {
-	const available_mb = machine_capacity.pressured_available(CALM, after)
+	const available_mb = machine_capacity.pressured_available(after)
 	const reading = { busy_cores: 0, available_mb }
 	const ledger = { cores: 1, memory_mb: HEAVY_MB }
 	const budget = machine_capacity.machine_budget(CORES, reading, ledger)
 
-	return core_admission.is_admitted('second', [claim('first', 0), claim('second', 1)], budget)
+	return core_admission.is_admitted('second', [claim('first', 0, 0), claim('second', 1)], budget)
 }
 
-describe('machine_capacity.pressured_available — memory under compression and swap pressure', () => {
+// joshuafolkken/kit#4313: a machine that swaps and compresses all day held a third of every wait with
+// memory to spare, so the traffic alone no longer answers no free memory.
+describe('machine_capacity.pressured_available — swap and compressor traffic alone set no limit', () => {
 	it('answers the available memory when nothing is under pressure', () => {
-		expect(machine_capacity.pressured_available(CALM, CALM)).toBe(AVAILABLE_MB)
+		expect(machine_capacity.pressured_available(CALM)).toBe(AVAILABLE_MB)
 	})
 
-	it('answers no free memory when swap traffic across the window passes the threshold', () => {
+	it('answers the available memory while swap traffic passes the threshold', () => {
 		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB + 1 }
 
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(0)
+		expect(machine_capacity.pressured_available(after)).toBe(AVAILABLE_MB)
 	})
 
-	it('answers the available memory under the trickle of a machine that swapped once', () => {
-		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB }
-
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(AVAILABLE_MB)
-	})
-
-	// Round 2 of #3943: the incident's thrash was compressor traffic with the kernel's verdict normal
-	// and the swap counters quiet, so the swap threshold alone admitted it.
-	it('answers no free memory when compressor traffic alone passes the threshold, swap quiet', () => {
+	it('answers the available memory while compressor traffic passes the threshold', () => {
 		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB + 1
 
-		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(0)
+		expect(machine_capacity.pressured_available({ ...CALM, compressed_mb })).toBe(AVAILABLE_MB)
 	})
 
-	it('answers the available memory under compressor traffic at the threshold', () => {
-		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB
+	it('admits a claim under swap traffic when the free memory holds what it declares', () => {
+		const swapping = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB + 1 }
 
-		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(
-			AVAILABLE_MB,
-		)
+		expect(admits_second_claim(swapping)).toBe(true)
+	})
+
+	it('holds a claim back when the free memory falls short of what it declares', () => {
+		expect(admits_second_claim({ ...CALM, available_mb: HEAVY_MB - 1 })).toBe(false)
 	})
 
 	it('leaves memory that could not be read unread, so it sets no limit', () => {
 		const unread = { available_mb: undefined, swapped_mb: undefined, pressure_level: undefined }
 
-		expect(machine_capacity.pressured_available(unread, unread)).toBeUndefined()
+		expect(machine_capacity.pressured_available(unread)).toBeUndefined()
 	})
 })
 
@@ -246,14 +243,14 @@ describe('machine_capacity.pressured_available — the kernel verdict', () => {
 	const CRITICAL = { ...CALM, pressure_level: machine_capacity.PRESSURE_HOLD }
 
 	it('answers no free memory while the kernel reports critical pressure', () => {
-		expect(machine_capacity.pressured_available(CALM, CRITICAL)).toBe(0)
+		expect(machine_capacity.pressured_available(CRITICAL)).toBe(0)
 	})
 
 	// joshuafolkken/kit#4199: macOS keeps the warning long after the pressure passed.
 	it('answers the available memory under the kernel warning alone', () => {
 		const after = { ...CALM, pressure_level: WARNING }
 
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(AVAILABLE_MB)
+		expect(machine_capacity.pressured_available(after)).toBe(AVAILABLE_MB)
 	})
 
 	it('holds a heavy claim back under pressure and admits it when there is none', () => {
@@ -288,9 +285,10 @@ async function read_swapping_machine(): Promise<MachineReading> {
 }
 
 describe('machine_capacity.read_machine — memory read at both ends of the window', () => {
-	it('answers no free memory when the swap counter advanced past the threshold during the window', async () => {
+	it('names the pressure but keeps the free memory when the swap counter advanced during the window', async () => {
 		const reading = await read_swapping_machine()
 
-		expect(reading.available_mb).toBe(0)
+		expect(reading.memory_pressured).toBe(true)
+		expect(reading.available_mb).toBeGreaterThan(0)
 	})
 })

@@ -3,19 +3,20 @@ import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-
 import { test_read_map, type ReadMap } from './test-read-map'
 import { unit_setup_files } from './unit-setup-files'
 
-// The whole unit suite is expensive. Measured warm on kit, that is 384 files
-// and 6,616 tests — 13.9s wall and 110s of CPU, 84% of everything the four gate checks spend, and
-// an implementation loop paid it again on every re-check. The same tree narrowed to one changed
-// file runs 31 files and 566 tests in 2.4s (7.9s of CPU, −93%).
+// The whole unit suite is expensive — the largest share of what the gate checks spend, and an
+// implementation loop paid it again on every re-check — while one changed file narrows it to a small
+// fraction. `josh lane:stats` reports what `test:unit` costs now.
 //
 // **The verification gate runs this narrowing in place of the whole suite** (joshuafolkken/kit#4065),
 // which is safe only because it reaches every test a change can break. A changed module reaches
 // the tests importing it through `vitest related`, and the tests reading it as data through the
 // test-read map a whole-suite run records (`test-read-map.ts`). A changed document, config or
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
-// non-code file added since the recorded tree that no recorded test read, or a file every test
+// non-code file added since the recorded tree that no recorded test read, where a test read inside its
+// directory or the tree did not hold it, or a file every test
 // depends on. A non-code file the recorded tree already held and no test read is one no test reads
-// (joshuafolkken/kit#4073), so a change made only of those runs nothing. CI runs the whole suite
+// (joshuafolkken/kit#4073), and so is one added since to a directory the tree held and no test read
+// inside (joshuafolkken/kit#4303), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
 // before the merge.
 //
@@ -125,8 +126,9 @@ function all_scope(reason: string): RelatedScope {
 	return { mode: 'all', files: [], reason }
 }
 
-// A file no recorded test read narrows only when the recorded tree held it: one added since is a file
-// the recorder never saw, so its having no reader says nothing.
+// A file no recorded test read narrows only when the recorded tree held it, or held its directory and
+// no recorded test read inside that: any other file added since is one the recorder never saw, so its
+// having no reader says nothing.
 function resolve_through_map(others: ReadonlyArray<string>, request: ScopeRequest): MapResolution {
 	const { map, recorded } = request
 
@@ -134,7 +136,9 @@ function resolve_through_map(others: ReadonlyArray<string>, request: ScopeReques
 	if (map === undefined) return { reason: `${NO_MAP_REASON} ${String(others[0])}` }
 
 	const unread = others.filter((file) => test_read_map.readers_of(map, file).length === 0)
-	const unknown = unread.find((file) => !recorded.has(file))
+	const unknown = unread.find(
+		(file) => !recorded.has(file) && !test_read_map.in_unread_directory(map, file),
+	)
 
 	if (unknown !== undefined) return { reason: `${unknown} is read by no recorded test` }
 

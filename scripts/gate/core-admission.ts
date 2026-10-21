@@ -8,12 +8,18 @@ import type { LedgerLoad, MachineBudget } from './machine-capacity'
 // **How long an admitted claim's tool takes to reach its declared peak.** The machine reading holds only
 // what a tool has already allocated, so a claim admitted moments ago is not in it yet: adding its
 // declared memory back would admit the next claim into memory about to be taken — the concurrent start
-// this ledger exists to stop. Until the window passes, the claim's memory counts only in the FIFO walk; a
+// this ledger exists to stop. Until the window passes, the claim's memory counts only in `is_admitted`; a
 // tool partway up is then counted twice, which costs a slower admission, never a swap. Its cores are in
 // the reading from the start, so the window does not apply to them.
 const RAMP_UP_MS = 30_000
+// How long after a waiting claim's own claim a lighter claim may still pass it (`may_pass`): long
+// enough for the related checks an edit triggers together, short enough that a heavy claim waits only
+// for the claims already in flight.
+const BYPASS_WINDOW_MS = 30_000
 // A narrowed unit claim still runs one worker: zero would run no test and report the suite green.
 const MIN_GRANT = 1
+// A unit claim narrowed to less than its asked weight over this waits rather than starts (`is_too_narrow`).
+const NARROW_DIVISOR = 2
 
 // What admission reads from a marker. `memory_mb` and `admitted_at` are optional because a marker an
 // older `josh` wrote has neither: it declares no memory, and it counts as load from outside the ledger.
@@ -66,62 +72,122 @@ function exceeds(totals: LedgerLoad, budget: LedgerLoad): boolean {
 	return totals.cores > budget.cores || totals.memory_mb > budget.memory_mb
 }
 
-// **The keys admitted under FIFO.** The head always runs — a single check heavier than the whole
-// machine must not wait for room that will never come — and each later reservation runs while the
-// cumulative weight ahead of it still fits the budget. The first that does not fit stops the walk, so a
-// place is never jumped: admission is in claim order, which is what removes the start-time asymmetry.
-// Memory is walked the same way, so a claim whose tool would not fit in free memory waits like one whose
-// cores would not fit.
-//
-// `exempt_index` is the place admitted whatever the budget says: the head's, or none.
-function walk_admitted(
-	reservations: ReadonlyArray<LedgerEntry>,
-	limit: LedgerLoad,
-	exempt_index: number,
-): Set<string> {
-	const totals = { cores: 0, memory_mb: 0 }
-	const admitted = new Set<string>()
-
-	for (const [index, entry] of reservations.toSorted(compare_claim).entries()) {
-		add_load(totals, entry.reservation)
-
-		if (index !== exempt_index && exceeds(totals, limit)) break
-
-		admitted.add(entry.key)
-	}
-
-	return admitted
-}
-
-function admitted_keys(
-	reservations: ReadonlyArray<LedgerEntry>,
-	budget: number,
-	memory_budget = Infinity,
-): Set<string> {
-	return walk_admitted(reservations, { cores: budget, memory_mb: memory_budget }, 0)
-}
-
-// **A saturated CPU holds the head too** (joshuafolkken/kit#4238): when the reading found the CPU
-// busier than the ledger declares, the room is coming back as that load leaves, so the head waits for
-// it like any claim — and the wait cap still admits it if the load never leaves. Only the cores hold it:
-// busy cores say nothing about memory, so the head keeps its memory exemption.
-function is_admitted(
-	key: string,
-	reservations: ReadonlyArray<LedgerEntry>,
-	budget: MachineBudget,
-): boolean {
-	if (!walk_admitted(reservations, budget, 0).has(key)) return false
-	if ((budget.busy_excess ?? 0) === 0) return true
-
-	return walk_admitted(reservations, { cores: budget.cores, memory_mb: Infinity }, -1).has(key)
-}
-
 function sum_load(reservations: ReadonlyArray<LedgerEntry>): LedgerLoad {
 	const load = { cores: 0, memory_mb: 0 }
 
 	for (const entry of reservations) add_load(load, entry.reservation)
 
 	return load
+}
+
+function is_waiting(entry: LedgerEntry): boolean {
+	return entry.reservation.admitted_at === undefined
+}
+
+function fits(entries: ReadonlyArray<LedgerEntry>, limit: LedgerLoad): boolean {
+	return !exceeds(sum_load(entries), limit)
+}
+
+// Where a claim stands in the ledger: the claims already running, whatever their place, and the
+// claims still waiting ahead of it in claim order.
+interface Placement {
+	own: LedgerEntry
+	is_oldest: boolean
+	ahead: Array<LedgerEntry>
+	running: Array<LedgerEntry>
+}
+
+function place(key: string, reservations: ReadonlyArray<LedgerEntry>): Placement | undefined {
+	const ordered = reservations.toSorted(compare_claim)
+	const index = ordered.findIndex((entry) => entry.key === key)
+	const own = ordered[index]
+
+	if (own === undefined) return undefined
+
+	return {
+		own,
+		is_oldest: index === 0,
+		ahead: ordered.slice(0, index).filter((entry) => is_waiting(entry)),
+		running: ordered.filter((entry) => entry.key !== key && !is_waiting(entry)),
+	}
+}
+
+// **The first waiting claim is held by the ledger, never by load from outside it**
+// (joshuafolkken/kit#4313). Holding it on `busy_excess` (joshuafolkken/kit#4238) made a solo gate's unit
+// claim wait out the cap behind one core of Claude sessions or editor load — work deferred, not removed.
+// It is admitted against the cores the ledger leaves, and a unit claim narrows to the room the outside
+// load leaves (`narrowed_weight`), so that load bounds its workers instead of its start.
+function first_waiter_limit(budget: MachineBudget): LedgerLoad {
+	return { cores: budget.cores + (budget.busy_excess ?? 0), memory_mb: budget.memory_mb }
+}
+
+// **A light claim passes a waiting one only within a window of that one's claim** (#4313). A claim that
+// fits the room the running claims leave runs instead of queueing behind a heavier claim that does not
+// fit it; a claim made more than the window after a waiter queues behind it, so a waiter is passed by a
+// bounded set of claims and is never starved.
+function may_pass({ own, ahead, running }: Placement, budget: MachineBudget): boolean {
+	const latest = own.reservation.claimed_at - BYPASS_WINDOW_MS
+	const is_recent = ahead.every((entry) => entry.reservation.claimed_at > latest)
+
+	return is_recent && fits([...running, own], budget)
+}
+
+function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget): boolean {
+	const limit = ahead.length === 0 ? first_waiter_limit(budget) : budget
+
+	return fits([...running, ...ahead, own], limit)
+}
+
+// **Admission: the oldest claim runs once nothing else does, then claim order, then a bounded pass.**
+// The oldest runs because a single check heavier than the whole machine must not wait for room that will
+// never come; claims that passed it are still running beside it, and their room does come back, so it
+// waits for them rather than starting on top of their cores and memory. A later claim runs when every
+// running claim, every claim waiting ahead of it and its own load fit the budget — the first waiter
+// against the ledger alone (`first_waiter_limit`) — or when it may pass the waiters ahead (`may_pass`).
+function is_admitted(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+): boolean {
+	const placement = place(key, reservations)
+
+	if (placement === undefined) return false
+	if (placement.is_oldest && placement.running.length === 0) return true
+
+	return fits_in_order(placement, budget) || may_pass(placement, budget)
+}
+
+function mark_admitted(entries: Array<LedgerEntry>, key: string): void {
+	const index = entries.findIndex((entry) => entry.key === key)
+	const entry = entries[index]
+
+	if (entry === undefined) return
+
+	entries[index] = {
+		...entry,
+		reservation: { ...entry.reservation, admitted_at: entry.reservation.claimed_at },
+	}
+}
+
+// **The keys one round of polls admits**, each claim polling in claim order and reading the ledger the
+// claims before it left — an admitted claim is running for every claim after it, as its marker is.
+function admitted_keys(
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: number,
+	memory_budget = Infinity,
+): Set<string> {
+	const limit = { cores: budget, memory_mb: memory_budget }
+	const ledger = [...reservations]
+	const admitted = new Set<string>()
+
+	for (const { key } of reservations.toSorted(compare_claim)) {
+		if (!is_admitted(key, ledger, limit)) continue
+
+		admitted.add(key)
+		mark_admitted(ledger, key)
+	}
+
+	return admitted
 }
 
 function is_ramped(reservation: LedgerReservation, now: number): boolean {
@@ -163,6 +229,24 @@ function narrowed_weight(
 	const room = Math.max(MIN_GRANT, Math.floor(budget - total_weight(others)))
 
 	return room >= own.weight ? undefined : room
+}
+
+// **A unit claim narrowed below half its asked width waits for room instead, until the wait cap**
+// (joshuafolkken/kit#4167). vitest fixes its pool at start, so a width read off one busy instant holds for
+// the whole suite after the cores come back: over seven days a run at three workers or fewer took a
+// median 197 s against 76–90 s at seven, and 14 of the 18 slowest unit runs started that narrow. The
+// wait costs at most the cap, past which the claim narrows as before; a narrowing to half or more — a
+// core of editor load beside a solo gate — still starts at once (joshuafolkken/kit#4313).
+function is_too_narrow(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	granted: number | undefined,
+): boolean {
+	if (granted === undefined) return false
+
+	const own = reservations.find((entry) => entry.key === key)?.reservation
+
+	return own !== undefined && granted * NARROW_DIVISOR < own.weight
 }
 
 // The ledger as it stands once `key` is admitted at `granted`, so the overflow it reports counts the
@@ -208,11 +292,13 @@ function describe_overflow(admission: Admission): string | undefined {
 }
 
 const core_admission = {
+	BYPASS_WINDOW_MS,
 	RAMP_UP_MS,
 	admitted_keys,
 	admitted_load,
 	describe_overflow,
 	is_admitted,
+	is_too_narrow,
 	ledger_load,
 	narrowed_weight,
 	sum_load,

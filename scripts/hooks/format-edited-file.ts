@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
+import { resolve_local_bin } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { json_value } from '#scripts/lib/json-value'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -83,12 +83,8 @@ const ESLINT_ARGUMENTS: ReadonlyArray<string> = [
 // identical rather than merely similar. The config entry file is re-read per request; the modules it
 // imports are not, which `plan_daemon_restart` below is the answer to. The daemon exits after 15
 // minutes of inactivity.
-const ESLINT_DAEMON = 'eslint_d'
+const { ESLINT_DAEMON } = eslint_daemon
 const DAEMON_RESTART = 'restart'
-// The two shapes a flat config is built from here and in every consumer of this kit: the root
-// `eslint.config.*` entry, and the rule modules under `eslint/` that it imports.
-const ESLINT_CONFIG_DIR = 'eslint'
-const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
 
 // The problems eslint could not auto-fix are handed to the model verbatim from eslint's own stdout —
 // its default formatter already prints the file, the `line:col`, and the rule name. A header names what the block is, since additionalContext arrives
@@ -103,11 +99,6 @@ const DIAGNOSTIC_TRUNCATION_NOTICE = '\n…(diagnostics truncated)'
 // The density line first, then the lint problems, with a blank line between them when both are
 // present.
 const SECTION_SEPARATOR = '\n\n'
-
-// Where this file sits inside the kit package. `eslint_d` is kit's dependency rather than the
-// consumer's, and pnpm writes a `node_modules/.bin` shim only for a project's *direct* dependencies,
-// so a consumer's project root cannot see it and this directory can.
-const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
 
 interface FormatCommand {
 	bin: string
@@ -226,10 +217,7 @@ const DAEMON_BINS: ReadonlySet<string> = new Set([ESLINT_BIN, ESLINT_DAEMON])
 function resolve_daemon_cli(bin: string, project_root: string): string | undefined {
 	if (!DAEMON_BINS.has(bin)) return undefined
 
-	return (
-		resolve_package_bin(MODULE_DIRECTORY, ESLINT_DAEMON, ESLINT_DAEMON) ??
-		resolve_package_bin(project_root, ESLINT_DAEMON, ESLINT_DAEMON)
-	)
+	return eslint_daemon.resolve_daemon_cli(project_root)
 }
 
 // Only the config *entry file* is re-read per request: ESLint cache-busts `eslint.config.js` by
@@ -238,13 +226,6 @@ function resolve_daemon_cli(bin: string, project_root: string): string | undefin
 // and then any source file, and it would be auto-fixed against the pre-edit rules for as long as the
 // daemon lives — an author testing a rule change would read that as the rule being broken. Restarting
 // after an edit to a config input is what makes the whole config current, not just its first file.
-function is_eslint_config_input(relative_path: string): boolean {
-	return (
-		relative_path.split(path.sep)[0] === ESLINT_CONFIG_DIR ||
-		ESLINT_CONFIG_ENTRY.test(relative_path)
-	)
-}
-
 function plan_daemon_restart(
 	file_path: string,
 	project_root: string,
@@ -253,7 +234,7 @@ function plan_daemon_restart(
 
 	if (
 		relative === undefined ||
-		!is_eslint_config_input(relative) ||
+		!eslint_daemon.is_config_input(relative) ||
 		resolve_daemon_cli(ESLINT_DAEMON, project_root) === undefined
 	) {
 		return []

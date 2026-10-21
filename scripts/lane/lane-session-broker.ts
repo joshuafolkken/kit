@@ -31,8 +31,12 @@ const POLL_MS = 100
 const LEGACY_HEARTBEAT_MS = 500
 const LEGACY_HEARTBEAT_LIMIT_MS = 3000
 const MINUTE_MS = 60_000
-const REQUEST_LIMIT_MINUTES = 30
-const REQUEST_LIMIT_MS = REQUEST_LIMIT_MINUTES * MINUTE_MS
+// **A relaunch is answered once the session has started, a review once it has finished**: waiting out a
+// review's limit on a relaunch left the stopped lane idle for half an hour (joshuafolkken/kit#4344).
+const REQUEST_LIMIT_MINUTES: Readonly<Record<BrokerAction['kind'], number>> = {
+	review: 30,
+	relaunch: 2,
+}
 const request_schema = z
 	.object({ session: z.uuid(), nonce: z.uuid(), action: lane_session_action.action_schema })
 	.strict()
@@ -250,8 +254,10 @@ async function wait_response(
 	target: string,
 	session: string,
 	nonce: string,
+	kind: BrokerAction['kind'],
 ): Promise<BrokerAnswer> {
-	const deadline = Date.now() + REQUEST_LIMIT_MS
+	const limit_minutes = REQUEST_LIMIT_MINUTES[kind]
+	const deadline = Date.now() + limit_minutes * MINUTE_MS
 
 	while (Date.now() < deadline) {
 		const verdict = response_verdict(target, session, nonce)
@@ -261,7 +267,7 @@ async function wait_response(
 		await sleep(POLL_MS)
 	}
 
-	return failure(`the broker gave no answer within ${String(REQUEST_LIMIT_MINUTES)} minutes`)
+	return failure(`the broker gave no answer within ${String(limit_minutes)} minutes`)
 }
 
 function live_response(target: string): BrokerResponse | undefined {
@@ -272,12 +278,18 @@ function live_response(target: string): BrokerResponse | undefined {
 		: undefined
 }
 
+// The session of the server answering for this lane now, or `undefined` while none does. A new session
+// means the server that held the lane before has ended.
+function serving_session(directory: string, issue: string): string | undefined {
+	const target = response_path(directory, issue)
+
+	return target === undefined ? undefined : live_response(target)?.session
+}
+
 // Whether a server answers for this lane now — what a Claude lane's ship asks before it hands a session
 // over rather than starting the session itself.
 function is_serving(directory: string, issue: string): boolean {
-	const target = response_path(directory, issue)
-
-	return target !== undefined && live_response(target) !== undefined
+	return serving_session(directory, issue) !== undefined
 }
 
 // **A request nobody waits for any more is taken back**: a server busy with an earlier request reads the
@@ -308,7 +320,7 @@ async function send(directory: string, issue: string, action: BrokerAction): Pro
 	const pending = request_path(directory, issue)
 
 	stamp_file.replace_stamp(pending, body)
-	const answer = await wait_response(target, response.session, nonce)
+	const answer = await wait_response(target, response.session, nonce, action.kind)
 
 	withdraw(pending, nonce)
 
@@ -333,6 +345,7 @@ const lane_session_broker = {
 	request_path,
 	response_path,
 	review_paths: lane_session_action.review_paths,
+	serving_session,
 	with_server,
 }
 

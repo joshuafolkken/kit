@@ -1,10 +1,9 @@
-#!/usr/bin/env tsx
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { doctor_io } from '#scripts/doctor/doctor-io'
 import { error_text } from '#scripts/lib/error-message'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
@@ -28,10 +27,8 @@ import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 import { working_tree } from './working-tree'
 
-const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const LEFTHOOK_BIN = 'lefthook'
-const ARGUMENT_START_INDEX = 2
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
 const INIT_USAGE = 'josh init [--profile basic|full] [--no-install] [--dry-run]'
 
@@ -335,10 +332,6 @@ function run_cli(args: ReadonlyArray<string>): void {
 		console.error(`\n✖ ${error_text.message_of(error)}\n`)
 		process.exitCode = 1
 	}
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	run_cli(process.argv.slice(ARGUMENT_START_INDEX))
 }
 
 const init = {

@@ -1,4 +1,4 @@
-import { existsSync, globSync, readFileSync } from 'node:fs'
+import { existsSync, globSync } from 'node:fs'
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
@@ -6,10 +6,10 @@ import { own_formatter } from '#scripts/init/own-formatter'
 import { project_profile } from '#scripts/init/project-profile'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { NOT_USED_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { z } from 'zod'
 
-const PACKAGE_JSON = 'package.json'
 const IGNORED_DIRS = new Set([
 	'node_modules',
 	'.git',
@@ -48,7 +48,7 @@ const object_schema = z.record(z.string(), z.unknown())
 function project_root(directory: string): string {
 	return (
 		ancestor_directories.nearest(directory, (candidate) =>
-			existsSync(path.join(candidate, PACKAGE_JSON)),
+			existsSync(package_manifest.manifest_path(candidate)),
 		) ?? directory
 	)
 }
@@ -86,16 +86,9 @@ function is_basic_manifest(manifest: unknown): boolean {
 	return project_profile.parse_profile(josh['profile']) === 'basic'
 }
 
-// The try covers the read alone — a missing or unreadable manifest — since the parse already answers
-// `undefined` for text that is not JSON.
+// A missing, unreadable or non-JSON manifest answers `undefined`; the shape is each caller's question.
 function read_manifest(directory: string): unknown {
-	try {
-		const manifest_path = path.join(project_root(directory), PACKAGE_JSON)
-
-		return json_value.parse_or_undefined(readFileSync(manifest_path, 'utf8'))
-	} catch {
-		return undefined
-	}
+	return package_manifest.read_manifest_if_valid(project_root(directory), z.unknown())
 }
 
 function is_basic(directory: string): boolean {
