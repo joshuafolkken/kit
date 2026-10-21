@@ -6,15 +6,28 @@ const CHILD = '2508'
 const CHILD_LAUNCH = 'child-launch'
 const CHILD_DISPATCHED = '#2508 dispatched'
 const PARKED_2509 = '#2509 parked'
+const DISPATCHED_2509 = '#2509 dispatched'
 
 function event(pos: number, kind: string, text: string): RunEvent {
 	return { pos, kind, text, at: '2026-09-24T00:00:00.000Z' }
 }
 
+it('excludes from the offer the merged children and the ones still in flight', () => {
+	const events = [
+		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(2, CHILD_LAUNCH, DISPATCHED_2509),
+		event(3, 'merge', '#2509 merged'),
+		event(4, CHILD_LAUNCH, '#2510 dispatched'),
+		event(5, 'park', '#2510 parked'),
+	]
+
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual(['2509', CHILD])
+})
+
 it('restores only live lanes launched by this invocation', () => {
 	const events = [
 		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
-		event(2, CHILD_LAUNCH, '#2509 dispatched'),
+		event(2, CHILD_LAUNCH, DISPATCHED_2509),
 		event(3, 'park', PARKED_2509),
 	]
 

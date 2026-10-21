@@ -231,6 +231,18 @@ describe('lane_ledger.record_held', () => {
 	})
 })
 
+describe('lane_ledger.record_offerable', () => {
+	it('records whether offerable work and a free lane coexist', async () => {
+		const target = ledger('offerable')
+
+		await lane_ledger.record_offerable(true, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: 'offerable', is_offerable: true },
+		])
+	})
+})
+
 describe('lane_ledger.target', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()

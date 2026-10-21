@@ -4,6 +4,8 @@ import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -258,5 +260,23 @@ describe('backlog_ready.read_backlog_next', () => {
 
 		await expect(backlog_ready.ready_issues()).resolves.toEqual(['2445'])
 		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], true, undefined)
+	})
+
+	// joshuafolkken/kit#4349: the stream is the repository's log, so an earlier run's merge is no exclusion.
+	it("excludes only this invocation's merged children", async () => {
+		const merge = run_event_stream.EVENT_KIND.MERGE
+		const events: ReadonlyArray<RunEvent> = [
+			{ pos: 1, at: '2026-09-22T12:00:00.000Z', kind: merge, text: '#2400 merged' },
+			{ pos: 2, at: '2026-09-23T13:00:00.000Z', kind: merge, text: '#2445 merged' },
+		]
+
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun'))
+		vi.spyOn(run_event_stream_emit, 'stream_target').mockResolvedValue('events.jsonl')
+		vi.spyOn(run_event_stream, 'read_events').mockReturnValue(events)
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(ANSWER)
+
+		await backlog_ready.read_backlog_next(TIMEOUT_MS)
+
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT, '--exclude', '2445'], false, TIMEOUT_MS)
 	})
 })

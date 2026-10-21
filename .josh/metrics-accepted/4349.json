@@ -1,0 +1,7 @@
+{
+	"reason": "#4349: stall detection shares the offer exclude list, measures from the first offerable observation (new ledger kind + shared module), and the watcher's minute probe records that observation",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 122
+	}
+}
