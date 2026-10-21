@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, lstatSync, readdirSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,7 +26,8 @@ const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
 // A consumer's config imports its rules from installed packages (`@joshuafolkken/app-kit/eslint…`),
 // so an install is a config input too: pnpm rewrites `node_modules/.modules.yaml` on every install,
 // and the lockfile on every dependency change a checkout or merge brings in.
-const DEPENDENCY_INPUTS = ['pnpm-lock.yaml', path.join('node_modules', '.modules.yaml')]
+const NODE_MODULES = 'node_modules'
+const DEPENDENCY_INPUTS = ['pnpm-lock.yaml', path.join(NODE_MODULES, '.modules.yaml')]
 // `eslint_d` writes `<token> <port> <pid> <hash>` here once, when the daemon has started — so the
 // file's mtime is when the daemon loaded its config.
 const DAEMON_RECORD = '.eslint_d'
@@ -50,7 +51,20 @@ interface DaemonRunOptions {
 	timeout_ms?: number
 }
 
+// `eslint_d` keys its one daemon on the record beside the eslint it resolves, so a project that
+// borrows another checkout's `node_modules` through a symlink — a test fixture's temporary
+// repository — would start, restart and overwrite that checkout's daemon (joshuafolkken/kit#4386).
+function is_borrowed_install(project_root: string): boolean {
+	return (
+		lstatSync(path.join(project_root, NODE_MODULES), {
+			throwIfNoEntry: false,
+		})?.isSymbolicLink() === true
+	)
+}
+
 function resolve_daemon_cli(project_root: string): string | undefined {
+	if (is_borrowed_install(project_root)) return undefined
+
 	return (
 		resolve_package_bin(MODULE_DIRECTORY, ESLINT_DAEMON, ESLINT_DAEMON) ??
 		resolve_package_bin(project_root, ESLINT_DAEMON, ESLINT_DAEMON)

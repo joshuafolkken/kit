@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/rules/timed-rerun.ts:28 | 2026-10-21 | #4356
