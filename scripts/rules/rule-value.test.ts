@@ -257,6 +257,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'lane-interactive-ask',
 	'lane-carry-conflict',
 	'lane-switch-main',
+	'lane-direct-tool',
 	'josh-git-bare',
 	'git-force',
 	'worktree-mutation',
