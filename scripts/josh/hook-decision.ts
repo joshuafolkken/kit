@@ -1,5 +1,6 @@
 import { text } from 'node:stream/consumers'
 import { json_value } from '#scripts/lib/json-value'
+import { file_reader } from '#scripts/lib/read-file'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
@@ -44,7 +45,6 @@ const ALLOW_DECISION = 'allow'
 // No record means nothing has been refused yet, and every span began after instant zero — which is
 // the answer wanted: the first qualifying accumulation of a run is refused.
 const NEVER_MS = 0
-const MISSING_FILE = 'ENOENT'
 
 // More than one spelling, because the mistake on this side is silent: a value meant to disable a
 // guard that the list does not recognize leaves it on, and the person sees refusals they asked to
@@ -70,9 +70,7 @@ function is_switch_opt_in(key: string): boolean {
 }
 
 function parse_hook_payload(raw_payload: string): HookPayload | undefined {
-	const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
-
-	return parsed.success ? parsed.data : undefined
+	return json_value.parse_with(raw_payload, payload_schema)
 }
 
 // The documented shape a `PreToolUse` hook answers with. Plain stdout is not it — only this envelope
@@ -138,25 +136,19 @@ function stamp_fault(switch_key: string): string {
 	)
 }
 
-// **A transcript that does not exist yet is not a fault.** A delegated unit's own file is named before
-// anything is written under it, so a fork's first guarded calls read a path with no file behind it —
-// `time-hook-transcript.ts` states that "no history" is the honest verdict there. Reported as a fault
-// it would print on every early call of every fork, which is the routine case drowning the signal this
-// exists to raise.
-function is_missing_file(error: unknown): boolean {
-	if (!(error instanceof Error) || !('code' in error)) return false
-
-	return typeof error.code === 'string' && error.code === MISSING_FILE
-}
-
 function error_text(error: unknown): string {
 	if (error instanceof Error) return error.message
 
 	return typeof error === 'string' ? error : 'a value that is not an error'
 }
 
+// **A transcript that does not exist yet is not a fault.** A delegated unit's own file is named before
+// anything is written under it, so a fork's first guarded calls read a path with no file behind it —
+// `time-hook-transcript.ts` states that "no history" is the honest verdict there. Reported as a fault
+// it would print on every early call of every fork, which is the routine case drowning the signal this
+// exists to raise.
 function fault_notice(switch_key: string, error: unknown): string | undefined {
-	if (is_missing_file(error)) return undefined
+	if (file_reader.is_absent(error)) return undefined
 
 	const detail = error_text(error)
 
@@ -417,10 +409,10 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 		return stamp.path(transcript_path)
 	}
 
-	// **Every failure allows the call.** A missing transcript, a payload that is not JSON, a
-	// half-written tail, a temp directory that cannot be written — each ends as "no refusal", for the
-	// same reason `format-edited-file.ts` swallows a formatter it could not start: a hook that failed
-	// closed would stop a run over its own plumbing.
+	// **Every failure allows the call.** An unreadable transcript, a half-written tail, a temp directory
+	// that cannot be written — each ends as "no refusal", for the same reason `format-edited-file.ts`
+	// swallows a formatter it could not start: a hook that failed closed would stop a run over its own
+	// plumbing. A payload that is not JSON names no call to judge, so it ends with no outcome at all.
 	//
 	// **What changed is that it no longer does so in silence**. The call still
 	// goes through — failing open is the right call and is not being revisited — but the fault comes
@@ -482,13 +474,22 @@ function report_no_payload(command: string): void {
 	)
 }
 
-// A guard entry's whole main: the payload on stdin judged by `outcome`, or the hand-run notice.
+// A hook entry's whole main: the hand-run notice from a terminal, else the payload on stdin handed to
+// `respond` once `.env` is loaded.
 async function respond_from_stdin(
 	command: string,
-	outcome: (raw: string) => GuardOutcome,
+	respond: (raw: string) => Promise<void> | void,
 ): Promise<void> {
-	if (process.stdin.isTTY) report_no_payload(command)
-	else write_outcome(await text(process.stdin), outcome)
+	if (process.stdin.isTTY) {
+		report_no_payload(command)
+
+		return
+	}
+
+	const raw_payload = await text(process.stdin)
+
+	load_environment_file()
+	await respond(raw_payload)
 }
 
 const hook_decision = {

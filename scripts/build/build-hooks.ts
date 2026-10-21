@@ -1,15 +1,8 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { build, type OnLoadArgs, type OutputFile, type Plugin, type PluginBuild } from 'esbuild'
 
 const BUILD_SCRIPT = fileURLToPath(import.meta.url)
@@ -120,10 +113,7 @@ function is_chunk_first(left: OutputFile, right: OutputFile): number {
 // Each file is written into a private staging directory and renamed into place, so a hook never
 // reads a half-written bundle and two builds running side by side never write one file at once.
 function place(staging: string, target: string, contents: Uint8Array | string): void {
-	const temporary = path.join(staging, path.basename(target))
-
-	writeFileSync(temporary, contents)
-	renameSync(temporary, target)
+	atomic_write.replace_file(target, contents, { staging_directory: staging })
 }
 
 function place_build(out_directory: string, files: ReadonlyArray<OutputFile>, stamp: string): void {

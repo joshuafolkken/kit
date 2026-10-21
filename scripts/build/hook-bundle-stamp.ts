@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
 
 // What a hook build was made from, so a later launch can tell whether `dist/hooks/` still matches the
@@ -171,13 +172,10 @@ function is_remembered(
 // Written through a rename so a concurrent launch never reads half a record. Best-effort: a tree that
 // cannot be written is simply hashed again next time.
 function remember(out_directory: string, verified: VerifiedDigest): void {
-	const temporary_path = path.join(out_directory, `${VERIFIED_NAME}.${String(process.pid)}`)
-
 	try {
-		writeFileSync(temporary_path, JSON.stringify(verified))
-		renameSync(temporary_path, path.join(out_directory, VERIFIED_NAME))
+		atomic_write.replace_file(path.join(out_directory, VERIFIED_NAME), JSON.stringify(verified))
 	} catch {
-		rmSync(temporary_path, { force: true })
+		// A record that could not be written leaves the digest to be computed again.
 	}
 }
 

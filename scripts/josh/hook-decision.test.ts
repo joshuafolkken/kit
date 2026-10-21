@@ -80,6 +80,10 @@ describe('hook_decision.parse_hook_payload', () => {
 
 		expect(hook_decision.parse_hook_payload(raw)).toBeUndefined()
 	})
+
+	it('answers undefined for invalid stdin rather than throwing', () => {
+		expect(hook_decision.parse_hook_payload('not json at all')).toBeUndefined()
+	})
 })
 
 describe('hook_decision.is_switch_enabled', () => {

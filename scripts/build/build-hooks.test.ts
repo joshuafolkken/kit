@@ -49,6 +49,11 @@ function create_format_directory(): string {
 const directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-'))
 const format_directory = create_format_directory()
 const TRANSCRIPT_PATH = path.join(directory, 't.jsonl')
+const UNREADABLE_TRANSCRIPT_PAYLOAD = JSON.stringify({
+	transcript_path: directory,
+	tool_name: 'Read',
+	tool_input: { file_path: 'absent.ts' },
+})
 
 interface RunResult {
 	stdout: string
@@ -159,10 +164,12 @@ describe('build_hooks', () => {
 // so code splitting moved their self-invoke into a shared chunk and the launched bundles ran nothing.
 // Source and bundle both printing nothing passed the parity checks above, so these assert an effect.
 describe('launched hook bundles run their main', () => {
+	// A payload that is not JSON now ends with no verdict (joshuafolkken/kit#4180), so the effect is a
+	// transcript the guards cannot read: a directory answers EISDIR, which they report as a fault.
 	it('emits the pretool guard verdict rather than exiting silently', async () => {
-		const result = await run('node', [PRETOOL_BUNDLE], 'not-json')
+		const result = await run('node', [PRETOOL_BUNDLE], UNREADABLE_TRANSCRIPT_PAYLOAD)
 
-		expect(result.stdout).toContain('JOSH_BATCH_GUARD')
+		expect(result.stdout).toContain("the guard could not read the run's history")
 	})
 
 	it('keeps the format fixture outside the repository pnpm pack walks', () => {

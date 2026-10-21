@@ -4,7 +4,6 @@ import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
@@ -162,7 +161,6 @@ async function decide_in(lang: string, message: string): Promise<Array<string>> 
 // `en` rather than the `ja` default, so a hard-coded default could not pass.
 describe('write_stop_decision — the session language is wired', () => {
 	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
 		// The suite may itself run inside a kit-launched agent, whose mark would stand the rule aside.
 		vi.stubEnv(agent_headless.KEY, undefined)
 	})
@@ -263,10 +261,6 @@ async function decide_held(
 
 // joshuafolkken/kit#2962: the hand-off reading reaches the stop rule, so a handed-off lane stops quietly.
 describe('write_stop_decision — the ship hand-off is wired', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	it('lets a held lane handed to the detached ship stop without a notify', async () => {
 		expect(await decide_held(true)).toBe('')
 	})
@@ -307,10 +301,6 @@ const QUOTED_MARKER_LINE = [
 // joshuafolkken/kit#3936: the successor's resume clears the record before the old session's turn ends,
 // so the record reads absent while the hold stands — the cut is read off the turn instead.
 describe('write_stop_decision — a relaunched cut whose record the successor already cleared', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	it('sends no notify and demands none when this turn relaunched the successor', async () => {
 		const written = await decide_held(false, false, [PROMPT_LINE, RELAUNCHED_CUT_LINE].join('\n'))
 
@@ -333,10 +323,6 @@ describe('write_stop_decision — a relaunched cut whose record the successor al
 
 // joshuafolkken/kit#3961: another session's hold, and a pause already announced, send nothing.
 describe('write_stop_decision — only this session’s unannounced pause is sent', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	afterEach(() => {
 		vi.unstubAllEnvs()
 	})
@@ -367,10 +353,6 @@ describe('write_stop_decision — only this session’s unannounced pause is sen
 
 // joshuafolkken/kit#2704: the lane mark and the transcript's pending tasks both reach the stop rule.
 describe('write_stop_decision — the lane background wait is wired', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	it('sends a lane child with a task still running back to wait', async () => {
 		expect(await decide_in_lane(['bxj18z032'])).toContain(
 			lane_background.LANE_BACKGROUND_STOP_REASON,

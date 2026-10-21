@@ -230,15 +230,16 @@ async function issue_create_with_label(input: {
 // say why it refused.
 type LabelWrite = { is_applied: true } | { is_applied: false; reason: string }
 
-// The issue's label names, read back after a failed write. A read that itself fails answers
-// `undefined`, which the caller treats as "not applied" — the write's own error is the reason then.
+// The issue's label names, every page of them — read back after a failed write, and by a pull
+// request's classification read. A read that itself fails answers `undefined`, which the write
+// treats as "not applied" — its own error is the reason then.
 async function read_label_names(
 	issue_number: string,
 	repo?: string,
 ): Promise<Array<string> | undefined> {
 	try {
 		const raw = await git_gh_exec.exec_gh_api({
-			path: `${git_gh_api_path.issue_api_path(issue_number, repo)}${LABELS_SEGMENT}`,
+			path: git_gh_api_path.issue_labels_api_path(issue_number, repo),
 			should_paginate: true,
 			jq_filter: LABEL_NAMES_FILTER,
 		})
@@ -260,7 +261,7 @@ async function issue_apply_label(
 	label: string,
 	repo?: string,
 ): Promise<LabelWrite> {
-	const labels_path = `${git_gh_api_path.issue_api_path(issue_number, repo)}${LABELS_SEGMENT}`
+	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number, repo)
 
 	try {
 		await git_gh_exec.exec_gh_api({ path: labels_path, body: JSON.stringify({ labels: [label] }) })
@@ -303,7 +304,7 @@ async function issue_add_label(
 // a `false` swallowed here would reach that guard as a success and the step would be reported as
 // done.
 async function issue_remove_label(issue_number: string, label: string): Promise<void> {
-	const labels_path = `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`
+	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number)
 
 	await git_gh_exec.exec_gh_api({
 		path: `${labels_path}/${encodeURIComponent(label)}`,
@@ -396,6 +397,7 @@ const git_gh_issue_write = {
 	label_ensure,
 	issue_create_request,
 	issue_create_with_label,
+	read_label_names,
 	issue_apply_label,
 	issue_add_label,
 	issue_remove_label,

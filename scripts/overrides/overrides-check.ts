@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { file_reader } from '#scripts/lib/read-file'
 import { overrides_snapshot_schema } from '#scripts/lib/schemas'
 import { overrides_files } from './overrides-files'
 import { overrides_check, type OverridesDiff } from './overrides-logic'
@@ -19,17 +20,13 @@ const ARGV_OFFSET = 2
 const OPTIONS = { save: { type: 'boolean', default: false } } as const
 const USAGE = cli_flags.usage_line(['--save'], 'overrides')
 
-function is_file_not_found(error: unknown): boolean {
-	return error instanceof Error && 'code' in error && error.code === 'ENOENT'
-}
-
 function load_snapshot(): Record<string, string> {
 	try {
 		return overrides_snapshot_schema.parse(
 			JSON.parse(readFileSync(overrides_check.SNAPSHOT_PATH, 'utf8')),
 		)
 	} catch (error) {
-		if (is_file_not_found(error)) {
+		if (file_reader.is_absent(error)) {
 			console.error(`✖ Snapshot not found: ${overrides_check.SNAPSHOT_PATH}`)
 			console.error('  Run with --save first to create a snapshot.')
 		} else {

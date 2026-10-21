@@ -1,4 +1,5 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
@@ -447,9 +448,7 @@ function notice_envelope(notice: string): string {
 }
 
 function parse_stop_payload(raw_payload: string): StopPayload | undefined {
-	const parsed = stop_payload_schema.safeParse(JSON.parse(raw_payload))
-
-	return parsed.success ? parsed.data : undefined
+	return json_value.parse_with(raw_payload, stop_payload_schema)
 }
 
 function is_enabled(): boolean {

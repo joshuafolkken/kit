@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -86,10 +87,7 @@ function read_record<T>(target: string, schema: z.ZodType<T>): T | undefined {
 }
 
 function write_record(target: string, body: BrokerResponse | z.infer<typeof reason_schema>): void {
-	const temporary = `${target}.${String(process.pid)}.tmp`
-
-	writeFileSync(temporary, JSON.stringify(body))
-	renameSync(temporary, target)
+	atomic_write.replace_file(target, JSON.stringify(body))
 }
 
 async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {

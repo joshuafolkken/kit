@@ -59,6 +59,9 @@ const PR_LABELS_PATH = `${REPO_PATH}/issues/1045/labels`
 const EXISTING_PR_LABELS_PATH = `${REPO_PATH}/issues/${String(PR_NUMBER)}/labels`
 const CHOOSE_ERROR = 'Choose one release classification'
 const RATE_LIMITED_MESSAGE = 'rate limited'
+const MALFORMED_ANSWER = 'jq: error: Cannot index string with "name"'
+const LABEL_NAMES_FILTER = '.[].name'
+const UNREADABLE_LABELS = 'Unreadable labels'
 
 // The duplicate-head answer, exactly as the live API gave it on the throwaway pull request: `gh`
 // writes this JSON to **stdout** and only `gh: Validation Failed (HTTP 422)` to stderr, and
@@ -133,6 +136,21 @@ describe('pr_create classification', () => {
 		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).rejects.toThrow(RATE_LIMITED_MESSAGE)
 	})
 
+	it('reports the pull request as classified when the label write throws after the label landed', async () => {
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[PR_LABELS_PATH]: async (request) => {
+					if (request.body !== undefined) throw new Error(RATE_LIMITED_MESSAGE)
+
+					return BUGFIX
+				},
+			}),
+		)
+
+		await expect(git_gh_pr.pr_create(TITLE, BODY, BUGFIX)).resolves.toBe(CREATED_URL)
+	})
+
 	it('refuses an unrecognized classification before posting the pull request', async () => {
 		await expect(git_gh_pr.pr_create(TITLE, BODY, 'bug' as never)).rejects.toThrow(CHOOSE_ERROR)
 
@@ -143,7 +161,7 @@ describe('pr_create classification', () => {
 describe('existing pull request classification', () => {
 	it('adds a missing classification to the existing pull request', async () => {
 		mocked_api.mockImplementation(
-			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: '[]' }),
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: '' }),
 		)
 
 		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
@@ -157,10 +175,7 @@ describe('existing pull request classification', () => {
 
 	it('reuses an existing classification without writing another label', async () => {
 		mocked_api.mockImplementation(
-			gh_api_routes({
-				...write_routes(),
-				[EXISTING_PR_LABELS_PATH]: JSON.stringify([{ name: BUGFIX }]),
-			}),
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: `bug\n${BUGFIX}` }),
 		)
 
 		await git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)
@@ -172,13 +187,51 @@ describe('existing pull request classification', () => {
 		const uppercase_label = BUGFIX.toUpperCase()
 
 		mocked_api.mockImplementation(
-			gh_api_routes({
-				...write_routes(),
-				[EXISTING_PR_LABELS_PATH]: JSON.stringify([{ name: uppercase_label }]),
-			}),
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: uppercase_label }),
 		)
 
 		await expect(git_gh_pr.pr_get_classification(PR_BRANCH)).resolves.toBe(BUGFIX)
+	})
+})
+
+describe('pull request label read', () => {
+	it('reads every page of the labels as names, never parsing the JSON itself', async () => {
+		mocked_api.mockImplementation(
+			gh_api_routes({ ...write_routes(), [EXISTING_PR_LABELS_PATH]: BUGFIX }),
+		)
+
+		await git_gh_pr.pr_get_classification(PR_BRANCH)
+
+		expect(request_to(EXISTING_PR_LABELS_PATH)).toMatchObject({
+			should_paginate: true,
+			jq_filter: LABEL_NAMES_FILTER,
+		})
+	})
+})
+
+// A read that failed is not "no classification": answering that would add a second classification
+// beside the one a person already put on the pull request.
+describe('unreadable pull request labels', () => {
+	beforeEach(() => {
+		mocked_api.mockImplementation(
+			gh_api_routes({
+				...write_routes(),
+				[EXISTING_PR_LABELS_PATH]: async () => {
+					throw new Error(MALFORMED_ANSWER)
+				},
+			}),
+		)
+	})
+
+	it('throws rather than answering no classification', async () => {
+		await expect(git_gh_pr.pr_get_classification(PR_BRANCH)).rejects.toThrow(UNREADABLE_LABELS)
+	})
+
+	it('writes no classification', async () => {
+		await expect(git_gh_pr.pr_ensure_classification(PR_BRANCH, BUGFIX)).rejects.toThrow(
+			UNREADABLE_LABELS,
+		)
+		expect(requests().filter((request) => request.body !== undefined)).toHaveLength(0)
 	})
 })
 

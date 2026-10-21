@@ -167,7 +167,7 @@ describe('security_audit_provision.provision — a download that verifies', () =
 	})
 
 	// The staging file is renamed onto the target, so none of it may survive the install — and the
-	// name itself is pinned by `build_staging_path`'s own tests rather than by its absence here.
+	// name itself is pinned by `atomic-write.ts`'s own tests rather than by its absence here.
 	it('leaves no staging file beside the installed binary', async () => {
 		const target_path = target_in('staging-name')
 

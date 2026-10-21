@@ -319,4 +319,8 @@ describe('stop_rules envelopes and payload', () => {
 		expect(stop_rules.parse_stop_payload('{"transcript_path":"/t"}')?.transcript_path).toBe('/t')
 		expect(stop_rules.parse_stop_payload('{}')).toBeUndefined()
 	})
+
+	it('answers undefined for invalid stdin rather than throwing', () => {
+		expect(stop_rules.parse_stop_payload('not json at all')).toBeUndefined()
+	})
 })

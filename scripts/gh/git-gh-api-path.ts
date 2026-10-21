@@ -28,6 +28,13 @@ function issue_api_path(issue_number: string, repo?: string): string {
 	return `${issues_api_path(repo)}/${issue_number}`
 }
 
+// One issue's labels — a pull request is an issue to this endpoint. Named here because the label
+// writes and reads in `git-gh-issue-write.ts` and the CI classification read in `pr-classification.ts`
+// all address it.
+function issue_labels_api_path(issue_number: string, repo?: string): string {
+	return `${issue_api_path(issue_number, repo)}/labels`
+}
+
 // The dependency relations, which REST serves from their own endpoint rather than inside the issue.
 // Named here because three call sites address it — the read in `git-gh-issue-read.ts` and both
 // writes in `git-gh-issue-write.ts`.
@@ -115,6 +122,7 @@ const git_gh_api_path = {
 	release_by_tag_api_path,
 	issues_api_path,
 	issue_api_path,
+	issue_labels_api_path,
 	blocked_by_api_path,
 	issue_comments_api_path,
 	pulls_api_path,
