@@ -3,6 +3,7 @@ import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { review_tree } from '#scripts/review/review-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map } from './test-read-map'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
@@ -68,7 +69,7 @@ describe('test_read_recording.with_read_recording', () => {
 		expect(test_read_map.write_map).toHaveBeenCalledWith(ROOT, {
 			version: test_read_map.MAP_VERSION,
 			commit: HEAD,
-			dirty: [DIRTY],
+			dirty: { [DIRTY]: review_tree.ABSENT_DIGEST },
 			directories: [DIRECTORY],
 			readers: { [DOCUMENT]: [READER] },
 		})
@@ -95,5 +96,26 @@ describe('test_read_recording.with_read_recording', () => {
 
 		expect(run).toHaveBeenCalledWith({})
 		expect(test_read_map.write_map).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4425: a dirty file's digest is what lets a later run skip it, so it must be the
+// content the tests read — an edit made while they ran is a change they never saw.
+describe('test_read_recording.with_read_recording — a tree that moves during the run', () => {
+	it('records the tree the run started on, not the one an edit during it left', async () => {
+		const run = vi.fn(async (environment: RecordingEnvironment) => {
+			write_worker_record(environment)
+			vi.mocked(git_command.head_commit).mockResolvedValue('moved-head')
+			vi.mocked(changed_paths.read_changed_since).mockResolvedValue([DIRTY, 'edited-mid-run.ts'])
+
+			return 0
+		})
+
+		await test_read_recording.with_read_recording(ROOT, ['run'], run)
+
+		expect(test_read_map.write_map).toHaveBeenCalledWith(
+			ROOT,
+			expect.objectContaining({ commit: HEAD, dirty: { [DIRTY]: review_tree.ABSENT_DIGEST } }),
+		)
 	})
 })

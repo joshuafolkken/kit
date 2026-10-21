@@ -26,9 +26,10 @@ import { test_read_trace, type ReadRecords } from './test-read-trace'
 interface ReadMap {
 	version: number
 	commit: string
-	// The files that differed from `commit` when the map was recorded, which count as changed for
-	// every narrowing read against it.
-	dirty: Array<string>
+	// The files that differed from `commit` when the map was recorded, each with the digest of its
+	// content then, so one whose content has not moved since does not count as changed
+	// (joshuafolkken/kit#4425).
+	dirty: Record<string, string>
 	// The directories `commit` holds, so a directory new since then is told apart from one no test
 	// read — the map's own keys cannot say which, since an unread directory has none.
 	directories: Array<string>
@@ -37,7 +38,7 @@ interface ReadMap {
 
 // Bumped whenever the shape or what a reader means changes, so a map an older kit wrote reads as no
 // map at all.
-const MAP_VERSION = 4
+const MAP_VERSION = 5
 
 const MAP_DIRECTORY = 'josh'
 const MAP_FILE_STEM = 'test-read-map'
@@ -78,17 +79,42 @@ function is_read_records(value: unknown): value is ReadRecords {
 	return is_object(value) && Object.values(value).every(is_string_array)
 }
 
-const PATH_LIST_FIELDS = ['dirty', 'directories'] as const
+function is_digest_record(value: unknown): value is Record<string, string> {
+	if (!is_object(value) || Array.isArray(value)) return false
+
+	return Object.values(value).every((digest) => typeof digest === 'string')
+}
+
+const FIELD_CHECKS: ReadonlyArray<[keyof ReadMap, (field: unknown) => boolean]> = [
+	['version', (field) => field === MAP_VERSION],
+	['commit', (field) => typeof field === 'string'],
+	['dirty', is_digest_record],
+	['directories', is_string_array],
+	['readers', is_read_records],
+]
 
 function is_read_map(value: unknown): value is ReadMap {
 	if (!is_object(value)) return false
 
-	return (
-		Reflect.get(value, 'version') === MAP_VERSION &&
-		typeof Reflect.get(value, 'commit') === 'string' &&
-		PATH_LIST_FIELDS.every((field) => is_string_array(Reflect.get(value, field))) &&
-		is_read_records(Reflect.get(value, 'readers'))
-	)
+	return FIELD_CHECKS.every(([field, is_valid]) => is_valid(Reflect.get(value, field)))
+}
+
+// **The files whose content differs from the tree the map was recorded on** (joshuafolkken/kit#4425).
+// `since` is every path that differs from `map.commit` now, and `current` the digest of every path
+// that was dirty then. A path dirty then is changed only when its digest moved: counted by name, a
+// lane's own change the map was recorded over read as changed on every later run, so a gate reused
+// no green unit step whenever the lane held any code.
+function changed_since_tree(
+	map: ReadMap,
+	since: ReadonlyArray<string>,
+	current: Readonly<Record<string, string>>,
+): Array<string> {
+	const fresh = since.filter((file) => !Object.hasOwn(map.dirty, file))
+	const moved = Object.entries(map.dirty)
+		.filter(([file, digest]) => current[file] !== digest)
+		.map(([file]) => file)
+
+	return [...new Set([...fresh, ...moved])]
 }
 
 function parse_json(text: string): unknown {
@@ -240,6 +266,7 @@ function collect_records(directory: string): Array<ReadRecords> {
 
 const test_read_map = {
 	MAP_VERSION,
+	changed_since_tree,
 	collect_records,
 	in_unread_directory,
 	map_path,

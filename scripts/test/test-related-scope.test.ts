@@ -40,7 +40,7 @@ const UNLISTED_FILE_COUNT = 2
 const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
-	dirty: [],
+	dirty: {},
 	directories: ['data', 'docs', 'lib', 'notes', 'scripts'],
 	readers: {
 		[DOCUMENT_FILE]: [READER_FILE],
