@@ -326,7 +326,7 @@ function render(view: BoardView): Array<string> {
 		above,
 		...plan_parts(header, notes, view.size),
 		processes: run_board_render_processes.processes_part(header),
-		notes: run_board_render_notes.notes_part(notes, header),
+		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
 		thanks: thanks_part(view.thanks, view.link, view.size?.columns),
 		legend: legend_lines(header, notes),
 		footer: view.footer ?? [],

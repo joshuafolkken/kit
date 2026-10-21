@@ -1,10 +1,11 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import type { NotesPart } from './run-board-fit'
+import { run_board_fit, type NotesPart } from './run-board-fit'
 import { run_board_kind } from './run-board-kind'
 import { run_board_labels, type Words } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_section } from './run-board-render-section'
+import { run_board_render_title } from './run-board-render-title'
 
 // The findings section of `run:board`, under the 🙋 decision rows, and the part of the legend that
 // names its symbols. A finding is read to the minute, and the legend names only the kinds the section
@@ -12,8 +13,10 @@ import { run_board_render_section } from './run-board-render-section'
 
 const { FILED_KIND_ICONS, KIND_WORDS, NOTES_ICON, NOTE_ICONS, WORDS, minute_of } = run_board_labels
 const NOTE_LIMIT = 6
+const { ROW_INDENT } = run_board_render_section
+const { columns_cut } = run_board_render_title
+const { width_of } = run_board_fit
 const GAP = '  '
-const INDENT = '  '
 const NUMBER_PLACEHOLDER = '{n}'
 // An `owner/repo#N` reference written out in a text.
 const QUALIFIED_REFERENCE = /(?<![\w./-])(?<repo>[\w.-]+\/[\w.-]+)#(?<number>\d+)/gu
@@ -25,11 +28,13 @@ type Link = (reference: string) => string
 type Rank = (typeof RANK_ORDER)[number]
 
 // The plan the section is drawn under — none before it is read, where no legend is drawn either —, the
-// link its numbers go through and the repository the plan was read for.
+// link its numbers go through, the repository the plan was read for and the pane's width where the
+// frame is kept within one.
 interface NotesView {
 	layout: BoardLayout | undefined
 	link: Link
 	repo?: string | undefined
+	columns?: number | undefined
 }
 
 interface NotesBody {
@@ -50,6 +55,7 @@ interface ItemsView {
 	has_legend: boolean
 	link: Link
 	repo: string | undefined
+	columns?: number | undefined
 }
 
 // The icons the legend can name, in its order, each with its word — a filed kind's the rows' own
@@ -84,8 +90,26 @@ function body_of(note: BoardNote, view: ItemsView): string {
 	return unqualified(note.text, view.repo)
 }
 
+function same(reference: string): string {
+	return reference
+}
+
+// A line wider than the pane keeps its head whole and ends its text on an ellipsis at the pane's edge
+// (joshuafolkken/kit#4384); the cut text's reference is left unlinked, so no hyperlink escape is cut
+// in two.
+function fitted_line(head: string, note: BoardNote, view: ItemsView): string {
+	const { columns } = view
+	const line = `${head}${body_of(note, view)}${found_of(note, view.link)}`
+
+	if (columns === undefined || width_of(line) <= columns) return line
+
+	const text = `${body_of(note, view)}${found_of(note, same)}`
+
+	return `${head}${columns_cut(text, Math.max(1, columns - width_of(head)))}`
+}
+
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
-// keeps the kind's word.
+// keeps the kind's word. Its icon stands in the plan rows' icon column.
 function note_text(note: BoardNote, view: ItemsView): string {
 	const { has_legend, link } = view
 	const kind = has_legend ? undefined : WORDS[note.kind]
@@ -94,7 +118,7 @@ function note_text(note: BoardNote, view: ItemsView): string {
 		.filter((part) => part !== undefined)
 		.join(' ')
 
-	return `${INDENT}${lead}${GAP}${body_of(note, view)}${found_of(note, link)}`
+	return fitted_line(`${ROW_INDENT}${lead}${GAP}`, note, view)
 }
 
 function rank_index(rank: Rank): number {
@@ -140,10 +164,10 @@ function items_of(notes: ReadonlyArray<BoardNote>, view: ItemsView): Array<NoteI
 // gives way first. Their numbers go through the board's
 // `header.link`, so they open their GitHub issue as the plan's rows do.
 function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody {
-	const { layout, link, repo } = view
+	const { layout, link, repo, columns } = view
 	const has_legend = layout !== undefined
 	const listed = listed_of(has_legend ? run_board_layout.rows_of(layout) : [])
-	const items = items_of(notes, { listed, has_legend, link, repo })
+	const items = items_of(notes, { listed, has_legend, link, repo, columns })
 	const lines = items.slice(0, NOTE_LIMIT).map((item) => item.line)
 
 	return { lines, hidden: items.length - lines.length }
@@ -156,10 +180,6 @@ function notes_part(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesPart
 	const label = view.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
 
 	return { head: run_board_render_section.heading_lines(label), label, ...body }
-}
-
-function same(reference: string): string {
-	return reference
 }
 
 // Each kind a drawn line leads with — one the rows' legend already names (`named`) is not named twice.

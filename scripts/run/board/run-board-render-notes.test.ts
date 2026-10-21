@@ -1,15 +1,21 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_render_section } from './run-board-render-section'
+import { run_board_render_title } from './run-board-render-title'
 
 // joshuafolkken/kit#3430: what the board says below its plan — the findings, the resume command and a
 // board with no run.
 
 const { clock_of, minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, WORDS, header, lines_of, note, rule } = run_board_render_fixture
+const { ROW_INDENT } = run_board_render_section
+const { ELLIPSIS } = run_board_render_title
 
 describe('run_board_render findings and no run', () => {
 	it('shows the newest findings and how many more there are', () => {
@@ -25,8 +31,8 @@ describe('run_board_render findings and no run', () => {
 		}
 		const lines = lines_of(header({ layout: undefined }), [filed, ...notes])
 
-		expect(lines).toContain(`  🆕 ${minute_of(NOW)} 3438 filed  Count seats (found during 3415)`)
-		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415 note  observation 0`)
+		expect(lines).toContain(`    🆕 ${minute_of(NOW)} 3438 filed  Count seats (found during 3415)`)
+		expect(lines).toContain(`    💬 ${minute_of(NOW)} 3415 note  observation 0`)
 		expect(lines.at(-1)).toBe('  more 3')
 	})
 
@@ -57,9 +63,9 @@ describe('run_board_render.render findings icons', () => {
 			.join('\n')
 
 		expect(lines).toContain(NOTES_RULE)
-		expect(lines).toContain(`  🆕 ${minute_of(NOW)} 3473  Lead`)
-		expect(lines).toContain(`  💤 ${minute_of(NOW)} 3473  Lead`)
-		expect(lines).toContain(`  💬 ${minute_of(NOW)} 3415  seen`)
+		expect(lines).toContain(`    🆕 ${minute_of(NOW)} 3473  Lead`)
+		expect(lines).toContain(`    💤 ${minute_of(NOW)} 3473  Lead`)
+		expect(lines).toContain(`    💬 ${minute_of(NOW)} 3415  seen`)
 
 		for (const word of [WORDS.notes, 'filed', 'park', ' note ']) {
 			expect(board).not.toContain(word)
@@ -83,7 +89,7 @@ describe('run_board_render.render findings icons', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
 
 		expect(lines).toContain(rule(WORDS.notes))
-		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+		expect(lines.at(-1)).toBe(`    🆕 ${minute_of(NOW)} 3473 filed  Lead`)
 	})
 })
 
@@ -132,7 +138,7 @@ describe('run_board_render.render filed kinds', () => {
 		const lines = lines_of(header(), [breaking, bug, enhancement, filed])
 
 		for (const icon of ['🧨', '🐛', '✨', '🆕']) {
-			expect(lines).toContain(`  ${icon} ${minute_of(NOW)} 3473  Lead`)
+			expect(lines).toContain(`    ${icon} ${minute_of(NOW)} 3473  Lead`)
 		}
 	})
 
@@ -168,7 +174,7 @@ describe('run_board_render.render filed kinds beside row kinds', () => {
 
 	it('keeps the kind word filed where no legend is drawn', () => {
 		expect(lines_of(header({ layout: undefined }), [bug]).at(-1)).toBe(
-			`  🐛 ${minute_of(NOW)} 3473 filed  Lead`,
+			`    🐛 ${minute_of(NOW)} 3473 filed  Lead`,
 		)
 	})
 })
@@ -184,13 +190,13 @@ describe('run_board_render.render findings links', () => {
 	it('links the finding’s issue and the issue it was found during', () => {
 		const lines = lines_of(header({ link: bracketed }), [found, note(NOW, 'seen')])
 
-		expect(lines).toContain(`  🆕 ${minute_of(NOW)} [other/repo#12]  Lead (found during [3415])`)
-		expect(lines).toContain(`  💬 ${minute_of(NOW)} [3415]  seen`)
+		expect(lines).toContain(`    🆕 ${minute_of(NOW)} [other/repo#12]  Lead (found during [3415])`)
+		expect(lines).toContain(`    💬 ${minute_of(NOW)} [3415]  seen`)
 	})
 
 	it('draws the numbers unchanged where the terminal gets no link', () => {
 		expect(lines_of(header(), [found])).toContain(
-			`  🆕 ${minute_of(NOW)} other/repo#12  Lead (found during 3415)`,
+			`    🆕 ${minute_of(NOW)} other/repo#12  Lead (found during 3415)`,
 		)
 	})
 })
@@ -201,7 +207,7 @@ describe('run_board_render.render park titles', () => {
 		const events = [{ pos: 1, at: new Date(NOW).toISOString(), kind: 'park', text: '#3526 parked' }]
 		const notes = run_board_notes.notes_of(events, new Map([[3526, 'Lead the lanes']]))
 
-		expect(lines_of(header(), notes)).toContain(`  💤 ${minute_of(NOW)} 3526  Lead the lanes`)
+		expect(lines_of(header(), notes)).toContain(`    💤 ${minute_of(NOW)} 3526  Lead the lanes`)
 	})
 })
 
@@ -210,7 +216,68 @@ describe('run_board_render.render findings with no legend', () => {
 		const lines = lines_of(header({ layout: undefined }), [filed])
 
 		expect(lines).toContain(rule(WORDS.notes))
-		expect(lines.at(-1)).toBe(`  🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+		expect(lines.at(-1)).toBe(`    🆕 ${minute_of(NOW)} 3473 filed  Lead`)
+	})
+})
+
+const PANE_ROWS = 200
+const NARROW = 40
+const WIDE = 200
+
+function pane_lines(
+	notes: ReadonlyArray<BoardNote>,
+	columns: number,
+	link = bracketed,
+): Array<string> {
+	return run_board_render
+		.render({ header: header({ link }), notes, size: { rows: PANE_ROWS, columns } })
+		.map((line) => stripVTControlCharacters(line))
+}
+
+function finding_of(lines: ReadonlyArray<string>): string {
+	return lines.find((line) => line.startsWith(`${ROW_INDENT}💬`)) ?? ''
+}
+
+// joshuafolkken/kit#4384: a finding stays on one line, cut to the pane's width, its icon in the plan
+// rows' icon column.
+describe('run_board_render.render findings within the pane', () => {
+	it('cuts a finding wider than the pane to an ellipsis at the pane’s edge', () => {
+		const long = note(NOW, 'x'.repeat(WIDE))
+		const line = finding_of(pane_lines([long], NARROW))
+
+		expect(run_board_fit.width_of(line)).toBe(NARROW)
+		expect(line.endsWith(ELLIPSIS)).toBe(true)
+	})
+
+	it('draws a finding that fits the pane whole', () => {
+		expect(pane_lines([note(NOW, 'seen')], WIDE)).toContain(
+			`${ROW_INDENT}💬 ${minute_of(NOW)} [3415]  seen`,
+		)
+	})
+
+	it('cuts wide characters and emoji by the columns they take', () => {
+		const text = `🧪${'あ'.repeat(WIDE)}`
+		const line = finding_of(pane_lines([note(NOW, text)], NARROW + 1))
+
+		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW + 1)
+		expect(line).toMatch(/あ…$/u)
+	})
+
+	it('cuts nothing where the pane’s width is not known', () => {
+		const text = 'x'.repeat(WIDE)
+
+		expect(lines_of(header(), [note(NOW, text)])).toContain(
+			`${ROW_INDENT}💬 ${minute_of(NOW)} 3415  ${text}`,
+		)
+	})
+
+	it('leaves a cut line’s found-during reference unlinked', () => {
+		const found: BoardNote = { ...note(NOW, 'x'.repeat(NARROW)), found_during: '3415' }
+		const line = finding_of(pane_lines([found], NARROW + NARROW))
+
+		expect(line).toContain('[3415]')
+		expect(line.endsWith(ELLIPSIS)).toBe(true)
+		expect(line).not.toContain('during [')
 	})
 })
 

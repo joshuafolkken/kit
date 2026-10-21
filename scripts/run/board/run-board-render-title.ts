@@ -141,6 +141,7 @@ const run_board_render_title = {
 	ELLIPSIS,
 	TITLE_LIMIT,
 	WHOLE,
+	columns_cut,
 	fitted,
 	reason_text,
 	row_overrun,
