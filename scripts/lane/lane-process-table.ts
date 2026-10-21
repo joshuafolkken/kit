@@ -5,7 +5,7 @@ import { lane_reap, type TreeProbes } from './lane-reap'
 import { process_tools } from './process-tools'
 
 // Every process on the machine at one instant, read by one asynchronous `ps`, answering the probes a
-// lane's tree and its states are read through (joshuafolkken/kit#4241), and the listing `run:board`'s
+// lane's tree is read through (joshuafolkken/kit#4241), and the listing `run:board`'s
 // usage columns are read from (joshuafolkken/kit#4246).
 //
 // **Why one snapshot.** `lane_reap`'s probes start one synchronous `ps` / `pgrep` per ancestor and per
@@ -51,11 +51,6 @@ interface ProcessRow {
 type ProcessTable = ReadonlyArray<ProcessRow>
 // A snapshot read on demand, `undefined` where `ps` did not answer.
 type TableRead = () => Promise<ProcessTable | undefined>
-
-// The tree probes, and each pid's `ps` `stat` — the empty list for a read that failed.
-interface TableProbes extends TreeProbes {
-	states_of: (pids: ReadonlyArray<number>) => Array<string>
-}
 
 function is_row(row: ProcessRow): boolean {
 	const { pid, parent, rss_kb, command } = row
@@ -108,8 +103,8 @@ function children_index(rows: ProcessTable): Map<number, Array<number>> {
 	return children
 }
 
-/** The probes a lane's tree and states are read through, answered from `rows` alone. */
-function probes_of(rows: ProcessTable): TableProbes {
+/** The probes a lane's tree is read through, answered from `rows` alone. */
+function probes_of(rows: ProcessTable): TreeProbes {
 	const by_pid = new Map(rows.map((row) => [row.pid, row]))
 	const children = children_index(rows)
 
@@ -117,8 +112,6 @@ function probes_of(rows: ProcessTable): TableProbes {
 		matching: (pattern) => matching_in(rows, pattern),
 		children_of: (pid) => children.get(pid) ?? [],
 		parent_of: (pid) => by_pid.get(pid)?.parent,
-		states_of: (pids) =>
-			pids.map((pid) => by_pid.get(pid)?.stat).filter((stat) => stat !== undefined),
 	}
 }
 
@@ -149,13 +142,6 @@ async function read_table(): Promise<ProcessTable | undefined> {
 	}
 }
 
-/** The probes of `table`, `undefined` where it could not be read. */
-async function probes_from(table: TableRead): Promise<TableProbes | undefined> {
-	const rows = await table()
-
-	return rows === undefined ? undefined : probes_of(rows)
-}
-
 /** `read`, run on the first call alone; every later call answers that same snapshot. */
 function shared(read: TableRead): TableRead {
 	const taken: { table?: ReturnType<TableRead> } = {}
@@ -170,7 +156,6 @@ function shared(read: TableRead): TableRead {
 const lane_process_table = {
 	PS_ARGUMENTS,
 	parse,
-	probes_from,
 	probes_of,
 	read_table,
 	shared,
@@ -178,4 +163,4 @@ const lane_process_table = {
 }
 
 export { lane_process_table }
-export type { ProcessRow, ProcessTable, TableProbes, TableRead }
+export type { ProcessRow, ProcessTable, TableRead }

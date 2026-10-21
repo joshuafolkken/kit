@@ -62,7 +62,7 @@ describe('run_board_lane_state.lanes_of — whose lane it is', () => {
 	it.each([
 		['its own', LAUNCHED, true],
 		['an earlier run’s', EARLIER_RUN, false],
-	])('sorts a backfilled record, which names no run, by its launch as %s', (_, at, is_own) => {
+	])('sorts a migrated record, which names no run, by its launch as %s', (_, at, is_own) => {
 		const lanes = lanes_of([{ ...record_of('running'), run: undefined, launched_at: at }])
 
 		expect(lanes.own.has(NUMBER)).toBe(is_own)

@@ -16,8 +16,8 @@ import type { LaneRecords } from '#scripts/lane/lane-state'
 // uncounted. Its memory stays held, which the free-memory check reads as measured
 // (`backlog-drive-memory.ts`); `lane:prune` still keeps it, since a child is there (`lane-spent.ts`).
 //
-// **A lane with no record is unknown, and keeps its place**, so the count errs toward fewer free lanes
-// until `lane:state --backfill` writes one. **Whether a child is there at all is not the record's**:
+// **A lane with no record is unknown, and keeps its place**, so the count errs toward fewer free
+// lanes. **Whether a child is there at all is not the record's**:
 // a child that parks or dies writes nothing, so only pgrep's own "no match" (`PROCESS_NONE`,
 // `lane_spent.idle_lanes`) clears a lane, and a probe that did not answer keeps it. A stranded lane has
 // no tree to work in and holds no place either. The reads stay local — no issue label is read —

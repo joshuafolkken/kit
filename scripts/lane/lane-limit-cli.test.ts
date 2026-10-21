@@ -167,7 +167,7 @@ describe('lane_limit_cli.run — the bare form', () => {
 		const issues = `${session_cite.issue('4211')} ${session_cite.issue('4212')}`
 
 		expect(result.output).toBe(
-			`lane limit 6 (JOSH_LANE_LIMIT) · in use 3 · free 3 · ${issues}: no lane state — pnpm josh lane:state --backfill`,
+			`lane limit 6 (JOSH_LANE_LIMIT) · in use 3 · free 3 · ${issues}: no lane state — counted in use`,
 		)
 	})
 })

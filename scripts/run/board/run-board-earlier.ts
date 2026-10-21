@@ -18,8 +18,8 @@ interface EarlierLanes {
 
 const NO_EARLIER: EarlierLanes = { lanes: [] }
 
-// What an unknown lane's row says after its title: the command that writes its record.
-const BACKFILL_TAIL = lane_state.BACKFILL_HINT
+// What an unknown lane's row says after its title: it has no record, and keeps its place.
+const UNKNOWN_TAIL = lane_state.NO_STATE_HINT
 
 // The mark an earlier run's running lane leads with in place of its phase (joshuafolkken/kit#4269),
 // two columns wide as every row icon is (`run-board-labels.ts`, kept out of it by its size).
@@ -61,7 +61,7 @@ function unknown_row(number: number, read: RowRead): BoardRow {
 		state: 'unknown',
 		status: undefined,
 		waits: [],
-		reason: { tail: BACKFILL_TAIL },
+		reason: { tail: UNKNOWN_TAIL },
 	}
 }
 
@@ -88,7 +88,7 @@ function rows_of(
 	]
 }
 
-const run_board_earlier = { BACKFILL_TAIL, EARLIER_ICON, NO_EARLIER, is_live, rows_of }
+const run_board_earlier = { EARLIER_ICON, NO_EARLIER, UNKNOWN_TAIL, is_live, rows_of }
 
 export { run_board_earlier }
 export type { EarlierLanes }
