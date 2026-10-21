@@ -2,6 +2,7 @@ import { accessSync, chmodSync, constants, mkdirSync, rmSync, writeFileSync } fr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { GIT_BINARY_KEY } from '#scripts/git/constants'
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { file_reader } from '#scripts/lib/read-file'
 import { shim_shell } from '#tools/build/shim-shell'
@@ -368,11 +369,23 @@ function read_log(log_file: string): string | undefined {
 	return file_reader.read_if_readable(log_file)
 }
 
+// **The pre-push hook's git location variables stop here** (joshuafolkken/kit#4394). Git exports
+// `GIT_DIR` to the hook, and a worker inheriting it had every read of the checkout it stands in —
+// `git worktree list` behind an unmocked lane read — refused by the inherited-environment finding and
+// failing the run at teardown, so the suite's answer depended on whether a hook launched it. Cleared
+// when the checkout resolves without them, as `scripts/hooks/run-hook.sh` does for the agent hooks;
+// a write into the checkout is still refused by the working-directory finding, and a test that hands
+// git a location variable itself is still refused by the environment one.
+function forget_hook_location(guarded_directory: string | undefined): void {
+	if (guarded_directory !== undefined) git_location_environment.clear_git_location_variables()
+}
+
 // `globalSetup` runs before any worker is forked, so the workers inherit this `PATH` and every `gh`
 // and `git` they spawn — directly or through a CLI subprocess of their own — resolves to a shim. They
 // inherit the record's path for the in-process Telegram guard and the redirected temp root with it.
 function arm(directory: string = GUARD_DIRECTORY, temporary_root: string = TEMPORARY_ROOT): void {
 	install_shim(directory)
+	forget_hook_location(GUARDED_GIT_DIRECTORY)
 	mkdirSync(temporary_root, { recursive: true })
 	process.env['PATH'] = `${directory}${path.delimiter}${process.env['PATH'] ?? ''}`
 	if (GIT_BINARY !== undefined) process.env[GIT_BINARY_KEY] = path.join(directory, GIT_SHIM_NAME)
