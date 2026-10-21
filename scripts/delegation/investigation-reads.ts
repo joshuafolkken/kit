@@ -38,11 +38,10 @@ const SEARCH_LABELS: ReadonlySet<string> = new Set(
 	SEARCH_COMMANDS.map((command) => time_shell.bash_label(command)),
 )
 
-// `.claude/agents/investigator.md`; a consumer receives it through the plugin as `kit:investigator`.
-const INVESTIGATOR_AGENT = 'investigator'
+const { INVESTIGATOR_AGENT } = delegation_policy
 
 // The deny reason is the only text that reaches the model, so it names the count, command and return shape.
-const REASON = `⛔ investigation: ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(delegation_policy.INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit. Run \`pnpm josh delegate investigation\`, then dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer); it returns \`file:line\` citations, never the file text. Keep main-line reads to files you will edit; every read-only search turn counts. \`.claude/skills/workflow-commands/delegation.md\``
+const REASON = `⛔ investigation: ${delegation_policy.INVESTIGATION_LIMIT}. ${delegation_policy.INVESTIGATION_STEP} Keep main-line reads to files you will edit; every read-only search turn counts. \`.claude/skills/workflow-commands/delegation.md\``
 
 interface ReadTally {
 	// The files read and not since edited, resolved.

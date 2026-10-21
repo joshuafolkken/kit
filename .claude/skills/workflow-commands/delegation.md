@@ -37,8 +37,10 @@ classification lives in `backlogrun-child.md` → "Each child runs in a delegate
 main line.** The unit returns conclusions with `file:line` citations, never the file text. It may run
 a temporary probe script and return its output.
 
-**The threshold is 3 files, and it is a count, not a forecast.** Brief the unit on what was already
-read. **A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard`
+**Subject reading beyond the edit targets → dispatch the unit before the first read**
+(`pnpm josh run:prep` → `=== investigation ===`). **The threshold is 3 files, and it is a count, not a
+forecast** — where the guard refuses, not a budget. Brief the unit on what was already read.
+**A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard`
 refuses the threshold call, in a lane child too (`pnpm josh delegate --list`; counting:
 `docs/josh-commands-automation.md` → "`josh investigation:guard`").
 
