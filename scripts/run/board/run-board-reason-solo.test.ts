@@ -1,5 +1,10 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan, RowReason } from './run-board-layout'
@@ -108,6 +113,59 @@ describe('run_board_reason.reader on a run:solo candidate', () => {
 		const read = reasons([solo(), blocked], [FIRST_LANE])
 
 		expect(read[1]).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4391: a running `run:solo` issue lets nothing new start, so every candidate row —
+// a waiting `run:solo` one too — leads with 🔒 and the holder, `epic_solo.holder_of`'s reading.
+const HOLDER = 4374
+const HELD: RowReason = { icon: WAIT_ICONS.solo_running, issues: [String(HOLDER)] }
+const HOLDING = [IN_PROGRESS_LABEL, RUN_SOLO_LABEL]
+
+function held_reasons(
+	children: Array<EpicChild>,
+	waits: ReadonlyArray<string> = [],
+	holder_labels: ReadonlyArray<string> = HOLDING,
+	lanes: ReadonlyArray<number> = [HOLDER],
+): Array<RowReason | undefined> {
+	const plan = { ...plan_of(children), labels: new Map([[HOLDER, holder_labels]]) }
+	const read = { plan, statuses: running(lanes), events: [], free_lanes: 1, is_stopped: false }
+	const reason_of = run_board_reason.reader(read)
+
+	return children.map((item) => reason_of(item, waits))
+}
+
+describe('run_board_reason.reader while a run:solo issue runs', () => {
+	it('leads every candidate row with 🔒 and the holder, a solo candidate too', () => {
+		expect(held_reasons([child(AHEAD), solo(), child(BEHIND)])).toStrictEqual([HELD, HELD, HELD])
+	})
+
+	it('keeps 🔒 for an in-progress run:solo issue outside this run’s lanes, as backlog:next holds', () => {
+		expect(held_reasons([child(AHEAD)], [], HOLDING, [])).toStrictEqual([HELD])
+	})
+
+	it('drops 🔒 for a parked run:solo issue, which backlog:next no longer reads as holding', () => {
+		const [reason] = held_reasons([child(AHEAD)], [], [...HOLDING, NEEDS_DECISION_LABEL], [])
+
+		expect(reason).toBeUndefined()
+	})
+
+	it('leaves a running issue without run:solo to the rows’ own reasons', () => {
+		const [solo_reason] = held_reasons([solo()], [], [IN_PROGRESS_LABEL, RUN_LANE_LABEL])
+
+		expect(solo_reason).toStrictEqual({ icon: WAIT_ICONS.solo, issues: [String(HOLDER)] })
+	})
+
+	it('keeps a blocked, an untriaged and a not-yet-due row on their own reasons', () => {
+		const [blocked] = held_reasons([child(BEHIND)], [String(BLOCKER)])
+		const [untriaged] = held_reasons([child(LATER, [])])
+		const [later] = held_reasons([
+			{ ...child(AHEAD), body: `## 背景\n\n- 実施可能日: ${FUTURE}\n` },
+		])
+
+		expect(blocked).toStrictEqual({ icon: WAIT_ICONS.blocker, issues: [String(BLOCKER)] })
+		expect(untriaged?.icon).toBe(WAIT_ICONS.untriaged)
+		expect(later?.icon).toBe(WAIT_ICONS.not_before)
 	})
 })
 

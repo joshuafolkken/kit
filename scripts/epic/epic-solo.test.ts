@@ -58,6 +58,20 @@ function waiting(gated: EpicNextResult): ReadonlyArray<number> {
 	return gated.waiting.map((entry) => entry.number)
 }
 
+// joshuafolkken/kit#4391: the running holder `select` and `run:board`'s 🔒 rows share.
+describe('epic_solo.holder_of', () => {
+	it('answers the running issue that carries run:solo, whatever its casing', () => {
+		const running = [child(FIRST), child(HOLDER, ['RUN:Solo'])]
+
+		expect(epic_solo.holder_of(running)).toBe(HOLDER)
+	})
+
+	it('answers undefined where no running issue carries run:solo', () => {
+		expect(epic_solo.holder_of([child(FIRST), child(SECOND, [IN_PROGRESS_LABEL])])).toBeUndefined()
+		expect(epic_solo.holder_of([])).toBeUndefined()
+	})
+})
+
 describe('epic_solo.gate', () => {
 	it('leaves the offer unchanged when no candidate or holder carries run:solo', () => {
 		const input = result([child(FIRST), child(SECOND)])

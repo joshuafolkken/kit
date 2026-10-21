@@ -1,10 +1,10 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
 import { figure_format } from '#scripts/lib/figure-format'
-import { MS_PER_MINUTE, MS_PER_SECOND, SECONDS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import cli_spinners from 'cli-spinners'
+import { run_board_length } from './run-board-length'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
@@ -14,11 +14,6 @@ import type { ItemState } from './run-board-status'
 // heartbeat has run — is degree-minute-second style (`1°15′57″`), so `:` is a time of day alone and
 // the board never reads a length as a moment.
 
-const MINUTES_PER_HOUR = 60
-// A length's units — hours, minutes and seconds — so a length never shares the clock's `:`.
-const SPAN_UNITS = { hours: '°', minutes: '′', seconds: '″' } as const
-// The seconds a length rounded to its minute draws, which `minute_span_of` leaves off.
-const ZERO_SECONDS = `00${SPAN_UNITS.seconds}`
 // Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
@@ -70,6 +65,7 @@ const WORDS = {
 	untriaged: 'untriaged',
 	solo: 'runs alone',
 	solo_ahead: 'behind solo',
+	solo_running: 'solo running',
 	// A blocker this run will not finish, which a person has to move (joshuafolkken/kit#4292).
 	on_human: 'needs a person',
 	// A lane held back by the machine-wide core budget, and why.
@@ -253,9 +249,9 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 
 // What a queued or waiting row leads with (joshuafolkken/kit#4288), in place of ⏳: 📂 a path a
 // running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
-// judged, 🧍 a `run:solo` issue waiting for the running lanes and 🙅 a row behind it (#4294; 🚧 is a
-// held check's), chosen on the same rule as every row icon. The rest are the board's own, shared
-// rather than copied.
+// judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
+// held check's) and 🔒 a row a running `run:solo` issue holds (#4391), chosen on the same rule as
+// every row icon. The rest are the board's own, shared rather than copied.
 const WAIT_ICONS = {
 	path: '📂',
 	named: '📋',
@@ -263,6 +259,7 @@ const WAIT_ICONS = {
 	untriaged: '❓',
 	solo: '🧍',
 	solo_ahead: '🙅',
+	solo_running: '🔒',
 	lane: LANES_ICON,
 	memory: HEADER_ICONS.memory,
 	blocker: WAITS_ICON,
@@ -281,6 +278,7 @@ const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
 	[WAIT_ICONS.held, 'held'],
 	[WAIT_ICONS.solo, 'solo'],
 	[WAIT_ICONS.solo_ahead, 'solo_ahead'],
+	[WAIT_ICONS.solo_running, 'solo_running'],
 	[WAIT_ICONS.memory, 'headroom'],
 	[WAIT_ICONS.untriaged, 'untriaged'],
 	[WAIT_ICONS.blocker, 'waits'],
@@ -298,6 +296,7 @@ const GAUGE_SHADES = {
 } as const satisfies Readonly<Record<string, Shade>>
 
 const { two_digits, clock_of, minute_of } = figure_format
+const { minute_span_of, span_of } = run_board_length
 
 // The local `MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
 // start, in the condition column it is the widest value of (joshuafolkken/kit#4288).
@@ -306,40 +305,6 @@ function day_minute_of(ms: number): string {
 	const day = [date.getMonth() + 1, date.getDate()].map((value) => two_digits(value))
 
 	return `${day.join('-')} ${minute_of(ms)}`
-}
-
-// A length as its hours, and its minutes and seconds within the hour, each its count with the mark it
-// is drawn with; a negative span reads as zero.
-function span_fields(ms: number): Array<{ value: number; unit: string }> {
-	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
-	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
-	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-
-	return [
-		{ value: hours, unit: SPAN_UNITS.hours },
-		{ value: minutes % MINUTES_PER_HOUR, unit: SPAN_UNITS.minutes },
-		{ value: seconds % SECONDS_PER_MINUTE, unit: SPAN_UNITS.seconds },
-	]
-}
-
-// **Every length the board draws**, in degree-minute-second style (`26″`, `3′27″`, `1°15′57″`): the
-// leading unit not padded and a zero one dropped down to the seconds, the units after it two digits;
-// a negative span reads as zero.
-function span_of(ms: number): string {
-	const fields = span_fields(ms)
-	const lead = fields.findIndex((field, index) => field.value > 0 || index === fields.length - 1)
-	const [first, ...rest] = fields.slice(lead)
-	const head = first === undefined ? '' : `${String(first.value)}${first.unit}`
-
-	return head + rest.map((field) => `${two_digits(field.value)}${field.unit}`).join('')
-}
-
-// A length rounded up to its minute, in `span_of`'s style without the seconds (`25′`, `1°05′`), never
-// under a minute: an estimate drawn to the second would claim a precision it does not have.
-function minute_span_of(ms: number): string {
-	const minutes = Math.max(1, Math.ceil(ms / MS_PER_MINUTE))
-
-	return span_of(minutes * MS_PER_MINUTE).slice(0, -ZERO_SECONDS.length)
 }
 
 function is_shade(color: Paint): color is Shade {

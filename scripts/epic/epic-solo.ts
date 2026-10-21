@@ -1,5 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { has_any_label, has_label_name, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import { has_label_name, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_busy, type BusyRead } from './epic-busy'
 import type { EpicChild } from './epic-graph'
@@ -28,8 +28,6 @@ import { epic_report, type EpicNextResult } from './epic-report'
 // them goes first is the ranking's question — `issue-rank.ts` puts a verification-path defect at the head — so an idle
 // repository takes the candidates in rank order like any other.
 
-const SOLO_LABELS: ReadonlySet<string> = new Set([RUN_SOLO_LABEL])
-
 // Which of the ordered candidates may start, which are held back, and why when a reason is worth
 // saying. `offered` keeps the candidates' own order.
 interface SoloSelection {
@@ -49,14 +47,27 @@ interface SoloGate {
 	notice?: string
 }
 
-function is_solo(child: EpicChild): boolean {
+// An issue as its number and its label names — a candidate, or a running issue `run:board` reads.
+type Labelled = Pick<EpicChild, 'number' | 'labels'>
+
+function is_solo(child: Labelled): boolean {
 	return has_label_name(child.labels, RUN_SOLO_LABEL)
+}
+
+// The running `run:solo` issue that lets nothing new start, if any — the one reading `select` and
+// `run:board`'s 🔒 rows share (joshuafolkken/kit#4391).
+function holder_of(running: ReadonlyArray<Labelled>): number | undefined {
+	return running.find((issue) => is_solo(issue))?.number
 }
 
 function solo_holder(read: BusyRead): number | undefined {
 	if (read.kind !== 'busy') return undefined
+	const running = read.issues.map((issue) => ({
+		number: issue.number,
+		labels: (issue.labels ?? []).map((label) => label.name),
+	}))
 
-	return read.issues.find((issue) => has_any_label(issue.labels, SOLO_LABELS))?.number
+	return holder_of(running)
 }
 
 function held_message(holder: number, repo: string): string {
@@ -157,7 +168,7 @@ function gate(
 		: { result: gated, notice: selection.notice }
 }
 
-const epic_solo = { gate, is_solo, queue_of, select }
+const epic_solo = { gate, holder_of, is_solo, queue_of, select }
 
-export type { SoloGate, SoloQueue, SoloSelection, SoloSelector }
+export type { Labelled, SoloGate, SoloQueue, SoloSelection, SoloSelector }
 export { epic_solo }
