@@ -158,7 +158,24 @@ describe('lane_stats.row', () => {
 		expect(cell_of(GATES, GATE_MEDIAN)).toBe('4.0')
 		expect(cell_of(GATES, 'gate max (min)')).toBe('9.0')
 	})
+})
 
+// joshuafolkken/kit#4397: a reused gate ran no check, so its milliseconds are no gate time.
+describe('lane_stats.row — a reused gate', () => {
+	it('leaves a reused gate out of the gate median', () => {
+		const reused: LedgerEntry = {
+			kind: 'gate',
+			at: hours_before_now(1),
+			elapsed_ms: 0,
+			is_passed: true,
+			is_reused: true,
+		}
+
+		expect(cell_of([...GATES, reused, reused], GATE_MEDIAN)).toBe('4.0')
+	})
+})
+
+describe('lane_stats.row — the load figures', () => {
 	it('reduces load samples to load, free memory and lane figures', () => {
 		expect(cell_of(LOADS, EFFECTIVE_LANES)).toBe('3.0')
 		expect(cell_of(LOADS, LOAD_PEAK)).toBe('8.0')

@@ -77,6 +77,19 @@ const WHOLE_SUITE_FILES: ReadonlySet<string> = new Set([
 const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import or read'
 const NO_MAP_REASON = 'no test-read map covers the changed non-code file'
+const WHOLE_SUITE_SUFFIX = 'affects every test'
+const UNRECORDED_SUFFIX = 'is read by no recorded test'
+
+// The stable kind each full-suite reason falls under, so the gate ledger counts the fallbacks by why
+// rather than by the file a reason names (joshuafolkken/kit#4397).
+const FALLBACK_KINDS: ReadonlyArray<{ kind: string; reason: string }> = [
+	{ kind: 'unreadable', reason: UNREADABLE_REASON },
+	{ kind: 'nothing-relatable', reason: NOTHING_RELATABLE_REASON },
+	{ kind: 'no-map', reason: NO_MAP_REASON },
+	{ kind: 'whole-suite-file', reason: WHOLE_SUITE_SUFFIX },
+	{ kind: 'unrecorded-file', reason: UNRECORDED_SUFFIX },
+]
+const OTHER_FALLBACK = 'other'
 
 // The command this narrowing belongs to, defined once: the guard prints it when it skips, and the
 // line below prints it in front of every decision.
@@ -140,7 +153,7 @@ function resolve_through_map(others: ReadonlyArray<string>, request: ScopeReques
 		(file) => !recorded.has(file) && !test_read_map.in_unread_directory(map, file),
 	)
 
-	if (unknown !== undefined) return { reason: `${unknown} is read by no recorded test` }
+	if (unknown !== undefined) return { reason: `${unknown} ${UNRECORDED_SUFFIX}` }
 
 	return { files: others.flatMap((file) => test_read_map.readers_of(map, file)), unread }
 }
@@ -185,7 +198,7 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 
 	const whole = changed.find((file) => WHOLE_SUITE_FILES.has(file))
 
-	if (whole !== undefined) return all_scope(`${whole} affects every test`)
+	if (whole !== undefined) return all_scope(`${whole} ${WHOLE_SUITE_SUFFIX}`)
 
 	const code = changed.filter((file) => is_relatable(file))
 	const resolution = resolve_through_map(
@@ -208,6 +221,23 @@ function describe_scope(scope: RelatedScope, root: string): string {
 	return `${COMMAND_LABEL}: ${scope.reason} — ${NONE_SUFFIX}.\n${listing}`
 }
 
+// The kind of full-suite fallback a run's output names, read off the line `describe_scope` printed, or
+// `undefined` when the run narrowed or ran nothing.
+function fallback_kind(output: string): string | undefined {
+	const prefix = `${COMMAND_LABEL}: `
+	const suffix = ` — ${VOCABULARY.fallback_suffix}.`
+	const line = output
+		.split('\n')
+		.map((candidate) => candidate.trim())
+		.find((candidate) => candidate.startsWith(prefix) && candidate.endsWith(suffix))
+
+	if (line === undefined) return undefined
+
+	const reason = line.slice(prefix.length, -suffix.length)
+
+	return FALLBACK_KINDS.find((entry) => reason.includes(entry.reason))?.kind ?? OTHER_FALLBACK
+}
+
 // `--run` is what keeps `vitest related` out of watch mode; the `run` sub-command already implies it
 // on the full-suite side, which is why only one of the two branches carries the flag.
 function vitest_arguments(
@@ -227,6 +257,7 @@ const related_scope = {
 	NO_MAP_REASON,
 	UNREADABLE_REASON,
 	describe_scope,
+	fallback_kind,
 	is_relatable,
 	resolve_scope,
 	vitest_arguments,
