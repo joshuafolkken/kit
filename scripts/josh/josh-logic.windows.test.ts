@@ -1,9 +1,12 @@
+import { constants } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const execa_sync_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
+// `constants` stays real: the lane ledger reads its open flags at import.
 vi.mock('node:fs', () => ({
+	constants,
 	existsSync: vi.fn().mockReturnValue(false),
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
 }))

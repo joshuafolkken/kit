@@ -12,14 +12,15 @@ throughput, gate duration and machine load side by side.
 One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in the josh temp root, keyed
 on the common git directory so every lane, the parent and the sampler write to the same file.
 
-| Entry      | Written by                                                    | Fields                                                               |
-| ---------- | ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `merge`    | `josh run:merge`, when a child merged                         | `at`, `issue`                                                        |
-| `gate`     | `josh gate`, when it finishes (passed or failed)              | `at`, `elapsed_ms`, `is_passed`, `unit_ms?`                          |
-| `load`     | `josh backlog:drive` while it runs, and `josh lane:sample`    | `at`, `load`, `available_mb?`, `swapped_mb?`, `lanes?`, `processes?` |
-| `dispatch` | `josh lane:dispatch`, when a child started                    | `at`, `issue`                                                        |
-| `stage`    | `josh ship`, as each stage ends; `josh followup` for the wait | `at`, `stage`, `elapsed_ms`, `issue?`                                |
-| `stop`     | `josh ship`, when it stops at a stage or on a conflict        | `at`, `issue`, `reason`                                              |
+| Entry       | Written by                                                    | Fields                                                               |
+| ----------- | ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `merge`     | `josh run:merge`, when a child merged                         | `at`, `issue`                                                        |
+| `gate`      | `josh gate`, when it finishes (passed or failed)              | `at`, `elapsed_ms`, `is_passed`, `unit_ms?`                          |
+| `load`      | `josh backlog:drive` while it runs, and `josh lane:sample`    | `at`, `load`, `available_mb?`, `swapped_mb?`, `lanes?`, `processes?` |
+| `dispatch`  | `josh lane:dispatch`, when a child started                    | `at`, `issue`                                                        |
+| `stage`     | `josh ship`, as each stage ends; `josh followup` for the wait | `at`, `stage`, `elapsed_ms`, `issue?`                                |
+| `stop`      | `josh ship`, when it stops at a stage or on a conflict        | `at`, `issue`, `reason`                                              |
+| `core-wait` | a command a held core-budget claim admitted after a wait      | `at`, `command`, `waited_ms`, `issue?`                               |
 
 A `stage` entry's `at` is when the stage ended, so it began `elapsed_ms` earlier. `josh followup`
 writes one of its own, `ci-wait` — the time it spent waiting for the checks — and that one carries no
@@ -85,15 +86,16 @@ kept, or a stranded one, has no child running and adds no load.
 Under the lane-limit row, `lane:stats` prints a second table: one row per stage of a lane, in the
 order a lane passes them, each with its median, its maximum and how many runs the period holds.
 
-| Row                           | Source                                                                     | Read for                                                    |
-| ----------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `implement`                   | a `dispatch` entry to the start of the same issue's first `stage` after it | how much of a lane neither decision below can move          |
-| `review`                      | `stage` entries of `josh ship`'s round-one review                          | whether to overlap the round-one review with CI             |
-| `ci-wait`                     | `stage` entries `josh followup` writes for its wait on the checks          | whether to overlap the round-one review with CI             |
-| `gate`                        | `stage` entries of `josh ship`'s gate                                      | whether to lower `JOSH_LANE_LIMIT`, beside the load columns |
-| `preflight`, `sync`, `commit` | `stage` entries of `josh ship`                                             | the rest of the time from dispatch to the pull request      |
-| `round-2`                     | `stage` entries of `josh ship`'s round-two review                          | its `runs` against `review`'s: the overlap's clean rate     |
-| `followup`, `report`          | `stage` entries of `josh ship`                                             | the rest of the time from the pull request to the merge     |
+| Row                           | Source                                                                      | Read for                                                          |
+| ----------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `implement`                   | a `dispatch` entry to the start of the same issue's first `stage` after it  | how much of a lane neither decision below can move                |
+| `review`                      | `stage` entries of `josh ship`'s round-one review                           | whether to overlap the round-one review with CI                   |
+| `ci-wait`                     | `stage` entries `josh followup` writes for its wait on the checks           | whether to overlap the round-one review with CI                   |
+| `gate`                        | `stage` entries of `josh ship`'s gate                                       | whether to lower `JOSH_LANE_LIMIT`, beside the load columns       |
+| `preflight`, `sync`, `commit` | `stage` entries of `josh ship`                                              | the rest of the time from dispatch to the pull request            |
+| `pre-detach`                  | `stage` entries of a detached `josh ship`'s fast checks in the child's turn | the time the child's own turn spends checking before the hand-off |
+| `round-2`                     | `stage` entries of `josh ship`'s round-two review                           | its `runs` against `review`'s: the overlap's clean rate           |
+| `followup`, `report`          | `stage` entries of `josh ship`                                              | the rest of the time from the pull request to the merge           |
 
 **A stage nothing recorded prints `not measured`, never `0`** — a period that ran no second review
 round has no `round-2` duration, which is not a round that took no time. A stage that found nothing
@@ -232,6 +234,18 @@ ended at the hour.
 **The decision the table is for**: what `backlog:stalled`'s "ready, free lane, no dispatch" time is
 made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
 own answer. Compare the rows from one period to the next to show the idle time shrinking.
+
+## How long a lane waited for the core budget
+
+Under the hold table, `lane:stats` prints one row per lane whose commands waited for the core budget:
+the total and median minutes and how many waits. A wait outside a lane is its own `outside a lane`
+row; a period with no wait prints a `none` row.
+
+A claim writes its `core-wait` entry once it is admitted, and only after a wait — one admitted on its
+first read cost nothing. `issue` is the lane of the checkout the claim ran in.
+
+The decision the table is for: how much of a lane's time is waiting rather than work. A wait inside
+a ship stage is also inside that stage's duration; this table names the part the budget held back.
 
 ## What the load is made of
 

@@ -7,7 +7,8 @@ import { z } from 'zod'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage, per stopped `josh ship` and per round-2 decision, read back by `josh lane:stats`.
+// `josh ship` stage, per stopped `josh ship`, per round-2 decision and per core-budget wait, read back
+// by `josh lane:stats`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -24,6 +25,9 @@ const LEDGER_SUFFIX = '.jsonl'
 const LINE_SEPARATOR = '\n'
 // `followup`'s wait for CI — a stage of a lane's run that no `josh ship` stage is the whole of.
 const CI_WAIT_STAGE = 'ci-wait'
+// A detached `josh ship`'s fast checks in the agent's own turn — not a resumable ship stage, since the
+// supervised gate runs them again (joshuafolkken/kit#4382).
+const PRE_DETACH_STAGE = 'pre-detach'
 const LEDGER_FILE_MODE = 0o600
 // The flags `detached-launch.ts` appends its log with, for the same deterministic shared-temp path.
 const { O_APPEND, O_CREAT, O_NOFOLLOW, O_WRONLY } = constants
@@ -42,6 +46,7 @@ const KIND = {
 	RELEASED: 'released',
 	ROUND_TWO: 'round-two',
 	OFFERABLE: 'offerable',
+	CORE_WAIT: 'core-wait',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -153,6 +158,16 @@ const offerable_schema = z.object({
 	at: z.string(),
 	is_offerable: z.boolean(),
 })
+// One claim that waited `waited_ms` for the core budget before `command` could start — written by the
+// command itself, so a wait inside a gate, a scoped check or a ship lands in one record. `issue` is the
+// lane the claim ran in, absent outside a lane (joshuafolkken/kit#4382).
+const core_wait_schema = z.object({
+	kind: z.literal(KIND.CORE_WAIT),
+	at: z.string(),
+	command: z.string(),
+	waited_ms: z.number(),
+	issue: z.number().optional(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -165,6 +180,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	released_schema,
 	round_two_schema,
 	offerable_schema,
+	core_wait_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -178,6 +194,8 @@ type OverlapEntry = z.infer<typeof overlap_schema>
 type HeldEntry = z.infer<typeof held_schema>
 type RoundTwoEntry = z.infer<typeof round_two_schema>
 type OfferableEntry = z.infer<typeof offerable_schema>
+type CoreWaitEntry = z.infer<typeof core_wait_schema>
+type CoreWaitRecord = Omit<CoreWaitEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
@@ -281,6 +299,10 @@ async function record_round_two(round_two: RoundTwoRecord, path?: string): Promi
 	await record({ kind: KIND.ROUND_TWO, at: now_iso(), ...round_two }, path)
 }
 
+async function record_core_wait(wait: CoreWaitRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.CORE_WAIT, at: now_iso(), ...wait }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -312,9 +334,11 @@ function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 const lane_ledger = {
 	CI_WAIT_STAGE,
 	KIND,
+	PRE_DETACH_STAGE,
 	append,
 	read_entries,
 	record,
+	record_core_wait,
 	record_dispatch,
 	record_gate,
 	record_held,
@@ -330,6 +354,8 @@ const lane_ledger = {
 }
 
 export type {
+	CoreWaitEntry,
+	CoreWaitRecord,
 	DispatchEntry,
 	GateCheckRecord,
 	GateEntry,

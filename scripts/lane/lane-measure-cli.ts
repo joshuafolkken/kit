@@ -7,6 +7,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
+import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_process_stats } from './lane-process-stats'
@@ -134,6 +135,7 @@ async function stats_command(
 			lane_stop_stats.table(entries, window, await read_events(context)),
 			lane_round_two_stats.table(entries, window),
 			lane_held_stats.table(entries, window),
+			lane_core_wait_stats.table(entries, window),
 			lane_process_stats.table(entries, window),
 			lane_check_stats.table(entries, window),
 		].join('\n\n'),

@@ -9,7 +9,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
-import { run_ship_pre_detach } from './run-ship-pre-detach'
+import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
@@ -401,7 +401,7 @@ async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<S
 		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, preflight)
 	}
 
-	const result = await run_ship_pre_detach.checks()
+	const result = await run_ship_pre_detach_timed.checks(args.number)
 
 	return [preflight, { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }]
 }

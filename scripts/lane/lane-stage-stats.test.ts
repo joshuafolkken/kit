@@ -68,6 +68,14 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 		expect(row_of(entries, CI_WAIT)).toStrictEqual(['3.0', '3.0', '1'])
 	})
 
+	// joshuafolkken/kit#4382: the pre-detach checks are timed apart from the preflight.
+	it('keeps the pre-detach checks on a row of their own', () => {
+		const pre_detach = 'pre-detach'
+		const entries = [stage('preflight', 1, 2), stage(pre_detach, 3, 1)]
+
+		expect(row_of(entries, pre_detach)).toStrictEqual(['3.0', '3.0', '1'])
+	})
+
 	it('prints not measured, never zero, for a stage nothing recorded', () => {
 		expect(row_of([stage(REVIEW, 2, 1)], 'round-2')).toStrictEqual(NOT_MEASURED_ROW)
 	})

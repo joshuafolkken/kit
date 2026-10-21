@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Reading } from './metrics-base'
+import type { CachedReading } from './metrics-base-cache'
 import type { Metrics } from './metrics-logic'
 
 // joshuafolkken/kit#3644: which commit the totals are held to, and the approval files read beside
@@ -14,10 +15,16 @@ vi.mock('#scripts/git/git-command', () => ({ git_command: { status: vi.fn() } })
 vi.mock('#scripts/git/change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn() },
 }))
+vi.mock('#scripts/git/base-tree', () => ({ base_tree: { with_tree: vi.fn() } }))
+vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('./metrics-base-cache', () => ({ metrics_base_cache: { read: vi.fn(), write: vi.fn() } }))
 
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { git_command } = await import('#scripts/git/git-command')
 const { change_base } = await import('#scripts/git/change-base')
+const { base_tree } = await import('#scripts/git/base-tree')
+const { execa } = await import('execa')
+const { metrics_base_cache } = await import('./metrics-base-cache')
 const { metrics_base } = await import('./metrics-base')
 const { metrics_ratchet } = await import('./metrics-ratchet')
 
@@ -114,5 +121,83 @@ describe('metrics_base.read', () => {
 		vi.mocked(git_command.status).mockResolvedValue(CLEAN_STATUS)
 
 		await expect(metrics_base.read(MERGE_BASE, current)).resolves.toBe(current)
+	})
+})
+
+type ExecaResult = Awaited<ReturnType<typeof execa>>
+
+const CURRENT: Reading = { metrics: METRICS, approvals: new Map() }
+const OTHER_HEAD = 'ccccccc'
+const APPROVAL_TEXT = 'approved'
+const MEASURED: CachedReading = {
+	stdout: JSON.stringify(METRICS),
+	approvals: [[APPROVAL_FILE, APPROVAL_TEXT]],
+}
+
+function off_base(): void {
+	vi.mocked(git_spawn.read).mockResolvedValue(OTHER_HEAD)
+	vi.mocked(git_command.status).mockResolvedValue(CLEAN_STATUS)
+}
+
+function child_result(stdout: string): ExecaResult {
+	return { stdout } as unknown as ExecaResult
+}
+
+function measuring(stdout: string): void {
+	vi.mocked(execa).mockResolvedValue(child_result(stdout))
+	vi.mocked(base_tree.with_tree).mockImplementation(
+		async (_prefix, _commit, use) => await use({ parent: scratch, tree: root() }),
+	)
+}
+
+// joshuafolkken/kit#4382: one base commit under one ruler is measured once.
+describe('metrics_base.read — the cached base', () => {
+	it('reads a cached base back without building a tree or starting the child', async () => {
+		off_base()
+		vi.mocked(metrics_base_cache.read).mockReturnValue(MEASURED)
+
+		const reading = await metrics_base.read(MERGE_BASE, CURRENT)
+
+		expect(reading).toStrictEqual({
+			metrics: METRICS,
+			approvals: new Map([[APPROVAL_FILE, APPROVAL_TEXT]]),
+		})
+		expect(base_tree.with_tree).not.toHaveBeenCalled()
+		expect(execa).not.toHaveBeenCalled()
+	})
+})
+
+describe('metrics_base.read — a base the cache does not answer for', () => {
+	it('measures a base nothing cached, and writes the measurement back', async () => {
+		off_base()
+		vi.mocked(metrics_base_cache.read).mockReturnValue(undefined)
+		measuring(JSON.stringify(METRICS))
+
+		const reading = await metrics_base.read(MERGE_BASE, CURRENT)
+
+		expect(reading).toStrictEqual({ metrics: METRICS, approvals: new Map() })
+		expect(execa).toHaveBeenCalledOnce()
+		expect(metrics_base_cache.write).toHaveBeenCalledWith(MERGE_BASE, expect.any(String), {
+			stdout: JSON.stringify(METRICS),
+			approvals: [],
+		})
+	})
+
+	it('measures again where the cached record no longer parses', async () => {
+		off_base()
+		vi.mocked(metrics_base_cache.read).mockReturnValue({ stdout: '{}', approvals: [] })
+		measuring(JSON.stringify(METRICS))
+
+		await expect(metrics_base.read(MERGE_BASE, CURRENT)).resolves.toStrictEqual(CURRENT)
+		expect(execa).toHaveBeenCalledOnce()
+	})
+
+	it('fails, and caches nothing, where the base printed no totals', async () => {
+		off_base()
+		vi.mocked(metrics_base_cache.read).mockReturnValue(undefined)
+		measuring('')
+
+		await expect(metrics_base.read(MERGE_BASE, CURRENT)).rejects.toThrow('printed no totals')
+		expect(metrics_base_cache.write).not.toHaveBeenCalled()
 	})
 })

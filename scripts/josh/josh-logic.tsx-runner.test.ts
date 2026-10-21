@@ -1,3 +1,4 @@
+import { constants } from 'node:fs/promises'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const execa_sync_mock = vi.hoisted(() => vi.fn())
@@ -6,7 +7,12 @@ const exists_sync_mock = vi.hoisted(() => vi.fn())
 const read_file_sync_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
-vi.mock('node:fs', () => ({ existsSync: exists_sync_mock, readFileSync: read_file_sync_mock }))
+// `constants` stays real: the lane ledger reads its open flags at import.
+vi.mock('node:fs', () => ({
+	constants,
+	existsSync: exists_sync_mock,
+	readFileSync: read_file_sync_mock,
+}))
 vi.mock('node:module', () => ({ createRequire: () => ({ resolve: resolve_mock }) }))
 
 const MANIFEST_PATH = '/pkg/node_modules/tsx/package.json'

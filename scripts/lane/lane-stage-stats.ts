@@ -25,6 +25,7 @@ const { STAGE } = run_ship_stage
 const STAGES = [
 	IMPLEMENT,
 	STAGE.PREFLIGHT,
+	lane_ledger.PRE_DETACH_STAGE,
 	STAGE.REVIEW,
 	STAGE.SYNC,
 	STAGE.GATE,

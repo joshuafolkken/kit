@@ -6,6 +6,7 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
+import type { WaitSink } from './core-wait-record'
 import type { MachineReading } from './machine-capacity'
 
 // joshuafolkken/kit#3943: a claim held back by the budget waited in silence. A waiting claim now
@@ -105,6 +106,58 @@ async function prints_nothing_solo(): Promise<void> {
 	expect(report).not.toHaveBeenCalled()
 	expect(core_budget.budget_waits(probe.directory, 1)).toStrictEqual([])
 }
+
+// joshuafolkken/kit#4382: an admitted claim that waited records how long, so a lane's time splits
+// into work and waiting.
+const WAITED_MS = 500
+
+async function records_its_wait(): Promise<void> {
+	write_blocker({ weight: CORES, admitted_at: 0 })
+	const clock = { now: 1 }
+	const record_wait = vi.fn<WaitSink>().mockResolvedValue(undefined)
+
+	await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		command: 'lint',
+		report: vi.fn<(line: string) => void>(),
+		read_machine: async () => UNREAD,
+		now: () => clock.now,
+		sleep: async () => {
+			clock.now += WAITED_MS
+			free_blocker()
+		},
+		record_wait,
+	})
+
+	const lane = lane_paths.lane_issue_of(process.cwd())
+	const issue = lane === undefined ? {} : { issue: Number(lane) }
+
+	expect(record_wait).toHaveBeenCalledExactlyOnceWith({
+		command: 'lint',
+		waited_ms: WAITED_MS,
+		...issue,
+	})
+}
+
+async function records_no_wait_solo(): Promise<void> {
+	const record_wait = vi.fn<WaitSink>().mockResolvedValue(undefined)
+
+	await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		read_machine: async () => UNREAD,
+		now: () => 1,
+		record_wait,
+	})
+
+	expect(record_wait).not.toHaveBeenCalled()
+}
+
+describe('core_budget.reserve — how long a claim waited', () => {
+	it('records the command, the wait and the lane once it is admitted', records_its_wait)
+	it('records nothing for a claim admitted at once', records_no_wait_solo)
+})
 
 describe('core_budget.reserve — a claim that waits says why', () => {
 	it(

@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { busy_average, type BusySample } from './busy-average'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
 import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
+import { core_wait_record, type WaitSink } from './core-wait-record'
 import { core_weights } from './core-weights'
 import { held_mark } from './held-mark'
 import { machine_capacity, type MachineBudget, type MachineReading } from './machine-capacity'
@@ -95,6 +96,8 @@ interface ReserveOptions {
 	directory?: string
 	now?: () => number
 	sleep?: (ms: number) => Promise<void>
+	// Where a claim that waited records how long, once admitted (`core-wait-record.ts`).
+	record_wait?: WaitSink
 }
 
 interface Handle {
@@ -198,6 +201,7 @@ interface TimingConfig {
 interface WaitContext extends TimingConfig {
 	read_machine: () => Promise<MachineReading>
 	report: (line: string) => void
+	record_wait: WaitSink | undefined
 	key: string
 	target: string
 	directory: string
@@ -307,14 +311,19 @@ async function await_admission(context: WaitContext): Promise<Admission> {
 		admission = await poll_admission(context)
 	}
 
+	await core_wait_record.record_admitted(context.fields, context.now(), context.record_wait)
+
 	return admission
 }
 
-// What a wait reads the machine through and reports its start to.
-function resolve_ports(options: ReserveOptions): Pick<WaitContext, 'read_machine' | 'report'> {
+// What a wait reads the machine through, reports its start to and records its length in.
+function resolve_ports(
+	options: ReserveOptions,
+): Pick<WaitContext, 'read_machine' | 'report' | 'record_wait'> {
 	return {
 		read_machine: options.read_machine ?? machine_capacity.read_machine,
 		report: options.report ?? report_wait,
+		record_wait: options.record_wait,
 	}
 }
 
