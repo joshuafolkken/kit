@@ -16,6 +16,8 @@ interface MeasureContext {
 	ledger_path?: string
 	// The run's event stream `lane:stats` reads parks from; absent, the repository's own.
 	events_path?: string
+	// The lane transcript directories `lane:stats` reads tool calls from; absent, this repository's lanes'.
+	transcript_directories?: ReadonlyArray<string>
 	now_ms?: number
 }
 

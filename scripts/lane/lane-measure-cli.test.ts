@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,10 +25,18 @@ afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
 })
 
-function fresh_context(): { ledger_path: string; events_path: string; now_ms: number } {
+interface TestContext {
+	ledger_path: string
+	events_path: string
+	transcript_directories: Array<string>
+	now_ms: number
+}
+
+function fresh_context(): TestContext {
 	return {
 		ledger_path: path.join(scratch, `${randomUUID()}.jsonl`),
 		events_path: path.join(scratch, `${randomUUID()}-events.jsonl`),
+		transcript_directories: [],
 		now_ms: NOW,
 	}
 }
@@ -215,5 +223,26 @@ describe('lane_measure_cli.run — stats round 2', () => {
 
 		expect(printed).toContain('| round 2 | code | decisions |')
 		expect(printed).toContain('| skip | inert | 1 |')
+	})
+})
+
+// joshuafolkken/kit#4418: and the lane sessions' transcript-side metrics, last.
+describe('lane_measure_cli.run — stats transcripts', () => {
+	it('prints the transcript table over the directories the context names', async () => {
+		const context = fresh_context()
+		const directory = mkdtempSync(path.join(scratch, 'transcripts-'))
+		const block = { type: 'tool_use', id: 't', input: { command: 'pnpm josh gate' } }
+		const line = { type: 'assistant', timestamp: AT, message: { content: [block] } }
+
+		writeFileSync(path.join(directory, 'session.jsonl'), JSON.stringify(line))
+		await lane_measure_cli.run(['stats', '--period', '2'], {
+			...context,
+			transcript_directories: [directory],
+		})
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| transcript metric | value |')
+		expect(printed).toContain('| verification calls, solo | 1 |')
 	})
 })
