@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { process_directories } from './process-directories'
 
@@ -19,12 +20,19 @@ describe('process_directories.parse', () => {
 	})
 })
 
-describe('process_directories.is_within', () => {
-	it('answers the directory itself and anything under it, never a sibling sharing its prefix', () => {
-		expect(process_directories.is_within(LANE, LANE)).toBe(true)
-		expect(process_directories.is_within(`${LANE}/packages/app`, LANE)).toBe(true)
-		expect(process_directories.is_within(`${LANE}0`, LANE)).toBe(false)
-		expect(process_directories.is_within('/Users/me/Development/kit', LANE)).toBe(false)
+describe('process_directories.lane_of', () => {
+	const root = path.dirname(LANE)
+
+	it('finds the lane a directory sits under at any depth, and none outside a lane', () => {
+		expect(process_directories.lane_of(LANE, root)).toBe('3423')
+		expect(process_directories.lane_of(`${LANE}/packages/app/src`, root)).toBe('3423')
+		expect(process_directories.lane_of(path.dirname(root), root)).toBeUndefined()
+	})
+
+	it('finds no lane under another repository’s lanes root of the same number', () => {
+		const other = '/Users/me/Development/.app-kit-lanes/3423/src'
+
+		expect(process_directories.lane_of(other, root)).toBeUndefined()
 	})
 })
 

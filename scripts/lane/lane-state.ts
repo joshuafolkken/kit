@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs'
+import path from 'node:path'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { session_cite } from '#scripts/issue/session-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -37,6 +39,9 @@ type LaneState = (typeof LANE_STATES)[number]
 
 const lane_run_schema = z.object({ started_at: z.string(), owner_pid: z.number().optional() })
 
+// A process the last `lane:close` could not end even with a SIGKILL, and why (`lane-reap-settle.ts`).
+const stuck_schema = z.object({ pid: z.number(), reason: z.string() })
+
 const lane_state_schema = z.object({
 	issue: z.string(),
 	run: lane_run_schema.optional(),
@@ -44,10 +49,12 @@ const lane_state_schema = z.object({
 	launched_at: z.string().optional(),
 	changed_at: z.string(),
 	changed_by: z.string(),
+	stuck: z.array(stuck_schema).optional(),
 })
 
 type LaneRun = z.infer<typeof lane_run_schema>
 type LaneStateRecord = z.infer<typeof lane_state_schema>
+type StuckProcess = z.infer<typeof stuck_schema>
 // Each lane's record, by issue; a lane with none is left out (`read_states`).
 type LaneRecords = ReadonlyMap<string, LaneStateRecord>
 
@@ -145,15 +152,18 @@ function apply_held(change: LaneChange, directory: string, now: Date): RecordOut
 	return { kind: 'written', record }
 }
 
-function apply(change: LaneChange, directory: string, now: Date): RecordOutcome {
-	const lock = `${state_path(directory, change.issue)}${LOCK_SUFFIX}`
-	const outcome = repository_lock.with_lock_sync(
-		() => apply_held(change, directory, now),
-		lock,
-		LOCK_WAIT_MS,
-	)
+const NO_DIRECTORY: RecordOutcome = { kind: 'skipped', reason: 'no git directory' }
+
+// The read, the check and the write of one record, under its lock.
+function locked(directory: string, issue: string, held: () => RecordOutcome): RecordOutcome {
+	const lock = `${state_path(directory, issue)}${LOCK_SUFFIX}`
+	const outcome = repository_lock.with_lock_sync(held, lock, LOCK_WAIT_MS)
 
 	return outcome ?? { kind: 'skipped', reason: `gave up waiting for the lock at ${lock}` }
+}
+
+function apply(change: LaneChange, directory: string, now: Date): RecordOutcome {
+	return locked(directory, change.issue, () => apply_held(change, directory, now))
 }
 
 function warn(change: LaneChange, reason: string): void {
@@ -169,7 +179,7 @@ async function resolve_directory(directory: string | undefined): Promise<string 
 async function outcome_of(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
 	const directory = await resolve_directory(options.directory)
 
-	if (directory === undefined) return { kind: 'skipped', reason: 'no git directory' }
+	if (directory === undefined) return NO_DIRECTORY
 
 	return apply(change, directory, options.now ?? new Date())
 }
@@ -197,6 +207,56 @@ async function read_state(issue: string, directory?: string): Promise<LaneStateR
 	const root = await resolve_directory(directory)
 
 	return root === undefined ? undefined : read_record(root, issue)
+}
+
+// The issue each record of `directory` is for, read off the file names `state_path` writes.
+function recorded_issues(directory: string): Array<string> {
+	const empty = state_path(directory, '')
+	const head = path.basename(empty).slice(0, -STATE_SUFFIX.length)
+
+	return readdirSync(path.dirname(empty))
+		.filter((name) => name.startsWith(head) && name.endsWith(STATE_SUFFIX))
+		.map((name) => name.slice(head.length, -STATE_SUFFIX.length))
+		.filter((issue) => issue.length > 0)
+}
+
+/** Every lane's record, a closed lane's included — the record outlives the work tree. */
+async function read_records(directory?: string): Promise<Array<LaneStateRecord>> {
+	const root = await resolve_directory(directory)
+
+	if (root === undefined) return []
+
+	const records = recorded_issues(root).map((issue) => read_record(root, issue))
+
+	return records.filter((record) => record !== undefined)
+}
+
+function stuck_held(issue: string, stuck: Array<StuckProcess>, directory: string): RecordOutcome {
+	const previous = read_record(directory, issue)
+
+	if (previous === undefined) return { kind: 'skipped', reason: 'no record' }
+
+	const record = { ...previous, stuck }
+
+	write_record(directory, record)
+
+	return { kind: 'written', record }
+}
+
+/**
+ * Note on the lane's record the processes its close could not end, leaving its state as it is: a lane
+ * a close has not finished is not `ended`. A lane with no record is not given one.
+ */
+async function record_stuck(
+	issue: string,
+	stuck: Array<StuckProcess>,
+	directory?: string,
+): Promise<RecordOutcome> {
+	const root = await resolve_directory(directory)
+
+	if (root === undefined) return NO_DIRECTORY
+
+	return locked(root, issue, () => stuck_held(issue, stuck, root))
 }
 
 /** Each of `issues`' records, by issue; an issue with none is left out. */
@@ -234,11 +294,13 @@ const lane_state = {
 	is_allowed,
 	paused_note,
 	paused_text,
+	read_records,
 	read_state,
 	read_states,
 	record_change,
+	record_stuck,
 	state_path,
 }
 
 export { lane_state }
-export type { LaneChange, LaneRecords, LaneState, LaneStateRecord, RecordOutcome }
+export type { LaneChange, LaneRecords, LaneState, LaneStateRecord, RecordOutcome, StuckProcess }

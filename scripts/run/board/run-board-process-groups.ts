@@ -27,12 +27,15 @@ interface ProcessRoots {
 	parent?: number | undefined
 }
 
-// What the grouping reads besides the figures: the open lanes by issue number.
+// What the grouping reads besides the figures: the open lanes by issue number, the processes a close
+// could not end, each with why (`lane-reap-settle.ts`), and the issues whose lane is not ended.
 interface GroupSources {
 	mark: UsageMark
 	figures: ProcessFigures
 	open_lanes: ReadonlySet<number>
 	roots: ProcessRoots
+	stuck: ReadonlyMap<number, string>
+	closing: ReadonlySet<string>
 }
 
 interface NamedFigure {
@@ -132,8 +135,17 @@ function named_figures(
 	return named.toSorted((left, right) => right.figure.memory_bytes - left.figure.memory_bytes)
 }
 
+// A leftover that outlived a close's SIGKILL is named with why; one whose lane is not ended yet is
+// being reaped (`↻`) — the supervisor closes that lane again each pass. An ended lane's leftover is
+// closed again by nothing, so it carries no mark (joshuafolkken/kit#4300).
 function leftover_label(pid: number, sources: GroupSources): string {
-	return `${name_of(pid, sources.mark)} ${issue_cite.plain(sources.mark.lanes.get(pid) ?? '')}`
+	const issue = sources.mark.lanes.get(pid) ?? ''
+	const lane = `${name_of(pid, sources.mark)} ${issue_cite.plain(issue)}`
+	const reason = sources.stuck.get(pid)
+
+	if (reason !== undefined) return `${lane} ⚠ ${reason} (pid ${String(pid)})`
+
+	return sources.closing.has(issue) ? `${lane} ↻` : lane
 }
 
 function backlogrun_of(

@@ -4,7 +4,7 @@ import { run_board_usage_lanes, type DirectoryRead, type LaneLookup } from './ru
 // joshuafolkken/kit#4359: a lane's eslint ran at 130% CPU while the board drew its lane at 0.1 — the
 // process's working directory went unanswered once and was remembered as being in no lane.
 
-const { lane_of, lanes_for } = run_board_usage_lanes
+const { lanes_for } = run_board_usage_lanes
 const ROOT = '/Users/me/Development/.kit-lanes'
 const LANE = `${ROOT}/4346`
 const OUTSIDE = '/Users/me/Development/kit'
@@ -36,18 +36,6 @@ function lookup_of(
 		root: ROOT,
 	}
 }
-
-describe('run_board_usage_lanes.lane_of', () => {
-	it('finds the lane a directory sits under at any depth, and none outside a lane', () => {
-		expect(lane_of(LANE, ROOT)).toBe('4346')
-		expect(lane_of(`${LANE}/packages/app/src`, ROOT)).toBe('4346')
-		expect(lane_of(OUTSIDE, ROOT)).toBeUndefined()
-	})
-
-	it('finds no lane under another repository’s lanes root of the same number', () => {
-		expect(lane_of('/Users/me/Development/.app-kit-lanes/4346/src', ROOT)).toBeUndefined()
-	})
-})
 
 describe('run_board_usage_lanes.lanes_for by ancestry', () => {
 	it('counts a process whose directory went unanswered, or names no lane, in its nearest ancestor’s lane', async () => {

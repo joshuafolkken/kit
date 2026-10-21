@@ -1,5 +1,4 @@
-import path from 'node:path'
-import { lane_paths } from '#scripts/lane/lane-paths'
+import { process_directories } from '#scripts/lane/process-directories'
 
 // Which lane `run:board` counts each listed process in.
 // **The working directory first:** a process whose directory sits under this repository's
@@ -35,17 +34,8 @@ interface ProcessLanes {
 	unread: ReadonlySet<number>
 }
 
-// The lane of `root` a directory sits under — itself or a directory above it, the outermost first.
-function lane_of(directory: string, root: string): string | undefined {
-	const parts = directory.split(path.sep)
-	const ancestors = parts.map((_, index) => parts.slice(0, index + 1).join(path.sep)).slice(1)
-	const environment = { [lane_paths.LANE_ROOT_KEY]: root }
-
-	return ancestors.map((ancestor) => lane_paths.lane_issue_of(ancestor, environment)).find(Boolean)
-}
-
 function directory_lane(directory: string | undefined, root: string): string | undefined {
-	return directory === undefined ? undefined : lane_of(directory, root)
+	return directory === undefined ? undefined : process_directories.lane_of(directory, root)
 }
 
 // The lanes still worth keeping: a gone process dropped, and one left unread asked again.
@@ -117,7 +107,7 @@ async function lanes_for(
 	return { lanes: new Map(lanes), unread: unread_of(fresh, read) }
 }
 
-const run_board_usage_lanes = { lane_of, lanes_for }
+const run_board_usage_lanes = { lanes_for }
 
 export { run_board_usage_lanes }
 export type { DirectoryRead, LaneLookup, ProcessLanes }

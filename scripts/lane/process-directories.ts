@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { lane_paths } from './lane-paths'
 
 // Each process's working directory, read with `lsof` — the one place its output is parsed.
 //
@@ -51,11 +52,19 @@ function list_all(platform: NodeJS.Platform = process.platform): Map<number, str
 	return result.error === undefined ? parse(result.stdout) : undefined
 }
 
-/** Whether `directory` is `root` or sits under it — `/42` is never under `/4`. */
-function is_within(directory: string, root: string): boolean {
-	return directory === root || directory.startsWith(`${root}${path.sep}`)
+/**
+ * The lane of `root` a directory sits under — itself or a directory above it, the outermost first.
+ * The one lane-membership reading: the board draws a leftover by it, and the close ends by it
+ * (joshuafolkken/kit#4300).
+ */
+function lane_of(directory: string, root: string): string | undefined {
+	const parts = directory.split(path.sep)
+	const ancestors = parts.map((_, index) => parts.slice(0, index + 1).join(path.sep)).slice(1)
+	const environment = { [lane_paths.LANE_ROOT_KEY]: root }
+
+	return ancestors.map((ancestor) => lane_paths.lane_issue_of(ancestor, environment)).find(Boolean)
 }
 
-const process_directories = { CWD_ARGUMENTS, is_within, list_all, parse }
+const process_directories = { CWD_ARGUMENTS, lane_of, list_all, parse }
 
 export { process_directories }

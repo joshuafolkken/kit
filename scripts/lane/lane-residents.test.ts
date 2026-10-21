@@ -16,6 +16,7 @@ const DEEP_NODE = 66_369
 const OTHER_LANE_NODE = 50_000
 const MAIN_NODE = 50_001
 const OWN = 60_000
+const ESLINT_D = 77_412
 const ALREADY_REAPED = 48_848
 // The caller's helper (`tsx`'s `esbuild`) and a command piped beside it, in the caller's group.
 const OWN_HELPER = 32_588
@@ -86,6 +87,17 @@ describe('lane_residents.end_residents', () => {
 
 		expect(ended).toStrictEqual([DETACHED_BOARD, DETACHED_NODE, DEEP_NODE])
 		expect(signalled).toStrictEqual([DETACHED_BOARD, DETACHED_NODE, DEEP_NODE])
+	})
+
+	// joshuafolkken/kit#4300: the lane's detached `eslint_d` (ppid 1, titled `eslint_d - <cwd>`) is
+	// found by its working directory alone — no title is matched.
+	it('terminates the lane’s detached eslint_d by its working directory', () => {
+		const signalled: Array<number> = []
+		const daemons = new Map([[ESLINT_D, LANE]])
+
+		lane_residents.end_residents(SUBJECT, [], probes_over(daemons, signalled))
+
+		expect(signalled).toStrictEqual([ESLINT_D])
 	})
 
 	it('never signals another lane’s, the main checkout’s or the caller’s own processes', () => {

@@ -98,8 +98,11 @@ async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawO
 	const is_noted = await note_issue(lane.issue, reason, saved.stash)
 	const closed = await lane_close.close_lane(lane.issue)
 
-	// After the close, so the record names the withdrawal rather than the close it ran.
-	await lane_state.record_change({ issue: lane.issue, state: 'ended', command: 'lane:withdraw' })
+	// After the close, so the record names the withdrawal rather than the close it ran. An `incomplete`
+	// close is not `ended`: the supervisor closes the lane again until its last process is gone.
+	if (closed.kind !== 'incomplete') {
+		await lane_state.record_change({ issue: lane.issue, state: 'ended', command: 'lane:withdraw' })
+	}
 
 	return {
 		kind: 'withdrawn',

@@ -43,8 +43,13 @@ vi.mock('./lane-spent', () => ({
 	lane_spent: { sort_lanes: vi.fn(async () => ({ spent: [], kept: [] })) },
 }))
 
+// No process outlives the close unless a test says so (`lane-close-settle.test.ts`).
+vi.mock('./lane-reap-settle', () => ({
+	lane_reap_settle: { settle: vi.fn(async () => []), survivor_texts: vi.fn(() => []) },
+}))
+
 vi.mock('./lane-state', () => ({
-	lane_state: { record_change: vi.fn() },
+	lane_state: { record_change: vi.fn(), read_state: vi.fn(), record_stuck: vi.fn() },
 }))
 
 const { lane_state } = await import('./lane-state')

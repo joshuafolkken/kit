@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { lane_close } from '#scripts/lane/lane-close'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -199,6 +200,9 @@ function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 			await new Promise((resolve) => setTimeout(resolve, milliseconds))
 		},
 		now: () => new Date(),
+		retry_closes: async () => {
+			await lane_close.retry_closes()
+		},
 	}
 }
 

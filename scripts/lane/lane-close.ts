@@ -4,6 +4,7 @@ import { git_worktree } from '#scripts/git/git-worktree'
 import { error_text } from '#scripts/lib/error-message'
 import { lane_paths } from './lane-paths'
 import { lane_reap } from './lane-reap'
+import { lane_reap_settle } from './lane-reap-settle'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
 import { lane_spent, type KeptLane } from './lane-spent'
@@ -132,6 +133,33 @@ async function resolve_lane(issue: string): Promise<ResolvedLane> {
 	return { existing, targets: lane_targets(root, issue, existing) }
 }
 
+// A lane closed before is `none` on a retry, and ends there once its record says it is not over —
+// an issue never opened is not given a record.
+async function is_ending(issue: string, kind: CloseKind): Promise<boolean> {
+	if (kind !== 'none') return kind === 'closed'
+
+	const record = await lane_state.read_state(issue)
+
+	return record !== undefined && record.state !== 'ended'
+}
+
+// The lane's processes, settled after the removal so the processes have had the work tree's deletion
+// to exit in too; what outlived the SIGKILL replaces what the lane's record noted for `run:board`.
+async function survivors_of(issue: string, directory: string): Promise<Array<string>> {
+	const survivors = await lane_reap_settle.settle({ issue, directory })
+
+	if (survivors !== undefined) await lane_state.record_stuck(issue, survivors)
+
+	return lane_reap_settle.survivor_texts(survivors)
+}
+
+// Whatever the removal left: the checkout's residue, then the processes that outlived it.
+async function left_behind_of(issue: string, targets: LaneTargets): Promise<Array<string>> {
+	const survivors = await survivors_of(issue, targets.directory)
+
+	return [...(await residue(targets)), ...survivors]
+}
+
 async function close_lane(issue: string): Promise<CloseOutcome> {
 	const { existing, targets } = await resolve_lane(issue)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
@@ -143,14 +171,20 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 
 	await remove_lane(targets)
 
-	const left_behind = await residue(targets)
+	const left_behind = await left_behind_of(issue, targets)
 	const kind = close_kind(did_exist, left_behind)
 
-	if (kind === 'closed') {
+	if (await is_ending(issue, kind)) {
 		await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
 	}
 
 	return { issue, kind, left_behind, reaped, residents }
+}
+
+type DuePredicate = (issue: string) => Promise<boolean>
+
+async function always_due(): Promise<boolean> {
+	return true
 }
 
 // A lane that could not be closed is recorded rather than thrown: a sweep has to attempt every lane,
@@ -169,14 +203,24 @@ async function try_close(issue: string): Promise<boolean> {
 
 // Sequential on purpose: two `git worktree` writes at once contend for the same registration
 // directory, and the whole point of the command is that nothing is left half-removed.
-async function close_each(issues: ReadonlyArray<string>): Promise<SweepOutcome> {
+async function close_into(sweep: SweepOutcome, issue: string, is_due: DuePredicate): Promise<void> {
+	if (!(await is_due(issue))) return
+	const bucket = (await try_close(issue)) ? sweep.closed : sweep.failed
+
+	bucket.push(issue)
+}
+
+// `is_due` is asked right before each close, not for every issue up front: a close can wait out the
+// grace window, and a lane opened again meanwhile is no longer one to close.
+async function close_each(
+	issues: ReadonlyArray<string>,
+	is_due: DuePredicate = always_due,
+): Promise<SweepOutcome> {
 	const sweep: SweepOutcome = { closed: [], failed: [] }
 
 	for (const issue of issues) {
 		// eslint-disable-next-line no-await-in-loop -- worktree writes contend for the same registration directory
-		const bucket = (await try_close(issue)) ? sweep.closed : sweep.failed
-
-		bucket.push(issue)
+		await close_into(sweep, issue, is_due)
 	}
 
 	return sweep
@@ -202,11 +246,29 @@ async function close_all_lanes(): Promise<SweepOutcome> {
 	return await close_each(lanes.map((lane) => lane.issue))
 }
 
+async function is_unfinished(issue: string): Promise<boolean> {
+	const { targets } = await resolve_lane(issue)
+
+	return !existsSync(targets.directory)
+}
+
+/**
+ * Close again every lane whose work tree is gone but whose record is not `ended` — a close a process
+ * outlived. The supervisor runs it each pass, so a lane ends once its last process does.
+ */
+async function retry_closes(): Promise<SweepOutcome> {
+	const records = await lane_state.read_records()
+	const issues = records.filter((record) => record.state !== 'ended').map(({ issue }) => issue)
+
+	return await close_each(issues, is_unfinished)
+}
+
 const lane_close = {
 	close_all_lanes,
 	close_lane,
 	prune_lanes,
 	resolve_lane,
+	retry_closes,
 }
 
 export type { CloseKind, CloseOutcome, PruneOutcome, ResolvedLane, SweepOutcome }

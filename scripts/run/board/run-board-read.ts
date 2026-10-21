@@ -66,6 +66,10 @@ interface LocalRead {
 	is_memory_held?: boolean | undefined
 	// The run's supervisor and parent session, named in the 💻 section (`run-board-roots.ts`).
 	roots?: ProcessRoots | undefined
+	// The processes a lane's close could not end, by pid, each with why (`lane-reap-settle.ts`).
+	stuck?: ReadonlyMap<number, string> | undefined
+	// The issues whose lane record is not ended — a close the supervisor still retries.
+	closing?: ReadonlySet<string> | undefined
 	// The run's record, whose declared order holds a queued row (`backlog-drive-named.ts`).
 	carry?: RunCarry | undefined
 }
@@ -160,6 +164,20 @@ async function lanes_here(
 	return run_board_lane_state.lanes_of({ events, lanes: issues, records, started_ms })
 }
 
+// The lanes not yet ended and the processes their closes could not end, off their records — once a
+// retried close ends the lane, its survivors are gone.
+async function unfinished_here(repository: string): Promise<Pick<LocalRead, 'closing' | 'stuck'>> {
+	const records = await lane_state.read_records(repository)
+	const unfinished = records.filter((record) => record.state !== 'ended')
+
+	return {
+		closing: new Set(unfinished.map(({ issue }) => issue)),
+		stuck: new Map(
+			unfinished.flatMap(({ stuck = [] }) => stuck.map(({ pid, reason }) => [pid, reason])),
+		),
+	}
+}
+
 type LaneRoomRead = Pick<
 	LocalRead,
 	'free_lanes' | 'lane_limit' | 'occupied_count' | 'earlier_occupied' | 'idle_lanes'
@@ -219,6 +237,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		lane_states,
 		resume,
 		roots,
+		...(await unfinished_here(repository)),
 		carry,
 		is_stranded,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),

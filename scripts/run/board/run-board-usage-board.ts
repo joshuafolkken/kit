@@ -2,9 +2,9 @@ import type { TableRead } from '#scripts/lane/lane-process-table'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { GatherPorts, GatherState } from './run-board-gather'
 import type { BoardUsage } from './run-board-header'
-import { run_board_process_groups } from './run-board-process-groups'
+import { run_board_process_groups, type GroupSources } from './run-board-process-groups'
 import type { LocalRead } from './run-board-read'
-import { run_board_usage, type UsageMark } from './run-board-usage'
+import { run_board_usage, type ProcessFigures, type UsageMark } from './run-board-usage'
 
 // What a reading draws: each lane's CPU/MEM/CMPRS and the 💻 section's groups, both from the same
 // differences between this reading and the last. A frame drawn once has no last reading, so it reads
@@ -14,18 +14,29 @@ const PRIME_MS = MS_PER_SECOND
 
 type UsageRead = Pick<GatherState, 'usage' | 'usages'>
 
+// Before the first local read: no lane open, no root running, nothing stuck.
+const NO_LOCAL: Pick<LocalRead, 'closing' | 'lanes' | 'roots' | 'stuck'> = { lanes: [] }
+
+function sources_of(
+	mark: UsageMark,
+	figures: ProcessFigures,
+	local: LocalRead | undefined,
+): GroupSources {
+	const { closing = new Set(), lanes, roots = {}, stuck = new Map() } = local ?? NO_LOCAL
+
+	return { mark, figures, open_lanes: new Set(lanes.map(Number)), roots, stuck, closing }
+}
+
 function board_usage_of(
 	before: UsageMark | undefined,
 	after: UsageMark,
 	local: LocalRead | undefined,
 ): BoardUsage {
 	const figures = run_board_usage.process_figures(before, after)
-	const open_lanes = new Set(local?.lanes.map(Number))
-	const roots = local?.roots ?? {}
 
 	return {
 		lanes: run_board_usage.usage_of(after, figures),
-		processes: run_board_process_groups.groups_of({ mark: after, figures, open_lanes, roots }),
+		processes: run_board_process_groups.groups_of(sources_of(after, figures, local)),
 		scale: { cores: after.cores, total_bytes: after.total_bytes },
 	}
 }

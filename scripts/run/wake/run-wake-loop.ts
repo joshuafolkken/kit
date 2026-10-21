@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import {
 	run_wake,
@@ -47,6 +48,8 @@ interface LoopPorts {
 	wake: (invocation: string, session_id: string, material: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
+	// Closes again a lane a process outlived, once the process is gone (`lane_close.retry_closes`).
+	retry_closes: () => Promise<void>
 }
 
 // `released`: the carry record ended while the driver paused, so there is nothing to hand on and the
@@ -151,6 +154,16 @@ async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecisio
 	return run_wake.decide({ ...input, has_work: await ports.has_work(input.read) })
 }
 
+// A lane whose close a process outlived ends once the process is gone (joshuafolkken/kit#4300). A
+// failed retry is the next pass's to try again, never a reason to stop the run.
+async function retry_closes(ports: LoopPorts): Promise<void> {
+	try {
+		await ports.retry_closes()
+	} catch (error) {
+		error_text.trace_swallowed('run_wake_loop.retry_closes', error)
+	}
+}
+
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
 // One pass: decide, act, write the result back. `undefined` means carry on to the next interval.
@@ -159,6 +172,8 @@ async function run_pass(
 	wake: RunWake,
 	ports: LoopPorts,
 ): Promise<LoopStop | undefined> {
+	await retry_closes(ports)
+
 	const outcome = await step(wake, await decide_pass(wake, ports), ports)
 
 	if (outcome.kind === 'stop') return outcome.stop
