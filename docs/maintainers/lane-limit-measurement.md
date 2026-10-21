@@ -268,9 +268,16 @@ reserves is the next thing to put on the budget.
 
 A `gate` entry's `checks` is one row per check it ran — its label, duration, verdict and whether it was
 reused from its own green record (`scripts/gate/check-reuse.ts`). Under the process table, `lane:stats`
-prints a fifth: one row per check, in the order they first appear, with the median and maximum duration
-in seconds, how many runs and how many of them were reused.
+prints a fifth: one row per check in first-appearance order — median and maximum seconds, runs, reuses
+and whole-suite fallbacks.
+
+The first row, `gate (whole)`, is the whole gate. A gate that reused its green record writes a `gate`
+entry with `is_reused: true` and no `checks`: a run and a reuse there, and outside the summary row's
+gate median ([#4397](https://github.com/joshuafolkken/kit/issues/4397)).
+
+A unit leg that ran the whole suite carries `fallback`, the reason's stable kind read off the line
+`test:related` printed (`related_scope.fallback_kind`). A last table counts the fallbacks by kind.
 
 **A reused check is counted, never timed** — it started no process, so its zero would pull the median
 toward a check that never ran. A check that was only ever reused prints `not measured`. A gate recorded
-before the field existed contributes no row.
+before the field existed contributes no check row.

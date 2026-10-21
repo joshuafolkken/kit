@@ -1,5 +1,6 @@
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_ledger, type GateCheckRecord } from '#scripts/lane/lane-ledger'
+import { related_scope } from '#scripts/test/test-related-scope'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
 import { gate_plan } from './gate-plan'
@@ -98,7 +99,18 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 		elapsed_ms: result.elapsed_ms,
 		is_passed: !gate_report.is_gate_step_failed(result),
 		is_reused: result.reused_at !== undefined,
+		fallback:
+			result.label === gate_plan.UNIT_LABEL
+				? related_scope.fallback_kind(result.output)
+				: undefined,
 	}))
+}
+
+// A gate that reused a green record started no check: its line is counted as reused, never timed.
+async function record_reused(ledger_path: string | undefined, elapsed_ms: number): Promise<void> {
+	if (ledger_path === undefined) return
+
+	await lane_ledger.record_gate(ledger_path, { elapsed_ms, is_passed: true, is_reused: true })
 }
 
 // The caller measures the elapsed time before this, so the end's reading is never part of it.
@@ -126,6 +138,7 @@ const gate_ledger = {
 	BACKGROUND_CORES,
 	SAMPLE_INTERVAL_MS,
 	record,
+	record_reused,
 	start,
 }
 

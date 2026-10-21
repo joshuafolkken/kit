@@ -244,6 +244,38 @@ describe('related_scope.resolve_scope — the whole-suite fallbacks', () => {
 	})
 })
 
+// joshuafolkken/kit#4397: the gate ledger counts each full-suite fallback by a stable kind, never by
+// the file its reason names.
+function kind_of(changed: ScopeRequest['changed'], map?: ReadMap): string | undefined {
+	const scope = related_scope.resolve_scope(request(changed, { map }))
+
+	return related_scope.fallback_kind(
+		`$ josh test:related\n${related_scope.describe_scope(scope, ROOT)}\n`,
+	)
+}
+
+describe('related_scope.fallback_kind', () => {
+	it.each([
+		['unreadable', undefined, MAP],
+		['nothing-relatable', [], MAP],
+		['whole-suite-file', [path.join('scripts', 'test', 'unit-setup-files.ts')], MAP],
+		['no-map', [DOCUMENT_FILE], undefined],
+		['unrecorded-file', [NEW_DIRECTORY_FILE], MAP],
+	])('reads the %s fallback off the line the run printed', (kind, changed, map) => {
+		expect(kind_of(changed, map)).toBe(kind)
+	})
+
+	it('reads no fallback off a run that narrowed', () => {
+		expect(kind_of([SOURCE_FILE], MAP)).toBeUndefined()
+	})
+
+	it('names a reason it has no kind for as other', () => {
+		const scope = { mode: 'all' as const, files: [], reason: 'a reason not yet named' }
+
+		expect(related_scope.fallback_kind(related_scope.describe_scope(scope, ROOT))).toBe('other')
+	})
+})
+
 describe('related_scope.describe_scope', () => {
 	it('names each file the run was narrowed by, relative to the root', () => {
 		const scope = related_scope.resolve_scope(request([SOURCE_FILE, OTHER_SOURCE_FILE]))

@@ -15,6 +15,10 @@ const CHECK = 'exports'
 const LINT_MS = [20_000, 40_000, 90_000]
 const CHECK_MS = 30_000
 const { NOT_MEASURED } = lane_stage_stats
+const { WHOLE_GATE_LABEL } = lane_check_stats
+const UNIT = 'test:unit'
+const NO_MAP = 'no-map'
+const WHOLE_SUITE = 'whole-suite-file'
 const LEGACY_GATE = { kind: 'gate', at: AT, elapsed_ms: 1, is_passed: true } satisfies LedgerEntry
 
 function gate(checks: ReadonlyArray<GateCheckRecord>): LedgerEntry {
@@ -42,19 +46,25 @@ describe('lane_check_stats.table — the recorded checks', () => {
 	it('reduces a check to its median, its maximum, its runs and its reuses, in seconds', () => {
 		const entries = LINT_MS.map((elapsed_ms) => gate([check(LINT, elapsed_ms)]))
 
-		expect(row_of(entries, LINT)).toStrictEqual(['40.0', '90.0', '3', '0'])
+		expect(row_of(entries, LINT)).toStrictEqual(['40.0', '90.0', '3', '0', '0'])
 	})
 
 	it('counts a reused check without letting its zero reach the timings', () => {
 		const timed = check(LINT, CHECK_MS)
 		const reused = check(LINT, 0, true)
 
-		expect(row_of([gate([timed]), gate([reused])], LINT)).toStrictEqual(['30.0', '30.0', '2', '1'])
+		expect(row_of([gate([timed]), gate([reused])], LINT)).toStrictEqual([
+			'30.0',
+			'30.0',
+			'2',
+			'1',
+			'0',
+		])
 	})
 
 	it('prints `not measured` for a check that was only ever reused', () => {
 		const reused = check(CHECK, 0, true)
-		const expected = [NOT_MEASURED, NOT_MEASURED, '1', '1']
+		const expected = [NOT_MEASURED, NOT_MEASURED, '1', '1', '0']
 
 		expect(row_of([gate([reused])], CHECK)).toStrictEqual(expected)
 	})
@@ -62,6 +72,37 @@ describe('lane_check_stats.table — the recorded checks', () => {
 	it('reads no row from a gate recorded before the checks were', () => {
 		const rows = rows_of([LEGACY_GATE, gate([check(CHECK, CHECK_MS)])])
 
-		expect(rows.slice(2).map(([label]) => label)).toStrictEqual([CHECK])
+		const check_rows = rows.slice(
+			2,
+			rows.findIndex((row) => row.length === 1),
+		)
+
+		expect(check_rows.map(([label]) => label)).toStrictEqual([WHOLE_GATE_LABEL, CHECK])
+	})
+})
+
+// joshuafolkken/kit#4397: a whole-gate reuse and the unit leg's full-suite fallback are both read back.
+describe('lane_check_stats.table — the whole gate and the fallbacks', () => {
+	it('counts a reused whole gate as a run and a reuse, timing only the gates that ran', () => {
+		const ran = { ...LEGACY_GATE, elapsed_ms: CHECK_MS }
+		const reused = { ...LEGACY_GATE, is_reused: true }
+
+		expect(row_of([ran, reused], WHOLE_GATE_LABEL)).toStrictEqual(['30.0', '30.0', '2', '1', '0'])
+	})
+
+	it('counts the unit leg runs that fell back to the whole suite', () => {
+		const fell_back = { ...check(UNIT, CHECK_MS), fallback: NO_MAP }
+		const narrowed = check(UNIT, CHECK_MS)
+
+		expect(row_of([gate([fell_back]), gate([narrowed])], UNIT)?.at(-1)).toBe('1')
+	})
+
+	it('breaks the fallbacks down by reason kind', () => {
+		const entries = [NO_MAP, NO_MAP, WHOLE_SUITE].map((fallback) =>
+			gate([{ ...check(UNIT, CHECK_MS), fallback }]),
+		)
+
+		expect(row_of(entries, NO_MAP)).toStrictEqual(['2'])
+		expect(row_of(entries, WHOLE_SUITE)).toStrictEqual(['1'])
 	})
 })
