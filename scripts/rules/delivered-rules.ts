@@ -15,6 +15,7 @@ import { issue_comments } from './issue-comments'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
+import { lane_direct_tool } from './lane-direct-tool'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { lane_split_park } from './lane-split-park'
@@ -212,6 +213,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	agent_model.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
+	lane_direct_tool.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.
 	josh_git_bare.ROW,
 	// The Bash-string gaps the deny glob cannot express, read by argv; `delivered-rules-bash.test.ts`
