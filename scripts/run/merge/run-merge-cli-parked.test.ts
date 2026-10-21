@@ -184,18 +184,15 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 	})
 })
 
-// joshuafolkken/kit#4268: a merged child's lane is ended on its state record.
+// joshuafolkken/kit#4300: a merged child's lane is ended on its state record by `lane:close` alone, so
+// a close that came back `incomplete` does not read as ended.
 describe('run_merge_cli.merge_child — the lane state record', () => {
-	it('records a merged child’s lane as ended by run:merge', async () => {
+	it('leaves a merged child’s ended record to lane:close', async () => {
 		read_issue_mock.mockResolvedValue(CLOSED_STATE)
 
 		await run_merge_cli.merge_child(context())
 
-		expect(record_change_mock).toHaveBeenCalledExactlyOnceWith({
-			issue: CHILD,
-			state: 'ended',
-			command: 'run:merge',
-		})
+		expect(record_change_mock).not.toHaveBeenCalled()
 	})
 
 	it('records no state for a parked child', async () => {

@@ -5,7 +5,6 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
-import { lane_state } from '#scripts/lane/lane-state'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -203,7 +202,8 @@ function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 
 // A merged child counted and its lane closed, the merge put on the stream and in the ledger. Returns the
 // carry when the ownership check refused it, `undefined` once recorded. `run:carry --end` records the
-// merges a run ended with through it too (`run-merge-collect.ts`).
+// merges a run ended with through it too (`run-merge-collect.ts`). The lane's `ended` record is
+// `lane:close`'s alone: an `incomplete` close leaves the lane open on it (joshuafolkken/kit#4300).
 async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	const refused = await run_merge_steps.do_merged(ctx)
 
@@ -214,7 +214,6 @@ async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 		`${issue_cite.plain(ctx.child)} merged`,
 	)
 	await lane_ledger.record_merge(Number(ctx.child))
-	await lane_state.record_change({ issue: ctx.child, state: 'ended', command: 'run:merge' })
 
 	return undefined
 }
