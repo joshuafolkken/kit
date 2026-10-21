@@ -188,8 +188,13 @@ function emit(token: MergeToken, code: number): ControlVerdict {
 	return { token, code, is_offer: false }
 }
 
+// No threshold is `backlog:drive`, which asks `backlog:offer` itself in the pass that collected the
+// child: `backlog:next` here would only hold back its next launch (joshuafolkken/kit#4406).
 async function offered(ctx: MergeContext): Promise<OfferVerdict> {
-	return { token: await run_merge_steps.ask_next(ctx), code: SUCCESS_EXIT_CODE, is_offer: true }
+	const token =
+		ctx.over === undefined ? run_merge_driver.DEFERRED_OFFER : await run_merge_steps.ask_next(ctx)
+
+	return { token, code: SUCCESS_EXIT_CODE, is_offer: true }
 }
 
 // A refused count means this session is not the carry record's owner, so the whole operation is
