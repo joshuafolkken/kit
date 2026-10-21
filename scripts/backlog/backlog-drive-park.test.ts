@@ -37,3 +37,14 @@ describe('backlog_drive — a parked child is not excluded', () => {
 		expect(released.kind === 'continue' && released.state.in_flight).toStrictEqual([FIRST_CHILD])
 	})
 })
+
+// joshuafolkken/kit#4365: `lane:withdraw` leaves the issue open, so the drive keeps it out of this run.
+describe('backlog_drive — a withdrawn child is excluded', () => {
+	it('excludes a child run:merge booked withdrawn from the next offer', async () => {
+		const { ports, offers } = harness({ finished: [FIRST_CHILD], withdrawn: [FIRST_CHILD] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(offers[0]?.exclude).toStrictEqual([FIRST_CHILD])
+		expect(result.state.exclude).toStrictEqual([FIRST_CHILD])
+	})
+})

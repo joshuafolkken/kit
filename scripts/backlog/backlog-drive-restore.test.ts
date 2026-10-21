@@ -72,3 +72,23 @@ it('does not restore a child a person withdrew whose lane remains registered', (
 it('reads a child a person withdrew as settled', () => {
 	expect(backlog_drive_restore.settled_issues(WITHDRAWN)).toStrictEqual(new Set([Number(CHILD)]))
 })
+
+// joshuafolkken/kit#4365: the withdrawn issue stays open, so this run's offer keeps it out itself; a
+// later run reads a stream without the withdrawal and offers it again.
+it('excludes from this run offer a child a person withdrew', () => {
+	expect(backlog_drive_restore.offer_exclude(WITHDRAWN)).toStrictEqual([CHILD])
+})
+
+it('offers again a withdrawn child launched afresh after its withdrawal once that launch settles', () => {
+	const events = [
+		...WITHDRAWN,
+		event(3, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(4, 'park', '#2508 parked'),
+	]
+
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual([])
+})
+
+it('offers a child withdrawn in another run', () => {
+	expect(backlog_drive_restore.offer_exclude([])).toStrictEqual([])
+})

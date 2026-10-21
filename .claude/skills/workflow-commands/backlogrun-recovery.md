@@ -38,7 +38,7 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
 
 ## A person withdraws a running child
 
-On a person's instruction to drop a running child's issue, run `pnpm josh lane:withdraw <N>
+On a person's instruction to drop a running child, run `pnpm josh lane:withdraw <N>
 --reason "<their reason>"` — `docs/josh-commands.md` → "`josh lane:withdraw`".
 
 ## Conflicts are not predicted

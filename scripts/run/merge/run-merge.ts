@@ -51,7 +51,7 @@ const ONE = 1
 //                   the child left `in-progress` and nothing counted (joshuafolkken/kit#4216).
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
-//                   GitHub state: closed as not planned, or about to be, it is neither merged nor failed.
+//                   GitHub state: left OPEN for the next run, it is neither merged nor failed.
 // - `unresolved`  — the state could not be read; re-read before deciding.
 // The names themselves are `run-merge-outcome.ts`'s.
 
@@ -113,8 +113,8 @@ function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 
 // The signals are read by the CLI and, but for a withdrawal, matter only for an OPEN child — a CLOSED
 // child is merged regardless of how the process exited. **A withdrawal is read first**: `lane:withdraw`
-// records it before stopping the child, so the parent may collect it while the issue is still OPEN, and
-// once it is CLOSED as not planned the closed state would otherwise read as a merge.
+// records it before stopping the child and leaves the issue OPEN, which would otherwise read as a child
+// to resume or park.
 function classify_child(
 	state: IssueState | undefined,
 	signals: EndingSignals = NO_SIGNALS,

@@ -1,10 +1,11 @@
 const LIST_SEPARATOR = ','
 
-// **A child in flight is never offered**, nor a merged one `backlog:next` still reads OPEN. The drive
-// builds this list from its state and the stall detector from the event stream (joshuafolkken/kit#4349);
-// both go through here. Kept free of the drive's imports so a reader of the stream does not load it.
-function exclude_of(merged: Iterable<string>, in_flight: Iterable<string>): ReadonlyArray<string> {
-	return [...new Set([...merged, ...in_flight])]
+// **A child in flight is never offered**, nor a settled one `backlog:next` still reads OPEN — merged, or
+// withdrawn from this run (joshuafolkken/kit#4365). The drive builds this list from its state and the
+// stall detector from the event stream (joshuafolkken/kit#4349); both go through here. Kept free of the
+// drive's imports so a reader of the stream does not load it.
+function exclude_of(settled: Iterable<string>, in_flight: Iterable<string>): ReadonlyArray<string> {
+	return [...new Set([...settled, ...in_flight])]
 }
 
 function exclude_argv(exclude: ReadonlyArray<string>): ReadonlyArray<string> {

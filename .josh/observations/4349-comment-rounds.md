@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/backlog/backlog-arrival.ts:101 | 2026-10-21 | #4349
+- rf:tests | low | scripts/backlog/backlog-stalled-detect.test.ts:101 | 2026-10-21 | #4349
+- rf:tests | low | scripts/backlog/backlog-stalled-detect.test.ts:46 | 2026-10-21 | #4349

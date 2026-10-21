@@ -30,7 +30,8 @@ const { MERGE_TOKEN } = run_merge_token
 const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
-const MERGED_OUTCOME = 'merged'
+// The outcomes that keep a child out of the rest of this run's offers.
+const EXCLUDED_OUTCOMES: ReadonlySet<string> = new Set(['merged', 'withdrawn'])
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
 const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
@@ -176,10 +177,12 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	}
 }
 
-// Only a merged child is excluded: `backlog:next` may still read it OPEN. Any other is classified by
-// its labels, so excluding it would hide a child a person released for the rest of the process.
+// A merged child is excluded because `backlog:next` may still read it OPEN, and a withdrawn one because
+// `lane:withdraw` leaves it OPEN for the next run, not this one (joshuafolkken/kit#4365). Any other is
+// classified by its labels, so excluding it would hide a child a person released for the rest of the
+// process.
 function excluded(issue: string, outcome: Collected['outcome'], state: DriveState): Array<string> {
-	if (outcome !== MERGED_OUTCOME || state.exclude.includes(issue)) return state.exclude
+	if (!EXCLUDED_OUTCOMES.has(outcome) || state.exclude.includes(issue)) return state.exclude
 
 	return [...state.exclude, issue]
 }
