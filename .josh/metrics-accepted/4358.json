@@ -1,0 +1,7 @@
+{
+	"reason": "Warm eslint_d daemon route for lint:related and pre-commit, with config/dependency staleness detection so a consumer's package install restarts the daemon",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 145
+	}
+}

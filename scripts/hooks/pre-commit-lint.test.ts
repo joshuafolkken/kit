@@ -9,9 +9,12 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run: vi.fn() } }))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
+const { eslint_daemon } = await import('#scripts/lint/eslint-daemon')
+const mocked_daemon_run = vi.mocked(eslint_daemon.run)
 const { pre_commit_lint } = await import('./pre-commit-lint')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -92,5 +95,33 @@ describe('pre_commit_lint.run', () => {
 
 		expect(await pre_commit_lint.run(['stylelint'])).toBe(pre_commit_lint.USAGE_ERROR_EXIT_CODE)
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4358: the warm daemon answers in place of a cold eslint, inside the same
+// reservation, and the cold route stays for a daemon that cannot answer.
+describe('pre_commit_lint.run — the warm eslint daemon', () => {
+	it('lints through the warm daemon inside the eslint reservation', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		reservation.mockImplementation(async (_weight, work) => await work())
+		mocked_daemon_run.mockResolvedValueOnce({ exit_code: 1, stdout: 'x', output: 'x' })
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+		expect(mocked_daemon_run).toHaveBeenCalledWith(built('eslint'), {
+			project_root: process.cwd(),
+		})
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(reservation).toHaveBeenCalledOnce()
+		reservation.mockRestore()
+	})
+
+	it('falls back to the cold eslint when the daemon cannot answer', async () => {
+		mocked_daemon_run.mockResolvedValueOnce(undefined)
+		mocked_execa.mockResolvedValueOnce({ exitCode: 0 } as unknown as ExecaResult)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(0)
+		expect(mocked_execa).toHaveBeenCalledWith('pnpm', built('eslint'), expect.anything())
 	})
 })
