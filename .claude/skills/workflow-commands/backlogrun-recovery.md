@@ -20,6 +20,7 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 | Answer | What the parent does |
 | --- | --- |
 | `alive` | Wait on `lane:await` again; touch nothing |
+| `paused` | Tell the person; neither wait nor recover (`docs/josh-commands-run.md` → `josh run:liveness`) |
 | `settled` | Re-read with `pnpm josh run:status <N>` and take the branch its state section says |
 | `undetermined` | Read the trace that failed and ask again. **A second in a row on the same child is a fault in the check**: send a `confirmation` naming the trace and stop — never escalate it to `stopped` |
 | `stopped` | The recovery below |
@@ -38,7 +39,7 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
 
 ## A person withdraws a running child
 
-On a person's instruction to drop a running child's issue, run `pnpm josh lane:withdraw <N>
+On a person's instruction to drop a running child, run `pnpm josh lane:withdraw <N>
 --reason "<their reason>"` — `docs/josh-commands.md` → "`josh lane:withdraw`".
 
 ## Conflicts are not predicted

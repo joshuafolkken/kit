@@ -35,6 +35,7 @@ import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_seats } from './backlog-drive-seats'
@@ -186,9 +187,15 @@ function judgement_reader(): () => Promise<number> {
 	}
 }
 
-// The two reports an offered pass leaves: why it started nothing, and the idle notice.
-function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle'> {
-	return { hold: holds.hold, idle: backlog_drive_idle.notify }
+// The reports an offered pass leaves: why it started nothing, the idle notice and the paused notice.
+function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
+	return {
+		hold: holds.hold,
+		idle: backlog_drive_idle.notify,
+		paused: async () => {
+			await backlog_drive_paused.notify()
+		},
+	}
 }
 
 // What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.
@@ -226,7 +233,15 @@ function ports_of(
 	}
 }
 
-async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string> | undefined> {
+// The lanes still in flight, and the children this run withdrew: a withdrawal while the drive was
+// handed back is never collected by this invocation, so its exclusion is read from the stream
+// (joshuafolkken/kit#4365).
+interface Seeded {
+	lanes: ReadonlyArray<string>
+	withdrawn: ReadonlyArray<string>
+}
+
+async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> {
 	const carry = await read_record()
 
 	if (carry === undefined) return undefined
@@ -240,7 +255,10 @@ async function seeded_lanes(context: DriveContext): Promise<ReadonlyArray<string
 	const carried = await backlog_drive_carried.carried(open)
 	const dispatched = backlog_drive_named.own_carried(carry, carried, context.is_only)
 
-	return backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [], dispatched)
+	return {
+		lanes: backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [], dispatched),
+		withdrawn: backlog_drive_restore.withdrawn_issues(events),
+	}
 }
 
 // The interval between two asks is `backlog:budget`'s own, so the driver keeps the one its reason prints.
@@ -260,16 +278,24 @@ async function report_end(
 	console.info(backlog_drive_args.resume_line(state, context))
 }
 
+function seeded_state(seeded: Seeded, context: DriveContext): DriveState {
+	const fresh = backlog_drive.initial_state(
+		seeded.lanes,
+		context.active ?? new Date().toISOString(),
+	)
+	const initial =
+		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
+
+	return { ...initial, exclude: [...new Set([...context.exclude, ...seeded.withdrawn])] }
+}
+
 async function drive(context: DriveContext): Promise<number> {
 	const seeded = await seeded_lanes(context)
 
 	if (seeded === undefined) return FAILURE_EXIT_CODE
-	const fresh = backlog_drive.initial_state(seeded, context.active ?? new Date().toISOString())
-	const initial =
-		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
-	const last = { state: { ...initial, exclude: [...context.exclude] } }
+	const last = { state: seeded_state(seeded, context) }
 	const holds = backlog_drive_hold.recorder()
-	const ports = ports_of(context, seeded, last, holds)
+	const ports = ports_of(context, seeded.lanes, last, holds)
 	const end = await backlog_drive.run_loop(last.state, loop_config(context.window_ms), ports)
 
 	await report_end(end, last.state, context, holds)
@@ -322,6 +348,7 @@ const backlog_drive_cli = {
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
 	run,
+	seeded_state,
 	to_offer,
 }
 

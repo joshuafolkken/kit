@@ -5,6 +5,7 @@ import path from 'node:path'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { figure_format } from '#scripts/lib/figure-format'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_state, type LaneChange } from './lane-state'
@@ -97,6 +98,36 @@ describe('lane_state.record_change — a launch outlives the changes after it', 
 		await record_at(change_of('open', OPEN), OPENED_AT)
 
 		expect(await lane_state.read_state(ISSUE, state.directory)).not.toHaveProperty('launched_at')
+	})
+})
+
+// joshuafolkken/kit#4270: the readers that count lanes and name a paused holder.
+describe('lane_state.read_states and paused_note', () => {
+	it('reads each issue’s record by issue, leaving out an issue with none', async () => {
+		await record_at(change_of('paused', PAUSE), PAUSED_AT)
+
+		const records = await lane_state.read_states([ISSUE, '9999'], state.directory)
+
+		expect([...records.keys()]).toStrictEqual([ISSUE])
+		expect(records.get(ISSUE)?.state).toBe('paused')
+	})
+
+	it('names when a paused lane was paused and the command that paused it', async () => {
+		await record_at(change_of('paused', PAUSE), PAUSED_AT)
+
+		const record = await lane_state.read_state(ISSUE, state.directory)
+		const since = figure_format.minute_of(PAUSED_AT.getTime())
+
+		expect(lane_state.paused_note(record)).toBe(`paused since ${since} by ${PAUSE}`)
+	})
+
+	it('notes nothing for a lane that is not paused or has no record', async () => {
+		await record_at(change_of('running', DISPATCH), LAUNCHED_AT)
+
+		expect(
+			lane_state.paused_note(await lane_state.read_state(ISSUE, state.directory)),
+		).toBeUndefined()
+		expect(lane_state.paused_note(undefined)).toBeUndefined()
 	})
 })
 

@@ -23,6 +23,7 @@ import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_hold } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_memory } from './backlog-drive-memory'
+import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 
@@ -30,7 +31,8 @@ const { MERGE_TOKEN } = run_merge_token
 const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
-const MERGED_OUTCOME = 'merged'
+// The outcomes that keep a child out of the rest of this run's offers.
+const EXCLUDED_OUTCOMES: ReadonlySet<string> = new Set(['merged', 'withdrawn'])
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
 const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
@@ -119,6 +121,9 @@ interface DrivePorts {
 	// A watch with nothing in flight — the one idle notification (`backlog-drive-idle.ts`), deduplicated
 	// per episode by the port itself.
 	idle: (state: DriveState) => Promise<void>
+	// A holding offer with nothing in flight — the paused-lane notice (`backlog-drive-paused.ts`), which
+	// reads the lane records itself and is deduplicated per pause episode by the port.
+	paused: () => Promise<void>
 	now: () => Date
 }
 
@@ -176,10 +181,12 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	}
 }
 
-// Only a merged child is excluded: `backlog:next` may still read it OPEN. Any other is classified by
-// its labels, so excluding it would hide a child a person released for the rest of the process.
+// A merged child is excluded because `backlog:next` may still read it OPEN, and a withdrawn one because
+// `lane:withdraw` leaves it OPEN for the next run, not this one (joshuafolkken/kit#4365). Any other is
+// classified by its labels, so excluding it would hide a child a person released for the rest of the
+// process.
 function excluded(issue: string, outcome: Collected['outcome'], state: DriveState): Array<string> {
-	if (outcome !== MERGED_OUTCOME || state.exclude.includes(issue)) return state.exclude
+	if (!EXCLUDED_OUTCOMES.has(outcome) || state.exclude.includes(issue)) return state.exclude
 
 	return [...state.exclude, issue]
 }
@@ -346,7 +353,8 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	if (read.verdict === RUN_VERDICT) return await run_offered(read.issues, next, ports)
 	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	const result = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const result = await backlog_drive_paused.noticed(idle, read, ports)
 
 	return await backlog_drive_hold.held(result, read, ports)
 }

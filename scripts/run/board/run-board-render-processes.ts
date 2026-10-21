@@ -2,6 +2,7 @@ import { run_board_fit, type DetailPart } from './run-board-fit'
 import type { BoardHeader, BoardUsage } from './run-board-header'
 import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
+import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
 import type { UsageFigure, UsageScale } from './run-board-usage'
@@ -10,17 +11,27 @@ import { run_board_usage_text } from './run-board-usage-text'
 // What is loading the machine, by who started it: the backlogrun's own processes — its supervisor, the
 // parent session and the lanes — the apps outside it, and whatever a run left behind. On a terminal
 // one row each with gauges under a rule whose labels stand over them, the parts of each group indented
-// under it so a short pane can drop them first; anywhere else one line of figures.
+// under it so a short pane can drop them first; anywhere else one line of figures. The cells start
+// at `USAGE_START`, as the lane rows' do, whatever the names (joshuafolkken/kit#4292): a part's name is
+// cut to fit before them.
 
-const { LANES_LABEL, column_cells, label_columns, lead_width } = run_board_render_lanes
+const { LANES_LABEL, column_cells, label_columns } = run_board_render_lanes
+const { USAGE_START } = run_board_render_lead
 const { columns_rule, heading_lines } = run_board_render_section
 const { title_of } = run_board_render_title
 const { plain_of } = run_board_usage_text
 const GAUGE = 5
 const CELL_GAP = ' '
-const INDENT = '  '
 const DETAIL = '  '
-const NAME_LIMIT = 24
+const PLAIN_INDENT = '  '
+// Two levels under the section's rule, whose icon stands in the second column.
+const INDENT = `${PLAIN_INDENT}${DETAIL}`
+// The columns a row's label is padded to, so its cells start at `USAGE_START`.
+const LABEL_WIDTH = USAGE_START - INDENT.length - CELL_GAP.length
+// A part's name with its count, in the label's columns after the part's own indent.
+const DETAIL_ROOM = LABEL_WIDTH - DETAIL.length
+// A part's name on the one-line form, which has no column to fit.
+const PLAIN_LIMIT = 24
 // Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a terminal
 // draws them: 🖥 and 🎛, text symbols drawn as emoji, overlapped the blank after them.
 const LABEL = '💻 processes'
@@ -46,8 +57,10 @@ function count_of(instances: number): string {
 	return instances > 1 ? ` ×${String(instances)}` : ''
 }
 
-function named(entry: NamedFigure): Labeled {
-	const label = `${title_of(entry.name, NAME_LIMIT)}${count_of(entry.instances)}`
+// A part's name, cut so it and its count fit `room` columns.
+function named(entry: NamedFigure, room = DETAIL_ROOM): Labeled {
+	const count = count_of(entry.instances)
+	const label = `${title_of(entry.name, room - count.length)}${count}`
 
 	return { label, figure: entry.figure, is_detail: true }
 }
@@ -108,21 +121,16 @@ function padded(text: string, width: number): string {
 }
 
 function screen_part(usage: BoardUsage): DetailPart {
-	const entries = labeled_of(usage)
-	const widest = Math.max(...entries.map((entry) => run_board_fit.width_of(label_text(entry))))
-	const label_width = lead_width(widest, LABEL, INDENT.length)
-	const lines = entries.map((entry) => {
+	const lines = labeled_of(usage).map((entry) => {
 		const cells = column_cells(entry.figure, usage.scale, GAUGE)
 
 		return {
-			text: `${INDENT}${padded(label_text(entry), label_width)}${CELL_GAP}${cells}`,
+			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
 			is_detail: entry.is_detail,
 		}
 	})
 
-	const columns = label_columns(INDENT.length + label_width + CELL_GAP.length, GAUGE)
-
-	return { head: ['', columns_rule(LABEL, columns)], lines }
+	return { head: ['', columns_rule(LABEL, label_columns(USAGE_START, GAUGE))], lines }
 }
 
 function plain_group(
@@ -132,7 +140,9 @@ function plain_group(
 	parts: ReadonlyArray<NamedFigure>,
 ): string {
 	const group = `${label} ${plain_of(figure, scale)}`
-	const named_parts = parts.map((part) => `${named(part).label} ${plain_of(part.figure, scale)}`)
+	const named_parts = parts.map(
+		(part) => `${named(part, PLAIN_LIMIT).label} ${plain_of(part.figure, scale)}`,
+	)
 
 	return named_parts.length === 0 ? group : `${group}: ${named_parts.join(', ')}`
 }
@@ -149,7 +159,7 @@ function plain_part(usage: BoardUsage): DetailPart {
 		leftover.entries.length === 0
 			? []
 			: [plain_group(scale, LABELS.leftover, leftover.total, leftover.entries)]
-	const text = `${INDENT}${[...groups, ...left].join(PART_GAP)}`
+	const text = `${PLAIN_INDENT}${[...groups, ...left].join(PART_GAP)}`
 
 	return { head: heading_lines(LABEL), lines: [{ text, is_detail: false }] }
 }

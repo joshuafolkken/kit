@@ -1,11 +1,9 @@
 import { run_board_earlier } from './run-board-earlier'
-import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
-import { run_board_render_waits } from './run-board-render-waits'
 
-// The icon a `run:board` row leads with: its state's, its phase's while it runs, or 🚧 while its lane
-// is held.
+// The icon a `run:board` row leads with: its state's, or its phase's while it runs. A held lane keeps
+// it, 🚧 standing in the progress column before it (joshuafolkken/kit#4292).
 
 const { PHASE_ICONS, STATE_ICONS } = run_board_labels
 const { EARLIER_ICON } = run_board_earlier
@@ -24,17 +22,10 @@ function running_lead(row: BoardRow): string {
 	return current === undefined ? state_lead(row) : PHASE_ICONS[current]
 }
 
-function phase_lead(row: BoardRow): string {
+function state_icon(row: BoardRow): string {
 	if (row.state !== 'running') return state_lead(row)
 
 	return row.is_earlier === true ? EARLIER_ICON : running_lead(row)
-}
-
-// 🚧 while the row's lane is held (joshuafolkken/kit#4052), its end keeping the phase's icon.
-function state_icon(row: BoardRow, header: BoardHeader): string {
-	const { BUDGET_ICON, held_of } = run_board_render_waits
-
-	return held_of(row, header) === undefined ? phase_lead(row) : BUDGET_ICON
 }
 
 const run_board_render_icon = {

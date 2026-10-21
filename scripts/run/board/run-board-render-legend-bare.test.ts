@@ -13,6 +13,7 @@ const LEGEND = [
 	'🚢 ship',
 	'🚦 gate',
 	'🔧 operation',
+	'⏰ elapsed',
 	'🏁 estimated finish',
 	'💤 parked',
 	'✨ feature',

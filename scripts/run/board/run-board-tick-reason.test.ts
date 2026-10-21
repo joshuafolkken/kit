@@ -53,7 +53,7 @@ async function row_of(issue: number, local: LocalRead, plan: BoardPlan): Promise
 
 	// Another row's condition column can name the issue, and a line with no title ends at its number.
 	const locator = new RegExp(
-		String.raw`^ {2}\S+ .{${String(CONDITION_WIDTH)}} ${String(issue)}(?: |$)`,
+		String.raw`^ {4}\S+ .{${String(CONDITION_WIDTH)}} ${String(issue)}(?: |$)`,
 		'u',
 	)
 
@@ -64,15 +64,15 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 	const POOL = plan_of([child(UNTRIAGED, []), child(HELD)])
 
 	it('draws an untriaged row and the row it holds back, each with its own reason', async () => {
-		expect(await row_of(UNTRIAGED, LOCAL, POOL)).toMatch(/^ {2}❓ {13}3727$/u)
-		expect(await row_of(HELD, LOCAL, POOL)).toMatch(/^ {2}✋ 3727 {8}3714$/u)
+		expect(await row_of(UNTRIAGED, LOCAL, POOL)).toMatch(/^ {4}❓ {13}3727$/u)
+		expect(await row_of(HELD, LOCAL, POOL)).toMatch(/^ {4}✋ 3727 {8}3714$/u)
 	})
 
 	it('draws next free lane from the count the local read carries', async () => {
 		const full = { ...LOCAL, free_lanes: NO_LANE_LEFT }
 		const plan = plan_of([child(HELD)])
 
-		expect(await row_of(HELD, full, plan)).toMatch(/^ {2}🧵 {13}3714$/u)
+		expect(await row_of(HELD, full, plan)).toMatch(/^ {4}🧵 {13}3714$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/🧵/u)
 	})
 
@@ -90,7 +90,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const named = { ...LOCAL, lanes: [String(OPENING)], carry }
 		const plan = plan_of([child(OPENING), child(HELD)])
 
-		expect(await row_of(HELD, named, plan)).toMatch(/^ {2}📋 3720 {8}3714$/u)
+		expect(await row_of(HELD, named, plan)).toMatch(/^ {4}📋 3720 {8}3714$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/📋/u)
 	})
 
@@ -98,7 +98,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const opening = { ...LOCAL, events: [OPENING_EVENT] }
 		const plan = plan_of([child(OPENING)])
 
-		expect(await row_of(OPENING, opening, plan)).toMatch(/^ {2}🚪 (?:\d+′)?\d+″ +3720$/u)
+		expect(await row_of(OPENING, opening, plan)).toMatch(/^ {4}🚪 (?:\d+′)?\d+″ +3720$/u)
 		expect(await row_of(OPENING, { ...opening, is_stranded: true }, plan)).not.toMatch(/🚪/u)
 	})
 })

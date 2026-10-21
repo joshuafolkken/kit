@@ -291,7 +291,9 @@ pnpm josh run:liveness 1169 --output <path> --window 45 --gap 2 --repo joshuafol
 
 <!-- /usage -->
 
-**Output / exit codes:** stdout is one token; stderr explains. `alive`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.
+**Output / exit codes:** stdout is one token; stderr explains. `alive`, `paused`, `stopped`, `settled` exit 0; `undetermined` exits 1. Growth in the transcript answers `alive` on its own. Two `undetermined` answers in a row is a check fault; the caller stops polling rather than escalating to `stopped`.
+
+The lane state record answers first: `paused` for a lane `lane:pause` paused (its process is alive but suspended, so it is never `alive`), `settled` for an ended one; a running lane, or one with no record, is left to the traces.
 
 ### `josh run:ending`
 

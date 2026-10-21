@@ -2,6 +2,8 @@ import type { BusyRead } from '#scripts/epic/epic-busy'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
+import type { LaneRecords, LaneStateRecord } from '#scripts/lane/lane-state'
+import { figure_format } from '#scripts/lib/figure-format'
 import { describe, expect, it } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_overlap } from './backlog-overlap'
@@ -175,6 +177,42 @@ describe('backlog_rank.select — the overlap separation', () => {
 		})
 
 		expect(numbers(selection.offered)).toStrictEqual([FIRST])
+	})
+})
+
+// joshuafolkken/kit#4270: lanes `lane:pause --all` stopped held five issues back for 1 h 40 min with
+// no word of why.
+const PAUSED_AT = '2026-10-20T01:28:00.000Z'
+
+function holder_lane(state: LaneStateRecord['state'], changed_by: string): LaneRecords {
+	const issue = String(RUNNING)
+
+	return new Map([[issue, { issue, state, changed_at: PAUSED_AT, changed_by }]])
+}
+
+// The notice for FIRST, whose file sits inside the directory the running RUNNING declares.
+function notice_beside(lanes: LaneRecords): string | undefined {
+	const candidates = [child(FIRST)]
+	const declared = backlog_overlap.declared_of([
+		{ number: RUNNING, body: LINT_BODY },
+		{ number: FIRST, body: LIMITS_BODY },
+	])
+	const input = { candidates, pool: candidates, read: busy(RUNNING), repo: REPO }
+
+	return backlog_rank.select({ ...input, standalone: new Set(), declared, lanes }).notice
+}
+
+describe('backlog_rank.select — a paused holder', () => {
+	it('names the holder as paused, with when and by what, in the wait it causes', () => {
+		const since = figure_format.minute_of(Date.parse(PAUSED_AT))
+
+		expect(notice_beside(holder_lane('paused', 'lane:pause'))).toMatch(
+			new RegExp(String.raw`declares — paused since ${since} by lane:pause\.$`, 'u'),
+		)
+	})
+
+	it('names nothing more for a holder whose lane is running', () => {
+		expect(notice_beside(holder_lane('running', 'lane:dispatch'))).toMatch(/declares\.$/u)
 	})
 })
 

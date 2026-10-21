@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 review fix: a named issue whose blocker the pool runs is no longer withheld for a person (withheld_of filters the named plan's verdict), with its test",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}

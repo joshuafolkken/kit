@@ -51,7 +51,7 @@ describe('run_board_render_drawn.drawn_of', () => {
 		const drawn = run_board_render_drawn.drawn_of(board(row), [row], LEADS)
 
 		expect(drawn.icons).toStrictEqual(new Set(['🔨', '🚢']))
-		expect(drawn.named).toStrictEqual([])
+		expect(drawn.named).toStrictEqual(['⏰ elapsed'])
 		expect(drawn.checks).toStrictEqual([])
 	})
 
@@ -94,6 +94,6 @@ describe('run_board_render_drawn.drawn_of a held row', () => {
 
 		expect(drawn.icons).toContain('⚓')
 		expect(drawn.checks).toStrictEqual([])
-		expect(drawn.held).toStrictEqual(['🚧 held check', '💪 cores'])
+		expect(drawn.held).toStrictEqual(['🚧 held', '💪 waits for CPU'])
 	})
 })

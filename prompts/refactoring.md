@@ -90,4 +90,4 @@ lint が一部の面しか見ない項目だけを挙げる。コーディング
 
 ## 実装後の品質保証（絶対遵守）
 
-実装後は `pnpm josh lint:related` → `pnpm josh gate` の順で全関与ファイルを確認し、エラー0件になるまで修正する。エラーが残ったまま完了報告しない。
+実装後は `pnpm josh lint:related` → `pnpm josh gate` の順で全関与ファイルを確認し、エラー0件になるまで修正する。エラーが残ったまま完了報告しない。レーン子の gate は `josh ship` が回す（`.claude/skills/workflow-commands/chain-rule.md` → "Run the review-to-merge chain" step 0）。

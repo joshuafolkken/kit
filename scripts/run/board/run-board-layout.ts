@@ -38,6 +38,9 @@ interface BoardPlan {
 	// The paths each issue's body declares (`Plan.scope.declared`), which a waiting row is checked
 	// against a running one by; a plan read without them checks none.
 	declared?: Declared | undefined
+	// The issues the classifier withholds for a person (`EpicNextResult.blocked_on_people`) — a blocker
+	// this run will not finish among them — whose waiting row leads with 🙋.
+	withheld?: ReadonlySet<number> | undefined
 }
 
 // Why a waiting row waits, or the stage its lane's launch is at, as one value its row only draws
@@ -388,20 +391,26 @@ function drawn_rows(layout: BoardLayout): Array<BoardRow> {
 	return [...rows_of(layout), ...(layout.earlier ?? [])]
 }
 
-// The lanes section's rows: the run's own that `apart` does not draw elsewhere, then the earlier run's
-// lanes still holding a place.
-function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<BoardRow> {
-	const own = layout.active.filter((row) => !apart.includes(row))
-
-	return [...own, ...(layout.earlier ?? [])]
-}
-
 // Every row waiting on a person's decision: the touched children parked on one, then the untouched
 // `needs-decision` children — what the 🙋 section draws and the header counts as a person's.
 function people_of(layout: BoardLayout): Array<BoardRow> {
 	const asked = layout.active.filter((row) => row.state === 'human')
 
 	return [...asked, ...layout.people]
+}
+
+// The run's own rows `apart` does not name, then the earlier run's lanes still holding a place.
+function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<BoardRow> {
+	const own = layout.active.filter((row) => !apart.includes(row))
+
+	return [...own, ...(layout.earlier ?? [])]
+}
+
+// The lanes section's rows: those neither finished nor waiting on a person's decision.
+function lanes_drawn(layout: BoardLayout): Array<BoardRow> {
+	const finished = layout.active.filter((row) => is_finished(row.state))
+
+	return lane_rows(layout, [...finished, ...people_of(layout)])
 }
 
 // The parked children the findings section says the park of: still parked on the board, their rows
@@ -421,6 +430,7 @@ const run_board_layout = {
 	is_finished,
 	is_settled,
 	lane_rows,
+	lanes_drawn,
 	layout_of,
 	listed_parks,
 	local_layout_of,

@@ -145,7 +145,7 @@ async function notify(state: DriveState, ports: IdlePorts = DEFAULT_PORTS): Prom
 	}
 }
 
-const backlog_drive_idle = { describe, noticed, notify }
+const backlog_drive_idle = { describe, noticed, notify, read_pool }
 
 export { backlog_drive_idle }
 export type { IdlePorts }

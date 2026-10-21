@@ -4,6 +4,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_solo, type SoloQueue } from '#scripts/epic/epic-solo'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
@@ -28,7 +29,7 @@ import type { ItemStatus } from './run-board-status'
 // judging it is what a person can do meanwhile.
 
 const { LANE_STAGE } = run_event_setup
-const { HEADER_ICONS, STAGE_ICONS, WAIT_ICONS } = run_board_labels
+const { HEADER_ICONS, STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
 const FIRST_ONLY = 1
 
@@ -63,6 +64,8 @@ interface Pool {
 	// The untriaged issue nothing blocks that withholds every candidate (`epic-triage.ts`), if any.
 	held_by: number | undefined
 	running: ReadonlyArray<number>
+	// The issues the classifier withholds for a person (`epic-outside-blocker.ts`'s `human`).
+	withheld: ReadonlySet<number>
 	// The row the run's planning is for, while the run plans (`run-board-planning.ts`).
 	planning: Planning | undefined
 	// The first `run:solo` candidate and the candidates behind it (`epic-solo.ts`), if any.
@@ -115,6 +118,7 @@ function pool_of(read: ReasonRead): Pool {
 	return {
 		held_by: waiting.find((child) => is_untriaged_candidate(child, read))?.number,
 		running,
+		withheld: read.plan.withheld ?? new Set(),
 		planning: run_board_planning.planning_of(read, running),
 		solo: epic_solo.queue_of(candidates),
 	}
@@ -124,8 +128,18 @@ function planned_of(child: EpicChild, pool: Pool): RowReason | undefined {
 	return pool.planning?.issue === child.number ? pool.planning.reason : undefined
 }
 
+// ` — paused since 01:28 by lane:pause` for a holder whose lane is paused (joshuafolkken/kit#4270):
+// only a paused lane's status carries who paused it, and its end is when.
+function paused_tail(status: ItemStatus | undefined): string {
+	const { ended_ms, paused_by } = status ?? {}
+
+	if (paused_by === undefined || ended_ms === undefined) return ''
+
+	return ` — ${lane_state.paused_text(ended_ms, paused_by)}`
+}
+
 // `📂 4238 … scripts/gate/machine-capacity.ts`: the running issue holding a path this row declares,
-// and the path after the title.
+// and the path after the title — with when and by what the holder was paused, where it is.
 function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	const { declared = new Map(), context } = read.plan
 	const holding = { holders: pool.running, repo: context.repo }
@@ -133,7 +147,9 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason |
 
 	if (clash === undefined) return undefined
 
-	return { icon: WAIT_ICONS.path, issues: [String(clash.holder)], tail: clash.path }
+	const tail = `${clash.path}${paused_tail(read.statuses.get(clash.holder))}`
+
+	return { icon: WAIT_ICONS.path, issues: [String(clash.holder)], tail }
 }
 
 // `🧵 4/4`: how many lanes hold a place against the limit the row starts after a free one of. Every
@@ -229,6 +245,12 @@ function not_before_of(child: EpicChild): RowReason | undefined {
 	}
 }
 
+// `🔗 4183` for a blocker the run finishes, `🙋 4183` where the classifier withholds the row for a
+// person: the run will not finish a blocker it waits on (joshuafolkken/kit#4292).
+function blocker_icon(child: EpicChild, pool: Pool): string {
+	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
+}
+
 // `❓ 4183`: an issue nobody has judged, naming its first standing blocker where it has one.
 function untriaged_of(waits: ReadonlyArray<string>): RowReason {
 	return { icon: WAIT_ICONS.untriaged, issues: waits.slice(0, FIRST_ONLY) }
@@ -241,7 +263,7 @@ function wait_of(
 	pool: Pool,
 ): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return untriaged_of(waits)
-	if (waits.length > 0) return { icon: WAIT_ICONS.blocker, issues: waits }
+	if (waits.length > 0) return { icon: blocker_icon(child, pool), issues: waits }
 
 	return not_before_of(child) ?? offer_wait(child, read, pool)
 }

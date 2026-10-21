@@ -139,6 +139,50 @@ describe('run_board_plan.read_plan running issues', () => {
 	})
 })
 
+// joshuafolkken/kit#4292: the issues the classifier withholds for a person, whose rows lead with 🙋.
+// The pool's classification withholds every issue it classifies, the named plan's none.
+async function withholding(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<Plan> {
+	const plan = plan_of(opted_in, exclude)
+	const people = opted_in.issues.length === POOL.length ? plan.result.waiting : []
+
+	return { ...plan, result: { ...plan.result, blocked_on_people: people } }
+}
+
+// The named issue is classified alone, so a blocker only the pool holds reads to it as outside.
+async function named_withheld(blocker: number): Promise<ReadonlySet<number> | undefined> {
+	async function classify(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<Plan> {
+		const plan = plan_of(opted_in, exclude)
+
+		if (opted_in.issues.length === POOL.length) return plan
+		const named = { ...child(SINGLE), blocked_by: [{ repo: REPO, number: blocker }] }
+
+		return { ...plan, result: { ...plan.result, waiting: [named], blocked_on_people: [named] } }
+	}
+
+	const plan = await run_board_plan.read_plan(
+		{ issues: [SINGLE], only: false },
+		{ ...ports(), classify: vi.fn(classify) },
+	)
+
+	return plan?.withheld
+}
+
+describe('run_board_plan.read_plan withheld issues', () => {
+	it('carries the classifier’s withheld issues, the named plan’s own verdict winning', async () => {
+		const read = { ...ports(), classify: vi.fn(withholding) }
+		const pool = await run_board_plan.read_plan({ issues: [], only: false }, read)
+		const joined = await run_board_plan.read_plan({ issues: [EPIC], only: false }, read)
+
+		expect(pool?.withheld).toStrictEqual(new Set(POOL))
+		expect(joined?.withheld).toStrictEqual(new Set([3412]))
+	})
+
+	it('frees a named issue whose blocker the pool runs, and keeps one whose blocker it does not', async () => {
+		expect(await named_withheld(3412)).toStrictEqual(new Set())
+		expect(await named_withheld(EPIC)).toStrictEqual(new Set([SINGLE]))
+	})
+})
+
 // joshuafolkken/kit#3750: the paths each body declares, which a waiting row is checked against.
 describe('run_board_plan.read_plan declared paths', () => {
 	const NAMED_PATHS = new Set(['named.ts'])

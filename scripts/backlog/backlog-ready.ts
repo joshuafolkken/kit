@@ -2,11 +2,11 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
-import { lane_paused, type PausedProbes } from '#scripts/lane/lane-paused'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -28,10 +28,12 @@ interface ReadyReading {
 	free_lanes: number
 }
 
-// How many open lanes hold a place under the limit, and how many hold a port seat.
+// How many open lanes hold a place under the limit, how many hold a port seat, and the ones with no
+// lane state record.
 interface LaneUse {
 	occupied: number
 	seated: number
+	unknown: ReadonlyArray<string>
 }
 
 // The lanes that hold a place under the limit, read once for every count drawn from them.
@@ -39,6 +41,8 @@ interface LaneRoom {
 	occupied: ReadonlyArray<LaneInfo>
 	// The open lanes no child is working in, read from the same snapshot.
 	idle: ReadonlyArray<string>
+	// The open lanes with no lane state record, counted as holding a place until one is written.
+	unknown: ReadonlyArray<string>
 	use: LaneUse
 }
 
@@ -52,30 +56,26 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-// A snapshot that could not be read leaves every lane unpaused, so the limit errs toward fewer free lanes.
-function is_paused_in(issue: string, probes: PausedProbes | undefined): boolean {
-	return probes !== undefined && lane_paused.is_lane_paused(issue, probes)
-}
-
-// The lanes that hold a place under the limit (`backlog-occupied.ts`), and the idle ones. Every lane's
-// paused and idle readings are drawn from one asynchronous process snapshot, so the count never blocks
-// its caller's event loop (joshuafolkken/kit#4241, #4245); `run:board` passes the snapshot its redraw
-// already read (#4246).
+// The lanes that hold a place under the limit (`backlog-occupied.ts`), the idle ones and the unknown
+// ones. Paused is each lane's state record's answer; every lane's idle reading is drawn from one
+// asynchronous process snapshot, so the count never blocks its caller's event loop
+// (joshuafolkken/kit#4241, #4245); `run:board` passes the snapshot its redraw already read (#4246).
 async function occupancy_of(
 	open: ReadonlyArray<LaneInfo>,
 	table: TableRead,
 ): Promise<Omit<LaneRoom, 'use'>> {
 	const rows = await table()
-	const probes = rows === undefined ? undefined : lane_process_table.probes_of(rows)
 	const issues = open.map((lane) => lane.issue)
 	const trace = { process_trace: await lane_snapshot_trace.traces_of(issues, rows) }
+	const records = await lane_state.read_states(issues)
 	const occupied = backlog_occupied.occupied_lanes(
 		open,
 		(live) => lane_spent.idle_lanes(live, trace),
-		(issue) => is_paused_in(issue, probes),
+		records,
 	)
+	const unknown = backlog_occupied.unknown_lanes(open, records)
 
-	return { occupied, idle: lane_spent.idle_lanes(open, trace) }
+	return { occupied, idle: lane_spent.idle_lanes(open, trace), unknown }
 }
 
 // The open lanes as the free count reads them: those that hold a place under the limit, and every
@@ -88,7 +88,9 @@ async function lane_room(
 	const occupancy = await occupancy_of(open, table)
 	const seated = open.filter((lane) => !lane.is_stranded).length
 
-	return { ...occupancy, use: { occupied: occupancy.occupied.length, seated } }
+	const use = { occupied: occupancy.occupied.length, seated, unknown: occupancy.unknown }
+
+	return { ...occupancy, use }
 }
 
 async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {

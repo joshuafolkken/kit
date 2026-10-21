@@ -1,12 +1,13 @@
 import { run_board_fit } from './run-board-fit'
+import { run_board_fresh } from './run-board-fresh'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
-import type { BoardRow, RowReason } from './run-board-layout'
+import { run_board_layout, type BoardRow, type RowReason } from './run-board-layout'
 
-// A queued or waiting row's condition column, and the issues its wait names after its title
-// (joshuafolkken/kit#4288) — pure. The column is one width in both sections, the widest value's — a 📅
-// row's `MM-DD HH:MM` — so every row's number starts in one column. A value is padded on its drawn
-// width: a linked issue's escape draws nothing.
+// A queued, waiting or done row's condition column, and the issues its wait names after its title
+// (joshuafolkken/kit#4288, #4292) — pure. The column is one width in every section, the widest value's
+// — a 📅 row's or a done row's `MM-DD HH:MM` — so every row's number starts in one column. A value is
+// padded on its drawn width: a linked issue's escape draws nothing.
 
 const CONDITION_WIDTH = run_board_labels.day_minute_of(0).length
 const ISSUE_SEPARATOR = ', '
@@ -44,9 +45,20 @@ function value_of(reason: RowReason, header: BoardHeader): string {
 	return reason.value ?? ''
 }
 
-// The column as drawn, blank where the row names no condition.
+// A finished row's end, `MM-DD HH:MM`, emphasized while fresh (joshuafolkken/kit#4292); blank where
+// the row is not finished or recorded no end.
+function ended_of(row: BoardRow, header: BoardHeader): string {
+	const ended_ms = row.status?.ended_ms
+
+	if (ended_ms === undefined || !run_board_layout.is_finished(row.state)) return ''
+
+	return run_board_fresh.since(run_board_labels.day_minute_of(ended_ms), ended_ms, header)
+}
+
+// The column as drawn: what the row waits on, else when it finished, else blank.
 function condition_of(row: BoardRow, header: BoardHeader): string {
-	const value = row.reason === undefined ? '' : value_of(row.reason, header)
+	const reason_value = row.reason === undefined ? '' : value_of(row.reason, header)
+	const value = reason_value === '' ? ended_of(row, header) : reason_value
 	const blank = Math.max(0, CONDITION_WIDTH - run_board_fit.width_of(value))
 
 	return `${value}${' '.repeat(blank)}`

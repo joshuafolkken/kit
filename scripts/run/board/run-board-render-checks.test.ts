@@ -62,13 +62,13 @@ describe('run_board_render_checks.checks_part', () => {
 
 describe('run_board_render_tail.tail_of in followup', () => {
 	it('ends a followup row on its checks', () => {
-		expect(run_board_render_tail.tail_of(running('followup'), board())[1]).toBe(DRAWN)
+		expect(run_board_render_tail.tail_of(running('followup'), board())[0]).toBe(DRAWN)
 	})
 
 	it('leaves a row in any other phase on its newest activity', () => {
 		const row = running('review')
 
-		expect(run_board_render_tail.tail_of(row, board())[1]).toBeUndefined()
+		expect(run_board_render_tail.tail_of(row, board())[0]).toBe('')
 		expect(run_board_render_tail.checks_of(row, board())).toBeUndefined()
 	})
 })

@@ -1,6 +1,6 @@
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
-import type { BoardRow } from './run-board-layout'
+import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_render_checks } from './run-board-render-checks'
 import type { LegendDrawn } from './run-board-render-legend'
 import { run_board_render_tail } from './run-board-render-tail'
@@ -11,19 +11,29 @@ import { run_board_render_waits } from './run-board-render-waits'
 // words leave unnamed, the header's estimated finish (joshuafolkken/kit#4044), and a followup row's checks
 // (joshuafolkken/kit#3770).
 
-const { NOW_ICONS, WORDS } = run_board_labels
+const { HEADER_ICONS, NOW_ICONS, WORDS } = run_board_labels
 
 function present(icons: ReadonlyArray<string | undefined>): Set<string> {
 	return new Set(icons.filter((icon) => icon !== undefined))
 }
 
-// The third line's kinds, then the estimated finish.
+// The lanes rule stands ⏰ over the lanes' times wherever a lanes section is drawn.
+function has_lanes(header: BoardHeader): boolean {
+	const { layout } = header
+
+	return layout !== undefined && run_board_layout.lanes_drawn(layout).length > 0
+}
+
+// The third line's kinds, ⏰ where the lanes rule stands it over the lanes' times, then the estimated
+// finish.
 function named_of(header: BoardHeader, icons: ReadonlySet<string>): Array<string> {
 	const is_operation = icons.has(NOW_ICONS.operation)
 	const operation = is_operation ? `${NOW_ICONS.operation} ${WORDS.operation}` : undefined
+	const elapsed = has_lanes(header) ? `${HEADER_ICONS.elapsed} ${WORDS.elapsed}` : undefined
 	const legends = [
 		run_board_header.now_legend(header),
 		operation,
+		elapsed,
 		run_board_header.estimate_legend(header),
 	]
 

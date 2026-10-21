@@ -65,7 +65,7 @@ const EVENT_KIND = {
 	// (`lane:restart`). It follows the fresh dispatch's `CHILD_LAUNCH`, so it is a launch to the parent and
 	// the board, and — like that launch — a batch record a lane child never reads as its own position.
 	RESTART: 'restart',
-	// A person withdrew a lane child — stopped it and closed its issue as not planned (`lane:withdraw`).
+	// A person withdrew a lane child — stopped it and left its issue open for the next run (`lane:withdraw`).
 	// It is written before the stop, so `run:merge` settles the child as withdrawn whatever GitHub says
 	// by the time the parent collects it, and counts it as neither a merge, a failure nor an outage.
 	WITHDRAW: 'withdraw',
@@ -153,6 +153,10 @@ const EVENT_KIND = {
 	// when is on the stream rather than only in a shell history (joshuafolkken/kit#4268). A trace: it
 	// says what a lane's processes were told, not where the run is.
 	LANE_STATE: 'lane-state',
+	// `backlog:drive` found nothing of the run in flight and only paused lanes left, paused past the
+	// silent window (joshuafolkken/kit#4270). Emitted once per pause episode (`emit_once_since_with`,
+	// reset by `LANE_STATE`), it is the dedup marker for the one paused-lane Telegram. A trace.
+	PAUSED_NOTICE: 'paused-notice',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -174,6 +178,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.PR_CHECKS,
 	EVENT_KIND.IDLE_NOTICE,
 	EVENT_KIND.LANE_STATE,
+	EVENT_KIND.PAUSED_NOTICE,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

@@ -38,13 +38,16 @@ function is_own(record: LaneStateRecord, started_ms: number): boolean {
 	return time_of(record.run.started_at) === started_ms
 }
 
-// What the record says of the lane: running, or paused since the record last changed.
+// What the record says of the lane: running, or paused since the record last changed, by the command
+// that paused it.
 function recorded(record: LaneStateRecord, folded: ItemStatus | undefined): ItemStatus {
 	const started_ms = time_of(record.launched_at) ?? folded?.started_ms
 	const lane = `lane ${record.issue}`
 
 	if (record.state === 'paused') {
-		return { ...folded, state: 'paused', started_ms, ended_ms: time_of(record.changed_at), lane }
+		const ended_ms = time_of(record.changed_at)
+
+		return { ...folded, state: 'paused', started_ms, ended_ms, lane, paused_by: record.changed_by }
 	}
 
 	return { ...folded, state: 'running', started_ms, lane }

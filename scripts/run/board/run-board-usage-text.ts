@@ -14,7 +14,7 @@ import type { UsageFigure, UsageScale } from './run-board-usage'
 // red past the share itself — with one lane running at 52.5% and 70% of the machine, with two at
 // 26.25% and 35%. A lane that ends widens the others' shares, and their colors may turn back.
 
-const { GAUGE_SHADES, HEADER_ICONS, bar_of, minute_of } = run_board_labels
+const { GAUGE_SHADES, bar_of } = run_board_labels
 const { CPU_RED, CPU_YELLOW, MEMORY_RED, MEMORY_YELLOW, threshold_alert } = run_board_machine
 const YELLOW_OF_SHARE = 0.75
 const BYTES_PER_KB = 1024
@@ -166,28 +166,9 @@ function plain_of(figure: UsageFigure, scale: UsageScale): string {
 	return [cpu === undefined ? NO_CORES : `${cpu}${PERCENT_UNIT}`, ...memories].join(PLAIN_GAP)
 }
 
-// The day a settled row finished, `10/8 `, where that is not the board's own day.
-function day_of(ended_ms: number, now_ms: number): string {
-	const ended = new Date(ended_ms)
-
-	if (ended.toDateString() === new Date(now_ms).toDateString()) return ''
-
-	return `${String(ended.getMonth() + 1)}/${String(ended.getDate())} `
-}
-
-// A settled row's finish time, drawn after its time: `🔚 14:05`, or `🔚 10/8 14:05` on another day;
-// `undefined` for a row settled with no recorded end. 🔚 is the header's own end mark — 🏁 is already a
-// done row's state icon.
-function finish_of(ended_ms: number | undefined, now_ms: number): string | undefined {
-	if (ended_ms === undefined) return undefined
-
-	return `${HEADER_ICONS.ended} ${day_of(ended_ms, now_ms)}${minute_of(ended_ms)}`
-}
-
 const run_board_usage_text = {
 	cell_widths,
 	cells_of,
-	finish_of,
 	lane_limits,
 	lane_thresholds,
 	plain_of,

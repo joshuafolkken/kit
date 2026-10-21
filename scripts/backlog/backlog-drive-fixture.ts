@@ -27,6 +27,7 @@ interface Harness {
 	states: Array<DriveState>
 	holds: Array<string | undefined>
 	idles: Array<DriveState>
+	pauses: Array<string>
 }
 
 interface Script {
@@ -35,8 +36,9 @@ interface Script {
 	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
 	offered?: ReadonlyArray<string>
-	// Children `run:merge` handled as parked rather than merged; every other reads as merged.
+	// Children `run:merge` handled as parked or withdrawn rather than merged; every other reads as merged.
 	parked?: ReadonlyArray<string>
+	withdrawn?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
@@ -65,6 +67,14 @@ function merge_token(script: Script, issue: string): MergeTokenRead {
 	return { token, is_offer: script.offered?.includes(issue) === true }
 }
 
+type MergeOutcome = Awaited<ReturnType<LoopPorts['merge']>>['outcome']
+
+function merge_outcome(script: Script, issue: string): MergeOutcome {
+	if (script.parked?.includes(issue) === true) return 'parked'
+
+	return script.withdrawn?.includes(issue) === true ? 'withdrawn' : 'merged'
+}
+
 // The child-facing ports: a finished child is merged once and then reads as gone.
 function child_ports(
 	script: Script,
@@ -78,9 +88,7 @@ function child_ports(
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
 
-			const outcome = script.parked?.includes(issue) === true ? 'parked' : 'merged'
-
-			return { ...merge_token(script, issue), outcome }
+			return { ...merge_token(script, issue), outcome: merge_outcome(script, issue) }
 		},
 	}
 }
@@ -165,13 +173,17 @@ function loop_ports(
 function report_ports(
 	holds: Array<string | undefined>,
 	idles: Array<DriveState>,
-): Pick<LoopPorts, 'hold' | 'idle'> {
+	pauses: Array<string>,
+): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
 	return {
 		hold: async (reason) => {
 			holds.push(reason)
 		},
 		idle: async (idle_state) => {
 			idles.push(idle_state)
+		},
+		paused: async () => {
+			pauses.push('paused')
 		},
 	}
 }
@@ -182,6 +194,7 @@ function harness(script: Script): Harness {
 	const states: Array<DriveState> = []
 	const holds: Array<string | undefined> = []
 	const idles: Array<DriveState> = []
+	const pauses: Array<string> = []
 
 	return {
 		calls,
@@ -189,13 +202,14 @@ function harness(script: Script): Harness {
 		states,
 		holds,
 		idles,
+		pauses,
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
 			...room_ports(script),
 			...memory_port(script),
 			...loop_ports(calls, states),
-			...report_ports(holds, idles),
+			...report_ports(holds, idles, pauses),
 		},
 	}
 }

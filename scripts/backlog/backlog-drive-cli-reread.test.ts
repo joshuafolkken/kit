@@ -43,6 +43,7 @@ function ports_with(launch: DrivePorts['launch']): DrivePorts {
 		memory_held: async () => false,
 		hold: async () => undefined,
 		idle: async () => undefined,
+		paused: async () => undefined,
 		now: () => new Date(),
 	}
 }

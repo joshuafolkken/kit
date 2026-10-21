@@ -1,5 +1,6 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { figure_format } from '#scripts/lib/figure-format'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
@@ -26,7 +27,7 @@ const RUNNING = 3701
 const SHARED = 'package.json'
 const NO_LANE_LEFT = 0
 const ONE_LANE_LEFT = 1
-const { STAGE_ICONS, WAIT_ICONS } = run_board_labels
+const { STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
 const { LANE_STAGE } = run_event_setup
 const UNTRIAGED_REASON: RowReason = { icon: WAIT_ICONS.untriaged, issues: [] }
 // joshuafolkken/kit#4288: ✋ names the untriaged issue the pool is held for.
@@ -148,9 +149,27 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 	it('leads a blocked row with 🔗 and its blockers, whatever else would keep it', () => {
 		const blocked = child(HELD, [BLOCKER, OTHER_BLOCKER])
 		const issues = [String(BLOCKER), String(OTHER_BLOCKER)]
+		const plan = plan_of([blocked, child(BLOCKER), child(OTHER_BLOCKER)])
 
-		expect(reasons([blocked], { free_lanes: NO_LANE_LEFT })).toStrictEqual([
+		expect(reasons([blocked], { plan, free_lanes: NO_LANE_LEFT })).toStrictEqual([
 			{ icon: WAIT_ICONS.blocker, issues },
+		])
+	})
+
+	it('leads a row with 🙋 where the classifier withholds it for a person', () => {
+		const blocked = child(HELD, [BLOCKER, OTHER_BLOCKER])
+		const issues = [String(BLOCKER), String(OTHER_BLOCKER)]
+		const plan = { ...plan_of([blocked, child(BLOCKER)]), withheld: new Set([HELD]) }
+
+		expect(reasons([blocked], { plan })).toStrictEqual([{ icon: STATE_ICONS.human, issues }])
+	})
+
+	it('leads a row with 🔗 where its blocker is outside the plan but the classifier waits on time', () => {
+		const blocked = child(HELD, [OTHER_BLOCKER])
+		const plan = plan_of([blocked])
+
+		expect(reasons([blocked], { plan })).toStrictEqual([
+			{ icon: WAIT_ICONS.blocker, issues: [String(OTHER_BLOCKER)] },
 		])
 	})
 
@@ -160,6 +179,20 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 		expect(reasons([blocked])).toStrictEqual([
 			{ icon: WAIT_ICONS.untriaged, issues: [String(BLOCKER)] },
 		])
+	})
+})
+
+// joshuafolkken/kit#4270: a paused lane held five rows back for 1 h 40 min with no word of why.
+describe('run_board_reason.reader — a paused holder', () => {
+	it('names when and by what the holder was paused after the path', () => {
+		const plan = plan_of([child(HELD)], DECLARED)
+		const ended_ms = Date.parse('2026-10-20T01:28:00.000Z')
+		const lane = `lane ${String(RUNNING)}`
+		const status: ItemStatus = { state: 'paused', lane, ended_ms, paused_by: 'lane:pause' }
+		const tail = `${SHARED} — paused since ${figure_format.minute_of(ended_ms)} by lane:pause`
+		const statuses = new Map([[RUNNING, status]])
+
+		expect(reasons([child(HELD)], { plan, statuses })).toStrictEqual([{ ...OVERLAP, tail }])
 	})
 })
 
@@ -297,7 +330,10 @@ describe('run_board_reason.reader — a row whose declared start time is ahead',
 	})
 
 	it('leads a blocked row with 🔗 whatever start time it declares', () => {
-		expect(reasons([not_before(FUTURE, [BLOCKER])])[0]?.icon).toBe(WAIT_ICONS.blocker)
+		const row = not_before(FUTURE, [BLOCKER])
+		const plan = plan_of([row, child(BLOCKER)])
+
+		expect(reasons([row], { plan })[0]?.icon).toBe(WAIT_ICONS.blocker)
 	})
 
 	// joshuafolkken/kit#4104: it carries the start time itself, which the 📅 rows are ordered by.

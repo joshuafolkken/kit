@@ -3,6 +3,7 @@ import path from 'node:path'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { session_cite } from '#scripts/issue/session-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
@@ -31,6 +32,8 @@ const LOCK_SUFFIX = '.lock'
 // A change holds the lock for one read and one rename; a wait this long means a holder is stuck.
 const LOCK_WAIT_MS = 5000
 const LANE_STATES = ['open', 'running', 'paused', 'ended'] as const
+// What a lane with no record is answered with: the command that writes one.
+const BACKFILL_HINT = 'no lane state — pnpm josh lane:state --backfill'
 
 type LaneState = (typeof LANE_STATES)[number]
 
@@ -52,6 +55,8 @@ const lane_state_schema = z.object({
 type LaneRun = z.infer<typeof lane_run_schema>
 type LaneStateRecord = z.infer<typeof lane_state_schema>
 type StuckProcess = z.infer<typeof stuck_schema>
+// Each lane's record, by issue; a lane with none is left out (`read_states`).
+type LaneRecords = ReadonlyMap<string, LaneStateRecord>
 
 // The states each one moves to. A lane with no record yet (opened before the record existed) moves to
 // any of them.
@@ -254,15 +259,48 @@ async function record_stuck(
 	return locked(root, issue, () => stuck_held(issue, stuck, root))
 }
 
+/** Each of `issues`' records, by issue; an issue with none is left out. */
+async function read_states(
+	issues: ReadonlyArray<string>,
+	directory?: string,
+): Promise<LaneRecords> {
+	const root = await resolve_directory(directory)
+
+	if (root === undefined) return new Map()
+
+	const read = issues.map((issue): [string, LaneStateRecord | undefined] => [
+		issue,
+		read_record(root, issue),
+	])
+
+	return new Map(read.filter((entry): entry is [string, LaneStateRecord] => entry[1] !== undefined))
+}
+
+/** `paused since 01:28 by lane:pause` — the one wording every reader names a paused lane in. */
+function paused_text(since_ms: number, changed_by: string): string {
+	return `paused since ${figure_format.minute_of(since_ms)} by ${changed_by}`
+}
+
+/** `paused_text` for a paused record, `undefined` for any other. */
+function paused_note(record: LaneStateRecord | undefined): string | undefined {
+	if (record?.state !== 'paused') return undefined
+
+	return paused_text(Date.parse(record.changed_at), record.changed_by)
+}
+
 const lane_state = {
+	BACKFILL_HINT,
 	LANE_STATES,
 	is_allowed,
+	paused_note,
+	paused_text,
 	read_records,
 	read_state,
+	read_states,
 	record_change,
 	record_stuck,
 	state_path,
 }
 
 export { lane_state }
-export type { LaneChange, LaneState, LaneStateRecord, RecordOutcome, StuckProcess }
+export type { LaneChange, LaneRecords, LaneState, LaneStateRecord, RecordOutcome, StuckProcess }

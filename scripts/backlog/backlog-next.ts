@@ -15,6 +15,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_state } from '#scripts/lane/lane-state'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_overlap } from './backlog-overlap'
@@ -311,11 +312,15 @@ function standalone_keys(context: PoolContext): ReadonlySet<string> {
 
 // The running lanes still carry the pickup label, so the opted-in listing holds their bodies too —
 // which is what lets a candidate be held back from a path a running lane already declares.
-// `backlog:plan --waves` reads the same scope, so its first wave is this offer.
-function gate_scope(context: PoolContext): GateScope {
+// `backlog:plan --waves` reads the same scope, so its first wave is this offer. Their lane state
+// records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
+async function gate_scope(context: PoolContext): Promise<GateScope> {
+	const { issues } = context.opted_in
+
 	return {
 		standalone: standalone_keys(context),
-		declared: backlog_overlap.declared_of(context.opted_in.issues),
+		declared: backlog_overlap.declared_of(issues),
+		lanes: await lane_state.read_states(issues.map((issue) => String(issue.number))),
 	}
 }
 
@@ -334,7 +339,7 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 
 	if (notice !== undefined) console.error(notice)
 
-	const gated = backlog_rank.gate(result, read, repo, gate_scope(context))
+	const gated = backlog_rank.gate(result, read, repo, await gate_scope(context))
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 

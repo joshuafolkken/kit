@@ -1,0 +1,8 @@
+{
+	"reason": "#4372: one lane-instructions pointer line and the step-0 sentence that stops lane children re-running gate/check/metrics before josh ship",
+	"date": "2026-10-21",
+	"growth": {
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 589
+	}
+}
