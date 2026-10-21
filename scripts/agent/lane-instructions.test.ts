@@ -72,6 +72,13 @@ describe('lane instruction composition', () => {
 		expect(composed).not.toContain('Explicit invocation required')
 		expect(composed).not.toContain('Distinguish consultation from execution')
 	})
+
+	it('leaves the gate to josh ship in the shipped document, pointing at the chain rule', () => {
+		const composed = lane_instructions.composed_in(REPO_ROOT, REPO_ROOT) ?? ''
+
+		expect(composed).toContain('レーン子では `josh ship` が回す')
+		expect(composed).toContain('chain-rule.md` → "Run the review-to-merge chain" step 0')
+	})
 })
 
 function value_after(flags: ReadonlyArray<string>, flag: string): string {
