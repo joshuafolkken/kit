@@ -120,3 +120,36 @@ describe('run_ship_stop_cause.record_of — the ledger record of a stop', () => 
 		})
 	})
 })
+
+// joshuafolkken/kit#4426: a review stop records the kind of each blocking finding it listed.
+describe('run_ship_stop_cause.record_of — the finding kinds of a review stop', () => {
+	it.each(['review', 'round-2'] as const)(
+		'carries the blocking finding kinds of a %s stop beside its cause',
+		(stage) => {
+			const body = 'bug-risks:medium:a.ts:3 — stale\ntests:low:b.ts\nreview found High/Medium'
+
+			expect(run_ship_stop_cause.record_of(7, stage, { body })).toStrictEqual({
+				issue: 7,
+				reason: stage,
+				cause: CAUSE.FINDING,
+				findings: ['bug-risks:medium'],
+			})
+		},
+	)
+
+	it('carries the fixed finding kinds of a stop its fixes decided', () => {
+		const body = 'fixed tests:medium:a.ts — no row\nreview fixes did not pass the scoped checks'
+
+		expect(run_ship_stop_cause.record_of(7, 'review', { body })).toHaveProperty('findings', [
+			'tests:medium',
+		])
+	})
+
+	it.each([
+		['review', `${api_auth.AUTH_FAILURE_NOTE}\nbug-risks:medium:a.ts`],
+		['gate', 'bug-risks:medium:a.ts'],
+		['review', 'Gate RED — the review verdict is blocked'],
+	] as const)('names no finding kinds for a %s stop no finding decided', (stage, body) => {
+		expect(run_ship_stop_cause.record_of(7, stage, { body })).not.toHaveProperty('findings')
+	})
+})

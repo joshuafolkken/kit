@@ -21,6 +21,8 @@ const acceptance_mock = vi.hoisted(() =>
 const removed_mock = vi.hoisted(() =>
 	vi.fn<(body: string | undefined) => Promise<string | undefined>>(),
 )
+const draft_mock = vi.hoisted(() => vi.fn<(issue: string) => Promise<string | undefined>>())
+const prepare_mock = vi.hoisted(() => vi.fn<(issue: string, rows: string) => Promise<string>>())
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -45,6 +47,9 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
+vi.mock('./run-ship-body-draft', () => ({
+	run_ship_body_draft: { existing: draft_mock, prepare: prepare_mock },
+}))
 
 const { run_ship_preflight } = await import('./run-ship-preflight')
 
@@ -73,6 +78,8 @@ const MISSING_BODY = path.join(TEMPORARY, 'missing.md')
 const TWO_PROBLEMS = '2 pull-request precondition(s)'
 const GIT_FAILURE = 'git status failed'
 const OPEN_PR_BODY = '## Summary\n'
+const DRAFT_PATH = path.join(TEMPORARY, 'josh-ship-body-2946.md')
+const ONE_CRITERION_BODY = '## 受け入れ条件\n\n- [ ] the first criterion\n'
 
 function body_file(text: string): string {
 	const target = path.join(TEMPORARY, `${randomUUID()}.md`)
@@ -92,6 +99,12 @@ beforeEach(() => {
 	acceptance_mock.mockReset().mockResolvedValue(undefined)
 	removed_mock.mockReset().mockResolvedValue(undefined)
 	issue_body_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// No ship body draft yet, and one written to `DRAFT_PATH` when asked.
+beforeEach(() => {
+	draft_mock.mockReset().mockResolvedValue(undefined)
+	prepare_mock.mockReset().mockResolvedValue(DRAFT_PATH)
 })
 
 // joshuafolkken/kit#4287: a removed test with no disposition stops the ship before the review, named
@@ -308,12 +321,14 @@ describe('run_ship_preflight.ahead — the acceptance-map skeleton', () => {
 		const skeleton = acceptance_map.skeleton(issue_body) ?? ''
 
 		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([
-			`${run_ship_preflight.ACCEPTANCE_PENDING}\n${skeleton}`,
+			`${run_ship_preflight.acceptance_pending_text(DRAFT_PATH)}\n${skeleton}`,
 		])
 		expect(skeleton).toContain(acceptance_map.criterion_id('the first criterion'))
 		expect(acceptance_mock).toHaveBeenCalledWith(ISSUE, undefined)
 	})
+})
 
+describe('run_ship_preflight.ahead — the acceptance-map refusal kept', () => {
 	it('keeps the refusal when no skeleton can be built', async () => {
 		acceptance_mock.mockResolvedValue(UNMAPPED)
 
@@ -322,7 +337,7 @@ describe('run_ship_preflight.ahead — the acceptance-map skeleton', () => {
 
 	it('keeps the refusal naming the missing rows for an open PR body', async () => {
 		acceptance_mock.mockResolvedValue(UNMAPPED)
-		issue_body_mock.mockResolvedValue(issue_body)
+		issue_body_mock.mockResolvedValue(ONE_CRITERION_BODY)
 		pr_body_mock.mockResolvedValue(OPEN_PR_BODY)
 
 		expect(await run_ship_preflight.ahead(ISSUE)).toStrictEqual([UNMAPPED])

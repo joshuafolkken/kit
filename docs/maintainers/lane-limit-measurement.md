@@ -192,6 +192,12 @@ once under each when it found two:
 
 A preflight stop recorded before the preconditions were kept reads under its cause.
 
+A `review` or `round-2` stop is counted under the `<category>:<severity>` of each blocking finding it
+listed instead (`bug-risks:medium 3, tests:medium 1`), once under each kind — or, on a stop its
+fixes decided (round-1 fixes red on the scoped pair, a round 2 that edited the tree), of each fixed
+finding. A review stop that no finding decided — a red gate at the join, a reviewer that never answered — and one recorded before the
+kinds were kept read under its cause.
+
 **The decision the table is for**: which stop reason to remove next — the reason with the largest
 `wait total (min)` costs the lanes the most time.
 

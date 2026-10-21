@@ -16,8 +16,8 @@ section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4) → 
 `run:entry` for a `run:planned` issue, else at the first implementation edit — never by hand; no cut
 follows the plan — a lane child's context is bounded by the
 threshold-gated implementation cut alone) → run the **verification gate** (the full procedure is `chain-rule.md`;
-in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child hands the rest to
-`pnpm josh ship --detach --review "<title> #<N>"` and ends its turn** (`chain-rule.md` step 0) → otherwise `pnpm josh run:cut <N>` (the pre-gate cut, before the gate; a no-op
+in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child fills in the ship body
+draft `run:prep` wrote, hands the rest to `pnpm josh ship --detach --review "<title> #<N>"` and ends its turn** (`chain-rule.md` step 0) → otherwise `pnpm josh run:cut <N>` (the pre-gate cut, before the gate; a no-op
 outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
 with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
 iterate to no high/medium findings, within the round cap (`prompts/review.md`) → **the clean path folds the ship region into

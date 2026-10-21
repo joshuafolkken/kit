@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { review_tree } from '#scripts/review/review-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
@@ -27,7 +28,7 @@ const SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'f00dcafe',
-	dirty: [],
+	dirty: {},
 	directories: [],
 	readers: { [READ_DOCUMENT]: [READER] },
 }
@@ -76,5 +77,32 @@ describe('test_related.reaches_tests', () => {
 		mocked_since.mockResolvedValue([READER])
 
 		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4425: the lane's own uncommitted code the map was recorded over is no change
+// since the map, so a gate whose unit inputs did not move reuses its green unit step.
+function map_dirty_with(digest: string): void {
+	vi.mocked(test_read_map.read_map).mockReturnValue({ ...MAP, dirty: { [SOURCE]: digest } })
+	mocked_since.mockResolvedValue([SOURCE])
+}
+
+describe('test_related.reaches_tests — code dirty when the map was recorded', () => {
+	it('answers false while that code holds the content the map was recorded on', async () => {
+		map_dirty_with(review_tree.tree_of(ROOT, [SOURCE])[SOURCE] ?? '')
+
+		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(false)
+	})
+
+	it('answers true once that code moved since the map was recorded', async () => {
+		map_dirty_with('digest-then')
+
+		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
+	})
+
+	it('answers true for a moved file a recorded test reads, whatever the dirty code', async () => {
+		map_dirty_with(review_tree.tree_of(ROOT, [SOURCE])[SOURCE] ?? '')
+
+		await expect(test_related.reaches_tests(ROOT, [READ_DOCUMENT])).resolves.toBe(true)
 	})
 })

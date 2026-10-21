@@ -6,7 +6,8 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), the scoped pair, `pnpm josh ship --detach --review
+   the implementer's self-check"), the scoped pair, the ship body draft filled in
+   (`report-format.md` → "PR 本文の受け入れ条件の対応表"), `pnpm josh ship --detach --review
    "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
    `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
    and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or

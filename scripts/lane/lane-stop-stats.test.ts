@@ -231,3 +231,19 @@ describe('lane_stop_stats.table — the unmet preconditions', () => {
 		expect(causes_of(entries, PREFLIGHT)).toBe('lock 1, check 1, unrecorded 1')
 	})
 })
+
+// joshuafolkken/kit#4426: a review stop counts under each kind of blocking finding it listed, so the
+// kind worth catching before the review is a number; a stop no finding decided counts under its cause.
+describe('lane_stop_stats.table — the blocking finding kinds', () => {
+	it('counts a review stop under every finding kind it named, beside an older one', () => {
+		const finding = 'finding'
+		const bug_risk = 'bug-risks:medium'
+		const entries = [
+			{ ...stop(REVIEW, 30), cause: finding, findings: [bug_risk, 'tests:medium'] },
+			{ ...stop(REVIEW, 20), cause: finding, findings: [bug_risk] },
+			{ ...stop(REVIEW, 10), cause: finding },
+		]
+
+		expect(causes_of(entries, REVIEW)).toBe('bug-risks:medium 2, tests:medium 1, finding 1')
+	})
+})

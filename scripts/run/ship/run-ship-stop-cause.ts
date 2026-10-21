@@ -1,6 +1,7 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import type { StopRecord } from '#scripts/lane/lane-ledger'
+import { run_ship_review } from './run-ship-review'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 
 // Why a `josh ship` stage stopped, beside the stage it stopped at: a review that found something, a
@@ -85,17 +86,26 @@ function cause_of(stage: Stage, failed: StoppedOutput): Cause {
 	return INFRA_STAGES.has(stage) && is_infra(body) ? CAUSE.INFRA : CAUSE.CHECK
 }
 
+// The kind of every blocking finding a review stop's output lists — empty on any other stop, and on a
+// review stop no finding decided (a red gate at the join, a reviewer that never answered).
+function findings_of(stage: Stage, cause: Cause, body: string): ReadonlyArray<string> {
+	return is_review(stage) && cause === CAUSE.FINDING ? run_ship_review.blocking_kinds(body) : []
+}
+
 // The lane ledger's record of one stop — the stage, its cause and, for a preflight, which
 // preconditions were unmet, so `lane:stats` counts the one worth meeting before a ship
-// (joshuafolkken/kit#4166).
+// (joshuafolkken/kit#4166); for a review, which kinds of finding stopped it (joshuafolkken/kit#4426).
 function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPUT): StopRecord {
-	const { conflicts, preconditions } = failed
+	const { body, conflicts, preconditions } = failed
+	const cause = cause_of(stage, failed)
+	const findings = findings_of(stage, cause, body)
 
 	return {
 		issue,
 		reason: run_ship_stage.stop_reason(stage, conflicts),
-		cause: cause_of(stage, failed),
+		cause,
 		...(preconditions !== undefined && { preconditions: [...preconditions] }),
+		...(findings.length > 0 && { findings: [...findings] }),
 	}
 }
 

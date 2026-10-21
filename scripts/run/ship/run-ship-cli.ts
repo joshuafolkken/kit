@@ -7,6 +7,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
@@ -59,9 +60,7 @@ const TRAILING_ISSUE_PATTERN = /#([1-9]\d*)\s*$/u
 // Both body forms `followup` documents, forwarded verbatim: the inline `--notify-message` and the
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
-// The PR body carrying the live-execution evidence `followup` gates the merge
-// on, forwarded to `git -y` as a path because it holds commands and their output.
-const BODY_FILE_OPTION = 'body-file'
+const { BODY_FILE_OPTION, body_arguments } = run_ship_body_draft
 const USAGE =
 	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
 const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
@@ -104,10 +103,6 @@ function notify_arguments(values: NotifyValues): ReadonlyArray<string> {
 
 		return value === undefined ? [] : [`--${option}`, value]
 	})
-}
-
-function body_arguments(path: string | undefined): ReadonlyArray<string> {
-	return path === undefined ? [] : [`--${BODY_FILE_OPTION}`, path]
 }
 
 const { PHASE, STAGE } = run_ship_stage
@@ -462,7 +457,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	return command.kind === 'log'
 		? await print_log(command.number)
-		: await run_ship_command(command.args)
+		: await run_ship_command(await run_ship_body_draft.with_draft(command.args))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

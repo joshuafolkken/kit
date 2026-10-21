@@ -44,7 +44,8 @@ const EVENT_ISSUE = /#([1-9]\d*)\b/u
 const UNRECORDED_CAUSE = 'unrecorded'
 const NO_CAUSES = '-'
 
-// `causes` is a preflight stop's unmet preconditions, every one of them, else the stop's one cause.
+// `causes` is a preflight stop's unmet preconditions or a review stop's blocking finding kinds, every
+// one of them, else the stop's one cause.
 interface StopWait {
 	reason: string
 	causes: ReadonlyArray<string>
@@ -100,11 +101,13 @@ function wait_ms(stop: StopEntry, ends: ReadonlyArray<IssueAt>): number | undefi
 	return later.length === 0 ? undefined : Math.min(...later)
 }
 
-// A stop recorded before it named its preconditions (joshuafolkken/kit#4166) counts under its cause.
+// A stop recorded before it named its preconditions (joshuafolkken/kit#4166) or its finding kinds
+// (joshuafolkken/kit#4426) counts under its cause.
 function causes_of(stop: StopEntry): ReadonlyArray<string> {
-	const { preconditions = [] } = stop
+	const { preconditions = [], findings = [] } = stop
+	const kinds = [...preconditions, ...findings]
 
-	return preconditions.length > 0 ? preconditions : [stop.cause ?? UNRECORDED_CAUSE]
+	return kinds.length > 0 ? kinds : [stop.cause ?? UNRECORDED_CAUSE]
 }
 
 function waits_of(

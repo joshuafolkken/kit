@@ -4,6 +4,7 @@ import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 
@@ -35,19 +36,22 @@ async function commit_directories(commit: string): Promise<Array<string>> {
 	return output.split('\0').filter((listed) => listed.length > 0)
 }
 
-// The tree the run read: the commit, every file that differed from it, and the directories it holds.
-async function tree_snapshot(): Promise<Pick<ReadMap, 'commit' | 'dirty' | 'directories'>> {
+type TreeSnapshot = Pick<ReadMap, 'commit' | 'dirty' | 'directories'>
+
+// The tree the run read: the commit, every file that differed from it with its content's digest, and
+// the directories it holds. **Read before the run starts**: a digest taken after it would vouch for
+// an edit made while the tests ran as content they read.
+async function tree_snapshot(root: string): Promise<TreeSnapshot> {
 	const commit = await git_command.head_commit()
-	const dirty = await changed_paths.read_changed_since(commit)
+	const dirty = review_tree.tree_of(root, await changed_paths.read_changed_since(commit))
 
 	return { commit, dirty, directories: await commit_directories(commit) }
 }
 
 // A map that cannot be written — no git, a read-only common directory — leaves the previous map in
 // place, and a narrowing over a stale map is refused by the commit it names.
-async function save_map(root: string, directory: string): Promise<void> {
+function save_map(root: string, directory: string, snapshot: TreeSnapshot): void {
 	try {
-		const snapshot = await tree_snapshot()
 		const readers = test_read_map.merge_records(test_read_map.collect_records(directory))
 
 		test_read_map.write_map(root, { version: test_read_map.MAP_VERSION, ...snapshot, readers })
@@ -66,12 +70,14 @@ async function with_read_recording(
 	const directory = mkdtempSync(path.join(tmpdir(), RECORD_DIRECTORY_PREFIX))
 
 	try {
+		// Settled rather than awaited, so a tree git cannot read records no map and fails no run.
+		const [tree] = await Promise.allSettled([tree_snapshot(root)])
 		const exit_code = await run({
 			[test_read_trace.RECORD_DIRECTORY_KEY]: directory,
 			[test_read_trace.ROOT_KEY]: root,
 		})
 
-		if (exit_code === 0) await save_map(root, directory)
+		if (exit_code === 0 && tree.status === 'fulfilled') save_map(root, directory, tree.value)
 
 		return exit_code
 	} finally {

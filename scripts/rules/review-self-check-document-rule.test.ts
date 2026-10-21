@@ -21,12 +21,16 @@ const CATEGORY_STEMS: ReadonlyArray<string> = [
 	'Failure is not a negative answer',
 	'Every caller moved with it',
 	'The Issue is met on HEAD',
+	// joshuafolkken/kit#4426: the three themes of lane-stopping findings the first five did not reach.
+	'State is read fresh',
+	'The rule covers its whole input space',
+	'Edge inputs and environments',
 ]
 
 // The two chain-rule entries — each its numbered item's opening, and the words its scoped pair is
 // run by, which the pointer has to precede.
 const STEP_MARKERS: ReadonlyArray<[string, string]> = [
-	['0. **A lane child**', 'the scoped pair, `pnpm josh ship'],
+	['0. **A lane child**', 'the scoped pair, the ship body draft'],
 	['1. Run `pnpm josh main:merge`', 'run the final scoped lint/test pair'],
 ]
 
