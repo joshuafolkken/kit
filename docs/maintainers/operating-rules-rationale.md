@@ -1,7 +1,6 @@
 # Operating rules — rationale
 
-This is maintainer-only history behind `prompts/collaboration-workflow/operating-rules.md`. It is
-never read during a run, and a change to this file changes no rule.
+Rationale behind `prompts/collaboration-workflow/operating-rules.md`.
 
 ## Rules that moved to their single source
 

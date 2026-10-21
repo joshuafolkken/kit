@@ -1,10 +1,7 @@
 # Triggered delivery — rationale
 
-This is maintainer-only rationale behind
-[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md):
-the measurements and arguments that justify the procedure's boundaries and mechanism, and the list
-of what each marker test pins. No run reads it — every trigger, action, verdict and boundary an
-agent follows stays in the procedure, and a change to this file changes no rule.
+Rationale behind
+[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md).
 
 ## Why delivery is needed
 

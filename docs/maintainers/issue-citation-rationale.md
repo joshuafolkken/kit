@@ -1,8 +1,6 @@
 # Issue citation — rationale
 
-This is maintainer-only history behind `prompts/collaboration-workflow/issue-citation.md`. It is never
-read during a run, and a change to this file changes no rule. The reasons below used to sit inside the
-rule text; they moved here in joshuafolkken/kit#3179.
+Rationale behind `prompts/collaboration-workflow/issue-citation.md`.
 
 ## Why the rule exists
 

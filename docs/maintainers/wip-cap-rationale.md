@@ -1,9 +1,6 @@
 # The open-Issue WIP cap (30) — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/wip-cap.md` — the
-measurements and arguments that justify the procedure's boundaries, exemptions and numbers. No run
-reads it. Every trigger, command, verdict and boundary an agent follows stays in the procedure, and a
-change to this file changes no rule.
+Rationale behind `prompts/collaboration-workflow/wip-cap.md`.
 
 ## Tests that pin the wording
 

@@ -1,8 +1,6 @@
 # Verify UI — rationale
 
-This is maintainer-only rationale behind `.claude/skills/verify-ui/SKILL.md`: the reasons and history
-behind the rendered-UI check. It is never read during a run — every step, fallback and refusal an agent
-acts on stays in the skill, and a change to this file changes no rule.
+Rationale behind `.claude/skills/verify-ui/SKILL.md`.
 
 ## Why the skill reads as it does
 

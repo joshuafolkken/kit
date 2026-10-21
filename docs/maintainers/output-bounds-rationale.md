@@ -1,9 +1,6 @@
 # Output bounds — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/output-bounds.md`: the
-measurements behind the Bash output cap, the alternatives rejected on the way, and the incident that
-produced the pipe rule. It is never read during a run, and a change to this file changes no rule. It
-moved out of the procedure in joshuafolkken/kit#3177.
+Rationale behind `prompts/collaboration-workflow/output-bounds.md`.
 
 ## Why 8,000
 

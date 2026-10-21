@@ -1,10 +1,6 @@
 # `backlogrun` steps — the rationale behind the procedure
 
-This document is maintainer-only: it holds the reasons, history and measurements behind the rules in
-`.claude/skills/workflow-commands/backlogrun-steps.md`. The procedure document states what a run does;
-this one records why it does it that way, so a change to a rule can be weighed against the reason it
-was written. It is never read during a run — nothing here is an instruction, and a rule stated only
-here binds nobody.
+Rationale behind `.claude/skills/workflow-commands/backlogrun-steps.md`.
 
 ## Why the authorization boundary is shaped this way
 

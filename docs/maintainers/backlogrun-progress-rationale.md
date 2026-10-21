@@ -1,11 +1,7 @@
 # Rationale behind the `backlogrun` progress and hand-off procedure
 
-This document is maintainer-only: it holds the reasons, measurements and history behind
-`.claude/skills/workflow-commands/backlogrun-progress.md`, so that the procedure document can stay a
-list of triggers, actions and answers. It is never read during a run — every rule it explains is stated
-in full in the procedure document, and a change to a rule is made there first. The heartbeat's
-rationale moved with its rules into `docs/maintainers/progress-watcher-rationale.md`
-(joshuafolkken/kit#3172).
+Rationale behind `.claude/skills/workflow-commands/backlogrun-progress.md`; the heartbeat's is in
+`docs/maintainers/progress-watcher-rationale.md` (joshuafolkken/kit#3172).
 
 ## Why a child's ending is read by `run:merge` alone
 

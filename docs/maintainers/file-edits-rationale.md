@@ -1,9 +1,6 @@
 # File edits do not carry the file's text in a command — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/file-edits.md` — the
-measurements and the arguments that justify the procedure's boundaries. No run reads it. Every
-trigger, action, verdict and limit an agent follows stays in the procedure, and a change to this file
-changes no rule.
+Rationale behind `prompts/collaboration-workflow/file-edits.md`.
 
 ## Measured cost of whole-file rewrites
 
@@ -40,7 +37,8 @@ The 97,042 tokens of Bash command text over 427 calls broke down as:
 
 **The edit scripts alone took about a fifth of the whole session's context.** They averaged 547
 tokens a call, the largest 1,200–1,800. What costs most is not the total but that each one is counted
-twice and stays in the context for the rest of the run.
+twice and stays in the context for the rest of the run: a write-back carries the body in both the
+command and the file, and the command is re-read on every later request.
 
 Re-measuring after the rule took effect is joshuafolkken/kit#1159.
 
@@ -62,7 +60,7 @@ keeps, and they are enough to behave correctly:
 3. The criterion is whether the call carries the text wholesale, not which tool it is (a short
    `sed -i` is allowed)
 
-The measurements, the allowed/refused table, the double-counting explanation, the three conditions
+The measurements, the allowed/refused table, the three conditions
 under which a whole-file rewrite is allowed, and **the concrete interpreter forms**
 (`python3 - <<'PY'` / `node -e` / `cat > file <<'EOF'`) live in `file-edits.md` and are left out of
 the resident side: they are the kind of text an agent behaves correctly without, and is more

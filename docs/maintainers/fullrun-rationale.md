@@ -1,8 +1,6 @@
 # `fullrun` and `prrun` manifests — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/fullrun.md` and the `prrun`
-manifest that is its difference. It is never read during a run — every step, stop and command an agent
-acts on stays in the procedure documents, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/fullrun.md` and `prrun.md`.
 
 ## Where each rule came from
 
