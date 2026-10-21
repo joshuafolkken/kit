@@ -10,7 +10,7 @@ import { run_board_status, type ItemStatus } from './run-board-status'
 // writes inside this run's span never makes it this run's. **What it is doing is the record's too** —
 // running or paused — and its time counts from the record's newest launch. The phase and the newest
 // activity are the stream's, folded from the lane's newest launch on. A lane with no record is not
-// guessed at: it is drawn unknown, and `lane:state --backfill` writes its record.
+// guessed at: it is drawn unknown.
 
 interface BoardLanes {
 	// This run's lanes, by issue, with what each is doing.
@@ -31,7 +31,7 @@ function time_of(at: string | undefined): number | undefined {
 	return at === undefined ? undefined : Date.parse(at)
 }
 
-// A record `lane:state --backfill` wrote names no run, so its launch is placed against this run's start.
+// A record the one-off migration wrote (joshuafolkken/kit#4268) names no run, so its launch is placed against this run's start.
 function is_own(record: LaneStateRecord, started_ms: number): boolean {
 	if (record.run === undefined) return (time_of(record.launched_at) ?? NaN) >= started_ms
 

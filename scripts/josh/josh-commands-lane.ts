@@ -16,7 +16,6 @@ const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
 // has to read `.env` to see them — without this the two are documented and unreachable.
 const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_FLAGS } as const
 const ISSUE_WITH_OPTIONS = '<issue> [options]'
-const BACKFILL_FLAG = '--backfill'
 const MEASURE_ARGUMENTS = {
 	script: 'scripts/lane/lane-measure-cli.ts',
 	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
@@ -182,16 +181,6 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Let a paused lane child carry on from where it stopped (SIGCONT)',
 		default_script_arguments: ['resume'],
 		usage: { examples: LANE_SIGNAL_EXAMPLES },
-	},
-	// A one-off migration (joshuafolkken/kit#4268), removed once the readers use the state record.
-	'lane:state': {
-		script: 'scripts/lane/lane-state-cli.ts',
-		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		description:
-			'Give every open lane opened before the lane state record existed a record of its own, read off what its child is doing now',
-		category: 'AI tools',
-		reference: [BACKFILL_FLAG, 'developer', ['files', 'git', 'processes']],
-		usage: { examples: [{ arguments: BACKFILL_FLAG }] },
 	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.

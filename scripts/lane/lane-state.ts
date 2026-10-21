@@ -32,8 +32,8 @@ const LOCK_SUFFIX = '.lock'
 // A change holds the lock for one read and one rename; a wait this long means a holder is stuck.
 const LOCK_WAIT_MS = 5000
 const LANE_STATES = ['open', 'running', 'paused', 'ended'] as const
-// What a lane with no record is answered with: the command that writes one.
-const BACKFILL_HINT = 'no lane state — pnpm josh lane:state --backfill'
+// What a lane with no record is answered with: its state is unknown, so it keeps its place.
+const NO_STATE_HINT = 'no lane state — counted in use'
 
 type LaneState = (typeof LANE_STATES)[number]
 
@@ -68,14 +68,12 @@ const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
 }
 
 // One command's change: the state it leaves the lane in, and whether it launched a child — a launch
-// stamps the launch time and the run that launched it, which every other change keeps. `launched_at`
-// is a launch time known without a launch: the backfill's, read off the lane's `.env`.
+// stamps the launch time and the run that launched it, which every other change keeps.
 interface LaneChange {
 	issue: string
 	state: LaneState
 	command: string
 	is_launch?: boolean
-	launched_at?: Date | undefined
 }
 
 interface StateOptions {
@@ -114,11 +112,9 @@ function current_run(directory: string): LaneRun | undefined {
 }
 
 function launch_fields(change: LaneChange, directory: string, now: Date): Partial<LaneStateRecord> {
-	if (change.is_launch === true) {
-		return { run: current_run(directory), launched_at: now.toISOString() }
-	}
+	if (change.is_launch !== true) return {}
 
-	return change.launched_at === undefined ? {} : { launched_at: change.launched_at.toISOString() }
+	return { run: current_run(directory), launched_at: now.toISOString() }
 }
 
 function next_record(
@@ -289,8 +285,8 @@ function paused_note(record: LaneStateRecord | undefined): string | undefined {
 }
 
 const lane_state = {
-	BACKFILL_HINT,
 	LANE_STATES,
+	NO_STATE_HINT,
 	is_allowed,
 	paused_note,
 	paused_text,

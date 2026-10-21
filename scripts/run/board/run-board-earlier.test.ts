@@ -8,7 +8,7 @@ import type { ItemStatus } from './run-board-status'
 // earlier run's, and a lane with no lane state record is drawn unknown with the command that writes it.
 
 const { EMPTY_LAYOUT, GB, NOW, board_usage, header, lines_of } = run_board_render_fixture
-const { BACKFILL_TAIL, is_live, rows_of } = run_board_earlier
+const { UNKNOWN_TAIL, is_live, rows_of } = run_board_earlier
 const EARLIER = 4173
 const PAUSED = 4180
 const UNKNOWN = 4190
@@ -33,11 +33,11 @@ describe('run_board_earlier.rows_of', () => {
 		expect(rows.map((row) => is_live(row))).toStrictEqual([true, false])
 	})
 
-	it('draws a lane with no record unknown, saying how to write its record', () => {
+	it('draws a lane with no record unknown, saying it keeps its place', () => {
 		const rows = rows_of({ lanes: [], unknown: [String(UNKNOWN)] }, new Map(), READ)
 
 		expect(rows.map((row) => [row.state, row.reason?.tail, row.is_earlier])).toStrictEqual([
-			['unknown', BACKFILL_TAIL, undefined],
+			['unknown', UNKNOWN_TAIL, undefined],
 		])
 	})
 

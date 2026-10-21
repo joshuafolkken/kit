@@ -82,10 +82,6 @@ describe('lane_process_table.probes_of', () => {
 		expect(probes.parent_of(UNLISTED)).toBeUndefined()
 	})
 
-	it('answers the states of the listed pids, leaving an unlisted one out', () => {
-		expect(probes.states_of([GATE, UNLISTED, ZOMBIE])).toEqual(['TN', 'Z'])
-	})
-
 	it('answers children from an index built once, not a scan of every row per call', () => {
 		const rows = lane_process_table.parse(LISTING)
 		const filter = vi.spyOn(rows, 'filter')
@@ -124,20 +120,6 @@ describe('lane_process_table.read_table', () => {
 		)
 
 		await expect(lane_process_table.read_table()).rejects.toThrow(/`ps` is not installed/u)
-	})
-})
-
-describe('lane_process_table.probes_from', () => {
-	it('answers the probes of the snapshot read', async () => {
-		const probes = await lane_process_table.probes_from(async () =>
-			lane_process_table.parse(LISTING),
-		)
-
-		expect(probes?.matching(LANE_PATTERN)).toEqual([LANE])
-	})
-
-	it('answers undefined where the snapshot could not be read', async () => {
-		await expect(lane_process_table.probes_from(async () => undefined)).resolves.toBeUndefined()
 	})
 })
 

@@ -98,13 +98,13 @@ function limit_text(limit: number): string {
 		: `${String(seated)} (${String(limit)} capped at the seats)`
 }
 
-// The lanes with no state record, counted in use until `lane:state --backfill` writes one.
+// The lanes with no state record, counted in use since their state is unknown.
 function unknown_text(unknown: ReadonlyArray<string>): string {
 	if (unknown.length === 0) return ''
 
 	const issues = unknown.map((issue) => session_cite.issue(issue)).join(' ')
 
-	return ` · ${issues}: ${lane_state.BACKFILL_HINT}`
+	return ` · ${issues}: ${lane_state.NO_STATE_HINT}`
 }
 
 function status_line(status: LimitStatus): string {
