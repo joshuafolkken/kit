@@ -5,6 +5,8 @@ import { git_argv } from './git-argv'
 // that it skips the wrapper and git's globals to reach the subcommand — and that `pnpm josh git` is not
 // mistaken for one, since that is the authorized node route the deny list already leaves alone.
 
+const TIMED_PUSHES = ['/usr/bin/time -p git push -f', '/usr/bin/time -o /tmp/t -p git push -f']
+
 describe('git_argv.parse', () => {
 	it('reads the subcommand of a bare git command', () => {
 		expect(git_argv.parse('git push origin main')?.subcommand).toBe('push')
@@ -35,6 +37,10 @@ describe('git_argv.parse', () => {
 
 	it('skips a wrapper named by its path', () => {
 		expect(git_argv.parse('/usr/bin/env git stash')?.subcommand).toBe('stash')
+	})
+
+	it.each(TIMED_PUSHES)('skips a time wrapper, its flags and their values in %j', (command) => {
+		expect(git_argv.parse(command)?.subcommand).toBe('push')
 	})
 
 	it('is not a git command when josh stands between the wrapper and git', () => {

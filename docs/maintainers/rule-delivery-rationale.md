@@ -384,9 +384,14 @@ test file pins:
   detach, outside a lane, and in the main checkout), that it fires every time, and that only one row
   claims a command
 - `scripts/rules/lane-direct-tool.test.ts` — pins that a lane child's direct `eslint` / `vitest` /
-  `cspell` / `tsc` (bare, `pnpm exec`, `npx`) is refused, since the core budget counts only what a
-  `josh` command reserves (joshuafolkken/kit#4357), and that it is silent outside a lane, for a
-  `pnpm josh` run (`reserved-run` included) and for a tool name inside a quoted argument
+  `cspell` / `tsc` (bare, `pnpm exec`, `npx`, behind a `/usr/bin/time -p` prefix —
+  joshuafolkken/kit#4356) is refused, since the core budget counts only what a `josh` command
+  reserves (joshuafolkken/kit#4357), and that it is silent outside a lane, for a `pnpm josh` run
+  (`reserved-run` included) and for a tool name inside a quoted argument
+- `scripts/rules/timed-rerun.test.ts` — pins that a command timed with `time` / `/usr/bin/time` /
+  `hyperfine` is pointed at the recorded durations (the Actions jobs, `pnpm josh lane:stats`) once
+  per run, that a record read or a quoted mention is silent, and that the row precedes
+  `lane-direct-tool`, its one overlap (joshuafolkken/kit#4356)
 - `scripts/rules/git-argv.test.ts` / `scripts/rules/git-force.test.ts` /
   `scripts/rules/worktree-guard.test.ts` / `scripts/rules/file-body.test.ts` — pin the predicates and
   message wording of the three groups of Bash-string rows (joshuafolkken/kit#2120). `scripts/rules/delivered-rules-bash.test.ts`

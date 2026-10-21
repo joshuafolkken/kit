@@ -13,8 +13,9 @@
 
 // The wrapper words that may stand in front of `git`, the same ones `run-tail-rule.ts` skips in front of
 // `josh`: environment assignments, the package-manager launchers, `sudo`, `env`, and an opening
-// subshell parenthesis. Left in, `sudo git push --force`, `env git commit` and `(git push -f)` are
-// silently not a git command.
+// subshell parenthesis — plus `time` with its flags, read here only. Left in, `sudo git push --force`,
+// `env git commit` and `(git push -f)` are silently not a git command, and
+// `/usr/bin/time -p pnpm exec eslint .` is not an `eslint` run (joshuafolkken/kit#4356).
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
 const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'pnpm',
@@ -24,7 +25,13 @@ const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'sudo',
 	'command',
 	'env',
+	'time',
 ])
+// The wrappers whose own flags stand between them and the program (`time -p`), skipped with them.
+const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time'])
+// Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`), so the
+// value is not read as the program.
+const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set(['-o', '-f', '--output', '--format'])
 const SUBSHELL_OPEN = '('
 
 // The git global options that consume a **separate** following token as their value, so the parser
@@ -73,12 +80,37 @@ function is_wrapper_token(word: string): boolean {
 	)
 }
 
+// The words a flagged wrapper's flag spans, its value included; 0 when the word is not a flag.
+function wrapper_flag_width(word = ''): number {
+	if (!word.startsWith(FLAG_PREFIX)) return 0
+
+	return WRAPPER_VALUE_FLAGS.has(word) ? AFTER_VALUE : NEXT
+}
+
+// The index after the wrapper word at `index`, past its own flags when it is a flagged wrapper.
+function after_wrapper_word(words: ReadonlyArray<string>, index: number): number {
+	let next = index + NEXT
+
+	if (!FLAGGED_WRAPPERS.has(program_name(words[index] ?? ''))) return next
+
+	let width = wrapper_flag_width(words[next])
+
+	while (width > 0) {
+		next += width
+		width = wrapper_flag_width(words[next])
+	}
+
+	return next
+}
+
 // Skip the wrapper: environment assignments, a launcher word, and a leading subshell parenthesis. The
 // first word that is none of these is where `git` has to be, or the segment is not a git command.
 function after_wrapper(words: ReadonlyArray<string>): number {
 	let index = 0
 
-	while (index < words.length && is_wrapper_token(words[index] ?? '')) index += NEXT
+	while (index < words.length && is_wrapper_token(words[index] ?? '')) {
+		index = after_wrapper_word(words, index)
+	}
 
 	return index
 }

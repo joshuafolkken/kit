@@ -68,6 +68,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'lane-carry-conflict': judgment(ANOTHER_COMMAND),
 	'lane-switch-main': judgment(ANOTHER_COMMAND),
 	'lane-direct-tool': judgment(ANOTHER_COMMAND),
+	'timed-rerun': judgment(ANOTHER_COMMAND),
 	'oracle-consulted': judgment(ANOTHER_COMMAND),
 	'test-declared': judgment(ANOTHER_COMMAND),
 	batching: judgment(ANOTHER_COMMAND),
