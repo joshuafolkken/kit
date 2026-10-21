@@ -152,6 +152,22 @@ function is_swap_stalled(own: LedgerEntry, budget: MachineBudget): boolean {
 	return budget.memory_pressured === true && (own.reservation.memory_mb ?? 0) > budget.memory_mb
 }
 
+// **The wait cap does not release a swap-stall hold** (joshuafolkken/kit#4451): the cap exists so a
+// wedged sibling cannot stall the machine for good, but a lone claim has no sibling, and a stall ends
+// when its traffic stops or its memory is free. Released at the cap, a 2.4 GB lint started into the
+// stall it waited on and swapped for the same 830 s.
+function is_swap_held(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+): boolean {
+	const placement = place(key, reservations)
+
+	if (placement === undefined || !placement.is_oldest || placement.running.length > 0) return false
+
+	return is_swap_stalled(placement.own, budget)
+}
+
 // The oldest claim runs alone once nothing else does — unless the machine is overloaded, where it waits
 // like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap, or stalled
 // on swap (`is_swap_stalled`), where it waits until the traffic stops or its memory is free.
@@ -166,7 +182,8 @@ function runs_alone({ own, is_oldest, running }: Placement, budget: MachineBudge
 // never come — except into a swap stall (`is_swap_stalled`), which passes. Claims that passed it are
 // still running beside it, and their room does come back, so it waits for them rather than starting on
 // top of their cores and memory. A later claim runs when every running claim, every claim waiting
-// ahead of it and its own load fit the budget — the first waiter against the ledger alone (`first_waiter_limit`) — or when it may pass the waiters ahead (`may_pass`).
+// ahead of it and its own load fit the budget — the first waiter against the ledger alone
+// (`first_waiter_limit`) — or when it may pass the waiters ahead (`may_pass`).
 function is_admitted(
 	key: string,
 	reservations: ReadonlyArray<LedgerEntry>,
@@ -321,6 +338,7 @@ const core_admission = {
 	admitted_load,
 	describe_overflow,
 	is_admitted,
+	is_swap_held,
 	is_too_narrow,
 	ledger_load,
 	narrowed_weight,

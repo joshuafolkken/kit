@@ -92,6 +92,14 @@ describe('core_admission.is_admitted — the oldest claim under a swap stall', (
 		expect(core_admission.is_admitted('lone', lone, budget)).toBe(true)
 	})
 
+	it('names the oldest claim held by the stall, and no claim beside a running one', () => {
+		const budget = { cores: BUDGET_CORES, memory_mb: STALL_FREE_MB, memory_pressured: true }
+		const beside = [...lone, admitted('running', 0)]
+
+		expect(core_admission.is_swap_held('lone', lone, budget)).toBe(true)
+		expect(core_admission.is_swap_held('lone', beside, budget)).toBe(false)
+	})
+
 	it('runs the oldest claim under swap traffic when its memory is free', () => {
 		const budget = { cores: BUDGET_CORES, memory_mb: FREE_MB, memory_pressured: true }
 
