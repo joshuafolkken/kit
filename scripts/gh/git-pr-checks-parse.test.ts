@@ -211,6 +211,35 @@ describe('parse_rollup_checks — edge cases', () => {
 	})
 })
 
+// joshuafolkken/kit#4351: REST answers `null` where it has no value yet, and one rejected element
+// once read the whole rollup as empty.
+describe('parse_pr_state_snapshot — REST nulls', () => {
+	it('reads a running check run with a null conclusion as pending beside the others', () => {
+		const passing = `{"name":"${SONAR_QUBE}","status":"completed","conclusion":"success"}`
+		const running = '{"name":"CodeQL","status":"in_progress","conclusion":null}'
+		const raw = `{"statusCheckRollup":[${passing},${running}]}`
+
+		expect(parse_pr_state_snapshot(raw).rollup).toStrictEqual([
+			{ name: SONAR_QUBE, status: CHECK_STATUS_PASS },
+			{ name: 'CodeQL', status: CHECK_STATUS_PENDING },
+		])
+	})
+})
+
+describe('parse_pr_state_snapshot — required_contexts', () => {
+	it('carries requiredContexts through as required_contexts', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [], requiredContexts: [SONAR_QUBE] })
+
+		expect(parse_pr_state_snapshot(raw).required_contexts).toStrictEqual([SONAR_QUBE])
+	})
+
+	it('omits required_contexts when the branch requires none', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [], requiredContexts: [] })
+
+		expect(parse_pr_state_snapshot(raw)).not.toHaveProperty('required_contexts')
+	})
+})
+
 // #4036: the merge names the head these checks were read from, so the parse must carry it through.
 describe('parse_pr_state_snapshot — head_sha', () => {
 	it('carries headRefOid through as head_sha', () => {

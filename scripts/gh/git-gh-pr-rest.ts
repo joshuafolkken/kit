@@ -27,7 +27,7 @@ import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 // branch name that says nothing about which repository holds it. Named once
 // because both sides of a pull request carry the same shape.
 const rest_repo_schema = z.looseObject({ full_name: z.string().optional() }).nullish()
-const rest_pull_side_schema = z.looseObject({ repo: rest_repo_schema })
+const rest_pull_side_schema = z.looseObject({ ref: z.string().optional(), repo: rest_repo_schema })
 
 type RestPullSide = z.infer<typeof rest_pull_side_schema>
 
