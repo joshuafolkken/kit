@@ -53,6 +53,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-paused.ts', 1],
 	['run/merge/run-merge-auth.ts', 1],
 	// A program reads it back: the run event stream, a process pattern, a child prompt, a parse key.
+	['backlog/backlog-drive-adopt.ts', 1],
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],

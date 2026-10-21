@@ -1,6 +1,8 @@
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_diff_reads } from '#scripts/git/git-diff-reads'
+import { git_merge_conflicts } from '#scripts/git/git-merge-conflicts'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { main_merge_regenerate } from '#scripts/git/main-merge-regenerate'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger, type OverlapRecord } from '#scripts/lane/lane-ledger'
@@ -13,7 +15,7 @@ import { poll } from '#scripts/lib/poll'
 // often as a `conflict` stop its child no longer had the context for.
 //
 // **The later ship waits for the earlier one rather than anything being pushed into a lane.** A lane
-// whose actual change overlaps this one's and whose pull request is already open (its branch pushed,
+// whose actual change conflicts with this one's and whose pull request is already open (its branch pushed,
 // its detached ship still running) is waited on until that ship ends, merged or stopped; the sync that
 // follows then merges a default branch that already holds it, so a conflict surfaces before this
 // lane's gate rather than after its CI. Merging into the other lane's tree instead could not work: a
@@ -37,6 +39,9 @@ const NAME_ONLY_ARGUMENTS = [
 	'--no-relative',
 	'--no-renames',
 ]
+const REGENERATED_PATHS: ReadonlySet<string> = new Set(
+	main_merge_regenerate.REGENERATED_FILES.map((entry) => entry.path),
+)
 
 interface OverlapOptions {
 	sleeper?: (duration_ms: number) => Promise<void>
@@ -102,6 +107,35 @@ async function is_open_ship(lane: LaneInfo, own: Launch): Promise<boolean> {
 	return await has_upstream(lane.directory)
 }
 
+async function lane_head(directory: string): Promise<string | undefined> {
+	try {
+		return await git_spawn.read(['-C', directory, 'rev-parse', 'HEAD'])
+	} catch {
+		return undefined
+	}
+}
+
+// Of the paths both lanes change, the ones merging the other lane's head into this lane's working
+// tree would actually stop on (joshuafolkken/kit#4348) — the working tree, since this lane's change is
+// not committed until after the sync: an identical addition merges cleanly, so only a real conflict
+// is waited on. Only a shared path is tried: a lane forked from an older default branch also
+// conflicts on files the default branch changed since, which this lane's sync takes from the default
+// branch, not from that lane. A file `main:merge` regenerates is resolved by the sync either way, so
+// it never counts. A merge that could not be tried falls back to every shared path, as the wait was
+// decided before.
+async function conflicting_paths(
+	lane: LaneInfo,
+	shared: ReadonlyArray<string>,
+): Promise<Array<string>> {
+	const theirs = await lane_head(lane.directory)
+	const conflicted =
+		theirs === undefined
+			? undefined
+			: git_merge_conflicts.working_tree_conflicts(theirs, shared, process.cwd())
+
+	return (conflicted ?? shared).filter((file_path) => !REGENERATED_PATHS.has(file_path))
+}
+
 async function shared_paths(
 	lane: LaneInfo,
 	launch: Launch,
@@ -110,8 +144,11 @@ async function shared_paths(
 	if (!(await is_open_ship(lane, launch))) return []
 
 	const paths = await lane_paths(lane.directory)
+	const shared = paths.filter((file_path) => own.has(file_path))
 
-	return paths.filter((file_path) => own.has(file_path))
+	if (shared.length === 0) return []
+
+	return await conflicting_paths(lane, shared)
 }
 
 async function other_lanes(issue: string): Promise<ReadonlyArray<LaneInfo>> {
@@ -120,8 +157,8 @@ async function other_lanes(issue: string): Promise<ReadonlyArray<LaneInfo>> {
 	return lanes.filter((lane) => lane.issue !== issue && !lane.is_stranded)
 }
 
-// Every other lane whose open pull request, shipped before this one, touches a path this lane changed,
-// with the shared paths.
+// Every other lane whose open pull request, shipped before this one, conflicts with this lane's change,
+// with the conflicting paths.
 async function find_overlap(issue: string): Promise<Overlap> {
 	const own = new Set(await changed_paths.read_changed_paths(false))
 	const launch = own_launch(issue)
@@ -186,7 +223,7 @@ function note(record: OverlapRecord | undefined): string {
 	const lanes = record.lanes.map((lane) => session_cite.issue(lane)).join(', ')
 	const outcome = record.is_cleared ? 'waited for' : 'gave up waiting for'
 
-	return `${outcome} ${lanes}, whose open pull requests also change: ${record.paths.join(', ')}`
+	return `${outcome} ${lanes}, whose open pull requests conflict on: ${record.paths.join(', ')}`
 }
 
 const run_ship_overlap = { MAX_WAIT_ATTEMPTS, await_overlap, note }

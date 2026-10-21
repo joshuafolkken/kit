@@ -33,6 +33,7 @@ const scratch = { directory: '' }
 function ports_with(launch: DrivePorts['launch']): DrivePorts {
 	return {
 		is_finished: () => false,
+		adoptable: async () => [],
 		merge: async () => ({ token: 'none', outcome: 'merged', is_offer: true }),
 		offer: async (state) => await backlog_drive_cli.read_offer(state, CONTEXT),
 		launch,
