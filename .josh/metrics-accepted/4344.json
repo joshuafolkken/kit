@@ -1,0 +1,7 @@
+{
+	"reason": "A failed relaunch is re-asked only of a new broker session, and a broker that died during the review is waited for before the stop, so serving_session and its wait add code lines",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}
