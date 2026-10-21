@@ -436,7 +436,7 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 - `--epic <E>` / `--repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
 - `--output <path>` — the transcript the outage split reads; absent, it is off.
-- `--driver` — the caller is `backlog:drive`, which has no context to cut, so the merge is never handed back `over`.
+- `--driver` — the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.
 
 <!-- /usage -->
 

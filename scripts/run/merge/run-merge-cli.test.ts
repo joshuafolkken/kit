@@ -119,6 +119,15 @@ describe('run_merge_cli.run — a merged child', () => {
 		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
 	})
 
+	it('leaves the next offer to the driver under --driver', async () => {
+		read_issue_mock.mockResolvedValue(state_read(CLOSED, []))
+
+		expect(await run_merge_cli.run([CHILD, '--driver'])).toBe(SUCCESS)
+		expect(do_merged_mock).toHaveBeenCalledOnce()
+		expect(ask_next_mock).not.toHaveBeenCalled()
+		expect(info_mock).toHaveBeenCalledWith(expect.stringContaining('"token":"deferred"'))
+	})
+
 	it('hands off when the merge crosses the budget', async () => {
 		read_issue_mock.mockResolvedValue(state_read(CLOSED, []))
 		is_over_budget_mock.mockResolvedValue(true)

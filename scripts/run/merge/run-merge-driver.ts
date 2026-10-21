@@ -16,6 +16,9 @@ const COMMAND = 'run:merge'
 const DRIVER_FLAG = '--driver'
 const JSON_KEY = 'merge'
 const LINE_BREAK = '\n'
+// The offer token `--driver` answers in place of `backlog:next`'s: the driver never reads an offer's
+// text, only that one was printed, and asks `backlog:offer` itself (joshuafolkken/kit#4406).
+const DEFERRED_OFFER = 'deferred'
 
 const control_schema = z.object({
 	token: z.enum(Object.values(run_merge_token.MERGE_TOKEN)),
@@ -62,7 +65,7 @@ function read(out: string): MergeResult | undefined {
 	return json_value.parse_with(last, printed_schema)?.[JSON_KEY]
 }
 
-const run_merge_driver = { DRIVER_FLAG, argv_of, print, printed, read }
+const run_merge_driver = { DEFERRED_OFFER, DRIVER_FLAG, argv_of, print, printed, read }
 
 export type { DriverMerge }
 export { run_merge_driver }

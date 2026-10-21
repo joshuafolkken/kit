@@ -1,0 +1,7 @@
+{
+	"reason": "run:merge --driver answers a deferred offer instead of spawning backlog:next (#4406)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

@@ -41,7 +41,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--driver'],
 					description:
-						'the caller is `backlog:drive`, which has no context to cut, so the merge is never handed back `over`.',
+						'the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.',
 				},
 			],
 		},
