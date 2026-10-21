@@ -15,9 +15,10 @@ const LANE = { issue: ISSUE, directory: '/w/.kit-lanes/4198' }
 const OTHER_LANE = { issue: OTHER, directory: '/w/.kit-lanes/4197' }
 const SUCCESS = 0
 const FAILURE = 1
-const TREE = { signalled: [101, 102], child: [101, 102] }
-const NOTHING = { signalled: [], child: [] }
-const RESIDENT_ONLY = { signalled: [103], child: [] }
+const TREE = { signalled: [101, 102], child: [101, 102], is_unread: false }
+const NOTHING = { signalled: [], child: [], is_unread: false }
+const RESIDENT_ONLY = { signalled: [103], child: [], is_unread: false }
+const UNREAD = { ...TREE, is_unread: true }
 const USAGE = [
 	'Usage: josh lane:pause <issue-number> | josh lane:pause --all',
 	'       josh lane:resume <issue-number> | josh lane:resume --all',
@@ -76,6 +77,17 @@ describe('lane_pause_cli.run — one lane', () => {
 		expect(record_change).not.toHaveBeenCalled()
 		expect(emit).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#4300: a resume whose resident read failed may leave a resident stopped.
+	it('exits non-zero and says so when the detached processes could not be read', async () => {
+		resume_lane.mockReturnValue(UNREAD)
+
+		expect(await lane_pause_cli.run(['resume', ISSUE])).toBe(FAILURE)
+		expect(info).toHaveBeenCalledWith(
+			'lane:resume #4198: resumed 2 process(es) — could not read the detached processes (lsof or ps failed); any of them was missed',
+		)
+		expect(record_change).toHaveBeenCalledOnce()
+	})
 })
 
 // joshuafolkken/kit#4268: a lane whose processes were signalled has the change on its state record and
@@ -121,6 +133,13 @@ describe('lane_pause_cli.run — --all', () => {
 
 		expect(await lane_pause_cli.run(['pause', '--all'])).toBe(SUCCESS)
 		expect(pause_lane.mock.calls).toStrictEqual([[OTHER_LANE], [LANE]])
+	})
+
+	it('fails when any lane’s detached processes could not be read', async () => {
+		open_lanes.mockResolvedValue([OTHER_LANE, LANE])
+		resume_lane.mockReturnValueOnce(UNREAD)
+
+		expect(await lane_pause_cli.run(['resume', '--all'])).toBe(FAILURE)
 	})
 })
 

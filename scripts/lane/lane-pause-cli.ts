@@ -12,7 +12,8 @@ import { lane_state } from './lane-state'
 // `josh lane:pause <issue> | --all` and `josh lane:resume <issue> | --all` — one script told apart by
 // the verb the registry passes first. A named lane with no child process to signal exits non-zero, so a
 // caller never takes a pause that stopped nothing as done — a detached resident signalled alone counts
-// as nothing. A lane whose child was signalled has the change written to its state record and to the
+// as nothing. A lane whose detached processes could not be read exits non-zero too, since a resume
+// may have left one of them stopped. A lane whose child was signalled has the change written to its state record and to the
 // run's event stream, so who halted it is on record.
 
 const ARGV_OFFSET = 2
@@ -58,9 +59,14 @@ function outcome_of(verb: Verb, result: LaneSignalled): string {
 	return `${done} ${count} process(es)`
 }
 
-// One line per lane: how many of its processes were signalled.
+const UNREAD_NOTE =
+	' — could not read the detached processes (lsof or ps failed); any of them was missed'
+
+// One line per lane: how many of its processes were signalled, and whether its residents went unread.
 function report(verb: Verb, issue: string, result: LaneSignalled): void {
-	console.info(`lane:${verb} ${issue_cite.plain(issue)}: ${outcome_of(verb, result)}`)
+	const note = result.is_unread ? UNREAD_NOTE : ''
+
+	console.info(`lane:${verb} ${issue_cite.plain(issue)}: ${outcome_of(verb, result)}${note}`)
 }
 
 async function record(verb: Verb, issue: string): Promise<void> {
@@ -73,13 +79,18 @@ async function record(verb: Verb, issue: string): Promise<void> {
 	)
 }
 
-async function settle(verb: Verb, lane: LaneProcesses): Promise<number> {
+async function settle(verb: Verb, lane: LaneProcesses): Promise<LaneSignalled> {
 	const result = lane_pause[VERBS[verb].act](lane)
 
 	report(verb, lane.issue, result)
 	if (result.child.length > 0) await record(verb, lane.issue)
 
-	return result.child.length
+	return result
+}
+
+// A named lane with no child signalled fails; any lane whose residents went unread fails.
+function is_failed(result: LaneSignalled, is_named: boolean): boolean {
+	return result.is_unread || (is_named && result.child.length === 0)
 }
 
 async function apply(
@@ -87,9 +98,11 @@ async function apply(
 	lanes: ReadonlyArray<LaneProcesses>,
 	is_named: boolean,
 ): Promise<number> {
-	const signalled = await Promise.all(lanes.map(async (lane) => await settle(verb, lane)))
+	const results = await Promise.all(lanes.map(async (lane) => await settle(verb, lane)))
 
-	return is_named && signalled.includes(0) ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+	return results.some((result) => is_failed(result, is_named))
+		? FAILURE_EXIT_CODE
+		: SUCCESS_EXIT_CODE
 }
 
 function report_usage(): number {

@@ -67,6 +67,7 @@ describe('lane_pause.pause_lane — the tree', () => {
 		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({
 			signalled: [CHILD, SHELL],
 			child: [CHILD, SHELL],
+			is_unread: false,
 		})
 		expect(signalled).toStrictEqual([
 			{ pid: CHILD, name: 'SIGSTOP' },
@@ -90,7 +91,11 @@ describe('lane_pause.pause_lane — the tree', () => {
 	it('answers the empty list when the lane has no child running', () => {
 		const probes = probes_over({ matching: [], children: {} }, [])
 
-		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [], child: [] })
+		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({
+			signalled: [],
+			child: [],
+			is_unread: false,
+		})
 	})
 })
 
@@ -105,6 +110,7 @@ describe('lane_pause — the lane’s residents', () => {
 		expect(lane_pause.pause_lane(TARGET, probes_over(tree, signalled))).toStrictEqual({
 			signalled: [CHILD, RESIDENT],
 			child: [CHILD],
+			is_unread: false,
 		})
 		expect(signalled.every(({ name }) => name === 'SIGSTOP')).toBe(true)
 	})
@@ -115,15 +121,40 @@ describe('lane_pause — the lane’s residents', () => {
 		expect(lane_pause.resume_lane(TARGET, probes_over(tree, []))).toStrictEqual({
 			signalled: [RESIDENT],
 			child: [],
+			is_unread: false,
 		})
 	})
 
-	it('names no child when only a resident outlived it', () => {
+	// A pause with no child records nothing, so a resident it stopped would never be resumed.
+	it('stops no resident when the lane has no child running', () => {
+		const signalled: Array<Signalled> = []
 		const tree: FakeTree = { matching: [], children: {}, residents: [RESIDENT] }
 
-		expect(lane_pause.pause_lane(TARGET, probes_over(tree, []))).toStrictEqual({
-			signalled: [RESIDENT],
+		expect(lane_pause.pause_lane(TARGET, probes_over(tree, signalled))).toStrictEqual({
+			signalled: [],
 			child: [],
+			is_unread: false,
+		})
+		expect(signalled).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4300: an `lsof` / `ps` that failed is not "no residents" — a resume would leave the
+// residents the pause stopped in SIGSTOP and say nothing.
+describe('lane_pause — residents that could not be read', () => {
+	it.each([
+		['pause', lane_pause.pause_lane],
+		['resume', lane_pause.resume_lane],
+	])('says the residents went unread on a %s whose read failed', (_label, act) => {
+		const probes = {
+			...probes_over({ matching: [CHILD], children: {} }, []),
+			residents: () => undefined,
+		}
+
+		expect(act(TARGET, probes)).toStrictEqual({
+			signalled: [CHILD],
+			child: [CHILD],
+			is_unread: true,
 		})
 	})
 })
@@ -169,7 +200,11 @@ describe('lane_pause.resume_lane', () => {
 		const tree = { matching: [OWN_PARENT, CHILD], children: { [CHILD]: [SHELL] } }
 		const resumed = lane_pause.resume_lane(TARGET, probes_over(tree, signalled))
 
-		expect(resumed).toStrictEqual({ signalled: [CHILD, SHELL], child: [CHILD, SHELL] })
+		expect(resumed).toStrictEqual({
+			signalled: [CHILD, SHELL],
+			child: [CHILD, SHELL],
+			is_unread: false,
+		})
 		expect(signalled.every(({ name }) => name === 'SIGCONT')).toBe(true)
 	})
 })
