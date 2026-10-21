@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 review fix: bound each cut → resume span by the issue's next cut so a never-resumed cut stays not ended",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 174
+	}
+}

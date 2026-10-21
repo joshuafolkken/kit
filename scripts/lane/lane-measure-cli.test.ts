@@ -138,6 +138,22 @@ describe('lane_measure_cli.run — stats reads the event stream', () => {
 
 		expect(printed).toContain('| gate | 1.0 | 1.0 | 1.0 | 1 | 0 |')
 	})
+
+	// joshuafolkken/kit#4395: the same stream times the slot's cut, park and merge hand-offs.
+	it('prints the hand-off gaps off the event stream the context names', async () => {
+		const context = fresh_context()
+		const resumed_at = new Date(Date.parse(AT) + 16_000).toISOString()
+
+		run_event_stream.append(context.events_path, 'cut', '#1 cut (implementation)', AT)
+		run_event_stream.append(context.events_path, 'resume', '#1 resumed', resumed_at)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| gap | count | median (s) | max (s) | not ended |')
+		expect(printed).toContain('| cut → resume | 1 | 16 | 16 | 0 |')
+	})
 })
 
 // joshuafolkken/kit#3995: and how long a free lane stayed empty, by why.

@@ -36,8 +36,9 @@ const REASONS = [
 	STAGE.FOLLOWUP,
 	STAGE.REPORT,
 ] as const
-// `#<N> parked`, `#<N> parked (<reason>)` and `#<N> waiting on #<M>` name the parked issue first.
-const PARKED_ISSUE = /#([1-9]\d*)\b/u
+// `#<N> parked`, `#<N> parked (<reason>)`, `#<N> waiting on #<M>`, `#<N> cut (<phase>)` and
+// `#<N> resumed` name their issue first.
+const EVENT_ISSUE = /#([1-9]\d*)\b/u
 
 // A stop recorded before it carried a cause (joshuafolkken/kit#3998) is counted under this one.
 const UNRECORDED_CAUSE = 'unrecorded'
@@ -60,13 +61,18 @@ function is_stop(entry: LedgerEntry): entry is StopEntry {
 	return entry.kind === lane_ledger.KIND.STOP
 }
 
-function parks_of(events: ReadonlyArray<RunEvent>): Array<IssueAt> {
+// Every run event of `kind`, with the issue its text names first.
+function events_of(events: ReadonlyArray<RunEvent>, kind: string): Array<IssueAt> {
 	return events
-		.filter((event) => event.kind === run_event_stream.EVENT_KIND.PARK)
+		.filter((event) => event.kind === kind)
 		.map((event) => ({
-			issue: Number(PARKED_ISSUE.exec(event.text)?.[1]),
+			issue: Number(EVENT_ISSUE.exec(event.text)?.[1]),
 			at_ms: Date.parse(event.at),
 		}))
+}
+
+function parks_of(events: ReadonlyArray<RunEvent>): Array<IssueAt> {
+	return events_of(events, run_event_stream.EVENT_KIND.PARK)
 }
 
 function ends_of(
@@ -163,6 +169,6 @@ function table(
 	].join('\n')
 }
 
-const lane_stop_stats = { REASONS, table }
+const lane_stop_stats = { REASONS, events_of, table }
 
 export { lane_stop_stats }
