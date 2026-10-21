@@ -4,10 +4,12 @@ import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 
 // Each process's working directory, read with `lsof` — the one place its output is parsed.
 //
-// **A process belongs to a lane by its working directory, not its ancestry.** A process detached from
-// a lane (`josh ship --detach`, a diagnostic started under `script`) is re-parented to pid 1, so no
-// parent chain reaches it, while its working directory still sits under `.kit-lanes/<N>`. `run:board`
-// draws such a process as a lane's or a leftover, and `lane:close` ends it (joshuafolkken/kit#4304).
+// **A process belongs to a lane by its working directory first, its ancestry only after.** A process
+// detached from a lane (`josh ship --detach`, a diagnostic started under `script`) is re-parented to
+// pid 1, so no parent chain reaches it, while its working directory still sits under `.kit-lanes/<N>`.
+// `run:board` draws such a process as a lane's or a leftover, and `lane:close` ends it
+// (joshuafolkken/kit#4304); the board falls back to the ancestry where the directory names no lane
+// (`run-board-usage-lanes.ts`).
 // **macOS alone**, as the board reads it: elsewhere nothing is listed.
 
 const LSOF_COMMAND = 'lsof'

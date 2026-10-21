@@ -54,6 +54,7 @@ function mark_of(rows: ReadonlyArray<Row>): UsageMark {
 		lanes: new Map(rows.map((row) => [row[0], row[4] === undefined ? undefined : String(row[4])])),
 		names: new Map(rows.map((row) => [row[0], row[2]])),
 		parents: new Map(rows.map((row) => [row[0], row[1]])),
+		unread: new Set(),
 		folded: new Set(),
 		cores: 4,
 		total_bytes: 100_000,

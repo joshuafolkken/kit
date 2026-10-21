@@ -42,6 +42,7 @@ function mark(at_ms: number, rows: ReadonlyArray<Row>): UsageMark {
 		at_ms,
 		processes,
 		lanes,
+		unread: new Set(),
 		names,
 		parents,
 		folded,

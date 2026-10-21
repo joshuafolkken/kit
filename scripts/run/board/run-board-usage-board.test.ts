@@ -34,6 +34,7 @@ function mark(at_ms: number, cpu_ms: number): UsageMark {
 			[LEFT, 'vitest'],
 		]),
 		parents: new Map(),
+		unread: new Set(),
 		folded: new Set(),
 		cores: CORES,
 		total_bytes: TOTAL_BYTES,

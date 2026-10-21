@@ -1,0 +1,7 @@
+{
+	"reason": "Lane attribution by working directory with an ancestry fallback, and keeping the answers of an lsof cut short so sustained load still resolves lanes (review round 1)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 63
+	}
+}

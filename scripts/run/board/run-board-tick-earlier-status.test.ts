@@ -53,6 +53,7 @@ const LIVE_MARK: UsageMark = {
 	lanes: new Map([[1, String(EARLIER)]]),
 	names: new Map([[1, 'eslint_d']]),
 	parents: new Map(),
+	unread: new Set(),
 	folded: new Set(),
 	cores: 1,
 	total_bytes: 1000,
