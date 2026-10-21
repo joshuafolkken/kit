@@ -1,0 +1,7 @@
+{
+	"reason": "run:board 🔒 rows (#4391): the holder reading moved to backlog:next's in-progress/park label rule, which needs the issue-labels import",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 31
+	}
+}
