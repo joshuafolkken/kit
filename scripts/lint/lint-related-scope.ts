@@ -10,7 +10,6 @@ import {
 	ESLINT_RELATED_CACHE_FLAGS,
 	PRETTIER_RELATED_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import type { CrossFileRecheckOptions } from './cross-file-recheck'
 
 // `josh lint` reads the whole repository on every call, and an implementation loop calls it after
 // every few edits — re-reading files the change never touched.
@@ -132,23 +131,10 @@ function eslint_arguments(
 	return [...ESLINT_ARGS, ...files, ...caches.eslint_flags, ...ESLINT_SCOPED_FLAGS]
 }
 
-// What re-reading a cached cross-file report (`cross-file-recheck.ts`) needs to ask the narrowed run's question
-// again: the same targets, the same cache file, and the Node API's spelling of `--no-warn-ignored`.
-function cross_file_recheck_options(
-	files: ReadonlyArray<string>,
-	caches: LintCaches = RELATED_CACHES,
-): CrossFileRecheckOptions {
-	return {
-		cache_file: caches.eslint_file,
-		patterns: files,
-		eslint_options: { warnIgnored: false },
-	}
-}
-
 const lint_related_scope = {
 	COMMAND_LABEL,
-	cross_file_recheck_options,
 	NOTHING_LINTABLE_REASON,
+	RELATED_CACHES,
 	describe_scope,
 	eslint_arguments,
 	is_lintable,

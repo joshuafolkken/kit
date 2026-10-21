@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	renameSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -8,9 +16,11 @@ import { import_graph, type ImportGraph } from './import-graph'
 // small tsconfig project and asks the hash again after one file in it changes.
 type ProjectFile = readonly [string, string]
 
+const TSCONFIG_NAME = 'tsconfig.json'
+
 function tsconfig_with(compiler_options: Record<string, unknown>): ProjectFile {
 	return [
-		'tsconfig.json',
+		TSCONFIG_NAME,
 		JSON.stringify({
 			compilerOptions: {
 				module: 'esnext',
@@ -41,8 +51,10 @@ const PACKAGE_NAME = 'fake-package'
 const PACKAGE_TYPES_FILE = 'index.d.ts'
 const PACKAGE_DIRECTORY = path.join('node_modules', PACKAGE_NAME)
 const PACKAGE_TYPES = path.join(PACKAGE_DIRECTORY, PACKAGE_TYPES_FILE)
+const LINKED_DIRECTORY = 'linked-package'
 const PACKAGE_USER = 'uses-package.ts'
 const USED_NUMBER = 'export declare const used: number\n'
+const USED_ANY = 'export declare const used: any\n'
 
 const roots: Array<string> = []
 
@@ -77,6 +89,18 @@ function write_package(root: string, types: string): void {
 		JSON.stringify({ name: PACKAGE_NAME, types: PACKAGE_TYPES_FILE }),
 	)
 	writeFileSync(path.join(root, PACKAGE_TYPES), types)
+}
+
+// A project importing the package, with the package installed under node_modules.
+function write_package_user(): string {
+	const root = write_project([
+		[PACKAGE_USER, `import { used } from '${PACKAGE_NAME}'\n\nexport const copy = used\n`],
+		TSCONFIG_FILE,
+	])
+
+	write_package(root, USED_NUMBER)
+
+	return root
 }
 
 afterEach(() => {
@@ -128,17 +152,25 @@ describe('import_graph.closure_hash', () => {
 describe('import_graph.closure_hash — a package import', () => {
 	// The resolved path carries the installed version, so the package's content is never read.
 	it('names a package import by where it resolves rather than by its content', async () => {
-		const root = write_project([
-			[PACKAGE_USER, `import { used } from '${PACKAGE_NAME}'\n\nexport const copy = used\n`],
-			TSCONFIG_FILE,
-		])
-
-		write_package(root, USED_NUMBER)
+		const root = write_package_user()
 		const before = await hash_of(root, PACKAGE_USER)
 
-		writeFileSync(path.join(root, PACKAGE_TYPES), 'export declare const used: any\n')
+		writeFileSync(path.join(root, PACKAGE_TYPES), USED_ANY)
 
 		expect(await hash_of(root, PACKAGE_USER)).toBe(before)
+	})
+
+	// A workspace or `link:` package resolves through its symlink to source outside the install.
+	it('reads a linked package whose real path sits outside node_modules', async () => {
+		const root = write_package_user()
+
+		renameSync(path.join(root, PACKAGE_DIRECTORY), path.join(root, LINKED_DIRECTORY))
+		symlinkSync(path.join(root, LINKED_DIRECTORY), path.join(root, PACKAGE_DIRECTORY))
+		const before = await hash_of(root, PACKAGE_USER)
+
+		writeFileSync(path.join(root, LINKED_DIRECTORY, PACKAGE_TYPES_FILE), USED_ANY)
+
+		expect(await hash_of(root, PACKAGE_USER)).not.toBe(before)
 	})
 })
 
@@ -153,6 +185,8 @@ const LOCALS_USER_SOURCE =
 const EXPORTED = 'exported.d.ts'
 const REFERENCED = 'referenced.d.ts'
 const WIDGET = 'widget.svelte'
+const BASE_CONFIG_NAME = 'base.json'
+const BASE_CONFIG = JSON.stringify({ compilerOptions: { strict: true } })
 
 // The hash of `file` before and after `edit` is written over one of the project's files.
 async function hashes_around(
@@ -167,6 +201,33 @@ async function hashes_around(
 
 	return [before, await hash_of(root, file)]
 }
+
+// joshuafolkken/kit#4420: `strict` decides what a type-aware rule reads as `any`, so the options are
+// read like an import.
+describe('import_graph.closure_hash — the compiler options', () => {
+	it('changes when the compiler options in tsconfig.json change', async () => {
+		const [before, after] = await hashes_around(
+			[UNRELATED_FILE],
+			UNRELATED,
+			tsconfig_with({ strict: false }),
+		)
+
+		expect(after).not.toBe(before)
+	})
+
+	it('changes when a configuration file tsconfig.json extends changes', async () => {
+		const extending: ProjectFile = [
+			TSCONFIG_NAME,
+			JSON.stringify({ extends: `./${BASE_CONFIG_NAME}`, include: ['*.ts'] }),
+		]
+		const root = write_project([UNRELATED_FILE, extending, [BASE_CONFIG_NAME, BASE_CONFIG]])
+		const before = await hash_of(root, UNRELATED)
+
+		writeFileSync(path.join(root, BASE_CONFIG_NAME), BASE_CONFIG.replace('true', 'false'))
+
+		expect(await hash_of(root, UNRELATED)).not.toBe(before)
+	})
+})
 
 describe('import_graph.closure_hash — what a file reads without importing it', () => {
 	it('changes when an ambient declaration the project includes changes', async () => {

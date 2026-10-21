@@ -69,6 +69,6 @@ describe('lint_gate_scope.narrowed_run', () => {
 		expect(narrowed.prettier).toStrictEqual(
 			expect.arrayContaining([SOURCE, ...PRETTIER_CACHE_FLAGS]),
 		)
-		expect(narrowed.recheck).toMatchObject({ cache_file: ESLINT_CACHE_FILE, patterns: [SOURCE] })
+		expect(narrowed.eslint_cache_file).toBe(ESLINT_CACHE_FILE)
 	})
 })

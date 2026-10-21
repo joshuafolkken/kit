@@ -12,7 +12,6 @@ import {
 	ESLINT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import type { CrossFileRecheckOptions } from './cross-file-recheck'
 import { lint_related_scope, type LintCaches } from './lint-related-scope'
 
 // `josh lint --changed` — the lint `josh gate` runs (joshuafolkken/kit#4085): the branch's changed
@@ -32,7 +31,7 @@ import { lint_related_scope, type LintCaches } from './lint-related-scope'
 interface NarrowedLint {
 	prettier: ReadonlyArray<string>
 	eslint: ReadonlyArray<string>
-	recheck: CrossFileRecheckOptions
+	eslint_cache_file: string
 }
 
 type Environment = Readonly<Record<string, string | undefined>>
@@ -103,7 +102,7 @@ function narrowed_run(files: ReadonlyArray<string>): NarrowedLint {
 	return {
 		prettier: lint_related_scope.prettier_arguments(files, GATE_CACHES),
 		eslint: lint_related_scope.eslint_arguments(files, GATE_CACHES),
-		recheck: lint_related_scope.cross_file_recheck_options(files, GATE_CACHES),
+		eslint_cache_file: GATE_CACHES.eslint_file,
 	}
 }
 
