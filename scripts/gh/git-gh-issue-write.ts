@@ -36,7 +36,6 @@ const LABEL_NAMES_FILTER = '.[].name'
 const LABELS_SEGMENT = '/labels'
 const COMMENTS_SEGMENT = '/comments'
 const CLOSED_STATE = 'closed'
-const NOT_PLANNED_REASON = 'not_planned'
 const COLOR_HASH = '#'
 const UNPROCESSABLE_STATUS = 422
 const ALREADY_EXISTS_CODE = 'already_exists'
@@ -135,18 +134,6 @@ async function close_with(
 
 async function issue_close(issue_number: string, comment: string | undefined): Promise<boolean> {
 	return await close_with(issue_number, comment, { state: CLOSED_STATE })
-}
-
-// The same close as "not planned" — the reason `issue-merged.ts` reads as no merge, so a closed issue
-// that was withdrawn is never taken for one whose work landed.
-async function issue_close_not_planned(
-	issue_number: string,
-	comment: string | undefined,
-): Promise<boolean> {
-	return await close_with(issue_number, comment, {
-		state: CLOSED_STATE,
-		state_reason: NOT_PLANNED_REASON,
-	})
 }
 
 // REST answers 422 `{"resource":"Label","code":"invalid","field":"color"}` for a color carrying a
@@ -406,7 +393,6 @@ const git_gh_issue_write = {
 	issue_comment,
 	issue_try_comment,
 	issue_close,
-	issue_close_not_planned,
 	label_ensure,
 	issue_create_request,
 	issue_create_with_label,

@@ -169,7 +169,7 @@ function last_issue_event(
 
 // A child's launch and the endings `run:merge` settles it with — the ones `run:board` stops drawing it
 // running on. A park or a split already ran `run:merge`, so a child closed after one owes nothing; a
-// withdrawal settles the child itself, its issue closed by the person who withdrew it.
+// withdrawal settles the child itself, its issue left open for the next run.
 const LAUNCH_OR_SETTLE_KINDS: ReadonlySet<string> = new Set([
 	KIND.CHILD_LAUNCH,
 	KIND.MERGE,

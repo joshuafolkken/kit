@@ -35,8 +35,9 @@ interface Script {
 	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
 	offered?: ReadonlyArray<string>
-	// Children `run:merge` handled as parked rather than merged; every other reads as merged.
+	// Children `run:merge` handled as parked or withdrawn rather than merged; every other reads as merged.
 	parked?: ReadonlyArray<string>
+	withdrawn?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
@@ -65,6 +66,14 @@ function merge_token(script: Script, issue: string): MergeTokenRead {
 	return { token, is_offer: script.offered?.includes(issue) === true }
 }
 
+type MergeOutcome = Awaited<ReturnType<LoopPorts['merge']>>['outcome']
+
+function merge_outcome(script: Script, issue: string): MergeOutcome {
+	if (script.parked?.includes(issue) === true) return 'parked'
+
+	return script.withdrawn?.includes(issue) === true ? 'withdrawn' : 'merged'
+}
+
 // The child-facing ports: a finished child is merged once and then reads as gone.
 function child_ports(
 	script: Script,
@@ -78,9 +87,7 @@ function child_ports(
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
 
-			const outcome = script.parked?.includes(issue) === true ? 'parked' : 'merged'
-
-			return { ...merge_token(script, issue), outcome }
+			return { ...merge_token(script, issue), outcome: merge_outcome(script, issue) }
 		},
 	}
 }

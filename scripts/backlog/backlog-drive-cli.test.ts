@@ -191,6 +191,19 @@ describe('backlog_drive_cli — a merge stop across a hand-back', () => {
 	})
 })
 
+// joshuafolkken/kit#4365: a child withdrawn while the drive was handed back is never collected by the
+// resumed drive, so the resume line alone would offer it again in the same run.
+describe('backlog_drive_cli.seeded_state — a withdrawal across a hand-back', () => {
+	it('excludes a child the stream reads withdrawn beside the resume line exclusion', () => {
+		const context = backlog_drive_cli.parse(['--owner', '4242', '--exclude', '2400'])
+		const seeded = { lanes: ['2402'], withdrawn: ['2401', '2400'] }
+		const state = context && backlog_drive_cli.seeded_state(seeded, context)
+
+		expect(state?.exclude).toStrictEqual(['2400', '2401'])
+		expect(state?.in_flight).toStrictEqual(['2402'])
+	})
+})
+
 describe('backlog_drive_cli.merge_token', () => {
 	it('keeps a successful first line and a failed hand-back token', () => {
 		expect(backlog_drive_cli.merge_token('2600\n', 0)).toBe('2600')

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_withdraw, type WithdrawOutcome } from './lane-withdraw'
 import { lane_withdraw_cli } from './lane-withdraw-cli'
 
-// joshuafolkken/kit#3908: `josh lane:withdraw` takes one issue and a non-empty reason, and exits zero
-// only once the issue is closed.
+// joshuafolkken/kit#3908: `josh lane:withdraw` takes one issue and a non-empty reason.
+// joshuafolkken/kit#4365: it exits zero once the withdrawal finished, the issue left open.
 
 const ISSUE = '3769'
 const REASON = 'superseded by #3780'
@@ -17,13 +17,12 @@ const error = vi.spyOn(console, 'error')
 
 vi.spyOn(lane_withdraw, 'describe').mockReturnValue(DESCRIBED)
 
-function withdrawn(is_closed: boolean): WithdrawOutcome {
+function withdrawn(is_noted: boolean): WithdrawOutcome {
 	return {
 		kind: 'withdrawn',
 		reaped: 1,
 		stash: undefined,
-		is_closed,
-		had_closed: false,
+		is_noted,
 		lane: 'closed',
 		residents: [],
 	}
@@ -35,7 +34,7 @@ beforeEach(() => {
 })
 
 describe('lane_withdraw_cli.run — the exit code', () => {
-	it('exits zero once the issue is closed, passing the trimmed reason', async () => {
+	it('exits zero once the withdrawal finished with the issue open, passing the trimmed reason', async () => {
 		withdraw.mockResolvedValue(withdrawn(true))
 
 		expect(await lane_withdraw_cli.run([ISSUE, '--reason', ` ${REASON} `])).toBe(SUCCESS)
@@ -43,10 +42,16 @@ describe('lane_withdraw_cli.run — the exit code', () => {
 		expect(error).toHaveBeenCalledWith(DESCRIBED)
 	})
 
-	it('exits non-zero when the issue could not be closed', async () => {
+	it('exits zero when only the comment could not be posted', async () => {
 		withdraw.mockResolvedValue(withdrawn(false))
 
-		expect(await lane_withdraw_cli.run([ISSUE, `--reason=${REASON}`])).toBe(FAILURE)
+		expect(await lane_withdraw_cli.run([ISSUE, `--reason=${REASON}`])).toBe(SUCCESS)
+	})
+
+	it('exits non-zero when the work could not be stashed', async () => {
+		withdraw.mockResolvedValue({ kind: 'unsaved', directory: `${ISSUE}-lane`, reason: 'locked' })
+
+		expect(await lane_withdraw_cli.run([ISSUE, '--reason', REASON])).toBe(FAILURE)
 	})
 
 	it('exits non-zero on a refusal', async () => {

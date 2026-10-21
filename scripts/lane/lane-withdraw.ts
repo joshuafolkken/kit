@@ -13,21 +13,18 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
 import { lane_state } from './lane-state'
 
-// `josh lane:withdraw <N> --reason <text>` — a person takes a running lane child's issue out of the run
-// for good: the child is stopped, its work stashed, the Issue closed as not planned and the lane closed.
+// `josh lane:withdraw <N> --reason <text>` — a person takes a running lane child's issue out of the
+// current run: the child is stopped, its work stashed and the lane closed. **The Issue stays open** —
+// a withdrawal ends this run's attempt, not the work — so a later run offers it again; this run does
+// not (`backlog-drive-restore.ts` → `offer_exclude`, and the drive's own exclusion).
 //
 // **The `withdraw` event is written first, before anything is stopped.** Killing the child alone would
 // let `lane:await` book it stopped and `run:merge` classify it from GitHub — an open issue resumed as an
 // `outage` or parked `run:stalled`. `run:merge` reads the event stream before GitHub, so a child whose
-// newest launch-or-withdraw event is a withdraw is booked `withdrawn` whatever the Issue's state reads
-// at that moment, and the race between the kill and the close cannot book it as anything else.
+// newest launch-or-withdraw event is a withdraw is booked `withdrawn` whatever the Issue's state reads.
 //
-// **The issue is read again once the child is stopped.** It may merge between the first read and the
-// reap; the reap stopped it, so the second read is final, and an issue it already closed keeps
-// GitHub's close — `run:merge` books a merged close as merged whatever the event stream says.
-//
-// A tree that could not be stashed is left in place with the Issue open: closing the lane would delete
-// the work, and the person decides what to keep.
+// A tree that could not be stashed is left in place: closing the lane would delete the work, and the
+// person decides what to keep.
 
 const WITHDRAW_OCCASION = 'lane withdraw'
 const WITHDRAW_CAUSE = 'a person withdrew it with `lane:withdraw`'
@@ -43,24 +40,21 @@ interface Withdrawn {
 	// How many of the child's processes the withdrawal stopped — 0 for a child that had already ended.
 	reaped: number
 	stash: string | undefined
-	is_closed: boolean
-	// The issue had closed on its own — merged — before the withdrawal reached it, so it was left as is.
-	had_closed: boolean
+	// Whether the comment saying the issue stays open reached it.
+	is_noted: boolean
 	lane: CloseKind
 	// What else the close ended from the checkout; `undefined` where it could not be read.
 	residents: ReadonlyArray<number> | undefined
 }
 
-type IssueSettled = Pick<Withdrawn, 'had_closed' | 'is_closed'>
-
 type Refused =
 	{ kind: typeof CLOSED_KIND } | { kind: typeof NO_LANE_KIND } | { kind: typeof UNREADABLE_KIND }
 type WithdrawOutcome = Withdrawn | Unsaved | Refused
 
-function close_comment(reason: string): string {
+function withdraw_comment(reason: string): string {
 	return [
-		'Withdrawn by a person with `pnpm josh lane:withdraw`.',
-		'Its lane child was stopped and the lane closed.',
+		'Withdrawn from the current run by a person with `pnpm josh lane:withdraw`.',
+		'Its lane child was stopped and the lane closed. The Issue stays open: this run does not resume it, and the next run offers it again.',
 		`- Why: ${reason}`,
 	].join('\n')
 }
@@ -82,32 +76,17 @@ async function refusal_of(issue: string): Promise<Refused | undefined> {
 	return undefined
 }
 
-async function close_open_issue(issue: string, reason: string): Promise<IssueSettled> {
-	const refusal = await refusal_of(issue)
-
-	// An unread issue may have merged during the reap, so it is left open for a person to close.
-	if (refusal !== undefined) {
-		const is_closed = refusal.kind === CLOSED_KIND
-
-		return { is_closed, had_closed: is_closed }
-	}
-
-	const is_closed = await git_gh_issue_write.issue_close_not_planned(issue, close_comment(reason))
-
-	return { is_closed, had_closed: false }
-}
-
-async function close_issue(
+async function note_issue(
 	issue: string,
 	reason: string,
 	stash: string | undefined,
-): Promise<IssueSettled> {
-	const settled = await close_open_issue(issue, reason)
+): Promise<boolean> {
+	const is_noted = await git_gh_issue_write.issue_try_comment(issue, withdraw_comment(reason))
 
 	if (stash !== undefined) await lane_preserve.announce(issue, stash, WITHDRAW_CAUSE)
 	await run_label.unmark(issue)
 
-	return settled
+	return is_noted
 }
 
 async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawOutcome> {
@@ -116,7 +95,7 @@ async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawO
 	const saved = await lane_preserve.keep_work(lane.issue, lane.directory, WITHDRAW_OCCASION)
 
 	if (saved.kind === 'unsaved') return saved
-	const settled = await close_issue(lane.issue, reason, saved.stash)
+	const is_noted = await note_issue(lane.issue, reason, saved.stash)
 	const closed = await lane_close.close_lane(lane.issue)
 
 	// After the close, so the record names the withdrawal rather than the close it ran.
@@ -126,13 +105,13 @@ async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawO
 		kind: 'withdrawn',
 		reaped,
 		stash: saved.stash,
-		...settled,
+		is_noted,
 		lane: closed.kind,
 		residents: closed.residents,
 	}
 }
 
-/** Stop `#<N>`'s lane child, stash its work, close the Issue as not planned and close the lane. */
+/** Stop `#<N>`'s lane child, stash its work and close the lane, leaving the Issue open. */
 async function withdraw(issue: string, reason: string): Promise<WithdrawOutcome> {
 	issue_number_shape.require_issue_number(issue)
 	const refusal = await refusal_of(issue)
@@ -164,16 +143,13 @@ function withdrawn_text(outcome: Withdrawn, issue: string): string {
 	const stopped = outcome.reaped === 0 ? 'Its child had already ended.' : 'Stopped its child.'
 	const head = `Withdrew ${cited}. ${stopped} ${stash_sentence(outcome.stash)}`
 	const lane = lane_suffix(outcome, cited)
+	const noted = outcome.is_noted ? '' : ' The comment saying so could not be posted.'
 
-	if (outcome.had_closed) return `${head} The Issue had already closed and was left as is.${lane}`
-
-	if (outcome.is_closed) return `${head} The Issue is closed as not planned.${lane}`
-
-	return `${head} The Issue could not be closed — close ${cited} by hand; \`run:merge\` books it withdrawn either way.${lane}`
+	return `${head} The Issue stays open: this run does not offer it again, the next run does.${noted}${lane}`
 }
 
 function unsaved_text(outcome: Unsaved, issue: string): string {
-	return `The child for ${session_cite.issue(issue)} was stopped, but its uncommitted work could not be stashed (${outcome.reason}), so the Issue is left open and the lane at ${outcome.directory}; \`run:merge\` books it withdrawn.`
+	return `The child for ${session_cite.issue(issue)} was stopped, but its uncommitted work could not be stashed (${outcome.reason}), so the lane is left at ${outcome.directory}; \`run:merge\` books it withdrawn.`
 }
 
 function refused_text(outcome: Refused, issue: string): string {

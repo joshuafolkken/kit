@@ -4,8 +4,9 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_withdraw, type WithdrawOutcome } from './lane-withdraw'
 
-// `josh lane:withdraw <issue> --reason <text>` — every explanation on standard error, and a withdrawal
-// that did not end with the Issue closed exits non-zero, so a caller never takes a half-done one as done.
+// `josh lane:withdraw <issue> --reason <text>` — every explanation on standard error, and anything but a
+// finished withdrawal exits non-zero, so a caller never takes a half-done one as done. The Issue stays
+// open on success.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -24,7 +25,7 @@ function issue_of(positionals: ReadonlyArray<string>): string | undefined {
 	return rest.length === 0 && issue_number_shape.is_issue_number(issue ?? '') ? issue : undefined
 }
 
-// A reason of only whitespace is no reason: the Issue would close with an empty `Why:` line.
+// A reason of only whitespace is no reason: the Issue would carry an empty `Why:` line.
 function reason_of(value: unknown): string | undefined {
 	const reason = cli_flags.string_of(value)?.trim()
 
@@ -41,7 +42,7 @@ function parse_request(argv: ReadonlyArray<string>): Request | undefined {
 }
 
 function exit_code_of(outcome: WithdrawOutcome): number {
-	return outcome.kind === 'withdrawn' && outcome.is_closed ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return outcome.kind === 'withdrawn' ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

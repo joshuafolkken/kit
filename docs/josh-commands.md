@@ -932,7 +932,7 @@ pnpm josh lane:restart 3769   # prints the fresh child's pid
 
 <!-- usage: lane:withdraw -->
 
-Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure.
+Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure.
 
 ```bash
 pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
@@ -940,10 +940,11 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 <!-- /usage -->
 
-- In order: records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, closes the Issue as not planned with a `- Why: <reason>` comment, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
-- The event comes first: `run:merge` books the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
+- In order: records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, comments on the Issue that it stays open with a `- Why: <reason>` line, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
+- The Issue stays open, its state reason unchanged: the withdrawal ends this run's attempt, not the work. This run's `backlog:next` / `backlog:offer` exclude it (read off the `withdraw` event); a later run offers it again.
+- The event comes first: `run:merge` and `run:board` book the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
 
-**Output / exit codes:** every explanation on stderr; exit 0 once the Issue is closed. A closed issue, no open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the Issue open and the lane in place, exit 1.
+**Output / exit codes:** every explanation on stderr; exit 0 once the withdrawal finished. A closed issue, no open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the lane in place, exit 1.
 
 ### `josh lane:pause` / `josh lane:resume`
 

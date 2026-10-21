@@ -5,7 +5,7 @@ import { lane_registry } from './lane-registry'
 //
 // **Nothing but the processes is touched here.** The work tree, the branch and the issue stay as they
 // are, so a paused lane is resumed rather than rebuilt — the one way to halt a lane that `lane:close`
-// (which deletes it) and `lane:withdraw` (which closes its issue) are not. The command
+// (which deletes it) and `lane:withdraw` (which takes its issue out of the run) are not. The command
 // (`lane-pause-cli.ts`) records the change in the lane's state and on the run's event stream.
 //
 // **The tree is `lane_reap`'s** — the same match, the same descendants, the caller's own ancestry

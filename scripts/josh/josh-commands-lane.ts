@@ -162,7 +162,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lane/lane-withdraw-cli.ts',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
-			'Stop a running lane child, stash its uncommitted work, close its issue as not planned and close the lane — booked withdrawn, not as an outage or a failure',
+			'Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure',
 		category: 'AI tools',
 		reference: ['<issue> --reason <text>', 'developer', ['files', 'git', 'processes', 'network']],
 		usage: {

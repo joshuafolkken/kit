@@ -65,7 +65,7 @@ const EVENT_KIND = {
 	// (`lane:restart`). It follows the fresh dispatch's `CHILD_LAUNCH`, so it is a launch to the parent and
 	// the board, and — like that launch — a batch record a lane child never reads as its own position.
 	RESTART: 'restart',
-	// A person withdrew a lane child — stopped it and closed its issue as not planned (`lane:withdraw`).
+	// A person withdrew a lane child — stopped it and left its issue open for the next run (`lane:withdraw`).
 	// It is written before the stop, so `run:merge` settles the child as withdrawn whatever GitHub says
 	// by the time the parent collects it, and counts it as neither a merge, a failure nor an outage.
 	WITHDRAW: 'withdraw',

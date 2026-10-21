@@ -352,9 +352,9 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its issue
-// and lane and put itself on the stream, so nothing is counted or written here and its seat goes to the
-// next child.
+// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its lane
+// and put itself on the stream, leaving its issue open for the next run, so nothing is counted or
+// written here and its seat goes to the next child.
 async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
