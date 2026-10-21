@@ -154,6 +154,8 @@ jobs:
       pull-requests: read
     outputs:
       reuse: ${{ steps.prove.outputs.reuse }}
+      run-id: ${{ steps.prove.outputs.run-id }}
+      pull-number: ${{ steps.prove.outputs.pull-number }}
     steps:
       - name: Prove the pushed tree passed PR Checks
         id: prove
@@ -221,6 +223,8 @@ jobs:
           fi
 
           echo 'reuse=true' >> "$GITHUB_OUTPUT"
+          echo "run-id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "pull-number=${pull_number}" >> "$GITHUB_OUTPUT"
           echo "Reusing successful PR Checks for tree ${current_tree}."
 
   # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
@@ -369,6 +373,76 @@ jobs:
         run: pnpm josh gate --verbose --no-unit
         env:
           JOSH_METRICS_BASE: HEAD^1
+
+      # joshuafolkken/kit#4449: a main push that reuses this run skips the job above, so it saves no
+      # ESLint cache, and a later pull request restored an entry several merges old. Since
+      # joshuafolkken/kit#4415 every entry whose imports changed since then is linted afresh — 1,180 to
+      # 2,281 of about 3,200 files at 38 to 58 changed ones. The cache this run leaves is the cache of
+      # the tree the push carries, so it is handed to `seed-eslint-cache` below rather than linted
+      # again there. The prefix is the cache key above without its sha; the seed job saves it under
+      # the push's sha, and the test pins the two together. The upload only saves time, so a
+      # transient artifact-service error must not turn this required job red; it continues on error.
+      - name: Write ESLint cache prefix
+        id: eslint-cache-prefix
+        if: github.event_name == 'pull_request'
+        env:
+          ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+        run: printf '%s\n' "${ESLINT_CACHE_PREFIX}" > eslint-cache-prefix
+
+      - name: Upload ESLint cache
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eslint-cache-${{ github.event.pull_request.number }}
+          path: |
+            .eslintcache
+            eslint-cache-prefix
+          include-hidden-files: true
+          retention-days: 1
+
+  # joshuafolkken/kit#4449: the other half of the hand-off above. It runs only on a push that reused
+  # a pull request's Checks, reads that exact run's cache, and saves it under this push's sha, so the
+  # next pull request restores the cache of the tree it branched from. `actions/cache` misses on the
+  # fresh key and saves the downloaded file in its post step; the prefix is checked before it becomes
+  # a key. A missing artifact — a run from before this — or a prefix that is not a key saves nothing
+  # and leaves the push green; the next pull request then restores an older entry, as it did before.
+  seed-eslint-cache:
+    name: Seed ESLint Cache
+    needs: reuse-pr-checks
+    if: ${{ needs.reuse-pr-checks.outputs.reuse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+    steps:
+      - name: Download the reused run's ESLint cache
+        id: download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ needs.reuse-pr-checks.outputs.run-id }}
+          PULL_NUMBER: ${{ needs.reuse-pr-checks.outputs.pull-number }}
+        run: |
+          if ! gh run download "${RUN_ID}" --repo "${REPOSITORY}" --name "eslint-cache-${PULL_NUMBER}"; then
+            echo '::notice::The reused run left no ESLint cache; saving nothing.'
+            exit 0
+          fi
+          prefix=$(cat eslint-cache-prefix)
+          if ! printf '%s' "${prefix}" | grep -Eq '^[A-Za-z]+-eslint-cache-v[0-9.]+-[0-9a-f]+-[0-9a-f]+-$'; then
+            echo '::warning::The ESLint cache prefix is not a cache key; saving nothing.'
+            exit 0
+          fi
+          echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+
+      - name: Save the ESLint cache under this push
+        id: save
+        if: steps.download.outputs.prefix != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .eslintcache
+          key: ${{ steps.download.outputs.prefix }}${{ github.sha }}
 
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
