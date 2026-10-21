@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url'
 // which module read it. `test-read-capture.ts`, armed by the `test-read-recorder.ts` setup file,
 // feeds this from inside every unit worker; everything here is pure so the decisions are testable without patching `fs`.
 //
-// **The reader is the first repository frame on the stack, not the test file alone.** Under
+// **The reader is the outermost repository frame on the stack, not the test file alone.** Under
 // `isolate: false` a module that reads a document at load time is evaluated once per worker, so its
-// read lands on whichever test imported it first. Recording the module as the reader lets
-// `vitest related` widen the read to every test that imports it, on any worker. The test file is
-// recorded beside it, because an async callback (a directory walk inside a dependency) leaves no
-// repository frame at all.
+// read lands on whichever test imported it first. Recording the module whose evaluation made the read
+// lets `vitest related` widen the read to every test that imports it, on any worker. A read a test
+// makes has the test outermost, so a shared helper it reads through — every test importing it — is
+// never the reader (joshuafolkken/kit#4417). The test file is recorded beside it, because an async
+// callback (a directory walk inside a dependency) leaves no repository frame at all.
 
 type ReadRecords = Record<string, Array<string>>
 
@@ -115,7 +116,7 @@ function frame_reader(query: ReaderQuery, script_name: string): string | undefin
 function stack_reader(query: ReaderQuery): string | undefined {
 	return query.scripts
 		.map((script_name) => frame_reader(query, script_name))
-		.find((reader) => reader !== undefined)
+		.findLast((reader) => reader !== undefined)
 }
 
 function add_reader(records: Map<string, Set<string>>, read_path: string, reader: string): void {

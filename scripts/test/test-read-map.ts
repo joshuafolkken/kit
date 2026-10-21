@@ -25,8 +25,9 @@ interface ReadMap {
 	readers: ReadRecords
 }
 
-// Bumped whenever the shape changes, so a map an older kit wrote reads as no map at all.
-const MAP_VERSION = 3
+// Bumped whenever the shape or what a reader means changes, so a map an older kit wrote reads as no
+// map at all.
+const MAP_VERSION = 4
 
 const MAP_DIRECTORY = 'josh'
 const MAP_FILE = 'test-read-map.json'
