@@ -1,8 +1,6 @@
 # `josh sync` — rationale
 
-This is maintainer-only rationale behind `docs/sync.md`: the arguments that justify what
-`josh sync` distributes and how. A consumer needs none of it to run `josh sync`, and a change to
-this file changes no behavior (joshuafolkken/kit#2896).
+Rationale behind `docs/sync.md`.
 
 ## The skills ship as a plugin
 

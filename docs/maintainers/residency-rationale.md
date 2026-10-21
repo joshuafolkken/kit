@@ -1,15 +1,6 @@
 # Rule residency — rationale
 
-This is maintainer-only history behind `prompts/collaboration-workflow/residency.md`, the single
-source of where a rule is written and how much of it stays resident. It is never read during a run,
-and `residency.md` states every binding condition itself — the retirement conditions, direct citation
-and the ceiling-raise conditions — so a change here changes no rule unless `residency.md` changes with
-it. It used to close `.claude/skills/workflow-commands/rule-residency.md`,
-which said of it that it was "retained as history, not as a live constraint"; that file was merged
-into `residency.md` and this text moved here unchanged (joshuafolkken/kit#2891). joshuafolkken/kit#3177
-cut `residency.md` down to its four questions and moved the rest here: the argument for the resident
-line, the trigger-and-pointer shape and the retirement route, the resident-rule list, the pointer
-citation convention, and the budget and its raise conditions.
+Rationale behind `prompts/collaboration-workflow/residency.md`.
 
 ## Why a delivered rule leaves no resident line
 

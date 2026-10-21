@@ -2,7 +2,6 @@
 
 - 通知は CI チェック成功後に投稿する
 - 通知投稿に失敗しても、実装完了の事実をログで確認できるようにする
-- 自動投稿する Issue コメントは `JOSH_SESSION_LANG` の言語（未設定なら `ja`）で書く。Issue タイトルだけは英語
 
 ### CI チェック失敗時の対応
 
@@ -45,7 +44,6 @@
   - 計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。`needs-decision` では止まらない
   - stash を残すのは持ち主の判断だけ。持ち主が計画に理由を書き、ランはそこで止まって確認する
 - staging・index の書き換え・`git commit` の直接実行は deny されており、deny には「そのターンでユーザーが明示指示した」という例外がない。ケース 1 はユーザー自身の端末で実行してもらう。コミットを指示されたら `pnpm josh git` を通す
-- index を守る deny と `pnpm josh rule:list` の `worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行も実装である（→「deny と配送ガードは実装であって規則ではない」）
 
 ### decision-autonomy — 意思決定の自律ポリシー（確認停止を減らす）
 
@@ -56,4 +54,4 @@
 - 自己修正（自分が公開した成果物の事実誤りの訂正、同じセッションで自分が特定した自分の作業の抜けの穴埋め）は Tier A。承認済みの作業の完了・修復に限り、目標の表明や問いで動いてよい意味ではない（→ `principles.md` → "consult-vs-execute"）
 - **Tier C との境界**: マージ・ブランチ削除・force push・スコープ外の変更は、自分が招いた問題でも Tier C。確認を外しても監査証跡は外さない
 - **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行も提案もしない。既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり戻せない）。`josh bump` が版を変えたら、変わった挙動の `docs/` をコミット前に更新する
-- 自動判断の記録: Issue 駆動ワークフロー内では `pnpm josh issue:comment <N> --body-file <path>` で、採用案・不採用の代替案・採用案が優位な理由を書く
+- 自動判断を記録する Issue コメントは `pnpm josh issue:comment <N> --body-file <path>` で投稿する

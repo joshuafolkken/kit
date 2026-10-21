@@ -1,11 +1,6 @@
 # Independent calls go in the same turn — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/turn-batching.md`: the
-measurements, history and argument that justify the procedure's boundaries, the guard's scope and the
-measurement. It is never read during a run. Every trigger, action, criterion, threshold and guard
-blind spot an agent obeys stays in the procedure document, so a change to this file changes no rule.
-The measurements, the rejected mechanisms and the history moved here from the procedure in
-joshuafolkken/kit#3177, and the text already here was brought to English at the same time.
+Rationale behind `prompts/collaboration-workflow/turn-batching.md`.
 
 ## Why the number of turns is the cost
 

@@ -1,8 +1,6 @@
 # Issue comments — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/issue-comments.md`: why an
-Issue's comments are read before implementing. It is never read during a run — every command, stop and
-step an agent acts on stays in the procedure document, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/issue-comments.md`.
 
 ## Why comments are read
 
