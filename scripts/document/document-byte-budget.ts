@@ -86,6 +86,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
+	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },

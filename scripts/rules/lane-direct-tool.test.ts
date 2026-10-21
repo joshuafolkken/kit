@@ -76,6 +76,9 @@ describe('runs_heavy_tool', () => {
 		['a later segment', 'cd scripts && eslint rules'],
 		['a piped segment', 'git diff --name-only | xargs echo && tsc -p .'],
 		['a `.bin` path', 'node_modules/.bin/eslint .'],
+		// joshuafolkken/kit#4356: the timed spelling that slipped through.
+		['a `time -p` prefix', '/usr/bin/time -p pnpm exec eslint .'],
+		['a `time -f <format>` prefix', '/usr/bin/time -f %e pnpm exec eslint .'],
 	])('matches %s', (_name, command) => {
 		expect(lane_direct_tool.runs_heavy_tool(command)).toBe(true)
 	})

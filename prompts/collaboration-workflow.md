@@ -27,6 +27,7 @@
 | 常駐ドキュメントと skill の分担                            | [`residency.md`](./collaboration-workflow/residency.md)                   |
 | 引き金つき配送 — 規則を効く瞬間に届ける                    | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)           |
 | コマンド出力が文脈へ持ち込む量の上限                       | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)           |
+| 所要時間は記録から測る                                     | [`measurement.md`](./collaboration-workflow/measurement.md)               |
 | 運用ルール                                                 | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)       |
 | 用語集 — lane・cut・hold・park など                        | [`glossary.md`](./collaboration-workflow/glossary.md)                     |
 | headless のレーン子・レビューの起動時の規則セット          | [`lane-instructions.md`](./collaboration-workflow/lane-instructions.md)   |
