@@ -148,3 +148,17 @@ describe('run_board_render.render — the condition column across sections', () 
 		expect(waiting_line.endsWith('1234')).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#4391: 🔒 names the running run:solo issue in the column.
+describe('run_board_render.render — a row a running run:solo issue holds', () => {
+	it('draws the holder in the condition column', () => {
+		const held = row(4387, { icon: WAIT_ICONS.solo_running, issues: ['4374'] })
+		const drawn = lines_of(
+			header({ layout: { ...EMPTY_LAYOUT, queued: [{ kind: 'row', row: held }] } }),
+		)
+		const held_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo_running} `)) ?? ''
+
+		expect(held_line).toContain(`4374${' '.repeat(CONDITION_WIDTH - '4374'.length)} 4387`)
+		expect(held_line.endsWith('4387')).toBe(true)
+	})
+})

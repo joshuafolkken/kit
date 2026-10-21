@@ -58,6 +58,9 @@ const check_schema = z.object({
 	// The CPU milliseconds the check's process tree spent, so a core weight can be re-measured from
 	// the ledger (joshuafolkken/kit#4362). Absent where the gate could not read it (off macOS).
 	cpu_ms: z.number().optional(),
+	// Why the unit leg ran the whole suite instead of the related tests — a stable kind, never the
+	// file it names (joshuafolkken/kit#4397). Absent when it narrowed, and on every other check.
+	fallback: z.string().optional(),
 })
 const gate_schema = z.object({
 	kind: z.literal(KIND.GATE),
@@ -73,6 +76,9 @@ const gate_schema = z.object({
 	// Each check's own duration and verdict, so `josh lane:stats` can name the check a slow gate waited
 	// on. A reused check started no process: its row says so, and its zero is no timing.
 	checks: z.array(check_schema).optional(),
+	// A gate that reused a green record for this tree and base and started no check: counted, never
+	// timed (joshuafolkken/kit#4397).
+	is_reused: z.boolean().optional(),
 })
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still

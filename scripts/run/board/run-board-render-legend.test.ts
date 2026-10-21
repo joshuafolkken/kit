@@ -183,6 +183,14 @@ describe('run_board_render_legend.legend_of run:solo icons', () => {
 		expect(legend_of([solo, behind])).toStrictEqual(['🧍 runs alone  🙅 behind solo'])
 	})
 
+	// joshuafolkken/kit#4391: 🔒, a row a running run:solo issue holds.
+	it('names 🔒 only where a row leads with it', () => {
+		const held = row(1, { reason: { icon: WAIT_ICONS.solo_running, issues: ['4374'] } })
+
+		expect(legend_of([held])).toStrictEqual(['🔒 solo running'])
+		expect(legend_of([row(1)]).join('\n')).not.toContain(WAIT_ICONS.solo_running)
+	})
+
 	it('names neither where no row leads with them', () => {
 		expect(legend_of([row(1, { reason: { icon: WAIT_ICONS.lane } })])).toStrictEqual([
 			'🧵 free lane',

@@ -6,6 +6,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
 import { gate_ledger } from './gate-ledger'
+import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
 import { machine_capacity } from './machine-capacity'
 
@@ -116,6 +117,23 @@ describe('run_verification_gate — the lane ledger', () => {
 		await run_into(undefined, PASS)
 
 		expect(record_gate).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4397: a gate that reused its green record still leaves a line, marked reused.
+describe('run_verification_gate — a reused gate', () => {
+	it('records a reused gate as reused, running no check', async () => {
+		const ledger_path = path.join(scratch, 'gate-reused.jsonl')
+
+		vi.spyOn(gate_skip, 'reusable_green_gate').mockReturnValueOnce({
+			taken_at: new Date().toISOString(),
+			files: {},
+		})
+		// Every check would fail, so a passing gate is one that ran none.
+		await expect(run_into(ledger_path, FAIL)).resolves.toBe(PASS)
+		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
+			{ kind: 'gate', is_passed: true, is_reused: true },
+		])
 	})
 })
 

@@ -4,9 +4,11 @@ import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import type { ProcessOwner } from '#scripts/josh/process-owner'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { related_scope } from '#scripts/test/test-related-scope'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
 import { gate_ledger } from './gate-ledger'
+import { gate_plan } from './gate-plan'
 import { machine_capacity } from './machine-capacity'
 
 // joshuafolkken/kit#3501: a gate records the load it ran beside, read where none of its own checks
@@ -136,6 +138,50 @@ describe('gate_ledger — each check CPU', () => {
 			},
 			{ label: 'check', elapsed_ms: 5, is_passed: true, is_reused: false },
 		])
+	})
+})
+
+// joshuafolkken/kit#4397: a whole-gate reuse and the unit leg's full-suite fallback both reach the ledger.
+describe('gate_ledger — the reuses and the fallbacks', () => {
+	it('records the reason kind the unit leg fell back to the whole suite for', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'fallback.jsonl')
+		const scope = { mode: 'all' as const, files: [], reason: related_scope.UNREADABLE_REASON }
+		const output = related_scope.describe_scope(scope, scratch)
+		const unit = {
+			label: gate_plan.UNIT_LABEL,
+			command: 'josh test:related',
+			exit_code: 0,
+			output,
+			elapsed_ms: 9,
+		}
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [unit], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry?.kind === 'gate' ? entry.checks : undefined).toMatchObject([
+			{ label: gate_plan.UNIT_LABEL, fallback: 'unreadable' },
+		])
+	})
+
+	it('records a reused whole gate as a passed, reused line with no checks', async () => {
+		const ledger_path = path.join(scratch, 'reused.jsonl')
+
+		await gate_ledger.record_reused(ledger_path, OUTCOME.elapsed_ms)
+
+		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
+			{ kind: 'gate', elapsed_ms: OUTCOME.elapsed_ms, is_passed: true, is_reused: true },
+		])
+	})
+
+	it('writes no reused line when no ledger was resolved', async () => {
+		const record_gate = vi.spyOn(lane_ledger, 'record_gate')
+
+		await gate_ledger.record_reused(undefined, OUTCOME.elapsed_ms)
+
+		expect(record_gate).not.toHaveBeenCalled()
 	})
 })
 

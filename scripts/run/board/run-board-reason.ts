@@ -1,8 +1,9 @@
 import { backlog_drive_named } from '#scripts/backlog/backlog-drive-named'
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { epic_solo, type SoloQueue } from '#scripts/epic/epic-solo'
+import { epic_solo, type Labelled, type SoloQueue } from '#scripts/epic/epic-solo'
 import { epic_triage } from '#scripts/epic/epic-triage'
+import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -20,11 +21,11 @@ import type { ItemStatus } from './run-board-status'
 // what follows the title. A row whose lane is being opened leads with the stage that lane is at; any
 // other with what `backlog:next` would answer for it, read off the same rules — after the row a
 // planning run is for, which says so (`run-board-planning.ts`): the driver's declared order for a named
-// run's issue, `epic_triage` for an untriaged issue, `epic_solo` for a `run:solo` issue and the rows
-// behind it, `backlog_overlap` for a declared path a running issue holds, the lane limit for a full
-// pool. A start time the body declares and the clock has not
-// reached (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers the
-// row until then; it reads in the local time every other time on the board does (#4017). A blocker
+// run's issue, `epic_triage` for an untriaged issue, `epic_solo` for a running `run:solo` issue, a
+// waiting one and the rows behind it, `backlog_overlap` for a declared path a running issue holds,
+// the lane limit for a full pool. A start time the body declares and the clock has not reached
+// (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers the row
+// until then; it reads in the local time every other time on the board does (#4017). A blocker
 // leads its row with `🔗`; a row that nobody has judged leads with ❓ even where it is blocked, since
 // judging it is what a person can do meanwhile.
 
@@ -70,6 +71,8 @@ interface Pool {
 	planning: Planning | undefined
 	// The first `run:solo` candidate and the candidates behind it (`epic-solo.ts`), if any.
 	solo: SoloQueue | undefined
+	// The running `run:solo` issue that lets nothing new start (`epic_solo.holder_of`), if any.
+	solo_holder: number | undefined
 }
 
 function stage_icon(text: string): string | undefined {
@@ -110,6 +113,14 @@ function is_candidate(child: EpicChild, read: ReasonRead): boolean {
 	)
 }
 
+// Every open issue holding a lane as `backlog:next` reads it (`epic-busy.ts`): `in-progress` and no
+// park label — a paused lane, or one another run or a person works, holds as this run's lanes do.
+function running_labelled(read: ReasonRead): Array<Labelled> {
+	return [...read.plan.labels]
+		.filter(([, labels]) => has_label_name(labels, IN_PROGRESS_LABEL) && !has_parked_label(labels))
+		.map(([number, labels]) => ({ number, labels }))
+}
+
 function pool_of(read: ReasonRead): Pool {
 	const waiting = run_board_layout.waiting_children(read)
 	const running = running_of(read)
@@ -121,6 +132,7 @@ function pool_of(read: ReasonRead): Pool {
 		withheld: read.plan.withheld ?? new Set(),
 		planning: run_board_planning.planning_of(read, running),
 		solo: epic_solo.queue_of(candidates),
+		solo_holder: epic_solo.holder_of(running_labelled(read)),
 	}
 }
 
@@ -201,6 +213,13 @@ function held_of(pool: Pool): RowReason | undefined {
 	return { icon: WAIT_ICONS.held, issues: [String(pool.held_by)] }
 }
 
+// `🔒 4374`: the running `run:solo` issue nothing new starts beside until it merges or is parked.
+function held_solo_of(pool: Pool): RowReason | undefined {
+	if (pool.solo_holder === undefined) return undefined
+
+	return { icon: WAIT_ICONS.solo_running, issues: [String(pool.solo_holder)] }
+}
+
 // `🧍 4288+1 … 4268`: a `run:solo` issue starts only into an idle repository, so it names the running
 // lanes it waits for — the first in the condition column, the rest after the title.
 function alone_of(running: ReadonlyArray<number>): RowReason | undefined {
@@ -218,14 +237,21 @@ function solo_of(child: EpicChild, pool: Pool): RowReason | undefined {
 	return is_behind ? { icon: WAIT_ICONS.solo_ahead, issues: [String(solo.solo.number)] } : undefined
 }
 
+// The `run:solo` gate as `epic_solo.select` reads it: a running `run:solo` issue first, then a waiting
+// one's wait.
+function solo_wait(child: EpicChild, pool: Pool): RowReason | undefined {
+	return held_solo_of(pool) ?? solo_of(child, pool)
+}
+
 // A candidate nothing blocks, in the order the driver answers: the declared order, then what
-// `backlog:next` answers — the pool held for a judgment, then a `run:solo` issue's wait, then a path a
-// running issue declares, then a pool with no lane left, then a machine with no memory.
+// `backlog:next` answers — the pool held for a judgment, then a running `run:solo` issue, then a
+// waiting `run:solo` issue's wait, then a path a running issue declares, then a pool with no lane
+// left, then a machine with no memory.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	return (
 		named_of(child, read, pool) ??
 		held_of(pool) ??
-		solo_of(child, pool) ??
+		solo_wait(child, pool) ??
 		overlap_of(child, read, pool) ??
 		room_wait(read)
 	)

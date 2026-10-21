@@ -246,8 +246,12 @@ function lane_cell(
 	return cell(median(minutes))
 }
 
+// A reused gate ran no check, so its few milliseconds would pull the median toward a gate that never ran.
 function gate_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
-	const minutes = entries.filter(is_gate).map((entry) => entry.elapsed_ms / MS_PER_MINUTE)
+	const minutes = entries
+		.filter(is_gate)
+		.filter((entry) => entry.is_reused !== true)
+		.map((entry) => entry.elapsed_ms / MS_PER_MINUTE)
 
 	return [cell(median(minutes)), cell(peak(minutes))]
 }
