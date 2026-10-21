@@ -3,18 +3,24 @@ import {
 	CSPELL_CACHE_FLAGS,
 	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
 	ESLINT_COMMIT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
-vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run: vi.fn() } }))
+vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('#scripts/lint/cross-file-recheck', () => ({
+	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
+}))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 const { eslint_daemon } = await import('#scripts/lint/eslint-daemon')
-const mocked_daemon_run = vi.mocked(eslint_daemon.run)
+const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
+const { cross_file_recheck } = await import('#scripts/lint/cross-file-recheck')
+const mocked_verify = vi.mocked(cross_file_recheck.verify)
 const { pre_commit_lint } = await import('./pre-commit-lint')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -98,30 +104,59 @@ describe('pre_commit_lint.run', () => {
 	})
 })
 
-// joshuafolkken/kit#4358: the warm daemon answers in place of a cold eslint, inside the same
-// reservation, and the cold route stays for a daemon that cannot answer.
-describe('pre_commit_lint.run — the warm eslint daemon', () => {
-	it('lints through the warm daemon inside the eslint reservation', async () => {
+const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }
+const ERROR_RULE = { ruleId: 'a-rule', severity: 2 } as const
+const WARNING_RULE = { ruleId: 'a-rule', severity: 1 } as const
+
+// joshuafolkken/kit#4358: eslint runs warm or cold through `eslint_daemon.run_or_cold`, inside the
+// eslint reservation.
+describe('pre_commit_lint.run — eslint', () => {
+	it('lints the staged files through the daemon route inside the eslint reservation', async () => {
 		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
 
 		reservation.mockImplementation(async (_weight, work) => await work())
-		mocked_daemon_run.mockResolvedValueOnce({ exit_code: 1, stdout: 'x', output: 'x' })
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
-		expect(mocked_daemon_run).toHaveBeenCalledWith(built('eslint'), {
-			project_root: process.cwd(),
-		})
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'))
 		expect(mocked_execa).not.toHaveBeenCalled()
 		expect(reservation).toHaveBeenCalledOnce()
 		reservation.mockRestore()
 	})
 
-	it('falls back to the cold eslint when the daemon cannot answer', async () => {
-		mocked_daemon_run.mockResolvedValueOnce(undefined)
-		mocked_execa.mockResolvedValueOnce({ exitCode: 0 } as unknown as ExecaResult)
+	it('fails a run that ended without an exit code', async () => {
+		mocked_run_or_cold.mockResolvedValueOnce({ ...STALE_RED, exit_code: undefined })
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4407: a merge can change only what a staged file imports, and the hook's content
+// cache keeps the staged file's red. The report is re-read before it is printed.
+describe('pre_commit_lint.run — the re-read eslint report', () => {
+	it('prints and answers with the re-read report rather than the cached one', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
+		mocked_verify.mockResolvedValueOnce({ output: 'fresh', exit_code: 0, elapsed_ms: 0 })
 
 		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(0)
-		expect(mocked_execa).toHaveBeenCalledWith('pnpm', built('eslint'), expect.anything())
+		expect(mocked_verify).toHaveBeenCalledWith(STALE_RED, expect.anything())
+		expect(write).toHaveBeenCalledWith('fresh')
+	})
+
+	it('re-reads the staged files against the hook cache, error rules only as --quiet', () => {
+		const options = pre_commit_lint.recheck_options(STAGED)
+		const rule_filter = options.eslint_options?.ruleFilter
+
+		expect(options).toMatchObject({
+			cache_file: ESLINT_COMMIT_CACHE_FILE,
+			patterns: STAGED,
+			errors_only: true,
+		})
+		expect(rule_filter?.(ERROR_RULE)).toBe(true)
+		expect(rule_filter?.(WARNING_RULE)).toBe(false)
 	})
 })

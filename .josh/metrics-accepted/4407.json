@@ -1,0 +1,7 @@
+{
+	"reason": "Re-read the pre-commit eslint report when a staged file's imports change, plus review-round fixes: the --quiet error-only filter and its regression case (#4407)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 35
+	}
+}

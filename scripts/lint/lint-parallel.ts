@@ -49,17 +49,9 @@ const COLD_RUN: LintRunOptions = { warm_daemon: false }
 
 // The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
 async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessResult> {
-	const started_at = performance.now()
-	const outcome = eslint.warm_daemon
-		? await eslint_daemon.run(eslint.args, { project_root: process.cwd() })
-		: undefined
-	if (outcome === undefined) return await buffered_process.run_buffered_process(eslint.args)
+	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
 
-	return {
-		output: outcome.output,
-		exit_code: outcome.exit_code,
-		elapsed_ms: performance.now() - started_at,
-	}
+	return await buffered_process.run_buffered_process(eslint.args)
 }
 
 // The finished report is re-read before it is returned, inside the lane's cache sharing, because

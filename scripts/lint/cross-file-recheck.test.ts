@@ -75,6 +75,10 @@ const WITH_EXPORT = `${WITHOUT_EXPORT}\nexport const DELTA = 2\n`
 const OWN_FILE_RULE = 'no-debugger'
 const OWN_FILE_RED = 'c.ts'
 const OWN_FILE_RED_SOURCE = 'debugger\n\nexport const GAMMA = 1\n'
+// A file no configuration matches: named, it draws a warning that carries no rule.
+const UNMATCHED_FILE = 'notes.txt'
+// eslint's default suppressions file, which its CLI applies whenever it exists.
+const SUPPRESSIONS_FILE = 'eslint-suppressions.json'
 
 // What the cached whole-tree run hands over: a failed report that names the rule.
 const CACHED_RED: BufferedProcessResult = { output: NO_CYCLE_RULE, exit_code: 1, elapsed_ms: 0 }
@@ -112,6 +116,37 @@ describe('cross_file_recheck.verify — a cycle that is there', () => {
 
 		expect(verified.exit_code).toBe(1)
 		expect(verified.output).toContain(UNTOUCHED_SIDE)
+	})
+
+	// joshuafolkken/kit#4407: the pre-commit hook's `--quiet` run hides a warning with no rule, such as
+	// the notice for a named file no configuration matches.
+	it('keeps the error results alone when asked as a `--quiet` run', async () => {
+		writeFileSync(path.join(root, UNMATCHED_FILE), 'notes\n')
+		const named = { ...options, patterns: [UNTOUCHED_SIDE, UNMATCHED_FILE] }
+
+		const loud = await cross_file_recheck.verify(CACHED_RED, named)
+		const quiet = await cross_file_recheck.verify(CACHED_RED, { ...named, errors_only: true })
+
+		expect(loud.output).toContain(UNMATCHED_FILE)
+		expect(quiet.output).toContain(NO_CYCLE_RULE)
+		expect(quiet.output).not.toContain(UNMATCHED_FILE)
+		expect(quiet.exit_code).toBe(1)
+	})
+
+	// joshuafolkken/kit#4407: the CLI run applies the suppressions file, so the re-read report does too.
+	it('keeps out a violation the suppressions file holds, as the CLI run does', async () => {
+		const suppressions = path.join(root, SUPPRESSIONS_FILE)
+
+		writeFileSync(
+			suppressions,
+			JSON.stringify({ [UNTOUCHED_SIDE]: { [NO_CYCLE_RULE]: { count: 1 } } }),
+		)
+		const verified = await cross_file_recheck.verify(CACHED_RED, options)
+
+		rmSync(suppressions)
+		expect(verified.exit_code).toBe(1)
+		expect(verified.output).toContain(path.join(root, EDITED_SIDE))
+		expect(verified.output).not.toContain(path.join(root, UNTOUCHED_SIDE))
 	})
 })
 

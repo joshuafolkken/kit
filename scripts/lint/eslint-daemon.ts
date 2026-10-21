@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_package_bin } from '#scripts/build/local-bin'
-import { buffered_process } from '#scripts/lib/buffered-process'
+import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
 
 // One warm eslint per checkout, reached by every eslint run that is not the gate's whole tree: the
@@ -179,6 +179,21 @@ async function run(
 	return is_start_failure(outcome) ? undefined : outcome
 }
 
+// The warm run from the current directory, read as a buffered child's result, or the cold
+// `pnpm exec eslint` when the daemon cannot answer — the one fallback `josh lint:related` and the
+// pre-commit hook both take before their report is re-read (`cross-file-recheck.ts`).
+async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<BufferedProcessResult> {
+	const started_at = performance.now()
+	const outcome = await run(pnpm_arguments, { project_root: process.cwd() })
+	if (outcome === undefined) return await buffered_process.run_buffered_process(pnpm_arguments)
+
+	return {
+		output: outcome.output,
+		exit_code: outcome.exit_code,
+		elapsed_ms: performance.now() - started_at,
+	}
+}
+
 const eslint_daemon = {
 	eslint_arguments_of,
 	is_config_input,
@@ -186,6 +201,7 @@ const eslint_daemon = {
 	newest_config_mtime,
 	resolve_daemon_cli,
 	run,
+	run_or_cold,
 	ESLINT_DAEMON,
 }
 
