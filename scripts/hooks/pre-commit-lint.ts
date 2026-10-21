@@ -3,10 +3,13 @@ import { fileURLToPath } from 'node:url'
 import { core_budget } from '#scripts/gate/core-budget'
 import {
 	CSPELL_COMMIT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
 	ESLINT_COMMIT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
+import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
+import { cross_file_recheck, type CrossFileRecheckOptions } from '#scripts/lint/cross-file-recheck'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { execa } from 'execa'
 
@@ -22,6 +25,9 @@ import { execa } from 'execa'
 const ARGV_OFFSET = 2
 const USAGE_ERROR_EXIT_CODE = 2
 const PNPM = 'pnpm'
+const ESLINT = 'eslint'
+// eslint's numeric "error" severity, the one rule severity `--quiet` keeps.
+const ERROR_SEVERITY = 2
 
 const TOOL_ARGUMENTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	cspell: [
@@ -59,34 +65,58 @@ function build_arguments(
 	return [...tool_arguments, ...staged_files]
 }
 
+// `--quiet` runs only the rules set to "error"; the Node API spells that as a rule filter, so the
+// re-reading asks the question the hook's run asked.
+function is_error_rule(rule: { severity: number }): boolean {
+	return rule.severity === ERROR_SEVERITY
+}
+
+// What re-reading a cached cross-file report (`cross-file-recheck.ts`) needs to ask the hook's run
+// again: the hook's own cache file and the staged files (joshuafolkken/kit#4407).
+function recheck_options(staged_files: ReadonlyArray<string>): CrossFileRecheckOptions {
+	return {
+		cache_file: ESLINT_COMMIT_CACHE_FILE,
+		patterns: staged_files,
+		errors_only: true,
+		eslint_options: { ruleFilter: is_error_rule },
+	}
+}
+
 // eslint goes through the lane's warm daemon when one is reachable (joshuafolkken/kit#4358): the same
 // argument list and the same cache file, without paying the config and plugin load per commit. It
 // runs inside the tool's core-budget reservation like the cold route does.
-async function run_through_daemon(
+//
+// Its red report is re-read before it is printed (joshuafolkken/kit#4407): a merge or checkout can
+// change only the files a staged file imports, and the content cache keeps the staged file's verdict.
+async function run_eslint(
 	command_arguments: ReadonlyArray<string>,
-): Promise<number | undefined> {
-	const outcome = await eslint_daemon.run(command_arguments, { project_root: process.cwd() })
-	if (outcome === undefined) return undefined
-	if (outcome.output !== '') process.stdout.write(`${outcome.output}\n`)
+	staged_files: ReadonlyArray<string>,
+): Promise<number> {
+	const result = await eslint_daemon.run_or_cold(command_arguments)
+	const verified = await cross_file_recheck.verify(result, recheck_options(staged_files))
+	if (verified.output !== '') process.stdout.write(verified.output)
 
-	return outcome.exit_code
+	return verified.exit_code ?? FAIL_EXIT_CODE
 }
 
 async function run_tool(command_arguments: ReadonlyArray<string>): Promise<number> {
-	const warm_exit_code = await run_through_daemon(command_arguments)
-	if (warm_exit_code !== undefined) return warm_exit_code
-
 	const result = await execa(PNPM, command_arguments, { stdio: 'inherit', reject: false })
 
 	return resolve_spawn_exit(PNPM, result)
 }
 
+async function run_reserved(tool: string, staged_files: ReadonlyArray<string>): Promise<number> {
+	const command_arguments = build_arguments(tool, staged_files) ?? []
+	if (tool === ESLINT) return await run_eslint(command_arguments, staged_files)
+
+	return await run_tool(command_arguments)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [tool = '', ...staged_files] = argv
-	const command_arguments = build_arguments(tool, staged_files)
 	const budget = TOOL_BUDGETS[tool]
 
-	if (command_arguments === undefined || budget === undefined) {
+	if (budget === undefined) {
 		console.error(USAGE)
 
 		return USAGE_ERROR_EXIT_CODE
@@ -94,7 +124,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	return await core_budget.with_command_reservation(
 		core_budget.CORE_WEIGHTS[budget],
-		async () => await run_tool(command_arguments),
+		async () => await run_reserved(tool, staged_files),
 		{ memory_mb: core_budget.MEMORY_MB[budget], command: `pre-commit ${tool}` },
 	)
 }
@@ -103,6 +133,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
 }
 
-const pre_commit_lint = { build_arguments, run, USAGE_ERROR_EXIT_CODE }
+const pre_commit_lint = { build_arguments, recheck_options, run, USAGE_ERROR_EXIT_CODE }
 
 export { pre_commit_lint }

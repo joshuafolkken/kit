@@ -18,11 +18,11 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 vi.mock('./cross-file-recheck', () => ({
 	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
 }))
-vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run: vi.fn() } }))
+vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
 
 const { cross_file_recheck } = await import('./cross-file-recheck')
 const { eslint_daemon } = await import('./eslint-daemon')
-const mocked_daemon_run = vi.mocked(eslint_daemon.run)
+const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
 const mocked_verify = vi.mocked(cross_file_recheck.verify)
 const { lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
@@ -157,8 +157,8 @@ describe('run_lint_checks', () => {
 	})
 })
 
-// joshuafolkken/kit#4358: only a run that asks for it reaches the warm daemon, and a daemon that
-// cannot answer falls back to the cold process.
+// joshuafolkken/kit#4358: only a run that asks for it reaches the warm daemon; the fallback to the
+// cold process is `eslint_daemon.run_or_cold`'s own.
 describe('run_lint_checks — the warm eslint daemon', () => {
 	const ESLINT = ['exec', 'eslint', TARGET]
 	const PRETTIER = ['exec', 'prettier', TARGET]
@@ -166,20 +166,12 @@ describe('run_lint_checks — the warm eslint daemon', () => {
 
 	it('lints through the daemon when asked, spawning only prettier', async () => {
 		mocked_execa.mockResolvedValueOnce(fake_result(0))
-		mocked_daemon_run.mockResolvedValueOnce({ exit_code: 1, stdout: 'x', output: 'x' })
+		mocked_run_or_cold.mockResolvedValueOnce({ exit_code: 1, output: 'x', elapsed_ms: 0 })
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await run_lint_checks(PRETTIER, ESLINT, RECHECK, WARM)).toBe(1)
-		expect(mocked_daemon_run).toHaveBeenCalledWith(ESLINT, { project_root: process.cwd() })
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT)
 		expect(mocked_execa).toHaveBeenCalledOnce()
-	})
-
-	it('falls back to the cold eslint process when the daemon cannot answer', async () => {
-		mock_exit_codes(0, 0)
-		mocked_daemon_run.mockResolvedValueOnce(undefined)
-
-		expect(await run_lint_checks(PRETTIER, ESLINT, RECHECK, WARM)).toBe(0)
-		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(ESLINT)
 	})
 
 	it('never reaches the daemon unless asked', async () => {
@@ -188,7 +180,7 @@ describe('run_lint_checks — the warm eslint daemon', () => {
 		await run_lint_checks(PRETTIER, ESLINT, RECHECK)
 		await run_lint_parallel_checks()
 
-		expect(mocked_daemon_run).not.toHaveBeenCalled()
+		expect(mocked_run_or_cold).not.toHaveBeenCalled()
 	})
 })
 

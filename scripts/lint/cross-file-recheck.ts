@@ -17,7 +17,8 @@ import type { ESLint } from 'eslint'
 // whose rules a hand-authored `.js` file keeps — as `import-x`.
 //
 // Only a stale red is re-read. A stale green — the other file broke, the untouched one still
-// answers clean — is not something a report can point at; the type check is what catches it.
+// answers clean — is not something a report can point at, and the type check does not report the
+// `no-unsafe-*` rules; invalidating it is joshuafolkken/kit#4415.
 //
 // That holds for a run narrowed to one change's files as much as for the whole tree: the change can
 // hold both files, and the one a later edit leaves alone keeps its cached report.
@@ -31,9 +32,12 @@ const UNCACHED_SUFFIX = '.uncached'
 
 type RulesMeta = ESLint.LintResultData['rulesMeta']
 
+type LintResults = Array<ESLint.LintResult>
+
 interface Linters {
 	cached: ESLint
 	fresh: ESLint
+	error_results: (results: LintResults) => LintResults
 }
 
 interface CrossFileRecheckOptions {
@@ -41,6 +45,8 @@ interface CrossFileRecheckOptions {
 	// What the run linted — the whole tree, or one change's files — so the cached run is asked the
 	// question it was asked the first time.
 	patterns: ReadonlyArray<string>
+	// A `--quiet` run prints its error results only, so the re-read report keeps those alone.
+	errors_only?: boolean
 	// What the fixture test varies: the directory linted and the configuration it is linted with.
 	eslint_options?: ESLint.Options
 }
@@ -77,9 +83,12 @@ function suspects_of(linter: ESLint, cached: Array<ESLint.LintResult>): Array<st
 		.map((result) => result.filePath)
 }
 
+// The CLI applies `eslint-suppressions.json` whenever it exists and the Node API only when asked, so
+// both linters ask: a re-read report otherwise brings back every violation the project suppressed.
 function cached_options(options: CrossFileRecheckOptions): ESLint.Options {
 	return {
 		...options.eslint_options,
+		applySuppressions: true,
 		cache: true,
 		cacheStrategy: 'content',
 		cacheLocation: options.cache_file,
@@ -92,6 +101,7 @@ function cached_options(options: CrossFileRecheckOptions): ESLint.Options {
 function fresh_options(options: CrossFileRecheckOptions): ESLint.Options {
 	return {
 		...options.eslint_options,
+		applySuppressions: true,
 		cache: false,
 		cacheLocation: `${options.cache_file}${UNCACHED_SUFFIX}`,
 	}
@@ -106,6 +116,7 @@ async function create_linters(options: CrossFileRecheckOptions): Promise<Linters
 	return {
 		cached: new eslint.ESLint(cached_options(options)),
 		fresh: new eslint.ESLint(fresh_options(options)),
+		error_results: (results) => eslint.ESLint.getErrorResults(results),
 	}
 }
 
@@ -116,6 +127,17 @@ async function lint_fresh(
 	const fresh = await linter.lintFiles(suspects)
 
 	return new Map(fresh.map((result) => [result.filePath, result]))
+}
+
+function merged_results(
+	linters: Linters,
+	cached: LintResults,
+	fresh: Map<string, ESLint.LintResult>,
+	options: CrossFileRecheckOptions,
+): LintResults {
+	const merged = cached.map((entry) => fresh.get(entry.filePath) ?? entry)
+
+	return options.errors_only === true ? linters.error_results(merged) : merged
 }
 
 async function report(
@@ -141,10 +163,7 @@ async function verify(
 	const suspects = suspects_of(linters.cached, cached)
 	if (suspects.length === 0) return result
 	const fresh = await lint_fresh(linters.fresh, suspects)
-	const verified = await report(
-		linters.fresh,
-		cached.map((entry) => fresh.get(entry.filePath) ?? entry),
-	)
+	const verified = await report(linters.fresh, merged_results(linters, cached, fresh, options))
 
 	return { ...verified, elapsed_ms: result.elapsed_ms + performance.now() - started_at }
 }

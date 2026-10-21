@@ -194,3 +194,24 @@ describe('eslint_daemon.run — nothing to reach', () => {
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#4358: the one fallback `josh lint:related` and the pre-commit hook share.
+describe('eslint_daemon.run_or_cold', () => {
+	it('answers with the daemon report when the daemon answers', async () => {
+		mocked_execa.mockResolvedValueOnce(answer(1, 'report'))
+
+		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({
+			exit_code: 1,
+			output: 'report',
+		})
+		expect(mocked_execa).toHaveBeenCalledOnce()
+	})
+
+	it('runs the cold pnpm eslint when the daemon cannot answer', async () => {
+		mocked_resolve.mockReturnValue(undefined)
+		mocked_execa.mockResolvedValueOnce(answer(0, 'cold'))
+
+		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({ exit_code: 0 })
+		expect(mocked_execa).toHaveBeenCalledExactlyOnceWith('pnpm', PNPM_ESLINT, expect.anything())
+	})
+})

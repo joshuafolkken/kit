@@ -254,7 +254,8 @@ export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // them per target: the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache
 // stays private; the scoped lint cache is exported because #2060 shares its completed file between
-// worktrees, but it still never overlaps the gate's distinct cache location.
+// worktrees, but it still never overlaps the gate's distinct cache location. The pre-commit hook's
+// eslint cache is exported because the hook re-reads a red report against it (#4407).
 export {
 	COMMAND_AUDIENCES,
 	COMMAND_SIDE_EFFECTS,
@@ -263,6 +264,7 @@ export {
 	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
 	ESLINT_COMMIT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,
