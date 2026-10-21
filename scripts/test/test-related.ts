@@ -6,7 +6,6 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { test_declared_logic } from './test-declared-logic'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
@@ -89,32 +88,24 @@ async function explicit_change(
 	return { changed: [...new Set([...explicit, ...since])], map }
 }
 
-// **A moved non-code file is never narrowed by**: it reaches tests through the map alone, and a
-// branch source that started reading it after the map's tree is in no entry, so an untouched test
-// reading it through that source would be missed. The whole branch change runs it.
-function is_map_read(moved: ReadonlyArray<string>): boolean {
-	return moved.some((file) => !related_scope.is_relatable(file))
-}
-
-// **What moved since this command's last green run, plus the branch's own test files**
-// (`since-green.ts`). A branch test is in no map entry for a file it started reading on the branch, so
-// a file it reads that moved since would otherwise reach no test; listing it runs it, as the change
-// since the map does. Nothing moved runs nothing; `undefined` reads the whole branch change instead.
+// **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
+// are. A moved file — code or not — reaches the tests reading it as data through the map, whose
+// entries hold no module that started reading it after the map's tree; the change since that tree
+// joins the list, so such a module runs the tests importing it. Nothing moved runs nothing; no map,
+// or one git can no longer diff against, answers `undefined`, which reads the whole branch change.
 async function since_green_change(map: ReadMap | undefined): Promise<ChangeReading | undefined> {
 	const moved = await since_green.read_moved(review_stamps.test_related_stamp)
 
-	if (moved === undefined || is_map_read(moved)) return undefined
+	if (moved === undefined) return undefined
 	if (moved.length === 0) return { changed: [], map, is_unmoved: true }
 
-	const branch = await branch_change()
+	const change = await explicit_change(moved, map)
 
-	if (branch === undefined) return undefined
+	if (change.map === undefined) return undefined
 
 	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
 
-	const tests = branch.filter((file) => test_declared_logic.is_test_file(file))
-
-	return { changed: [...new Set([...moved, ...tests])], map }
+	return change
 }
 
 async function whole_change(map: ReadMap | undefined): Promise<ChangeReading> {

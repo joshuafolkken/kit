@@ -66,13 +66,6 @@ async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<
 	return byte_check_exit_code(scope, root)
 }
 
-// The narrowing line is printed before either child starts, so a scoped run is never read as a
-// whole one, and a fallback says which of the two it was rather than looking like a narrow run
-// that found nothing.
-//
-// **A green run leaves a record of the tree it was green on**, so
-// `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
-// and the three states in which it is withheld, are `scoped-green.ts`.
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), while a lintable file
 // is among it; otherwise the whole branch change, as before.
 async function since_green_scope(root: string): Promise<ChangedFileScope | undefined> {
@@ -105,6 +98,13 @@ async function resolve_lint_scope(
 	})
 }
 
+// The narrowing line is printed before either child starts, so a scoped run is never read as a
+// whole one, and a fallback says which of the two it was rather than looking like a narrow run
+// that found nothing.
+//
+// **A green run leaves a record of the tree it was green on**, so
+// `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
+// and the three states in which it is withheld, are `scoped-green.ts`.
 async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const scope = await resolve_lint_scope(command_arguments, root)

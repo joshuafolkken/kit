@@ -9,7 +9,7 @@ import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4393: a ship retry re-ran every test the whole branch diff reaches. A bare run now
-// reads only what moved since its last green run, plus the branch's own test files.
+// reads only what moved since its last green run, plus the change since the test-read map's tree.
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({
@@ -40,6 +40,20 @@ const FIXED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const UNTOUCHED_SOURCE = path.join('scripts', 'test', 'test-related-scope.ts')
 const BRANCH_TEST = path.join('scripts', 'test', 'test-related.test.ts')
 const NARROWING_LINE = 'since its last green run'
+const MAP_TREE = 'f00dcafe'
+const PRUNED_TREE = new Error('bad object')
+
+function map_with(
+	readers: Record<string, Array<string>>,
+): ReturnType<typeof test_read_map.read_map> {
+	return {
+		version: test_read_map.MAP_VERSION,
+		commit: MAP_TREE,
+		dirty: [],
+		directories: [],
+		readers,
+	}
+}
 
 function vitest_arguments(): ReadonlyArray<string> {
 	return mocked_run.mock.calls[0]?.[1] ?? []
@@ -49,15 +63,23 @@ function absolute(file: string): string {
 	return path.join(REPOSITORY_ROOT, file)
 }
 
+const WHOLE_BRANCH = [
+	'related',
+	absolute(FIXED_SOURCE),
+	absolute(UNTOUCHED_SOURCE),
+	absolute(BRANCH_TEST),
+	'--run',
+]
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
-	vi.mocked(changed_paths.read_changed_since).mockResolvedValue([])
+	vi.mocked(changed_paths.read_changed_since).mockResolvedValue([BRANCH_TEST])
 	vi.mocked(changed_paths.read_held_at).mockResolvedValue([])
 	vi.mocked(test_unit_guard.is_running).mockReturnValue(true)
 	vi.mocked(since_green.describe).mockReturnValue(NARROWING_LINE)
-	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
+	vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({}))
 	mocked_changed.mockResolvedValue([FIXED_SOURCE, UNTOUCHED_SOURCE, BRANCH_TEST])
 	mocked_run.mockResolvedValue(0)
 })
@@ -71,7 +93,7 @@ describe('test_related.run_related_tests — since the last green run', () => {
 		expect(mocked_moved).toHaveBeenCalledWith(review_stamps.test_related_stamp)
 	})
 
-	it('narrows to the moved files and the branch tests, leaving an untouched source out', async () => {
+	it('narrows to the moved files and the change since the map, leaving an untouched source out', async () => {
 		mocked_moved.mockResolvedValue([FIXED_SOURCE])
 
 		await test_related.run_related_tests([])
@@ -106,20 +128,34 @@ describe('test_related.run_related_tests — since the last green run', () => {
 
 describe('test_related.run_related_tests — reading the whole branch instead', () => {
 	it('reads the whole branch change when there is nothing to narrow by', async () => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(undefined)
 		mocked_moved.mockResolvedValue(undefined)
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual([
-			'related',
-			absolute(FIXED_SOURCE),
-			absolute(UNTOUCHED_SOURCE),
-			absolute(BRANCH_TEST),
-			'--run',
-		])
+		expect(vitest_arguments()).toEqual(WHOLE_BRANCH)
 	})
 
-	it('runs the whole suite when the branch change cannot be read', async () => {
+	it('reads the whole branch change when no test-read map covers the moved files', async () => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(undefined)
+		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(WHOLE_BRANCH)
+	})
+
+	it("reads the whole branch change when the map's tree can no longer be diffed", async () => {
+		vi.mocked(changed_paths.read_changed_since).mockRejectedValue(PRUNED_TREE)
+		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(WHOLE_BRANCH)
+	})
+
+	it('runs the whole suite when neither change can be read', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockRejectedValue(PRUNED_TREE)
 		mocked_moved.mockResolvedValue([FIXED_SOURCE])
 		mocked_changed.mockRejectedValue(new Error('not a git repository'))
 
@@ -135,24 +171,35 @@ describe('test_related.run_related_tests — reading the whole branch instead', 
 	})
 })
 
-// A branch source that started reading a document after the map's tree is in no map entry, so an
-// untouched test reading the document through that source is reached only by the source itself.
-describe('test_related.run_related_tests — a moved non-code file', () => {
+// A source that started reading a moved file as data after the map's tree is in no map entry, so an
+// untouched test reaching the file through that source is reached only by the source itself.
+describe('test_related.run_related_tests — a moved file read through a newer source', () => {
 	const document = 'docs/josh-commands.md'
+	const document_reader = path.join('scripts', 'test', 'test-related-scope.test.ts')
 
-	it('reads the whole branch change rather than the map readers alone', async () => {
-		vi.mocked(test_read_map.read_map).mockReturnValue({
-			version: test_read_map.MAP_VERSION,
-			commit: 'f00dcafe',
-			dirty: [],
-			directories: [],
-			readers: { [document]: [path.join('scripts', 'test', 'test-related-scope.test.ts')] },
-		})
+	it('runs the map readers of a moved non-code file and the source changed since the map', async () => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(map_with({ [document]: [document_reader] }))
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, document])
 		mocked_moved.mockResolvedValue([document])
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toContain(absolute(UNTOUCHED_SOURCE))
+		expect(vitest_arguments()).toEqual(
+			expect.arrayContaining([absolute(UNTOUCHED_SOURCE), absolute(document_reader)]),
+		)
+	})
+
+	it('runs the source changed since the map for a moved code file read as data', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE])
+		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			absolute(FIXED_SOURCE),
+			absolute(UNTOUCHED_SOURCE),
+			'--run',
+		])
 	})
 })
