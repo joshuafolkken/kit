@@ -185,6 +185,17 @@ describe('lane_stop_stats.table — the causes', () => {
 		expect(causes_of(entries, GATE)).toBe('infra 2, check 1')
 	})
 
+	// joshuafolkken/kit#4431: a review stop on no finding counts under its own cause.
+	it('counts a review stop on a refused attestation apart from its findings', () => {
+		const entries = [
+			{ ...stop(REVIEW, 30), cause: 'finding' },
+			{ ...stop(REVIEW, 20), cause: 'attest' },
+			{ ...stop(REVIEW, 10), cause: 'finding' },
+		]
+
+		expect(causes_of(entries, REVIEW)).toBe('finding 2, attest 1')
+	})
+
 	it('counts a stop recorded before it carried a cause as unrecorded', () => {
 		expect(causes_of([stop(REVIEW, 10)], REVIEW)).toBe('unrecorded 1')
 	})

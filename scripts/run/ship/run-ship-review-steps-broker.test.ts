@@ -92,10 +92,14 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 		expect(launch).not.toHaveBeenCalled()
 	})
 
+	// joshuafolkken/kit#4431: a reviewer the broker could not start is the infrastructure, no finding.
 	it('stops before attestation when the isolated reviewer is unavailable', async () => {
 		reviewer_on(OPENAI_REVIEWER_PROFILE)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject({
+			code: FAILED,
+			cause: 'infra',
+		})
 		expect(commands()).toStrictEqual([OPEN])
 		expect(launch).not.toHaveBeenCalled()
 	})

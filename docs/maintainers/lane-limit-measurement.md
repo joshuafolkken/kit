@@ -171,11 +171,17 @@ keeps about a week of a run's events, so a park older than that is gone and its 
 `not resumed`.
 
 The `causes` column counts each reason's stops by cause, most frequent first (`infra 2, check 1`):
-`finding`, `conflict`, `infra` (a rate limit, missing checks, a network failure) or `check`.
+`finding`, `conflict`, `infra` (a rate limit, missing checks, a network failure), `check`, `auth` (a
+reviewer that could not authenticate) or `attest` (a refused review attestation).
 
-Only `sync`, `commit`, `followup` and `report` can read as `infra`. `josh ship` re-runs such a
-stage up to twice, a minute apart, before it stops (`run-ship-infra-retry.ts`). A stop recorded
-before causes existed reads as `unrecorded`.
+Of the stages outside the review rounds, only `sync`, `commit`, `followup` and `report` can read as
+`infra`. `josh ship` re-runs such a stage up to twice, a minute apart, before it stops
+(`run-ship-infra-retry.ts`).
+
+A `review` or `round-2` stop is counted under the cause of the step
+that stopped it — `check` for a red scoped pair or join, `infra` for a reviewer that did not finish,
+`attest` for a refused attestation — and is never re-run in place; only a stop on a recorded finding
+is a `finding`. A stop recorded before causes existed reads as `unrecorded`.
 
 A `preflight` stop is counted under each precondition it found unmet instead (`run-ship-preflight.ts`),
 once under each when it found two:

@@ -18,52 +18,81 @@ describe('run_ship_stop_cause.cause_of', () => {
 		'fatal: unable to access: Could not resolve host: github.com',
 		'HTTP 502: Bad Gateway (https://api.github.com/graphql)',
 	])('reads a followup that stopped on %s as the infrastructure', (output) => {
-		expect(cause_of('followup', output)).toBe(CAUSE.INFRA)
+		expect(cause_of('followup', { body: output })).toBe(CAUSE.INFRA)
 	})
 
 	it.each(['sync', 'commit', 'report'] as const)(
 		'reads a %s stop for the infrastructure',
 		(stage) => {
-			expect(cause_of(stage, RATE_LIMITED)).toBe(CAUSE.INFRA)
+			expect(cause_of(stage, { body: RATE_LIMITED })).toBe(CAUSE.INFRA)
 		},
 	)
 })
 
 describe('run_ship_stop_cause.cause_of — every stop that is not the infrastructure', () => {
 	it('reads a followup on a red check as a check', () => {
-		expect(cause_of('followup', 'CI / test failed')).toBe(CAUSE.CHECK)
+		expect(cause_of('followup', { body: 'CI / test failed' })).toBe(CAUSE.CHECK)
 	})
 
 	it.each(['gate', 'preflight'] as const)(
 		'never reads a %s stop as the infrastructure, whatever its output names',
 		(stage) => {
-			expect(cause_of(stage, `✗ retries after a ${RATE_LIMITED}`)).toBe(CAUSE.CHECK)
+			expect(cause_of(stage, { body: `✗ retries after a ${RATE_LIMITED}` })).toBe(CAUSE.CHECK)
 		},
 	)
 
-	it.each(['review', 'round-2'] as const)('reads a %s stop as a finding', (stage) => {
-		expect(cause_of(stage, RATE_LIMITED)).toBe(CAUSE.FINDING)
+	it.each(['review', 'round-2'] as const)('reads an untagged %s stop as a finding', (stage) => {
+		expect(cause_of(stage, { body: RATE_LIMITED })).toBe(CAUSE.FINDING)
 	})
 
 	it.each([
 		`isolated reviewer failed: the broker answered a failure: ${api_auth.AUTH_FAILURE_NOTE}: the reviewer exited with code 1`,
 		`${api_auth.AUTH_FAILURE_NOTE}: reviewer failed — log: /tmp/review.log`,
 	])('reads a review stop on a reviewer that could not authenticate as auth', (output) => {
-		expect(cause_of('review', output)).toBe(CAUSE.AUTH)
+		expect(cause_of('review', { body: output })).toBe(CAUSE.AUTH)
 	})
 
 	it('keeps a finding that quotes the authentication note mid-line a finding', () => {
-		expect(cause_of('review', `High: the text ${api_auth.AUTH_FAILURE_NOTE} is wrong`)).toBe(
-			CAUSE.FINDING,
-		)
+		expect(
+			cause_of('review', { body: `High: the text ${api_auth.AUTH_FAILURE_NOTE} is wrong` }),
+		).toBe(CAUSE.FINDING)
 	})
 
 	it('reads a stop with conflicts as a conflict before the infrastructure', () => {
-		expect(cause_of('followup', RATE_LIMITED, ['src/a.ts'])).toBe(CAUSE.CONFLICT)
+		expect(cause_of('followup', { body: RATE_LIMITED, conflicts: ['src/a.ts'] })).toBe(
+			CAUSE.CONFLICT,
+		)
 	})
 
 	it('reads an empty conflict list as no conflict', () => {
-		expect(cause_of('sync', 'merge failed', [])).toBe(CAUSE.CHECK)
+		expect(cause_of('sync', { body: 'merge failed', conflicts: [] })).toBe(CAUSE.CHECK)
+	})
+})
+
+// joshuafolkken/kit#4431: a review round's stop on no finding is recorded under the cause its step tagged.
+describe('run_ship_stop_cause.cause_of — a review stop its step tagged', () => {
+	it.each([CAUSE.CHECK, CAUSE.INFRA, CAUSE.ATTEST])(
+		'reads a review stop tagged %s under that cause, not as a finding',
+		(cause) => {
+			expect(cause_of('review', { body: 'Gate RED', cause })).toBe(cause)
+			expect(cause_of('round-2', { body: 'Gate RED', cause })).toBe(cause)
+		},
+	)
+
+	it('reads a tagged stop on a reviewer that could not authenticate as auth', () => {
+		const body = `isolated reviewer failed: ${api_auth.AUTH_FAILURE_NOTE}`
+
+		expect(cause_of('review', { body, cause: CAUSE.INFRA })).toBe(CAUSE.AUTH)
+	})
+
+	it('ignores a tag on a stage that is no review round', () => {
+		expect(cause_of('gate', { body: 'red', cause: CAUSE.ATTEST })).toBe(CAUSE.CHECK)
+	})
+
+	it('records the tagged cause in the ledger record', () => {
+		expect(
+			run_ship_stop_cause.record_of(7, 'review', { body: 'refused', cause: CAUSE.ATTEST }),
+		).toStrictEqual({ issue: 7, reason: 'review', cause: CAUSE.ATTEST })
 	})
 })
 

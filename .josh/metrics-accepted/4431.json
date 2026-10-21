@@ -1,0 +1,7 @@
+{
+	"reason": "Review stops carry their own cause (check/infra/attest) through StepResult, ShipSection and ShipResume instead of all recording finding #4431",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}

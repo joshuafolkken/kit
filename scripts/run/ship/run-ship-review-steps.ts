@@ -12,6 +12,7 @@ import { review_round2 } from '#scripts/review/review-round2'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_scoped, type Phase } from './run-ship-scoped'
+import { run_ship_stop_cause, type Cause } from './run-ship-stop-cause'
 import type { StepResult } from './run-ship-sync'
 
 // The side effects of `josh ship --review`: the round-1 review — open, launch, join, attest and
@@ -64,8 +65,20 @@ const { run_phases, scoped_pair } = run_ship_scoped
 
 type PromptOf = (brief_path: string, findings_path: string, issue: string) => string
 
-function failure(out: string): JoshResult {
-	return { code: FAILURE_EXIT_CODE, out }
+const { CAUSE } = run_ship_stop_cause
+
+// **Every stop is tagged with the step's own cause**, so a round that stopped on a red join, a reviewer
+// that did not finish or a refused attestation is not booked as a finding (joshuafolkken/kit#4431).
+function failure(out: string, cause: Cause): StepResult {
+	return { code: FAILURE_EXIT_CODE, out, cause }
+}
+
+function tagged(cause: Cause, result: JoshResult): StepResult {
+	return result.code === SUCCESS_EXIT_CODE ? result : { ...result, cause }
+}
+
+function tagged_phase(cause: Cause, phase: Phase): Phase {
+	return async () => tagged(cause, await phase())
 }
 
 function paths(): { brief: string; findings: string; log: string } {
@@ -104,8 +117,11 @@ async function run_direct_session(
 	note(agent_role_profile.describe_review(Number(round), profile))
 	const result = await detached_launch.launch_attached(request, note)
 
-	if (result.kind === 'failed') return failure(`reviewer could not start: ${result.note}`)
-	if (result.exit_code !== SUCCESS_EXIT_CODE) return failure(exited_note(log_path))
+	if (result.kind === 'failed') {
+		return failure(`reviewer could not start: ${result.note}`, CAUSE.INFRA)
+	}
+
+	if (result.exit_code !== SUCCESS_EXIT_CODE) return failure(exited_note(log_path), CAUSE.INFRA)
 
 	return { code: SUCCESS_EXIT_CODE, out: '' }
 }
@@ -127,7 +143,10 @@ async function run_session(
 	round: Round,
 ): Promise<JoshResult> {
 	const built = agent_argv.review_in(prompt, Number(round), PROJECT_ROOT)
-	if (built.kind === 'rejected') return failure(`reviewer profile rejected: ${built.note}`)
+
+	if (built.kind === 'rejected') {
+		return failure(`reviewer profile rejected: ${built.note}`, CAUSE.INFRA)
+	}
 
 	if (!is_brokered(built.profile, issue)) {
 		return await run_direct_session(built.argv, built.profile, log_path, round)
@@ -137,7 +156,7 @@ async function run_session(
 
 	return answer.is_success
 		? { code: SUCCESS_EXIT_CODE, out: '' }
-		: failure(`isolated reviewer failed: ${answer.reason}`)
+		: failure(`isolated reviewer failed: ${answer.reason}`, CAUSE.INFRA)
 }
 
 // The brief goes to a file and the previous round's findings are removed, so a reviewer that writes
@@ -200,17 +219,23 @@ async function record_and_route(
 ): Promise<JoshResult> {
 	const verdict = current_verdict()
 
-	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note)
+	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note, CAUSE.INFRA)
 
 	const outcome = outcome_of(verdict)
 	const flags = record_flags(round, outcome)
 	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...verdict.specs])
 
-	if (recorded.code !== SUCCESS_EXIT_CODE) return recorded
+	if (recorded.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, recorded)
 
 	const out = [...verdict.report, outcome.note].join('\n')
 
-	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out)
+	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out, CAUSE.FINDING)
+}
+
+// A refused attestation — the issue changed after the brief, an update left unread, no attestation —
+// is no finding: the round read what it was briefed on.
+async function attest_phase(): Promise<StepResult> {
+	return tagged(CAUSE.ATTEST, await josh(ATTEST_CHECK))
 }
 
 // A brief-minting command, then a reviewer handed what it printed.
@@ -228,7 +253,7 @@ function reviewed(
 
 			opened.brief = result.out
 
-			return result
+			return tagged(CAUSE.CHECK, result)
 		},
 		async () => await launch_reviewer(opened.brief, prompt_of, issue, round),
 	]
@@ -267,10 +292,10 @@ async function review_stage(issue: string, is_stale = false): Promise<StepResult
 	if (!is_stale && recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
 
 	return await run_phases([
-		scoped_pair,
+		tagged_phase(CAUSE.CHECK, scoped_pair),
 		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, ROUND_ONE),
-		join_gate,
-		async () => await josh(ATTEST_CHECK),
+		tagged_phase(CAUSE.CHECK, join_gate),
+		attest_phase,
 		async () => await round_one_record(issue),
 	])
 }
@@ -284,11 +309,13 @@ async function review_stage(issue: string, is_stale = false): Promise<StepResult
 async function round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(ROUND_TWO_DECISION)
 
-	if (decision.code !== SUCCESS_EXIT_CODE) return decision
+	if (decision.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, decision)
 
 	const answer = review_round2.parse_json(decision.out)
 
-	if (answer === undefined) return failure(`${UNREADABLE_DECISION_NOTE}\n${decision.out}`)
+	if (answer === undefined) {
+		return failure(`${UNREADABLE_DECISION_NOTE}\n${decision.out}`, CAUSE.CHECK)
+	}
 
 	note(answer.reason)
 	await lane_ledger.record_round_two({
@@ -302,9 +329,9 @@ async function round_two_stage(issue: string): Promise<StepResult> {
 	}
 
 	return await run_phases([
-		scoped_pair,
+		tagged_phase(CAUSE.CHECK, scoped_pair),
 		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, ROUND_TWO),
-		async () => await josh(ATTEST_CHECK),
+		attest_phase,
 		async () => await record_and_route(issue, ROUND_TWO, run_ship_review.round_two_outcome),
 	])
 }
