@@ -112,6 +112,7 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 		is_reused: result.reused_at !== undefined,
 		...(result.cpu_ms !== undefined && { cpu_ms: Math.round(result.cpu_ms) }),
 		...unit_facts(result),
+		claim: result.claim,
 	}))
 }
 

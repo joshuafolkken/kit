@@ -34,6 +34,16 @@ interface GateStepResult extends BufferedProcessResult {
 	reused_at?: string | undefined
 	// The CPU milliseconds the check's process tree spent, where the gate could read it (`check-cpu.ts`).
 	cpu_ms?: number | undefined
+	// The check's place in the core budget, absent on a check that claimed none (`gate-run-steps.ts`).
+	claim?: CheckClaim | undefined
+}
+
+// The width a check asked the core budget for, the width it ran at and how long it waited for it, so
+// whether a unit claim's wait for room paid off is read per run (joshuafolkken/kit#4451).
+interface CheckClaim {
+	requested: number
+	granted: number
+	waited_ms: number
 }
 
 function is_gate_step_failed(result: GateStepResult): boolean {
@@ -287,5 +297,5 @@ const gate_report = {
 	report_gate_steps,
 }
 
-export type { GateReport, GateStep, GateStepResult }
+export type { CheckClaim, GateReport, GateStep, GateStepResult }
 export { gate_report }

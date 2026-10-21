@@ -11,6 +11,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
 import { busy_average, type BusySample } from './busy-average'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
+import { core_budget_timing, type TimingConfig } from './core-budget-timing'
 import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
 import { core_wait_record, type WaitSink } from './core-wait-record'
 import { core_weights } from './core-weights'
@@ -45,13 +46,6 @@ import { machine_capacity, type MachineBudget, type MachineReading } from './mac
 
 const RESERVED_PREFIX = 'josh-core-reserved-'
 const RESERVED_SUFFIX = '.json'
-// How often a waiting reservation re-reads the ledger: short enough that a freed place is taken up
-// promptly, long enough that the wait itself burns no measurable CPU.
-const POLL_INTERVAL_MS = 50
-// The longest a reservation waits before it is admitted at minimum width regardless — a heavy step must
-// make progress even if the budget never clears, so a leaked or wedged sibling cannot stall the machine
-// for good. Two minutes is well past a unit suite's worst measured time under six-way load.
-const WAIT_CAP_MS = 120_000
 // The head of an unsaturated ledger is always admitted, so the smallest declared budget is one core.
 const MIN_BUDGET = 1
 
@@ -172,12 +166,6 @@ function normalize_budget(budget: number): number {
 	return Number.isFinite(budget) ? Math.max(MIN_BUDGET, Math.floor(budget)) : MIN_BUDGET
 }
 
-async function default_sleep(ms: number): Promise<void> {
-	await new Promise<void>((resolve) => {
-		setTimeout(resolve, ms)
-	})
-}
-
 // **Replaced atomically, never unlinked and recreated**: the admitted rewrite lands on a marker other
 // lanes are polling, and a reader that hit the gap between an unlink and its create would see the ledger
 // without this place and admit past it.
@@ -187,15 +175,6 @@ function write_reservation(target: string, fields: ReservationFields): void {
 
 function report_wait(line: string): void {
 	process.stderr.write(`${line}\n`)
-}
-
-// The clock and cadence a wait runs on, resolved apart from the ledger fields so `reserve` stays under
-// the complexity limit — each default is a branch.
-interface TimingConfig {
-	now: () => number
-	sleep: (ms: number) => Promise<void>
-	poll_interval_ms: number
-	wait_cap_ms: number
 }
 
 interface WaitContext extends TimingConfig {
@@ -209,15 +188,6 @@ interface WaitContext extends TimingConfig {
 	deadline: number
 	fields: ReservationFields
 	busy_samples: Array<BusySample>
-}
-
-function resolve_timing(options: ReserveOptions): TimingConfig {
-	return {
-		now: options.now ?? Date.now,
-		sleep: options.sleep ?? default_sleep,
-		poll_interval_ms: options.poll_interval_ms ?? POLL_INTERVAL_MS,
-		wait_cap_ms: options.wait_cap_ms ?? WAIT_CAP_MS,
-	}
 }
 
 // **A claim alone in the ledger reads the machine too** (joshuafolkken/kit#4238): load outside the
@@ -248,9 +218,11 @@ async function current_budget(
 // to "load the ledger holds" for every later reader — its cores at once, its memory once its tool has
 // had time to ramp up.
 function admit(context: WaitContext, overflow?: Overflow, granted?: number): Admission {
-	write_reservation(context.target, { ...context.fields, admitted_at: context.now(), granted })
+	const admitted_at = context.now()
 
-	return { overflow, granted }
+	write_reservation(context.target, { ...context.fields, admitted_at, granted })
+
+	return { overflow, granted, waited_ms: admitted_at - context.fields.claimed_at }
 }
 
 function overflow_of(
@@ -288,7 +260,11 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 
 	if (reason === undefined) return admit(context, undefined, granted)
 
-	if (context.now() >= context.deadline) {
+	// Past the cap a held claim runs regardless, except one a swap stall holds.
+	if (
+		context.now() >= context.deadline &&
+		!core_admission.is_swap_held(context.key, reservations, budget)
+	) {
 		const held = core_admission.with_grant(context.key, reservations, granted)
 
 		return admit(context, overflow_of(context, held, budget), granted)
@@ -341,7 +317,7 @@ function claim_fields(
 }
 
 async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
-	const timing = resolve_timing(options)
+	const timing = core_budget_timing.resolve_timing(options)
 	const directory = options.directory ?? PLATFORM_TEMP_ROOT
 	const claimed_at = timing.now()
 	const name = marker_name(randomUUID())

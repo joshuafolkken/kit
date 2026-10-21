@@ -73,3 +73,52 @@ describe('core_admission.describe_overflow — the summary line past the budget'
 		expect(note).not.toContain('MB')
 	})
 })
+
+// joshuafolkken/kit#4451: a lone gate's first claim skipped the memory test and started a 2.4 GB lint
+// into a host-wide swap stall with 1.7 GB free.
+describe('core_admission.is_admitted — the oldest claim under a swap stall', () => {
+	const STALL_FREE_MB = 1700
+	const BESIDE_FREE_MB = 3400
+	const lone = [admitted('lone', undefined)]
+
+	it('holds the oldest claim while swap traffic runs and its memory is not free', () => {
+		const budget = { cores: BUDGET_CORES, memory_mb: STALL_FREE_MB, memory_pressured: true }
+
+		expect(core_admission.is_admitted('lone', lone, budget)).toBe(false)
+	})
+
+	it('runs the oldest claim alone heavier than free memory on a machine with no swap traffic', () => {
+		const budget = { cores: BUDGET_CORES, memory_mb: STALL_FREE_MB, memory_pressured: false }
+
+		expect(core_admission.is_admitted('lone', lone, budget)).toBe(true)
+	})
+
+	it('names the oldest claim held by the stall', () => {
+		const budget = { cores: BUDGET_CORES, memory_mb: STALL_FREE_MB, memory_pressured: true }
+
+		expect(core_admission.is_swap_held('lone', lone, budget)).toBe(true)
+	})
+
+	it('holds a claim beside a running one when their memory together is not free', () => {
+		// Room for the claim alone, not for it beside the running claim.
+		const budget = { cores: BUDGET_CORES, memory_mb: BESIDE_FREE_MB, memory_pressured: true }
+		const beside = [...lone, admitted('running', 0)]
+
+		expect(core_admission.is_swap_held('lone', beside, budget)).toBe(true)
+	})
+
+	it('releases a claim beside a running one when their memory together is free', () => {
+		const budget = { cores: BUDGET_CORES, memory_mb: FREE_MB, memory_pressured: true }
+		const light = { key: 'light', reservation: { weight: TOOL_CORES, claimed_at: 0, memory_mb: 1 } }
+
+		expect(core_admission.is_swap_held('light', [light, admitted('running', 0)], budget)).toBe(
+			false,
+		)
+	})
+
+	it('runs the oldest claim under swap traffic when its memory is free', () => {
+		const budget = { cores: BUDGET_CORES, memory_mb: FREE_MB, memory_pressured: true }
+
+		expect(core_admission.is_admitted('lone', lone, budget)).toBe(true)
+	})
+})

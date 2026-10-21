@@ -68,19 +68,22 @@ async function records_and_prints_once(): Promise<void> {
 	])
 }
 
-// The blocker holds the tool's memory, ramped up, and the reading is pressured: nothing is free.
+// The blocker holds the tool's memory, ramped up, and the reading is pressured: nothing is free. The
+// stall passes with the blocker — a lone claim still waits out a stall (joshuafolkken/kit#4451).
 async function names_pressure(): Promise<void> {
 	write_blocker({ weight: 1, memory_mb: TOOL_MEMORY_MB, admitted_at: -core_admission.RAMP_UP_MS })
 	const report = vi.fn<(line: string) => void>()
+	const machine = { reading: PRESSURED }
 	const handle = await core_budget.reserve(1, {
 		directory: probe.directory,
 		budget: CORES,
 		memory_mb: TOOL_MEMORY_MB,
-		read_machine: async () => PRESSURED,
+		read_machine: async () => machine.reading,
 		report,
 		now: () => 1,
 		sleep: async () => {
 			free_blocker()
+			machine.reading = UNREAD
 		},
 	})
 
@@ -90,6 +93,33 @@ async function names_pressure(): Promise<void> {
 		wait_reason: 'pressure',
 		admitted_at: 1,
 	})
+}
+
+// joshuafolkken/kit#4451: the wait cap released a lone claim into the swap stall it waited on. Each poll
+// runs past the cap; the stall lasts three of them, and the claim starts only once it passes.
+const STALL_POLLS = 3
+const WAIT_CAP_MS = 10
+
+async function waits_out_a_stall_past_the_cap(): Promise<void> {
+	const clock = { now: 1, polls: 0 }
+	const handle = await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		memory_mb: TOOL_MEMORY_MB,
+		report: vi.fn<(line: string) => void>(),
+		read_machine: async () => (clock.polls < STALL_POLLS ? PRESSURED : UNREAD),
+		wait_cap_ms: WAIT_CAP_MS,
+		now: () => clock.now,
+		sleep: async () => {
+			clock.now += WAIT_CAP_MS
+			clock.polls += 1
+		},
+	})
+
+	core_budget.release(handle)
+
+	expect(clock.polls).toBe(STALL_POLLS)
+	expect(handle.admission.overflow).toBeUndefined()
 }
 
 async function prints_nothing_solo(): Promise<void> {
@@ -166,4 +196,5 @@ describe('core_budget.reserve — a claim that waits says why', () => {
 	)
 	it('names memory pressure when the reading saw compression or swap', names_pressure)
 	it('prints nothing for a claim admitted at once', prints_nothing_solo)
+	it('keeps a lone claim a swap stall holds waiting past the cap', waits_out_a_stall_past_the_cap)
 })

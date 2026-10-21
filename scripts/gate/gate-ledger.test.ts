@@ -139,6 +139,26 @@ describe('gate_ledger — each check CPU', () => {
 			{ label: 'check', elapsed_ms: 5, is_passed: true, is_reused: false },
 		])
 	})
+
+	// joshuafolkken/kit#4451: the unit claim's asked and granted width and its wait, per run.
+	it('records the core-budget claim a check ran under, and none for one that claimed none', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'claim.jsonl')
+		const claim = { requested: 7, granted: 3, waited_ms: 120_000 }
+		const lint = { label: 'lint', command: 'josh lint', exit_code: 0, output: '', elapsed_ms: 5 }
+
+		await gate_ledger.record(
+			await gate_ledger.start(ledger_path),
+			[{ ...lint, claim }, lint],
+			OUTCOME,
+		)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry).toMatchObject({ checks: [{ claim }, { label: 'lint' }] })
+		expect(entry?.kind === 'gate' ? entry.checks?.[1] : undefined).not.toHaveProperty('claim')
+	})
 })
 
 // joshuafolkken/kit#4397: a whole-gate reuse and the unit leg's full-suite fallback both reach the ledger.

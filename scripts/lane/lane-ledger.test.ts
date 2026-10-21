@@ -243,6 +243,20 @@ describe('lane_ledger.record_core_wait', () => {
 	})
 })
 
+// joshuafolkken/kit#4451: a unit run's slowest files read back as one entry.
+describe('lane_ledger.record_unit_files', () => {
+	it('writes each file and its wall time, read back as a unit-files entry', async () => {
+		const target = ledger(lane_ledger.KIND.UNIT_FILES)
+		const files = [{ file: 'scripts/stalled.test.ts', elapsed_ms: 370_000 }]
+
+		await lane_ledger.record_unit_files(files, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: lane_ledger.KIND.UNIT_FILES, files },
+		])
+	})
+})
+
 describe('lane_ledger.record_offerable', () => {
 	it('records whether offerable work and a free lane coexist', async () => {
 		const target = ledger('offerable')
