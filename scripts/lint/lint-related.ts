@@ -37,6 +37,7 @@ async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
 		lint_related_scope.prettier_arguments(scope.files),
 		lint_related_scope.eslint_arguments(scope.files),
 		lint_related_scope.cross_file_recheck_options(scope.files),
+		{ warm_daemon: true },
 	)
 }
 
