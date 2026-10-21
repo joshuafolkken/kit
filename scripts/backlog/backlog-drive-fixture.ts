@@ -31,13 +31,17 @@ interface Harness {
 
 interface Script {
 	finished?: ReadonlyArray<string>
+	// Lanes this run launched outside the loop, adopted on the first offered pass that does not hold them.
+	adoptable?: ReadonlyArray<string>
 	// A scripted token is `run:merge`'s control verdict unless the child is in `offered`, whose token is
 	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
 	offered?: ReadonlyArray<string>
-	// Children `run:merge` handled as parked or withdrawn rather than merged; every other reads as merged.
+	// Children `run:merge` handled as parked, withdrawn or failed rather than merged; every other reads as
+	// merged.
 	parked?: ReadonlyArray<string>
 	withdrawn?: ReadonlyArray<string>
+	unmerged?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
@@ -69,20 +73,32 @@ function merge_token(script: Script, issue: string): MergeTokenRead {
 type MergeOutcome = Awaited<ReturnType<LoopPorts['merge']>>['outcome']
 
 function merge_outcome(script: Script, issue: string): MergeOutcome {
-	if (script.parked?.includes(issue) === true) return 'parked'
+	const scripted: ReadonlyArray<[ReadonlyArray<string> | undefined, MergeOutcome]> = [
+		[script.parked, 'parked'],
+		[script.withdrawn, 'withdrawn'],
+		[script.unmerged, 'failed'],
+	]
 
-	return script.withdrawn?.includes(issue) === true ? 'withdrawn' : 'merged'
+	return scripted.find(([issues]) => issues?.includes(issue) === true)?.[1] ?? 'merged'
 }
 
 // The child-facing ports: a finished child is merged once and then reads as gone.
 function child_ports(
 	script: Script,
 	calls: Array<string>,
-): Pick<LoopPorts, 'is_finished' | 'merge'> {
+): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
 	const finished = new Set(script.finished)
+	const adoptable = new Set(script.adoptable)
 
 	return {
 		is_finished: (issue) => finished.has(issue),
+		adoptable: async (in_flight) => {
+			const adopting = [...adoptable].filter((issue) => !in_flight.includes(issue))
+
+			for (const issue of adopting) adoptable.delete(issue)
+
+			return adopting
+		},
 		merge: async (issue) => {
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)

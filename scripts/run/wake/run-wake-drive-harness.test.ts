@@ -40,6 +40,7 @@ interface World {
 function drive_ports(world: World): DrivePorts {
 	return {
 		is_finished: () => world.started,
+		adoptable: async () => [],
 		merge: async () => {
 			world.merged = true
 
