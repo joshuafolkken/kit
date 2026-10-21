@@ -23,6 +23,7 @@ const LINE_SEPARATOR = /\r?\n/u
 const HIGH = 'high'
 const MEDIUM = 'medium'
 const FIXED_PREFIX = 'fixed '
+const KIND_FIELDS = 2
 // What a finding line carries after its spec: one sentence saying what is wrong, so a stopped ship's
 // log tells the resumed lane child the defect rather than only its location.
 const DESCRIPTION_SEPARATOR = ' — '
@@ -153,6 +154,23 @@ function is_blocking(finding: Finding): boolean {
 	return severity === HIGH || (severity === MEDIUM && !finding.is_fixed)
 }
 
+function kinds_of(findings: ReadonlyArray<Finding>): ReadonlyArray<string> {
+	return [...new Set(findings.map((finding) => finding.spec.split(':', KIND_FIELDS).join(':')))]
+}
+
+// `bug-risks:medium` — each kind of finding that decided a stopped stage, once per kind (the stop
+// counts once under each in `lane:stats`), so the lane ledger records which kinds of finding stop a
+// lane rather than only that one did (joshuafolkken/kit#4426). The blocking findings decide it where
+// there are any; otherwise the stop was decided by the fixes — round-1 fixes red on the scoped pair, or
+// a round 2 that edited the tree — so the fixed findings do. A line outside the grammar is the stage's
+// own prose and never counts.
+function blocking_kinds(text: string): ReadonlyArray<string> {
+	const findings = spec_findings(text).filter((finding) => is_recordable(finding))
+	const blocking = findings.filter((finding) => is_blocking(finding))
+
+	return kinds_of(blocking.length > 0 ? blocking : findings.filter((finding) => finding.is_fixed))
+}
+
 function scored_kind(findings: ReadonlyArray<Finding>): ScoredVerdict['kind'] {
 	if (findings.some((finding) => is_blocking(finding))) return VERDICT.BLOCKING
 
@@ -216,6 +234,7 @@ const run_ship_review = {
 	FIXED_PREFIX,
 	UNVERIFIED_OUTCOME,
 	VERDICT,
+	blocking_kinds,
 	has_fixes,
 	is_clean_round_one,
 	read_verdict,

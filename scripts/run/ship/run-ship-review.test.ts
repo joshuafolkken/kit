@@ -201,6 +201,34 @@ describe('run_ship_review.has_fixes — whether the reviewer edited the tree', (
 	})
 })
 
+// joshuafolkken/kit#4426: the kinds a stopped review's output lists, for the lane ledger — only the
+// findings that block, once per kind, never the stage's own prose around them.
+describe('run_ship_review.blocking_kinds — the kinds that stopped a review', () => {
+	const medium_kind = 'bug-risks:medium'
+	const tests_kind = 'tests:medium'
+
+	it.each([
+		['', []],
+		[LOW_ONLY, []],
+		[`${MEDIUM_FIXED}\n${tests_kind}:c.ts`, [tests_kind]],
+		// A stop no blocking finding decided — fixes red on the scoped pair, a round 2 that edited the
+		// tree — was decided by the fixed findings.
+		[MEDIUM_FIXED, [medium_kind]],
+		[`${MEDIUM_FIXED}\n${LOW_ONLY}\nreview fixes did not pass the scoped checks`, [medium_kind]],
+		[`${MEDIUM_FIXED}\nfixed ${tests_kind}:c.ts\n${MEDIUM_FIXED}`, [medium_kind, tests_kind]],
+		[`${MEDIUM_OPEN}\n${medium_kind}:b.ts`, [medium_kind]],
+		[`${MEDIUM_OPEN} — the guard reads a stale stamp`, [medium_kind]],
+		[`fixed assumptions:high:b.ts — never fixed in place`, ['assumptions:high']],
+		[
+			`${MEDIUM_OPEN}\n${LOW_ONLY}\n${tests_kind}:c.ts\nreview found High/Medium: x`,
+			[medium_kind, tests_kind],
+		],
+		['✗ verification gate failed: test:unit', []],
+	])('reads %j as %j', (text, kinds) => {
+		expect(run_ship_review.blocking_kinds(text)).toStrictEqual(kinds)
+	})
+})
+
 describe('run_ship_review — the two prompts', () => {
 	it('lets round 1 fix a local Medium and asks it to mark what it fixed', () => {
 		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
