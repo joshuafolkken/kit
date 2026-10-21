@@ -1,13 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import {
-	cpSync,
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
+import { cpSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { hook_launch } from '#scripts/init/hook-launch'
 import {
@@ -15,6 +6,7 @@ import {
 	SHARED_CACHE_SPECS,
 	type GateCacheSpec,
 } from '#scripts/josh/josh-command-types'
+import { atomic_write } from '#scripts/lib/atomic-write'
 
 // Warming a fresh lane's verification caches from the main checkout.
 //
@@ -75,30 +67,13 @@ function portable_content(
 // runs in parallel with the tool whose cache is being copied, and a temporary name in the checkout
 // root is listed by its tree walk and gone by the time it is read (#3763). `node_modules` is skipped
 // by every tree scan and sits on the checkout's own filesystem, so the rename stays atomic.
-function stage_path(destination_root: string, cache_file: string): string {
-	const staging_directory = path.join(destination_root, ...STAGING_SEGMENTS)
-
-	mkdirSync(staging_directory, { recursive: true })
-
-	return path.join(staging_directory, `${cache_file}.${String(process.pid)}.${randomUUID()}.tmp`)
-}
-
-function publish_staged(temporary_path: string, destination_path: string, content: string): void {
-	try {
-		writeFileSync(temporary_path, content, { flag: 'wx' })
-		renameSync(temporary_path, destination_path)
-	} finally {
-		rmSync(temporary_path, { force: true })
-	}
-}
-
 function write_atomically(destination_root: string, cache_file: string, content: string): void {
 	if (!existsSync(destination_root)) return
 
 	try {
-		const temporary_path = stage_path(destination_root, cache_file)
-
-		publish_staged(temporary_path, path.join(destination_root, cache_file), content)
+		atomic_write.replace_file(path.join(destination_root, cache_file), content, {
+			staging_directory: path.join(destination_root, ...STAGING_SEGMENTS),
+		})
 	} catch {
 		// Best-effort: a cache that could not be published simply leaves the destination unchanged.
 	}

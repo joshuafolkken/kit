@@ -2,6 +2,7 @@ import { repo_map_logic } from '#scripts/discovery/repo-map-logic'
 import { repo_origin } from '#scripts/discovery/repo-origin'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { json_value } from '#scripts/lib/json-value'
 import { GH_API_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
@@ -209,14 +210,10 @@ function to_answer(repo: string, fields: ManifestFields): ManifestAnswer {
 }
 
 function to_manifest(repo: string, stdout: string): ManifestAnswer {
-	try {
-		const parsed: unknown = JSON.parse(stdout.trim())
-		if (typeof parsed !== 'object' || parsed === null) return { kind: 'unreadable' }
+	const parsed = json_value.parse_or_undefined(stdout.trim())
+	if (typeof parsed !== 'object' || parsed === null) return { kind: 'unreadable' }
 
-		return to_answer(repo, parsed)
-	} catch {
-		return { kind: 'unreadable' }
-	}
+	return to_answer(repo, parsed)
 }
 
 // Why the read failed, asked only when it did. The status line is the protocol rather than prose, so

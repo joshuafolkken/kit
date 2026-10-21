@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
-import { mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import path from 'node:path'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { file_reader } from '#scripts/lib/read-file'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 
@@ -21,7 +22,6 @@ const REFRESH_MINUTES = 15
 const REFRESH_MS = REFRESH_MINUTES * MS_PER_MINUTE
 const REFRESH_ARGV = ['josh', 'rule:value', '--refresh']
 const PNPM = 'pnpm'
-const TEMPORARY_SUFFIX = '.tmp'
 
 interface CachePorts {
 	now: () => number
@@ -45,12 +45,7 @@ function is_refresh_due(cwd: string, now_ms: number): boolean {
 }
 
 function write_cache_file(cwd: string, file: string, text: string): void {
-	const target = cache_path(cwd, file)
-	const temporary = `${target}${TEMPORARY_SUFFIX}`
-
-	mkdirSync(path.dirname(target), { recursive: true })
-	writeFileSync(temporary, text)
-	renameSync(temporary, target)
+	atomic_write.replace_file(cache_path(cwd, file), text)
 }
 
 function ignore_spawn_error(): void {

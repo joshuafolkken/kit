@@ -1,5 +1,6 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { json_value } from '#scripts/lib/json-value'
 
 // The shared half of every "report a GitHub repository setting kit cannot write" check.
 //
@@ -49,13 +50,9 @@ function query_repo_api(api_path: string): RepoApiResult {
 function parse_payload(exit_code: number, stdout: string): object | undefined {
 	if (exit_code !== 0) return undefined
 
-	try {
-		const parsed: unknown = JSON.parse(stdout)
+	const parsed = json_value.parse_or_undefined(stdout)
 
-		return typeof parsed === 'object' && parsed !== null ? parsed : undefined
-	} catch {
-		return undefined
-	}
+	return typeof parsed === 'object' && parsed !== null ? parsed : undefined
 }
 
 // Read one field off a parsed body. `Reflect.get` rather than an index signature: the body is

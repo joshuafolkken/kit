@@ -230,8 +230,9 @@ async function issue_create_with_label(input: {
 // say why it refused.
 type LabelWrite = { is_applied: true } | { is_applied: false; reason: string }
 
-// The issue's label names, read back after a failed write. A read that itself fails answers
-// `undefined`, which the caller treats as "not applied" — the write's own error is the reason then.
+// The issue's label names, every page of them — read back after a failed write, and by a pull
+// request's classification read. A read that itself fails answers `undefined`, which the write
+// treats as "not applied" — its own error is the reason then.
 async function read_label_names(
 	issue_number: string,
 	repo?: string,
@@ -396,6 +397,7 @@ const git_gh_issue_write = {
 	label_ensure,
 	issue_create_request,
 	issue_create_with_label,
+	read_label_names,
 	issue_apply_label,
 	issue_add_label,
 	issue_remove_label,

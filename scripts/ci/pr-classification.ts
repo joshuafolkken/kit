@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
@@ -18,6 +19,8 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 const DECLARATION_PREFIX = '- リリース分類: '
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
 const LEGACY_LABELS: ReadonlySet<string> = new Set(['semver-major', 'semver-minor'])
+const LABELS_SEGMENT = '/labels'
+const LABEL_NAMES_FILTER = '.[].name'
 
 const LABEL = z.object({ name: z.string() })
 const USER = z.object({ login: z.string() })
@@ -95,10 +98,14 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 // payload, that run fails, and when it lands in the newer check suite GitHub keeps its red result —
 // a rerun replays the same payload and fails again.
 function fetch_current_labels(repository: string, pull_number: number): ReadonlyArray<string> {
-	const path = `repos/${repository}/issues/${String(pull_number)}/labels`
+	const path = `${git_gh_api_path.issue_api_path(String(pull_number), repository)}${LABELS_SEGMENT}`
 
 	try {
-		const names = git_gh_exec.exec_gh_api_sync({ path, jq_filter: '.[].name' })
+		const names = git_gh_exec.exec_gh_api_sync({
+			path,
+			should_paginate: true,
+			jq_filter: LABEL_NAMES_FILTER,
+		})
 
 		return names.split('\n').filter((name) => name !== '')
 	} catch (error) {

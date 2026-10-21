@@ -28,12 +28,20 @@ function parse_with<T>(text: string, schema: z.ZodType<T>): T | undefined {
 	return parsed.success ? parsed.data : undefined
 }
 
+// The read a listing wants: text that is not JSON and JSON that is not an array both answer
+// `undefined`, so a caller can keep "unreadable" apart from an empty listing.
+function parse_array(text: string): Array<unknown> | undefined {
+	const value = parse_or_undefined(text)
+
+	return Array.isArray(value) ? value : undefined
+}
+
 // A plain object, as opposed to an array or a primitive. `typeof null` is `'object'`, and an array
 // answers `'object'` too, so both have to be excluded by hand before a key lookup means anything.
 function is_record(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-const json_value = { parse_or_undefined, parse_with, is_record }
+const json_value = { parse_or_undefined, parse_with, parse_array, is_record }
 
 export { json_value }

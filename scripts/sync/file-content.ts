@@ -1,13 +1,10 @@
 import { lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { file_reader } from '#scripts/lib/read-file'
 
 const PATH_SEPARATORS = path.sep === '\\' ? /[/\\]/u : /\//u
 const MAX_RESOLVE_STEPS = 4096
-
-function is_absent_error(error: unknown): boolean {
-	return error instanceof Error && 'code' in error && error.code === 'ENOENT'
-}
 
 function is_read_denied(error: unknown): boolean {
 	return (
@@ -19,7 +16,7 @@ function is_regular_existing_file(destination_path: string): boolean {
 	try {
 		return lstatSync(destination_path).isFile()
 	} catch (error) {
-		if (is_absent_error(error)) return false
+		if (file_reader.is_absent(error)) return false
 		throw error
 	}
 }

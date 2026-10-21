@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { RELEASE_LABEL } from './issue-labels'
 
 // The decisions behind `josh issue:release`, kept apart from the command
@@ -20,14 +21,9 @@ function is_listing_row(value: unknown): value is ListingRow {
 // release Issue at a time; were a person to open a second, the oldest is the one the next release
 // closes, so it is the one every new blocker joins.
 function open_release_of(json: string): number | undefined {
-	try {
-		const parsed: unknown = JSON.parse(json)
-		const rows = Array.isArray(parsed) ? parsed.filter((row) => is_listing_row(row)) : []
+	const rows = (json_value.parse_array(json) ?? []).filter((row) => is_listing_row(row))
 
-		return rows.length === 0 ? undefined : Math.min(...rows.map((row) => row.number))
-	} catch {
-		return undefined
-	}
+	return rows.length === 0 ? undefined : Math.min(...rows.map((row) => row.number))
 }
 
 function title_of(repo: string): string {
