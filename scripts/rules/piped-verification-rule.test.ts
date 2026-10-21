@@ -27,7 +27,7 @@ const RATIONALE = 'docs/maintainers/output-bounds-rationale.md'
 const SUITE_PATH = 'scripts/rules/piped-verification-rule.test.ts'
 // Named once: the enumeration, the topic file and this suite have to agree on the command, and a
 // string kept correct in one of three places is not kept.
-const GUARD_COMMAND = 'pnpm josh rule:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
 // The escape hatch that keeps the check's status, asserted on both sides: a refusal that named no way
 // to bound the output would leave the caller with the problem that put the pipe there.
 const PIPEFAIL = '`set -o pipefail`'

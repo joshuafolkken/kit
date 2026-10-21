@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { run_watcher_guard } from './run-watcher-guard'
 
 // joshuafolkken/kit#2113. The guard detects "in-flight lanes, stale watcher" and refuses — the
-// same contract `batch:guard` and `rule:guard` hold. Behavior is pinned here so a refactor that
+// same contract `pretool:guard` holds. Behavior is pinned here so a refactor that
 // silently returns 'ok' in the stale case is caught before it reaches a run.
 
 vi.mock('#scripts/lane/lane-registry', () => ({

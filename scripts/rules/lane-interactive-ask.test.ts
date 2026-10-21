@@ -5,7 +5,6 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_interactive_ask } from './lane-interactive-ask'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2201: a dispatched lane child's interactive ask must be refused and routed to the
 // park, so this suite owns the two halves that decide whether the refusal fires — the tool-name match
@@ -54,7 +53,7 @@ function payload_of(name: string, tool_name = ASK_TOOL): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// Every test starts with no dispatch mark; the lane block sets it in its own beforeEach.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
@@ -97,7 +96,7 @@ describe('is_interactive_ask', () => {
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
 	beforeEach(() => {
@@ -114,7 +113,7 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 
 	it('delivers the rule on an interactive ask that has not parked', () => {
-		const reason = rule_delivery(payload_of('lane-ask'), NOW_MS)
+		const reason = delivered_rules.delivery(payload_of('lane-ask'), NOW_MS)
 
 		expect(reason).toBe(delivered_rules.LANE_INTERACTIVE_ASK_REASON)
 	})
@@ -125,8 +124,10 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('refuses the ask again on a second occurrence', () => {
 		const payload = payload_of('lane-ask-again')
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_INTERACTIVE_ASK_REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(
+			delivered_rules.LANE_INTERACTIVE_ASK_REASON,
+		)
+		expect(delivered_rules.delivery(payload, A_LATER_CALL_MS)).toBe(
 			delivered_rules.LANE_INTERACTIVE_ASK_REASON,
 		)
 	})
@@ -136,11 +137,11 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
-describe('rule_delivery — outside a lane checkout', () => {
+describe('delivered_rules.delivery — outside a lane checkout', () => {
 	// **The ordinary case is silence.** A person's own session, in the main checkout, may ask a question
 	// and must never be refused for it.
 	it('says nothing about an interactive ask in a checkout that is not a lane', () => {
-		expect(rule_delivery(payload_of('plain-ask'), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('plain-ask'), NOW_MS)).toBeUndefined()
 	})
 })
 

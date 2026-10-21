@@ -5,7 +5,7 @@ import { backlog_ready } from './backlog-ready'
 // Why a free lane stayed empty, written where `josh lane:stats` reads it (joshuafolkken/kit#3995).
 //
 // **The driver already dispatches the moment a lane frees**: a pass that collected a child asks the
-// offer at once (`backlog-drive.ts` → `is_offering`). What a `backlog:stalled` episode could not say is
+// offer at once (`backlog-drive.ts` → `is_offering`). What a backlog stall episode could not say is
 // why a free lane then stayed empty — an offer that started nothing, or the driver handed back to a
 // session that had not restarted it yet. Each such pass records its reason; the time is derived in
 // `lane-held-stats.ts`, so a hold is told apart from a dispatch that was simply slow.

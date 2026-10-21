@@ -16,7 +16,7 @@ const MISSING_WHY = '(no `why` in `scripts/rules/guard-remedy.ts`)'
 function item({ id, about }: StopRule): string {
 	return [
 		`- **${about.title}** (\`${id}\`, ${about.topic})`,
-		`  - fires: \`${about.entry ?? delivered_rules.RULE_GUARD}\` — ${about.fires}`,
+		`  - fires: \`${about.entry ?? delivered_rules.PRETOOL_GUARD}\` — ${about.fires}`,
 		`  - silent: ${about.quiet}`,
 		`  - not automated: ${guard_remedy.why_of(id) ?? MISSING_WHY}`,
 	].join('\n')

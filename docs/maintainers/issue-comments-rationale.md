@@ -19,7 +19,7 @@ because the conflict rule is that the later text wins, and a comment nobody read
 
 A `backlogrun` named issue and epic child inherit the read rather than restate it: each runs in a
 delegated unit executing `fullrun`'s procedure, and the hook keys its once-per-run record on the
-_fork's_ transcript, so every child is delivered to in its own right. The `rule:guard` refusal
+_fork's_ transcript, so every child is delivered to in its own right. The `issue-comments` row of `pnpm josh rule:list`'s refusal
 (`scripts/rules/delivered-rules.test.ts`) reaches Claude Code alone and repeats until the comments are
 read — the hook is what makes the rule hard to walk past, not the rule itself.
 

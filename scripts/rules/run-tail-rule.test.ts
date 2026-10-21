@@ -6,7 +6,6 @@ import { test_declared_changed } from '#scripts/test/test-declared-changed'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 import { run_tail_rule } from './run-tail-rule'
 import { test_declared_commit } from './test-declared-commit'
 
@@ -68,13 +67,15 @@ function payload_of(
 // assertion is about run-tail alone (joshuafolkken/kit#2169). The seam is restored the moment the call
 // returns, so it never leaks into the next test.
 function deliver(payload: string, now_ms: number): string | undefined {
-	return test_declared_changed.with_paths(EXEMPT_TREE, () => rule_delivery(payload, now_ms))
+	return test_declared_changed.with_paths(EXEMPT_TREE, () =>
+		delivered_rules.delivery(payload, now_ms),
+	)
 }
 
 // Assigned rather than deleted: an empty value is not one the disabled list recognizes, so the guard
 // reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 })
 
 afterAll(() => {
@@ -176,7 +177,7 @@ describe('is_push_step_call and is_backgrounded_push_step', () => {
 	})
 })
 
-describe('rule_delivery — the run tail at the call that pushes in the foreground', () => {
+describe('delivered_rules.delivery — the run tail at the call that pushes in the foreground', () => {
 	it('delivers the rule on the foreground commit-push-PR step', () => {
 		const reason = deliver(payload_of(RUN_TAIL, FOREGROUND_PUSH), NOW_MS)
 
@@ -224,14 +225,14 @@ describe('rule_delivery — the run tail at the call that pushes in the foregrou
 })
 
 // **The seam that keeps the run-tail assertions off the live tree** (joshuafolkken/kit#2169). Before it,
-// `rule_delivery` read `git status` at trigger time, so the three assertions above failed whenever the
+// `delivered_rules.delivery` read `git status` at trigger time, so the three assertions above failed whenever the
 // developer's own tree carried an untested runtime change. Injecting the verdict pins both directions:
 // `required` means `test-declared` speaks first, `exempt` means the push is run-tail's alone.
 describe('the working-tree seam — the verdict the run-tail delivery runs under', () => {
 	it('delivers test-declared first when the injected tree is an untested runtime change', () => {
 		const payload = payload_of('seam-required', FOREGROUND_PUSH)
 		const reason = test_declared_changed.with_paths(RUNTIME_TREE, () =>
-			rule_delivery(payload, NOW_MS),
+			delivered_rules.delivery(payload, NOW_MS),
 		)
 
 		expect(reason).toBe(test_declared_commit.REASON)
@@ -240,7 +241,7 @@ describe('the working-tree seam — the verdict the run-tail delivery runs under
 	it('leaves the foreground push to run-tail when the injected tree is exempt', () => {
 		const payload = payload_of('seam-exempt', FOREGROUND_PUSH)
 		const reason = test_declared_changed.with_paths(EXEMPT_TREE, () =>
-			rule_delivery(payload, NOW_MS),
+			delivered_rules.delivery(payload, NOW_MS),
 		)
 
 		expect(reason).toBe(delivered_rules.RUN_TAIL_REASON)

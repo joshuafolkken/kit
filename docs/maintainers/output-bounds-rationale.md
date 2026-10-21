@@ -68,7 +68,7 @@ would have committed a red tree.
   placed a detector instead. joshuafolkken/kit#1344 and joshuafolkken/kit#1460 also measured prose that
   moved no number.
 
-**Triggered delivery was adopted** (`rule-delivery.md`): `pnpm josh rule:guard` refuses, on the spot, a
+**Triggered delivery was adopted** (`rule-delivery.md`): the `piped-verification` row of `pnpm josh rule:list` refuses, on the spot, a
 `Bash` call where a pass/fail josh check stands before a pipe. **A refusal cannot be skimmed past.**
 
 **The commonest shape is rewritten instead of refused** (joshuafolkken/kit#3570). Almost every

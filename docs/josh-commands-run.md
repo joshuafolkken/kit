@@ -240,7 +240,7 @@ the lane's issue number (`scripts/lane/lane-child-marker.ts`).
   or none, is read as a person. An interactive `fullrun` carries no mark.
 - `run:cut` itself looks for an open lane for the issue instead (`not-a-lane` otherwise).
 
-**The gate guard:** `josh rule:guard` refuses `josh gate` in a lane with no cut record carried.
+**The gate guard:** the `pre-gate-cut` row of `pnpm josh rule:list` refuses `josh gate` in a lane with no cut record carried.
 
 - It fires for a marked child and nowhere else — the working directory is `<lane root>/<issue number>`
   **and** `JOSH_LANE_CHILD` names that issue (`run:cut`'s open-lane lookup need not agree byte for
@@ -703,24 +703,6 @@ pnpm josh run:watcher:guard
 The watcher is fresh when `run:progress` has pinged its life record within three watcher ticks, roughly 90 s. Wired as a `PreToolUse` hook, so no next Bash call is issued while it is stale.
 
 **Output / exit codes:** exits 0 when no lane children are in-flight or the watcher is fresh. Exits 1 and writes a note to stderr telling the user to restart `run:progress --wait` before proceeding.
-
-### `josh run:stranded`
-
-<!-- usage: run:stranded -->
-
-Report whether the run is stranded — owner gone, no successor holding the budget, and no supervisor watching.
-
-```bash
-pnpm josh run:stranded
-```
-
-<!-- /usage -->
-
-The supervisor is a `run:wake` one. Run by the `Stop` hook; a strand sends one 🚨 Telegram and stops nothing.
-
-**Output / exit codes:** always exits 0, printing `stranded` or `ok` on stdout. Recovery is another actor's — the notification names `run:wake --start`, which wakes a fresh successor to claim the budget; the cutting session stays refused `busy` and must not resume the run itself.
-
-Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:stranded` in detail".
 
 ## Lanes
 

@@ -1,6 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
 import { COMMAND_TIMEOUT_MS, FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { migrate_logic } from '#scripts/registry-migration/migrate-logic'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
@@ -18,6 +17,7 @@ const SCOPE_SEPARATOR = '/'
 const ENCODED_SCOPE_SEPARATOR = '%2f'
 const SCOPE_PATTERN = /^@[^/]+(?=\/)/u
 const SCOPE_REGISTRY_SUFFIX = ':registry'
+const GITHUB_REGISTRY_HOST = 'npm.pkg.github.com'
 const PNPM = 'pnpm'
 const JSON_FLAG = '--json'
 const FAILURE_EXIT_CODE = 1
@@ -63,8 +63,19 @@ function read_packument(package_name: string, accept: string): unknown {
 	return json_value.parse_or_undefined(result.stdout)
 }
 
-// Whether this checkout installs the package's scope from GitHub Packages, read with the same
-// `pnpm config get` `josh registry:migrate` uses (project `.npmrc` over user `~/.npmrc`). The two
+// The host is compared, not searched for, so a registry carrying it only in its path is not GitHub.
+function is_github_registry(value: string): boolean {
+	try {
+		const url = new URL(value)
+
+		return url.protocol === 'https:' && url.hostname === GITHUB_REGISTRY_HOST
+	} catch {
+		return false
+	}
+}
+
+// Whether this checkout installs the package's scope from GitHub Packages, read with
+// `pnpm config get` (project `.npmrc` over user `~/.npmrc`). The two
 // registries are published by parallel jobs and can drift, so a consumer routed to GitHub Packages
 // keeps reading it: public npm could otherwise offer a release its registry does not carry yet.
 // Memoized per scope — kit and app-kit share one, and one report asks for both packages.
@@ -75,7 +86,7 @@ function is_github_scope(scope: string): boolean {
 		reject: false,
 		timeout: FETCH_TIMEOUT_MS,
 	})
-	const is_github = result.exitCode === 0 && migrate_logic.is_github_tarball(result.stdout.trim())
+	const is_github = result.exitCode === 0 && is_github_registry(result.stdout.trim())
 
 	github_scopes.set(scope, is_github)
 

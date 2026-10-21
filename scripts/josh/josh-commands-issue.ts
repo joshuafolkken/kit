@@ -79,22 +79,6 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
-	'defect:rate': {
-		script: 'scripts/issue/defect-rate-main.ts',
-		description: 'Print the defect rate of merged work: defects filed per enhancement completed',
-		category: 'AI tools',
-		reference: ['[--days <n>]', 'automation', ['network']],
-		usage: {
-			examples: [{ arguments: '', note: 'the last 14 days' }, { arguments: '--days 30' }],
-			flags: [
-				{
-					names: ['--days <n>'],
-					description:
-						'the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.',
-				},
-			],
-		},
-	},
 	'defect:origin': {
 		script: 'scripts/issue/defect-origin-main.ts',
 		description:

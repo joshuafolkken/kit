@@ -6,7 +6,6 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_switch_main } from './lane-switch-main'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2313: a dispatched lane child that runs `git switch main` fails structurally — a lane
 // is a linked work tree and the primary checkout holds the default branch. This suite owns the two halves
@@ -61,7 +60,7 @@ function payload_of(name: string, command: string): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// Every test starts with no dispatch mark and no configured lane root, so the `.kit-lanes` pattern
 	// decides what is a lane; the lane block sets the mark in its own beforeEach.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
@@ -135,7 +134,7 @@ describe('is_switch_away_from_lane', () => {
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
 	beforeEach(() => {
@@ -153,7 +152,7 @@ describe('rule_delivery — inside a lane checkout', () => {
 
 	// **The `git switch main` is refused before it fails** (joshuafolkken/kit#2313 acceptance 1).
 	it('delivers the rule on `git switch main` from a lane child', () => {
-		expect(rule_delivery(payload_of('lane-switch', SWITCH_MAIN), NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload_of('lane-switch', SWITCH_MAIN), NOW_MS)).toBe(REASON)
 	})
 
 	// **Every occurrence, not once per run.** A child must never run this, so a second call is refused
@@ -161,13 +160,13 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('refuses `git switch main` again on a second occurrence', () => {
 		const payload = payload_of('lane-switch-again', SWITCH_MAIN)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
 	})
 
 	// A lane child returning to its own branch is not touched.
 	it(OWN_BRANCH_TITLE, () => {
-		expect(rule_delivery(payload_of('lane-own', SWITCH_OWN), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('lane-own', SWITCH_OWN), NOW_MS)).toBeUndefined()
 	})
 
 	it('is claimed by exactly one rule in the enumeration', () => {
@@ -175,11 +174,13 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
-describe('rule_delivery — outside a lane checkout', () => {
+describe('delivered_rules.delivery — outside a lane checkout', () => {
 	// **The ordinary case is silence** (acceptance 3): the primary checkout, where the parent runs
 	// `git switch main`, must never be refused for it.
 	it('says nothing about `git switch main` in a checkout that is not a lane', () => {
-		expect(rule_delivery(payload_of('plain-switch', SWITCH_MAIN), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('plain-switch', SWITCH_MAIN), NOW_MS),
+		).toBeUndefined()
 	})
 })
 

@@ -19,7 +19,6 @@ import {
 	FILING_COMMAND,
 	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#1524: a rule that left residency has to *fire*, or the relocation deleted it. The
 // whole point of the Issue is that prose which is never read is indistinguishable from an absent
@@ -29,7 +28,7 @@ const harness = delivered_rules_harness.create_harness()
 const { payload_for, payload_of, transcript_for } = harness
 const WORK_DIRECTORY = harness.work
 // The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
-// working directory to the non-lane WORK_DIRECTORY per test to stay hermetic wherever it was launched: rule_delivery
+// working directory to the non-lane WORK_DIRECTORY per test to stay hermetic wherever it was launched: delivered_rules.delivery
 // and rules_claiming invoke each rule's real trigger, and the pre-gate-cut trigger reads the live
 // process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree would
 // otherwise see the gate cases fire that rule and the silence assertions break (joshuafolkken/kit#1884).
@@ -70,7 +69,7 @@ const EVALUATED_BODY_COMMAND =
 	'gh api repos/joshuafolkken/kit/issues/1198/comments -f body="see `pnpm josh ms`"'
 const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
-// Three consecutive single-call turns with the third still open — the one shape `batch:guard`
+// Three consecutive single-call turns with the third still open — the one shape the batching guard
 // refuses, and therefore the one shape this guard has to stay quiet on.
 function unbatched_text(): string {
 	return [
@@ -100,13 +99,13 @@ function rules_claiming(command: string): number {
 }
 
 // The batching guard's own record, written the way that guard writes it — so a case can put a run
-// into the state where `batch:guard` has already spoken and will not speak again.
+// into the state where the batching guard has already spoken and will not speak again.
 const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
 
 // Assigned rather than deleted, for the reason `batch-guard.test.ts` gives: an empty value is not one
 // the disabled list recognizes, so the guard reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// The lane-child block sets `JOSH_LANE_CHILD`; clearing it here, beside the cwd reset, keeps it from
 	// leaking into any case that runs after — the same reset-before-every-case discipline as the cwd.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
@@ -137,12 +136,12 @@ describe('cwd isolation', () => {
 	})
 })
 
-describe('rule_delivery — the comments at the call that reads the body', () => {
+describe('delivered_rules.delivery — the comments at the call that reads the body', () => {
 	it.each([
 		['view', BODY_READ_COMMAND],
 		['api', BODY_READ_API_COMMAND],
 	])('delivers the rule on the %s spelling', (name, command) => {
-		const reason = rule_delivery(payload_of(`body-${name}`, command), NOW_MS)
+		const reason = delivered_rules.delivery(payload_of(`body-${name}`, command), NOW_MS)
 
 		expect(reason).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
@@ -173,33 +172,35 @@ describe('rule_delivery — the comments at the call that reads the body', () =>
 	it('keeps refusing the body-only reissue until the comments are read', () => {
 		const payload = payload_of('body-repeat', BODY_READ_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBe(
+			delivered_rules.ISSUE_COMMENTS_REASON,
+		)
 	})
 
 	// The read the refusal asks for must itself pass, or obeying the rule would wedge the run.
 	it('says nothing about the read it asked the run to make', () => {
 		const payload = payload_of('body-obeyed', COMMENTED_READ_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 
 // The two stand-downs added in joshuafolkken/kit#1905: a state-only projection is not a body read,
 // and a body read the run has already earned by reading the comments is not refused a second time.
-describe('rule_delivery — the comments rule stands down when it should', () => {
+describe('delivered_rules.delivery — the comments rule stands down when it should', () => {
 	// **A `--jq`/`--json` projection that never names the body is a state check, not the body read this
 	// rule guards** (joshuafolkken/kit#1905) — while one that still names the body stays a body read.
 	it('says nothing about a read that projects the body away', () => {
 		const payload = payload_of('state-check', STATE_CHECK_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 
 	it('still delivers on a `--jq` read that names the body', () => {
 		const payload = payload_of('body-jq', BODY_JQ_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 
 	// **A body read the run has already earned is not refused** (joshuafolkken/kit#1905): the tail
@@ -207,28 +208,28 @@ describe('rule_delivery — the comments rule stands down when it should', () =>
 	it('says nothing when the run already read that Issue comments', () => {
 		const payload = payload_of('already-read', BODY_READ_COMMAND, 'Bash', comment_read_tail(1319))
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 
 	// A comment read of a *different* Issue leaves this body read refused.
 	it('still delivers when the earlier comment read was another Issue', () => {
 		const payload = payload_of('other-read', BODY_READ_COMMAND, 'Bash', comment_read_tail(1900))
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 })
 
 // joshuafolkken/kit#3423: the WIP cap and the fold question are `issue:file`'s own steps, so a run's
 // first filing reaches the command on its first call rather than after a refusal and a reissue.
-describe('rule_delivery — the call that files', () => {
+describe('delivered_rules.delivery — the call that files', () => {
 	it('lets a first filing through to the command', () => {
-		expect(rule_delivery(payload_of('filing', FILING_COMMAND), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('filing', FILING_COMMAND), NOW_MS)).toBeUndefined()
 	})
 })
 
-describe('rule_delivery — the masked verification at the call that pipes it', () => {
+describe('delivered_rules.delivery — the masked verification at the call that pipes it', () => {
 	it('delivers the rule on the call that pipes a check', () => {
-		const reason = rule_delivery(payload_of('piped', PIPED_GATE_COMMAND), NOW_MS)
+		const reason = delivered_rules.delivery(payload_of('piped', PIPED_GATE_COMMAND), NOW_MS)
 
 		expect(reason).toBe(delivered_rules.PIPED_VERIFICATION_REASON)
 	})
@@ -236,8 +237,10 @@ describe('rule_delivery — the masked verification at the call that pipes it', 
 	it(ONCE_PER_RUN, () => {
 		const payload = payload_of('piped-repeat', PIPED_GATE_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.PIPED_VERIFICATION_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(
+			delivered_rules.PIPED_VERIFICATION_REASON,
+		)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBeUndefined()
 	})
 
 	// The invariant `is_first_delivery` depends on, re-checked for this row as the enumeration's own
@@ -251,13 +254,13 @@ describe('rule_delivery — the masked verification at the call that pipes it', 
 
 // What happens on a turn where the trigger does not fire: nothing at all reaches stdout, which is the
 // same answer the other two guards give. A hook that spoke on these calls would cost every run.
-describe('rule_delivery — silent where nothing binds', () => {
+describe('delivered_rules.delivery — silent where nothing binds', () => {
 	it.each([
 		['a comment', 'gh api repos/joshuafolkken/kit/issues/1524/comments --field body=@/tmp/b.md'],
 		['an ordinary command', 'pnpm josh gate'],
 		['a listing', 'gh issue list --state open'],
 	])('says nothing on %s', (label, command) => {
-		expect(rule_delivery(payload_of(`quiet-${label}`, command), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of(`quiet-${label}`, command), NOW_MS)).toBeUndefined()
 	})
 
 	// **Never wired to a write, and never answering about one** (joshuafolkken/kit#1390): Claude Code
@@ -265,26 +268,28 @@ describe('rule_delivery — silent where nothing binds', () => {
 	it('says nothing about a write tool even when its input looks like a filing', () => {
 		const payload = payload_of('write', FILING_COMMAND, 'Edit')
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 
 	it('says nothing when the switch is off', () => {
-		process.env[SWITCH_ENV_KEY] = 'off'
+		process.env[delivered_rules.SWITCH_ENV_KEY] = 'off'
 
-		expect(rule_delivery(payload_of('off', 'gh issue create -t x'), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('off', 'gh issue create -t x'), NOW_MS),
+		).toBeUndefined()
 	})
 
 	it('says nothing when the payload is not a payload', () => {
-		expect(rule_delivery('not json', NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery('not json', NOW_MS)).toBeUndefined()
 	})
 
 	it('says nothing when the payload names no command at all', () => {
-		expect(rule_delivery(payload_of('empty', ''), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('empty', ''), NOW_MS)).toBeUndefined()
 	})
 })
 
 // **The collision that would delete a rule silently, and the invariant that prevents it.**
-// `pnpm josh batch:guard` is wired to `Bash` too, and the shared shell records its stamp *before*
+// The batching guard runs on `Bash` too, and the shared shell records its stamp *before*
 // returning a reason — so a call both hooks refused would lose one of the two reasons with both
 // records already written, and the losing rule could never fire again in that run. It cannot happen
 // for the filing rows because the batching guard does not treat a filing call as a candidate at all.
@@ -293,7 +298,7 @@ describe('rule_delivery — silent where nothing binds', () => {
 // stand-aside in `is_first_delivery` remains for a once-per-run row whose trigger the batching guard
 // also claims — the table below pins both halves, and **any row added to the enumeration has to be
 // re-checked against it**.
-describe('rule_delivery — the two Bash guards never answer about the same call', () => {
+describe('delivered_rules.delivery — the two Bash guards never answer about the same call', () => {
 	it.each([
 		[FILING_COMMAND, false],
 		[DIRECT_FILING_API_COMMAND, false],
@@ -312,7 +317,7 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 	it('refuses a body read on a history the batching guard refuses', () => {
 		const transcript = transcript_for('body-collision', unbatched_text())
 
-		expect(rule_delivery(payload_for(transcript, BODY_READ_COMMAND), NOW_MS)).toBe(
+		expect(delivered_rules.delivery(payload_for(transcript, BODY_READ_COMMAND), NOW_MS)).toBe(
 			delivered_rules.ISSUE_COMMENTS_REASON,
 		)
 	})
@@ -323,16 +328,18 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 
 		BATCH_STAMP.record(BATCH_STAMP.path(transcript), BATCH_REFUSED_AT_MS)
 
-		expect(rule_delivery(call, BATCH_REFUSED_AT_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(delivered_rules.delivery(call, BATCH_REFUSED_AT_MS)).toBe(
+			delivered_rules.ISSUE_COMMENTS_REASON,
+		)
 	})
 })
 
 // The enumeration is the mechanism: one row per relocated rule, and the next rule to leave residency
 // costs a row rather than a second delivery path. The reading of the call itself is
 // `shell-body-trigger.test.ts`; what is pinned here is the row wired to it.
-describe('rule_delivery — the shell-body rule at the call that would execute text', () => {
+describe('delivered_rules.delivery — the shell-body rule at the call that would execute text', () => {
 	it('delivers the rule on a comment whose body carries a backtick', () => {
-		const reason = rule_delivery(payload_of('evaluated', EVALUATED_BODY_COMMAND), NOW_MS)
+		const reason = delivered_rules.delivery(payload_of('evaluated', EVALUATED_BODY_COMMAND), NOW_MS)
 
 		expect(reason).toBe(delivered_rules.SHELL_BODY_REASON)
 	})
@@ -343,15 +350,15 @@ describe('rule_delivery — the shell-body rule at the call that would execute t
 	it(ONCE_PER_RUN, () => {
 		const payload = payload_of('shell-body-repeat', EVALUATED_BODY_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.SHELL_BODY_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.SHELL_BODY_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBeUndefined()
 	})
 
 	// **Never wired to a write** (joshuafolkken/kit#1390), the same omission every row depends on.
 	it('says nothing about a write tool even when its input looks like an inline body', () => {
 		const payload = payload_of('body-write', EVALUATED_BODY_COMMAND, 'Edit')
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 
@@ -400,12 +407,12 @@ describe('DELIVERED_RULES — trigger overlap', () => {
 		const payload = payload_of('overlap', command)
 
 		expect(rules_claiming(command)).toBe(DIRECT_FILING_WITH_BODY_RULE_COUNT)
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.DIRECT_FILING_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.DIRECT_FILING_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.DIRECT_FILING_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBe(delivered_rules.DIRECT_FILING_REASON)
 	})
 })
 
-describe('rule_delivery — a dispatched lane child keeps the rule guard', () => {
+describe('delivered_rules.delivery — a dispatched lane child keeps the rule guard', () => {
 	// joshuafolkken/kit#2138: the rule guard fires in a lane child — it carries the lane-only rules a
 	// child depends on and the safety rules it must still obey — so this block sets the mark and stays in
 	// a lane checkout, unlike every other block here, which runs from the non-lane WORK_DIRECTORY.
@@ -420,9 +427,9 @@ describe('rule_delivery — a dispatched lane child keeps the rule guard', () =>
 	// The rule guard fires in a child (the enumeration's `rule: true`, pinned in
 	// `lane-guard-policy.test.ts`) — a safety rule still delivers here.
 	it('still delivers a rule in a lane child', () => {
-		expect(rule_delivery(payload_of('lane-shell-body', EVALUATED_BODY_COMMAND), NOW_MS)).toBe(
-			delivered_rules.SHELL_BODY_REASON,
-		)
+		expect(
+			delivered_rules.delivery(payload_of('lane-shell-body', EVALUATED_BODY_COMMAND), NOW_MS),
+		).toBe(delivered_rules.SHELL_BODY_REASON)
 	})
 
 	// **The batching stand-aside is disabled in a lane child.** The batching guard is suppressed there
@@ -434,6 +441,6 @@ describe('rule_delivery — a dispatched lane child keeps the rule guard', () =>
 		const transcript = transcript_for('lane-body-collision', unbatched_text())
 		const call = payload_for(transcript, BODY_READ_COMMAND)
 
-		expect(rule_delivery(call, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
+		expect(delivered_rules.delivery(call, NOW_MS)).toBe(delivered_rules.ISSUE_COMMENTS_REASON)
 	})
 })

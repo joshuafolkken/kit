@@ -69,7 +69,7 @@ describe('issue:lint agrees with issue-template.md', () => {
 	})
 })
 
-describe('issue:backlinks agrees with issue-template.md', () => {
+describe('issue_backlinks agrees with issue-template.md', () => {
 	const document = read_repo_file(ISSUE_TEMPLATE)
 
 	it.each([

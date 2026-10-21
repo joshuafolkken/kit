@@ -53,17 +53,23 @@ pnpm josh format:edited   # run by the PostToolUse hook, the tool call as JSON o
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh format:edited` in detail".
 
-### `josh batch:guard`
+### `josh pretool:guard`
 
-<!-- usage: batch:guard -->
+<!-- usage: pretool:guard -->
 
-Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin).
+Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin).
 
 ```bash
-pnpm josh batch:guard   # run inside pretool:guard, not wired on its own
+pnpm josh pretool:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
 ```
 
 <!-- /usage -->
+
+It also runs the duplicate-read guard. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
+
+**How each guard behaves in a dispatched lane child is an enumeration** in `scripts/lane/lane-guard-policy.ts` — `refuse`, `notice` or `off` per guard; `lane-guard-policy.test.ts` pins it to the guards' live behavior.
+
+Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pretool:guard` in detail".
 
 ```json
 "PreToolUse": [
@@ -87,12 +93,12 @@ Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/in
 - **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its digest matches the source, and rebuilds it in-process when stale.
 - A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on `dist/hooks/` (published bundles have no source to be stale against) and whose fallback is the `dist/josh.js` dispatcher.
 
+#### The batching guard
+
 - The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **Silent in a dispatched lane child** (`JOSH_LANE_CHILD`): the notice is `off` there (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
 - **Fires more than once per run**: again every `REFIRE_EVERY` further single-call turns (the notice every `NOTICE_REFIRE_EVERY`); a batched turn starts a fresh sequence.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
-
-Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh batch:guard` in detail".
 
 ### `josh time:density`
 
@@ -122,19 +128,9 @@ lanes=10 round_trips=634 tools/turn=1.13 batched=63/634
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh time:density` in detail".
 
-### `josh investigation:guard`
+#### The investigation guard
 
-<!-- usage: investigation:guard -->
-
-Claude Code hook: refuse a read once the unedited-read threshold is reached again (reads the tool call on stdin).
-
-```bash
-pnpm josh investigation:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
-```
-
-<!-- /usage -->
-
-The threshold counts un-edited files read since the run's last delegated unit.
+Refuses a read once the unedited-read threshold is reached again. The threshold counts un-edited files read since the run's last delegated unit.
 
 Matcher `Read|Bash`, timeout 20.
 
@@ -144,41 +140,19 @@ Matcher `Read|Bash`, timeout 20.
 - **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The investigation guard refuses in a lane child".
 - Set `JOSH_INVESTIGATION_GUARD` to `off` / `0` / `false` / `no` to disable.
 
-Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh investigation:guard` in detail".
+#### The duplicate-read guard
 
-### `josh duplicate-read:guard`
-
-<!-- usage: duplicate-read:guard -->
-
-Claude Code hook: refuse a second whole-file read of a path whose content has not changed since the run last read it (reads the tool call on stdin).
-
-```bash
-pnpm josh duplicate-read:guard   # run inside pretool:guard, not wired on its own
-```
-
-<!-- /usage -->
-
-It is composed in `pretool:guard` alongside `batch:guard`, `investigation:guard` and `rule:guard`, not a separate `PreToolUse` entry.
+Refuses a second whole-file read of a path whose content has not changed since the run last read it. It is composed in `pretool:guard` alongside the batch, investigation and rule guards, not a separate `PreToolUse` entry.
 
 - The transcript gives when the path was last read; the file's `mtime` says whether it changed since. A file whose `mtime` predates that read is refused; anything that moves the `mtime` (edit, merge, background growth) lets it through.
 - A read carrying an `offset` or `limit` is never refused. A failed stat (deleted or unreadable file) allows the call.
-- One refusal per accumulation: a run reading on anyway is not refused again, and the refusal re-arms when a fresh successful read of the target lands — the same shape as `investigation:guard`.
-- **In a dispatched lane child it is a `notice`, not a refusal** (`JOSH_LANE_CHILD`). See the `pretool:guard` lane-child enumeration below.
+- One refusal per accumulation: a run reading on anyway is not refused again, and the refusal re-arms when a fresh successful read of the target lands — the same shape as the investigation guard.
+- **In a dispatched lane child it is a `notice`, not a refusal** (`JOSH_LANE_CHILD`). See the `pretool:guard` lane-child enumeration above.
 - Set `JOSH_DUPLICATE_READ_GUARD` to `off` / `0` / `false` / `no` to disable.
 
-### `josh rule:guard`
+#### The rule guard
 
-<!-- usage: rule:guard -->
-
-Claude Code hook: deliver a trigger-delivered rule at the call that binds it (reads the tool call on stdin).
-
-```bash
-pnpm josh rule:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
-```
-
-<!-- /usage -->
-
-Wired to `PreToolUse` on `Bash` alone (timeout 20), in place of a rule resident in `CLAUDE.md`.
+Delivers a trigger-delivered rule at the call that binds it, in place of a rule resident in `CLAUDE.md` (`pnpm josh rule:list` prints every row).
 
 `scripts/rules/delivered-rules.ts` holds one row per relocated rule — an id, the trigger, and the refusal text.
 
@@ -194,8 +168,6 @@ Wired to `PreToolUse` on `Bash` alone (timeout 20), in place of a rule resident 
 
 Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deliver once per run, some on every occurrence, and some refuse until an earlier command has run.
 
-Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh rule:guard` in detail".
-
 ### `josh rule:list`
 
 <!-- usage: rule:list -->
@@ -209,24 +181,6 @@ pnpm josh rule:list   # print every trigger-delivered rule
 <!-- /usage -->
 
 The rules `rule-delivery.md` points at: one item per guard row of `scripts/rules/delivered-rules.ts`, then the `Stop` hook's rows. The prose is each row's own `about` field (the `Stop` rows' in `scripts/rules/stop-rule-rows.ts`), so a row cannot be added without it. A hookless agent reads it as its checklist.
-
-### `josh pretool:guard`
-
-<!-- usage: pretool:guard -->
-
-Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin).
-
-```bash
-pnpm josh pretool:guard   # run by the PreToolUse hook, the pending tool call as JSON on stdin
-```
-
-<!-- /usage -->
-
-It also runs `duplicate-read:guard`. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
-
-**How each guard behaves in a dispatched lane child is an enumeration** in `scripts/lane/lane-guard-policy.ts` — `refuse`, `notice` or `off` per guard; `lane-guard-policy.test.ts` pins it to the guards' live behavior.
-
-Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pretool:guard` in detail".
 
 ### `josh codex:hook-adapter`
 
@@ -981,7 +935,7 @@ The budget is [`josh gate`](josh-commands.md#josh-gate)'s; the pre-push install 
 - `<weight> -- <command...>`: the cores to reserve, then the command.
 - Claims a place before the command starts and waits while the budget is full, as a gate check does; the place is released when the command exits, and its exit code is forwarded.
 - A missing separator, a non-integer weight, or no command is a usage error (exit `1`).
-- A dispatched lane child that launches `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`) is refused by `pnpm josh rule:guard` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
+- A dispatched lane child that launches `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`) is refused by the `lane-direct-tool` row of `pnpm josh rule:list` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh reserved-run` in detail".
 

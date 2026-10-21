@@ -1,6 +1,6 @@
 ---
 name: investigator
-description: Read-only investigation unit for the pre-implementation reading — finds out how an Issue's subject currently works and returns the conclusion with its `file:line` citations, never the file text. Dispatch it when `pnpm josh investigation:guard` asks for a delegated unit, or when `pnpm josh delegate investigation` answers `delegate`.
+description: Read-only investigation unit for the pre-implementation reading — finds out how an Issue's subject currently works and returns the conclusion with its `file:line` citations, never the file text. Dispatch it when the `investigation` row of `pnpm josh rule:list` asks for a delegated unit, or when `pnpm josh delegate investigation` answers `delegate`.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: low

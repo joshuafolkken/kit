@@ -6,7 +6,7 @@ states only each command's contract — what it does, its arguments, output, exi
 ## `josh delegate` no longer counts investigation reads
 
 The investigation threshold's counting first lived beside the `josh delegate` enumeration; it moved
-into `josh investigation:guard`, which is why a delegation resets the counter rather than spending it.
+into the `investigation` row of `pnpm josh rule:list`, which is why a delegation resets the counter rather than spending it.
 
 ## Where each command came from
 
@@ -20,7 +20,6 @@ the behavior. joshuafolkken/kit#3280 moved these commands out of the automation 
 | `josh issue:already-done` | #4130                                    |
 | `josh pkg:scout`          | #2216                                    |
 | `josh issue:lint`         | #2123, #2212, #2353                      |
-| `josh defect:rate`        | #2449, #2455                             |
 | `josh defect:origin`      | #4272                                    |
 | `josh defect:report`      | #4272                                    |
 | `josh report:lint`        | #2123                                    |
@@ -30,7 +29,6 @@ the behavior. joshuafolkken/kit#3280 moved these commands out of the automation 
 | `josh auto-ok:next`       | #2928                                    |
 | `josh backlog:next`       | #2244, #2449, #2455, #2776, #2779, #2928 |
 | `josh backlog:plan`       | #2778                                    |
-| `josh backlog:stalled`    | #2359                                    |
 | `josh backlog:offer`      | #2335                                    |
 | `josh backlog:drive`      | #2499, #2508, #2881                      |
 | `josh oracle:list`        | #2324, #2334, #2808                      |
@@ -67,14 +65,6 @@ Prints `ok` and required labels when headings and either `## 背景` declaration
 
 A body declaring itself a behavior-change Issue with `- 種別: 振る舞い変更` is additionally held to three headings — `## 発火点`, `## ベースライン` and `## 再現`. The firing point is matched against the delivery table: a hook-deliverable tool (`Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`) passes, a real but undeliverable tool is a mismatch, and a non-tool name is off the table. The baseline must be `` `<command>` → <value> `` so it is re-runnable; prose is refused. The reproduction must be a backticked command and its actual output in a fenced block (` ``` ` or `~~~`); prose ("確認した") is refused for the same reason — a defect claimed from a reading rather than a reproduction is caught at filing. A code-only Issue is held to none of this. After merge, [`josh measure:rerun`](../josh-commands-automation.md#josh-measurererun) re-runs the baseline.
 
-## `josh defect:rate` in detail
-
-**Behavior:** the numerator is issues filed in the window labelled `bug`, `bugfix` or `route:interrupt`, or declaring `- 種別: 不具合`; the denominator is issues closed as completed in the window labelled `enhancement`. The labels read older issues, whose bodies rarely declared a kind, by the same standard as newer ones. With no completed enhancement, prints `n/a`. The search API returns at most 1000 results; beyond that the counts are lower bounds. An unreadable search exits 1. `backlog:next` uses this rate to prioritize defects.
-
-## `josh issue:backlinks` in detail
-
-**Verdicts:** `ok` (exit 0) when `## Upstream issues` lists repository-qualified references and each listed upstream cites `## Origin` back — a body with only `## Upstream candidate` (nothing filed yet) also reads `ok`; `missing-upstream` when no backlink heading is present; `missing-origin` when a listed upstream does not point back; `wrong-heading` for a near-miss heading (`## Upstream`), a bare `#N` reference, or a checkbox reference. Anything but `ok` exits 1.
-
 ## `josh stash:push` in detail
 
 The skills once pushed in two forms: `-u` with no exclusion, and no `-u` with `.josh/observations` excluded. Each was right about one thing. Without `-u`, a new untracked `*.test.ts` stays behind and the next `pnpm josh ms` refuses it. Without the exclusion, the run's own observation-ledger lines leave the tree before its commit or the batch-end flush can carry them.
@@ -95,7 +85,7 @@ stdout is one token per line (all exit 0 unless noted): `<number>…` (each an i
 
 **Triage gate**: a candidate is triaged when it carries `run:solo` (runs alone) or `run:lane` (may run beside others), matched case-insensitively. When any candidate of this repository carries neither, the command prints `triage` and no numbers — an untriaged issue may be one that must run alone, so none of the others may start either — and names the untriaged issues on stderr. `backlog:offer` maps it to the budget answer `untriaged`, `backlog:budget` answers `triage`, and `backlog:drive` hands it back to the parent. The gate runs before the `run:solo` gate below. `epic:next --lanes` applies it to a named epic's lanes too.
 
-Defect priority: on a `run` answer the command measures `defect:rate` over its default 14 days. While the rate is strictly above the baseline (0.73, `BASELINE_RATE` in `scripts/issue/defect-rate.ts`), the runnable numbers are re-ordered — defects (counted as `defect:rate`'s numerator counts them) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
+Defect priority: on a `run` answer the command measures the defect rate (`scripts/issue/defect-rate.ts`) over its default 14 days: the numerator is issues filed in the window labelled `bug`, `bugfix` or `route:interrupt`, or declaring `- 種別: 不具合`; the denominator is issues closed as completed in the window labelled `enhancement`; with none completed the rate is `n/a`. While the rate is strictly above the baseline (0.73, `BASELINE_RATE` in `scripts/issue/defect-rate.ts`), the runnable numbers are re-ordered — defects (counted as the rate's numerator counts them) first, new mechanisms (`- 種別: 振る舞い変更` without either) last, everything else in between — each kind keeping the graph's order. At or below the baseline, or when the rate cannot be read (noted on stderr), the order is unchanged. Only the order within the runnable set changes, so no dependency is crossed.
 
 Ranking: after the defect priority, this repository's runnable numbers are sorted by four keys, the earlier order breaking ties — `priority:critical` first, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then the number of open backlog issues blocked by it. The `run:solo` gate below sees the whole ranking; only then are the standalone (non-epic) numbers cut to five, and a number past the cut is listed as waiting.
 
@@ -105,9 +95,9 @@ Ranking: after the defect priority, this repository's runnable numbers are sorte
 
 - `--waves` — print the order the run takes instead of the sections. It assumes each wave merges before the next one starts, leaves out issues a run already has, and plans only this repository. A running issue of this repository counts as merged before wave 1, so an issue behind it reaches a wave rather than the unreached list; a parked one, or one in another repository, does not. Wave 1 is what `backlog:next` prints for an idle repository, or, when that is nothing, the issues the running ones release; each later wave marks the earlier ones closed and applies the same classification and `run:solo` gate again. A wave of several issues is marked `(parallel)`. Issues no wave reaches are listed last with their reason. Read-only, and refused with named issues or `--only`.
 
-## `josh backlog:stalled` in detail
+## The stall report in detail
 
-stdout is one verdict word, always exit 0 — it reports, it never stops: `stalled` (all three hold), `unreadable` (no run stream to key on), or `ok`. On `stalled` it leaves a `stall` marker on the run's event stream — once per episode, which is what a terminal reader following the stream sees and what `run:step` reads as `backlog:next` — and sends no Telegram notification (joshuafolkken/kit#4015): the next dispatch resolves a stall, and the idle notification of `backlog:drive` is what reaches the person. The cheap conditions gate the costly one: the backlog is only read when the run is already idle past the threshold with a free lane. Wired into the Stop hook (`stop-guard`) so it fires at each loop boundary; failures are swallowed so a report never holds a stop.
+The `Stop` hook (`stop-guard`) reports a stall when ready backlog work sits undispatched with a free lane and no recent dispatch — all three facts must hold. On a stall it leaves a `stall` marker on the run's event stream — once per episode, which is what a terminal reader following the stream sees and what `run:step` reads as `backlog:next` — and sends no Telegram notification (joshuafolkken/kit#4015): the next dispatch resolves a stall, and the idle notification of `backlog:drive` is what reaches the person. The cheap conditions gate the costly one: the backlog is only read when the run is already idle past the threshold with a free lane. It fires at each loop boundary; failures are swallowed so a report never holds a stop.
 
 ## `josh backlog:budget` in detail
 

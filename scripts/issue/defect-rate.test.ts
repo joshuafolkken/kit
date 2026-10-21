@@ -7,7 +7,6 @@ const CODE_ONLY_BODY = '## 背景\n\n- 種別: コードのみ\n'
 const NOW_MS = Date.parse('2026-09-23T14:00:00Z')
 const DAYS = 14
 const SINCE = '2026-09-09'
-const LOWER_BOUNDS = 'lower bounds'
 const INTERRUPT = 'route:interrupt'
 const ENHANCEMENT = 'enhancement'
 
@@ -113,27 +112,12 @@ describe('defect_rate.is_above_baseline', () => {
 	})
 })
 
-describe('defect_rate.format', () => {
+describe('defect_rate.rate_text', () => {
 	it('prints the rate with both counts', () => {
-		expect(defect_rate.format(result(20, 48))[0]).toBe(
-			'Defect rate over the last 14 days (since 2026-09-09): 0.42 (20 / 48)',
-		)
-	})
-
-	it('names both definitions on the detail lines', () => {
-		const [, defects, enhancements] = defect_rate.format(result(20, 48))
-
-		expect(defects).toContain('bug / bugfix / route:interrupt')
-		expect(defects).toContain(defect_rate.DEFECT_DECLARATION_LINE)
-		expect(enhancements).toContain('labelled enhancement, closed as completed')
+		expect(defect_rate.rate_text(result(20, 48))).toBe('0.42 (20 / 48)')
 	})
 
 	it('prints n/a rather than a number when the denominator is zero', () => {
-		expect(defect_rate.format(result(1, 0))[0]).toContain('n/a')
-	})
-
-	it('warns that the counts are lower bounds when the search was capped', () => {
-		expect(defect_rate.format(result(1, 2, true)).at(-1)).toContain(LOWER_BOUNDS)
-		expect(defect_rate.format(result(1, 2)).join('\n')).not.toContain(LOWER_BOUNDS)
+		expect(defect_rate.rate_text(result(1, 0))).toContain('n/a')
 	})
 })

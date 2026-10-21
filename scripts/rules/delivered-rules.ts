@@ -61,11 +61,13 @@ interface RuleAbout {
 	fires: string
 	// The silent turn — it matches the state in which the rule is already kept.
 	quiet: string
-	// The hook command that delivers it; absent reads as `RULE_GUARD`.
+	// The hook command that delivers it; absent reads as `PRETOOL_GUARD`.
 	entry?: string
 }
 
-const RULE_GUARD = 'pnpm josh rule:guard'
+// Every row here — batching and investigation included — is delivered by the one `PreToolUse`
+// process (`scripts/hooks/pretool-guard.ts`).
+const PRETOOL_GUARD = 'pnpm josh pretool:guard'
 
 // `id` keys the rule's own refusal record, so one rule firing never spends another's budget.
 interface DeliveredRule {
@@ -96,7 +98,7 @@ interface DeliveredRule {
 	former_reasons?: ReadonlyArray<string>
 }
 
-// Scored but possibly delivered by its own binary (batching, investigation) — joining `DELIVERED_RULES`
+// Scored but possibly delivered by its own guard inside `pretool-guard.ts` (batching, investigation) — joining `DELIVERED_RULES`
 // would refuse one violation twice — so `is_trigger` is optional here.
 type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 	is_trigger?: DeliveredRule['is_trigger']
@@ -250,7 +252,6 @@ const BATCHING_RULE: MeasuredRule = {
 	about: {
 		title: 'Turn batching',
 		topic: '`turn-batching.md`',
-		entry: 'pnpm josh batch:guard',
 		fires:
 			'the `Bash` / `Edit` / `Read` after three single-call turns in a row; fires **again** every three more such turns',
 		quiet: 'calls per round trip above the floor',
@@ -266,7 +267,6 @@ const INVESTIGATION_RULE: MeasuredRule = {
 	about: {
 		title: 'Investigation delegation threshold',
 		topic: '`delegation.md`',
-		entry: 'pnpm josh investigation:guard',
 		fires:
 			'the `Read` / `Bash` that makes the third read of a file the run will not edit; fires **again** once reads pile up to the threshold again',
 		quiet: 'reads under the threshold — nothing to delegate yet',
@@ -377,7 +377,7 @@ const delivered_rules = {
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	POLL_LOOP_REASON: poll_loop.POLL_LOOP_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
-	RULE_GUARD,
+	PRETOOL_GUARD,
 	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
 	RUN_TAIL_REASON: run_tail_rule.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,

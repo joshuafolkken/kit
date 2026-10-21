@@ -1,0 +1,8 @@
+{
+	"reason": "#4183: references to the retired guard commands now name the rule:list row that fires (acceptance criterion), slightly longer than the bare command name",
+	"date": "2026-10-21",
+	"growth": {
+		"ai_cost.resident_bytes": 29,
+		"ai_cost.on_demand_bytes": 206
+	}
+}

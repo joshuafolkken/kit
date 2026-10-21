@@ -13,6 +13,12 @@ const KIT_URL = 'https://registry.npmjs.org/@joshuafolkken%2fkit'
 // A scope routed to GitHub Packages. Its own name, because the scope's registry is memoized.
 const GITHUB_PACKAGE = '@github-routed/kit'
 const GITHUB_REGISTRY = 'https://npm.pkg.github.com/'
+// A scope whose registry names the GitHub host only in its path, which is not GitHub Packages.
+const PATH_PACKAGE = '@path-routed/kit'
+const SCOPE_REGISTRIES = [
+	['@github-routed', GITHUB_REGISTRY],
+	['@path-routed', 'https://example.com/npm.pkg.github.com/'],
+] as const
 const LATEST = '1.1035.0'
 const PUBLISHED_AT = '2026-10-02T12:48:29.697Z'
 const ABBREVIATED_ACCEPT = 'application/vnd.npm.install-v1+json'
@@ -28,9 +34,11 @@ function fake_result(stdout: string, exit_code = 0): ExecaSyncResult {
 function respond_with(packument: ExecaSyncResult): void {
 	execa_outcomes.mockImplementation((command: string, arguments_: ReadonlyArray<string>) => {
 		if (command !== 'pnpm') return packument
-		const is_github = arguments_.at(-1)?.startsWith('@github-routed') === true
+		const scope = arguments_.at(-1) ?? ''
 
-		return fake_result(is_github ? GITHUB_REGISTRY : 'undefined')
+		return fake_result(
+			SCOPE_REGISTRIES.find(([prefix]) => scope.startsWith(prefix))?.[1] ?? 'undefined',
+		)
 	})
 }
 
@@ -118,6 +126,13 @@ describe('npm_registry — a scope routed to GitHub Packages', () => {
 
 		expect(npm_registry.read_release_times(GITHUB_PACKAGE)).toBeUndefined()
 		expect(packument_requests()).toHaveLength(0)
+	})
+
+	it('reads public npm when the registry names the GitHub host only in its path', () => {
+		respond_with(fake_result(LATEST_BODY))
+
+		expect(npm_registry.read_latest(PATH_PACKAGE)).toBe(LATEST)
+		expect(packument_requests()).toHaveLength(1)
 	})
 })
 

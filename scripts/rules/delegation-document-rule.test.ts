@@ -204,7 +204,7 @@ describe('the widened unit is one row, not a second', () => {
 const THRESHOLD_SENTENCE = `the threshold is ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files, and it is a count, not a forecast`
 // What a delegation does to the count.
 const RESET_SENTENCE = 'a delegation resets the counter rather than spending it'
-const READ_GUARD_COMMAND = 'josh investigation:guard'
+const READ_GUARD_COMMAND = 'the `investigation` row of `pnpm josh rule:list`'
 
 describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (document_path) => {
 	const unwrapped = read_unwrapped(document_path)

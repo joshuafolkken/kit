@@ -1,4 +1,4 @@
-import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import type { CommandEntry } from './josh-command-types'
 
 const EXCLUDE = '--exclude <N>'
 const JUST_MERGED = 'skip the issue just merged'
@@ -94,17 +94,6 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				},
 			],
 		},
-	},
-	'backlog:stalled': {
-		script: 'scripts/backlog/backlog-stalled-cli.ts',
-		// A stall sends one Telegram warning. The `Stop` hook calls the detector
-		// directly, so this flag costs only the manual command its in-process dispatch.
-		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		description:
-			'Report whether ready backlog work is sitting undispatched with a free lane and no recent dispatch',
-		category: 'AI tools',
-		reference: ['', 'automation', ['network']],
-		usage: { examples: [{ arguments: '' }] },
 	},
 	'backlog:budget': {
 		script: 'scripts/backlog/backlog-budget-main.ts',

@@ -3,7 +3,7 @@ import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // How long a free lane stayed empty, and why: the ledger's `held` entries of one period reduced to one
-// row per reason, printed by `josh lane:stats` so the idle capacity a `backlog:stalled` episode reported
+// row per reason, printed by `josh lane:stats` so the idle capacity a backlog stall episode reported
 // is split by cause — an offer that started nothing apart from a driver waiting on its session
 // (joshuafolkken/kit#3995).
 //

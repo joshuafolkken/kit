@@ -29,8 +29,8 @@ const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 const SHELL_BODY = 'shell-body'
 const BODY_BY_PATH = 'pnpm josh followup --notify-message-file /tmp/body.md'
 
-// The rule delivered by a binary of its own, so `rule:value` reads it from `MEASURED_RULES` while
-// `rule:guard` never delivers it (joshuafolkken/kit#1792).
+// The rule delivered by a guard of its own, so `rule:value` reads it from `MEASURED_RULES` while
+// `DELIVERED_RULES` never delivers it (joshuafolkken/kit#1792).
 const BATCHING = 'batching'
 // The second rule delivered by a binary of its own (joshuafolkken/kit#1764).
 const INVESTIGATION = 'investigation'
@@ -459,7 +459,7 @@ describe('rule_value.measure — a folded turn is not reordered around a unit ca
 // The second rule delivered by a binary of its own, and the one whose subject is the largest
 // contributor any mechanism here addresses (joshuafolkken/kit#1764).
 describe('rule_value.measure — the investigation guard, which delivers itself', () => {
-	// A row in `DELIVERED_RULES` would refuse a violation `josh investigation:guard` is already
+	// A row in `DELIVERED_RULES` would refuse a violation the investigation guard is already
 	// refusing — two records written for one call, of which Claude Code surfaces one.
 	it('is scored from the measured registry and delivered from neither', () => {
 		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).not.toContain(INVESTIGATION)

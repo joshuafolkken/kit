@@ -234,7 +234,7 @@ The driver offers once a minute while it waits, so consecutive entries cover the
 ends at the dispatch or the release. A hold past an hour is a driver nobody restarted, and it reads as
 ended at the hour.
 
-**The decision the table is for**: what `backlog:stalled`'s "ready, free lane, no dispatch" time is
+**The decision the table is for**: what the `Stop` hook's stall report's "ready, free lane, no dispatch" time is
 made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
 own answer. Compare the rows from one period to the next to show the idle time shrinking.
 

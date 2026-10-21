@@ -139,30 +139,30 @@ single source of the enumeration, and of what a turn on which the trigger does n
 `prompts/collaboration-workflow/rule-delivery.md`; no count is copied here** — a number kept in two
 places always drifts (joshuafolkken/kit#1525).
 
-- **Independent calls go in the same turn** — the trigger is `pnpm josh batch:guard` (the `Bash` /
+- **Independent calls go in the same turn** — the trigger is the `batching` row of `pnpm josh rule:list` (the `Bash` /
   `Edit` / `Read` after three single-call turns in a row). What the resident period measured was that
   **residency was not working** (figures at the pointer). Measurements, rejected mechanisms and the
   condition never to weaken a gate are in `prompts/collaboration-workflow/turn-batching.md` and
   `docs/maintainers/turn-batching-rationale.md`; `scripts/rules/turn-batching-rule.test.ts` pins it
   (joshuafolkken/kit#1304, #1390, #1524; `Edit` joined in #1762, `Read` in #1798).
-- **The backlog WIP cap** — delivered by `pnpm josh rule:guard` from joshuafolkken/kit#1524 until
+- **The backlog WIP cap** — delivered by `pnpm josh rule:list`'s rows from joshuafolkken/kit#1524 until
   joshuafolkken/kit#3423, which retired the row: `pnpm josh issue:file` counts the cap and holds the
   filing itself, so the pre-refusal was a pure round trip. Its hold message still carries how to count,
   the decision not to file, the two exemptions and **the three interrupt tests**; dropping the three
   would put "is it serious" back into judgement (joshuafolkken/kit#1518). Posting a comment is not
   filing and is out of scope. The procedure and the conditions for moving the numbers are in
   `prompts/collaboration-workflow/wip-cap.md` (joshuafolkken/kit#1469).
-- **Reading Issue comments** — the trigger is `pnpm josh rule:guard` (a `Bash` that reads only an Issue
+- **Reading Issue comments** — the trigger is the `issue-comments` row of `pnpm josh rule:list` (a `Bash` that reads only an Issue
   body). The refusal hands over the re-read with comments and how to treat a comment that contradicts
   the body. It refuses every time until the precondition is met, so it refuses even on a turn where
-  `batch:guard`'s trigger overlaps. The procedure stays in `issue-comments.md`, because a session that
+  the `batching` row's trigger overlaps. The procedure stays in `issue-comments.md`, because a session that
   runs no hooks still has the duty to read.
-- **Never put a body in shell double quotes** — the trigger is `pnpm josh rule:guard` (a `Bash` whose body
+- **Never put a body in shell double quotes** — the trigger is the `shell-body` row of `pnpm josh rule:list` (a `Bash` whose body
   value contains a backtick or `$`). **The trigger reads the body, not the flag** — every worked example
   passes a harmless placeholder, so keying on the flag would refuse turns already keeping the rule.
   Measurements, safe spellings and the trigger's blind spots — the spellings the regex does not know
   included — are in `prompts/collaboration-workflow/shell-body.md` (joshuafolkken/kit#1198).
-- **Never carry a file's new text inside a command** — the trigger is `pnpm josh rule:guard` (a `Bash`
+- **Never carry a file's new text inside a command** — the trigger is the `file-body` row of `pnpm josh rule:list` (a `Bash`
   that carries a file body). The criterion is "does it carry the whole body", not the tool name, and
   **widening an `Edit` to the whole file is part of the same rule** (joshuafolkken/kit#1150, #1260).
   The table is `prompts/collaboration-workflow/file-edits.md`, the measurements

@@ -53,7 +53,7 @@ avoiding. So passing both is refused rather than resolved in favor of either.
 
 **That writing a rule down is not enough to have it followed has been measured repeatedly in this
 repository** ([`rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md)). So this rule
-rides as one row of the joshuafolkken/kit#1524 mechanism, and `pnpm josh rule:guard` refuses the matching `Bash` call and
+rides as one row of the joshuafolkken/kit#1524 mechanism, and the `shell-body` row of `pnpm josh rule:list` refuses the matching `Bash` call and
 puts the rule in front of the run. The enumeration's row is `shell-body` in
 `scripts/rules/delivered-rules.ts`, and the trigger it reads — which spellings carry a body inline and
 what the shell does to that value — is in `scripts/rules/shell-body-trigger.ts`.

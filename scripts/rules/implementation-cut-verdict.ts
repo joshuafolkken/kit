@@ -11,7 +11,7 @@ import { z } from 'zod'
 // threshold crossing rather than once per run, that read can no longer be paid on every edit, so the
 // verdict is cached beside the instant it was read and a burst of edits shares one read.
 //
-// **An in-memory memo cannot span two edits.** `pnpm josh rule:guard` runs as a fresh process on each
+// **An in-memory memo cannot span two edits.** `pnpm josh pretool:guard` runs as a fresh process on each
 // `PreToolUse`, so the cache is a per-checkout stamp rather than a module variable — the same handoff
 // shape the refusal stamp itself uses.
 //
