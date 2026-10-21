@@ -26,12 +26,26 @@ const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 	'metrics',
 ])
 // A command is `josh <name>` at the start of a shell command — after a separator, past env
-// assignments and a `pnpm` / `npx` runner — so `josh lint:related; josh test:related` names both.
-// A heredoc body or a quoted string only mentions a command, so both are cut before matching.
-const SEPARATOR_PATTERN = /[;&|(\n]/u
+// assignments, shell keywords and a `pnpm` / `npx` runner — so `josh lint:related; josh test:related`
+// and `out=$(pnpm josh gate)` name their commands. A heredoc body or a quoted string only mentions a
+// command, so both are cut before matching; a `<<<` here-string opens no body.
+const SEPARATOR_PATTERN = /[;&|()\n]/u
 const WORD_PATTERN = /\s+/u
-const RUNNERS: ReadonlySet<string> = new Set(['pnpm', 'npx'])
-const HEREDOC_TAG_PATTERN = /<<-?\s*['"]?(?<tag>\w+)/u
+const PREFIX_WORDS: ReadonlySet<string> = new Set([
+	'pnpm',
+	'npx',
+	'if',
+	'elif',
+	'else',
+	'then',
+	'while',
+	'until',
+	'do',
+	'time',
+	'!',
+	'{',
+])
+const HEREDOC_TAG_PATTERN = /(?<!<)<<(?!<)-?\s*['"]?(?<tag>\w+)/u
 const QUOTED_PATTERN = /'[^']*'|"(?:[^"\\]|\\.)*"/gu
 // `scripts/gate/core-wait.ts` writes this into every wait line it prints.
 const CORE_WAIT_PHRASE = 'waits for the core budget'
@@ -61,7 +75,7 @@ function without_heredocs(text: string): string {
 // The josh command `segment` runs, or `''` when it runs none.
 function segment_command(segment: string): string {
 	const words = segment.trim().split(WORD_PATTERN)
-	const start = words.findIndex((word) => !word.includes('=') && !RUNNERS.has(word))
+	const start = words.findIndex((word) => !word.includes('=') && !PREFIX_WORDS.has(word))
 
 	return words[start] === 'josh' ? (words[start + 1] ?? '') : ''
 }

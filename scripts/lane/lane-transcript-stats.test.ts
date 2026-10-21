@@ -96,6 +96,25 @@ describe('lane_transcript_stats.table — mentioned commands', () => {
 		expect(value_of(mention_table, SOLO)).toBe('1')
 		expect(value_of(mention_table, CHAINED)).toBe('0')
 	})
+
+	it('keeps the lines after a here-string, which opens no heredoc body', () => {
+		const here_string = call({ command: `grep a <<< "word"\n${GATE}` })
+
+		expect(value_of(lane_transcript_stats.table([here_string], WINDOW), SOLO)).toBe('1')
+	})
+})
+
+describe('lane_transcript_stats.table — wrapped commands', () => {
+	it('names a command inside a subshell, a substitution or after a shell keyword', () => {
+		const wrapped = [
+			call({ command: `(cd lane && ${LINT})` }),
+			call({ command: `out=$(${GATE})` }),
+			call({ command: `if true; then ${GATE}; fi` }),
+			call({ command: `time ${GATE}` }),
+		]
+
+		expect(value_of(lane_transcript_stats.table(wrapped, WINDOW), SOLO)).toBe('4')
+	})
 })
 
 describe('lane_transcript_stats.table — tool time', () => {

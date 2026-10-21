@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/gate/machine-capacity.ts:354 | 2026-10-21 | #4361
