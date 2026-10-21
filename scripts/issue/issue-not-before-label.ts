@@ -5,6 +5,7 @@ import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { error_text } from '#scripts/lib/error-message'
 import { has_label_name, NOT_BEFORE_LABEL, REPOSITORY_LABELS } from './issue-labels'
 import { issue_not_before } from './issue-not-before'
+import { issue_sample_gate } from './issue-sample-gate'
 import { session_cite } from './session-cite'
 
 // joshuafolkken/kit#4079: the body's start-time declaration held an issue back from `backlog:next`,
@@ -26,7 +27,7 @@ const NOT_APPLIED = 'the label was not applied'
 const LABELLED_LIMIT = 200
 
 function is_waiting(body: string | undefined, now: number): boolean {
-	return issue_not_before.waiting_date(body, now) !== undefined
+	return !issue_not_before.is_due(body, now)
 }
 
 // What the label owes one issue: `add` while the declared time is ahead and the label is absent,
@@ -125,6 +126,7 @@ async function sweep(
 	const seen = new Set(scanned.map((issue) => issue.number))
 	const labelled = await read_labelled()
 
+	await issue_sample_gate.prime(labelled.map((issue) => issue.body))
 	await sync([...scanned, ...labelled.filter((issue) => !seen.has(issue.number))], now)
 }
 

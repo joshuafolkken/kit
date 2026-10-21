@@ -108,6 +108,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['epic/epic-next-views.ts', 1],
 	['epic/epic-reference.ts', 1],
 	['epic/epic-solo-stale.ts', 1],
+	['issue/issue-sample-gate.ts', 1],
 	['epic/epic-solo.ts', 2],
 	['epic/epic-triage.ts', 1],
 	['issue/defect-origin.ts', 2],

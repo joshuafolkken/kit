@@ -190,20 +190,20 @@ function park_comment(reason: ParkReason): string {
 	return [
 		`Parked with \`${RUN_STALLED_LABEL}\` by \`pnpm josh run:merge\`, the \`backlogrun\` driver — a mechanical failure, with no decision to make.`,
 		`- Why: ${reason.cause}`,
-		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker or start date still ahead.',
+		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker, start date still ahead or sample condition not yet met.',
 		streak_line(reason.carry),
 		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child)}.`,
 	].join('\n')
 }
 
 // Why the run released a child it would otherwise have parked: the child records open blockers or a
-// start date still ahead, so when it runs is already decided and it waits rather than asking a person.
+// start date still ahead or samples still short, so when it runs is already decided and it waits rather than asking a person.
 // Script-emitted, so English.
 function waiting_comment(waits: ReadonlyArray<string>): string {
 	return [
 		'Released to wait by `pnpm josh run:merge`, the `backlogrun` driver — not parked, and not counted as a failure.',
 		`- Why: the child’s session ended unfinished while it waits on: ${waits.join(', ')}.`,
-		'- Next: when it runs is already recorded — it becomes runnable again once its blockers merge and its start date arrives; a blocker outside the backlog still needs a person to land it.',
+		'- Next: when it runs is already recorded — it becomes runnable again once its blockers merge, its start date arrives and its sample condition is met; a blocker outside the backlog still needs a person to land it.',
 	].join('\n')
 }
 

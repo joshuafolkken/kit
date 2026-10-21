@@ -9,6 +9,7 @@ import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
@@ -208,7 +209,11 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 		LISTING_LIMIT,
 	)
 
-	return json === undefined ? await classify_failed_read() : parse_listing(json, is_capped)
+	const read = json === undefined ? await classify_failed_read() : parse_listing(json, is_capped)
+
+	if (read.kind === 'read') await issue_sample_gate.prime(read.issues.map((issue) => issue.body))
+
+	return read
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native

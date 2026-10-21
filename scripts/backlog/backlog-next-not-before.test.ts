@@ -7,6 +7,7 @@ import {
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { PRIORITY_CRITICAL_LABEL } from '#scripts/issue/issue-labels'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -22,6 +23,7 @@ const PAST = '2000-01-01T00:00Z'
 const READING_REPO = 'joshuafolkken/kit'
 const NOT_BEFORE = 'not-before'
 const OTHER_ISSUE_NUMBER = 9001
+const MEASURED_PR = 4313
 
 const streams = console_streams()
 const { stdout, stderr } = streams
@@ -45,6 +47,7 @@ function classify(row: OpenIssueData): ReturnType<typeof backlog_pool.classify_s
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	issue_sample_gate.reset()
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(git_gh_issue_write, 'label_ensure').mockResolvedValue()
@@ -91,6 +94,34 @@ describe('backlog:next with a declared start time', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 		expect(stderr()).not.toContain('not before')
+	})
+})
+
+// joshuafolkken/kit#4414: a sample condition names its pull request, so the reason is linkified.
+describe('backlog:next with a declared sample condition', () => {
+	const sampled: OpenIssueData = {
+		...issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+		body: `## 背景\n\n- 実施可能条件: #${String(MEASURED_PR)} のマージ後 3 マージ\n`,
+	}
+
+	beforeEach(() => {
+		backlog_fixture.stub_backlog({ opted_in: [sampled] })
+		vi.spyOn(issue_sample_gate, 'prime').mockResolvedValue()
+	})
+
+	it('waits and links the pull request it waits on', async () => {
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
+		expect(stderr()).toContain(`until the merge of [#${String(MEASURED_PR)}](`)
+	})
+
+	it('labels the issue not-before while it waits', async () => {
+		await backlog_next.run([])
+
+		expect(git_gh_issue_write.issue_add_label).toHaveBeenCalledWith(
+			String(OLD_ISSUE_NUMBER),
+			NOT_BEFORE,
+		)
 	})
 })
 

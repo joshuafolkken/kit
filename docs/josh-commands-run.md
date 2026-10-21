@@ -446,7 +446,7 @@ child (CLOSED) is counted into the carry record (resetting the failure streak), 
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API) has it dropped, unparked and uncounted: re-dispatchable;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
-an open blocker or a `- 実施可能日:` still ahead (or, its body unreadable, carries `not-before`): then it
+an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
 newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`.
@@ -667,6 +667,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `❓` — the issue carries neither `run:lane` nor `run:solo`; with a standing blocker, the column names the first one. It leads a blocked row too, since judging it is what a person can do meanwhile.
 - `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker that overruns the column — another repository's `owner/repo#N` — leaves it blank, and every blocker follows the title.
 - `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local time; `backlog:next` keeps the UTC spelling.
+- `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
 - `✋ <N>` — judged and unblocked, but the unblocked untriaged issue `<N>` withholds the whole pool.
 - `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and is running …" from.

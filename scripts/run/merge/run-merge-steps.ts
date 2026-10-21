@@ -8,6 +8,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_park } from '#scripts/issue/issue-park'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
@@ -329,16 +330,17 @@ async function has_not_before_label(ctx: MergeContext): Promise<boolean> {
 }
 
 // The child's declared start date while it is still ahead (joshuafolkken/kit#4076), or its `not-before`
-// label when the body could not be read (joshuafolkken/kit#4102). A due date or none answers none, so
-// the child is parked as before.
+// label when the body could not be read (joshuafolkken/kit#4102), or the samples it still waits on. A
+// due date or none answers none, so the child is parked as before.
 async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>> {
 	const body = await git_gh_command.issue_get_body(ctx.child, ctx.repo)
 
 	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : NO_WAITS
 
-	const date = issue_not_before.waiting_date(body)
+	await issue_sample_gate.prime([body])
+	const reason = issue_not_before.waiting_reason(body)
 
-	return date === undefined ? NO_WAITS : [`start date ${date}`]
+	return reason === undefined ? NO_WAITS : [reason]
 }
 
 // A child that ended unfinished while an open blocker it records still has to land first, or while
