@@ -12,6 +12,7 @@ const RECORDER = path.join(SCRIPTS, 'test', 'test-read-capture.ts')
 const READER_RELATIVE = path.join('scripts', 'docs-reader.ts')
 const READER = path.join(ROOT, READER_RELATIVE)
 const TEST_FILE = path.join(SCRIPTS, 'docs-reader.test.ts')
+const HELPER = path.join(SCRIPTS, 'lib', 'read-file.ts')
 const DOCUMENT = 'docs/a.md'
 const DEPENDENCY = path.join(ROOT, 'node_modules', 'glob', 'index.js')
 
@@ -85,8 +86,18 @@ describe('test_read_trace.read_target', () => {
 })
 
 describe('test_read_trace.stack_reader', () => {
-	it('answers the first repository frame below the recorder', () => {
+	// joshuafolkken/kit#4417: a shared helper between the test and `fs` answered as the reader, and
+	// `vitest related` widened every read through it to every test importing the helper.
+	it('answers the test, not the helper it read through, for a read a test makes', () => {
 		const scripts = ['node:fs', RECORDER, DEPENDENCY, READER, TEST_FILE]
+
+		expect(test_read_trace.stack_reader({ root: ROOT, scripts, recorder: RECORDER })).toBe(
+			path.relative(ROOT, TEST_FILE),
+		)
+	})
+
+	it('answers the module whose evaluation made the read when no test is on the stack', () => {
+		const scripts = ['node:fs', RECORDER, HELPER, READER, DEPENDENCY]
 
 		expect(test_read_trace.stack_reader({ root: ROOT, scripts, recorder: RECORDER })).toBe(
 			READER_RELATIVE,
