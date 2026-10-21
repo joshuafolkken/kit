@@ -56,19 +56,22 @@ async function gate_stage(): Promise<StepResult> {
 	return { ...result, is_skipped }
 }
 
+// The default branch is merged before the gate, so the pull request opens on a branch that is current;
+// a clean merge goes on without waking anyone. A merge after the gate would move the merge base the
+// gate's record pins, so the pre-push hook could not reuse that record. **With `--review` it runs before
+// round 1 too**: the gate round 1 launches then reads the base the commit carries, so a clean round
+// leaves the gate stage a reuse rather than a whole second gate over a moved base (joshuafolkken/kit#4442).
+const SYNC_STEP: Step = {
+	stage: STAGE.SYNC,
+	header: run_ship.SYNC_HEADER,
+	run: async (args) => await run_ship_sync.sync_stage(args.number),
+}
+
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
 // first: a round-1 reviewer may have edited the tree since the preflight, and `josh gate` refuses a tree
 // with no green record. The commit step carries the `--skip-*` flags a resumed ship needs, so an
 // existing commit or push is never made twice.
 const COMMIT_STEPS: ReadonlyArray<Step> = [
-	// The default branch is merged again before the commit, so the pull request opens on a branch that
-	// is current; a clean merge goes on without waking anyone. It runs before the gate: a merge after it
-	// would move the merge base the gate's record pins, so the pre-push hook could not reuse that record.
-	{
-		stage: STAGE.SYNC,
-		header: run_ship.SYNC_HEADER,
-		run: async (args) => await run_ship_sync.sync_stage(args.number),
-	},
 	{
 		stage: STAGE.GATE,
 		header: run_ship.GATE_HEADER,
@@ -106,8 +109,8 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 ]
 
 // `--review` puts the supervised round-1 review in front of the gate: it launches the gate itself, so
-// the gate stage that follows reuses that tree's green record unless the sync stage between them
-// merged the default branch and changed the tree. It also puts the round-2 pass between the commit
+// the gate stage that follows reuses that tree's green record unless the round changed the tree. It
+// also puts the round-2 pass between the commit
 // and the followup, so the PR opens between the rounds and round 2 runs beside CI — a no-op when
 // round 1 left no fix delta.
 const REVIEW_STEP: Step = {
@@ -123,9 +126,9 @@ const ROUND_TWO_STEP: Step = {
 }
 
 function steps(args: ShipArguments): ReadonlyArray<Step> {
-	if (!args.is_review) return [PREFLIGHT_STEP, ...COMMIT_STEPS, ...MERGE_STEPS]
+	if (!args.is_review) return [PREFLIGHT_STEP, SYNC_STEP, ...COMMIT_STEPS, ...MERGE_STEPS]
 
-	return [PREFLIGHT_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
+	return [PREFLIGHT_STEP, SYNC_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
 }
 
 const run_ship_steps = { PREFLIGHT_STEP, steps }

@@ -18,13 +18,18 @@ import { lane_transcript_calls, type ToolCall } from './lane-transcript-calls'
 // fractional `--period` (since a merge) counts the same calls whichever session they sit in.
 
 const TIMED_COMMANDS: ReadonlyArray<string> = ['lint:related', 'test:related']
-const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
-	...TIMED_COMMANDS,
-	'cspell:dot',
-	'gate',
-	'ship',
-	'metrics',
-])
+// **The verification calls split by what ran them** (joshuafolkken/kit#4442): the scoped checks of the
+// implementation loop, a whole `gate` or `metrics` run by hand before the ship, and the `ship` call —
+// whose own gate runs inside it and is the ledger's to count — so a hand-run gate is never hidden in the
+// loop's volume. A call naming two classes counts in each.
+const CALL_CLASSES: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [
+	['verification calls, scoped checks', new Set([...TIMED_COMMANDS, 'cspell:dot'])],
+	['verification calls, gate / metrics by hand', new Set(['gate', 'metrics'])],
+	['verification calls, ship', new Set(['ship'])],
+]
+const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set(
+	CALL_CLASSES.flatMap(([, names]) => [...names]),
+)
 // A command is `josh <name>` at the start of a shell command — after a separator, past env
 // assignments, shell keywords and a `pnpm` / `npx` runner — so `josh lint:related; josh test:related`
 // and `out=$(pnpm josh gate)` name their commands. A heredoc body or a quoted string only mentions a
@@ -127,6 +132,16 @@ function solo_median_row(verifying: ReadonlyArray<ToolCall>, name: string): Arra
 	return [`${name} median, solo (s)`, seconds_cell(lane_stats.median(durations(solo)))]
 }
 
+function class_rows(verifying: ReadonlyArray<ToolCall>): Array<Array<string>> {
+	return CALL_CLASSES.map(([metric, names]) => {
+		const named = verifying.filter((call) =>
+			verification_commands(call.command).some((name) => names.has(name)),
+		)
+
+		return [metric, String(named.length)]
+	})
+}
+
 function rows_of(calls: ReadonlyArray<ToolCall>): Array<Array<string>> {
 	const times = session_times(calls)
 	const verifying = calls.filter((call) => verification_commands(call.command).length > 0)
@@ -139,6 +154,7 @@ function rows_of(calls: ReadonlyArray<ToolCall>): Array<Array<string>> {
 		['tool time per session, mean (min)', lane_stage_stats.cell(lane_stats.mean(times))],
 		['verification calls, solo', String(verifying.length - chained.length)],
 		['verification calls, chained', String(chained.length)],
+		...class_rows(verifying),
 		['waited for the core budget', share_cell(waited.length, verifying.length)],
 		...TIMED_COMMANDS.map((name) => solo_median_row(verifying, name)),
 	]

@@ -75,6 +75,15 @@ describe('lane_transcript_stats.table — verification calls', () => {
 		expect(value_of(table, WAITED)).toBe('1 of 5 (20.0%)')
 	})
 
+	it('splits the calls into the scoped checks, a gate or metrics by hand, and the ship', () => {
+		const shipped = [...calls, call({ command: 'pnpm josh ship --detach --review "t #1"' })]
+		const split_table = lane_transcript_stats.table(shipped, WINDOW)
+
+		expect(value_of(split_table, 'verification calls, scoped checks')).toBe('4')
+		expect(value_of(split_table, 'verification calls, gate / metrics by hand')).toBe('1')
+		expect(value_of(split_table, 'verification calls, ship')).toBe('1')
+	})
+
 	it('counts commands joined by a bare separator as chained', () => {
 		const joined = call({ command: `${LINT}; pnpm josh test:related&&${GATE}` })
 		const joined_table = lane_transcript_stats.table([joined], WINDOW)

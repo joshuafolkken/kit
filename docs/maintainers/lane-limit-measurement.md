@@ -305,6 +305,9 @@ It prints tool time per session, the verification calls (`lint:related` / `test:
 `cspell:dot` / `gate` / `ship` / `metrics`), the share that waited for the core budget, and the
 `lint:related` / `test:related` medians.
 
+- The verification calls are also split by class: the scoped checks, `gate` / `metrics` run by hand,
+  and `ship`. A gate inside `ship` is not a call; the ledger's `gate (whole)` row counts it
+  ([#4442](https://github.com/joshuafolkken/kit/issues/4442)).
 - A call is timed from its `tool_use` line to its `tool_result` line, in the foreground only.
 - One Bash call naming two verification commands is counted as chained; the medians take solo calls.
 - The period is cut at each call's timestamp. A delegated unit's transcript is not a session.

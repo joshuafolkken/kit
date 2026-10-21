@@ -54,6 +54,12 @@ describe('run_board_estimate.left_ms for a running child', () => {
 		expect(run_board_estimate.left_ms(read({ active }))).toBe(4 * MINUTE)
 	})
 
+	it('counts the gate still ahead of a child in its sync', () => {
+		const active = [running(1, 'sync', 0)]
+
+		expect(run_board_estimate.left_ms(read({ active }))).toBe(10 * MINUTE)
+	})
+
 	it('counts a failed ship as back at implement', () => {
 		const active = [running(1, 'failed', 0)]
 
