@@ -309,8 +309,8 @@ function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
 // swaps out 0.4–1.3 TB a day as a matter of course, so that traffic held about a third of every wait
 // with memory to spare (joshuafolkken/kit#4313). A claim now waits on memory only when the free figure
 // falls short of what it declares; the traffic still names the wait as pressure (`memory_pressured`),
-// and holds a lone claim that would run alone past the shortfall (`core_admission.is_admitted`,
-// joshuafolkken/kit#4451).
+// and holds a claim past the shortfall that running alone or the wait cap would otherwise start
+// (`core_admission.is_swap_held`, joshuafolkken/kit#4451).
 function pressured_available(after: MemoryReading): number | undefined {
 	if (after.available_mb === undefined) return undefined
 

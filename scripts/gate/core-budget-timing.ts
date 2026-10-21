@@ -3,8 +3,8 @@
 const POLL_INTERVAL_MS = 50
 // The longest a reservation waits before it is admitted at minimum width regardless — a heavy step must
 // make progress even if the budget never clears, so a leaked or wedged sibling cannot stall the machine
-// for good. Two minutes is well past a unit suite's worst measured time under six-way load. A lone claim
-// a swap stall holds is the exception (`core_admission.is_swap_held`).
+// for good. Two minutes is well past a unit suite's worst measured time under six-way load. A claim a
+// swap stall holds is the exception (`core_admission.is_swap_held`).
 const WAIT_CAP_MS = 120_000
 
 // The clock and cadence a wait runs on, resolved apart from the ledger fields so `reserve` stays under

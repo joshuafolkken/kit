@@ -260,7 +260,7 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 
 	if (reason === undefined) return admit(context, undefined, granted)
 
-	// Past the cap a held claim runs regardless, except a lone one a swap stall holds.
+	// Past the cap a held claim runs regardless, except one a swap stall holds.
 	if (
 		context.now() >= context.deadline &&
 		!core_admission.is_swap_held(context.key, reservations, budget)

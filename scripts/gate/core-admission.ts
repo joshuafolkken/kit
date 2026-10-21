@@ -50,7 +50,8 @@ interface Overflow {
 }
 
 // `granted` is set only when a unit claim was narrowed to the room left at the wait cap. `waited_ms` is
-// how long the claim waited, zero for one admitted on its first read (joshuafolkken/kit#4451).
+// how long the claim waited, about one machine read's window for one admitted on its first read
+// (joshuafolkken/kit#4451).
 interface Admission {
 	overflow: Overflow | undefined
 	granted?: number | undefined
@@ -148,14 +149,17 @@ function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget
 // the memory test, so a lone gate started a 2.4 GB lint into a stall with 1.7 GB free and swapped it
 // for 830 s. Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
 // heavier than free memory on a calm machine would wait for room that never comes.
-function is_swap_stalled(own: LedgerEntry, budget: MachineBudget): boolean {
-	return budget.memory_pressured === true && (own.reservation.memory_mb ?? 0) > budget.memory_mb
+function is_swap_stalled({ own, running }: Placement, budget: MachineBudget): boolean {
+	const needed_mb = sum_load([...running, own]).memory_mb
+
+	return budget.memory_pressured === true && needed_mb > budget.memory_mb
 }
 
-// **The wait cap does not release a swap-stall hold** (joshuafolkken/kit#4451): the cap exists so a
-// wedged sibling cannot stall the machine for good, but a lone claim has no sibling, and a stall ends
-// when its traffic stops or its memory is free. Released at the cap, a 2.4 GB lint started into the
-// stall it waited on and swapped for the same 830 s.
+// **The wait cap does not release a swap-stall hold, for any claim** (joshuafolkken/kit#4451): the cap
+// exists so a wedged sibling cannot stall the machine for good, but a stall ends when its traffic stops
+// or its memory is free, so the hold cannot outlive it. Released at the cap, a 2.4 GB lint started into
+// the stall it waited on and swapped for the same 830 s — and holding only a lone claim let a gate's
+// later claims start into the stall at their own caps, after which the lint was no longer alone.
 function is_swap_held(
 	key: string,
 	reservations: ReadonlyArray<LedgerEntry>,
@@ -163,18 +167,16 @@ function is_swap_held(
 ): boolean {
 	const placement = place(key, reservations)
 
-	if (placement === undefined || !placement.is_oldest || placement.running.length > 0) return false
-
-	return is_swap_stalled(placement.own, budget)
+	return placement !== undefined && is_swap_stalled(placement, budget)
 }
 
 // The oldest claim runs alone once nothing else does — unless the machine is overloaded, where it waits
 // like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap, or stalled
 // on swap (`is_swap_stalled`), where it waits until the traffic stops or its memory is free.
-function runs_alone({ own, is_oldest, running }: Placement, budget: MachineBudget): boolean {
-	if (!is_oldest || running.length > 0) return false
+function runs_alone(placement: Placement, budget: MachineBudget): boolean {
+	if (!placement.is_oldest || placement.running.length > 0) return false
 
-	return budget.is_overloaded !== true && !is_swap_stalled(own, budget)
+	return budget.is_overloaded !== true && !is_swap_stalled(placement, budget)
 }
 
 // **Admission: the oldest claim runs once nothing else does, then claim order, then a bounded pass.**
