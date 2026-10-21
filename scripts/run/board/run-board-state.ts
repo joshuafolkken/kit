@@ -68,6 +68,8 @@ interface BoardState extends GatherRead {
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_fetch: Fetch<ClosedAnswer> | undefined
 	closed_attempted_ms: number | undefined
+	// The children the last closed read asked about — a child not among them is asked without waiting.
+	closed_asked: ReadonlySet<number>
 	// The last ask every child answered, open or closed; a failed read leaves it where it was.
 	closed_answered_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
@@ -92,6 +94,7 @@ const FRESH_STATE: BoardState = {
 	closed: new Map(),
 	closed_fetch: undefined,
 	closed_attempted_ms: undefined,
+	closed_asked: new Set(),
 	closed_answered_ms: undefined,
 	gauges: undefined,
 	spots: [],

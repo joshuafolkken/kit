@@ -18,8 +18,8 @@ import { run_board_setup, type SetupRead } from './run-board-setup'
 // What each issue of a run is doing now, read from the run's own event stream and what each open lane's
 // record says (`run-board-lane-state.ts`).
 // Local reads only — no `gh` call — so `run:board` can redraw it every few seconds; the plan these
-// statuses are laid over is the slow GitHub half, and so is what a child that left the open listing
-// answers when read closed.
+// statuses are laid over is the slow GitHub half, and so is what a child that left the open listing,
+// or is drawn stopped, answers when read closed.
 
 type ItemState =
 	| 'running'

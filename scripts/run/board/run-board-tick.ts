@@ -27,7 +27,7 @@ import { run_board_thanks } from './run-board-thanks'
 
 const { REDRAW_MS, SPOT } = run_board_spin
 const { FRESH_STATE } = run_board_state
-const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
+const { PLAN_RETRY_MS, gather_github, open_read_of, statuses_for } = run_board_github
 const { gather_thanks } = run_board_thanks
 
 // The state of the run on screen, over the reads just taken; a different run starts its plan state
@@ -85,12 +85,7 @@ function planned_statuses(
 	plan: BoardPlan,
 	local: LocalRead,
 ): ReadonlyMap<number, ItemStatus> {
-	const read = {
-		open_numbers: plan.context.open_numbers,
-		read_ms: state.fetched_ms,
-		closed: state.closed,
-		labels: plan.labels,
-	}
+	const read = open_read_of(state, plan)
 
 	return run_board_released.without_released(
 		run_board_status.settle_closed(statuses_for(state, local), read),
