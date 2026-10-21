@@ -3,6 +3,7 @@ import { Worker } from 'node:worker_threads'
 import {
 	run_board_gather,
 	type Gatherer,
+	type GatherPorts,
 	type GatherRead,
 	type GatherState,
 } from './run-board-gather'
@@ -10,8 +11,9 @@ import type { LocalRead } from './run-board-read'
 
 // The live board's side of its worker thread (`run-board-gather-worker.ts`): the worker takes the
 // reads off this machine and hands each round over; a redraw draws the last one it handed, so no read
-// stops the board's spinner. A worker that dies is said on the board, and started again on the next
-// redraw — there is no other place the reads are taken.
+// stops the board's spinner. A round that throws is handed over as failed, and the worker reads again
+// next round; a worker that dies is said on the board, and started again on the next redraw — there is
+// no other place the reads are taken.
 
 const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
@@ -28,6 +30,11 @@ interface LocalPost {
 interface GatherPost {
 	read: Omit<GatherRead, 'local'>
 	local?: LocalPost | undefined
+}
+
+// A round whose reads threw, handed over with why; the worker reads again next round.
+interface FailedPost {
+	failed: string
 }
 
 // The part of a worker the board listens to.
@@ -62,6 +69,40 @@ function is_post(value: unknown): value is GatherPost {
 	return typeof value === 'object' && value !== null && 'read' in value
 }
 
+// What a failure is said as: the first line of its message.
+function reason_of(error: unknown): string {
+	const message = error instanceof Error ? error.message : String(error)
+
+	return message.split('\n', 1)[0] ?? ''
+}
+
+function failed_of(error: unknown): FailedPost {
+	return { failed: reason_of(error) }
+}
+
+// One round on the worker: the reads handed over, or why they threw — the state kept for the next.
+async function gather_round(
+	state: GatherState,
+	ports: GatherPorts,
+	post: (value: GatherPost | FailedPost) => void,
+): Promise<GatherState> {
+	try {
+		const next = await run_board_gather.gather(state, ports, 'background')
+
+		post(post_of(state, next))
+
+		return next
+	} catch (error) {
+		post(failed_of(error))
+
+		return state
+	}
+}
+
+function is_failed(value: unknown): value is FailedPost {
+	return typeof value === 'object' && value !== null && 'failed' in value
+}
+
 function settle(thread: Thread, read: GatherRead): void {
 	thread.latest = read
 
@@ -80,29 +121,39 @@ function local_of(thread: Thread, post: LocalPost): LocalRead | undefined {
 function receive(thread: Thread, post: GatherPost): void {
 	const local = post.local === undefined ? thread.latest?.local : local_of(thread, post.local)
 
-	settle(thread, { ...post.read, local, read_failed_ms: undefined })
+	settle(thread, { ...post.read, local, read_failed_ms: undefined, read_error: undefined })
 }
 
-// A worker that threw or exited keeps the last round on screen, said failed until the next answers.
-function fail(thread: Thread, worker: GatherWorker, now: () => number): void {
+// A failed read keeps the last round on screen, said failed and why until the next answers.
+function said_failed(thread: Thread, reason: string, now: () => number): void {
+	settle(thread, { ...(thread.latest ?? EMPTY_READ), read_failed_ms: now(), read_error: reason })
+}
+
+// A worker that threw or exited is started again on the next redraw.
+function fail(thread: Thread, worker: GatherWorker, reason: string, now: () => number): void {
 	if (thread.worker !== worker) return
 
 	thread.worker = undefined
-	settle(thread, { ...(thread.latest ?? EMPTY_READ), read_failed_ms: now() })
+	said_failed(thread, reason, now)
+}
+
+function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
+	worker.on('message', (value) => {
+		if (is_post(value)) receive(thread, value)
+		else if (is_failed(value)) said_failed(thread, value.failed, now)
+	})
+	worker.on('error', (error) => {
+		fail(thread, worker, reason_of(error), now)
+	})
+	worker.on('exit', (code) => {
+		fail(thread, worker, `exit ${String(code)}`, now)
+	})
 }
 
 function start(thread: Thread, spawn: Spawn, now: () => number): GatherWorker {
 	const worker = spawn()
 
-	worker.on('message', (value) => {
-		if (is_post(value)) receive(thread, value)
-	})
-	worker.on('error', () => {
-		fail(thread, worker, now)
-	})
-	worker.on('exit', () => {
-		fail(thread, worker, now)
-	})
+	listen(thread, worker, now)
 	// The board's own loop keeps the process; the worker never holds it open past the board.
 	worker.unref()
 
@@ -132,7 +183,7 @@ function worker_gatherer(spawn: Spawn = spawn_worker, now: () => number = Date.n
 	}
 }
 
-const run_board_gather_thread = { WORKER_URL, post_of, worker_gatherer }
+const run_board_gather_thread = { WORKER_URL, gather_round, post_of, worker_gatherer }
 
 export { run_board_gather_thread }
-export type { GatherPost, GatherWorker }
+export type { FailedPost, GatherPost, GatherWorker }

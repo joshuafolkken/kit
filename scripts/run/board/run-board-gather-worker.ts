@@ -6,10 +6,11 @@ import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_spin } from './run-board-spin'
 
 // The live board's worker thread: one round of the reads off this machine a redraw apart, each handed
-// to the board as it lands (`run-board-gather-thread.ts`). A read that throws ends the worker, which
-// the board says and starts again.
+// to the board as it lands (`run-board-gather-thread.ts`). A round that throws is handed over as
+// failed, and the next round reads again.
 
-const { FRESH_GATHER, gather } = run_board_gather
+const { FRESH_GATHER } = run_board_gather
+const { gather_round } = run_board_gather_thread
 
 async function gather_forever(port: MessagePort): Promise<void> {
 	const ports = run_board_gather_live.ports_of(true)
@@ -17,10 +18,9 @@ async function gather_forever(port: MessagePort): Promise<void> {
 
 	for (;;) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each round folds the state the last one left
-		const next = await gather(state, ports, 'background')
-
-		port.postMessage(run_board_gather_thread.post_of(state, next))
-		state = next
+		state = await gather_round(state, ports, (value) => {
+			port.postMessage(value)
+		})
 		// eslint-disable-next-line no-await-in-loop -- polling: each round waits a redraw
 		await sleep(run_board_spin.REDRAW_MS)
 	}

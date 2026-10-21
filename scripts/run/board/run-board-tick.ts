@@ -175,6 +175,7 @@ function header_of(
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
 		read_failed_ms: state.read_failed_ms,
+		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
 		usages: state.usages,
@@ -241,7 +242,7 @@ async function tick(
 	const { local } = read
 
 	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), read.read_failed_ms))
+		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), read))
 
 		return { ...state, ...read, spots: [] }
 	}
