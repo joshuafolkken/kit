@@ -7,7 +7,6 @@ import { run_park } from '#scripts/run/park/run-park'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_park } from './lane-park'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2034: a dispatched lane child that stopped for a decision left no question on the
 // Issue, so this suite owns the two halves that decide whether the refusal fires — the command match
@@ -59,7 +58,7 @@ function payload_of(name: string, command: string, tool_name = BASH): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// Every test starts with no dispatch mark; the lane block sets it in its own beforeEach.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
@@ -221,7 +220,7 @@ describe('records_the_park', () => {
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
 	beforeEach(() => {
@@ -238,7 +237,10 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 
 	it('delivers the rule on a confirmation stop that has not parked', () => {
-		const reason = rule_delivery(payload_of('lane-park-stop', CONFIRMATION_NOTIFY), NOW_MS)
+		const reason = delivered_rules.delivery(
+			payload_of('lane-park-stop', CONFIRMATION_NOTIFY),
+			NOW_MS,
+		)
 
 		expect(reason).toBe(delivered_rules.LANE_PARK_REASON)
 	})
@@ -248,12 +250,14 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('says nothing on the reissued stop', () => {
 		const payload = payload_of('lane-park-once', CONFIRMATION_NOTIFY)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_PARK_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_PARK_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBeUndefined()
 	})
 
 	it('says nothing about a progress notification, which is not a stop', () => {
-		expect(rule_delivery(payload_of('lane-park-progress', PROGRESS_NOTIFY), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('lane-park-progress', PROGRESS_NOTIFY), NOW_MS),
+		).toBeUndefined()
 	})
 
 	it('is claimed by exactly one rule in the enumeration', () => {
@@ -261,19 +265,19 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
-describe('rule_delivery — outside a lane checkout', () => {
+describe('delivered_rules.delivery — outside a lane checkout', () => {
 	// **The ordinary case is silence.** A person's own `fullrun`, in the main checkout, sends the same
 	// confirmation Telegram when it stops and must never be refused for it.
 	it('says nothing about a confirmation stop in a checkout that is not a lane', () => {
 		expect(
-			rule_delivery(payload_of('lane-park-plain', CONFIRMATION_NOTIFY), NOW_MS),
+			delivered_rules.delivery(payload_of('lane-park-plain', CONFIRMATION_NOTIFY), NOW_MS),
 		).toBeUndefined()
 	})
 
 	it('says nothing about a write tool whose input looks like a stop', () => {
 		const payload = payload_of('lane-park-write', CONFIRMATION_NOTIFY, 'Edit')
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 

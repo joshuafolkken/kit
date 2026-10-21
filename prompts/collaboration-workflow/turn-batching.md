@@ -1,6 +1,6 @@
 # 独立した呼び出しは同じターンに載せる（joshuafolkken/kit#1304）
 
-常駐側には [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」への導線だけが残り、規則本文は `pnpm josh batch:guard` が効く瞬間に配送する。
+常駐側には [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」への導線だけが残り、規則本文は `pnpm josh rule:list` の `batching` 行が効く瞬間に配送する。
 
 ## 何を求めているか
 

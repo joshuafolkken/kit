@@ -78,7 +78,7 @@ const FORCE_PUSH_DENY_PATTERNS: ReadonlyArray<string> = [
 const SHORT_FLAG_NO_SPACE_PATTERN = /\*-[a-zA-Z](?![a-zA-Z-])/u
 
 // The entrance entries for the destructive commands joshuafolkken/kit#2983 decided to stop. They
-// catch only the plain spelling; the `destructive-command` row of `pnpm josh rule:guard` reads the
+// catch only the plain spelling; the `destructive-command` row of `pnpm josh rule:list` reads the
 // argv and catches the rest (`rm -r -f`, `env gh pr close`).
 const DESTRUCTIVE_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(rm -fr *)',

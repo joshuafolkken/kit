@@ -41,7 +41,6 @@ const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	path.join('cost-runtime', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
 	path.join('agent', 'codex-home-source.ts'),
-	path.join('registry-migration', 'user-npmrc.ts'),
 ]
 // Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
 // low-level primitives the named calls are built on. Each entry is written so it can only match a

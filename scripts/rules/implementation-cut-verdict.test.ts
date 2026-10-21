@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
 
 // joshuafolkken/kit#2385: `is_over_threshold_edit` now fires per threshold crossing, so its
-// transcript-priced verdict read is a candidate on every edit — and `pnpm josh rule:guard` runs as a
+// transcript-priced verdict read is a candidate on every edit — and `pnpm josh pretool:guard` runs as a
 // fresh process each `PreToolUse`, so the reuse has to survive across processes in a per-checkout
 // stamp. This suite pins that a burst of edits inside the window shares one read and that the first
 // edit past it re-reads.

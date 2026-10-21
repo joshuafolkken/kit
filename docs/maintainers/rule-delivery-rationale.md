@@ -157,7 +157,7 @@ runs; this row avoids it
 because a body-only read **does not pass**. A `PreToolUse` refusal carries a single string, though,
 so **the hook does not inject the comment text** — the run fetches it itself, one round trip later.
 
-**This is the only row whose trigger overlaps `batch:guard`'s.** `time_batch_guard.is_guarded_call`
+**This is the only row whose trigger overlaps the `batching` row's.** `time_batch_guard.is_guarded_call`
 treats `gh issue view` as a candidate (`gh issue create` it does not). But this row refuses every time
 until its prerequisite is met, so it skips the `is_first_delivery` yield branch and refuses even on a
 turn that also draws a batching refusal. `delivered-rules.test.ts` pins this.
@@ -197,7 +197,7 @@ joshuafolkken/kit#1570: the parent set a fresh waiting timer every time it woke,
 once, and progress reports landed every few minutes instead of once per interval. So **a row that
 owns its own `decide` is outside once-per-run and refuses every time its condition holds**.
 
-**For such a row, the yield branch shared with `batch:guard` protects something else.** A
+**For such a row, the yield branch shared with the `batching` row protects something else.** A
 once-per-run row protected its **record** — losing the race would waste the run's only delivery. A
 call that sets a waiting timer is by definition a single `Bash`, a shape the batching guard also
 treats as a candidate, so **yielding the refusal as well would let a reissue inside the 10-second
@@ -212,7 +212,7 @@ once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped t
 the run that skimmed the procedure would be the one that walked past the guard. The rows are
 `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
 stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
-record to use up either, so it does not yield to `batch:guard` (yielding would let a reissue inside
+record to use up either, so it does not yield to the `batching` row (yielding would let a reissue inside
 the 10-second window through without the prerequisite).
 
 **When the evidence of the prerequisite cannot be read, the default is to refuse.** A deliberate
@@ -321,7 +321,7 @@ test file pins:
 - `scripts/rules/delivered-rules.test.ts` — each entry **actually fires** on its trigger and is silent
   otherwise. Prose that did not work is where this mechanism started, so **a move that does not fire
   is not a move**
-- `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` is wired under `PreToolUse` naming
+- `scripts/claude/claude-settings-hooks.test.ts` — `pretool:guard` is wired under `PreToolUse` naming
   `Bash` alone, declares a timeout and points at a josh subcommand that exists
 - `scripts/backlog/backlog-manufacturing-rule.test.ts` — the WIP cap exists in `wip-cap.md` as its
   single source, and the hold `issue:file` prints carries the refusal, the two exemptions and the

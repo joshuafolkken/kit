@@ -471,24 +471,6 @@ pnpm josh init   # create/merge config files, install and format (--no-install s
 
 See [init.md](./init.md) for the full file list and [`josh doctor`](#josh-doctor) for the settings reports.
 
-### `josh registry:migrate`
-
-<!-- usage: registry:migrate -->
-
-Migrate a project from GitHub Packages to public npm.
-
-```bash
-pnpm josh registry:migrate
-```
-
-<!-- /usage -->
-
-Checks every locked `@joshuafolkken` package is on public npm, then updates `.npmrc` and the lockfile, restoring both if resolution fails.
-
-**Output / exit codes:** exits non-zero without changing settings when a locked scoped package version is unavailable on public npm, configuration is ambiguous, or the resolved lockfile still points to GitHub Packages. Re-running a completed migration is a no-op. See [authentication.md](./authentication.md).
-
-Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh registry:migrate` in detail".
-
 ### `josh sync`
 
 <!-- usage: sync -->

@@ -46,7 +46,7 @@ pnpm josh run:cut <N>
 
 ### The gate refuses until the cut has been taken
 
-`pnpm josh rule:guard` **refuses `pnpm josh gate`** in a lane with no cut record carried, handing back
+The `pre-gate-cut` row of `pnpm josh rule:list` **refuses `pnpm josh gate`** in a lane with no cut record carried, handing back
 the command above — run it. When the guard fires: `docs/josh-commands-run.md` → "`josh run:cut`"; its
 row: `prompts/collaboration-workflow/rule-delivery.md`.
 
@@ -104,7 +104,7 @@ Same `cost_verdict.per_request_cost` through `cost_cli.session_verdict` as `back
 
 ### It is a guard, fired at the edit that crosses the threshold
 
-**The trigger**: `pnpm josh rule:guard` refuses an `Edit` / `Write` in a dispatched lane child over
+**The trigger**: the `implementation-cut` row of `pnpm josh rule:list` refuses an `Edit` / `Write` in a dispatched lane child over
 threshold, handing back `pnpm josh run:cut --impl <N> --handoff <path>`. `cut` ends the turn; the
 fresh process's `run:cut --resume <N>` answers `resume-impl` — **the implementation resume clears the
 record**, so the cut may fire again. **A cut that relaunches its successor owes no Telegram** — the
@@ -129,16 +129,16 @@ turn boundary (`chain-rule.md`).
 **The trigger**: a dispatched lane child about to stop for a decision (Tier B, Tier C, an upstream
 defect) parks its own Issue first — `backlogrun-park.md` → "park and continue" — so `pnpm josh
 run:liveness` reads it `settled`. A `needs-human-review` or `already-done` stop already carries its
-label. `pnpm josh rule:guard` refuses `pnpm josh notify --task-type confirmation` from a marked child
+label. The `lane-park` row of `pnpm josh rule:list` refuses `pnpm josh notify --task-type confirmation` from a marked child
 until `pnpm josh run:park` has recorded the park — **It fires once per run.** (`scripts/rules/lane-park.ts`).
 
 **A split is not a park**: a child that promoted its Issue to an `epic` stops without
-`needs-decision` — `backlogrun-park.md` → "Splitting a child mid-run". `pnpm josh rule:guard` refuses a
+`needs-decision` — `backlogrun-park.md` → "Splitting a child mid-run". The `lane-split-park` row of `pnpm josh rule:list` refuses a
 `needs-decision` write onto that epic, on every occurrence (`scripts/rules/lane-split-park.ts`).
 
 ### The interactive ask is refused one call earlier
 
 **The trigger**: a headless session ends the turn on an interactive ask, so the notify guard never
-fires; `pnpm josh rule:guard` refuses `AskUserQuestion` for a marked lane child on every occurrence — park the question instead.
+fires; the `lane-interactive-ask` row of `pnpm josh rule:list` refuses `AskUserQuestion` for a marked lane child on every occurrence — park the question instead.
 `pnpm josh run:ending` lifts a slipped ask into the park basis (`scripts/rules/lane-interactive-ask.ts`,
 `scripts/agent/interactive-ask.ts`).

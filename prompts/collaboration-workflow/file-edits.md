@@ -2,7 +2,7 @@
 
 `CLAUDE.md` からは [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」を経て届く。
 
-`pnpm josh rule:guard`（file-body の行）が、既存ファイルを書き戻すヒアドキュメント・書き込むインタプリタ heredoc / `node -e`・書き込むスクリプトを作るヒアドキュメント・`perl -0pi -e` を拒否する。ガードに見えない Edit / Write の全文書き直しと `sed -i` は以下に従う。
+`pnpm josh rule:list` の `file-body` 行が、既存ファイルを書き戻すヒアドキュメント・書き込むインタプリタ heredoc / `node -e`・書き込むスクリプトを作るヒアドキュメント・`perl -0pi -e` を拒否する。ガードに見えない Edit / Write の全文書き直しと `sed -i` は以下に従う。
 
 ### 何を禁じているか
 

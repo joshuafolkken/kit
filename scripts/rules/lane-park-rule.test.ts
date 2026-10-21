@@ -9,7 +9,8 @@ import { rule_list } from './rule-list'
 // the trigger.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const FIRING_SUITE = 'scripts/rules/lane-park.test.ts'
-const GUARD_COMMAND = 'pnpm josh rule:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
+const ROW_REFERENCE = '`lane-park` row of `pnpm josh rule:list`'
 const STOP_NOTIFY = 'pnpm josh notify --task-type confirmation'
 const PARK_SOURCE = 'backlogrun-park.md'
 
@@ -52,7 +53,7 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	it.each([
 		'It fires for a marked child and nowhere else',
 		'**It fires once per run.**',
-		GUARD_COMMAND,
+		ROW_REFERENCE,
 		PARK_SOURCE,
 	])('states the boundary %j', (marker) => {
 		expect(content).toContain(marker)

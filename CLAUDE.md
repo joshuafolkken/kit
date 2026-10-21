@@ -59,7 +59,7 @@ Before every `git commit`, a subagent runs `/code-review` per `prompts/review.md
 
 - **No commits** unless explicitly requested. **No merges, branch deletions, force pushes or other shared-state mutations** unless requested in the current turn — except invoking `fullrun` or `backlogrun` authorizes the merge via `pnpm josh followup`; `prrun` does not. `.claude/settings.json` denies these, but the deny is narrower than the rule — never read "the tool let me" as permission.
 - **Never stage or mutate the git index on your own** — only on explicit instruction or via `pnpm josh git`. `prompts/collaboration-workflow/operating-rules.md` → "no-self-staging".
-- **Use `pnpm josh git`; open a PR with `pnpm josh pr`** — `pnpm josh rule:guard` refuses a direct `gh pr create`. GitHub operations are `gh api` (REST) — `prompts/collaboration-workflow/gh-rest.md`.
+- **Use `pnpm josh git`; open a PR with `pnpm josh pr`** — the `direct-pr-create` row of `pnpm josh rule:list` refuses a direct `gh pr create`. GitHub operations are `gh api` (REST) — `prompts/collaboration-workflow/gh-rest.md`.
 - **Run `git status` (and `git stash list`) live** before acting on any tree assumption.
 
 ## Collaboration Workflow

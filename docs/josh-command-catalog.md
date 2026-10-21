@@ -7,7 +7,6 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 
 | Command | Arguments | Audience | Side effects | Description |
 | --- | --- | --- | --- | --- |
-| `josh batch:guard` | — | automation | none | Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin) |
 | `josh behavior` · `josh bh` | — | developer | files | Check the current run's recorded transcript against the behavior assertions (no model call) |
 | `josh bytes` · `josh by` | `<files...>` | developer | none | Print an agent-read document's byte size against its ceiling and the headroom left |
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
@@ -46,7 +45,6 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh init` · `josh i` | `[--profile basic\|full] [--no-install] [--dry-run]` | developer | files, network, processes | Initialize config in a new project |
 | `josh profile` · `josh pf` | `[--profile basic\|full]` | developer | files | Show the project profile and the reason for it |
 | `josh propagate` · `josh pg` | `[--dry-run] [--skip-publish-wait] [--target <repo>]` | maintainer | files, network | Carry the published release into every consumer repository next to this one |
-| `josh registry:migrate` · `josh rmi` | — | developer | files, network, processes | Migrate a project from GitHub Packages to public npm |
 | `josh sonar:hotspots` | `<PR>` | automation | network | Fetch SonarCloud hotspots on a pull request and print each one's Step B disposition |
 | `josh sonar:new-code` | `<PR>` | automation | network | Fail when a pull request adds any new SonarCloud issue or duplicated block |
 | `josh start` · `josh st` | `[--profile basic\|full] [--yes] [--github] [--public] [--dry-run] [--init-command <command>] [--push-preflight-command <command>]` | developer | files, git, network, processes | Set a project up for the GitHub Issue workflow, from git init to the setup PR |
@@ -123,20 +121,17 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh backlog:next` | `[--exclude <n>[,<n>...]] [--repo <owner/repo>]` | automation | network | Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics |
 | `josh backlog:offer` | `[options]` | automation | files, network, processes | Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start |
 | `josh backlog:plan` | `[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]` | automation | network | Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope |
-| `josh backlog:stalled` | — | automation | network | Report whether ready backlog work is sitting undispatched with a free lane and no recent dispatch |
 | `josh backlogrun` · `josh blr` | `[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude\|codex] \| --stop \| --restart` | developer | files, network, processes | Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record |
 | `josh cases` | `<path...>` | automation | files | Read changed paths and print the I/O boundaries crossed and their mandatory abnormal cases: network \| process \| fs \| none |
 | `josh clone:scan` | — | automation | files | Count code duplication across files and first-party repositories, printing each clone as file:line pairs |
 | `josh cost` | `(--cut \| --over <tokens-per-request>) [--path <dir>]` | automation | none | Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over) |
 | `josh cost:audit` · `josh ca` · **kit only** | `[--period <days>]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
 | `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
-| `josh defect:rate` | `[--days <n>]` | automation | network | Print the defect rate of merged work: defects filed per enhancement completed |
 | `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
 | `josh disposition` | `<path...>` | automation | none | Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime) |
 | `josh doc:read` | `<file>` | automation | none | Read a whole document safely: print it, or point at the Read tool when over the Bash cap |
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
-| `josh duplicate-read:guard` | — | automation | none | Claude Code hook: refuse a second whole-file read of a path whose content has not changed since the run last read it (reads the tool call on stdin) |
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
 | `josh epic` | `<title> <issue...> [--ordered]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
@@ -145,10 +140,8 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh epic:next` | `<epic>... [--repo <owner/repo>] [--lanes]` | automation | network | List an epic's runnable children, bundled per repository |
 | `josh eval` · `josh ev` · **kit only** | `[scenario...]` | maintainer | processes, network | Run the agent rule-compliance scenarios (real Claude sessions) |
 | `josh fanout` | `<unit-files> <unit-files> [<unit-files> …]` | automation | none | Say whether proposed implementation units are file-disjoint, so they may run in parallel |
-| `josh investigation:guard` | — | automation | none | Claude Code hook: refuse a read once the unedited-read threshold is reached again (reads the tool call on stdin) |
 | `josh issue:ack` | `<issue>` | automation | network | Record that the run read a person's update to its issue, printing the update it acknowledges |
 | `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold |
-| `josh issue:backlinks` | `<issue>` | automation | network | Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
 | `josh issue:file` | `<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` | automation | network | File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle |
@@ -187,7 +180,6 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
 | `josh review:brief` | `[--round <1\|2>] \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
 | `josh review:round2` | `[--round-1-closed] [--json]` | automation | none | Say whether the second /code-review round is due, or may be skipped entirely |
-| `josh rule:guard` | — | automation | none | Claude Code hook: deliver a trigger-delivered rule at the call that binds it (reads the tool call on stdin) |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
@@ -210,7 +202,6 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh run:review` | `[--join]` | automation | processes, files | Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict) |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |
-| `josh run:stranded` | — | automation | processes, notifications | Report whether the run is stranded — owner gone, no successor holding the budget, and no supervisor watching |
 | `josh run:tail` | `[<issue> ...]` | automation | git, network | Close a run in one call: return to the default branch, commit the observation ledger, read the citations, decide the release scope |
 | `josh run:tidy` | — | automation | git, network, files | Close merged lanes and drop stashes whose issues are all merged |
 | `josh run:wake` | `[options]` | automation | processes, notifications | Wake the next session of a cut backlogrun from outside the conversation |

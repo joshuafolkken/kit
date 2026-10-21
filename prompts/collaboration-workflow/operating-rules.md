@@ -19,7 +19,7 @@
 - auto-merge の本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)、`backlogrun` の子への継承は [`backlogrun-child.md`](../../.claude/skills/workflow-commands/backlogrun-child.md)
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green」は次へ進む承認ではない
-- **deny と配送ガードは実装であって規則ではない。** `gh pr merge`・force push・ブランチ削除は `.claude/settings.json` の `permissions.deny` と `pnpm josh rule:guard` が拒否する（一覧は [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」）が、規則より狭い。ツールが通したことを許可と読まない。`fullrun` の auto-merge は `pnpm josh followup` の内部から gh を起動するため影響を受けない
+- **deny と配送ガードは実装であって規則ではない。** `gh pr merge`・force push・ブランチ削除は `.claude/settings.json` の `permissions.deny` と `pnpm josh rule:list` の `git-force` 行が拒否する（一覧は [`rule-delivery.md`](./rule-delivery.md) →「配送されている規則」）が、規則より狭い。ツールが通したことを許可と読まない。`fullrun` の auto-merge は `pnpm josh followup` の内部から gh を起動するため影響を受けない
 - 共有状態に影響する操作（Tier C）は、迷ったら確認する。可逆な実装・設計判断（Tier A）は下記 "decision-autonomy" に従う
 
 ### no-self-staging — git index を勝手に変更しない（自律 staging の禁止）
@@ -45,7 +45,7 @@
   - 計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。`needs-decision` では止まらない
   - stash を残すのは持ち主の判断だけ。持ち主が計画に理由を書き、ランはそこで止まって確認する
 - staging・index の書き換え・`git commit` の直接実行は deny されており、deny には「そのターンでユーザーが明示指示した」という例外がない。ケース 1 はユーザー自身の端末で実行してもらう。コミットを指示されたら `pnpm josh git` を通す
-- index を守る deny と `pnpm josh rule:guard`（`worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行）も実装である（→「deny と配送ガードは実装であって規則ではない」）
+- index を守る deny と `pnpm josh rule:list` の `worktree-mutation`・`index-mutation`・`destructive-command`・`protected-file` 行も実装である（→「deny と配送ガードは実装であって規則ではない」）
 
 ### decision-autonomy — 意思決定の自律ポリシー（確認停止を減らす）
 

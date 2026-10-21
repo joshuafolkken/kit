@@ -55,7 +55,6 @@ const ALIASES: Record<string, string> = {
 	st: 'start',
 	sy: 'sync',
 	un: 'uninstall',
-	rmi: 'registry:migrate',
 	g: 'git',
 	gp: 'pr',
 	ms: 'main:sync',

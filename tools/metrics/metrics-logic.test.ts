@@ -63,9 +63,9 @@ describe('metrics_logic.rule_totals', () => {
 
 describe('metrics_logic.guard_count', () => {
 	it('counts only the commands named as guards', () => {
-		expect(metrics_logic.guard_count(['batch:guard', 'run:watcher:guard', 'lines', 'guard'])).toBe(
-			2,
-		)
+		expect(
+			metrics_logic.guard_count(['pretool:guard', 'run:watcher:guard', 'lines', 'guard']),
+		).toBe(2)
 	})
 })
 

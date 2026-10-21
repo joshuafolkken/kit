@@ -1,14 +1,10 @@
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
-import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import { defect_rate, type DefectRate, type RateIssue } from './defect-rate'
 
-const SUCCESS_EXIT_CODE = 0
-const FAILURE_EXIT_CODE = 1
 const PER_PAGE = '100'
 const FIRST_PAGE = 1
 const SECOND_PAGE = 2
@@ -17,20 +13,6 @@ const SEARCH_RESULT_CEILING = 1000
 // The search API allows 30 requests a minute; both searches together stay at the ~10 requests the
 // sequential walk made, so this bounds only how many are in flight at once.
 const PAGE_CONCURRENCY = 4
-const USAGE = 'Usage: pnpm josh defect:rate [--days <n>]'
-const UNKNOWN_REPO_MESSAGE =
-	'Could not read this repository from `git remote`, so no issue can be searched — check `gh auth status` and that this is a checkout with an `origin` remote.'
-const UNREADABLE_SEARCH_MESSAGE =
-	'Could not read the issue search from GitHub, so no rate is printed.'
-
-const OPTIONS = { days: { type: 'string' } } as const
-
-// A positive whole number of days and nothing else — `0`, an empty string from an unset shell
-// variable and `1.5` are refused rather than read as a window nobody asked for.
-const DAYS_PATTERN = /^[1-9]\d*$/u
-// Ten years — far past any window worth asking for, and far inside the Date range, so an absurd value
-// is refused with the usage instead of crashing the window's date conversion.
-const MAX_WINDOW_DAYS = 3650
 
 const search_item_schema = z.object({
 	body: z.string().nullish(),
@@ -49,20 +31,6 @@ type SearchPage = z.infer<typeof search_page_schema>
 interface SearchResult {
 	issues: ReadonlyArray<RateIssue>
 	is_capped: boolean
-}
-
-function read_days(argv: ReadonlyArray<string>): number | undefined {
-	const values = cli_flags.values_of(argv, OPTIONS)
-
-	if (values === undefined) return undefined
-
-	const raw = values.days ?? String(defect_rate.DEFAULT_WINDOW_DAYS)
-
-	if (!DAYS_PATTERN.test(raw)) return undefined
-
-	const days = Number(raw)
-
-	return days <= MAX_WINDOW_DAYS ? days : undefined
 }
 
 function search_path(query: string, page: number = FIRST_PAGE): string {
@@ -132,8 +100,7 @@ async function search(query: string): Promise<SearchResult | undefined> {
 	}
 }
 
-// The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks
-// this same measurement, so the two cannot disagree about the rate.
+// The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks it.
 async function measure_window(
 	repo: string,
 	days: number,
@@ -158,40 +125,6 @@ async function measure_window(
 	})
 }
 
-async function report(repo: string, days: number, now_ms: number): Promise<number> {
-	const measured = await measure_window(repo, days, now_ms)
-
-	if (measured === undefined) {
-		console.error(UNREADABLE_SEARCH_MESSAGE)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	for (const line of defect_rate.format(measured)) console.info(line)
-
-	return SUCCESS_EXIT_CODE
-}
-
-async function run(argv: ReadonlyArray<string>, now_ms: number = Date.now()): Promise<number> {
-	const days = read_days(argv)
-
-	if (days === undefined) {
-		console.error(USAGE)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	const repo = await git_gh_command.repo_get_name_with_owner()
-
-	if (repo === undefined) {
-		console.error(UNKNOWN_REPO_MESSAGE)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	return await report(repo, days, now_ms)
-}
-
-const defect_rate_cli = { USAGE, read_days, search_path, measure_window, run }
+const defect_rate_cli = { search_path, measure_window }
 
 export { defect_rate_cli }

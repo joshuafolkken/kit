@@ -6,7 +6,6 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_direct_tool } from './lane-direct-tool'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#4357: the core budget counts only what a `josh` command reserves, so a lane agent's
 // direct `eslint` / `vitest` / `cspell` / `tsc` overlaps the other lanes uncounted. **Both directions
@@ -50,7 +49,7 @@ function payload_of(name: string, command: string): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	Reflect.deleteProperty(process.env, lane_paths.LANE_ROOT_KEY)
 	process.chdir(WORK_DIRECTORY)
@@ -109,7 +108,7 @@ describe('is_lane_direct_tool', () => {
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -124,12 +123,14 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('refuses a direct tool on every occurrence', () => {
 		const payload = payload_of('lane-direct', PNPM_EXEC_ESLINT)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
 	})
 
 	it('lets the budgeted wrapper through', () => {
-		expect(rule_delivery(payload_of('lane-reserved', JOSH_RESERVED), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('lane-reserved', JOSH_RESERVED), NOW_MS),
+		).toBeUndefined()
 	})
 
 	it('is claimed by exactly one rule in the enumeration', () => {
@@ -137,9 +138,11 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
-describe('rule_delivery — outside a lane checkout', () => {
+describe('delivered_rules.delivery — outside a lane checkout', () => {
 	it('says nothing about a direct tool in a checkout that is not a lane', () => {
-		expect(rule_delivery(payload_of('plain-direct', PNPM_EXEC_ESLINT), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('plain-direct', PNPM_EXEC_ESLINT), NOW_MS),
+		).toBeUndefined()
 	})
 })
 

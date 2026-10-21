@@ -133,7 +133,7 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   waited on. After a failed send the stop-time detector leaves the marker and
   notifies instead, and a run `run:carry --end` closed gets none. `run:board` then draws
   the run `■` rather than `⏸` — it reads the same owner-gone, no-supervisor judgement as
-  `run:stranded` — so a run nobody is polling for is never drawn as one still waiting. Recovery is
+  the `Stop` hook's strand report — so a run nobody is polling for is never drawn as one still waiting. Recovery is
   `pnpm josh run:wake --start`.
 
 ## Running a named epic's children — the loop `backlog:drive` walks

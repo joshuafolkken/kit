@@ -1,6 +1,5 @@
 import type { CommandEntry } from './josh-command-types'
 
-const IN_PRETOOL_GUARD = 'run inside pretool:guard, not wired on its own'
 const PRE_TOOL_USE = 'run by the PreToolUse hook, the pending tool call as JSON on stdin'
 
 // The Claude Code and Codex hook commands, split out of `josh-commands-development.ts` when each
@@ -20,20 +19,6 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
-	'batch:guard': {
-		script: 'scripts/hooks/batch-guard-main.ts',
-		description:
-			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
-		category: 'Development',
-		reference: ['', 'automation', ['none']],
-		usage: { examples: [{ arguments: '', note: IN_PRETOOL_GUARD }] },
-		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` is a per-machine preference kept in
-		// `.env`, which every other command reads through `OPTIONAL_ENV_FILE_FLAGS` — but declaring any
-		// `tsx_arguments` disqualifies a command from in-process dispatch (`josh-in-process.ts`), and
-		// this one runs before every `Bash` call, where a second ~0.16 s tsx start is not affordable.
-		// The script calls `process.loadEnvFile` itself instead, which is
-		// node's own `--env-file` parser with node's own precedence.
-	},
 	'pretool:guard': {
 		script: 'scripts/hooks/pretool-guard-cli.ts',
 		description:
@@ -41,10 +26,12 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		usage: { examples: [{ arguments: '', note: PRE_TOOL_USE }] },
-		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this is the one
-		// PreToolUse hook consumers run before every guarded call, so it must stay eligible for
-		// in-process dispatch rather than pay a second tsx start. Each guard it composes loads `.env`
-		// through the shared loader.
+		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` and the other guard switches are
+		// per-machine preferences kept in `.env`, which every other command reads through
+		// `OPTIONAL_ENV_FILE_FLAGS` — but declaring any `tsx_arguments` disqualifies a command from
+		// in-process dispatch (`josh-in-process.ts`), and this is the one PreToolUse hook consumers run
+		// before every guarded call, where a second ~0.16 s tsx start is not affordable. Each guard it
+		// composes loads `.env` through the shared loader instead.
 	},
 	'stop:guard': {
 		script: 'scripts/hooks/stop-guard.ts',
@@ -70,7 +57,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		usage: {
 			examples: [{ arguments: '', note: 'run by the UserPromptSubmit hook; `ja` prints nothing' }],
 		},
-		// **No `tsx_arguments`, deliberately**, the same as `batch:guard` above: this runs on every
+		// **No `tsx_arguments`, deliberately**, the same as `pretool:guard` above: this runs on every
 		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
 		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
 	},

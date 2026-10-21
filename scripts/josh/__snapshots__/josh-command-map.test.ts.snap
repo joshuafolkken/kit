@@ -43,7 +43,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "r": "ranges",
     "rc": "ruleset:check",
     "re": "release",
-    "rmi": "registry:migrate",
     "rt": "reconcile-templates",
     "rtr": "retrospective",
     "ruv": "rule:value",
@@ -148,13 +147,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
-    "backlog:stalled": [
-      "",
-      "automation",
-      [
-        "network",
-      ],
-    ],
     "backlogrun": [
       "[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop | --restart",
       "developer",
@@ -162,13 +154,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
         "network",
         "processes",
-      ],
-    ],
-    "batch:guard": [
-      "",
-      "automation",
-      [
-        "none",
       ],
     ],
     "behavior": [
@@ -255,13 +240,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
-    "defect:rate": [
-      "[--days <n>]",
-      "automation",
-      [
-        "network",
-      ],
-    ],
     "defect:report": [
       "",
       "automation",
@@ -310,13 +288,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "git",
-      ],
-    ],
-    "duplicate-read:guard": [
-      "",
-      "automation",
-      [
-        "none",
       ],
     ],
     "e2e:retry-check": [
@@ -449,13 +420,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
-    "investigation:guard": [
-      "",
-      "automation",
-      [
-        "none",
-      ],
-    ],
     "issue:ack": [
       "<issue>",
       "automation",
@@ -469,13 +433,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "network",
         "files",
-      ],
-    ],
-    "issue:backlinks": [
-      "<issue>",
-      "automation",
-      [
-        "network",
       ],
     ],
     "issue:cite": [
@@ -936,15 +893,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
-    "registry:migrate": [
-      "",
-      "developer",
-      [
-        "files",
-        "network",
-        "processes",
-      ],
-    ],
     "release": [
       "[--dry-run]",
       "maintainer",
@@ -1035,13 +983,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "review:round2": [
       "[--round-1-closed] [--json]",
-      "automation",
-      [
-        "none",
-      ],
-    ],
-    "rule:guard": [
-      "",
       "automation",
       [
         "none",
@@ -1217,14 +1158,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "network",
         "files",
-      ],
-    ],
-    "run:stranded": [
-      "",
-      "automation",
-      [
-        "processes",
-        "notifications",
       ],
     ],
     "run:tail": [

@@ -18,7 +18,8 @@ const DISPATCH_MARK = '`JOSH_LANE_CHILD`'
 const FIRING_SUITE = 'scripts/rules/pre-gate-cut.test.ts'
 // Named once: the enumeration, the topic file and the command reference have to agree on both
 // commands, and a string kept correct in one of three places is not kept.
-const GUARD_COMMAND = 'pnpm josh rule:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
+const ROW_REFERENCE = '`pre-gate-cut` row of `pnpm josh rule:list`'
 const CUT_COMMAND = 'pnpm josh run:cut <N>'
 
 describe('the delivered text — what the refusal states', () => {
@@ -64,7 +65,7 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 
 	it.each([
 		'### The gate refuses until the cut has been taken',
-		GUARD_COMMAND,
+		ROW_REFERENCE,
 		'**It fires for a marked child and nowhere else**',
 		DISPATCH_MARK,
 		RUN_COMMANDS_DOCUMENT,

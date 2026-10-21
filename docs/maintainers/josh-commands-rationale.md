@@ -92,10 +92,6 @@ Options: `--profile basic|full` sets the profile instead of asking (the detected
 
 Existing state: with a GitHub origin, nothing replaces it and `main` is never pushed to. After a failed commit hook, a re-run on the setup branch resumes step 6. A non-GitHub origin, or commits on a branch other than `main`, is refused before any change. In a repository with at least one commit, the working tree must be clean: uncommitted changes — modified, staged or untracked files that are not ignored — are listed and refused before any change, so the setup commit holds only what kit wrote; commit or stash them (`git stash push -u -- .`) first. The setup branch a failed commit left is exempt, since its uncommitted files are that run's own output.
 
-## `josh registry:migrate` in detail
-
-Migrate an existing project from GitHub Packages to public npm. Prints the current registry and proposed change, checks that every locked `@joshuafolkken` package (kit, `app-kit` and the rest) has its exact version on public npm, then updates the project `.npmrc` and rewrites the lockfile entries of all of them. It leaves user-level configuration and any `//npm.pkg.github.com/:_authToken=` line untouched and restores both project files if dependency resolution fails.
-
 ## `josh adopt` in detail
 
 Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each toolkit's managed files, update the other dependencies with [`josh latest`](../josh-commands.md#josh-latest), verify, and open the issue and pull request. The consumer-side counterpart of [`josh propagate`](../josh-commands-automation.md#josh-propagate), sharing its step order with `josh latest` added — propagation carries one exact release and leaves the other dependencies alone.

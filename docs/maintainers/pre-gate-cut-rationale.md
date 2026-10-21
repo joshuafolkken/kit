@@ -32,7 +32,7 @@ request, so a long implementation is billed like a long `backlogrun` parent, whi
 **The pre-gate cut.** Carried as prose, the step fired exactly never: joshuafolkken/kit#1850 measured
 six lane children, and four issued the _entry_ check `pnpm josh run:cut --resume <N>`, were answered
 `fresh`, and went to the gate; not one issued the cut — the cut was taken **0 times**. A step a run is free to skip is the step skipped
-under time pressure, hence the `rule:guard` refusal of the gate (joshuafolkken/kit#1864). The asking
+under time pressure, hence the `pre-gate-cut` row's refusal of the gate (joshuafolkken/kit#1864). The asking
 spellings (`--resume`, `--end`, `--json`) are not counted as the cut because they ask about one rather
 than take it — counting them would have credited four of the six measured children. The refusal fires
 once per run because five of the six verdicts leave the process holding the run, each needing the

@@ -62,6 +62,6 @@ later steps name its number. **Its duplicate scan is read exactly as it is for a
 — the stash, the comment naming its `stash:pop`, the blocked-by and the release; a failure is rerun as
 is (`docs/josh-commands-run.md` → `josh run:pause`). Name the comment's pop in the Telegram too.
 
-**Automatic filing is capped at 10 Issues per run** at every entry point; `pnpm josh rule:guard`
-refuses the eleventh filing (`prompts/collaboration-workflow/rule-delivery.md`). On reaching it, stop
+**Automatic filing is capped at 10 Issues per run** at every entry point; the `filing-cap` row of
+`pnpm josh rule:list` refuses the eleventh filing (`prompts/collaboration-workflow/rule-delivery.md`). On reaching it, stop
 and report. `kickoff` is exempt — it never implements, so it never discovers one.

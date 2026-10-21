@@ -13,13 +13,6 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<path>', 'automation', ['files']],
 		usage: { examples: [{ arguments: '.josh/tmp/issue-body.md' }] },
 	},
-	'issue:backlinks': {
-		script: 'scripts/issue/issue-backlinks-cli.ts',
-		description: 'Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading',
-		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
-		usage: { examples: [{ arguments: '2123' }] },
-	},
 	'report:lint': {
 		script: 'scripts/report/report-lint-cli.ts',
 		description: 'Check a two-layer work summary on stdin against its mechanical format rules',

@@ -236,7 +236,7 @@ pnpm josh issue:comment 2304 --body "a short note"           # inline, for a bod
 
 It accepts a PR as well as an issue and prints the comment URL.
 
-The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared with `notify` / `followup`; `--body` and `--body-file` at once is refused. `pnpm josh rule:guard` refuses the `-f body=@…` misfire before it runs (the `raw-field-body` row), so the literal `@<path>` cannot reach GitHub.
+The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared with `notify` / `followup`; `--body` and `--body-file` at once is refused. The `raw-field-body` row of `pnpm josh rule:list` refuses the `-f body=@…` misfire before it runs, so the literal `@<path>` cannot reach GitHub.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:comment` in detail".
 
@@ -332,27 +332,6 @@ A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベース�
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".
 
-### `josh defect:rate`
-
-<!-- usage: defect:rate -->
-
-Print the defect rate of merged work: defects filed per enhancement completed.
-
-```bash
-pnpm josh defect:rate             # the last 14 days
-pnpm josh defect:rate --days 30
-```
-
-**Options:**
-
-- `--days <n>` — the window in whole days (default 14, at most 3650). Anything else prints the usage and exits 1.
-
-<!-- /usage -->
-
-Defects filed in the window over enhancements completed in it; `n/a` with none completed. An unreadable search exits 1. `backlog:next` uses the rate to prioritize defects.
-
-Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh defect:rate` in detail".
-
 ### `josh defect:origin`
 
 <!-- usage: defect:origin -->
@@ -380,24 +359,6 @@ pnpm josh defect:report   # every issue labelled bug, open or closed
 <!-- /usage -->
 
 Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. Unknown and undeclared origins are counted apart.
-
-### `josh issue:backlinks`
-
-<!-- usage: issue:backlinks -->
-
-Classify an origin issue’s upstream backlinks: ok, missing, or wrong heading.
-
-```bash
-pnpm josh issue:backlinks 2123
-```
-
-<!-- /usage -->
-
-The backlink headings (`## Origin` / `## Upstream issues` / `## Upstream candidate`) are single-sourced in `prompts/collaboration-workflow/issue-template.md`.
-
-`ok` (exit 0) when `## Upstream issues` and each upstream's `## Origin` cite each other; otherwise `missing-upstream`, `missing-origin` or `wrong-heading`, exit 1.
-
-Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:backlinks` in detail".
 
 ### `josh report:lint`
 
@@ -716,7 +677,7 @@ Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `
 
 **Triage gate**: while any candidate carries neither `run:solo` nor `run:lane`, it prints `triage` and no numbers, naming the untriaged issues on stderr.
 
-**Defect priority**: while `defect:rate` is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back.
+**Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back.
 
 **Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then the number of issues it blocks; standalone numbers are cut to five.
 
@@ -755,24 +716,6 @@ Sections: **Ready now** (runnable children grouped by repository; a `run:solo` r
 **Waiting on a person** (parked children — `needs-decision`, `run:stalled` or `already-done` — each naming its label), **Out of scope** (every open issue the backlog will not run, with the reason).
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".
-
-### `josh backlog:stalled`
-
-<!-- usage: backlog:stalled -->
-
-Report whether ready backlog work is sitting undispatched with a free lane and no recent dispatch.
-
-```bash
-pnpm josh backlog:stalled
-```
-
-<!-- /usage -->
-
-It reads three facts, weighs none: the runnable count from `backlog:next`, the free-lane count, and the age of the last `child-launch` event on the run's stream.
-
-stdout is one verdict word, always exit 0: `stalled`, `unreadable` or `ok`. A stall leaves one marker on the event stream and sends no Telegram — the idle notification of `backlog:drive` reaches a person; the Stop hook runs it.
-
-Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:stalled` in detail".
 
 ### `josh backlog:budget`
 
@@ -989,7 +932,7 @@ What comes back is the conclusion plus supporting `file:line` citations, never t
 
 **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count.
 
-**A delegation resets the counter rather than spending it**; `josh investigation:guard` does the counting (`docs/maintainers/josh-commands-backlog-rationale.md` → "`josh delegate` no longer counts investigation reads").
+**A delegation resets the counter rather than spending it**; the `investigation` row of `pnpm josh rule:list` does the counting (`docs/maintainers/josh-commands-backlog-rationale.md` → "`josh delegate` no longer counts investigation reads").
 
 **The mechanism is not the unit.** **One row covers both batch entry points**: an epic's child and one named issue of a `backlogrun` are the same unit, so both were wired to `epic-child`.
 

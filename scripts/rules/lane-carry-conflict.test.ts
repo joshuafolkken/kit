@@ -5,7 +5,6 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_carry_conflict } from './lane-carry-conflict'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2267: a dispatched lane child read its parent's live carry record as a competing
 // run and parked its Issue unimplemented. The budget commands `run:merge` / `run:carry` are the
@@ -56,7 +55,7 @@ function payload_of(name: string, command: string): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// Every test starts with no dispatch mark; the lane block sets it in its own beforeEach.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
@@ -159,7 +158,7 @@ describe('is_carry_conflict', () => {
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
 	beforeEach(() => {
@@ -178,7 +177,7 @@ describe('rule_delivery — inside a lane checkout', () => {
 	// **The parent's live record is not read as a competing run** (joshuafolkken/kit#2267 acceptance):
 	// the child is refused the budget command and handed the continue instruction instead of parking.
 	it('delivers the rule on a budget command from a lane child', () => {
-		const reason = rule_delivery(payload_of('lane-merge', MERGE_COMMAND), NOW_MS)
+		const reason = delivered_rules.delivery(payload_of('lane-merge', MERGE_COMMAND), NOW_MS)
 
 		expect(reason).toBe(REASON)
 	})
@@ -188,8 +187,8 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('refuses the budget command again on a second occurrence', () => {
 		const payload = payload_of('lane-merge-again', MERGE_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
 	})
 
 	it('is claimed by exactly one rule in the enumeration', () => {
@@ -198,11 +197,13 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
-describe('rule_delivery — outside a lane checkout', () => {
+describe('delivered_rules.delivery — outside a lane checkout', () => {
 	// **The ordinary case is silence.** A person's own session, or the parent itself, runs `run:merge`
 	// and must never be refused for it.
 	it('says nothing about a budget command in a checkout that is not a lane', () => {
-		expect(rule_delivery(payload_of('plain-merge', MERGE_COMMAND), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('plain-merge', MERGE_COMMAND), NOW_MS),
+		).toBeUndefined()
 	})
 })
 

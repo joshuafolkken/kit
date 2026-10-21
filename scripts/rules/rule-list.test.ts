@@ -21,10 +21,10 @@ describe('rule_list.render — every row is listed', () => {
 		expect(rendered).not.toContain(rule_list.MISSING_WHY)
 	})
 
-	it('names each entry point', () => {
-		for (const entry of ['rule:guard', 'stop:guard', 'batch:guard', 'investigation:guard']) {
-			expect(rendered).toContain(`pnpm josh ${entry}`)
-		}
+	it('names only the two hook commands as entry points', () => {
+		const entries = new Set(rendered.match(/(?<=fires: `pnpm josh )[\w:]+/gu))
+
+		expect(entries).toEqual(new Set(['pretool:guard', 'stop:guard']))
 	})
 })
 

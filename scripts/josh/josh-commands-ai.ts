@@ -1,9 +1,8 @@
 import { core_budget } from '#scripts/gate/core-budget'
-import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import type { CommandEntry } from './josh-command-types'
 import { BACKLOG_COMMANDS } from './josh-commands-backlog'
 import { DOCUMENT_COMMANDS } from './josh-commands-document'
 import { EPIC_COMMANDS } from './josh-commands-epic'
-import { GUARD_COMMANDS } from './josh-commands-guard'
 import { ISSUE_COMMANDS } from './josh-commands-issue'
 import { LANE_COMMANDS } from './josh-commands-lane'
 import { REVIEW_COMMANDS } from './josh-commands-review'
@@ -219,24 +218,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	},
 	...SHIP_COMMANDS,
 	...LANE_COMMANDS,
-	...GUARD_COMMANDS,
 	'run:watcher:guard': {
 		script: 'scripts/run/run-watcher-guard-cli.ts',
 		description:
 			'Guard: exits non-zero when lane children are in-flight but the watcher has not pinged recently',
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
-		usage: { examples: [BARE] },
-	},
-	'run:stranded': {
-		script: 'scripts/run/run-stranded-cli.ts',
-		// `.env` rather than the ambient environment: the strand notification needs the Telegram
-		// credentials, the same reason `run:wake` carries these flags.
-		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		description:
-			'Report whether the run is stranded — owner gone, no successor holding the budget, and no supervisor watching',
-		category: 'AI tools',
-		reference: ['', 'automation', ['processes', 'notifications']],
 		usage: { examples: [BARE] },
 	},
 	...SPLIT_COMMANDS,

@@ -2,7 +2,7 @@ import { Readable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hook_decision } from './hook-decision'
 
-const COMMAND = 'batch:guard'
+const COMMAND = 'pretool:guard'
 const PAYLOAD = '{"tool_name":"Read"}'
 const REASON = 'refused'
 

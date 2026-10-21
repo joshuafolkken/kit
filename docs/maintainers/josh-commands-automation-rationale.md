@@ -34,21 +34,17 @@ The issues that introduced or reshaped each command, kept here so the reference 
 provenance citations. Read an issue for the decision behind a behavior; the reference states only
 the behavior.
 
-| Command                     | Issues                                                           |
-| --------------------------- | ---------------------------------------------------------------- |
-| `josh batch:guard`          | #2138, #2164, #2178, #2276, #2405, #2984 (the hook launch shape) |
-| `josh time:density`         | #2405                                                            |
-| `josh investigation:guard`  | #2138, #2382, #3927                                              |
-| `josh duplicate-read:guard` | #2298                                                            |
-| `josh rule:guard`           | #2297, #2385, #2807                                              |
-| `josh pretool:guard`        | #2138, #2164, #2178, #2276, #2298, #2382, #2405                  |
-| `josh stop:guard`           | #2121, #2247, #2422                                              |
-| `josh followup`             | #2446, #2770, #3023                                              |
-| `josh observations:flush`   | #2763, #2919                                                     |
-| `josh measure:rerun`        | #2178, #3064                                                     |
-| `josh review:record`        | #2325, #2343, #2419, #2919, #3645                                |
-| `josh reserved-run`         | #2351                                                            |
-| `josh repo:party`           | #2122                                                            |
+| Command                   | Issues                                                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `josh time:density`       | #2405                                                                                                      |
+| `josh pretool:guard`      | #2138, #2164, #2178, #2276, #2297, #2298, #2382, #2385, #2405, #2807, #2984 (the hook launch shape), #3927 |
+| `josh stop:guard`         | #2121, #2247, #2422                                                                                        |
+| `josh followup`           | #2446, #2770, #3023                                                                                        |
+| `josh observations:flush` | #2763, #2919                                                                                               |
+| `josh measure:rerun`      | #2178, #3064                                                                                               |
+| `josh review:record`      | #2325, #2343, #2419, #2919, #3645                                                                          |
+| `josh reserved-run`       | #2351                                                                                                      |
+| `josh repo:party`         | #2122                                                                                                      |
 
 ## `josh refactor:scan` in detail
 
@@ -58,9 +54,9 @@ Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 descri
 
 - **Reports the problems `eslint --fix` could not fix** on the same `additionalContext`, lifted from the `--fix` pass's own stdout (no extra process) — file, `line:col` and rule name, so they are seen on the edit rather than deferred to the gate. What eslint fixed is applied silently; a file that runs prettier alone (`.md` / `.yml`) reports nothing. The block is cut to a bounded length and marked when a lint dump would be large. It never sets `permissionDecision`, so the edit is not turned into a failure.
 
-## `josh batch:guard` in detail
+## The batching guard and the hook launch in detail
 
-Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is **not wired standalone**: it is one of the three `PreToolUse` guards consolidated into `josh pretool:guard` (with `investigation:guard` and the rule guard), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
+The batching guard refuses a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is one of the `PreToolUse` guards consolidated into `josh pretool:guard` (with the investigation and rule guards), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
 
 - The launcher (`scripts/hooks/run-hook.sh <name> [arguments]`) holds everything the hooks share, once: it hands the hook to the ready gate, which runs `dist/hooks/<name>.js` once it passes and otherwise runs the live source through `pnpm josh <command>` — the name with its first `-` turned into `:` (`pretool-guard` → `pretool:guard`).
 - The root prefix in front of it (`scripts/init/hook-launch.ts`) takes the root Claude Code names in `CLAUDE_PROJECT_DIR`, so a Claude Code hook call starts no `git` and no `env` or `dirname` process (joshuafolkken/kit#3946, joshuafolkken/kit#4187): a hook runs on every tool call across every lane, and on macOS each process start is also scanned by `XprotectService` / `syspolicyd`.
@@ -74,11 +70,11 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 
 Report tool calls per round trip across the recent lane sessions — the density the batching guard is measured on, as a command rather than a hand-counted `node -e`. Kit-only (it reads kit's own lane transcripts). Aggregates the ten most recent lane sessions holding at least thirty round trips, dividing summed calls by summed round trips through the same `time-round-trips.ts` the guard and the live density line read, so the three cannot disagree about what a round trip is.
 
-## `josh investigation:guard` in detail
+## The investigation guard in detail
 
 - **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`), at the same threshold. Why: "The investigation guard refuses in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 
-## `josh rule:guard` in detail
+## The rule guard in detail
 
 - **The implementation-phase cut row**: the trigger is an `Edit` / `Write` from a lane working tree that has not yet taken its cut, once the recent-context verdict (`pnpm josh cost --cut`'s, unmeasurable read `!== UNDER` on the safety-net side) is over the shared threshold, handing over `pnpm josh run:cut --impl <N> --handoff <path>`. Unlike the pre-gate row it fires on every threshold crossing: once per run left a `busy` / `failed` verdict to grow the context unwatched, so it carries `decide` and lets an edit reissued right after a refusal through. The verdict read is reused over a few-second per-checkout window. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source.
 

@@ -8,7 +8,6 @@ import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { josh_git_bare } from './josh-git-bare'
 import { pr_merge } from './pr-merge'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2120: the three Bash-string rows fire through the real delivery path, and stay
 // silent on the safe forms — the doctrine that a relocation which does not fire is not a relocation.
@@ -36,7 +35,7 @@ const EXISTING_TARGET = path.join(work, 'target.md')
 writeFileSync(EXISTING_TARGET, 'existing body\n')
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 })
 
 afterAll(() => {
@@ -45,7 +44,7 @@ afterAll(() => {
 
 // The delivered reason, or undefined, for a command run once through the guard on a fresh transcript.
 function delivered_for(name: string, command: string): string | undefined {
-	return rule_delivery(payload_of(name, command), NOW_MS)
+	return delivered_rules.delivery(payload_of(name, command), NOW_MS)
 }
 
 // How many rows' triggers claim a command. One refusal can leave a `PreToolUse` hook, so a command two

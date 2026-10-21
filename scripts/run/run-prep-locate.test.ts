@@ -34,12 +34,12 @@ beforeEach(() => {
 
 describe('run_prep_locate.extract_targets', () => {
 	it('keeps backticked paths, identifiers and commands', () => {
-		const body = 'See `scripts/run/run-prep.ts`, `run_prep_cli` and `investigation:guard`.'
+		const body = 'See `scripts/run/run-prep.ts`, `run_prep_cli` and `pretool:guard`.'
 
 		expect(run_prep_locate.extract_targets(body)).toStrictEqual([
 			PREP_PATH,
 			'run_prep_cli',
-			'investigation:guard',
+			'pretool:guard',
 		])
 	})
 
