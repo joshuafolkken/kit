@@ -329,6 +329,8 @@ pnpm josh run:prep <N>
 
 Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `josh ship` would otherwise meet late: a missing release classification, a runtime change whose PR body lacks `## 実機証跡`, and an unmapped acceptance criterion — printed with the `未記入` rows to copy. `met` when none applies; `unmet` lists each to fix before the gate. The ship and `followup` refuse on all.
 
+Its `=== investigation ===` section names, before the first read, the step the investigation guard otherwise names only on its refusal: the limit and the `investigator` dispatch — the same wording, from `delegation-policy.ts`.
+
 ### `josh run:entry`
 
 <!-- usage: run:entry -->

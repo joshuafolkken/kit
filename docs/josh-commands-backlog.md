@@ -984,7 +984,8 @@ Verdict to stdout, reason to stderr.
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** What comes back is the conclusion plus supporting `file:line` citations, never the file text; a throwaway probe script is written, run and deleted inside the unit.
+**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast.** It is where the guard refuses, not a budget: a run whose subject needs reading delegates before the first read (`run:prep` → `=== investigation ===`).
+What comes back is the conclusion plus supporting `file:line` citations, never the file text; a throwaway probe script is written, run and deleted inside the unit.
 
 **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. `pnpm josh delegate --list` prints the count.
 
