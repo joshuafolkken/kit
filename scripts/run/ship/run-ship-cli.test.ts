@@ -312,7 +312,7 @@ describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/k
 		expect(review_mock).toHaveBeenCalledWith(NUMBER, false)
 		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
 		expect(info_lines[0]).toMatch(
-			/^=== preflight ===\nready\n\n=== review ===\nreview clean\n\n=== sync origin\/main ===\nmain brings nothing in\n\n=== gate ===/u,
+			/^=== preflight ===\nready\n\n=== sync origin\/main ===\nmain brings nothing in\n\n=== review ===\nreview clean\n\n=== gate ===/u,
 		)
 	})
 

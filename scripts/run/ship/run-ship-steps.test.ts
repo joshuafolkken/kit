@@ -71,13 +71,13 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 		])
 	})
 
-	it('puts round 1 before the gate and round 2 between commit and followup with --review', () => {
+	it('syncs before round 1, so its gate reads the base the gate stage reuses, with --review', () => {
 		const stages = run_ship_steps.steps({ ...ARGS, is_review: true }).map((step) => step.stage)
 
 		expect(stages).toStrictEqual([
 			STAGE.PREFLIGHT,
-			STAGE.REVIEW,
 			STAGE.SYNC,
+			STAGE.REVIEW,
 			STAGE.GATE,
 			STAGE.COMMIT,
 			STAGE.ROUND_TWO,
