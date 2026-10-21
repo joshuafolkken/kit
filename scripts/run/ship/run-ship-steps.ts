@@ -1,5 +1,6 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_ship } from './run-ship'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -10,6 +11,7 @@ import { run_ship_sync, type StepResult } from './run-ship-sync'
 // CLI so the order is read in one place.
 
 const should_forward_stderr = true
+const SUCCESS_EXIT_CODE = 0
 
 interface ShipArguments {
 	title: string
@@ -80,12 +82,21 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	},
 ]
 
+// The merge, then the ship body draft goes with it (`run-ship-body-draft.ts`).
+async function followup_stage(args: ShipArguments): Promise<StepResult> {
+	const result = await run_ship_sync.followup_stage(args.title, args.notify)
+
+	if (result.code === SUCCESS_EXIT_CODE) await run_ship_body_draft.remove(args.number)
+
+	return result
+}
+
 // The merge before the report bookkeeping.
 const MERGE_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.FOLLOWUP,
 		header: run_ship.FOLLOWUP_HEADER,
-		run: async (args) => await run_ship_sync.followup_stage(args.title, args.notify),
+		run: async (args) => await followup_stage(args),
 	},
 	{
 		stage: STAGE.REPORT,

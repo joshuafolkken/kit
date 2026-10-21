@@ -30,7 +30,7 @@ const CATEGORY_STEMS: ReadonlyArray<string> = [
 // The two chain-rule entries — each its numbered item's opening, and the words its scoped pair is
 // run by, which the pointer has to precede.
 const STEP_MARKERS: ReadonlyArray<[string, string]> = [
-	['0. **A lane child**', 'the scoped pair, `pnpm josh ship'],
+	['0. **A lane child**', 'the scoped pair, the ship body draft'],
 	['1. Run `pnpm josh main:merge`', 'run the final scoped lint/test pair'],
 ]
 
