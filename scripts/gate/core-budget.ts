@@ -248,9 +248,11 @@ async function current_budget(
 // to "load the ledger holds" for every later reader — its cores at once, its memory once its tool has
 // had time to ramp up.
 function admit(context: WaitContext, overflow?: Overflow, granted?: number): Admission {
-	write_reservation(context.target, { ...context.fields, admitted_at: context.now(), granted })
+	const admitted_at = context.now()
 
-	return { overflow, granted }
+	write_reservation(context.target, { ...context.fields, admitted_at, granted })
+
+	return { overflow, granted, waited_ms: admitted_at - context.fields.claimed_at }
 }
 
 function overflow_of(

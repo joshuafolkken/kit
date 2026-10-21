@@ -49,10 +49,12 @@ interface Overflow {
 	budget: MachineBudget
 }
 
-// `granted` is set only when a unit claim was narrowed to the room left at the wait cap.
+// `granted` is set only when a unit claim was narrowed to the room left at the wait cap. `waited_ms` is
+// how long the claim waited, zero for one admitted on its first read (joshuafolkken/kit#4451).
 interface Admission {
 	overflow: Overflow | undefined
 	granted?: number | undefined
+	waited_ms?: number | undefined
 }
 
 // Claim order, with the filename as the tiebreak so every reader agrees on the same ledger order
@@ -142,18 +144,29 @@ function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget
 	return fits([...running, ...ahead, own], limit)
 }
 
+// **A host-wide swap stall holds the oldest claim too** (joshuafolkken/kit#4451). Running alone skipped
+// the memory test, so a lone gate started a 2.4 GB lint into a stall with 1.7 GB free and swapped it
+// for 830 s. Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
+// heavier than free memory on a calm machine would wait for room that never comes.
+function is_swap_stalled(own: LedgerEntry, budget: MachineBudget): boolean {
+	return budget.memory_pressured === true && (own.reservation.memory_mb ?? 0) > budget.memory_mb
+}
+
 // The oldest claim runs alone once nothing else does — unless the machine is overloaded, where it waits
-// like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap.
-function runs_alone({ is_oldest, running }: Placement, budget: MachineBudget): boolean {
-	return is_oldest && running.length === 0 && budget.is_overloaded !== true
+// like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap, or stalled
+// on swap (`is_swap_stalled`), where it waits until the traffic stops or its memory is free.
+function runs_alone({ own, is_oldest, running }: Placement, budget: MachineBudget): boolean {
+	if (!is_oldest || running.length > 0) return false
+
+	return budget.is_overloaded !== true && !is_swap_stalled(own, budget)
 }
 
 // **Admission: the oldest claim runs once nothing else does, then claim order, then a bounded pass.**
 // The oldest runs because a single check heavier than the whole machine must not wait for room that will
-// never come; claims that passed it are still running beside it, and their room does come back, so it
-// waits for them rather than starting on top of their cores and memory. A later claim runs when every
-// running claim, every claim waiting ahead of it and its own load fit the budget — the first waiter
-// against the ledger alone (`first_waiter_limit`) — or when it may pass the waiters ahead (`may_pass`).
+// never come — except into a swap stall (`is_swap_stalled`), which passes. Claims that passed it are
+// still running beside it, and their room does come back, so it waits for them rather than starting on
+// top of their cores and memory. A later claim runs when every running claim, every claim waiting
+// ahead of it and its own load fit the budget — the first waiter against the ledger alone (`first_waiter_limit`) — or when it may pass the waiters ahead (`may_pass`).
 function is_admitted(
 	key: string,
 	reservations: ReadonlyArray<LedgerEntry>,

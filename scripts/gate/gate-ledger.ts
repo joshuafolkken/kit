@@ -104,6 +104,7 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 			result.label === gate_plan.UNIT_LABEL
 				? related_scope.fallback_kind(result.output)
 				: undefined,
+		claim: result.claim,
 	}))
 }
 

@@ -257,6 +257,8 @@ async function reserve_admits_at_wait_cap(): Promise<void> {
 			budget: { cores: MEASURED_CORES, memory_mb: Infinity, busy_excess: 0, is_overloaded: false },
 		})
 		expect(core_budget.describe_overflow(handle.admission)).toContain('past the core budget')
+		// joshuafolkken/kit#4451: the wait reaches the gate ledger's check row on the admission.
+		expect(handle.admission.waited_ms).toBe(TEST_WAIT_CAP_MS)
 	})
 }
 

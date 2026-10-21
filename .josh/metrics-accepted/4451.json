@@ -1,0 +1,7 @@
+{
+	"reason": "Swap-stall admission hold, per-check core-budget claim in the gate ledger, and the vitest slowest-file reporter writing to the lane ledger (#4451)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 111
+	}
+}

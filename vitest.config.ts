@@ -1,3 +1,4 @@
+import { unit_file_reporter } from '#tools/test/unit-file-reporter'
 import { vitest_config_workers } from '#tools/test/vitest-config-workers'
 import { defineConfig } from 'vitest/config'
 import { unit_projects } from './tools/test/unit-projects.ts'
@@ -19,6 +20,8 @@ export default defineConfig({
 		// `undefined` — alone, or driven by `josh`, whose guard sizes the run itself — leaves the choice
 		// to the command line or vitest's default (joshuafolkken/kit#4262).
 		maxWorkers: vitest_config_workers.config_workers(),
+		// The default output, plus the run's slowest files in the lane ledger (joshuafolkken/kit#4451).
+		reporters: ['default', unit_file_reporter.create()],
 		// Root-level so both projects keep sharing this config's Vite server (joshuafolkken/kit#4301).
 		deps: unit_projects.DEPENDENCY_OPTIMIZER,
 		coverage: {

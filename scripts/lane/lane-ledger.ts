@@ -47,6 +47,7 @@ const KIND = {
 	ROUND_TWO: 'round-two',
 	OFFERABLE: 'offerable',
 	CORE_WAIT: 'core-wait',
+	UNIT_FILES: 'unit-files',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -61,6 +62,10 @@ const check_schema = z.object({
 	// Why the unit leg ran the whole suite instead of the related tests — a stable kind, never the
 	// file it names (joshuafolkken/kit#4397). Absent when it narrowed, and on every other check.
 	fallback: z.string().optional(),
+	// The width the check asked the core budget for, the width it ran at and how long it waited, so a
+	// unit claim's wait for room is read per run (joshuafolkken/kit#4451). Absent on a check that
+	// claimed none — a reused one, or one inside another gate's claim.
+	claim: z.object({ requested: z.number(), granted: z.number(), waited_ms: z.number() }).optional(),
 })
 const gate_schema = z.object({
 	kind: z.literal(KIND.GATE),
@@ -181,6 +186,15 @@ const core_wait_schema = z.object({
 	waited_ms: z.number(),
 	issue: z.number().optional(),
 })
+// One vitest run's slowest test files, each with its wall time from environment setup to its last
+// test, so a unit run whose wall time far outran its CPU names the file it stalled on
+// (joshuafolkken/kit#4451). Written by the run itself (`tools/test/unit-file-reporter.ts`).
+const unit_file_schema = z.object({ file: z.string(), elapsed_ms: z.number() })
+const unit_files_schema = z.object({
+	kind: z.literal(KIND.UNIT_FILES),
+	at: z.string(),
+	files: z.array(unit_file_schema),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -194,6 +208,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	round_two_schema,
 	offerable_schema,
 	core_wait_schema,
+	unit_files_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -209,6 +224,8 @@ type RoundTwoEntry = z.infer<typeof round_two_schema>
 type OfferableEntry = z.infer<typeof offerable_schema>
 type CoreWaitEntry = z.infer<typeof core_wait_schema>
 type CoreWaitRecord = Omit<CoreWaitEntry, 'kind' | 'at'>
+type UnitFilesEntry = z.infer<typeof unit_files_schema>
+type UnitFileRecord = z.infer<typeof unit_file_schema>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
@@ -316,6 +333,13 @@ async function record_core_wait(wait: CoreWaitRecord, path?: string): Promise<vo
 	await record({ kind: KIND.CORE_WAIT, at: now_iso(), ...wait }, path)
 }
 
+async function record_unit_files(
+	files: ReadonlyArray<UnitFileRecord>,
+	path?: string,
+): Promise<void> {
+	await record({ kind: KIND.UNIT_FILES, at: now_iso(), files: [...files] }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -362,6 +386,7 @@ const lane_ledger = {
 	record_round_two,
 	record_stage,
 	record_stop,
+	record_unit_files,
 	target,
 	target_of,
 }
@@ -383,5 +408,7 @@ export type {
 	StageEntry,
 	StopEntry,
 	StopRecord,
+	UnitFileRecord,
+	UnitFilesEntry,
 }
 export { lane_ledger }

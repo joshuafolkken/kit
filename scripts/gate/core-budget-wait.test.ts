@@ -68,19 +68,22 @@ async function records_and_prints_once(): Promise<void> {
 	])
 }
 
-// The blocker holds the tool's memory, ramped up, and the reading is pressured: nothing is free.
+// The blocker holds the tool's memory, ramped up, and the reading is pressured: nothing is free. The
+// stall passes with the blocker — a lone claim still waits out a stall (joshuafolkken/kit#4451).
 async function names_pressure(): Promise<void> {
 	write_blocker({ weight: 1, memory_mb: TOOL_MEMORY_MB, admitted_at: -core_admission.RAMP_UP_MS })
 	const report = vi.fn<(line: string) => void>()
+	const machine = { reading: PRESSURED }
 	const handle = await core_budget.reserve(1, {
 		directory: probe.directory,
 		budget: CORES,
 		memory_mb: TOOL_MEMORY_MB,
-		read_machine: async () => PRESSURED,
+		read_machine: async () => machine.reading,
 		report,
 		now: () => 1,
 		sleep: async () => {
 			free_blocker()
+			machine.reading = UNREAD
 		},
 	})
 

@@ -3,9 +3,9 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { check_cpu, type CheckCpu } from './check-cpu'
-import { core_budget } from './core-budget'
+import { core_budget, type Admission } from './core-budget'
 import { gate_plan, type GatePlan } from './gate-plan'
-import type { GateStep, GateStepResult } from './gate-report'
+import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
 import { build_gate_step, with_granted_workers } from './gate-steps'
 import { project_checks } from './project-checks'
 
@@ -96,6 +96,15 @@ function reused_result(step: GateStep, reused_at: string): GateStepResult {
 	}
 }
 
+// What the check asked the budget for and what it ran at, for its ledger row (`gate-ledger.ts`).
+function claim_of(requested: number, admission: Admission): CheckClaim {
+	return {
+		requested,
+		granted: admission.granted ?? requested,
+		waited_ms: admission.waited_ms ?? 0,
+	}
+}
+
 // **A nested gate takes no reservation, and the budget is what makes that necessary rather than
 // merely tidy**. The unit step spawns the suite, which runs this repository's
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
@@ -114,6 +123,7 @@ async function run_reserved_step(
 		async (admission) => ({
 			...(await run_gate_step(with_granted_workers(reserved.step, admission.granted), cpu)),
 			budget_note: core_budget.describe_overflow(admission),
+			claim: claim_of(reserved.weight, admission),
 		}),
 		{
 			budget: budget.available_cores,
