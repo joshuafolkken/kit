@@ -188,6 +188,16 @@ describe('lane_withdraw.withdraw — the lane state record', () => {
 		})
 		expect(first_call(record_change)).toBeGreaterThan(first_call(close_lane))
 	})
+
+	// joshuafolkken/kit#4300: a close a process outlived leaves the lane for the supervisor to close again.
+	it('records no end when the close was incomplete', async () => {
+		close_lane.mockResolvedValue({ ...CLOSED_LANE, kind: 'incomplete' })
+
+		await expect(lane_withdraw.withdraw(ISSUE, REASON)).resolves.toMatchObject({
+			lane: 'incomplete',
+		})
+		expect(record_change).not.toHaveBeenCalled()
+	})
 })
 
 describe('lane_withdraw.withdraw — refusals write nothing', () => {

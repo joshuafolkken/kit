@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake, type RunWake } from './run-wake'
 import { run_wake_loop, type DriveResult, type LoopPorts } from './run-wake-loop'
 import type { LaunchResult } from './run-wake-session'
@@ -92,6 +92,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 				await Promise.resolve()
 			},
 			now: () => NOW,
+			retry_closes: async () => undefined,
 		},
 	}
 }
@@ -136,6 +137,22 @@ describe('run_wake_loop.run_loop — deterministic driver', () => {
 
 		expect(stop.reason).toBe('ended')
 		expect(scripted.wakes).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4300: a lane whose close a process outlived is closed again on every pass, and a
+// failed retry never stops the run.
+describe('run_wake_loop.run_loop — closing again what a process outlived', () => {
+	it('retries the closes on every pass, carrying on past a failed one', async () => {
+		const retry_closes = vi.fn(async () => {
+			throw new Error('lsof failed')
+		})
+		const ports = { ...recorder([IN_FLIGHT, IN_FLIGHT, ENDED]).ports, retry_closes }
+
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(stop.reason).toBe('ended')
+		expect(retry_closes).toHaveBeenCalledTimes(3)
 	})
 })
 

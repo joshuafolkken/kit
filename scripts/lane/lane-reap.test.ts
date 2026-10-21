@@ -14,32 +14,17 @@ const LOOP_SUBSHELL = 48_901
 const STRANGER = 70_000
 const OWN_PARENT = 60_000
 const INIT = 1
-const DAEMON = 20_611
-const DAEMON_PATTERN_START = '^eslint_d'
 
 interface FakeTable {
 	matching: Array<number>
 	children: Record<number, Array<number>>
 	parents: Record<number, number>
 	immune?: Array<number>
-	// Detached processes by the title `ps` shows, matched as `pgrep -f` would.
-	titles?: Record<number, string>
-}
-
-function matching_titles(table: FakeTable, pattern: string): Array<number> {
-	const titles = Object.entries(table.titles ?? {})
-
-	return titles
-		.filter(([, title]) => new RegExp(pattern, 'u').test(title))
-		.map(([pid]) => Number(pid))
 }
 
 function probes_over(table: FakeTable, signalled: Array<number>): ReapProbes {
 	return {
-		matching: (pattern) =>
-			pattern.startsWith(DAEMON_PATTERN_START)
-				? matching_titles(table, pattern)
-				: [...table.matching],
+		matching: () => [...table.matching],
 		children_of: (pid) => table.children[pid] ?? [],
 		parent_of: (pid) => table.parents[pid],
 		terminate: (pid) => {
@@ -114,54 +99,23 @@ describe('lane_reap.reap_child — what it spares', () => {
 	})
 })
 
-// joshuafolkken/kit#4265: the edit hook's `eslint_d` detaches to pid 1, so no tree reaches it, and a
-// paused lane kept it running. It is found by its `eslint_d - <lane directory>` title.
-describe('lane_reap.lane_daemons', () => {
-	it('finds only the daemon serving that lane directory', () => {
-		const titles = {
-			[DAEMON]: `eslint_d - ${DIRECTORY}     PORT_SEED=1 TERM_PROGRAM=vscode`,
-			[DAEMON + 1]: `eslint_d - ${DIRECTORY}0`,
-			[DAEMON + 2]: 'eslint_d - /w/kit',
-			[DAEMON + 3]: 'eslint_d - /w/_kit-lanes/2398',
-			[DAEMON + 4]: `node ${DIRECTORY}/eslint_d - ${DIRECTORY}`,
-		}
-		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry(), titles }, [])
+// joshuafolkken/kit#4300: the lane's `eslint_d` is found by its working directory
+// (`lane-residents.ts`), so the reap matches no daemon title.
+describe('lane_reap.reap_child — no daemon title', () => {
+	it('matches only the child, never an eslint_d title', () => {
+		const patterns: Array<string> = []
+		const probes: ReapProbes = {
+			...probes_over({ matching: [], children: {}, parents: own_ancestry() }, []),
+			matching: (pattern) => {
+				patterns.push(pattern)
 
-		expect(lane_reap.lane_daemons(DIRECTORY, probes)).toStrictEqual([DAEMON])
-	})
-
-	it('never answers the caller or its ancestors', () => {
-		const titles = { [OWN_PARENT]: `eslint_d - ${DIRECTORY}` }
-		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry(), titles }, [])
-
-		expect(lane_reap.lane_daemons(DIRECTORY, probes)).toStrictEqual([])
-	})
-})
-
-describe('lane_reap.reap_child — the lane’s daemon', () => {
-	it('terminates the daemon with the tree and counts only the child’s processes', () => {
-		const signalled: Array<number> = []
-		const table: FakeTable = {
-			matching: [CHILD],
-			children: {},
-			parents: own_ancestry(),
-			titles: { [DAEMON]: `eslint_d - ${DIRECTORY}` },
+				return []
+			},
 		}
 
-		expect(lane_reap.reap_child(LANE, probes_over(table, signalled))).toStrictEqual([CHILD])
-		expect(signalled).toStrictEqual([CHILD, DAEMON])
-	})
+		lane_reap.reap_child(LANE, probes)
 
-	it('ends a daemon a child that already ended left behind', () => {
-		const signalled: Array<number> = []
-		const titles = { [DAEMON]: `eslint_d - ${DIRECTORY}` }
-		const probes = probes_over(
-			{ matching: [], children: {}, parents: own_ancestry(), titles },
-			signalled,
-		)
-
-		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([])
-		expect(signalled).toStrictEqual([DAEMON])
+		expect(patterns.some((pattern) => pattern.includes('eslint_d'))).toBe(false)
 	})
 })
 

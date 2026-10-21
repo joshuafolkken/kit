@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_state, type LaneChange } from './lane-state'
 
 const ISSUE = '4268'
+const OTHER_ISSUE = '4300'
+const STUCK = [{ pid: 20_611, reason: 'owned by root' }]
 const OPENED_AT = new Date('2026-10-20T01:00:00.000Z')
 const LAUNCHED_AT = new Date('2026-10-20T02:00:00.000Z')
 const PAUSED_AT = new Date('2026-10-20T03:00:00.000Z')
@@ -44,6 +46,7 @@ beforeEach(() => {
 afterEach(() => {
 	stamp_file.remove_stamp(run_carry.carry_path(state.directory))
 	stamp_file.remove_stamp(lane_state.state_path(state.directory, ISSUE))
+	stamp_file.remove_stamp(lane_state.state_path(state.directory, OTHER_ISSUE))
 	rmSync(state.directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
@@ -192,4 +195,42 @@ describe('lane_state.record_change — two writers at once', () => {
 		},
 		SPAWN_TIMEOUT_MS,
 	)
+})
+
+// joshuafolkken/kit#4300: the supervisor finds a close a process outlived among every lane's record.
+describe('lane_state.read_records', () => {
+	it('lists every lane’s record, a closed lane’s included', async () => {
+		await record_at(change_of('open', OPEN), OPENED_AT)
+		await record_at({ issue: OTHER_ISSUE, state: 'ended', command: CLOSE }, PAUSED_AT)
+
+		const records = await lane_state.read_records(state.directory)
+
+		expect(records).toHaveLength(2)
+		expect(records).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ issue: ISSUE, state: 'open' }),
+				expect.objectContaining({ issue: OTHER_ISSUE, state: 'ended' }),
+			]),
+		)
+	})
+})
+
+describe('lane_state.record_stuck', () => {
+	it('notes the processes on the record and keeps its state', async () => {
+		await record_at(change_of('open', OPEN), OPENED_AT)
+
+		await lane_state.record_stuck(ISSUE, STUCK, state.directory)
+
+		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toMatchObject({
+			state: 'open',
+			stuck: STUCK,
+		})
+	})
+
+	it('gives a lane with no record none', async () => {
+		const outcome = await lane_state.record_stuck(ISSUE, STUCK, state.directory)
+
+		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'no record' })
+		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toBeUndefined()
+	})
 })

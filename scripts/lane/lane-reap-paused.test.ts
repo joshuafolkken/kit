@@ -41,7 +41,11 @@ describe('lane_reap.reap_child — a paused lane', () => {
 		const child = await stopped_child()
 		const pid = pid_of(child)
 		const exited = exit_code_of(child)
-		const probes = { ...lane_reap.SYSTEM_PROBES, matching: () => [pid], parent_of: () => undefined }
+		const probes = {
+			...lane_reap.SYSTEM_PROBES,
+			matching: () => [pid],
+			parent_of: () => undefined,
+		}
 
 		expect(lane_reap.reap_child(LANE, { ...probes, children_of: () => [] })).toStrictEqual([pid])
 		await expect(exited).resolves.toBe(0)

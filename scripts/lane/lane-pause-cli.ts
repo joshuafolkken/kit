@@ -44,15 +44,12 @@ async function lanes_of(target: ReadonlyArray<string>): Promise<Array<LaneProces
 	return [await lane_registry.lane_location(issue)]
 }
 
-// The daemons are named only when there were any, so a lane without one reads as it always did.
 function outcome_of(verb: Verb, result: LaneSignalled): string {
 	const { done } = VERBS[verb]
-	const daemons =
-		result.ended.length === 0 ? '' : `, ended ${String(result.ended.length)} daemon(s)`
 
-	if (result.signalled.length === 0) return `no child process running — nothing ${done}${daemons}`
+	if (result.signalled.length === 0) return `no child process running — nothing ${done}`
 
-	return `${done} ${String(result.signalled.length)} process(es)${daemons}`
+	return `${done} ${String(result.signalled.length)} process(es)`
 }
 
 // One line per lane: how many of its processes were signalled.

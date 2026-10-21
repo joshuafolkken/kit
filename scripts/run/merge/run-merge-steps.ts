@@ -172,12 +172,16 @@ async function sync_main(): Promise<void> {
 }
 
 // `lane:close` says on stderr what it terminated — the child and whatever else ran from the checkout
-// (joshuafolkken/kit#4304) — so that stderr is passed on rather than dropped with the capture.
+// (joshuafolkken/kit#4304) — so that stderr is passed on rather than dropped with the capture. An
+// `incomplete` close — a process that outlived even a SIGKILL — is logged and the run carries on: the
+// merge cannot be undone, and the supervisor closes the lane again each pass until it ends
+// (joshuafolkken/kit#4300).
 async function close_lane(child: string): Promise<void> {
 	const result = await josh(['lane:close', child])
 	const said = result.err?.trimEnd() ?? ''
 
 	if (said !== '') console.error(said)
+	if (result.code !== 0) console.error(`${session_cite.issue(child)}: lane:close is incomplete`)
 }
 
 async function stash_work(child: string, directory: string): Promise<void> {

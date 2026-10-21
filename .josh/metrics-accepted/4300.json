@@ -1,0 +1,7 @@
+{
+	"reason": "#4300 adds the working-directory lane reader, the SIGTERM→SIGKILL settle step, the supervisor close retry and the board's ended-lane leftover marking; the eslint_d title match it replaces was smaller",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 186
+	}
+}

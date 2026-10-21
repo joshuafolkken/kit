@@ -15,8 +15,8 @@ const LANE = { issue: ISSUE, directory: '/w/.kit-lanes/4198' }
 const OTHER_LANE = { issue: OTHER, directory: '/w/.kit-lanes/4197' }
 const SUCCESS = 0
 const FAILURE = 1
-const TREE = { signalled: [101, 102], ended: [] }
-const NOTHING = { signalled: [], ended: [] }
+const TREE = { signalled: [101, 102] }
+const NOTHING = { signalled: [] }
 const USAGE = [
 	'Usage: josh lane:pause <issue-number> | josh lane:pause --all',
 	'       josh lane:resume <issue-number> | josh lane:resume --all',
@@ -61,25 +61,6 @@ describe('lane_pause_cli.run — one lane', () => {
 
 		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('lane:pause #4198: no child process running — nothing paused')
-	})
-})
-
-// joshuafolkken/kit#4265: the daemons a pause ended are named beside the processes it stopped.
-describe('lane_pause_cli.run — the lane’s daemon', () => {
-	it('names the daemons it ended', async () => {
-		pause_lane.mockReturnValue({ signalled: [101], ended: [201] })
-
-		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(SUCCESS)
-		expect(info).toHaveBeenCalledWith('lane:pause #4198: paused 1 process(es), ended 1 daemon(s)')
-	})
-
-	it('still exits non-zero when only a daemon was there', async () => {
-		pause_lane.mockReturnValue({ signalled: [], ended: [201] })
-
-		expect(await lane_pause_cli.run(['pause', ISSUE])).toBe(FAILURE)
-		expect(info).toHaveBeenCalledWith(
-			'lane:pause #4198: no child process running — nothing paused, ended 1 daemon(s)',
-		)
 	})
 })
 

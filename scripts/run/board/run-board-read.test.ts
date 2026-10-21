@@ -52,8 +52,32 @@ const LANE_ROOM = {
 const UNRECORDED = {
 	resume: undefined,
 	roots: { supervisor: undefined, parent: undefined },
+	stuck: new Map(),
+	closing: new Set(),
 	carry: undefined,
 }
+const STUCK_PID = 20_611
+const STUCK_REASON = 'owned by root'
+
+// joshuafolkken/kit#4300: a process a close could not end is named on the board with why, until a
+// retried close ends its lane.
+describe('run_board_read.read_local — the processes a close could not end', () => {
+	it('reads them off the records of the lanes not yet ended', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const stuck = [{ pid: STUCK_PID, reason: STUCK_REASON }]
+		const record = { issue: '3433', changed_at: STARTED_AT, changed_by: 'lane:open', stuck }
+
+		vi.spyOn(lane_state, 'read_records').mockResolvedValue([
+			{ ...record, state: 'open' },
+			{ ...record, issue: '3434', state: 'ended', stuck: [{ pid: 1, reason: 'gone' }] },
+		])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({
+			closing: new Set(['3433']),
+			stuck: new Map([[STUCK_PID, STUCK_REASON]]),
+		})
+	})
+})
 
 // joshuafolkken/kit#4206: the declared order a queued row waits on is read off the running run's record.
 describe('run_board_read.read_local — the run’s record', () => {

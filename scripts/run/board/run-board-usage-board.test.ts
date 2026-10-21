@@ -41,7 +41,12 @@ function mark(at_ms: number, cpu_ms: number): UsageMark {
 	}
 }
 
-const LOCAL_READ = { ...LOCAL, lanes: [String(LANE)], roots: { supervisor: SUPERVISOR } }
+const LOCAL_READ = {
+	...LOCAL,
+	lanes: [String(LANE)],
+	roots: { supervisor: SUPERVISOR },
+	closing: new Set([String(CLOSED_LANE)]),
+}
 
 describe('run_board_usage_board.board_usage_of', () => {
 	it('draws each open lane its figure and the scale of the newer reading', () => {
@@ -60,7 +65,7 @@ describe('run_board_usage_board.board_usage_of', () => {
 
 		expect(processes.backlogrun.supervisor.memory_bytes).toBe(100)
 		expect(processes.leftover.entries.map((entry) => entry.name)).toStrictEqual([
-			`vitest #${String(CLOSED_LANE)}`,
+			`vitest #${String(CLOSED_LANE)} ↻`,
 		])
 	})
 

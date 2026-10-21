@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import path from 'node:path'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_reap } from './lane-reap'
 import { process_directories } from './process-directories'
@@ -89,8 +90,9 @@ function lane_processes(
 	directories: ReadonlyMap<number, string>,
 	marks: ReadonlyMap<number, string>,
 ): Array<number> {
+	const root = path.dirname(lane.directory)
 	const within = [...directories]
-		.filter(([, cwd]) => process_directories.is_within(cwd, lane.directory))
+		.filter(([, cwd]) => process_directories.lane_of(cwd, root) === lane.issue)
 		.map(([pid]) => pid)
 	const marked = [...marks].filter(([, issue]) => issue === lane.issue).map(([pid]) => pid)
 
@@ -154,7 +156,7 @@ function report(ended: ReadonlyArray<number> | undefined, cited: string): void {
 	if (sentence !== undefined) console.error(sentence)
 }
 
-const lane_residents = { end_residents, parse_groups, report, residents_sentence }
+const lane_residents = { end_residents, parse_groups, report, residents, residents_sentence }
 
 export type { ResidentLane, ResidentProbes }
 export { lane_residents }

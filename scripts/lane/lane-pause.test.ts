@@ -13,10 +13,9 @@ const OTHER = { issue: '4197', directory: '/w/.kit-lanes/4197' }
 const CHILD = 48_848
 const SHELL = 48_900
 const LATE_CHILD = 48_950
-const DAEMON = 20_611
+const RESIDENT = 20_611
 const OWN_PARENT = 60_000
 const INIT = 1
-const DAEMON_PATTERN_START = '^eslint_d'
 const TERMINATE = 'SIGTERM'
 const LANE: LaneInfo = {
 	issue: ISSUE,
@@ -32,8 +31,8 @@ const LANE: LaneInfo = {
 interface FakeTree {
 	matching: Array<number>
 	children: Record<number, Array<number>>
-	// The detached `eslint_d` the daemon pattern finds.
-	daemons?: Array<number>
+	// Detached processes sitting in the lane's directory, out of the tree's reach.
+	residents?: Array<number>
 }
 
 interface Signalled {
@@ -43,10 +42,10 @@ interface Signalled {
 
 function probes_over(tree: FakeTree, signalled: Array<Signalled>): PauseProbes {
 	return {
-		matching: (pattern) =>
-			pattern.startsWith(DAEMON_PATTERN_START) ? [...(tree.daemons ?? [])] : [...tree.matching],
+		matching: () => [...tree.matching],
 		children_of: (pid) => tree.children[pid] ?? [],
 		parent_of: (pid) => ({ [process.pid]: OWN_PARENT, [OWN_PARENT]: INIT })[pid],
+		residents: () => tree.residents ?? [],
 		signal: (pid, name) => {
 			signalled.push({ pid, name })
 
@@ -65,10 +64,7 @@ describe('lane_pause.pause_lane — the tree', () => {
 		const signalled: Array<Signalled> = []
 		const probes = probes_over({ matching: [CHILD], children: { [CHILD]: [SHELL] } }, signalled)
 
-		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({
-			signalled: [CHILD, SHELL],
-			ended: [],
-		})
+		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [CHILD, SHELL] })
 		expect(signalled).toStrictEqual([
 			{ pid: CHILD, name: 'SIGSTOP' },
 			{ pid: SHELL, name: 'SIGSTOP' },
@@ -91,34 +87,30 @@ describe('lane_pause.pause_lane — the tree', () => {
 	it('answers the empty list when the lane has no child running', () => {
 		const probes = probes_over({ matching: [], children: {} }, [])
 
-		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [], ended: [] })
+		expect(lane_pause.pause_lane(TARGET, probes)).toStrictEqual({ signalled: [] })
 	})
 })
 
-// joshuafolkken/kit#4265: the lane's detached `eslint_d` kept running under a pause, so `run:board`
-// drew the lane as working. It is ended rather than stopped — a resume would not reach it.
-describe('lane_pause.pause_lane — the lane’s daemon', () => {
-	it('ends the daemon before it stops the tree', () => {
+// joshuafolkken/kit#4300: a process detached to pid 1 — the edit hook's `eslint_d` — kept running
+// under a pause, so `run:board` drew the lane as working. It is found by its working directory and
+// stopped with the tree, so a resume continues it.
+describe('lane_pause — the lane’s residents', () => {
+	it('stops a resident with the tree, never ending it', () => {
 		const signalled: Array<Signalled> = []
-		const tree: FakeTree = { matching: [CHILD], children: {}, daemons: [DAEMON] }
+		const tree: FakeTree = { matching: [CHILD], children: {}, residents: [RESIDENT] }
 
 		expect(lane_pause.pause_lane(TARGET, probes_over(tree, signalled))).toStrictEqual({
-			signalled: [CHILD],
-			ended: [DAEMON],
+			signalled: [CHILD, RESIDENT],
 		})
-		expect(signalled).toStrictEqual([
-			{ pid: DAEMON, name: TERMINATE },
-			{ pid: CHILD, name: 'SIGSTOP' },
-		])
+		expect(signalled.every(({ name }) => name === 'SIGSTOP')).toBe(true)
 	})
 
-	it('never stops the daemon it ended', () => {
-		const signalled: Array<Signalled> = []
-		const tree: FakeTree = { matching: [], children: {}, daemons: [DAEMON] }
+	it('continues a resident on resume', () => {
+		const tree: FakeTree = { matching: [], children: {}, residents: [RESIDENT] }
 
-		lane_pause.pause_lane(TARGET, probes_over(tree, signalled))
-
-		expect(signalled).toStrictEqual([{ pid: DAEMON, name: TERMINATE }])
+		expect(lane_pause.resume_lane(TARGET, probes_over(tree, []))).toStrictEqual({
+			signalled: [RESIDENT],
+		})
 	})
 })
 
@@ -163,7 +155,7 @@ describe('lane_pause.resume_lane', () => {
 		const tree = { matching: [OWN_PARENT, CHILD], children: { [CHILD]: [SHELL] } }
 		const resumed = lane_pause.resume_lane(TARGET, probes_over(tree, signalled))
 
-		expect(resumed).toStrictEqual({ signalled: [CHILD, SHELL], ended: [] })
+		expect(resumed).toStrictEqual({ signalled: [CHILD, SHELL] })
 		expect(signalled.every(({ name }) => name === 'SIGCONT')).toBe(true)
 	})
 })

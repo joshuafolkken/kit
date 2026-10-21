@@ -971,11 +971,13 @@ pnpm josh lane:resume --all   # every open lane
 
 - Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch and Issue are untouched; the child keeps its memory.
 - A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record.
-- A pause ends the lane's detached `eslint_d` (titled `eslint_d - <lane directory>`) rather than stopping it: a resume would not reach it, and the next lint starts it again. `lane:close`, `lane:withdraw` and `lane:restart` end it too.
-- `lane:close` also ends every process still running from the lane (working directory under its checkout, or the lane's `JOSH_LANE_CHILD` mark inherited in its environment, application bundles excepted; macOS), the caller's own ancestry spared, and prints how many it ended. `lane:restart` does the same before the fresh dispatch.
+- The lane's processes are its child's tree plus every process still running from the lane (working directory under its checkout, or the lane's `JOSH_LANE_CHILD` mark inherited in its environment, application bundles excepted; macOS), the caller's own ancestry spared.
+- A detached `eslint_d` or `ship --detach` re-parented to pid 1 is among them. A pause stops them all, so a resume continues what it stopped.
+- `lane:close` ends the same set and prints how many it ended: SIGTERM, then SIGKILL. A process alive after both leaves the close `incomplete`, with no `ended` record. `lane:withdraw` and `lane:restart` end it too.
+- The supervisor retries such a close on every pass; `run:board` marks its leftover row `↻` (being ended) or `⚠ <reason> (pid <pid>)`.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
 
-**Output / exit codes:** one line per lane (`, ended N daemon(s)` when a pause ended any), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
+**Output / exit codes:** one line per lane (`paused N process(es)`), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
 
 ### `josh lane:state`
 

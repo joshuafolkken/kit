@@ -19,7 +19,8 @@ const OPEN_LANE = 4154
 const CLOSED_LANE = 4130
 const CLAUDE = 'claude'
 const ESLINT_D = 'eslint_d - /Users/me/.kit-lanes/4130'
-const LEFTOVER_ESLINT = 'eslint_d #4130'
+const LEFTOVER_ESLINT = 'eslint_d #4130 ↻'
+const ESLINT_PID = 400
 const CHROME_APP = 'Google Chrome'
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CHROME_HELPER =
@@ -35,7 +36,7 @@ const ROWS: ReadonlyArray<Row> = [
 	[201, SESSION, 'node', 60],
 	[300, DRIVE, CLAUDE, 100, OPEN_LANE],
 	[301, 300, 'node', 200, OPEN_LANE],
-	[400, LAUNCHD, ESLINT_D, 1000, CLOSED_LANE],
+	[ESLINT_PID, LAUNCHD, ESLINT_D, 1000, CLOSED_LANE],
 	[500, LAUNCHD, CHROME, 3000],
 	[501, 500, CHROME_HELPER, 2000],
 	[600, LAUNCHD, CLAUDE, 700],
@@ -62,12 +63,19 @@ function mark_of(rows: ReadonlyArray<Row>): UsageMark {
 }
 
 const ROOTS: ProcessRoots = { supervisor: SUPERVISOR, parent: SESSION }
+// The closed lanes' records are not ended yet: the supervisor still closes them again.
+const CLOSING: ReadonlySet<string> = new Set(['4130', '4154'])
 
-function groups_for(roots: ProcessRoots, open: ReadonlyArray<number> = [OPEN_LANE]): ProcessGroups {
+function groups_for(
+	roots: ProcessRoots,
+	open: ReadonlyArray<number> = [OPEN_LANE],
+	stuck: ReadonlyMap<number, string> = new Map(),
+	closing: ReadonlySet<string> = CLOSING,
+): ProcessGroups {
 	const mark = mark_of(ROWS)
 	const figures = run_board_usage.process_figures(undefined, mark)
 
-	return groups_of({ mark, figures, open_lanes: new Set(open), roots })
+	return groups_of({ mark, figures, open_lanes: new Set(open), roots, stuck, closing })
 }
 
 describe('run_board_process_groups.app_of', () => {
@@ -85,7 +93,14 @@ describe('run_board_process_groups.groups_of over the same table twice', () => {
 
 	it('names each command once, and none again on the next redraw', () => {
 		// An empty table forgets every command an earlier test named.
-		groups_of({ mark: mark_of([]), figures: new Map(), open_lanes: new Set(), roots: ROOTS })
+		groups_of({
+			mark: mark_of([]),
+			figures: new Map(),
+			open_lanes: new Set(),
+			roots: ROOTS,
+			stuck: new Map(),
+			closing: new Set(),
+		})
 		const naming = vi.spyOn(run_board_app_name, 'app_of')
 
 		groups_for(ROOTS)
@@ -150,8 +165,24 @@ describe('run_board_process_groups.groups_of outside the backlogrun', () => {
 		expect(backlogrun.lanes.count).toBe(0)
 		expect(leftover.entries.map((entry) => entry.name)).toStrictEqual([
 			LEFTOVER_ESLINT,
-			'node #4154',
-			`${CLAUDE} #4154`,
+			'node #4154 ↻',
+			`${CLAUDE} #4154 ↻`,
 		])
+	})
+
+	// joshuafolkken/kit#4300: a leftover that outlived a close's SIGKILL is named with why, not as
+	// one being reaped.
+	it('names a leftover a close could not end with why and its pid', () => {
+		const { leftover } = groups_for(ROOTS, [OPEN_LANE], new Map([[ESLINT_PID, 'owned by root']]))
+
+		expect(leftover.entries.map((entry) => entry.name)).toStrictEqual([
+			'eslint_d #4130 ⚠ owned by root (pid 400)',
+		])
+	})
+
+	it('marks no leftover of a lane whose record is ended as being reaped', () => {
+		const { leftover } = groups_for(ROOTS, [OPEN_LANE], new Map(), new Set())
+
+		expect(leftover.entries.map((entry) => entry.name)).toStrictEqual(['eslint_d #4130'])
 	})
 })
