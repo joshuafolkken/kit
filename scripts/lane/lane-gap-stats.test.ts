@@ -13,9 +13,13 @@ const MS_PER_SECOND = 1000
 const ISSUE = 4300
 const OTHER = 4356
 const RELAUNCH = 'cut → resume'
+const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const MERGE = 'followup → merge'
 const CUT_TEXT = `#${String(ISSUE)} cut (implementation)`
+const OUTAGE_TEXT = `#${String(ISSUE)} outage (re-dispatchable)`
+const OUTAGE_KIND = 'outage'
+const LAUNCH_KIND = 'child-launch'
 const UNMEASURED = 'not measured | not measured'
 const HEADER = '| gap | count | median (s) | max (s) | not ended |'
 
@@ -92,7 +96,38 @@ describe('lane_gap_stats.table -- cut → resume', () => {
 	})
 })
 
+describe('lane_gap_stats.table -- outage → relaunch', () => {
+	// A child that ended with no result is collected as an outage and dispatched again (joshuafolkken/kit#4410).
+	it('times each outage until its own issue launched again', () => {
+		const events = [
+			event(OUTAGE_KIND, OUTAGE_TEXT, 100),
+			event(LAUNCH_KIND, `#${String(OTHER)} dispatched`, 95),
+			event(LAUNCH_KIND, `#${String(ISSUE)} dispatched`, 77),
+		]
+
+		expect(row_of([], events, OUTAGE)).toBe(`| ${OUTAGE} | 1 | 23 | 23 | 0 |`)
+	})
+
+	it('ends an outage no later than the same issue next outage', () => {
+		const events = [
+			event(OUTAGE_KIND, OUTAGE_TEXT, 300),
+			event(OUTAGE_KIND, OUTAGE_TEXT, 100),
+			event(LAUNCH_KIND, `#${String(ISSUE)} dispatched`, 80),
+		]
+
+		expect(row_of([], events, OUTAGE)).toBe(`| ${OUTAGE} | 2 | 20 | 20 | 1 |`)
+	})
+})
+
 describe('lane_gap_stats.table -- park → offer', () => {
+	// The #4377 park of 2026-10-21: the driver's pass after it found the pool full.
+	it('ends a park at the full pool released entry', () => {
+		const events = [event('park', `#${String(ISSUE)} waiting on start date`, 60)]
+		const entries: Array<LedgerEntry> = [{ kind: 'released', at: seconds_before_now(45) }]
+
+		expect(row_of(entries, events, PARK)).toBe(`| ${PARK} | 1 | 15 | 15 | 0 |`)
+	})
+
 	// The #4300 park of 2026-10-21: the cap's park, then the driver's collection, each answered.
 	it('times each park until the next offer answer after it', () => {
 		const events = [
@@ -136,7 +171,7 @@ describe('lane_gap_stats.table -- the period', () => {
 		const lines = lane_gap_stats.table([], WINDOW).split('\n')
 
 		expect(lines[0]).toBe(HEADER)
-		expect(lines).toHaveLength(5)
+		expect(lines).toHaveLength(6)
 	})
 
 	it('leaves out a gap that started before the period', () => {

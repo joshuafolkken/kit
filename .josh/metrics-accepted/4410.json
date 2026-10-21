@@ -1,0 +1,7 @@
+{
+	"reason": "New outage → relaunch gap row and a shared issue-span helper for lane:stats (#4410)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 26
+	}
+}
