@@ -5,11 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
+vi.mock('#scripts/git/git-spawn-sync', () => ({ git_spawn_sync: { read: vi.fn() } }))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 const { resolve_package_bin } = await import('#scripts/build/local-bin')
 const mocked_resolve = vi.mocked(resolve_package_bin)
+const { git_spawn_sync } = await import('#scripts/git/git-spawn-sync')
+const mocked_git_read = vi.mocked(git_spawn_sync.read)
 const { eslint_daemon } = await import('./eslint-daemon')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -23,6 +26,8 @@ const MS_PER_S = 1000
 const RULE_MODULE = 'eslint/rules/a-rule.js'
 const CONFIG_ENTRY = 'eslint.config.js'
 const PNPM_PRETTIER = ['exec', 'prettier', TARGET]
+// What `git rev-parse --git-path logs/HEAD` prints in a main checkout: relative to the work tree.
+const HEAD_REFLOG = '.git/logs/HEAD'
 
 const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-'))
 
@@ -52,6 +57,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	mkdirSync(project_root, { recursive: true })
 	mocked_resolve.mockReturnValue(CLI)
+	mocked_git_read.mockReturnValue(undefined)
 })
 
 afterEach(() => {
@@ -118,6 +124,18 @@ describe('eslint_daemon.newest_config_mtime', () => {
 		},
 	)
 
+	// joshuafolkken/kit#4443: a merge moves sources the daemon's type program read but never linted.
+	it("reads the work tree's HEAD reflog that a merge or checkout appends to", () => {
+		write_file(CONFIG_ENTRY, OLDER_S)
+		write_file(HEAD_REFLOG, NEWER_S)
+		mocked_git_read.mockReturnValue(HEAD_REFLOG)
+
+		expect(eslint_daemon.newest_config_mtime(project_root)).toBe(NEWER_S * MS_PER_S)
+		expect(mocked_git_read).toHaveBeenCalledWith(['rev-parse', '--git-path', 'logs/HEAD'], {
+			cwd: project_root,
+		})
+	})
+
 	it('skips a config input that is gone by the time it is read', () => {
 		write_file(RULE_MODULE, NEWER_S)
 		symlinkSync(path.join(project_root, 'missing.js'), path.join(project_root, CONFIG_ENTRY))
@@ -158,6 +176,21 @@ describe('eslint_daemon.run', () => {
 		mocked_execa.mockResolvedValueOnce(answer(1, ''))
 
 		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4443: a daemon whose config is current still holds the pre-merge types.
+describe('eslint_daemon.run — after a merge', () => {
+	it('stops a daemon started before the last merge before linting', async () => {
+		checkout(NEWER_S, OLDER_S)
+		write_file(HEAD_REFLOG, NEWER_S + NEWER_S)
+		mocked_git_read.mockReturnValue(HEAD_REFLOG)
+		mocked_execa.mockResolvedValue(answer(0, ''))
+
+		await eslint_daemon.run(PNPM_ESLINT, { project_root })
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual([CLI, 'stop'])
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual([CLI, '--quiet', TARGET])
 	})
 })
 

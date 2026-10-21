@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_package_bin } from '#scripts/build/local-bin'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
 
@@ -28,6 +29,11 @@ const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
 // and the lockfile on every dependency change a checkout or merge brings in.
 const NODE_MODULES = 'node_modules'
 const DEPENDENCY_INPUTS = ['pnpm-lock.yaml', path.join(NODE_MODULES, '.modules.yaml')]
+// The daemon's type program keeps every source it read but did not lint, so a merge that changes
+// those types leaves typed rules failing on the old ones (joshuafolkken/kit#4443). Git appends to this
+// work tree's HEAD reflog on every merge, checkout, reset, pull and commit — the commands that move
+// sources under the daemon without an edit the hook sees.
+const HEAD_REFLOG = path.join('logs', 'HEAD')
 // `eslint_d` writes `<token> <port> <pid> <hash>` here once, when the daemon has started — so the
 // file's mtime is when the daemon loaded its config.
 const DAEMON_RECORD = '.eslint_d'
@@ -87,6 +93,16 @@ function eslint_arguments_of(
 	return pnpm_arguments.slice(PNPM_ESLINT_PREFIX_LENGTH)
 }
 
+// A linked worktree's reflog lives under its own git directory, which `--git-path` resolves; outside
+// a repository there is none.
+function head_reflog_paths(project_root: string): ReadonlyArray<string> {
+	const reflog = git_spawn_sync.read(['rev-parse', '--git-path', HEAD_REFLOG], {
+		cwd: project_root,
+	})
+
+	return reflog === undefined ? [] : [path.resolve(project_root, reflog)]
+}
+
 function config_input_paths(project_root: string): ReadonlyArray<string> {
 	const entries = readdirSync(project_root).filter((name) => ESLINT_CONFIG_ENTRY.test(name))
 	const config_directory = path.join(project_root, ESLINT_CONFIG_DIR)
@@ -100,6 +116,7 @@ function config_input_paths(project_root: string): ReadonlyArray<string> {
 	return [
 		...[...entries, ...DEPENDENCY_INPUTS].map((name) => path.join(project_root, name)),
 		...modules,
+		...head_reflog_paths(project_root),
 	]
 }
 
@@ -128,7 +145,8 @@ function daemon_started_ms(project_root: string): number | undefined {
 
 // A daemon keeps the rule modules it imported first — eslint cache-busts only the config entry file —
 // so a config input written after it started (an edit, a `git merge`, a checkout) leaves it linting
-// against the old rules. The edit hook restarts it on its own config edits; this catches the rest.
+// against the old rules, and a HEAD move after it started leaves it typing against the old sources.
+// The edit hook restarts it on its own config edits; this catches the rest.
 function is_stale(started_ms: number | undefined, newest_input_ms: number): boolean {
 	return started_ms !== undefined && started_ms < newest_input_ms
 }
