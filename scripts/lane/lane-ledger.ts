@@ -61,6 +61,8 @@ const check_schema = z.object({
 	// Why the unit leg ran the whole suite instead of the related tests — a stable kind, never the
 	// file it names (joshuafolkken/kit#4397). Absent when it narrowed, and on every other check.
 	fallback: z.string().optional(),
+	// The unit leg's since-green no-op: nothing moved, so it ran no test (joshuafolkken/kit#4457).
+	is_unmoved: z.boolean().optional(),
 })
 const gate_schema = z.object({
 	kind: z.literal(KIND.GATE),

@@ -226,3 +226,23 @@ describe('gate_ledger — the load between the ends', () => {
 		expect(live_reservations).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#4457: the since-green no-op ran no test, so it is told apart from a unit run.
+describe('gate_ledger — the unit leg no-op', () => {
+	it('records the unit leg since-green no-op as unmoved, with no fallback', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'unmoved.jsonl')
+		const scope = { mode: 'none' as const, files: [], reason: related_scope.UNMOVED_REASON }
+		const output = related_scope.describe_scope(scope, scratch)
+		const unit = { label: gate_plan.UNIT_LABEL, command: '', exit_code: 0, output, elapsed_ms: 9 }
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [unit], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+		const [unit_check] = entry?.kind === 'gate' ? (entry.checks ?? []) : []
+
+		expect(unit_check).toMatchObject({ is_unmoved: true })
+		expect(unit_check?.fallback).toBeUndefined()
+	})
+})

@@ -77,6 +77,7 @@ const WHOLE_SUITE_FILES: ReadonlySet<string> = new Set([
 const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import or read'
 const NO_MAP_REASON = 'no test-read map covers the changed non-code file'
+const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
 const WHOLE_SUITE_SUFFIX = 'affects every test'
 const UNRECORDED_SUFFIX = 'is read by no recorded test'
 
@@ -238,6 +239,14 @@ function fallback_kind(output: string): string | undefined {
 	return FALLBACK_KINDS.find((entry) => reason.includes(entry.reason))?.kind ?? OTHER_FALLBACK
 }
 
+// Whether a run's output is the since-green no-op — nothing moved, so no test ran — read off the line
+// `describe_scope` printed, so the gate ledger never times it as a unit run (joshuafolkken/kit#4457).
+function is_unmoved(output: string): boolean {
+	const line = `${COMMAND_LABEL}: ${UNMOVED_REASON} — ${NONE_SUFFIX}.`
+
+	return output.split('\n').some((candidate) => candidate.trim() === line)
+}
+
 // `--run` is what keeps `vitest related` out of watch mode; the `run` sub-command already implies it
 // on the full-suite side, which is why only one of the two branches carries the flag.
 function vitest_arguments(
@@ -255,10 +264,12 @@ const related_scope = {
 	LISTED_FILE_LIMIT,
 	NOTHING_RELATABLE_REASON,
 	NO_MAP_REASON,
+	UNMOVED_REASON,
 	UNREADABLE_REASON,
 	describe_scope,
 	fallback_kind,
 	is_relatable,
+	is_unmoved,
 	resolve_scope,
 	vitest_arguments,
 }
