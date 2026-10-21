@@ -17,6 +17,13 @@ import { import_graph, type ImportGraph } from './import-graph'
 // unguarded run wrote, or one from before this — is dropped as well, because nothing says what it
 // read.
 //
+// The drop clears a stale red as well as a stale green: an import rule's report — `import/no-cycle`,
+// `import-x/named` — is about another file too, and once that file changes the entry is linted
+// afresh. Only imports are followed, so a rule that reads the files importing this one — a
+// reverse-dependency rule such as `import/no-unused-modules`, a no-op under ESLint 10 — would go
+// stale here. This is the one place cache staleness is decided; it replaced the cross-file re-read that
+// once ran after a red cached run (joshuafolkken/kit#3641, #3667, #4407, #4420).
+//
 // The record rides inside eslint's own cache file, in the entry's `data` beside the results eslint
 // keeps there, rather than a file of its own: it then travels wherever the cache file does — a lane's
 // seed, CI's cache — and eslint replaces `data` whole whenever it lints the file again, so a hash can
@@ -106,8 +113,7 @@ function record(cache_file: string, hashes: Hashes, graph: ImportGraph): void {
 	if (recorded.length > 0) write_entries(cache_file, entries)
 }
 
-// Runs one cached eslint run — the process and whatever re-reads its cache after it — between the
-// drop and the record. A project without `typescript` or a `tsconfig.json` runs it as it was.
+// Runs one cached eslint run between the drop and the record. A project without `typescript` or a `tsconfig.json` runs it as it was.
 async function guard<T>(
 	cache_file: string,
 	run: () => Promise<T>,

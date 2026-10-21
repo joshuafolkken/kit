@@ -181,7 +181,7 @@ async function run(
 
 // The warm run from the current directory, read as a buffered child's result, or the cold
 // `pnpm exec eslint` when the daemon cannot answer — the one fallback `josh lint:related` and the
-// pre-commit hook both take before their report is re-read (`cross-file-recheck.ts`).
+// pre-commit hook both take.
 async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<BufferedProcessResult> {
 	const started_at = performance.now()
 	const outcome = await run(pnpm_arguments, { project_root: process.cwd() })

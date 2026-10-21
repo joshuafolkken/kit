@@ -15,6 +15,7 @@ import type ts from 'typescript'
 const TSCONFIG = 'tsconfig.json'
 const HASH_ALGORITHM = 'sha256'
 const MISSING = 'missing'
+const NODE_MODULES = 'node_modules'
 const MODULE_STATEMENT = /^(?:import|export)\b/mu
 const GLOBAL_DECLARATION = /^declare (?:global|module|namespace)\b/mu
 
@@ -38,6 +39,12 @@ interface GraphContext extends Resolver {
 	content_hashes: Map<string, string>
 }
 
+interface ProjectConfig {
+	options: ts.CompilerOptions
+	file_names: ReadonlyArray<string>
+	config_files: ReadonlyArray<string>
+}
+
 interface ImportGraph {
 	closure_hash: (file: string) => string
 }
@@ -57,17 +64,34 @@ async function load_typescript(): Promise<TypeScript | undefined> {
 	}
 }
 
-function ignore_diagnostic(): void {
-	// A configuration that does not parse fails the type check, which reports it; here it only
-	// leaves the options the parse did reach.
-}
-
-function parsed_config(typescript: TypeScript, root: string): ts.ParsedCommandLine | undefined {
+// A configuration that does not parse fails the type check, which reports it; here it only leaves
+// the options the parse did reach. `config_files` are `tsconfig.json` and every file it extends: a
+// type-aware verdict reads the compiler options — `strict` decides what is `any` — so a changed
+// option is a changed input like a changed import.
+function parsed_config(typescript: TypeScript, root: string): ProjectConfig | undefined {
 	const config_file = path.join(root, TSCONFIG)
 	if (!typescript.sys.fileExists(config_file)) return undefined
-	const host = { ...typescript.sys, onUnRecoverableConfigFileDiagnostic: ignore_diagnostic }
+	const source = typescript.readJsonConfigFile(config_file, typescript.sys.readFile)
+	const parsed = typescript.parseJsonSourceFileConfigFileContent(
+		source,
+		typescript.sys,
+		root,
+		undefined,
+		config_file,
+	)
 
-	return typescript.getParsedCommandLineOfConfigFile(config_file, {}, host)
+	return {
+		options: parsed.options,
+		file_names: parsed.fileNames,
+		config_files: [config_file, ...(source.extendedSourceFiles ?? [])],
+	}
+}
+
+// A package is named by its resolved path only while that path sits in an install. A workspace or
+// `link:` package resolves through its symlink to source the project edits — a path that carries no
+// version — so its files are read like the project's own.
+function is_installed(file: string): boolean {
+	return file.split(path.sep).includes(NODE_MODULES)
 }
 
 function as_dependency(
@@ -76,7 +100,7 @@ function as_dependency(
 ): Dependency | undefined {
 	if (file === undefined) return undefined
 
-	return { file, external: external === true }
+	return { file, external: external === true && is_installed(file) }
 }
 
 // A file named by its path from the one naming it: a `/// <reference path>`, or a relative import the
@@ -157,17 +181,15 @@ function is_ambient(file: string): boolean {
 	return GLOBAL_DECLARATION.test(content) || !MODULE_STATEMENT.test(content)
 }
 
-// What every file reads without importing it: the project's ambient declarations and the type
-// packages its compiler options load (`types`, or every `@types` package when it is unset).
-function ambient_of(
-	resolver: Resolver,
-	root: string,
-	files: ReadonlyArray<string>,
-): Array<Dependency> {
+// What every file reads without importing it: the project's ambient declarations, the type packages
+// its compiler options load (`types`, or every `@types` package when it is unset), and the
+// configuration files those options come from.
+function ambient_of(resolver: Resolver, root: string, config: ProjectConfig): Array<Dependency> {
 	const config_file = path.join(root, TSCONFIG)
-	const declarations = files
-		.filter((file) => is_ambient(file))
-		.map((file) => ({ file, external: false }))
+	const declarations = [
+		...config.file_names.filter((file) => is_ambient(file)),
+		...config.config_files,
+	].map((file) => ({ file, external: false }))
 	const types = resolver.typescript
 		.getAutomaticTypeDirectiveNames(resolver.options, resolver.typescript.sys)
 		.map((name) => resolve_type(resolver, name, config_file))
@@ -250,7 +272,7 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 		typescript,
 		options,
 		resolution_cache: typescript.createModuleResolutionCache(root, (name) => name, options),
-		ambient: ambient_of({ typescript, options }, root, parsed.fileNames),
+		ambient: ambient_of({ typescript, options }, root, parsed),
 		dependencies: new Map(),
 		content_hashes: new Map(),
 	}

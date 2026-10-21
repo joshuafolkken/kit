@@ -11,7 +11,7 @@ import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 // joshuafolkken/kit#4415. Only the file the caller imports changes, and the value it hands over
 // becomes `any`: the caller is now an unsafe assignment, while its own content — the cache's key —
 // is what it was. The cases lint a real caller against a real cache file and a real tsconfig
-// project, for the reason `cross-file-recheck-typed.test.ts` gives.
+// project: a mocked linter would have no stale entry to answer with.
 const LINT_PROBE_TIMEOUT_MS = 120_000
 
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })

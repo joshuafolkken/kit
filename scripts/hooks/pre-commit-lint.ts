@@ -9,7 +9,6 @@ import {
 } from '#scripts/josh/josh-command-types'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
-import { cross_file_recheck, type CrossFileRecheckOptions } from '#scripts/lint/cross-file-recheck'
 import { eslint_cache_dependencies } from '#scripts/lint/eslint-cache-dependencies'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { execa } from 'execa'
@@ -27,8 +26,6 @@ const ARGV_OFFSET = 2
 const USAGE_ERROR_EXIT_CODE = 2
 const PNPM = 'pnpm'
 const ESLINT = 'eslint'
-// eslint's numeric "error" severity, the one rule severity `--quiet` keeps.
-const ERROR_SEVERITY = 2
 
 const TOOL_ARGUMENTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	cspell: [
@@ -66,42 +63,20 @@ function build_arguments(
 	return [...tool_arguments, ...staged_files]
 }
 
-// `--quiet` runs only the rules set to "error"; the Node API spells that as a rule filter, so the
-// re-reading asks the question the hook's run asked.
-function is_error_rule(rule: { severity: number }): boolean {
-	return rule.severity === ERROR_SEVERITY
-}
-
-// What re-reading a cached cross-file report (`cross-file-recheck.ts`) needs to ask the hook's run
-// again: the hook's own cache file and the staged files (joshuafolkken/kit#4407).
-function recheck_options(staged_files: ReadonlyArray<string>): CrossFileRecheckOptions {
-	return {
-		cache_file: ESLINT_COMMIT_CACHE_FILE,
-		patterns: staged_files,
-		errors_only: true,
-		eslint_options: { ruleFilter: is_error_rule },
-	}
-}
-
 // eslint goes through the lane's warm daemon when one is reachable (joshuafolkken/kit#4358): the same
 // argument list and the same cache file, without paying the config and plugin load per commit. It
 // runs inside the tool's core-budget reservation like the cold route does.
 //
 // A merge or checkout can change only the files a staged file imports, and the content cache keeps
-// the staged file's verdict: its entry is dropped first when they changed (joshuafolkken/kit#4415),
-// and its red report is re-read before it is printed (joshuafolkken/kit#4407).
-async function run_eslint(
-	command_arguments: ReadonlyArray<string>,
-	staged_files: ReadonlyArray<string>,
-): Promise<number> {
-	const verified = await eslint_cache_dependencies.guard(ESLINT_COMMIT_CACHE_FILE, async () => {
-		const result = await eslint_daemon.run_or_cold(command_arguments)
+// the staged file's verdict: its entry is dropped first when they changed (joshuafolkken/kit#4415).
+async function run_eslint(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const result = await eslint_cache_dependencies.guard(
+		ESLINT_COMMIT_CACHE_FILE,
+		async () => await eslint_daemon.run_or_cold(command_arguments),
+	)
+	if (result.output !== '') process.stdout.write(result.output)
 
-		return await cross_file_recheck.verify(result, recheck_options(staged_files))
-	})
-	if (verified.output !== '') process.stdout.write(verified.output)
-
-	return verified.exit_code ?? FAIL_EXIT_CODE
+	return result.exit_code ?? FAIL_EXIT_CODE
 }
 
 async function run_tool(command_arguments: ReadonlyArray<string>): Promise<number> {
@@ -112,7 +87,7 @@ async function run_tool(command_arguments: ReadonlyArray<string>): Promise<numbe
 
 async function run_reserved(tool: string, staged_files: ReadonlyArray<string>): Promise<number> {
 	const command_arguments = build_arguments(tool, staged_files) ?? []
-	if (tool === ESLINT) return await run_eslint(command_arguments, staged_files)
+	if (tool === ESLINT) return await run_eslint(command_arguments)
 
 	return await run_tool(command_arguments)
 }
@@ -138,6 +113,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
 }
 
-const pre_commit_lint = { build_arguments, recheck_options, run, USAGE_ERROR_EXIT_CODE }
+const pre_commit_lint = { build_arguments, run, USAGE_ERROR_EXIT_CODE }
 
 export { pre_commit_lint }

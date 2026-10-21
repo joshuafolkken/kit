@@ -11,9 +11,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
-vi.mock('#scripts/lint/cross-file-recheck', () => ({
-	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
-}))
 vi.mock('#scripts/lint/eslint-cache-dependencies', () => ({
 	eslint_cache_dependencies: {
 		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
@@ -24,8 +21,6 @@ const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 const { eslint_daemon } = await import('#scripts/lint/eslint-daemon')
 const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
-const { cross_file_recheck } = await import('#scripts/lint/cross-file-recheck')
-const mocked_verify = vi.mocked(cross_file_recheck.verify)
 const { eslint_cache_dependencies } = await import('#scripts/lint/eslint-cache-dependencies')
 const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
 const { pre_commit_lint } = await import('./pre-commit-lint')
@@ -112,8 +107,6 @@ describe('pre_commit_lint.run', () => {
 })
 
 const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }
-const ERROR_RULE = { ruleId: 'a-rule', severity: 2 } as const
-const WARNING_RULE = { ruleId: 'a-rule', severity: 1 } as const
 
 // joshuafolkken/kit#4358: eslint runs warm or cold through `eslint_daemon.run_or_cold`, inside the
 // eslint reservation.
@@ -140,44 +133,17 @@ describe('pre_commit_lint.run — eslint', () => {
 	})
 })
 
-// joshuafolkken/kit#4407: a merge can change only what a staged file imports, and the hook's content
-// cache keeps the staged file's red. The report is re-read before it is printed.
-describe('pre_commit_lint.run — the re-read eslint report', () => {
-	it('prints and answers with the re-read report rather than the cached one', async () => {
+// joshuafolkken/kit#4415: a merge can change only what a staged file imports, and the hook's content
+// cache keeps the staged file's verdict. Its entry is dropped from the hook's cache file before the
+// run reads it, and the run's own report is the one printed.
+describe('pre_commit_lint.run — the dependency guard', () => {
+	it('runs eslint inside the guard of the hook cache file and prints its report', async () => {
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
-		mocked_verify.mockResolvedValueOnce({ output: 'fresh', exit_code: 0, elapsed_ms: 0 })
 
-		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(0)
-		expect(mocked_verify).toHaveBeenCalledWith(STALE_RED, expect.anything())
-		expect(write).toHaveBeenCalledWith('fresh')
-	})
-
-	it('re-reads the staged files against the hook cache, error rules only as --quiet', () => {
-		const options = pre_commit_lint.recheck_options(STAGED)
-		const rule_filter = options.eslint_options?.ruleFilter
-
-		expect(options).toMatchObject({
-			cache_file: ESLINT_COMMIT_CACHE_FILE,
-			patterns: STAGED,
-			errors_only: true,
-		})
-		expect(rule_filter?.(ERROR_RULE)).toBe(true)
-		expect(rule_filter?.(WARNING_RULE)).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#4415: an entry whose imports changed is dropped from the hook's cache file before
-// the run reads it — the stale green the re-reading cannot point at.
-describe('pre_commit_lint.run — the dependency guard', () => {
-	it('runs eslint and its re-reading inside the guard of the hook cache file', async () => {
-		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
-
-		await pre_commit_lint.run(['eslint', ...STAGED])
-
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
 		expect(mocked_guard).toHaveBeenCalledWith(ESLINT_COMMIT_CACHE_FILE, expect.any(Function))
-		expect(mocked_verify).toHaveBeenCalledOnce()
+		expect(write).toHaveBeenCalledWith(STALE_RED.output)
 	})
 })
