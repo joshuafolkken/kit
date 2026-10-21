@@ -4,6 +4,7 @@ headless のレーン子とレビューセッションは、`CLAUDE.md` を読�
 
 - 起動プロンプトがそのまま明示の起動。応答する人はいないので、確認は求めない。
 - `CLAUDE.md` を開き直さない。ここに無い規則は、対話セッションでしか効かない。
+- 下の `pnpm josh gate` は、レーン子では `josh ship` が回す（`.claude/skills/workflow-commands/chain-rule.md` → "Run the review-to-merge chain" step 0）。
 
 ## Communication
 
