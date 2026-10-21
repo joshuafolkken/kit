@@ -218,7 +218,9 @@ The driver records the hold only while a lane is free. A pass that collects a ch
 next offer in that same pass, so a freed lane is offered at once. Two passes record a `held` entry:
 
 - An offered pass that started nothing. The entry is `offer:<verdict>[:<answer>]`, for example
-  `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing.
+  `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing. A wait the
+  `run:solo` gate caused names its cause in place of the answer, `offer:watch:solo`, so the lanes a
+  solo run left empty show apart from every other `blocked` offer.
 - A driver end that hands control back to a session. The entry is `hand-back:<reason>`, for example
   `hand-back:merge` or `hand-back:window`. A finished run (`stop`, or the drain's `watch` or
   `retrospective`) is not a hold.

@@ -64,6 +64,16 @@ describe('backlog_drive.run_loop — the holds it reports', () => {
 		expect(holds[0]).toBe('offer:wait:blocked')
 	})
 
+	// joshuafolkken/kit#4396: a `run:solo` wait is its own reason, apart from every other `blocked`.
+	it('reports the offer’s cause in place of its answer', async () => {
+		const offers = [{ ...offer('watch'), answer: 'blocked', cause: 'solo' }]
+		const { ports, holds } = harness({ offers })
+
+		await backlog_drive.run_loop(state([FIRST_CHILD]), ONE_PASS, ports)
+
+		expect(holds[0]).toBe('offer:watch:solo')
+	})
+
 	it('reports the stop verdict as no hold: the run is finishing', async () => {
 		const { ports, holds } = harness({ offers: [offer('stop')] })
 

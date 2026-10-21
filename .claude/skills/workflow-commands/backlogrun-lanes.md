@@ -15,10 +15,15 @@ merged. **Decide it from three conditions that must all hold, never from how ser
 it a defect (not an improvement, refactor, removal or feature)? Is it in kit's own verification gate
 (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
 checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
-answer wrongly (a false green or a false red)? All three, and the issue carries `run:solo`; any one
-missing, and it carries `run:lane`. `backlog:next` and `epic:next --lanes` answer `triage` for an
-issue with neither, so a filed issue carries one of the two from its filing. **It stops the other
-lanes for one reason only: a batch run on broken verification leaves nobody's result trustworthy.**
+answer wrongly (a false green or a false red) **on every run**? All three, and the issue carries
+`run:solo`; any one missing, and it carries `run:lane`. `backlog:next` and `epic:next --lanes` answer
+`triage` for an issue with neither, so a filed issue carries one of the two from its filing. **It stops
+the other lanes for one reason only: a batch run on broken verification leaves nobody's result
+trustworthy.**
+
+**A wrong answer that only comes some of the time — a flaky test, a timeout under load — is not a solo
+run.** It carries `run:lane` and `priority:critical`, so it leads the next offer while the other lanes
+keep running: a flake costs another lane one rerun, less than every lane stopped until it merges.
 
 ## Lanes — running more than one child at a time
 

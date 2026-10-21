@@ -191,3 +191,27 @@ describe('epic_solo.queue_of', () => {
 		expect(queue?.behind.map((item) => item.number)).toStrictEqual([THIRD])
 	})
 })
+
+// joshuafolkken/kit#4396: `backlog:offer` tells a `run:solo` wait apart off the gate's own notices.
+describe('epic_solo.is_solo_wait', () => {
+	it('reads both of the gate’s wait notices as a run:solo wait', () => {
+		const waiting_notice = epic_solo.gate(result([solo(FIRST)]), busy([]), REPO).notice ?? ''
+		const held_notice = epic_solo.gate(result([child(FIRST)]), busy([RUN_SOLO_LABEL]), REPO).notice
+
+		expect(epic_solo.is_solo_wait(waiting_notice)).toBe(true)
+		expect(epic_solo.is_solo_wait(held_notice ?? '')).toBe(true)
+	})
+
+	it('reads a triage notice that names run:solo as no run:solo wait', () => {
+		const triage = `#${String(FIRST)} carries neither \`${RUN_SOLO_LABEL}\` nor \`run:lane\`.`
+
+		expect(epic_solo.is_solo_wait(triage)).toBe(false)
+		expect(epic_solo.is_solo_wait('')).toBe(false)
+	})
+
+	it('reads the stale-holder release notice as no run:solo wait', () => {
+		const stale = `#${String(HOLDER)} carries \`${RUN_SOLO_LABEL}\` and \`${IN_PROGRESS_LABEL}\`, but no process of it is running in ${REPO}.`
+
+		expect(epic_solo.is_solo_wait(stale)).toBe(false)
+	})
+})
