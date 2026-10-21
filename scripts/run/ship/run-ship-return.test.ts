@@ -22,11 +22,13 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
-	lane_session_broker: { is_serving: serving_mock, request: request_mock },
+	lane_session_broker: { serving_session: serving_mock, request: request_mock },
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
 }))
+
+vi.mock('node:timers/promises', () => ({ setTimeout: async (): Promise<void> => undefined }))
 
 vi.mock('./run-ship-probe', () => ({ run_ship_probe: { read_review_stale: stale_mock } }))
 vi.mock('./run-ship-relaunch-cap', () => ({
@@ -45,13 +47,16 @@ const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: tru
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
 const CONTEXT = { excerpt: [OUTPUT], changed: [CHANGED_FILE], more_changed: 0 }
+const SERVER = 'server-1'
+const NEW_SERVER = 'server-2'
+const STOPPED = { is_success: false, reason: 'the broker stopped serving before it answered' }
 
 beforeEach(() => {
 	emit_mock.mockReset()
 	is_child_mock.mockReset().mockReturnValue(true)
 	find_lane_mock.mockReset().mockResolvedValue(LANE)
 	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
-	serving_mock.mockReset().mockReturnValue(false)
+	serving_mock.mockReset().mockReturnValue(undefined)
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	is_over_mock.mockReset().mockResolvedValue(false)
 	park_mock.mockReset().mockResolvedValue(true)
@@ -107,7 +112,7 @@ describe('run_ship_return.return_control', () => {
 // the supervisor's broker serves is relaunched by that broker instead.
 describe('run_ship_return.return_control on a served lane', () => {
 	it('asks the broker to relaunch the child and starts none itself', async () => {
-		serving_mock.mockReturnValue(true)
+		serving_mock.mockReturnValue(SERVER)
 
 		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('relaunched')
 		expect(request_mock).toHaveBeenCalledWith(LANE.directory, ISSUE, {
@@ -117,11 +122,12 @@ describe('run_ship_return.return_control on a served lane', () => {
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 
-	it('records the stop when the broker could not relaunch the child', async () => {
-		serving_mock.mockReturnValue(true)
+	it('asks the broker that failed the relaunch no more and hands the issue to the driver', async () => {
+		serving_mock.mockReturnValue(SERVER)
 		request_mock.mockResolvedValue({ is_success: false, reason: 'the relaunch did not start' })
 
-		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('recorded')
+		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('redispatch')
+		expect(request_mock).toHaveBeenCalledTimes(1)
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 
@@ -129,11 +135,70 @@ describe('run_ship_return.return_control on a served lane', () => {
 	it("writes the broker's reason to the ship log", async () => {
 		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-		serving_mock.mockReturnValue(true)
+		serving_mock.mockReturnValue(SERVER)
 		request_mock.mockResolvedValue({ is_success: false, reason: 'the issue is parked' })
 		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
 
 		expect(write).toHaveBeenCalledWith(expect.stringContaining('— the issue is parked'))
+	})
+})
+
+// joshuafolkken/kit#4344: a relaunch the broker failed left the lane idle until the stall detector.
+describe('run_ship_return.return_control when the broker fails the relaunch', () => {
+	const SILENT = { is_success: false, reason: 'the broker gave no answer within 2 minutes' }
+	const FAILURES = [
+		['stopped serving', STOPPED],
+		['gave no answer', SILENT],
+	] as const
+
+	it.each(FAILURES)(
+		'asks a new broker once more and relaunches when one %s',
+		async (_label, failed) => {
+			serving_mock
+				.mockReturnValueOnce(SERVER)
+				.mockReturnValueOnce(SERVER)
+				.mockReturnValue(NEW_SERVER)
+			request_mock.mockResolvedValueOnce(failed).mockResolvedValue({ is_success: true })
+
+			expect(await run_ship_return.return_control(ISSUE, 'review', RESUME, OUTPUT)).toBe(
+				'relaunched',
+			)
+			expect(request_mock).toHaveBeenCalledTimes(2)
+		},
+	)
+
+	it.each(FAILURES)(
+		'hands the issue to the driver when the new broker also %s',
+		async (_label, failed) => {
+			serving_mock.mockReturnValueOnce(SERVER).mockReturnValue(NEW_SERVER)
+			request_mock.mockResolvedValue(failed)
+
+			expect(await run_ship_return.return_control(ISSUE, 'review', RESUME, OUTPUT)).toBe(
+				'redispatch',
+			)
+			expect(request_mock).toHaveBeenCalledTimes(2)
+			expect(relaunch_mock).not.toHaveBeenCalled()
+		},
+	)
+})
+
+// joshuafolkken/kit#4344: a broker that died during the review left the stop to a relaunch with no token.
+describe('run_ship_return.return_control after the broker stopped serving', () => {
+	it('asks no more of a broker that never serves the lane again', async () => {
+		serving_mock.mockReturnValueOnce(SERVER).mockReturnValue(undefined)
+		request_mock.mockResolvedValue(STOPPED)
+
+		expect(await run_ship_return.return_control(ISSUE, 'review', RESUME, OUTPUT)).toBe('redispatch')
+		expect(request_mock).toHaveBeenCalledTimes(1)
+		expect(relaunch_mock).not.toHaveBeenCalled()
+	})
+
+	it('waits for a broker that stopped serving before the stop rather than relaunching', async () => {
+		serving_mock.mockReturnValueOnce(undefined).mockReturnValue(SERVER)
+
+		expect(await run_ship_return.return_control(ISSUE, 'review', RESUME, OUTPUT)).toBe('relaunched')
+		expect(request_mock).toHaveBeenCalledTimes(1)
+		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 })
 

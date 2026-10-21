@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -34,8 +35,11 @@ import { run_ship_stop_text } from './run-ship-stop-text'
 // front of the agent that ran it.
 
 const OPENAI_PROVIDER = 'openai'
+// A minute of polling, long enough for the supervisor's 5-second lane scan to reopen a server.
+const SERVING_POLL_MS = 1000
+const SERVING_POLLS = 60
 
-type ReturnOutcome = 'relaunched' | 'recorded' | 'parked'
+type ReturnOutcome = 'relaunched' | 'recorded' | 'parked' | 'redispatch'
 
 function stop_text(issue: string, stage: Stage, resume: ShipResume, output: string): string {
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
@@ -75,19 +79,46 @@ function relaunched(lane: LaneInfo, stop: ShipStop): ReturnOutcome {
 // **A served lane's child is relaunched by its broker, not from here**: this supervisor descends from the
 // child's Bash tool, which Claude Code starts without the token, so a child started here could not sign
 // in where the token is the only credential (joshuafolkken/kit#3817).
-async function brokered(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
+async function ask_broker(lane: LaneInfo, stop: ShipStop): Promise<boolean> {
 	const answer = await lane_session_broker.request(lane.directory, lane.issue, {
 		kind: 'relaunch',
 		stop,
 	})
 
-	if (answer.is_success) return 'relaunched'
+	if (!answer.is_success) note(`the lane broker did not start the lane child — ${answer.reason}`)
 
-	note(
-		`the lane child could not be relaunched: the lane broker did not start it — ${answer.reason}`,
-	)
+	return answer.is_success
+}
 
-	return 'recorded'
+// The session of a broker serving the lane within the wait, other than `previous` — one that stopped
+// serving is reopened by the supervisor's next lane scan (`claude-lane-broker.ts`).
+async function await_server(lane: LaneInfo, previous?: string): Promise<string | undefined> {
+	for (let polled = 0; polled < SERVING_POLLS; polled += 1) {
+		const session = lane_session_broker.serving_session(lane.directory, lane.issue)
+		if (session !== undefined && session !== previous) return session
+
+		// eslint-disable-next-line no-await-in-loop -- polling: each check waits on the scan the previous one missed
+		await sleep(SERVING_POLL_MS)
+	}
+
+	return undefined
+}
+
+// **A relaunch the broker failed is asked once more, of a new broker only, then handed to the driver**: a
+// stop left recorded waited hours for the stall detector (joshuafolkken/kit#4344). The broker that failed
+// may still be starting the first relaunch, so asking it again could start a second child beside it.
+// Once this supervisor exits, the driver's next poll reads the stop as unanswered and re-dispatches the
+// issue (`run-merge-ship.ts`).
+async function brokered(lane: LaneInfo, stop: ShipStop, server: string): Promise<ReturnOutcome> {
+	if (await ask_broker(lane, stop)) return 'relaunched'
+
+	const next = await await_server(lane, server)
+
+	if (next !== undefined && (await ask_broker(lane, stop))) return 'relaunched'
+
+	note('the lane child could not be relaunched: the driver re-dispatches the issue')
+
+	return 'redispatch'
 }
 
 // A child that stopped more often than the cap allows is parked instead of relaunched
@@ -121,10 +152,11 @@ async function return_control(
 	if (await run_ship_relaunch_cap.is_over(issue)) return await parked(issue, stage, resume)
 
 	const stop = { stage, ...resume, context: await run_ship_stop_context.build(issue, output) }
+	// **A broker that stopped serving before the stop is waited for**: one that died during the review left
+	// the lane unserved at the stop, and a child started here cannot sign in on a token (joshuafolkken/kit#4344).
+	const server = await await_server(lane)
 
-	return lane_session_broker.is_serving(lane.directory, issue)
-		? await brokered(lane, stop)
-		: relaunched(lane, stop)
+	return server === undefined ? relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
 // The stopped ship's arguments and its failed section, as `return_control` takes them: the section's
