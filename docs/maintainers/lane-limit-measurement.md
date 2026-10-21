@@ -278,8 +278,21 @@ entry with `is_reused: true` and no `checks`: a run and a reuse there, and outsi
 gate median ([#4397](https://github.com/joshuafolkken/kit/issues/4397)).
 
 A unit leg that ran the whole suite carries `fallback`, the reason's stable kind read off the line
-`test:related` printed (`related_scope.fallback_kind`). A last table counts the fallbacks by kind.
+`test:related` printed (`related_scope.fallback_kind`). A table under it counts the fallbacks by kind.
 
 **A reused check is counted, never timed** — it started no process, so its zero would pull the median
 toward a check that never ran. A check that was only ever reused prints `not measured`. A gate recorded
 before the field existed contributes no check row.
+
+## What the lane sessions' transcripts show
+
+The last table is read from the lane sessions' transcripts (`~/.claude/projects/<lane-slug>/*.jsonl`),
+not the ledger ([#4418](https://github.com/joshuafolkken/kit/issues/4418)).
+
+It prints tool time per session, the verification calls (`lint:related` / `test:related` /
+`cspell:dot` / `gate` / `ship` / `metrics`), the share that waited for the core budget, and the
+`lint:related` / `test:related` medians.
+
+- A call is timed from its `tool_use` line to its `tool_result` line, in the foreground only.
+- One Bash call naming two verification commands is counted as chained; the medians take solo calls.
+- The period is cut at each call's timestamp. A delegated unit's transcript is not a session.

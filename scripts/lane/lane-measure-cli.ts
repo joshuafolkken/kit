@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { setInterval as every } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -17,6 +18,8 @@ import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stop_stats } from './lane-stop-stats'
+import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
 //
@@ -115,12 +118,23 @@ async function read_events(context: MeasureContext): Promise<ReadonlyArray<RunEv
 	return await run_event_stream_emit.all_events()
 }
 
+// Every lane's transcript directory under this checkout's lane root, read from a lane or the main checkout.
+function transcript_directories(context: MeasureContext): ReadonlyArray<string> {
+	if (context.transcript_directories !== undefined) return context.transcript_directories
+
+	const main_cwd = cost_transcript.session_cwd(process.cwd())
+
+	return cost_transcript.lane_transcript_directories(main_cwd, cost_transcript.home_directory())
+}
+
+interface PeriodRecords {
+	entries: ReturnType<typeof lane_ledger.read_entries>
+	events: ReadonlyArray<RunEvent>
+	calls: ReadonlyArray<ToolCall>
+}
+
 // The tables under the period's row, in the order `lane:stats` prints them.
-function tables_of(
-	entries: ReturnType<typeof lane_ledger.read_entries>,
-	window: StatsWindow,
-	events: ReadonlyArray<RunEvent>,
-): Array<string> {
+function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
 	return [
 		lane_stage_stats.table(entries, window),
 		lane_stop_stats.table(entries, window, events),
@@ -130,6 +144,7 @@ function tables_of(
 		lane_core_wait_stats.table(entries, window),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
+		lane_transcript_stats.table(calls, window),
 	]
 }
 
@@ -146,13 +161,13 @@ async function stats_command(
 	const label = { limit: await limit_label(values.limit), period_days }
 	const entries = await read_ledger(context)
 	const row = lane_stats.row(entries, window, label)
+	const records = {
+		entries,
+		events: await read_events(context),
+		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+	}
 
-	console.info(
-		[
-			`${lane_stats.header()}\n${row}`,
-			...tables_of(entries, window, await read_events(context)),
-		].join('\n\n'),
-	)
+	console.info([`${lane_stats.header()}\n${row}`, ...tables_of(records, window)].join('\n\n'))
 
 	return 0
 }
