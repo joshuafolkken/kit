@@ -7,9 +7,9 @@ import { run_carry, type CarryOwner } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake } from './run-wake'
-import { run_wake_cli } from './run-wake-cli'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
+import { run_wake_ports } from './run-wake-ports'
 import { run_wake_restart } from './run-wake-restart'
 
 // joshuafolkken/kit#3701: a driver that exited non-zero left the carry record adopted for the
@@ -50,7 +50,7 @@ async function stop_at_the_first_wait(): Promise<void> {
 
 async function supervise(): Promise<LoopStop> {
 	const ports: LoopPorts = {
-		...run_wake_cli.ports_for(context(), PROFILE),
+		...run_wake_ports.ports_for(context(), PROFILE),
 		sleep: stop_at_the_first_wait,
 		// The retry reads and closes the checkout's own lanes, which are a live run's: never from a test.
 		retry_closes: async () => undefined,

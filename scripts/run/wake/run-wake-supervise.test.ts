@@ -29,6 +29,7 @@ const PORTS: LoopPorts = {
 	sleep: vi.fn(),
 	now: vi.fn(),
 	retry_closes: vi.fn(),
+	is_code_stale: vi.fn(),
 }
 const OPENED = 'broker opened'
 const SUPERVISED = 'supervised'

@@ -259,6 +259,22 @@ describe('lane_session_broker — a failed action names its reason', () => {
 	})
 })
 
+// joshuafolkken/kit#4509: the supervisor defers its reload while a request is being answered.
+describe('lane_session_broker.is_answering', () => {
+	it('reads true only while a request is being answered', async () => {
+		const seen: Array<boolean> = []
+
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+			seen.push(lane_session_broker.is_answering())
+
+			return REJECTED
+		})
+		await request_relaunch(CLAUDE_LANE)
+
+		expect([...seen, lane_session_broker.is_answering()]).toStrictEqual([true, false])
+	})
+})
+
 // joshuafolkken/kit#4230: a supervisor started before main added a stop field dropped the newer ship's
 // request unread, and the ship waited out the 30-minute limit on a server that was still alive.
 describe('lane_session_broker — a request the broker cannot read', () => {

@@ -1,0 +1,7 @@
+{
+	"reason": "#4509 adds the supervisor's code-staleness watch (run-wake-code.ts), its reload path deferred while a lane request is answered, the successor take-over check (run-wake-takeover.ts) and their tests",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 247
+	}
+}
