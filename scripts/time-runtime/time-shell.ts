@@ -53,10 +53,25 @@ const CHAIN_PATTERN = /&&|\|\||;|\n/u
 // body is not shell syntax at all — an `it's` there is prose — so it is removed before the quotes are
 // paired, keeping the rest of its marker line (`cat <<EOF > f && git add f`) where the shell reads it.
 // Without both, a stray quote paired with one much later and erased every command between them.
-const QUOTED_SPAN_PATTERN = /\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*"/gu
+//
+// **A `$(…)` inside double quotes is one atom of the span** (joshuafolkken/kit#4525): the quotes in
+// `"$(gh issue create --title "x")"` belong to the substitution, so the span closes at the outer `"`
+// rather than at the first inner one, which left the substitution cut in half. A `$` is read one way
+// only — the atom where one follows, a character where none does — because a `$` either could take
+// made an unclosed `"` followed by many `$(…)` try every split of them before failing.
+const SUBSTITUTION_ATOM = /\$\([^()]*\)/u
+const LONE_DOLLAR = /\$(?!\([^()]*\))/u
+const QUOTED_SPAN_PATTERN = new RegExp(
+	String.raw`\\[\s\S]|'[^']*'|"(?:\\[\s\S]|${SUBSTITUTION_ATOM.source}|${LONE_DOLLAR.source}|[^"\\$])*"`,
+	'gu',
+)
 const HEREDOC_MARKER = /(?<!<)<<-?\s*(['"]?)(\w+)\1/u
 const HEREDOC_DELIMITER_GROUP = 2
 const LINE_BREAK = '\n'
+const DOUBLE_QUOTE = '"'
+// A command substitution with no nested parenthesis — the shape a quoted `"$(cmd …)"` is written in.
+// An escaped `\$(` is literal text inside double quotes, so it runs nothing.
+const SUBSTITUTION_PATTERN = /(?<!\\)\$\(([^()]*)\)/gu
 // `set -o pipefail` tells the shell to report the pipeline with the first failing command's status,
 // so nothing in it is discarded. The flag letters are loose because `set -eo pipefail` and
 // `set -euo pipefail` are the same instruction, and the `set` word is required so that a path or a
@@ -77,14 +92,31 @@ const FLAG_PREFIX = '-'
 // Two kinds of prefix, and they are not interchangeable. A wrapper runs the command that follows it,
 // so the walk continues past it; a navigation builtin runs nothing, so its segment yields no command
 // at all and the walk moves to the next segment.
-const WRAPPER_COMMANDS = new Set(['time', 'env', 'sudo'])
+//
+// **A wrapper is skipped with the flag values and operands it takes, and named by its basename**
+// (joshuafolkken/kit#4525). `/usr/bin/time -f %e pnpm josh gate` left the walk on `%e`, and
+// `timeout 600 pnpm josh gate` stopped at `timeout`, so a refusal keyed on the command was escaped by
+// wrapping it. Every reader that asks which command a segment runs goes through this one walk.
+interface WrapperShape {
+	readonly valued: ReadonlySet<string>
+	readonly operands: number
+}
+
+const WRAPPER_COMMANDS: ReadonlyMap<string, WrapperShape> = new Map([
+	['time', { valued: new Set(['-f', '-o', '--format', '--output']), operands: 0 }],
+	['env', { valued: new Set(['-u', '-C', '-S', '--unset', '--chdir']), operands: 0 }],
+	['sudo', { valued: new Set(['-u', '-g', '-C', '-D']), operands: 0 }],
+	['timeout', { valued: new Set(['-s', '-k', '--signal', '--kill-after']), operands: 1 }],
+])
 const NAVIGATION_COMMANDS = new Set(['cd', 'pushd', 'popd', 'export', 'source', 'set', '.'])
+const PATH_SEPARATOR = '/'
+const FLAG_AND_VALUE = 2
 
 // Anchored at a segment's command position, not searched anywhere in the string. A loose search
 // charged `git commit -m "ran pnpm josh gate"` to `josh gate`, and this repository's own commit
 // messages and issue comments name josh subcommands constantly. Only the first match counts: a
 // compound command naming two would otherwise charge its whole duration to each.
-const JOSH_PATTERN = /^(?:pnpm\s+(?:exec\s+)?)?josh\s+([a-z][\w:-]*)/u
+const JOSH_PATTERN = /^(?:(?:pnpm|npx)\s+(?:exec\s+)?)?josh\s+([a-z][\w:-]*)/u
 const JOSH_PREFIX = 'josh '
 const COMMAND_KEY = 'command'
 
@@ -99,19 +131,45 @@ function bash_command(input: unknown): string {
 // A wrapper's own flags are skipped with it. Skipping only the wrapper word left the walk on a flag,
 // which is not command-shaped, so `env -i pnpm test` yielded no command at all and its duration left
 // the per-command table entirely.
-function is_skippable(word: string): boolean {
-	if (word.startsWith(FLAG_PREFIX)) return true
+function after_flags(
+	words: ReadonlyArray<string>,
+	start: number,
+	valued: ReadonlySet<string>,
+): number {
+	let index = start
 
-	return ASSIGNMENT_PATTERN.test(word) || WRAPPER_COMMANDS.has(word)
+	while (words[index]?.startsWith(FLAG_PREFIX) === true) {
+		index += valued.has(words[index] ?? '') ? FLAG_AND_VALUE : 1
+	}
+
+	return index
+}
+
+// The index past the prefix word at `index`, or `index` itself when that word is the command.
+function after_prefix_word(words: ReadonlyArray<string>, index: number): number {
+	const word = words[index] ?? ''
+
+	if (word.startsWith(FLAG_PREFIX) || ASSIGNMENT_PATTERN.test(word)) return index + 1
+
+	const wrapper = WRAPPER_COMMANDS.get(word.slice(word.lastIndexOf(PATH_SEPARATOR) + 1))
+
+	if (wrapper === undefined) return index
+
+	return after_flags(words, index + 1, wrapper.valued) + wrapper.operands
 }
 
 // One segment with its leading assignments and wrappers dropped, so the first entry is the command
 // position. Shared by both readers below: what counts as the command is one rule, not two.
 function command_words(segment: string): Array<string> {
 	const words = segment.replaceAll(SUBSHELL_OPENER, ' ').trim().split(WHITESPACE_PATTERN)
-	const start = words.findIndex((word) => !is_skippable(word))
+	let start = 0
 
-	return start === -1 ? [] : words.slice(start)
+	for (let next = after_prefix_word(words, start); next !== start;) {
+		start = next
+		next = after_prefix_word(words, start)
+	}
+
+	return words.slice(start)
 }
 
 // The command this segment runs, or nothing. Nothing has two causes and both are deliberate: a
@@ -186,15 +244,35 @@ function without_heredoc_bodies(command: string): string {
 // removal for a different reason — a quoted `sed` script holds `|` and slashes that read as a
 // pipeline and as paths — and two spellings of "remove the quotes" would disagree the first time one
 // of them learned about a quoting form the other did not.
+//
+// **A `$(…)` inside double quotes runs, so it is kept as a command of its own** (joshuafolkken/kit#4525):
+// `out="$(pnpm josh gate)"` runs the gate, and removing the span with its quotes hid it. A single-quoted
+// span expands nothing and goes whole. The substitution's own quoted arguments go as any other.
+function spoken_substitutions(span: string): string {
+	if (!span.startsWith(DOUBLE_QUOTE)) return ' '
+
+	const inner = [...span.matchAll(SUBSTITUTION_PATTERN)].map((match) =>
+		(match[1] ?? '').replaceAll(QUOTED_SPAN_PATTERN, ' '),
+	)
+
+	return inner.length === 0 ? ' ' : ` ; ${inner.join(' ; ')} ; `
+}
+
 function unquoted(command: string): string {
-	return without_heredoc_bodies(command).replaceAll(QUOTED_SPAN_PATTERN, ' ')
+	return without_heredoc_bodies(command).replaceAll(QUOTED_SPAN_PATTERN, (span) =>
+		spoken_substitutions(span),
+	)
 }
 
 // Quoted text replaced by spaces of its own length, so an offset found here is the same offset in the
 // command — what a caller cutting the command where the unquoted reading says to needs. `undefined`
 // for a line carrying a heredoc, whose body lines a cut would read as commands of their own.
+function has_heredoc(command: string): boolean {
+	return HEREDOC_MARKER.test(command)
+}
+
 function blanked(command: string): string | undefined {
-	if (HEREDOC_MARKER.test(command)) return undefined
+	if (has_heredoc(command)) return undefined
 
 	return command.replaceAll(QUOTED_SPAN_PATTERN, (span) => ' '.repeat(span.length))
 }
@@ -344,8 +422,10 @@ const time_shell = {
 	blanked,
 	command_segment,
 	discarded_commands,
+	has_heredoc,
 	josh_arguments,
 	josh_command_of,
+	josh_command_of_segment,
 	josh_commands_of,
 	josh_signatures_of,
 	leading_word,

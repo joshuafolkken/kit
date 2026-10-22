@@ -35,10 +35,24 @@ const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
 
 // A filing made by hand rather than through `josh issue:file` — the call the `direct-filing` row
 // refuses on every occurrence.
-function is_direct_filing(command: string): boolean {
-	if (ISSUE_CREATE_COMMAND.test(command)) return true
+//
+// **Read outside quotes, but not outside a heredoc** (joshuafolkken/kit#4525). `echo "… gh issue create
+// …"` files nothing, so the `gh` call is matched on the unquoted line — which keeps a `"$(gh issue
+// create …)"` that runs. A heredoc body is matched as written: `bash <<EOF` runs it, and the body cannot
+// be told apart from prose, so the rule errs on the refusing side. The endpoint and the title field are
+// still read from the line as written, where a quoted path or field keeps them.
+const GH_API_COMMAND = /\bgh\s+api\b/u
 
-	return ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
+function spoken_line(command: string): string {
+	return time_shell.has_heredoc(command) ? command : time_shell.unquoted(command)
+}
+
+function is_direct_filing(command: string): boolean {
+	const spoken = spoken_line(command)
+
+	if (ISSUE_CREATE_COMMAND.test(spoken)) return true
+
+	return GH_API_COMMAND.test(spoken) && ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
 }
 
 // `pnpm josh issue:file`, in either spelling — **the** filing act once a direct one is refused, so the

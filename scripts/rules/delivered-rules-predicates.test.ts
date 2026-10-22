@@ -46,8 +46,19 @@ describe('is_direct_filing', () => {
 		ISSUE_LIST_COMMAND,
 		'gh pr create --title "x"',
 		FILING_COMMAND,
+		'echo "run gh issue create --title x"',
+		'echo "gh api repos/o/r/issues -f title=x"',
 	])(LEAVES_ALONE, (command) => {
 		expect(bash_triggers.is_direct_filing(command)).toBe(false)
+	})
+
+	it.each([
+		'url="$(gh issue create --title x)"',
+		'url="$(gh issue create --title "Fix foo" --body-file b.md)"',
+		'gh api "repos/o/r/issues" -f \'title=x\'',
+		"bash <<'EOF'\ngh issue create --title x\nEOF",
+	])(READS_A_FILING, (command) => {
+		expect(bash_triggers.is_direct_filing(command)).toBe(true)
 	})
 })
 

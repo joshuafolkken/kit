@@ -42,6 +42,54 @@ describe('josh_arguments', () => {
 	})
 })
 
+// The wrappers a run puts around a check, skipped with their flag values and operands, and named by
+// their basename (joshuafolkken/kit#4525).
+describe('josh_command_of — wrappers', () => {
+	it.each([
+		'CI=1 timeout 600 pnpm josh gate',
+		'/usr/bin/time -f %e pnpm josh gate',
+		'timeout -k 5 -s KILL 600 pnpm josh gate',
+		'env -u HOME CI=1 pnpm josh gate',
+		'npx josh gate',
+	])('reads %j as the gate', (command) => {
+		expect(time_shell.josh_command_of(command)).toBe('josh gate')
+	})
+
+	it('names the wrapped command in the label, not the wrapper', () => {
+		expect(time_shell.bash_label('timeout 600 git push')).toBe('Bash: git')
+	})
+})
+
+describe('unquoted — command substitutions', () => {
+	it('keeps a double-quoted `$(…)` as a command of its own', () => {
+		expect(time_shell.josh_commands_of('out="$(pnpm josh gate)"')).toEqual(['josh gate'])
+	})
+
+	it('keeps a double-quoted `$(…)` whose own arguments are quoted', () => {
+		expect(time_shell.unquoted('url="$(gh issue create --title "Fix foo" --body-file b.md)"')).toBe(
+			'url= ; gh issue create --title   --body-file b.md ; ',
+		)
+	})
+
+	it('drops a single-quoted `$(…)`, which expands nothing', () => {
+		expect(time_shell.josh_commands_of("echo '$(pnpm josh gate)'")).toEqual([])
+	})
+
+	it('drops an escaped `\\$(…)`, which is literal text inside double quotes', () => {
+		expect(time_shell.josh_commands_of(String.raw`echo "\$(pnpm josh gate)"`)).toEqual([])
+	})
+
+	it('drops a double-quoted mention with no substitution', () => {
+		expect(time_shell.josh_commands_of('echo "pnpm josh gate"')).toEqual([])
+	})
+
+	it('reads an unclosed quote followed by many substitutions without backtracking through them', () => {
+		const command = `echo "x ${'$(a) '.repeat(40)}`
+
+		expect(time_shell.unquoted(command)).toBe(command)
+	})
+})
+
 describe('josh_signatures_of', () => {
 	it('keeps the operands that tell two reads apart', () => {
 		expect(time_shell.josh_signatures_of('pnpm josh lane:output 1 a.log')).toEqual([
