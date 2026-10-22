@@ -229,8 +229,19 @@ describe('eslint_daemon.run — nothing to reach', () => {
 })
 
 // joshuafolkken/kit#4358: the one fallback `josh lint:related` and the pre-commit hook share.
+// `run_or_cold` reads the current directory, so each test pins it to the temporary checkout rather
+// than the live one, whose daemon state would decide whether a `stop` runs (joshuafolkken/kit#4469).
 describe('eslint_daemon.run_or_cold', () => {
+	beforeEach(() => {
+		vi.spyOn(process, 'cwd').mockReturnValue(project_root)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	it('answers with the daemon report when the daemon answers', async () => {
+		checkout(NEWER_S, OLDER_S)
 		mocked_execa.mockResolvedValueOnce(answer(1, 'report'))
 
 		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({
@@ -238,6 +249,20 @@ describe('eslint_daemon.run_or_cold', () => {
 			output: 'report',
 		})
 		expect(mocked_execa).toHaveBeenCalledOnce()
+	})
+
+	it('answers with the daemon report after stopping a stale daemon', async () => {
+		checkout(OLDER_S, NEWER_S)
+		mocked_execa.mockResolvedValueOnce(answer(0, '')).mockResolvedValueOnce(answer(1, 'report'))
+
+		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({
+			exit_code: 1,
+			output: 'report',
+		})
+		expect(mocked_execa.mock.calls.map((call) => call[1])).toEqual([
+			[CLI, 'stop'],
+			[CLI, '--quiet', TARGET],
+		])
 	})
 
 	it('runs the cold pnpm eslint when the daemon cannot answer', async () => {
