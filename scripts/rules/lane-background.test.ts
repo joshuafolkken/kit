@@ -77,6 +77,13 @@ function finish_line(id: string): string {
 	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { content } })
 }
 
+// The `TaskStop` result the harness writes in place of a notice (joshuafolkken/kit#4472).
+function stopped_line(id: string): string {
+	const body = { message: `Successfully stopped task: ${id} (pnpm josh test:related)`, task_id: id }
+
+	return launch_line(id, JSON.stringify(body))
+}
+
 describe('lane_background.is_background_long_run', () => {
 	it.each([
 		GATE_AND_PUSH,
@@ -276,6 +283,22 @@ describe('lane_background.pending_background_ids', () => {
 
 	it('ignores a partial first line and a tail with no launch', () => {
 		expect(lane_background.pending_background_ids('{"type":"us\nnot json')).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4472: the #4469 child stopped a moved call with `TaskStop`, which writes no
+// notice, and every stop after it was sent back.
+describe('lane_background.pending_background_ids — a task stopped with TaskStop', () => {
+	it('drops a moved call stopped with TaskStop', () => {
+		const tail = [moved_line(TASK_ID), stopped_line(TASK_ID)].join('\n')
+
+		expect(lane_background.pending_background_ids(tail)).toStrictEqual([])
+	})
+
+	it('keeps a task open when TaskStop stopped a different one', () => {
+		const tail = [launch_line(TASK_ID), stopped_line('b9other9')].join('\n')
+
+		expect(lane_background.pending_background_ids(tail)).toStrictEqual([TASK_ID])
 	})
 })
 

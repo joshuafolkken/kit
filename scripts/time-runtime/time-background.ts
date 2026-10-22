@@ -72,6 +72,11 @@ const AGENT_LAUNCH_PATTERN =
 // an enumeration of the harness's spellings, and a spelling it added later would silently start
 // reporting finished commands as never finished.
 const FINISH_PATTERN = /^<task-notification>[\s\S]*?<task-id>([\w-]+)<\/task-id>/u
+// The other end of a backgrounded task: the result of a `TaskStop` call. The harness writes no
+// task-notification for a task it was told to stop, so reading the notice alone left a stopped task
+// open for ever, and the lane stop guard blocked every stop after it (joshuafolkken/kit#4472). It is
+// anchored on the result's own first key for the reason `AGENT_LAUNCH_PATTERN` is.
+const STOP_PATTERN = /^\{"message":"Successfully stopped task:\s*([\w-]+)/u
 // The output file every reader of a backgrounded command names, whichever command it uses to read
 // it — `tail`, `cat`, `sed`, `grep`, or the `Monitor` tool, all of which carry the path.
 const OUTPUT_PATTERN = /tasks\/([\w-]+)\.output/u
@@ -118,6 +123,11 @@ function agent_launch_id(text: string): string {
 // which is nearly all of them, since only one line kind in a transcript carries this notice.
 function finished_id(text: string): string {
 	return FINISH_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
+}
+
+// The background run a `TaskStop` result reports stopping, or nothing for every other tool result.
+function stopped_id(text: string): string {
+	return STOP_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
 }
 
 // One line, as much of it as this reading needs. Taken structurally rather than as a `TranscriptLine`
@@ -307,6 +317,7 @@ const time_background = {
 	launch_id,
 	agent_launch_id,
 	finished_id,
+	stopped_id,
 	finished_at,
 	read_id,
 	read_id_of,

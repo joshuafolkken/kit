@@ -107,8 +107,8 @@ interface TranscriptLine {
 	type: string
 	timestamp_ms: number
 	branch: string
-	// The background run this line is the harness's end-of-task notice for, and `''` for every other
-	// line. It is read here rather than downstream for the reason every
+	// The background run this line is the harness's end-of-task notice for — or the `TaskStop` result
+	// that stopped it, which gets no notice — and `''` for every other line. It is read here rather than downstream for the reason every
 	// derived field above is: the notice is the line's whole content, which a span does not keep, and
 	// it is the only thing in a transcript that says a command had *finished* rather than merely been
 	// looked at.
@@ -226,6 +226,27 @@ function notice_text(data: TranscriptRecord): string {
 	return carried.find((one): one is string => typeof one === 'string') ?? ''
 }
 
+// The task a `TaskStop` result on this line stopped, which is an end the harness writes no notice for.
+// Its result body is a plain string, so only string contents are read and nothing is flattened again.
+function stopped_background(content: TranscriptContent | null | undefined): string {
+	if (!Array.isArray(content)) return time_background.NO_BACKGROUND
+
+	const ids = content.map((block) =>
+		typeof block.content === 'string' ? time_background.stopped_id(block.content) : '',
+	)
+
+	return ids.find((id) => id !== time_background.NO_BACKGROUND) ?? time_background.NO_BACKGROUND
+}
+
+// The task this line reports the end of: the harness's notice, or else a `TaskStop` result.
+function finished_background(data: TranscriptRecord): string {
+	const notice = time_background.finished_id(notice_text(data))
+
+	return notice === time_background.NO_BACKGROUND
+		? stopped_background(data.message?.content)
+		: notice
+}
+
 // A line without a parseable timestamp is dropped rather than dated: it has no place on a timeline,
 // and inventing one would move every span around it.
 function to_line(data: TranscriptRecord): TranscriptLine | undefined {
@@ -237,7 +258,7 @@ function to_line(data: TranscriptRecord): TranscriptLine | undefined {
 		type: data.type ?? '',
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
-		finished_background: time_background.finished_id(notice_text(data)),
+		finished_background: finished_background(data),
 		stop_guard: stop_guard_of(data),
 		...message_fields(data.message),
 	}
