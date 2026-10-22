@@ -4,6 +4,7 @@ import { removed_tests } from './removed-tests'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
 import { review_interaction } from './review-interaction'
+import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
 // already knows.
@@ -421,6 +422,9 @@ interface BriefInput {
 	// The run-tooling paths an interaction review is briefed on (joshuafolkken/kit#4276). Absent, the
 	// brief is `/code-review`'s alone.
 	interaction?: ReadonlyArray<string> | undefined
+	// The readers outside the diff of each exported name it edits (joshuafolkken/kit#4515). A failed
+	// read is printed as one; absent or empty, no section.
+	readers?: ReadersRead | undefined
 }
 
 const SECOND_ROUND = 2
@@ -444,12 +448,22 @@ function target_block(input: BriefInput): string {
 // code that narrowing exists to keep out of scope. Decided by the target actually printed, not by
 // the round: every round that cannot narrow widens through `whole_change_target`, and that round
 // needs the parts as much as a first one does.
-function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
-	const is_whole_change = target.includes(whole_change_target(input.checkout.root, input.base))
+function is_whole_change(input: BriefInput, target: string): boolean {
+	return target.includes(whole_change_target(input.checkout.root, input.base))
+}
 
-	if (!is_whole_change || input.diff === undefined) return []
+function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
+	if (!is_whole_change(input, target) || input.diff === undefined) return []
 
 	return ['', review_diff_parts.reading_block(input.diff.parts, input.diff.cap)]
+}
+
+// Beside a whole-change target only, for the reason `diff_block` gives: a narrowed round keeps the
+// rest of the change, and so its readers, out of scope.
+function readers_block(input: BriefInput, target: string): ReadonlyArray<string> {
+	if (!is_whole_change(input, target)) return []
+
+	return review_untouched_readers.brief_block(input.readers)
 }
 
 // The level alone on the first line, because the level-only mode's contract — a caller reading the
@@ -476,6 +490,7 @@ function compose(input: BriefInput): string {
 		'',
 		target,
 		...diff_block(input, target),
+		...readers_block(input, target),
 		...removed_tests.brief_block(input.removed_tests ?? []),
 		...interaction_block(input.interaction),
 	].join('\n')
