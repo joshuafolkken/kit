@@ -4,6 +4,7 @@ import {
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import type { Span } from '#scripts/lane/lane-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -12,6 +13,7 @@ import type { ClosedIssue } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import type { BoardLanes } from './run-board-lane-state'
+import { run_board_lane_time } from './run-board-lane-time'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_setup, type SetupRead } from './run-board-setup'
 
@@ -36,9 +38,11 @@ type ItemState =
 
 interface ItemStatus {
 	state: ItemState
-	// When the child first launched in this run — a re-dispatch or a restart does not move it, so the
-	// row's time is the lane's whole time.
+	// When the child first launched in this run — a re-dispatch or a restart does not move it.
 	started_ms?: number | undefined
+	// Each launch of the child in this run until what took it off the lanes (`run-board-lane-time.ts`):
+	// the row's time is their sum, not the gaps between them.
+	spans?: ReadonlyArray<Span> | undefined
 	// The child's newest launch, present only where it launched again after `started_ms` — what the
 	// GitHub read is weighed against.
 	launched_ms?: number | undefined
@@ -91,7 +95,7 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
 // A person's restart, and a re-dispatch after an outage, start the child over in a fresh session, so
 // its track starts over too; its time does not (`launched`).
-const LAUNCH_KINDS: ReadonlySet<string> = new Set([KIND.CHILD_LAUNCH, KIND.RESTART])
+const { LAUNCH_KINDS } = run_board_lane_time
 // What the GitHub read may still settle: a running child, and one whose lane has no child left in it —
 // a child that merged and then died is drawn merged, not stopped.
 const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'paused', 'stopped'])
@@ -134,15 +138,22 @@ function moved(previous: ItemStatus, track: ReadonlyArray<Phase>, event: RunEven
 
 // The status a child settles into: its start and the track it had reached, so a settled row still
 // draws how it got there.
-function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
+// What a settled child keeps of its run: its newest launch, its spans on a lane, and its track.
+function kept_of(
+	previous: ItemStatus | undefined,
+): Pick<ItemStatus, 'launched_ms' | 'spans' | 'track'> {
+	const spans = previous?.spans
 	const track = previous?.track
 
 	return {
-		state,
-		started_ms: previous?.started_ms,
 		...relaunch_of(previous),
+		...(spans !== undefined && { spans }),
 		...(track !== undefined && { track }),
 	}
+}
+
+function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
+	return { state, started_ms: previous?.started_ms, ...kept_of(previous) }
 }
 
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
@@ -245,6 +256,18 @@ function remembered<Value>(
 }
 
 const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
+const SPANS: EventsMemo<ReadonlyMap<number | undefined, ReadonlyArray<Span>>> = new WeakMap()
+
+// A child the stream never saw launched keeps no spans, so its row is timed from its lane record.
+function with_spans(statuses: Map<number, ItemStatus>, events: ReadonlyArray<RunEvent>): void {
+	const spans = remembered(SPANS, events, run_board_lane_time.spans_of)
+
+	for (const [issue, status] of statuses) {
+		const issue_spans = spans.get(issue)
+
+		if (issue_spans !== undefined) statuses.set(issue, { ...status, spans: issue_spans })
+	}
+}
 
 // A running lane no child is working in is stopped whatever the stream last said: a child that died
 // writes no ending, so its row would otherwise run — and its phase time grow — for as long as the lane
@@ -273,6 +296,8 @@ function statuses_of(
 
 		statuses.set(issue, lane_status(status, is_idle))
 	}
+
+	with_spans(statuses, events)
 
 	return statuses
 }

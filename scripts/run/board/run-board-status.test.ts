@@ -71,6 +71,7 @@ describe('run_board_status.statuses_of', () => {
 		expect(statuses.get(3409)).toStrictEqual({
 			state: 'merged',
 			started_ms: Date.parse(T0),
+			spans: [{ from_ms: Date.parse(T0), end_ms: Date.parse(T2) }],
 			ended_ms: Date.parse(T2),
 			track: ['investigate'],
 		})
@@ -139,7 +140,10 @@ describe('run_board_status.statuses_of lanes', () => {
 		const paused: ItemStatus = { state: 'paused', started_ms: Date.parse(T0), lane: 'lane 3409' }
 		const lanes = { ...NO_LANES, own: new Map([[3409, paused]]) }
 
-		expect(run_board_status.statuses_of(events, lanes).get(3409)).toStrictEqual(paused)
+		expect(run_board_status.statuses_of(events, lanes).get(3409)).toStrictEqual({
+			...paused,
+			spans: [{ from_ms: Date.parse(T0), end_ms: undefined }],
+		})
 	})
 })
 
