@@ -1,0 +1,8 @@
+{
+	"reason": "#4477 adds the requested K-selection rule (3 bases) to measurement.md",
+	"date": "2026-10-22",
+	"growth": {
+		"rules.lines": 4,
+		"ai_cost.on_demand_bytes": 370
+	}
+}
