@@ -25,6 +25,24 @@ const CATEGORY_STEMS: ReadonlyArray<string> = [
 	'State is read fresh',
 	'The rule covers its whole input space',
 	'Edge inputs and environments',
+	// joshuafolkken/kit#4479: wrong premises about another component, the top theme still stopping lanes.
+	'Claims about other components are checked in their code',
+]
+
+// The intro's count, indexed by the number of items, so adding an item without rewording
+// "Answer these <n>" fails here.
+const COUNT_WORDS: ReadonlyArray<string> = [
+	'zero',
+	'one',
+	'two',
+	'three',
+	'four',
+	'five',
+	'six',
+	'seven',
+	'eight',
+	'nine',
+	'ten',
 ]
 
 // The two chain-rule entries — each its numbered item's opening, and the words its scoped pair is
@@ -39,8 +57,20 @@ function unwrapped(text: string): string {
 	return text.replaceAll(/\s+/gu, ' ')
 }
 
+function raw_self_check_section(): string {
+	return document_section.section(read_repo_file(REVIEW_PROMPT), HEADING)?.text ?? ''
+}
+
 function self_check_section(): string {
-	return unwrapped(document_section.section(read_repo_file(REVIEW_PROMPT), HEADING)?.text ?? '')
+	return unwrapped(raw_self_check_section())
+}
+
+function item_count(): number {
+	return raw_self_check_section().match(/^\d+\. \*\*/gmu)?.length ?? 0
+}
+
+function count_word(count: number): string {
+	return COUNT_WORDS[count] ?? String(count)
 }
 
 function chain_step(start: string): string {
@@ -57,6 +87,13 @@ describe('the implementer self-check before review round 1', () => {
 
 	it.each(CATEGORY_STEMS)('the section asks "%s"', (stem) => {
 		expect(self_check_section()).toContain(stem)
+	})
+
+	it('the intro states the number of items the section lists', () => {
+		const count = item_count()
+
+		expect(count).toBe(CATEGORY_STEMS.length)
+		expect(self_check_section()).toContain(`Answer these ${count_word(count)} over`)
 	})
 
 	it('the section leaves the review, its severity tests and the round cap unchanged', () => {

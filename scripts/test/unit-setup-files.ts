@@ -30,6 +30,11 @@ const WORKER_GUARDS: ReadonlyArray<string> = [...STDOUT_GUARD, ...TELEGRAM_GUARD
 // the harness config's: only this suite's runs feed the test-read map.
 const READ_RECORDER: ReadonlyArray<string> = ['./tools/test/test-read-recorder.ts']
 
+// The unit suite's own reporter, which vitest loads by this path in its own process. Named rather
+// than imported so neither it nor the ledger it writes joins the config's import graph
+// (joshuafolkken/kit#4465).
+const UNIT_FILE_REPORTER = './vitest.reporter.config.ts'
+
 // Kept apart from `unit-projects.ts` so the shipped `josh test:related` can name every setup file
 // without loading the kit-internal project partition.
 const unit_setup_files = {
@@ -38,6 +43,7 @@ const unit_setup_files = {
 	READ_RECORDER,
 	STATE_GUARD,
 	STDOUT_GUARD,
+	UNIT_FILE_REPORTER,
 	TELEGRAM_GUARD,
 	WORKER_GUARDS,
 }

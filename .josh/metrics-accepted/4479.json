@@ -1,0 +1,9 @@
+{
+	"reason": "#4479 adds self-check item 9 (claims about other components, run contexts) to prompts/review.md, bolded like its eight siblings, and pins the intro's item count in its document-rule test",
+	"date": "2026-10-22",
+	"growth": {
+		"rules.lines": 4,
+		"ai_cost.on_demand_bytes": 398,
+		"prose.excess_bold": 1
+	}
+}

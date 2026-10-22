@@ -24,7 +24,7 @@ first review counts), whichever comes first. Round 2 is a verification pass over
 
 ## Before round 1 — the implementer's self-check
 
-Answer these eight over your own diff before the scoped pair that precedes round 1, and fix what an
+Answer these nine over your own diff before the scoped pair that precedes round 1, and fix what an
 answer turns up (about four in five of 100 sampled High/Medium findings that stopped lane reviews
 fell under one; `pnpm josh lane:stats` counts the kinds that still stop). The review, its severity
 tests and the round cap are unchanged.
@@ -49,6 +49,10 @@ tests and the round cap are unchanged.
    text, a subshell, a pipe, a heredoc) and pin one test row per kind.
 8. **Edge inputs and environments** — say what the change does when its input is empty, absent or
    new, and outside a TTY, a lane or the default agent runtime.
+9. **Claims about other components are checked in their code** — for every claim your code or a
+   comment makes about another component's behavior (what a stage does, who enforces a limit, which
+   repository it runs in), open that component's code and confirm it; then name each context the
+   change runs in — kit and a consumer, and a predecessor that died midway leaving its record behind.
 
 The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
 merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".

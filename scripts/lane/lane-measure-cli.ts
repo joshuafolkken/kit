@@ -18,6 +18,7 @@ import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stop_stats } from './lane-stop-stats'
+import { lane_test_related_stats } from './lane-test-related-stats'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
@@ -144,6 +145,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_core_wait_stats.table(entries, window),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
+		lane_test_related_stats.table(entries, window),
 		lane_transcript_stats.table(calls, window),
 	]
 }

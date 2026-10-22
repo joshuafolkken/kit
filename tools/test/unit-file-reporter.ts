@@ -1,4 +1,6 @@
 import path from 'node:path'
+import { unit_count_file } from '#scripts/test/unit-count-file'
+import { test_module_elapsed, type TimedModule } from '#tools/test/test-module-elapsed'
 import type { Reporter, TestModule } from 'vitest/node'
 
 // Each unit run's slowest test files, written to the lane ledger once the run ends
@@ -12,40 +14,14 @@ import type { Reporter, TestModule } from 'vitest/node'
 // Enough to name a stalled file beside the few that are always slow, few enough for a short line.
 const SLOWEST_COUNT = 5
 
-// `lane_ledger`'s `UnitFileRecord` by shape: even a type import would bring the ledger into the config's
-// import graph, and `record_unit_files` still checks this against its own schema type.
+// `lane_ledger`'s `UnitFileRecord` by shape, so this module loads nothing of the ledger until the run
+// ends; `record_unit_files` still checks this against its own schema type.
 interface UnitFileRecord {
 	file: string
 	elapsed_ms: number
 }
 
 type UnitFilesSink = (files: ReadonlyArray<UnitFileRecord>) => Promise<void>
-
-// The part of vitest's `TestModule` this reads, so a test hands it a plain object.
-interface TimedModule {
-	moduleId: string
-	diagnostic: () => Pick<
-		ReturnType<TestModule['diagnostic']>,
-		| 'environmentSetupDuration'
-		| 'prepareDuration'
-		| 'collectDuration'
-		| 'setupDuration'
-		| 'duration'
-	>
-}
-
-// From the file's environment setup to its last test: a stall in an import shows as well as one in a test.
-function elapsed_of(module: TimedModule): number {
-	const diagnostic = module.diagnostic()
-
-	return Math.round(
-		diagnostic.environmentSetupDuration +
-			diagnostic.prepareDuration +
-			diagnostic.collectDuration +
-			diagnostic.setupDuration +
-			diagnostic.duration,
-	)
-}
 
 function slowest_files(
 	modules: ReadonlyArray<TimedModule>,
@@ -54,7 +30,7 @@ function slowest_files(
 	return modules
 		.map((module) => ({
 			file: path.relative(root, module.moduleId),
-			elapsed_ms: elapsed_of(module),
+			elapsed_ms: test_module_elapsed.elapsed_of(module),
 		}))
 		.toSorted((left, right) => right.elapsed_ms - left.elapsed_ms)
 		.slice(0, SLOWEST_COUNT)
@@ -62,9 +38,8 @@ function slowest_files(
 
 // Best-effort, as every ledger writer is: outside a repository there is no ledger, and a failed read
 // or append is dropped rather than failing the run it measures. The ledger and git helpers load at the
-// run end, not with `vitest.config.ts`: their extensionless relative imports would otherwise enter the
-// config's import graph, which Vite's native config loader cannot resolve (`vitest-config.test.ts`).
-// That also keeps a failed import inside the `try`.
+// run end, which keeps a failed import inside the `try`. `vitest.config.ts` names this reporter by path
+// and never imports it, so none of this enters the config's import graph (joshuafolkken/kit#4465).
 async function record_to_ledger(files: ReadonlyArray<UnitFileRecord>): Promise<void> {
 	try {
 		const [{ lane_ledger }, { run_carry }] = await Promise.all([
@@ -91,10 +66,17 @@ async function report(
 	await sink(slowest_files(modules))
 }
 
+// The count target is read once, in vitest's own process, so a test file the run starts cannot
+// overwrite it (joshuafolkken/kit#4465).
 function create(): Reporter {
+	const count_target = process.env[unit_count_file.COUNT_FILE_ENVIRONMENT]
+
 	return {
 		async onTestRunEnd(modules: ReadonlyArray<TestModule>): Promise<void> {
-			await report(modules)
+			await Promise.all([
+				report(modules),
+				unit_count_file.write_count(modules.length, count_target),
+			])
 		},
 	}
 }
@@ -102,11 +84,9 @@ function create(): Reporter {
 const unit_file_reporter = {
 	SLOWEST_COUNT,
 	create,
-	elapsed_of,
 	record_to_ledger,
 	report,
 	slowest_files,
 }
 
-export type { TimedModule }
 export { unit_file_reporter }

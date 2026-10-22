@@ -257,6 +257,28 @@ describe('lane_ledger.record_unit_files', () => {
 	})
 })
 
+// joshuafolkken/kit#4465: one `josh test:related` run's input counts and test files read back.
+describe('lane_ledger.record_test_related', () => {
+	it('writes the scope, the input counts, the test files and the time, read back as one entry', async () => {
+		const target = ledger(lane_ledger.KIND.TEST_RELATED)
+		const run = {
+			scope: 'related',
+			changed: 3,
+			synced: 40,
+			since_map: 5,
+			readers: 2,
+			test_files: 12,
+			elapsed_ms: 900,
+		}
+
+		await lane_ledger.record_test_related(run, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: lane_ledger.KIND.TEST_RELATED, ...run },
+		])
+	})
+})
+
 describe('lane_ledger.record_offerable', () => {
 	it('records whether offerable work and a free lane coexist', async () => {
 		const target = ledger('offerable')

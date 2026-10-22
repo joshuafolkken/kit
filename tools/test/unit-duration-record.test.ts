@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { TimedModule } from './test-module-elapsed'
 import { unit_duration_record } from './unit-duration-record'
-import type { TimedModule } from './unit-file-reporter'
 
 // joshuafolkken/kit#4467: the per-file durations the CI unit shards are balanced by.
 

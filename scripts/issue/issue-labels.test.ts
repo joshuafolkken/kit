@@ -15,6 +15,7 @@ import {
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	label_name_of,
+	MEASURED_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_BEFORE_LABEL,
@@ -51,6 +52,8 @@ const AUTO_OK_SPELLING = 'auto-ok'
 const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
 // joshuafolkken/kit#1679: the exit for an Issue whose work a run verified is already merged.
 const ALREADY_DONE_SPELLING = 'already-done'
+// joshuafolkken/kit#4475: the mark `run:carry --end` collects a measurement-only lane by.
+const MEASURED_SPELLING = 'measured'
 // joshuafolkken/kit#4102: the park a mechanical failure gets, kept apart from a person's decision.
 const RUN_STALLED_SPELLING = 'run:stalled'
 const RUN_STALLED_CREATED_CASING = 'Run:Stalled'
@@ -79,6 +82,7 @@ describe('the label names', () => {
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
 		[ALREADY_DONE_LABEL, ALREADY_DONE_SPELLING],
+		[MEASURED_LABEL, MEASURED_SPELLING],
 		[DEFERRED_LABEL, DEFERRED_SPELLING],
 		[INTERRUPT_ROUTE_LABEL, INTERRUPT_ROUTE_SPELLING],
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
@@ -131,6 +135,7 @@ describe('WORKFLOW_LABELS', () => {
 			RUN_STALLED_LABEL,
 			NEEDS_HUMAN_REVIEW_LABEL,
 			ALREADY_DONE_LABEL,
+			MEASURED_LABEL,
 			DEFERRED_LABEL,
 			NOT_BEFORE_LABEL,
 			BUG_LABEL,

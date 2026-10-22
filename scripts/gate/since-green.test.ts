@@ -67,6 +67,28 @@ describe('since_green.read_moved — what it narrows to', () => {
 	})
 })
 
+// joshuafolkken/kit#4465: `josh test:related` records how much of its input a main sync brought in.
+describe('since_green.read_moved_parts — the main sync kept apart', () => {
+	it('answers the edited files and what the main sync brought in as two lists', async () => {
+		tree_now({ [SOURCE]: 'digest-a', [FIXED]: 'digest-b2' }, 'base-b')
+		base_moved(FROM_MAIN)
+
+		await expect(since_green.read_moved_parts(stamp, record_at('parts'))).resolves.toStrictEqual({
+			changed: [FIXED],
+			synced: [FROM_MAIN],
+		})
+	})
+
+	it('answers undefined when the main sync brought in a toolchain file', async () => {
+		tree_now(RECORDED.files, 'base-b')
+		base_moved(MANIFEST)
+
+		await expect(
+			since_green.read_moved_parts(stamp, record_at('synced-manifest')),
+		).resolves.toBeUndefined()
+	})
+})
+
 describe('since_green.read_moved — when it reads the whole branch instead', () => {
 	it('answers undefined with no green record', async () => {
 		tree_now({ [FIXED]: 'digest-b2' })

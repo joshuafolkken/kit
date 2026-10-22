@@ -1,7 +1,9 @@
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { unit_count_file } from '#scripts/test/unit-count-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { unit_file_reporter, type TimedModule } from './unit-file-reporter'
+import type { TimedModule } from './test-module-elapsed'
+import { unit_file_reporter } from './unit-file-reporter'
 
 // joshuafolkken/kit#4451: a unit run whose wall time far outran its CPU left no record of the file it
 // stalled on, so each run's slowest files reach the lane ledger.
@@ -12,6 +14,7 @@ const SETUP_PHASES = 4
 const SLOW_MS = 370_000
 const STALLED = 'stalled.test.ts'
 const REPOSITORY = '/repository/.git'
+const COUNT_TARGET = '/repository/count'
 
 function timed(file: string, duration: number, root: string = ROOT): TimedModule {
 	return {
@@ -92,5 +95,23 @@ describe('unit_file_reporter.record_to_ledger — the ledger it writes', () => {
 
 		await expect(unit_file_reporter.record_to_ledger([])).resolves.toBeUndefined()
 		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4465: `josh test:related` reads the run's test-file count from a file it names.
+describe('unit_file_reporter.create — the count file', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('writes the run’s test-file count to the file named when the reporter was created', async () => {
+		vi.stubEnv(unit_count_file.COUNT_FILE_ENVIRONMENT, COUNT_TARGET)
+		const write = vi.spyOn(unit_count_file, 'write_count').mockResolvedValue()
+		const reporter = unit_file_reporter.create()
+
+		vi.stubEnv(unit_count_file.COUNT_FILE_ENVIRONMENT, 'changed-after-create')
+		await reporter.onTestRunEnd?.([], [], 'passed')
+
+		expect(write).toHaveBeenCalledWith(0, COUNT_TARGET)
 	})
 })

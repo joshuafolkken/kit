@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Durations } from '#tools/test/duration-shard'
-import { unit_file_reporter, type TimedModule } from '#tools/test/unit-file-reporter'
+import { test_module_elapsed, type TimedModule } from '#tools/test/test-module-elapsed'
 import type { Reporter, TestModule } from 'vitest/node'
 
 // The per-file durations the CI unit shards are balanced by (joshuafolkken/kit#4467), and the
@@ -56,7 +56,7 @@ function measured_of(modules: ReadonlyArray<TimedModule>, root: string): Duratio
 	return Object.fromEntries(
 		modules.map((module) => [
 			relative_file(root, module.moduleId),
-			unit_file_reporter.elapsed_of(module),
+			test_module_elapsed.elapsed_of(module),
 		]),
 	)
 }
