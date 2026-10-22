@@ -27,6 +27,8 @@ PR の効果を測る後続 Issue を起票するとき:
   - 最大値・裾: 変更前の標本数と同程度。
 - 受け入れ条件の集計は固定日数でなく `pnpm josh lane:stats --period <days>` とし、`<days>` は元 PR のマージからの経過日数（小数可）にする。
 
+計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file <path>`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
+
 ## 手元で再実行してよいとき
 
 記録で答えられない問い（記録の無い変更前後の比較など）に限る。

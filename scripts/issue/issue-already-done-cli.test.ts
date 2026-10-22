@@ -7,21 +7,24 @@ import { issue_already_done_cli } from './issue-already-done-cli'
 // joshuafolkken/kit#4130: the already-merged exit as one command. The GitHub writes and the hold
 // release are mocked, so the order they run in — and where a failure stops it — is read back.
 
-const { issue_comment, issue_apply_label, issue_close, release } = vi.hoisted(() => ({
-	issue_comment: vi.fn<(issue_number: string, body: string) => Promise<string>>(),
-	issue_apply_label:
-		vi.fn<
-			(
-				issue_number: string,
-				label: string,
-			) => Promise<{ is_applied: true } | { is_applied: false; reason: string }>
-		>(),
-	issue_close: vi.fn<() => Promise<boolean>>(),
-	release: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
-}))
+const { issue_comment, issue_apply_label, issue_close, issue_get_body, release } = vi.hoisted(
+	() => ({
+		issue_get_body: vi.fn<(issue_number: string) => Promise<string | undefined>>(),
+		issue_comment: vi.fn<(issue_number: string, body: string) => Promise<string>>(),
+		issue_apply_label:
+			vi.fn<
+				(
+					issue_number: string,
+					label: string,
+				) => Promise<{ is_applied: true } | { is_applied: false; reason: string }>
+			>(),
+		issue_close: vi.fn<() => Promise<boolean>>(),
+		release: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
+	}),
+)
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
-	git_gh_command: { issue_comment, issue_apply_label, issue_close },
+	git_gh_command: { issue_comment, issue_apply_label, issue_close, issue_get_body },
 }))
 
 vi.mock('#scripts/run/hold/run-hold-cli', () => ({ run_hold_cli: { run: release } }))
@@ -32,6 +35,23 @@ const EVIDENCE = 'merged in #4000\n- criterion 1: scripts/a.ts:12\n'
 const work = mkdtempSync(path.join(tmpdir(), 'issue-already-done-cli-'))
 const EVIDENCE_FILE = path.join(work, 'evidence.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
+
+// joshuafolkken/kit#4504: the body of #4446, the follow-up measurement a lane exited here instead
+// of with `issue:measured`.
+const SAMPLE_WAIT = '- 実施可能条件: #4448 のマージ後 30 マージ'
+const MEASUREMENT_BODY = [
+	'<!-- josh:run -->',
+	'## 背景',
+	'',
+	'- 種別: 非不具合',
+	'- 目的: 効果測定',
+	'- 人の判断: 不要',
+	'- 優先度: 通常',
+	SAMPLE_WAIT,
+	'',
+	'parent: #4317',
+].join('\n')
+const WORK_BODY = '## 背景\n\n- 種別: 不具合\n- 優先度: 通常\n'
 
 writeFileSync(EVIDENCE_FILE, EVIDENCE)
 writeFileSync(EMPTY_FILE, '  \n\n')
@@ -56,6 +76,7 @@ beforeEach(() => {
 		return 0
 	})
 	issue_close.mockReset()
+	issue_get_body.mockReset().mockResolvedValue(WORK_BODY)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -136,6 +157,35 @@ describe('issue_already_done_cli.run — refuses before writing anything', () =>
 		const code = await issue_already_done_cli.run(argv)
 
 		expect(code).toBe(1)
+		expect(calls).toStrictEqual([])
+	})
+})
+
+describe('issue_already_done_cli.run — a measurement-only issue is refused', () => {
+	it('writes nothing and points to issue:measured', async () => {
+		const errors: Array<string> = []
+
+		issue_get_body.mockResolvedValue(MEASUREMENT_BODY)
+		vi.spyOn(console, 'error').mockImplementation((line: unknown) => {
+			errors.push(String(line))
+		})
+		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
+
+		expect(code).toBe(1)
+		expect(calls).toStrictEqual([])
+		expect(errors.join('\n')).toContain(`josh issue:measured ${ISSUE} --evidence-file`)
+	})
+
+	it('ignores the declaration inside a code fence', async () => {
+		issue_get_body.mockResolvedValue(`${WORK_BODY}\n\`\`\`\n${SAMPLE_WAIT}\n\`\`\`\n`)
+
+		expect(await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])).toBe(0)
+	})
+
+	it('writes nothing when the body cannot be read', async () => {
+		issue_get_body.mockResolvedValue(undefined)
+
+		expect(await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])).toBe(1)
 		expect(calls).toStrictEqual([])
 	})
 })

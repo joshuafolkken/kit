@@ -21,9 +21,12 @@ interface EvidenceRequest {
 	evidence: string
 }
 
+// `admit`, when given, runs once the request parsed and before the first write: an exit that does not
+// fit the Issue refuses there, with nothing written.
 interface EvidenceExit {
 	command: string
 	finish: (issue_number: string) => Promise<boolean>
+	admit?: (issue_number: string) => Promise<boolean>
 }
 
 // An evidence file that is empty or whitespace only is refused before anything is written: a comment
@@ -78,9 +81,13 @@ async function write_exit(request: EvidenceRequest, exit: EvidenceExit): Promise
 	return (await post_evidence(request)) && (await exit.finish(request.issue_number))
 }
 
+async function is_admitted(request: EvidenceRequest, exit: EvidenceExit): Promise<boolean> {
+	return exit.admit === undefined || (await exit.admit(request.issue_number))
+}
+
 async function run(argv: ReadonlyArray<string>, exit: EvidenceExit): Promise<number> {
 	const request = resolve_request(argv, exit.command)
-	if (request === undefined) return FAILURE_EXIT_CODE
+	if (request === undefined || !(await is_admitted(request, exit))) return FAILURE_EXIT_CODE
 
 	return (await write_exit(request, exit))
 		? await run_hold_cli.run(['--release', request.issue_number])

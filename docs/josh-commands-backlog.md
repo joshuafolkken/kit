@@ -290,7 +290,7 @@ pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # 
 
 <!-- /usage -->
 
-See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. The Issue is never closed.
+See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. The Issue is never closed. A follow-up measurement — a body declaring `- 実施可能条件: #<PR> のマージ後 <K> マージ` — or a body that cannot be read is refused before anything is written; a measurement exits with `josh issue:measured`.
 
 ### `josh issue:measured`
 

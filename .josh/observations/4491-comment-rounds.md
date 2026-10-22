@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/cases/cases-interaction-scan.ts:56 | 2026-10-22 | #4491
+- rf:project-conventions | low | docs/maintainers/josh-commands-backlog-rationale.md:142 | 2026-10-22 | #4491
