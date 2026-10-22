@@ -29,6 +29,7 @@ const STATIC_JOB = 'static-checks'
 const UNIT_JOB = 'unit'
 const REUSE_JOB = 'reuse-pr-checks'
 const AGGREGATE_JOB = 'checks'
+const NODE_COMPAT_JOB = 'node-compat'
 const NOTIFY_JOB = 'notify-auto-tag'
 // The name the branch ruleset's required status check is matched against. It is a repository
 // setting, so nothing in this file can read the ruleset itself — what this pins is the half the
@@ -107,11 +108,14 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 		expect(runtime_job(AGGREGATE_JOB)?.name).toBe(REQUIRED_CONTEXT)
 	})
 
-	it('answers for both halves of the gate', () => {
+	// joshuafolkken/kit#4541 merged with a `Node 22.19.0 build` still in progress: the job was neither
+	// required by the ruleset nor needed by `Checks`, so nothing waited for it.
+	it('answers for both halves of the gate and the Node build matrix', () => {
 		expect(ci_yml_fixture.job_needs(runtime_job(AGGREGATE_JOB))).toEqual([
 			REUSE_JOB,
 			STATIC_JOB,
 			UNIT_JOB,
+			NODE_COMPAT_JOB,
 		])
 	})
 
@@ -123,7 +127,7 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 	// Read from the step's `env` rather than its script: the results reach the shell as environment
 	// variables, because a `${{ }}` expression spliced into a `run:` body is a shape to keep out of a
 	// workflow whatever the value's provenance.
-	it.each([STATIC_JOB, UNIT_JOB])('reads the result of %s', (job_name) => {
+	it.each([STATIC_JOB, UNIT_JOB, NODE_COMPAT_JOB])('reads the result of %s', (job_name) => {
 		const declared = Object.values(aggregate_step()?.env ?? {})
 
 		expect(declared).toContain(`\${{ needs.${job_name}.result }}`)
