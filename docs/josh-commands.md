@@ -604,6 +604,20 @@ The reader over what `josh review:record` wrote.
 
 Related: [`josh review:record`](josh-commands-automation.md#josh-reviewrecord).
 
+### `josh review:stops`
+
+<!-- usage: review:stops -->
+
+List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence.
+
+```bash
+pnpm josh review:stops --period 30   # the last 30 days (default 7)
+```
+
+<!-- /usage -->
+
+Reads `josh/review-stops.jsonl` in the git common directory, which `josh ship` appends to on each review stop.
+
 ### `josh main:sync`
 
 <!-- usage: main:sync -->

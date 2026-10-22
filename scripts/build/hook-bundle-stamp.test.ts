@@ -119,6 +119,15 @@ describe('is_fresh against the recorded build', () => {
 
 		expect(is_fixture_fresh(fixture)).toBe(true)
 	})
+
+	// joshuafolkken/kit#4496: a toolchain input moves what the build emits with every source unchanged.
+	it('reads a toolchain input created since the build as stale', () => {
+		const fixture = create_fixture()
+
+		writeFileSync(path.join(fixture.package_directory, 'tsconfig.build.json'), '{}\n')
+
+		expect(is_fixture_fresh(fixture)).toBe(false)
+	})
 })
 
 // Whole-second times, which `utimesSync` can set back exactly — a sub-millisecond mtime read off disk

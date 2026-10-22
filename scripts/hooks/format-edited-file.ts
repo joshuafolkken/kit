@@ -373,7 +373,10 @@ async function format_edited_file(
 		...plan_commands(file_path, project_root),
 		...plan_daemon_restart(file_path, project_root),
 	]
+	const daemon_before = eslint_daemon.read_record(project_root)
 	const unfixed = await collect_unfixed(plan, runner, project_root)
+
+	eslint_daemon.remember_started(project_root, daemon_before)
 
 	return format_diagnostics(unfixed === '' ? undefined : unfixed)
 }

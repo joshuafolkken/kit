@@ -1,13 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { RECORD, reuse_operations } from '#scripts/gate/reuse-operations-fixture'
-import {
-	ESLINT_CONFIG,
-	LOCKFILE,
-	reuse_world,
-	TSCONFIG,
-	type World,
-} from '#scripts/gate/reuse-world-fixture'
+import { CONFIG_FILES, reuse_world, TSCONFIG, type World } from '#scripts/gate/reuse-world-fixture'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import fc from 'fast-check'
 import { parse, stringify } from 'flatted'
@@ -25,8 +19,9 @@ import { reuse_disk, type Disk } from './reuse-disk-fixture'
 // **An entry reads every file its imports reach, every ambient declaration and the tsconfig** — its
 // own content is eslint's own cache key, so the guard leaves it to eslint. A `.d.ts` with no module
 // statement and a module declaring `global` reach every file without being imported. The daemon reads
-// the eslint config and the lockfile, and its type program the tsconfig, which it never watches; a
-// source edit reaches it through the edit hook, a merge only through the HEAD reflog.
+// the eslint config, the manifest and the lockfile, and its type program the tsconfig, which it never
+// watches; a source edit reaches it through the edit hook, a merge only through the commit checked
+// out (joshuafolkken/kit#4496).
 
 const MAX_STEPS = 20
 const NUM_RUNS = 25
@@ -34,14 +29,15 @@ const CACHE_FILE = '.eslintcache'
 const ABSENT = '<absent>'
 const LINTED_KINDS: ReadonlySet<string> = new Set(['module', 'declaration', 'globals'])
 const AMBIENT_KINDS: ReadonlySet<string> = new Set(['declaration', 'globals'])
-const DAEMON_INPUTS: ReadonlyArray<string> = [ESLINT_CONFIG, LOCKFILE, TSCONFIG]
+const DAEMON = 'daemon'
 
 interface Walk {
 	world: World
 	disk: Disk
 	// What each cached entry's verdict read, as `closure` renders it.
 	linted: Map<string, string>
-	daemon_started: number
+	// What the daemon was current for when the last green record started it.
+	daemon_fingerprint: string
 }
 
 interface Verdicts {
@@ -55,7 +51,8 @@ interface CacheEntry {
 	value: { data: Record<string, unknown>; content?: string | undefined }
 }
 
-vi.spyOn(git_spawn_sync, 'read').mockReturnValue(reuse_disk.HEAD_REFLOG)
+// `git rev-parse HEAD`: the merge base the walk sits on.
+const head = vi.spyOn(git_spawn_sync, 'read')
 
 function reached(world: World, start: string): ReadonlyArray<string> {
 	const seen = new Set([start])
@@ -139,17 +136,18 @@ async function actual_verdicts(walk: Walk): Promise<Verdicts> {
 		async () => lint(walk, cache),
 		root,
 	)
-	const newest = eslint_daemon.newest_config_mtime(root)
+	const recorded = eslint_daemon.record_text(DAEMON, walk.daemon_fingerprint)
+	const current = eslint_daemon.fingerprint(root)
 
 	return {
 		kept: kept.toSorted(reuse_world.by_name),
-		daemon_restarts: eslint_daemon.is_stale(walk.daemon_started, newest),
+		daemon_restarts: eslint_daemon.is_stale({ daemon: DAEMON, recorded }, current),
 	}
 }
 
 function has_daemon_input_moved(world: World): boolean {
 	const { recorded } = world
-	const has_config_moved = DAEMON_INPUTS.some(
+	const has_config_moved = CONFIG_FILES.some(
 		(relative) => recorded.contents.get(relative) !== world.contents.get(relative),
 	)
 
@@ -173,6 +171,12 @@ function remember(walk: Walk, kept: ReadonlyArray<string>): void {
 	walk.linted = new Map([...cached].map((file) => [file, closure(walk.world, file)]))
 }
 
+// Writes the world to disk and checks out the merge base it now sits on.
+function sync(disk: Disk, world: World): void {
+	reuse_disk.sync(disk, world)
+	head.mockReturnValue(reuse_world.base_name(disk.base))
+}
+
 async function take(
 	walk: Walk,
 	choice: readonly [number, number],
@@ -182,8 +186,8 @@ async function take(
 
 	trace.push(step.name)
 	step.apply()
-	reuse_disk.sync(walk.disk, walk.world)
-	if (step.name === RECORD) walk.daemon_started = reuse_disk.ms_at(walk.disk.tick)
+	sync(walk.disk, walk.world)
+	if (step.name === RECORD) walk.daemon_fingerprint = eslint_daemon.fingerprint(walk.disk.root)
 	const expected = expected_verdicts(walk)
 	const actual = await actual_verdicts(walk)
 
@@ -194,10 +198,14 @@ async function take(
 async function start_walk(): Promise<Walk> {
 	const world = reuse_world.create_world()
 	const disk = reuse_disk.create_disk()
-	const walk: Walk = { world, disk, linted: new Map(), daemon_started: 0 }
 
-	reuse_disk.sync(disk, world)
-	walk.daemon_started = reuse_disk.ms_at(disk.tick)
+	sync(disk, world)
+	const walk: Walk = {
+		world,
+		disk,
+		linted: new Map(),
+		daemon_fingerprint: eslint_daemon.fingerprint(disk.root),
+	}
 	const { kept } = await actual_verdicts(walk)
 
 	remember(walk, kept)

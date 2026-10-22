@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
@@ -312,6 +312,45 @@ describe('format_edited_file', () => {
 		await expect(
 			format_edited_file(payload_for(file_path), failing_runner, TEST_DIRECTORY),
 		).resolves.toBeUndefined()
+	})
+})
+
+const EMPTY_JSON = '{}'
+
+// A project with an installed eslint and no daemon running yet.
+function daemon_project(): { root: string; eslint_directory: string } {
+	const root = mkdtempSync(path.join(tmpdir(), 'format-edited-daemon-'))
+	const eslint_directory = path.join(root, 'node_modules', 'eslint')
+
+	mkdirSync(eslint_directory, { recursive: true })
+
+	for (const directory of [root, eslint_directory]) {
+		writeFileSync(path.join(directory, 'package.json'), EMPTY_JSON)
+	}
+
+	return { root, eslint_directory }
+}
+
+// A daemon the hook's eslint fix started is current, so the next lint run must not cold-start it.
+describe('format_edited_file — a daemon its commands started', () => {
+	it('records the daemon', async () => {
+		const { root, eslint_directory } = daemon_project()
+		const file_path = path.join(root, 'started.ts')
+
+		writeFileSync(file_path, '')
+
+		await format_edited_file(
+			payload_for(file_path),
+			async () => {
+				writeFileSync(path.join(eslint_directory, '.eslint_d'), 'token 1 2 hash')
+
+				return { exit_code: 0, stdout: '' }
+			},
+			root,
+		)
+
+		expect(existsSync(path.join(eslint_directory, '.eslint_d-toolchain'))).toBe(true)
+		rmSync(root, { recursive: true, force: true })
 	})
 })
 

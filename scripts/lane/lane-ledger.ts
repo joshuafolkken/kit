@@ -72,8 +72,8 @@ async function target(): Promise<string | undefined> {
 
 // **Append, never rewrite** — `O_APPEND` keeps each short line whole across concurrent writers, and
 // `O_NOFOLLOW` plus `stamp_file`'s ownership test keep a planted link or another account's file from
-// receiving it.
-function append(path: string, entry: LedgerEntry): void {
+// receiving it. Any JSON-lines log takes it — the durable review stop log too (joshuafolkken/kit#4519).
+function append(path: string, entry: object): void {
 	const descriptor = openSync(path, APPEND_FLAGS, LEDGER_FILE_MODE)
 
 	try {

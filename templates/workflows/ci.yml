@@ -148,6 +148,10 @@ jobs:
           # joshuafolkken/kit#4346: ESLint hashes `process.version` into every entry, and runner
           # images carry different Node.js patch releases for `'24'`, so a restore across two of them
           # lints cold. The resolved version leads every key: each release keeps its own lineage.
+          # joshuafolkken/kit#4496: the key is not built from kit's toolchain input list — the cache
+          # is restored before the install, and this workflow has no kit source to run. The lockfile
+          # and eslint config hashes move it with the two inputs ESLint's own per-entry check does
+          # not cover.
           key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
