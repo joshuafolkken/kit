@@ -203,6 +203,38 @@ describe('git_pr_followup.run — the CI wait in the lane ledger', () => {
 	})
 })
 
+// joshuafolkken/kit#4574: a wait that polled CodeRabbit rate-limited records its part beside it.
+describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () => {
+	it('records the CodeRabbit wait the polls saw beside the CI wait', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const rate_limited = { name: 'CodeRabbit', status: 'pass', description: 'Rate limited' }
+		const polled = {
+			rollup: [rate_limited],
+			merge_state_status: undefined,
+			review_decision: undefined,
+		}
+		let now_ms = 0
+
+		vi.spyOn(performance, 'now').mockImplementation(() => (now_ms += 1000))
+		vi.mocked(git_pr_checks.wait_for_pr_success).mockImplementation(
+			async (_branch, _reads, _before, observe) => {
+				await observe?.(polled)
+				await observe?.(polled)
+
+				return { ...polled, head_sha: CHECKED_SHA }
+			},
+		)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(record.mock.calls.map(([stage]) => stage.stage)).toStrictEqual([
+			lane_ledger.CI_WAIT_STAGE,
+			lane_ledger.CODERABBIT_WAIT_STAGE,
+			lane_ledger.CODERABBIT_RATE_LIMIT_STAGE,
+		])
+	})
+})
+
 // joshuafolkken/kit#1539: a step after the merge is cleanup, and the merge cannot be taken back. Its
 // failure used to end the process, which discarded the steps after it — the working-tree hold release
 // among them — and returned a non-zero exit that `epicrun` and `queue` read as a failed child.

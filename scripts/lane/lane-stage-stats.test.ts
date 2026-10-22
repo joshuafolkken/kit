@@ -87,6 +87,23 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 	})
 })
 
+// joshuafolkken/kit#4574: CodeRabbit's part of followup's waits, and its rate-limited part.
+describe('lane_stage_stats.table — the CodeRabbit wait', () => {
+	it('keeps the CodeRabbit wait and its rate-limited part on rows of their own', () => {
+		const wait = 'coderabbit-wait'
+		const rate_limit = 'coderabbit-rate-limit'
+		const entries = [
+			stage(CI_WAIT, 30, 1),
+			stage(wait, 2, 3),
+			stage(wait, 25, 1),
+			stage(rate_limit, 20, 1),
+		]
+
+		expect(row_of(entries, wait)).toStrictEqual(['13.5', '25.0', '2'])
+		expect(row_of(entries, rate_limit)).toStrictEqual(['20.0', '20.0', '1'])
+	})
+})
+
 describe('lane_stage_stats.table — the implementation, from dispatch to the first ship stage', () => {
 	const { IMPLEMENT } = lane_stage_stats
 
