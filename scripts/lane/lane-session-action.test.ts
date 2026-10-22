@@ -1,5 +1,6 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
@@ -129,5 +130,20 @@ describe('lane_session_action.action_schema — a relaunch stop', () => {
 		const parsed = lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop })
 
 		expect(parsed.success).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4489: the ship tags its stop with a cause, and the strict schema refused every relaunch.
+describe('lane_session_action.action_schema — a stop cause', () => {
+	it.each(Object.values(run_ship_stop_cause.CAUSE))('takes the %s cause', (cause) => {
+		const stop = { ...RELAUNCH.stop, cause }
+
+		expect(lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop }).success).toBe(true)
+	})
+
+	it('refuses a cause the ship never writes', () => {
+		const stop = { ...RELAUNCH.stop, cause: 'weather' }
+
+		expect(lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop }).success).toBe(false)
 	})
 })

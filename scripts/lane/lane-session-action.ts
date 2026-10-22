@@ -6,6 +6,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { detached_launch, type AttachedLaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { run_ship_stop_context } from '#scripts/run/ship/run-ship-stop-context'
 import { z } from 'zod'
 import { lane_child_invocation, type ShipStop } from './lane-child-invocation'
@@ -30,6 +31,7 @@ const stop_schema = z
 		flags: z.array(z.string()).readonly(),
 		is_review: z.boolean(),
 		conflicts: z.array(z.string()).readonly().default([]),
+		cause: z.enum(run_ship_stop_cause.CAUSE).exactOptional(),
 		is_review_stale: z.boolean().exactOptional(),
 		context: run_ship_stop_context.stop_context_schema.exactOptional(),
 	})
