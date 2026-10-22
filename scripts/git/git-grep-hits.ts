@@ -50,13 +50,27 @@ function parse(stdout: string): Array<Hit> {
 
 // `git grep` exits 1 when nothing matches, which `git_spawn.read` raises. Only that is "no match": a
 // git without `grep -m` (older than 2.38) exits 129, and naming every target absent then would send
-// the reader away from code that is there.
+// the reader away from code that is there. `root` searches that checkout rather than the working
+// directory's.
 async function search(
 	target: string,
 	flags: ReadonlyArray<string>,
 	pathspecs: ReadonlyArray<string>,
+	root?: string,
 ): Promise<GrepResult> {
-	const grep_arguments = ['grep', '-n', '-I', '-F', ...flags, '-e', target, '--', ...pathspecs]
+	const location = root === undefined ? [] : ['-C', root]
+	const grep_arguments = [
+		...location,
+		'grep',
+		'-n',
+		'-I',
+		'-F',
+		...flags,
+		'-e',
+		target,
+		'--',
+		...pathspecs,
+	]
 
 	try {
 		return { hits: parse(await git_spawn.read(grep_arguments)), has_failed: false }

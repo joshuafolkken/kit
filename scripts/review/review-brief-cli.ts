@@ -26,6 +26,7 @@ import { review_level, type ReviewLevel } from './review-level'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
+import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
 
 // `josh review:brief` — print the whole `/code-review` invocation, not just the level.
 //
@@ -241,6 +242,20 @@ async function read_removed_tests(): Promise<ReadonlyArray<string>> {
 	}
 }
 
+// **A failure is marked, and the brief says the list could not be read** — never an empty list,
+// which would read as a change with no reader outside it.
+async function read_readers(
+	root: string,
+	base: string,
+	paths: ReadonlyArray<string>,
+): Promise<ReadersRead> {
+	try {
+		return await review_untouched_readers.read({ root, base, paths })
+	} catch {
+		return review_untouched_readers.FAILED_READ
+	}
+}
+
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile, interaction } = request
 	const opened = await open_contract()
@@ -267,6 +282,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		rubric_path: RUBRIC_PATH,
 		...contract,
 		diff: await read_diff(contract.checkout.root, base, paths),
+		readers: await read_readers(contract.checkout.root, base, paths),
 		removed_tests: await read_removed_tests(),
 		interaction,
 	})
