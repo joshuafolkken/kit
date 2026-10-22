@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
@@ -84,8 +84,8 @@ async function change_since(
 
 // **The map's tree is whichever lane last ran the whole suite green**, so the change since it holds that
 // lane's own branch change too (joshuafolkken/kit#4527). What this branch did not change is marked
-// `since_map`: it still reaches its readers, but only this branch's change can send the run to the
-// whole suite. A branch change git cannot read marks nothing.
+// `since_map`: it still reaches its readers — a source file only when it names what moved — but only
+// this branch's change can send the run to the whole suite. A branch change git cannot read marks nothing.
 async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 	const changed = await change_since(root, map)
 
@@ -101,7 +101,8 @@ async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 // Explicit file arguments win over the git reading, which is what makes the narrowing testable by
 // hand and usable from a hook that already knows which file it just wrote. **The map still answers
 // only for the change since its tree**, so that change joins the arguments: a test added since the
-// map was recorded is in no entry, and only its own appearance in the change runs it.
+// map was recorded is in no entry, and only its own appearance in the change runs it — a source file
+// there only when it names a file the arguments moved (`naming_moved`).
 async function explicit_change(
 	root: string,
 	explicit: ReadonlyArray<string>,
@@ -120,7 +121,8 @@ async function explicit_change(
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
 // are. A moved file — code or not — reaches the tests reading it as data through the map, whose
 // entries hold no module that started reading it after the map's tree; the change since that tree
-// joins the list, so such a module runs the tests importing it. Nothing moved runs nothing; no map,
+// joins the list — its test files, and a source file only when it names a moved file
+// (`naming_moved`) — so such a module runs the tests importing it. Nothing moved runs nothing; no map,
 // or one git can no longer diff against, answers `undefined`, which reads the whole branch change.
 async function since_green_change(
 	root: string,
@@ -185,6 +187,45 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 	)
 }
 
+function text_of(file_path: string): string {
+	try {
+		return readFileSync(file_path, 'utf8')
+	} catch {
+		return ''
+	}
+}
+
+// Each file's text is read once, however many names it is checked for.
+function names_any(text: string, names: ReadonlyArray<string>): boolean {
+	return names.some((name) => text.includes(name))
+}
+
+// **The code files of the change since the map that name a file this change moved** — read off their
+// text, the one place a file-system read added since the map's tree shows (`is_code_input` in
+// `test-related-scope.ts`, joshuafolkken/kit#4532). A file the tree no longer holds names nothing.
+function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> {
+	const { changed = [], since_map = [] } = change
+	const names = changed
+		.filter((file) => !since_map.includes(file))
+		.map((file) => path.basename(file))
+	const code = since_map.filter((file) => related_scope.is_relatable(file))
+
+	return new Set(code.filter((file) => names_any(text_of(path.join(root, file)), names)))
+}
+
+async function scope_of(root: string, change: ChangeReading): Promise<RelatedScope> {
+	const recorded = await recorded_files(change)
+	const naming = naming_moved(root, change)
+
+	return related_scope.resolve_scope({
+		root,
+		...change,
+		recorded,
+		naming_moved: naming,
+		is_present: existsSync,
+	})
+}
+
 // **Whether a set of changed files can reach any test**, answered by the decision this command
 // narrows with, so the gate's reuse of a green unit step (`check-inputs.ts`) can never trust a change
 // this command would have run tests for. Unknown reaches: no map, or one recorded on a tree git can
@@ -197,8 +238,7 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 
 	if (change.map === undefined) return true
 
-	const recorded = await recorded_files(change)
-	const scope = related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
+	const scope = await scope_of(root, change)
 
 	return scope.mode !== 'none'
 }
@@ -230,9 +270,7 @@ async function resolve_change(root: string, change: ChangeReading): Promise<Rela
 
 	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
 
-	const recorded = await recorded_files(change)
-
-	return related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
+	return await scope_of(root, change)
 }
 
 async function read_run_input(

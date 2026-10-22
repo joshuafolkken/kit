@@ -24,6 +24,9 @@ const READER = path.join('scripts', 'test', 'test-related.test.ts')
 const READ_DOCUMENT = 'README.md'
 const UNREAD_DOCUMENT = 'CONTRIBUTING.md'
 const SOURCE = path.join('scripts', 'test', 'test-related.ts')
+// A real source whose text names the document, as a file-system read of it does.
+const NAMING_SOURCE = path.join('scripts', 'doctor', 'doctor-logic.ts')
+const NAMED_DOCUMENT = path.join('docs', 'josh-commands.md')
 
 const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
@@ -73,10 +76,18 @@ describe('test_related.reaches_tests', () => {
 		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
 	})
 
+	// joshuafolkken/kit#4532: a source changed since the map reaches only through naming what moved; a
+	// test always does.
 	it('answers true when a test changed since the map was recorded, whatever moved', async () => {
 		mocked_since.mockResolvedValue([READER])
 
 		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
+	})
+
+	it('answers true when a source changed since the map names a moved file', async () => {
+		mocked_since.mockResolvedValue([NAMING_SOURCE])
+
+		await expect(test_related.reaches_tests(ROOT, [NAMED_DOCUMENT])).resolves.toBe(true)
 	})
 })
 
@@ -94,10 +105,11 @@ describe('test_related.reaches_tests — code dirty when the map was recorded', 
 		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(false)
 	})
 
-	it('answers true once that code moved since the map was recorded', async () => {
+	// joshuafolkken/kit#4532: what moved since the green unit step is `paths`; that code is not in it.
+	it('answers false once that code moved since the map, while it names no moved file', async () => {
 		map_dirty_with('digest-then')
 
-		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
+		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(false)
 	})
 
 	it('answers true for a moved file a recorded test reads, whatever the dirty code', async () => {

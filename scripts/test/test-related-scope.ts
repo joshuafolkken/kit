@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
+import { test_declared_logic } from './test-declared-logic'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { whole_suite_files } from './whole-suite-files'
 
@@ -96,10 +97,13 @@ interface ScopeRequest {
 	recorded: ReadonlySet<string>
 	is_present: (file_path: string) => boolean
 	// The part of `changed` that joined only because it differs from the map's tree — which another
-	// lane's branch records — not because this change moved it. It still adds the tests reading it,
-	// but never sends the run to the whole suite: this tree verified it already, or main's CI did
-	// (joshuafolkken/kit#4527).
+	// lane's branch records — not because this change moved it. A non-code file of it still adds the
+	// tests reading it, a source file only through `naming_moved`, but neither ever sends the run to
+	// the whole suite: this tree verified it already, or main's CI did (joshuafolkken/kit#4527).
 	since_map?: ReadonlyArray<string>
+	// The source files of `since_map` that name a file this change moved — with its test files, the
+	// only ones of that part handed to vitest (joshuafolkken/kit#4532). See `is_code_input`.
+	naming_moved?: ReadonlySet<string>
 }
 
 // What the decision narrows to: the files to hand vitest, and the changed files known to reach no
@@ -119,6 +123,22 @@ function is_relatable(file_path: string): boolean {
 
 function is_moved(request: ScopeRequest, file: string): boolean {
 	return request.since_map?.includes(file) !== true
+}
+
+// **A source file only the map's tree differs by — another lane's change, or main's since — is handed
+// to vitest only when it names a file this change moved** (joshuafolkken/kit#4532). Leaving the rest
+// out is safe: an import of a moved module is reached from that module itself, since `vitest related`
+// walks every test file's graph rather than the map's; the one read neither the graph nor the map sees
+// is a file-system read added since the map's tree, and such a read names the file it reads. A test
+// file of that part always joins: the map holds no entry for it, it may reach a moved file through a
+// helper's read rather than its own, and it runs only itself. A read whose path is assembled from
+// fragments or listed from a directory is missed here and caught by CI's whole suite before the merge,
+// as a child process's read is.
+function is_code_input(request: ScopeRequest, file: string): boolean {
+	if (!is_relatable(file)) return false
+	if (is_moved(request, file) || test_declared_logic.is_test_file(file)) return true
+
+	return request.naming_moved?.has(file) === true
 }
 
 // A full-suite scope's `files` are the changed files that sent it there (joshuafolkken/kit#4510), as a
@@ -193,7 +213,7 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 
 	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
 
-	const code = changed.filter((file) => is_relatable(file))
+	const code = changed.filter((file) => is_code_input(request, file))
 	const resolution = resolve_through_map(
 		changed.filter((file) => !is_relatable(file)),
 		request,

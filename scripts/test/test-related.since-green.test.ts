@@ -42,6 +42,9 @@ const REPOSITORY_ROOT = process.cwd()
 const FIXED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const UNTOUCHED_SOURCE = path.join('scripts', 'test', 'test-related-scope.ts')
 const BRANCH_TEST = path.join('scripts', 'test', 'test-related.test.ts')
+// A real source whose text names `FIXED_SOURCE`, and a real test whose text does not.
+const NAMING_SOURCE = path.join('scripts', 'test', 'test-related-main.ts')
+const SCOPE_TEST = path.join('scripts', 'test', 'test-related-scope-triggers.test.ts')
 const NARROWING_LINE = 'since its last green run'
 const MAP_TREE = 'f00dcafe'
 const PRUNED_TREE = new Error('bad object')
@@ -187,21 +190,24 @@ describe('test_related.run_related_tests — reading the whole branch instead', 
 describe('test_related.run_related_tests — a moved file read through a newer source', () => {
 	const document = 'docs/josh-commands.md'
 	const document_reader = path.join('scripts', 'test', 'test-related-scope.test.ts')
+	// A real source whose text names the document, as a file-system read of it does.
+	const document_source = path.join('scripts', 'doctor', 'doctor-logic.ts')
 
 	it('runs the map readers of a moved non-code file and the source changed since the map', async () => {
 		vi.mocked(test_read_map.read_map).mockReturnValue(map_with({ [document]: [document_reader] }))
-		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, document])
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([document_source, document])
 		mocked_moved.mockResolvedValue(changed_only(document))
 
 		await test_related.run_related_tests([])
 
 		expect(vitest_arguments()).toEqual(
-			expect.arrayContaining([absolute(UNTOUCHED_SOURCE), absolute(document_reader)]),
+			expect.arrayContaining([absolute(document_source), absolute(document_reader)]),
 		)
 	})
 
-	it('runs the source changed since the map for a moved code file read as data', async () => {
-		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE])
+	// joshuafolkken/kit#4532: `NAMING_SOURCE` names the moved `test-related.ts`; `UNTOUCHED_SOURCE` does not.
+	it('runs only the source changed since the map that names a moved code file', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, NAMING_SOURCE])
 		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
@@ -209,7 +215,33 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 		expect(vitest_arguments()).toEqual([
 			'related',
 			absolute(FIXED_SOURCE),
-			absolute(UNTOUCHED_SOURCE),
+			absolute(NAMING_SOURCE),
+			'--run',
+		])
+	})
+
+	it('leaves out the source changed since the map that names no moved file', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', absolute(FIXED_SOURCE), '--run'])
+	})
+})
+
+// joshuafolkken/kit#4532: a test the map holds no entry for may reach a moved file through a helper.
+describe('test_related.run_related_tests — a test changed since the map', () => {
+	it('runs it though it names no moved file', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, SCOPE_TEST])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			absolute(FIXED_SOURCE),
+			absolute(SCOPE_TEST),
 			'--run',
 		])
 	})
