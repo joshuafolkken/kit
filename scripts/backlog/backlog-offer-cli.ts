@@ -5,6 +5,7 @@ import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
+import { backlog_next_shared } from './backlog-next-shared'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
 // `josh backlog:offer` — one composite command for a `backlogrun` loop-head event.
@@ -188,7 +189,7 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 }
 
 async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {
-	const next = await josh_command.josh_run(next_argv(values), should_forward_stderr)
+	const next = await backlog_next_shared.read(next_argv(values), should_forward_stderr)
 	const offer = backlog_offer.answer_of(
 		{ code: next.code, tokens: to_tokens(next.out), err: next.err },
 		counts.running,

@@ -1,4 +1,5 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { lane_limit_cli } from '#scripts/lane/lane-limit-cli'
 import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -10,6 +11,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { backlog_next_shared } from './backlog-next-shared'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
 
 // joshuafolkken/kit#2452: a parent woken five times relayed each progress line without asking for the
@@ -54,6 +56,8 @@ function running_records(issues: ReadonlyArray<string>): Map<string, LaneStateRe
 
 beforeEach(() => {
 	vi.spyOn(lane_state, 'read_states').mockImplementation(async (issues) => running_records(issues))
+
+	return shared_cache_fixture.isolate_shared_cache(backlog_next_shared.NEXT_CACHE)
 })
 
 afterEach(() => {

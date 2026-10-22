@@ -1,6 +1,7 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json } from '#scripts/git/parse-json-array'
+import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
 import { defect_rate, type DefectRate, type RateIssue } from './defect-rate'
@@ -13,6 +14,23 @@ const SEARCH_RESULT_CEILING = 1000
 // The search API allows 30 requests a minute; both searches together stay at the ~10 requests the
 // sequential walk made, so this bounds only how many are in flight at once.
 const PAGE_CONCURRENCY = 4
+const MS_PER_MINUTE = 60_000
+const CACHE_TTL_MINUTES = 15
+// A 14-day rate does not move within a quarter of an hour, and every `backlog:next` / `backlog:plan`
+// a backlogrun's drive, probe and board make asks it — each costing two or more search requests
+// against the 30-a-minute limit (joshuafolkken/kit#4550).
+const RATE_CACHE: CacheSlot = {
+	prefix: 'josh-defect-rate-',
+	ttl_ms: CACHE_TTL_MINUTES * MS_PER_MINUTE,
+}
+
+const defect_rate_schema = z.object({
+	days: z.number(),
+	since: z.string(),
+	defects: z.number(),
+	enhancements: z.number(),
+	is_capped: z.boolean(),
+})
 
 const search_item_schema = z.object({
 	body: z.string().nullish(),
@@ -100,13 +118,11 @@ async function search(query: string): Promise<SearchResult | undefined> {
 	}
 }
 
-// The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks it.
-async function measure_window(
+async function measure_uncached(
 	repo: string,
 	days: number,
-	now_ms: number,
+	since: string,
 ): Promise<DefectRate | undefined> {
-	const since = defect_rate.window_start(now_ms, days)
 	const [filed, completed] = await Promise.all([
 		search(defect_rate.filed_query(repo, since)),
 		search(defect_rate.completed_query(repo, since)),
@@ -125,6 +141,23 @@ async function measure_window(
 	})
 }
 
-const defect_rate_cli = { search_path, measure_window }
+// The rate over a window, or `undefined` when either search could not be read. `backlog:next` asks it.
+// Shared across processes for `CACHE_TTL_MINUTES`; an unread rate is not kept.
+async function measure_window(
+	repo: string,
+	days: number,
+	now_ms: number,
+): Promise<DefectRate | undefined> {
+	const since = defect_rate.window_start(now_ms, days)
+	const key = [repo, String(days), since].join(' ')
+
+	return await shared_cache.remember(
+		{ slot: RATE_CACHE, key, schema: defect_rate_schema },
+		async () => await measure_uncached(repo, days, since),
+		now_ms,
+	)
+}
+
+const defect_rate_cli = { RATE_CACHE, search_path, measure_window }
 
 export { defect_rate_cli }

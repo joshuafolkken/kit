@@ -1,5 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
-import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { git_common_directory } from '#scripts/git/git-common-directory'
+import { shared_cache } from '#scripts/josh/shared-cache'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { DefectRate } from './defect-rate'
 import { defect_rate_cli } from './defect-rate-cli'
 
@@ -14,6 +17,8 @@ const TWO_SEARCHES = 2
 const THREE_PAGES_TOTAL = 201
 const OVER_CEILING = 5000
 const CEILING_PAGES = 10
+const WITHIN_TTL_MS = 60_000
+const RATE_LIMITED = 'rate limited'
 
 // `body` is optional because GitHub serves an empty body as null, which JSON.stringify cannot write
 // from a fixture without a null literal — an omitted field reaches the same schema branch.
@@ -57,7 +62,14 @@ async function measure(days: number = DAYS): Promise<DefectRate | undefined> {
 	return await defect_rate_cli.measure_window(REPO, days, NOW_MS)
 }
 
+// Every test measures through the shared cache, keyed to a root of its own so no answer leaks between
+// tests or into the record a real backlogrun on this machine reads.
+beforeEach(() => {
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(`/defect-rate-test/${randomUUID()}`)
+})
+
 afterEach(() => {
+	shared_cache.clear(defect_rate_cli.RATE_CACHE)
 	vi.restoreAllMocks()
 })
 
@@ -91,9 +103,40 @@ describe('defect_rate_cli.measure_window', () => {
 	})
 
 	it('answers nothing rather than a rate when a search cannot be read', async () => {
-		vi.spyOn(git_gh_exec, 'exec_gh_api').mockRejectedValue(new Error('rate limited'))
+		vi.spyOn(git_gh_exec, 'exec_gh_api').mockRejectedValue(new Error(RATE_LIMITED))
 
 		expect(await measure()).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4550: every `backlog:next` a backlogrun's drive, probe and board made searched again,
+// holding the 30-a-minute search limit near its ceiling.
+describe('defect_rate_cli.measure_window — the shared cache', () => {
+	it('answers a second measure within the TTL without searching', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM]))
+		const first = await measure()
+
+		expect(await defect_rate_cli.measure_window(REPO, DAYS, NOW_MS + WITHIN_TTL_MS)).toEqual(first)
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES)
+	})
+
+	it('searches again once the TTL has passed', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM]))
+
+		await measure()
+		await defect_rate_cli.measure_window(REPO, DAYS, NOW_MS + defect_rate_cli.RATE_CACHE.ttl_ms)
+
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES * 2)
+	})
+
+	it('keeps no unread rate, so the next measure searches again', async () => {
+		const api = stub_search(page([DEFECT_ITEM]), page([ENHANCEMENT_ITEM]))
+
+		api.mockRejectedValueOnce(new Error(RATE_LIMITED))
+
+		expect(await measure()).toBeUndefined()
+		expect(await measure()).toBeDefined()
+		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES * 2)
 	})
 })
 
