@@ -1,7 +1,7 @@
 {
-	"reason": "Wrapper-aware command walk, double-quoted substitution reading (incl. quoted arguments inside it), the heredoc predicate the direct-filing trigger reads, and the gh api anchor that keeps a quoted mention from counting as a filing",
+	"reason": "Round-2 review fixes: shell-script runners (bash -c / eval) and backtick substitutions read by the direct-filing trigger, plus nohup/nice/command/exec/stdbuf wrappers",
 	"date": "2026-10-22",
 	"growth": {
-		"scripts.code_lines": 59
+		"scripts.code_lines": 67
 	}
 }

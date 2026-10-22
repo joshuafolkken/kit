@@ -69,9 +69,10 @@ const HEREDOC_MARKER = /(?<!<)<<-?\s*(['"]?)(\w+)\1/u
 const HEREDOC_DELIMITER_GROUP = 2
 const LINE_BREAK = '\n'
 const DOUBLE_QUOTE = '"'
-// A command substitution with no nested parenthesis — the shape a quoted `"$(cmd …)"` is written in.
-// An escaped `\$(` is literal text inside double quotes, so it runs nothing.
-const SUBSTITUTION_PATTERN = /(?<!\\)\$\(([^()]*)\)/gu
+// A command substitution with no nested parenthesis — the shape a quoted `"$(cmd …)"` is written in —
+// or its backtick spelling. An escaped `\$(` or `` \` `` is literal text inside double quotes, so it
+// runs nothing.
+const SUBSTITUTION_PATTERN = /(?<!\\)\$\((?<dollar>[^()]*)\)|(?<!\\)`(?<tick>[^`]*)`/gu
 // `set -o pipefail` tells the shell to report the pipeline with the first failing command's status,
 // so nothing in it is discarded. The flag letters are loose because `set -eo pipefail` and
 // `set -euo pipefail` are the same instruction, and the `set` word is required so that a path or a
@@ -107,6 +108,11 @@ const WRAPPER_COMMANDS: ReadonlyMap<string, WrapperShape> = new Map([
 	['env', { valued: new Set(['-u', '-C', '-S', '--unset', '--chdir']), operands: 0 }],
 	['sudo', { valued: new Set(['-u', '-g', '-C', '-D']), operands: 0 }],
 	['timeout', { valued: new Set(['-s', '-k', '--signal', '--kill-after']), operands: 1 }],
+	['nohup', { valued: new Set(), operands: 0 }],
+	['nice', { valued: new Set(['-n', '--adjustment']), operands: 0 }],
+	['command', { valued: new Set(), operands: 0 }],
+	['exec', { valued: new Set(['-a']), operands: 0 }],
+	['stdbuf', { valued: new Set(['-i', '-o', '-e']), operands: 0 }],
 ])
 const NAVIGATION_COMMANDS = new Set(['cd', 'pushd', 'popd', 'export', 'source', 'set', '.'])
 const PATH_SEPARATOR = '/'
@@ -252,7 +258,7 @@ function spoken_substitutions(span: string): string {
 	if (!span.startsWith(DOUBLE_QUOTE)) return ' '
 
 	const inner = [...span.matchAll(SUBSTITUTION_PATTERN)].map((match) =>
-		(match[1] ?? '').replaceAll(QUOTED_SPAN_PATTERN, ' '),
+		(match.groups?.['dollar'] ?? match.groups?.['tick'] ?? '').replaceAll(QUOTED_SPAN_PATTERN, ' '),
 	)
 
 	return inner.length === 0 ? ' ' : ` ; ${inner.join(' ; ')} ; `

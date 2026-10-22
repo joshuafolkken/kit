@@ -51,6 +51,11 @@ describe('josh_command_of — wrappers', () => {
 		'timeout -k 5 -s KILL 600 pnpm josh gate',
 		'env -u HOME CI=1 pnpm josh gate',
 		'npx josh gate',
+		'nohup pnpm josh gate',
+		'nice -n 10 pnpm josh gate',
+		'command pnpm josh gate',
+		'exec pnpm josh gate',
+		'stdbuf -o L pnpm josh gate',
 	])('reads %j as the gate', (command) => {
 		expect(time_shell.josh_command_of(command)).toBe('josh gate')
 	})

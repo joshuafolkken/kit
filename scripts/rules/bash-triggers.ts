@@ -41,10 +41,18 @@ const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
 // create …)"` that runs. A heredoc body is matched as written: `bash <<EOF` runs it, and the body cannot
 // be told apart from prose, so the rule errs on the refusing side. The endpoint and the title field are
 // still read from the line as written, where a quoted path or field keeps them.
+//
+// **A quoted script handed to a shell runs, so it is read as written too**: `bash -c "gh issue create
+// …"`, `sh -c '…'` and `eval "…"` file the Issue the quotes would otherwise hide.
 const GH_API_COMMAND = /\bgh\s+api\b/u
+const SHELL_SCRIPT_RUNNER = /\b(?:(?:ba|z|da|k)?sh\s+(?:-\w+\s+)*-\w*c\b|eval\b)/u
 
 function spoken_line(command: string): string {
-	return time_shell.has_heredoc(command) ? command : time_shell.unquoted(command)
+	if (time_shell.has_heredoc(command)) return command
+
+	const plain = time_shell.unquoted(command)
+
+	return SHELL_SCRIPT_RUNNER.test(plain) ? command : plain
 }
 
 function is_direct_filing(command: string): boolean {

@@ -57,6 +57,10 @@ describe('is_direct_filing', () => {
 		'url="$(gh issue create --title "Fix foo" --body-file b.md)"',
 		'gh api "repos/o/r/issues" -f \'title=x\'',
 		"bash <<'EOF'\ngh issue create --title x\nEOF",
+		'bash -c "gh issue create --title x"',
+		"sh -c 'gh issue create --title x'",
+		'eval "gh issue create --title x"',
+		'echo "`gh issue create --title x`"',
 	])(READS_A_FILING, (command) => {
 		expect(bash_triggers.is_direct_filing(command)).toBe(true)
 	})
