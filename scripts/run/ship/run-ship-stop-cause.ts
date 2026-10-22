@@ -1,7 +1,7 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import type { StopRecord } from '#scripts/lane/lane-ledger'
-import { run_ship_review } from './run-ship-review'
+import { run_ship_review, type StopFinding } from './run-ship-review'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 
 // Why a `josh ship` stage stopped, beside the stage it stopped at: a review that found something, a
@@ -86,10 +86,22 @@ function cause_of(stage: Stage, failed: StoppedOutput): Cause {
 	return INFRA_STAGES.has(stage) && is_infra(body) ? CAUSE.INFRA : CAUSE.CHECK
 }
 
-// The kind of every blocking finding a review stop's output lists — empty on any other stop, and on a
-// review stop no finding decided (a red gate at the join, a reviewer that never answered).
+// Whether a finding decided the stop — false on any other stop, and on a review stop no finding decided
+// (a red gate at the join, a reviewer that never answered).
+function is_finding_stop(stage: Stage, cause: Cause): boolean {
+	return is_review(stage) && cause === CAUSE.FINDING
+}
+
+// The kind of every blocking finding a review stop's output lists.
 function findings_of(stage: Stage, cause: Cause, body: string): ReadonlyArray<string> {
-	return is_review(stage) && cause === CAUSE.FINDING ? run_ship_review.blocking_kinds(body) : []
+	return is_finding_stop(stage, cause) ? run_ship_review.blocking_kinds(body) : []
+}
+
+// Each finding that decided a review stop, whole, for the durable stop log (joshuafolkken/kit#4519).
+function details_of(stage: Stage, failed: StoppedOutput = NO_OUTPUT): ReadonlyArray<StopFinding> {
+	if (!is_finding_stop(stage, cause_of(stage, failed))) return []
+
+	return run_ship_review.blocking_details(failed.body)
 }
 
 // The lane ledger's record of one stop — the stage, its cause and, for a preflight, which
@@ -109,7 +121,7 @@ function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPU
 	}
 }
 
-const run_ship_stop_cause = { CAUSE, cause_of, is_review, record_of }
+const run_ship_stop_cause = { CAUSE, cause_of, details_of, is_review, record_of }
 
 export type { Cause }
 export { run_ship_stop_cause }
