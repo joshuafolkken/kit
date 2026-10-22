@@ -26,11 +26,13 @@ const result_schema = z.object({
 	err: z.string().exactOptional(),
 })
 
-async function cache_key(argv: ReadonlyArray<string>): Promise<string> {
+// The key a shared plan read is kept under: what was asked, and the newest event on the run's stream.
+// `run:board`'s plan read keys by it too (joshuafolkken/kit#4558).
+async function stream_key(scope: unknown): Promise<string> {
 	const target = await run_event_stream_emit.stream_target()
 	const last = target === undefined ? undefined : run_event_stream.read_last(target)
 
-	return JSON.stringify({ argv, last })
+	return JSON.stringify({ argv: scope, last })
 }
 
 function is_kept(result: JoshResult): boolean {
@@ -53,7 +55,7 @@ async function read(
 	should_forward_stderr = false,
 	timeout_ms?: number,
 ): Promise<JoshResult> {
-	const key = await cache_key(argv)
+	const key = await stream_key(argv)
 	const now_ms = Date.now()
 	const kept = shared_cache.read(NEXT_CACHE, key, result_schema, now_ms)
 
@@ -66,6 +68,6 @@ async function read(
 	return result
 }
 
-const backlog_next_shared = { NEXT_CACHE, read }
+const backlog_next_shared = { NEXT_CACHE, read, stream_key }
 
 export { backlog_next_shared }
