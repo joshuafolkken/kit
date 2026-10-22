@@ -464,16 +464,19 @@ jobs:
   # which for a matrix is `success` only when every shard succeeded — no change there is needed.
   # The shards split by the recorded per-file durations in `tools/test/unit-durations.json`, not by
   # file count, so they finish together (`tools/test/duration-shard.ts`, joshuafolkken/kit#4467).
+  # Four shards, not three (joshuafolkken/kit#4573): balanced at three, each shard still ran its tests
+  # for 196–227 seconds and set the CI wait; a fourth cuts each slice by a quarter for about 12
+  # seconds of duplicated setup.
   # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
-    name: Unit Tests (${{ matrix.shard }}/3)
+    name: Unit Tests (${{ matrix.shard }}/4)
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -505,7 +508,7 @@ jobs:
       # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
       # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
-        run: pnpm josh test:unit --shard=${{ matrix.shard }}/3
+        run: pnpm josh test:unit --shard=${{ matrix.shard }}/4
 
       # One shard is enough: the check does not depend on which test files ran beside it.
       - name: Verify optional ESLint consumer install
