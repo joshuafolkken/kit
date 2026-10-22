@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/run/board/run-board-tick.ts:158 | 2026-10-22 | #4484
+- rf:bug-risks | low | scripts/run/board/run-board-github.ts:213 | 2026-10-22 | #4484
