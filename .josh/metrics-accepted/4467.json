@@ -1,0 +1,7 @@
+{
+	"reason": "Duration-balanced CI unit sharding (#4467) adds the shard split, its vitest sequencer and the opt-in duration recorder",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 163
+	}
+}

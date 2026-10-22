@@ -99,7 +99,14 @@ function create(): Reporter {
 	}
 }
 
-const unit_file_reporter = { SLOWEST_COUNT, create, record_to_ledger, report, slowest_files }
+const unit_file_reporter = {
+	SLOWEST_COUNT,
+	create,
+	elapsed_of,
+	record_to_ledger,
+	report,
+	slowest_files,
+}
 
 export type { TimedModule }
 export { unit_file_reporter }
