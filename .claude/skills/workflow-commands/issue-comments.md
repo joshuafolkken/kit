@@ -64,6 +64,12 @@ park-and-continue (`backlogrun-park.md` → "park and continue"). **Never close 
 **Looking familiar is no license to skip the work**: a criterion you cannot point at merged code for is
 one this run still owes.
 
+## A measurement-only Issue
+
+**Every criterion is a measurement, so no pull request closes it** → `pnpm josh issue:measured <N>
+--evidence-file <path>` (per criterion, the result and its run), never a bare comment: an OPEN child is
+parked `run:stalled`. Invoking `fullrun` / `backlogrun` authorizes this close. `docs/josh-commands-backlog.md` → "`josh issue:measured`".
+
 ## A long thread
 
 **The fetch is one call; what costs is carrying it** — hence the projection to author, timestamp and

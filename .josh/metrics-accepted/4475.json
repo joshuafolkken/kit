@@ -1,0 +1,8 @@
+{
+	"reason": "New issue:measured command for measurement-only issues (#4475); the evidence-exit shape is shared with issue:already-done, so only the label-and-close step, the provisioned measured label the shared issue-merged timeline reader counts as the merge, and the one-section rule in issue-comments.md are new",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 86,
+		"ai_cost.on_demand_bytes": 375
+	}
+}
