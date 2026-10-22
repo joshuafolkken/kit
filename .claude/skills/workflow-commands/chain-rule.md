@@ -46,6 +46,7 @@ Review results and successful pushes are never turn boundaries.
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>`).
+   A change to the run tooling also takes the interaction review: `prompts/review.md` → "Interaction review".
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>" --body-file <evidence.md>` — the file carries `## 実機証跡` and
    `## 受け入れ条件の対応` (`report-format.md`), both asked at the preflight: PR preflight → gate → `git -y` →

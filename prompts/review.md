@@ -71,10 +71,20 @@ pnpm josh review:brief --level-only --staged   # the staged diff
 
 ---
 
+## Interaction review
+
+After round 1 and its record, `pnpm josh review:brief --interaction` answers whether the change takes
+the interaction review and prints its brief; hand it to a reviewer subagent, dispose of the findings
+by the three-way disposition below, and record the pass with
+`pnpm josh review:record --interaction --issue <N> [<category>:<severity>:<file> ...]`.
+
+`pnpm josh followup` refuses a due change with none recorded; `pnpm josh ship --review` runs it itself.
+
 ## Review round cap (2 rounds)
 
 Two rounds is the ceiling, not the schedule: every fix creates new surface a further round would find
-something in. Whether round 2 is due is `pnpm josh review:round2`'s answer (below).
+something in. Whether round 2 is due is `pnpm josh review:round2`'s answer (below). The interaction
+review is not one of the two.
 
 ### A merge-conflict resolution review is not one of the two
 

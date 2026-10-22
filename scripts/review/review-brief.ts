@@ -3,6 +3,7 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { removed_tests } from './removed-tests'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
+import { review_interaction } from './review-interaction'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
 // already knows.
@@ -417,6 +418,9 @@ interface BriefInput {
 	diff?: { parts: DiffParts; cap: number } | undefined
 	// The tests the change removes, listed for the reviewer to account for. Absent or empty, no section.
 	removed_tests?: ReadonlyArray<string> | undefined
+	// The run-tooling paths an interaction review is briefed on (joshuafolkken/kit#4276). Absent, the
+	// brief is `/code-review`'s alone.
+	interaction?: ReadonlyArray<string> | undefined
 }
 
 const SECOND_ROUND = 2
@@ -450,6 +454,10 @@ function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
 
 // The level alone on the first line, because the level-only mode's contract — a caller reading the
 // answer with `$(...)` — is the one thing a brief must not break.
+function interaction_block(targets: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
+	return targets === undefined ? [] : ['', review_interaction.brief_block(targets)]
+}
+
 function compose(input: BriefInput): string {
 	const profile = input.profile ?? agent_role_profile.DEFAULT_PROFILES.reviewer
 	const target = target_block(input)
@@ -469,6 +477,7 @@ function compose(input: BriefInput): string {
 		target,
 		...diff_block(input, target),
 		...removed_tests.brief_block(input.removed_tests ?? []),
+		...interaction_block(input.interaction),
 	].join('\n')
 }
 

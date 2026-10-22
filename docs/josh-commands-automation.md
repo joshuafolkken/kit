@@ -567,6 +567,7 @@ pnpm josh review:record --issue 2325 bug-risks:medium:src/foo.ts:42 tests:low:a.
 pnpm josh review:record --issue 2325                                                      # a zero-finding round — records one `none` line
 pnpm josh review:record --issue 2325 --comment                                            # a round that passed after the PR opened — an Issue comment, no append
 pnpm josh review:record --check --issue 2325                                              # the merge gate: was it recorded?
+pnpm josh review:record --issue 2325 --interaction                                        # the interaction review’s pass — a `- ri:` line
 ```
 
 <!-- /usage -->

@@ -804,6 +804,7 @@ Print the whole /code-review invocation: level, what the gate already proved, ta
 ```bash
 pnpm josh review:brief                       # round 1
 pnpm josh review:brief --round 2             # verification pass, scoped to the fix delta
+pnpm josh review:brief --interaction         # the interaction review of a run-tooling change
 pnpm josh review:brief --level-only          # the level alone (pre-commit review)
 pnpm josh review:brief --level-only --json   # level and reason, machine-readable
 ```

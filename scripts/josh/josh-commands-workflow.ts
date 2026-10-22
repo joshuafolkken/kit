@@ -188,7 +188,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Record a review round’s findings, or check a round was recorded',
 		category: 'Workflow',
 		reference: [
-			'--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>',
+			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | --check [--interaction] --issue <N>',
 			'automation',
 			['files', 'network'],
 		],
@@ -201,6 +201,10 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 					note: 'a round that passed after the PR opened — an Issue comment, no append',
 				},
 				{ arguments: `${CHECK} ${REVIEW_ISSUE}`, note: 'the merge gate: was it recorded?' },
+				{
+					arguments: `${REVIEW_ISSUE} --interaction`,
+					note: 'the interaction review’s pass — a `- ri:` line',
+				},
 			],
 		},
 	},

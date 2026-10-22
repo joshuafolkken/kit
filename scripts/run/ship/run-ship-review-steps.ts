@@ -1,18 +1,13 @@
-import { agent_argv, type AgentArgv } from '#scripts/agent/agent-argv'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { api_auth } from '#scripts/agent/api-auth'
-import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import type { JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
-import { lane_session_broker } from '#scripts/lane/lane-session-broker'
+import { review_interaction } from '#scripts/review/review-interaction'
 import { review_record } from '#scripts/review/review-record'
 import { review_round2 } from '#scripts/review/review-round2'
-import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
-import { run_ship_scoped, type Phase } from './run-ship-scoped'
-import { run_ship_stop_cause, type Cause } from './run-ship-stop-cause'
+import { run_ship_reviewer, type Round } from './run-ship-reviewer'
+import { run_ship_scoped } from './run-ship-scoped'
+import { run_ship_stop_cause } from './run-ship-stop-cause'
 import type { StepResult } from './run-ship-sync'
 
 // The side effects of `josh ship --review`: the round-1 review — open, launch, join, attest and
@@ -21,7 +16,8 @@ import type { StepResult } from './run-ship-sync'
 //
 // 1. `run:review` starts the gate detached and mints the brief — the nonce `review:attest` checks.
 // 2. the reviewer is launched the way `run:wake` launches a session — `agent_argv` under the reviewer
-//    profile, `detached_launch.launch_attached` to wait for its exit — handed the brief by path.
+//    profile, `detached_launch.launch_attached` to wait for its exit — handed the brief by path
+//    (`run-ship-reviewer.ts`).
 // 3. `run:review --join` blocks a verdict over a red gate; `review:attest --check` refuses a review
 //    that read another checkout; `review:record` writes the round the merge gate reads.
 //
@@ -40,19 +36,15 @@ import type { StepResult } from './run-ship-sync'
 // unreadable findings file, a High or an unfixed Medium in round 1, and anything but a clean round 2 —
 // recorded first, because the round was attested, then routed back.
 
-const SUCCESS_EXIT_CODE = 0
-const FAILURE_EXIT_CODE = 1
-const should_forward_stderr = true
 const RUN_REVIEW = 'run:review'
-const ATTEST_CHECK = ['review:attest', '--check']
 const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed', '--json']
-const ROUND_TWO_BRIEF = ['review:brief', '--round', '2']
+const REVIEW_BRIEF = 'review:brief'
+const ROUND_TWO_BRIEF = [REVIEW_BRIEF, '--round', '2']
+const INTERACTION_FLAG = '--interaction'
+const INTERACTION_BRIEF = [REVIEW_BRIEF, INTERACTION_FLAG]
 const UNREADABLE_DECISION_NOTE = 'review:round2 printed no decision josh ship can read:'
-const ROUND_ONE = '1'
-const ROUND_TWO = '2'
 const COMMENT_FLAG = '--comment'
 
-type Round = typeof ROUND_ONE | typeof ROUND_TWO
 const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
@@ -62,127 +54,21 @@ const ROUND_ONE_RECORDED_NOTE =
 // The scoped pair's precondition, met by the supervisor itself rather than stopped on,
 // single-sourced with the preflight and gate stages.
 const { run_phases, scoped_pair } = run_ship_scoped
-
-type PromptOf = (brief_path: string, findings_path: string, issue: string) => string
-
 const { CAUSE } = run_ship_stop_cause
-
-// **Every stop is tagged with the step's own cause**, so a round that stopped on a red join, a reviewer
-// that did not finish or a refused attestation is not booked as a finding (joshuafolkken/kit#4431).
-function failure(out: string, cause: Cause): StepResult {
-	return { code: FAILURE_EXIT_CODE, out, cause }
-}
-
-function tagged(cause: Cause, result: JoshResult): StepResult {
-	return result.code === SUCCESS_EXIT_CODE ? result : { ...result, cause }
-}
-
-function tagged_phase(cause: Cause, phase: Phase): Phase {
-	return async () => tagged(cause, await phase())
-}
-
-function paths(): { brief: string; findings: string; log: string } {
-	return lane_session_broker.review_paths(PROJECT_ROOT)
-}
-
-async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
-}
-
-function note(text: string): void {
-	process.stderr.write(`${text}\n`)
-}
-
-// A reviewer that could not authenticate is named as such (`api-auth.ts`), so the stop is not booked as
-// a review finding (joshuafolkken/kit#4216).
-function exited_note(log_path: string): string {
-	const exited = `reviewer failed — log: ${log_path}`
-
-	if (!api_auth.is_auth_failed_transcript(stamp_file.read_stamp_text(log_path))) return exited
-
-	return `${api_auth.AUTH_FAILURE_NOTE}: ${exited}`
-}
-
-// Under the round's reviewer profile — the same model and effort (`JOSH_REVIEWER_*` included) the
-// chain's subagent is given — and waited on, so the join below runs only once the review has finished.
-// Each call is its own process, so round 2 is a fresh session by construction.
-async function run_direct_session(
-	argv: AgentArgv,
-	profile: AgentProfile,
-	log_path: string,
-	round: Round,
-): Promise<JoshResult> {
-	const request = { argv, cwd: PROJECT_ROOT, log_path, profile }
-
-	note(agent_role_profile.describe_review(Number(round), profile))
-	const result = await detached_launch.launch_attached(request, note)
-
-	if (result.kind === 'failed') {
-		return failure(`reviewer could not start: ${result.note}`, CAUSE.INFRA)
-	}
-
-	if (result.exit_code !== SUCCESS_EXIT_CODE) return failure(exited_note(log_path), CAUSE.INFRA)
-
-	return { code: SUCCESS_EXIT_CODE, out: '' }
-}
-
-// A lane child's reviewer is started by the lane's broker: an OpenAI lane's always, since a nested Codex
-// cannot write outside its sandbox, and a Claude lane's whenever the `run:wake` supervisor serves it, since this
-// ship was started from the child's Bash tool and so never received a token-only credential
-// (joshuafolkken/kit#3817). A Claude lane nobody serves starts the reviewer itself, as before.
-function is_brokered(profile: AgentProfile, issue: string): boolean {
-	if (!lane_child_marker.is_child_of(PROJECT_ROOT)) return false
-
-	return profile.provider === 'openai' || lane_session_broker.is_serving(PROJECT_ROOT, issue)
-}
-
-async function run_session(
-	prompt: string,
-	log_path: string,
-	issue: string,
-	round: Round,
-): Promise<JoshResult> {
-	const built = agent_argv.review_in(prompt, Number(round), PROJECT_ROOT)
-
-	if (built.kind === 'rejected') {
-		return failure(`reviewer profile rejected: ${built.note}`, CAUSE.INFRA)
-	}
-
-	if (!is_brokered(built.profile, issue)) {
-		return await run_direct_session(built.argv, built.profile, log_path, round)
-	}
-
-	const answer = await lane_session_broker.request(PROJECT_ROOT, issue, { kind: 'review', round })
-
-	return answer.is_success
-		? { code: SUCCESS_EXIT_CODE, out: '' }
-		: failure(`isolated reviewer failed: ${answer.reason}`, CAUSE.INFRA)
-}
-
-// The brief goes to a file and the previous round's findings are removed, so a reviewer that writes
-// nothing reads as unfinished rather than as the last round's verdict.
-async function launch_reviewer(
-	brief: string,
-	prompt_of: PromptOf,
-	issue: string,
-	round: Round,
-): Promise<JoshResult> {
-	const target = paths()
-
-	stamp_file.write_text_stamp(target.brief, brief)
-	stamp_file.remove_stamp(target.findings)
-
-	return await run_session(
-		prompt_of(target.brief, target.findings, issue),
-		target.log,
-		issue,
-		round,
-	)
-}
-
-function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
-	return run_ship_review.read_verdict(stamp_file.read_stamp_text(paths().findings))
-}
+const {
+	attest_phase,
+	current_verdict,
+	failure,
+	josh,
+	note,
+	paths,
+	reviewed,
+	ROUND_ONE,
+	ROUND_TWO,
+	SUCCESS_EXIT_CODE,
+	tagged,
+	tagged_phase,
+} = run_ship_reviewer
 
 // A red join blocks unless the reviewer fixed findings in place: the background gate then read the
 // tree before the fixes, so its verdict describes a tree that no longer exists. The join still ran to
@@ -212,17 +98,19 @@ function record_flags(round: Round, outcome: RoundOutcome): ReadonlyArray<string
 	return round === ROUND_TWO && outcome.is_passing ? [COMMENT_FLAG] : []
 }
 
+// `kind` is the record's own flags — `--interaction` for the interaction review's `- ri:` line.
 async function record_and_route(
 	issue: string,
 	round: Round,
 	outcome_of: (verdict: ScoredVerdict) => RoundOutcome,
+	kind: ReadonlyArray<string> = [],
 ): Promise<JoshResult> {
 	const verdict = current_verdict()
 
 	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note, CAUSE.INFRA)
 
 	const outcome = outcome_of(verdict)
-	const flags = record_flags(round, outcome)
+	const flags = [...kind, ...record_flags(round, outcome)]
 	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...verdict.specs])
 
 	if (recorded.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, recorded)
@@ -232,43 +120,20 @@ async function record_and_route(
 	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out, CAUSE.FINDING)
 }
 
-// A refused attestation — the issue changed after the brief, an update left unread, no attestation —
-// is no finding: the round read what it was briefed on.
-async function attest_phase(): Promise<StepResult> {
-	return tagged(CAUSE.ATTEST, await josh(ATTEST_CHECK))
-}
-
-// A brief-minting command, then a reviewer handed what it printed.
-function reviewed(
-	open: ReadonlyArray<string>,
-	prompt_of: PromptOf,
-	issue: string,
-	round: Round,
-): ReadonlyArray<Phase> {
-	const opened = { brief: '' }
-
-	return [
-		async () => {
-			const result = await josh(open)
-
-			opened.brief = result.out
-
-			return tagged(CAUSE.CHECK, result)
-		},
-		async () => await launch_reviewer(opened.brief, prompt_of, issue, round),
-	]
-}
-
 // Fixes made in place are counted only once the scoped pair is green on the fixed tree. The reviewer is
 // asked to leave it green; this is the check that it did, and a fix it could not get green is routed as
 // the finding it still is — recorded, then stopped before the gate and the commit take it in.
-async function round_one_record(issue: string): Promise<JoshResult> {
+async function round_one_record(issue: string, kind?: ReadonlyArray<string>): Promise<JoshResult> {
 	const is_fixed = current_verdict().kind === run_ship_review.VERDICT.FIXED
 	const checked = is_fixed ? await scoped_pair() : undefined
 	const is_verified = checked === undefined || checked.code === SUCCESS_EXIT_CODE
 
-	return await record_and_route(issue, ROUND_ONE, (verdict) =>
-		is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
+	return await record_and_route(
+		issue,
+		ROUND_ONE,
+		(verdict) =>
+			is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
+		kind,
 	)
 }
 
@@ -286,7 +151,7 @@ function skipped(out: string): StepResult {
 // verify, and `round_two_stage` asks whether it is due after the commit — unless the issue changed after
 // that round's brief: the recorded round then never read it, and `josh followup` refuses the merge on it
 // (joshuafolkken/kit#4221).
-async function review_stage(issue: string, is_stale = false): Promise<StepResult> {
+async function round_one_stage(issue: string, is_stale: boolean): Promise<StepResult> {
 	const recorded = await review_record.check(Number(issue))
 
 	if (!is_stale && recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
@@ -298,6 +163,37 @@ async function review_stage(issue: string, is_stale = false): Promise<StepResult
 		attest_phase,
 		async () => await round_one_record(issue),
 	])
+}
+
+// The interaction review (joshuafolkken/kit#4276): after round 1, over a change to the run tooling,
+// scoped pair → `review:brief --interaction` → reviewer → attest → `review:record --interaction`. Its
+// fixes are verified as round 1's are; no join, since round 1 already drained the gate.
+async function interaction_stage(issue: string): Promise<StepResult> {
+	return await run_phases([
+		tagged_phase(CAUSE.CHECK, scoped_pair),
+		...reviewed(INTERACTION_BRIEF, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
+		attest_phase,
+		async () => await round_one_record(issue, [INTERACTION_FLAG]),
+	])
+}
+
+// Round 1, then the interaction review where it is due and not yet recorded — so a relaunched ship
+// whose round 1 is recorded still owes it. The first stop is returned as it is.
+async function review_stage(issue: string, is_stale = false): Promise<StepResult> {
+	const first = await round_one_stage(issue, is_stale)
+
+	if (
+		first.code !== SUCCESS_EXIT_CODE ||
+		(await review_interaction.status(Number(issue))) !== 'missing'
+	) {
+		return first
+	}
+
+	const second = await interaction_stage(issue)
+
+	if (second.code !== SUCCESS_EXIT_CODE) return second
+
+	return { code: SUCCESS_EXIT_CODE, out: [first.out, second.out].join('\n') }
 }
 
 // The round-2 verification pass, after the commit so it runs beside CI: due only when the round-1 fix

@@ -53,50 +53,33 @@ vi.mock('#scripts/review/review-stamps', () => ({
 	review_stamps: { clear_round_one: vi.fn() },
 }))
 
-// **Mocked for the same reason `review_stamps` above is, and for one more** (joshuafolkken/kit#1522):
-// `main` runs at import time, so the real check would read — and the real clear would remove — the
-// checkout-attestation record of whatever run is executing this suite. The real check would also
-// *refuse*, because a suite is not a review: importing this module would then throw before a single
-// case ran.
-const NOT_REQUIRED = vi.hoisted(() => 'not-required')
-const attest_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: NOT_REQUIRED })))
-const attest_clear_mock = vi.hoisted(() => vi.fn(async () => undefined))
-const REFUSAL_SENTINEL = vi.hoisted(() => 'attestation-refusal-sentinel')
-
+// **Mocked for the same reason `review_stamps` above is** (joshuafolkken/kit#1522): `main` runs at
+// import time, so the real clear would remove the checkout-attestation record of whatever run is
+// executing this suite.
 vi.mock('#scripts/review/review-attest', () => ({
-	review_attest: {
-		check_here: attest_check_mock,
-		clear_here: attest_clear_mock,
-		refusal_message: () => REFUSAL_SENTINEL,
-	},
+	review_attest: { clear_here: vi.fn(async () => undefined) },
 }))
 
-// The issue watch polls GitHub, so it is mocked for the same reason (joshuafolkken/kit#3773).
-const WATCH_REFUSAL = vi.hoisted(() => 'issue-watch-refusal-sentinel')
-const watch_refusal_mock = vi.hoisted(() =>
-	vi.fn(async (): Promise<string | undefined> => undefined),
-)
+// **Mocked for the same reason, and for one more**: the real review gates read that run's attestation
+// and ledger, and would *refuse*, because a suite is not a review — importing this module would then
+// throw before a single case ran. Their own cases are in `followup-review-gates.test.ts`.
+const attested_mock = vi.hoisted(() => vi.fn(async () => undefined))
 
-vi.mock('#scripts/issue/issue-watch-gate', () => ({
-	issue_watch_gate: { review_refusal_here: watch_refusal_mock },
-}))
+vi.mock(import('./followup-review-gates'), async (import_original) => {
+	const { followup_review_gates } = await import_original()
 
-// **Mocked for the same reason `review_attest` above is** (joshuafolkken/kit#2343): `main` runs at
-// import time, so the real check would read the observation ledger of whatever run is executing this
-// suite. Its default is `not-required`, so importing the module does not throw before a case runs.
-const OK = vi.hoisted(() => 'ok')
+	return {
+		followup_review_gates: {
+			...followup_review_gates,
+			assert_review_attested: attested_mock,
+			assert_review_recorded: vi.fn(async () => undefined),
+		},
+	}
+})
+
 const FEATURE_BRANCH = 'feature-branch'
 const ALLOWS_MERGE_TITLE = 'allows the merge when the verdict is %s'
 const NO_MERGE_TITLE = 'leaves a --no-merge run alone'
-const RECORD_REFUSAL_SENTINEL = vi.hoisted(() => 'record-refusal-sentinel')
-const record_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: NOT_REQUIRED })))
-
-vi.mock('#scripts/review/review-record', () => ({
-	review_record: {
-		check: record_check_mock,
-		refusal_message: () => RECORD_REFUSAL_SENTINEL,
-	},
-}))
 
 // **Mocked for the same reason** (joshuafolkken/kit#2446): the real check reads the branch diff and
 // the pull request body over the network. Its default is `exempt`, so the import-time `main` passes.
@@ -180,7 +163,7 @@ describe('prepare_merge — a pull request that has already merged', () => {
 	const BRANCH = 'merged-branch'
 
 	it('asks no merge gate and commits no ledger line', async () => {
-		attest_check_mock.mockClear()
+		attested_mock.mockClear()
 		evidence_check_mock.mockClear()
 		vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
 		await git_followup_workflow.prepare_merge(
@@ -189,7 +172,7 @@ describe('prepare_merge — a pull request that has already merged', () => {
 			BRANCH,
 		)
 
-		expect(attest_check_mock).not.toHaveBeenCalled()
+		expect(attested_mock).not.toHaveBeenCalled()
 		expect(evidence_check_mock).not.toHaveBeenCalled()
 		expect(git_followup_flush.commit_ledger_step).not.toHaveBeenCalled()
 	})
@@ -251,81 +234,6 @@ describe('is_merge_resolved', () => {
 
 	it('returns false when both --merge and --no-merge are set (--no-merge wins)', () => {
 		expect(git_followup_workflow.is_merge_resolved({ merge: true, 'no-merge': true })).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#1522. `/code-review` is forked by the harness into the *session's* working
-// directory, so a run implementing in a lane can be reviewed against a different tree — one holding
-// the previous child's already-merged code, where there is nothing wrong to find. The review returns
-// no findings and the run reads that as clean. This is the seam where that stops being free.
-describe('a merge is refused unless the review attested its checkout', () => {
-	// The whole point: the defect produced *no* signal, so silence must not read as success.
-	it.each([['missing'], ['mismatch']])('throws when the verdict is %s', async (status) => {
-		attest_check_mock.mockResolvedValueOnce({ status })
-
-		await expect(git_followup_workflow.assert_review_attested(true)).rejects.toThrow(
-			REFUSAL_SENTINEL,
-		)
-	})
-
-	it.each([[OK], [NOT_REQUIRED]])(ALLOWS_MERGE_TITLE, async (status) => {
-		attest_check_mock.mockResolvedValueOnce({ status })
-
-		await expect(git_followup_workflow.assert_review_attested(true)).resolves.toBeUndefined()
-	})
-
-	// joshuafolkken/kit#3773: an attested review of the earlier specification is still refused.
-	it('throws on an issue update the review did not read', async () => {
-		attest_check_mock.mockResolvedValueOnce({ status: OK })
-		watch_refusal_mock.mockResolvedValueOnce(WATCH_REFUSAL)
-
-		await expect(git_followup_workflow.assert_review_attested(true)).rejects.toThrow(WATCH_REFUSAL)
-	})
-
-	// A `--no-merge` run has not reached the gate this record guards, and nothing merges there. The
-	// clearing half moved with the run's tail — `git-followup-finish.test.ts` covers it.
-	it(NO_MERGE_TITLE, async () => {
-		attest_check_mock.mockClear()
-		await git_followup_workflow.assert_review_attested(false)
-
-		expect(attest_check_mock).not.toHaveBeenCalled()
-	})
-})
-
-// joshuafolkken/kit#2343. Recording a review round was prose, and across eleven merges the call was
-// never made. This is the seam where an unrecorded round stops being free: the merge is refused
-// unless the round left a line for its issue.
-describe('a merge is refused unless the review round was recorded', () => {
-	const RECORDED_ISSUE = '2343'
-
-	it('throws when the round is missing', async () => {
-		record_check_mock.mockResolvedValueOnce({ status: 'missing' })
-
-		await expect(
-			git_followup_workflow.assert_review_recorded(true, RECORDED_ISSUE),
-		).rejects.toThrow(RECORD_REFUSAL_SENTINEL)
-	})
-
-	it.each([[OK], [NOT_REQUIRED]])(ALLOWS_MERGE_TITLE, async (status) => {
-		record_check_mock.mockResolvedValueOnce({ status })
-
-		await expect(
-			git_followup_workflow.assert_review_recorded(true, RECORDED_ISSUE),
-		).resolves.toBeUndefined()
-	})
-
-	it(NO_MERGE_TITLE, async () => {
-		record_check_mock.mockClear()
-		await git_followup_workflow.assert_review_recorded(false, RECORDED_ISSUE)
-
-		expect(record_check_mock).not.toHaveBeenCalled()
-	})
-
-	it('carries on when no issue number can identify the round', async () => {
-		record_check_mock.mockClear()
-		await git_followup_workflow.assert_review_recorded(true, undefined)
-
-		expect(record_check_mock).not.toHaveBeenCalled()
 	})
 })
 

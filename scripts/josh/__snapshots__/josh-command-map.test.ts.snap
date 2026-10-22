@@ -960,7 +960,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:brief": [
-      "[--round <1|2>] | --level-only [--staged] [--json]",
+      "[--round <1|2>] | --interaction | --level-only [--staged] [--json]",
       "automation",
       [
         "files",
@@ -974,7 +974,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:record": [
-      "--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>",
+      "--issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | --check [--interaction] --issue <N>",
       "automation",
       [
         "files",

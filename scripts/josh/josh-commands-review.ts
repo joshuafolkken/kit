@@ -17,11 +17,16 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone)',
 		category: 'AI tools',
-		reference: ['[--round <1|2>] | --level-only [--staged] [--json]', 'automation', ['files']],
+		reference: [
+			'[--round <1|2>] | --interaction | --level-only [--staged] [--json]',
+			'automation',
+			['files'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'round 1' },
 				{ arguments: '--round 2', note: 'verification pass, scoped to the fix delta' },
+				{ arguments: '--interaction', note: 'the interaction review of a run-tooling change' },
 				{ arguments: LEVEL_ONLY, note: 'the level alone (pre-commit review)' },
 				{ arguments: '--level-only --json', note: 'level and reason, machine-readable' },
 			],

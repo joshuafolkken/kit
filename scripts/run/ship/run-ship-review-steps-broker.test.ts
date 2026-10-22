@@ -25,6 +25,10 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
+// Never `missing`, so these cases run no interaction review (joshuafolkken/kit#4276).
+vi.mock('#scripts/review/review-interaction', () => ({
+	review_interaction: { status: async () => undefined },
+}))
 vi.mock('#scripts/review/review-record', () => ({
 	review_record: { check: vi.fn(async () => ({ status: 'missing' })) },
 }))
