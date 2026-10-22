@@ -104,6 +104,8 @@ interface RowRead {
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
 
+const NO_READ: RowRead = { titles: new Map(), labels: new Map() }
+
 interface Overlay {
 	plan: BoardPlan
 	statuses: ReadonlyMap<number, ItemStatus>
@@ -366,9 +368,8 @@ const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreache
 function local_layout_of(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
+	read: RowRead = NO_READ,
 ): BoardLayout {
-	const read = { titles: new Map(), labels: new Map() }
-
 	return {
 		...EMPTY_LAYOUT,
 		active: active_rows(statuses, read),

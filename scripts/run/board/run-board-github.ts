@@ -5,6 +5,7 @@ import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_idle } from './run-board-idle'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
+import type { Known } from './run-board-snapshot'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
 import {
 	run_board_status,
@@ -34,9 +35,11 @@ interface Gather {
 	pace: Pace
 }
 
-// A title the board once knew stays known, so an issue that left the open listing keeps its name.
-function with_titles(plan: BoardPlan, previous: BoardPlan | undefined): BoardPlan {
-	const titles = new Map([...(previous?.context.titles ?? []), ...plan.context.titles])
+// A title the board once knew stays known, so an issue that left the open listing keeps its name —
+// one the last board's snapshot named among them.
+function with_titles(plan: BoardPlan, state: BoardState): BoardPlan {
+	const previous = state.plan?.context.titles ?? state.known.titles
+	const titles = new Map([...previous, ...plan.context.titles])
 
 	return { ...plan, context: { ...plan.context, titles } }
 }
@@ -73,7 +76,7 @@ function fold_plan(state: BoardState): BoardState {
 
 	return {
 		...settled,
-		plan: with_titles(answer.value, state.plan),
+		plan: with_titles(answer.value, state),
 		fetched_ms: state.attempted_ms,
 		failed_ms: undefined,
 	}
@@ -183,6 +186,22 @@ async function settle(pending: Fetch<unknown> | undefined, pace: Pace): Promise<
 	if (pending !== undefined && pace === 'settled') await pending.landed
 }
 
+// The titles and labels the board names its rows by: the plan's once it has landed, the snapshot's before.
+function known_of(state: BoardState): Known {
+	if (state.plan === undefined) return state.known
+
+	return { titles: state.plan.context.titles, labels: state.plan.labels }
+}
+
+// Each read that landed rewrites the snapshot whole, for the board opened next on this run.
+function keep_snapshot(before: BoardState, after: BoardState, gather: Gather): void {
+	if (after.plan === before.plan && after.closed === before.closed) return
+
+	const run_started_ms = gather.local.started_ms
+
+	gather.ports.snapshot?.save({ run_started_ms, ...known_of(after), closed: after.closed })
+}
+
 // Folds what landed and launches what is due — the plan first, since the closed children are read off
 // the plan's listing.
 async function gather_github(state: BoardState, gather: Gather): Promise<BoardState> {
@@ -194,10 +213,14 @@ async function gather_github(state: BoardState, gather: Gather): Promise<BoardSt
 
 	await settle(closing.closed_fetch, gather.pace)
 
-	return fold_closed(closing)
+	const gathered = fold_closed(closing)
+
+	keep_snapshot(state, gathered, gather)
+
+	return gathered
 }
 
-const run_board_github = { PLAN_RETRY_MS, gather_github, open_read_of, statuses_for }
+const run_board_github = { PLAN_RETRY_MS, gather_github, known_of, open_read_of, statuses_for }
 
 export { run_board_github }
 export type { Gather }
