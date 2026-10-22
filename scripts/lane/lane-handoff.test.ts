@@ -139,6 +139,31 @@ describe('lane_handoff.merge_wait_reader', () => {
 	})
 })
 
+// joshuafolkken/kit#4466 round 2: a followup stop waiting for a place queues the waiters behind it, so only
+// a live supervisor's mark counts.
+function place_ship_at(result: ShipResult, is_place_waiting: boolean): void {
+	run_ship_stage.mark_place_waiting(ship_at(result, false), is_place_waiting)
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(REPOSITORY)
+}
+
+describe('lane_handoff.is_place_waiting', () => {
+	it('reads a running ship marked waiting for a place as waiting', () => {
+		place_ship_at('running', true)
+
+		expect(lane_handoff.is_place_waiting(ISSUE, '/lane')).toBe(true)
+		expect(run_ship_stage.record_path).toHaveBeenCalledWith(REPOSITORY, ISSUE)
+	})
+
+	it.each([
+		['an unmarked running ship', 'running', false],
+		['a marked ship that is no longer running', 'failed', true],
+	] as const)('reads %s as not waiting', (_case, result, is_marked) => {
+		place_ship_at(result, is_marked)
+
+		expect(lane_handoff.is_place_waiting(ISSUE, '/lane')).toBe(false)
+	})
+})
+
 describe('lane_handoff.ship_running_since', () => {
 	const LAUNCHED_AT = 1000
 

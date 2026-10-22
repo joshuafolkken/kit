@@ -10,13 +10,9 @@ const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
-const limit_mock = vi.hoisted(() => vi.fn())
-const lane_use_mock = vi.hoisted(() => vi.fn())
+const place_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/lane/lane-capacity', () => ({
-	lane_capacity: { lane_limit: limit_mock, seated_limit: (limit: number): number => limit },
-}))
-vi.mock('#scripts/backlog/backlog-ready', () => ({ backlog_ready: { lane_use: lane_use_mock } }))
+vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: place_mock } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -67,8 +63,6 @@ const ARGS = {
 const SERVER = 'server-1'
 const NEW_SERVER = 'server-2'
 const STOPPED = { is_success: false, reason: 'the broker stopped serving before it answered' }
-const LIMIT = 4
-const USE = { occupied: 1, seated: 1, unknown: [] }
 
 beforeEach(() => {
 	emit_mock.mockReset()
@@ -84,8 +78,7 @@ beforeEach(() => {
 })
 
 beforeEach(() => {
-	limit_mock.mockReset().mockResolvedValue({ kind: 'limit', limit: LIMIT })
-	lane_use_mock.mockReset().mockResolvedValue(USE)
+	place_mock.mockReset().mockResolvedValue(undefined)
 })
 
 describe('run_ship_return.return_control', () => {
@@ -153,41 +146,22 @@ describe('run_ship_return.return_control on a merge wait that needs judgement', 
 // joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
 // place before it relaunches, keeping its stop prompt rather than handing the issue to the driver.
 describe('run_ship_return.return_control on a merge wait past the lane limit', () => {
-	it('waits for a place, then relaunches the followup stop with its output', async () => {
-		lane_use_mock
-			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 1 })
-			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 1 })
-			.mockResolvedValue({ ...USE, occupied: LIMIT })
-
+	it('waits for a place for its lane before it relaunches the stop with its output', async () => {
 		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
 			'relaunched',
 		)
-		expect(lane_use_mock).toHaveBeenCalledTimes(3)
+		expect(place_mock).toHaveBeenCalledWith(LANE, 'followup')
+		expect(place_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			relaunch_mock.mock.invocationCallOrder[0] ?? 0,
+		)
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(OUTPUT)
 	})
 
-	it('relaunches once the wait runs out with the lanes still full', async () => {
-		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
+	it('waits for no place past the ship-stop cap', async () => {
+		is_over_mock.mockResolvedValue(true)
+		await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)
 
-		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
-			'relaunched',
-		)
-	})
-
-	it('relaunches a stop before the followup however many lanes are working', async () => {
-		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
-
-		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('relaunched')
-		expect(lane_use_mock).not.toHaveBeenCalled()
-	})
-
-	it('relaunches a followup stop when the lane limit cannot be read', async () => {
-		limit_mock.mockResolvedValue({ kind: 'invalid', problem: 'JOSH_LANE_LIMIT is not a number' })
-		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
-
-		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
-			'relaunched',
-		)
+		expect(place_mock).not.toHaveBeenCalled()
 	})
 })
 

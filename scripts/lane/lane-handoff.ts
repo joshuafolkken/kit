@@ -74,6 +74,16 @@ async function merge_wait_reader(read: StartRead): Promise<(issue: string) => bo
 	return (issue) => repository !== undefined && is_merge_waiting(repository, issue, read)
 }
 
+// The live ship for `issue` in the repository `directory` belongs to waits for a lane place before it
+// relaunches its child (`run-ship-place.ts`); a dead supervisor's mark reads as no wait.
+function is_place_waiting(issue: string, directory: string): boolean {
+	const repository = git_common_directory.repository(directory)
+
+	if (repository === undefined || !is_ship_running(issue, directory)) return false
+
+	return run_ship_stage.read_place_waiting(run_ship_stage.record_path(repository, issue))
+}
+
 // When the detached ship for `issue` that is still live was launched, or `undefined` where none is.
 function ship_running_since(issue: string, directory: string): number | undefined {
 	const repository = git_common_directory.repository(directory)
@@ -92,6 +102,7 @@ function is_handed_off(directory: string, source: MarkerSource = process.env): b
 
 const lane_handoff = {
 	is_handed_off,
+	is_place_waiting,
 	is_ship_running,
 	is_ship_succeeded,
 	merge_wait_reader,

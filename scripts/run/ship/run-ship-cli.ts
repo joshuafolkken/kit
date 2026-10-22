@@ -288,7 +288,7 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 
 	// A supervisor that died mid-followup left its wait marked; this one waits on nothing yet.
 	record(target, (path) => {
-		run_ship_stage.mark_merge_waiting(path, false)
+		run_ship_stage.clear_waits(path)
 	})
 
 	return { target, done, state, started }

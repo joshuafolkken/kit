@@ -1,7 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { backlog_ready } from '#scripts/backlog/backlog-ready'
-import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -11,6 +9,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { ShipSection } from './run-ship'
 import { run_ship_next, type ShipResume } from './run-ship-next'
+import { run_ship_place } from './run-ship-place'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_relaunch_cap } from './run-ship-relaunch-cap'
 import { run_ship_stage, type Stage } from './run-ship-stage'
@@ -40,9 +39,6 @@ const OPENAI_PROVIDER = 'openai'
 // A minute of polling, long enough for the supervisor's 5-second lane scan to reopen a server.
 const SERVING_POLL_MS = 1000
 const SERVING_POLLS = 60
-// An hour of lane counts, half a minute apart: about two lanes' median run (`lane:stats`).
-const PLACE_POLL_MS = 30_000
-const PLACE_POLLS = 120
 
 type ReturnOutcome = 'relaunched' | 'recorded' | 'parked' | 'redispatch'
 
@@ -138,42 +134,6 @@ async function parked(issue: string, stage: Stage, resume: ShipResume): Promise<
 	return 'recorded'
 }
 
-// **A followup stop past the lane limit waits for a place, then relaunches**: its lane held no place
-// while it waited (`backlog-occupied.ts`), so the next launch may have taken it, and a child started at
-// once would run past the limit (joshuafolkken/kit#4466). The stopped lane counts again while this
-// supervisor waits, so the driver launches nothing into the place it waits for. The relaunch keeps the
-// ship-stop prompt and the relaunch cap, which a driver re-dispatch would lose. An unreadable limit or
-// lane count relaunches at once, and so does a place that does not free within the wait.
-async function is_lane_over_limit(): Promise<boolean> {
-	const limit = await lane_capacity.lane_limit()
-
-	if (limit.kind !== 'limit') return false
-
-	const use = await backlog_ready.lane_use()
-
-	return use.occupied > lane_capacity.seated_limit(limit.limit)
-}
-
-async function is_over_limit(stage: Stage): Promise<boolean> {
-	if (stage !== run_ship_stage.STAGE.FOLLOWUP) return false
-
-	try {
-		return await is_lane_over_limit()
-	} catch {
-		return false
-	}
-}
-
-async function await_place(stage: Stage): Promise<void> {
-	for (let polled = 0; polled < PLACE_POLLS; polled += 1) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each check waits on a lane the previous one saw busy
-		if (!(await is_over_limit(stage))) return
-
-		// eslint-disable-next-line no-await-in-loop -- polling: the wait between two lane counts
-		await sleep(PLACE_POLL_MS)
-	}
-}
-
 // `output` is the failed stage's own output: the relaunched child's prompt carries its tail.
 async function return_control(
 	issue: string,
@@ -191,7 +151,9 @@ async function return_control(
 	if (lane === undefined) return 'recorded'
 
 	if (await run_ship_relaunch_cap.is_over(issue)) return await parked(issue, stage, resume)
-	await await_place(stage)
+	// A followup stop waits for a lane place, keeping the ship-stop prompt and the relaunch cap a driver
+	// re-dispatch would lose (`run-ship-place.ts`).
+	await run_ship_place.await_place(lane, stage)
 
 	const stop = { stage, ...resume, context: await run_ship_stop_context.build(issue, output) }
 	// **A broker that stopped serving before the stop is waited for**: one that died during the review left

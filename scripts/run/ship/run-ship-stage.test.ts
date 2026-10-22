@@ -244,6 +244,35 @@ describe('run_ship_stage record — the merge wait (joshuafolkken/kit#4466)', ()
 		writeFileSync(target, JSON.stringify({ done: [], started: [STAGE.FOLLOWUP] }))
 
 		expect(run_ship_stage.read_merge_waiting(target)).toBe(false)
+		expect(run_ship_stage.read_place_waiting(target)).toBe(false)
+	})
+})
+
+describe('run_ship_stage record — the place wait (joshuafolkken/kit#4466)', () => {
+	it('keeps the place wait apart from the merge wait until it is taken down', () => {
+		const target = fresh_target()
+
+		run_ship_stage.mark_place_waiting(target, true)
+
+		expect(run_ship_stage.read_place_waiting(target)).toBe(true)
+		expect(run_ship_stage.read_merge_waiting(target)).toBe(false)
+
+		run_ship_stage.mark_place_waiting(target, false)
+
+		expect(run_ship_stage.read_place_waiting(target)).toBe(false)
+	})
+
+	it('takes both waits down for a successor supervisor and keeps the stages', () => {
+		const target = fresh_target()
+
+		run_ship_stage.mark_done(target, STAGE.COMMIT)
+		run_ship_stage.mark_merge_waiting(target, true)
+		run_ship_stage.mark_place_waiting(target, true)
+		run_ship_stage.clear_waits(target)
+
+		expect(run_ship_stage.read_merge_waiting(target)).toBe(false)
+		expect(run_ship_stage.read_place_waiting(target)).toBe(false)
+		expect(run_ship_stage.read_done(target).has(STAGE.COMMIT)).toBe(true)
 	})
 })
 

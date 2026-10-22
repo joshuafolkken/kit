@@ -1,8 +1,8 @@
 {
-	"reason": "Round-3 fix: free_lanes passes the holder count as the seated count, so a merge-waiting holder frees its limit place but keeps its port seat and lane:open is not offered past the last seat",
+	"reason": "Round-2 fix: followup stops waiting for a lane place queue in issue order through a place-wait mark on the ship stage record (run-ship-place.ts), so waiters past the limit no longer each count themselves and wait out the hour together",
 	"date": "2026-10-22",
 	"growth": {
-		"scripts.code_lines": 138,
+		"scripts.code_lines": 203,
 		"ai_cost.on_demand_bytes": 346
 	}
 }
