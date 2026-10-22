@@ -1,0 +1,7 @@
+{
+	"reason": "One toolchain input list (scripts/gate/toolchain-inputs.ts) shared by the metrics base cache, hook bundle stamp, gate verdicts and the ESLint daemon, whose staleness now reads a content fingerprint record instead of file times, recorded by the edit hook too for the daemons it starts (#4496)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 65
+	}
+}
