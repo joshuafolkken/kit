@@ -47,6 +47,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "rtr": "retrospective",
     "ruv": "rule:value",
     "rvf": "review:findings",
+    "rvs": "review:stops",
     "sd": "cspell:dot",
     "st": "start",
     "sy": "sync",
@@ -992,6 +993,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "review:round2": [
       "[--round-1-closed] [--json]",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "review:stops": [
+      "[--period <days>]",
+      "developer",
       [
         "none",
       ],

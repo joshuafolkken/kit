@@ -68,6 +68,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
 | `josh review:findings` · `josh rvf` | — | developer | files | Count review findings by category from the observation ledger |
 | `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file> ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
+| `josh review:stops` · `josh rvs` | `[--period <days>]` | developer | none | List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence |
 
 ## Versioning
 

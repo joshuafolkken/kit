@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
@@ -186,9 +187,13 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 }
 
 // Every stop goes to the lane ledger — supervised, in an agent's own turn, or a lane child's preflight
-// before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason.
+// before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason. A review
+// stop's deciding findings also go, whole, to the durable stop log `review:stops` reads.
 async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
-	await lane_ledger.record_stop(run_ship_stop_cause.record_of(Number(args.number), stage, failed))
+	const issue = Number(args.number)
+
+	await lane_ledger.record_stop(run_ship_stop_cause.record_of(issue, stage, failed))
+	review_stop_log.record({ issue, stage, findings: run_ship_stop_cause.details_of(stage, failed) })
 }
 
 // A detached supervisor hands the stopped stage back (`run-ship-return.ts`); a

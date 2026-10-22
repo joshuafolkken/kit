@@ -66,7 +66,10 @@ function window_of(period_days: number, now_ms: number): StatsWindow {
 	return { since_ms: now_ms - period_days * MS_PER_DAY, until_ms: now_ms }
 }
 
-function in_window(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): Array<LedgerEntry> {
+function in_window<T extends { at: string }>(
+	entries: ReadonlyArray<T>,
+	window: StatsWindow,
+): Array<T> {
 	return entries.filter((entry) => {
 		const at = Date.parse(entry.at)
 

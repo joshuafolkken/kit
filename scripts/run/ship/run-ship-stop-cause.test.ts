@@ -8,6 +8,8 @@ import { run_ship_stop_cause } from './run-ship-stop-cause'
 
 const { CAUSE, cause_of } = run_ship_stop_cause
 const RATE_LIMITED = 'CodeRabbit: Review rate limit exceeded'
+const MEDIUM_KIND = 'bug-risks:medium'
+const MEDIUM_SPEC = `${MEDIUM_KIND}:a.ts`
 
 describe('run_ship_stop_cause.cause_of', () => {
 	it.each([
@@ -132,7 +134,7 @@ describe('run_ship_stop_cause.record_of — the finding kinds of a review stop',
 				issue: 7,
 				reason: stage,
 				cause: CAUSE.FINDING,
-				findings: ['bug-risks:medium'],
+				findings: [MEDIUM_KIND],
 			})
 		},
 	)
@@ -151,5 +153,27 @@ describe('run_ship_stop_cause.record_of — the finding kinds of a review stop',
 		['review', 'Gate RED — the review verdict is blocked'],
 	] as const)('names no finding kinds for a %s stop no finding decided', (stage, body) => {
 		expect(run_ship_stop_cause.record_of(7, stage, { body })).not.toHaveProperty('findings')
+	})
+})
+
+// joshuafolkken/kit#4519: a review stop hands each deciding finding, whole, to the durable stop log.
+describe('run_ship_stop_cause.details_of — the findings of a review stop, whole', () => {
+	it('carries the file:line and first sentence of each deciding finding', () => {
+		const body = `${MEDIUM_SPEC}:3 — stale. More.\ntests:low:b.ts\nreview found High/Medium`
+
+		expect(run_ship_stop_cause.details_of('review', { body })).toStrictEqual([
+			{ kind: MEDIUM_KIND, location: 'a.ts:3', sentence: 'stale.' },
+		])
+	})
+
+	it.each([
+		['review', `${api_auth.AUTH_FAILURE_NOTE}\n${MEDIUM_SPEC}`],
+		['gate', MEDIUM_SPEC],
+	] as const)('names no finding for a %s stop no finding decided', (stage, body) => {
+		expect(run_ship_stop_cause.details_of(stage, { body })).toStrictEqual([])
+	})
+
+	it('names no finding for a stop with no output', () => {
+		expect(run_ship_stop_cause.details_of('review')).toStrictEqual([])
 	})
 })

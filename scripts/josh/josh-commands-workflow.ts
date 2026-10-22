@@ -208,6 +208,16 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The reader over the durable review stop log: each finding that stopped a ship, with its file:line
+	// and first sentence, so a period's stops are classified without reading ship logs.
+	'review:stops': {
+		script: 'scripts/review/review-stops-cli.ts',
+		description:
+			'List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence',
+		category: 'Workflow',
+		reference: ['[--period <days>]', 'developer', ['none']],
+		usage: { examples: [{ arguments: '--period 30', note: 'the last 30 days (default 7)' }] },
+	},
 	// The reader over what `review:record` wrote: each recurring category’s
 	// count, and the number of zero-finding rounds that distinguishes a quiet category from an unwatched one.
 	'review:findings': {
