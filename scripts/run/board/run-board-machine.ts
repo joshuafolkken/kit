@@ -198,7 +198,6 @@ function line_of(gauges: MachineGauges | undefined, width = 0): string | undefin
 }
 
 const run_board_machine = {
-	CPU_RED,
 	CPU_YELLOW,
 	GAP,
 	MEMORY_RED,
@@ -210,7 +209,6 @@ const run_board_machine = {
 	line_of,
 	percent_text,
 	rate_text,
-	threshold_alert,
 }
 
 export { run_board_machine }

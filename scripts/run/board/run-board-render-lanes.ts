@@ -33,7 +33,8 @@ const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, 
 interface LaneCells {
 	usages: LaneUsages
 	scale: UsageScale
-	// Each live row's share of the header's yellow thresholds, counted once a frame.
+	// Where each live row's gauges are full — its share of the header's yellow thresholds, counted once a
+	// frame.
 	limits: CellLimits
 	gauge: number
 	// The widest row number of the section, so the kind icon and title after it start in one column.
@@ -53,8 +54,8 @@ function column_widths(gauge: number): Array<number> {
 	)
 }
 
-// A figure's cells, each right-aligned in its column — shaded at `limits` where a lane row passes its
-// share, at the whole machine's thresholds where not.
+// A figure's cells, each right-aligned in its column — full at `limits` where a lane row passes its
+// share, at the whole machine where not.
 function column_cells(
 	figure: UsageFigure | undefined,
 	scale: UsageScale,
