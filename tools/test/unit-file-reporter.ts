@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { unit_count_file } from '#scripts/test/unit-count-file'
+import { test_module_elapsed, type TimedModule } from '#tools/test/test-module-elapsed'
 import type { Reporter, TestModule } from 'vitest/node'
 
 // Each unit run's slowest test files, written to the lane ledger once the run ends
@@ -22,32 +23,6 @@ interface UnitFileRecord {
 
 type UnitFilesSink = (files: ReadonlyArray<UnitFileRecord>) => Promise<void>
 
-// The part of vitest's `TestModule` this reads, so a test hands it a plain object.
-interface TimedModule {
-	moduleId: string
-	diagnostic: () => Pick<
-		ReturnType<TestModule['diagnostic']>,
-		| 'environmentSetupDuration'
-		| 'prepareDuration'
-		| 'collectDuration'
-		| 'setupDuration'
-		| 'duration'
-	>
-}
-
-// From the file's environment setup to its last test: a stall in an import shows as well as one in a test.
-function elapsed_of(module: TimedModule): number {
-	const diagnostic = module.diagnostic()
-
-	return Math.round(
-		diagnostic.environmentSetupDuration +
-			diagnostic.prepareDuration +
-			diagnostic.collectDuration +
-			diagnostic.setupDuration +
-			diagnostic.duration,
-	)
-}
-
 function slowest_files(
 	modules: ReadonlyArray<TimedModule>,
 	root: string = process.cwd(),
@@ -55,7 +30,7 @@ function slowest_files(
 	return modules
 		.map((module) => ({
 			file: path.relative(root, module.moduleId),
-			elapsed_ms: elapsed_of(module),
+			elapsed_ms: test_module_elapsed.elapsed_of(module),
 		}))
 		.toSorted((left, right) => right.elapsed_ms - left.elapsed_ms)
 		.slice(0, SLOWEST_COUNT)
@@ -114,5 +89,4 @@ const unit_file_reporter = {
 	slowest_files,
 }
 
-export type { TimedModule }
 export { unit_file_reporter }

@@ -458,6 +458,8 @@ jobs:
   # its files over more machines. `fail-fast: false` keeps a red shard from cancelling the others,
   # so one run reports every failing file. The `Checks` aggregate below reads `needs.unit.result`,
   # which for a matrix is `success` only when every shard succeeded — no change there is needed.
+  # The shards split by the recorded per-file durations in `tools/test/unit-durations.json`, not by
+  # file count, so they finish together (`tools/test/duration-shard.ts`, joshuafolkken/kit#4467).
   # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:

@@ -108,6 +108,12 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_PRE_PUSH_FORCE`   | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).                   |
 | `JOSH_PRE_COMMIT_FORCE` | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands-automation.md#josh-pre-commit-type-check)). |
 
+### Unit tests
+
+| Variable              | Required | Default | Used when                                                                                                                                                         |
+| --------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_UNIT_DURATIONS` | No       | off     | `record` writes each run file's duration into `tools/test/unit-durations.json`, which `josh test:unit --shard=<index>/<count>` balances the shards by (kit only). |
+
 ### Agent guards
 
 Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard off.

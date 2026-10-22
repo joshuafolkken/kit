@@ -2,7 +2,8 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { unit_count_file } from '#scripts/test/unit-count-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { unit_file_reporter, type TimedModule } from './unit-file-reporter'
+import type { TimedModule } from './test-module-elapsed'
+import { unit_file_reporter } from './unit-file-reporter'
 
 // joshuafolkken/kit#4451: a unit run whose wall time far outran its CPU left no record of the file it
 // stalled on, so each run's slowest files reach the lane ledger.
