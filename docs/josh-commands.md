@@ -299,6 +299,23 @@ On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in detail".
 
+### `josh test:pinned`
+
+<!-- usage: test:pinned -->
+
+Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on.
+
+```bash
+pnpm josh test:pinned           # unpinned / unchecked <file>:<line> lines
+pnpm josh test:pinned --max 5   # check at most 5 hunks; the rest print as unchecked
+```
+
+<!-- /usage -->
+
+Exits non-zero when any checked hunk is unpinned; an unchecked hunk alone does not fail the run.
+
+Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:pinned` in detail".
+
 ### `josh test:e2e`
 
 <!-- usage: test:e2e -->

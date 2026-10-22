@@ -1,4 +1,4 @@
-import { mkdtemp, rm, symlink } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_worktree } from './git-worktree'
@@ -60,7 +60,24 @@ async function with_tree<T>(
 	}
 }
 
-const base_tree = { NODE_MODULES, with_tree }
+async function copy_one(tree: string, file: string): Promise<void> {
+	const target = path.join(tree, file)
+
+	await mkdir(path.dirname(target), { recursive: true })
+	await copyFile(file, target)
+}
+
+// The caller's working-tree files into the tree at the same relative paths. Each file has its own
+// target, and a recursive `mkdir` tolerates a sibling creating the same parent.
+async function copy_in(tree: string, files: ReadonlyArray<string>): Promise<void> {
+	await Promise.all(
+		files.map(async (file) => {
+			await copy_one(tree, file)
+		}),
+	)
+}
+
+const base_tree = { NODE_MODULES, copy_in, with_tree }
 
 export type { BaseTree }
 export { base_tree }

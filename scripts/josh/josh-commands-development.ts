@@ -218,6 +218,20 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['git', 'processes']],
 		usage: { examples: [{ arguments: '', note: 'red, green, no-test or test-only' }] },
 	},
+	'test:pinned': {
+		script: 'scripts/test/test-pinned-main.ts',
+		description:
+			'Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on',
+		category: 'Development',
+		reference: ['[--max <n>]', 'developer', ['git', 'processes']],
+		...gate_plan.DIRECT_UNIT_CLAIM,
+		usage: {
+			examples: [
+				{ arguments: '', note: 'unpinned / unchecked <file>:<line> lines' },
+				{ arguments: '--max 5', note: 'check at most 5 hunks; the rest print as unchecked' },
+			],
+		},
+	},
 	disposition: {
 		script: 'scripts/review/disposition-cli.ts',
 		description:
