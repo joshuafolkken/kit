@@ -74,8 +74,9 @@ interface MergeContext {
 	// The merged pull request that closes the child, when GitHub left the child OPEN after the merge —
 	// the one `merged` child whose issue this command still has to close.
 	merged_pr?: string | undefined
-	// The outage is a ship stop no relaunch answered: re-dispatched, but not added to the streak.
-	is_unanswered?: boolean | undefined
+	// The outage is not an API outage (`EndingSignals.is_streak_exempt`): re-dispatched, but not added
+	// to the streak.
+	is_streak_exempt?: boolean | undefined
 }
 
 interface FailedResult {
@@ -416,7 +417,7 @@ interface OutageResult {
 // outage streak against its guard. Returns `is_refused: true` without touching labels when the carry
 // record rejected the count.
 async function count_outage(ctx: MergeContext): Promise<ApplyCarryResult> {
-	if (ctx.is_unanswered !== true) return await apply_carry(ctx, run_merge.change_of('outage'))
+	if (ctx.is_streak_exempt !== true) return await apply_carry(ctx, run_merge.change_of('outage'))
 
 	const refused = await refused_carry(ctx)
 

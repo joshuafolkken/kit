@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_merge, type ChildOutcome } from './run-merge'
 
 // joshuafolkken/kit#3908: the readings `run:merge` takes beside a returned child's GitHub state — a
 // person's withdrawal among them — and the outcome they decide.
@@ -6,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const events_mock = vi.hoisted(() => vi.fn())
 const closing_pr_mock = vi.hoisted(() => vi.fn())
 const merged_mock = vi.hoisted(() => vi.fn())
+const restart_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { current_events: events_mock },
@@ -25,6 +27,10 @@ vi.mock('./run-merge-steps', () => ({
 
 vi.mock('./run-merge-ship', () => ({
 	run_merge_ship: { is_unanswered: vi.fn().mockResolvedValue(false) },
+}))
+
+vi.mock('./run-merge-restart', () => ({
+	run_merge_restart: { is_host_restart: restart_mock },
 }))
 
 const { run_merge_signals } = await import('./run-merge-signals')
@@ -58,6 +64,43 @@ beforeEach(() => {
 	events_mock.mockReset().mockResolvedValue([])
 	closing_pr_mock.mockReset().mockResolvedValue(undefined)
 	merged_mock.mockReset().mockResolvedValue(false)
+	restart_mock.mockReset().mockResolvedValue(false)
+})
+
+// joshuafolkken/kit#4540: six children a host restart killed were each counted a failure, and the
+// third tripped the failure guard.
+const RESTARTED = ['4497', '4509', '4513', '4516']
+
+async function outcome_of_child(child: string): Promise<ChildOutcome> {
+	const context = { ...CONTEXT, child }
+	const signals = await run_merge_signals.read_signals(context as Context, OPEN_READ)
+
+	return run_merge_signals.outcome_of(OPEN_READ, signals)
+}
+
+// The failures the children's outcomes add to the carry record, in the order `run:merge` reads them.
+async function failures_of(children: ReadonlyArray<string>): Promise<number> {
+	const outcomes = await Promise.all(children.map(async (child) => await outcome_of_child(child)))
+
+	return outcomes.filter((outcome) => run_merge.change_of(outcome)?.failures !== undefined).length
+}
+
+describe('run_merge_signals — children a host restart killed', () => {
+	it('reads a killed child as an outage left out of the run-wide streak', async () => {
+		restart_mock.mockResolvedValue(true)
+
+		expect(await signals_of(OPEN_READ)).toMatchObject({ is_outage: true, is_streak_exempt: true })
+	})
+
+	it('does not trip the failure guard however many the restart killed', async () => {
+		restart_mock.mockResolvedValue(true)
+
+		expect(run_merge.is_guard_tripped(await failures_of(RESTARTED))).toBe(false)
+	})
+
+	it('still counts a child that ended itself a failure', async () => {
+		expect(await failures_of(RESTARTED)).toBe(RESTARTED.length)
+	})
 })
 
 describe('run_merge_signals.read_signals — the readings beside the GitHub state', () => {

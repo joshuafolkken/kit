@@ -1,0 +1,7 @@
+{
+	"reason": "Restart detection reads the newest launch's own exit record (last log line) rather than any earlier launch's, so a surviving temp root cannot mask a restart-killed child; plus the host-restart outage path itself",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

@@ -22,7 +22,7 @@ const CONTEXT = {
 	owner: run_carry.NO_OWNER,
 }
 const CHILD_LANE = { issue: CONTEXT.child, directory: `/w/.kit-lanes/${CONTEXT.child}` }
-const UNANSWERED = { ...CONTEXT, is_unanswered: true }
+const UNANSWERED = { ...CONTEXT, is_streak_exempt: true }
 const OWNED_CARRY: RunCarry = {
 	invocation: 'backlogrun #3964 #3936 #3961',
 	started_at: new Date().toISOString(),
