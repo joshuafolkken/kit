@@ -47,6 +47,10 @@ function record(overrides: Partial<RunCarry> = {}): RunCarry {
 	}
 }
 
+function unreadable_process(): undefined {
+	return undefined
+}
+
 function modified_at(ms: number | undefined): () => number | undefined {
 	return () => ms
 }
@@ -172,5 +176,23 @@ describe('an owner whose process restarted inside the same conversation', () => 
 		const later = new Date(Date.now() + run_carry_conversation.CONVERSATION_QUIET_MS + 1)
 
 		expect(run_carry.is_owner_live(restarted, later)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4539: a headless parent is never resumed into a new process, so its fresh
+// transcript says nothing about it — a gone pid is a gone owner at once.
+describe('a headless owner whose process has gone', () => {
+	const headless = record({ owner_pid: DEAD_PID, owner_start: undefined, is_owner_headless: true })
+
+	it('reads as gone even while its transcript is fresh', () => {
+		expect(run_carry.is_owner_live(headless)).toBe(false)
+	})
+
+	it('leaves an attached owner judged by its conversation', () => {
+		expect(run_carry.is_owner_live({ ...headless, is_owner_headless: false })).toBe(true)
+	})
+
+	it('still reads as live when its process cannot be read', () => {
+		expect(run_carry.is_owner_live(headless, NOW, unreadable_process)).toBe(true)
 	})
 })
