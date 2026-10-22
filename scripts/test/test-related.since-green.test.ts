@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import type { MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -97,7 +98,10 @@ describe('test_related.run_related_tests — since the last green run', () => {
 
 		await test_related.run_related_tests([])
 
-		expect(mocked_moved).toHaveBeenCalledWith(review_stamps.test_related_stamp)
+		expect(mocked_moved).toHaveBeenCalledWith(
+			review_stamps.test_related_stamp,
+			gate_plan.UNIT_LABEL,
+		)
 	})
 
 	it('narrows to the moved files and the change since the map, leaving an untouched source out', async () => {

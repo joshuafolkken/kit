@@ -18,7 +18,8 @@ import { gate_tree, type GateTree } from './gate-tree'
 //
 // **The judgement is the gate's own, not a second one.** "There is a record and nothing it covers has
 // moved" is `review_brief.matching_stamp` plus the base equality `gate_skip.reusable_green_gate`
-// already compares, over the same `FileMapStamp` shape written to the same kind of file. A second
+// already compares and the inputs fingerprint each record carries (`verification-inputs.ts`), over the
+// same `FileMapStamp` shape written to the same kind of file. A second
 // definition of "this tree is unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where
 // two commands would start disagreeing about one working tree.
 //
@@ -94,7 +95,11 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 function describes_tree(check: ScopedCheck, tree: Record<string, string>, base: string): boolean {
 	const stamp = review_brief.matching_stamp(check.stamp.read(check.source), tree)
 
-	return stamp !== undefined && file_map_stamp.describes_base(stamp, base)
+	return (
+		stamp !== undefined &&
+		file_map_stamp.describes_base(stamp, base) &&
+		check.stamp.describes_inputs(stamp)
+	)
 }
 
 // **Whether there is a tree to speak about at all**, asked once and used from both ends: the reader

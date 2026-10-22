@@ -52,6 +52,10 @@ interface FileMapStamp {
 	// (`review-round-one-blobs.ts`). When `base` moves, round 2 carries these onto the new base and
 	// measures the fix delta from there; a record without them falls back to the moved-base refusal.
 	blobs?: Record<string, string>
+	// The fingerprint of what the vouched check reads beside the files — its tools' versions and its
+	// environment (`verification-inputs.ts`, joshuafolkken/kit#4495). Written by a record created with an
+	// `inputs` source; a reader of such a record refuses one whose fingerprint is absent or differs.
+	inputs?: string
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -83,13 +87,23 @@ function tree_fields({ base, completed_at, blobs }: Partial<FileMapStamp>): Part
 	}
 }
 
+function input_fields({ inputs }: Partial<FileMapStamp>): Partial<FileMapStamp> {
+	return typeof inputs === 'string' ? { inputs } : {}
+}
+
 function parse_stamp(raw: string): FileMapStamp | undefined {
 	const parsed = JSON.parse(raw) as Partial<FileMapStamp>
 	const { taken_at, files } = parsed
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
 
-	return { taken_at, files, ...identity_fields(parsed), ...tree_fields(parsed) }
+	return {
+		taken_at,
+		files,
+		...identity_fields(parsed),
+		...tree_fields(parsed),
+		...input_fields(parsed),
+	}
 }
 
 // Whether the process that wrote this record is still running. It takes the
@@ -169,6 +183,9 @@ interface FileMapStampAccess {
 	// would manufacture the very vouching the field exists to withhold.
 	complete: (target?: string) => string | undefined
 	read: (source?: string) => FileMapStamp | undefined
+	// Whether `stamp` was written under the inputs fingerprint read now; always `true` for a record
+	// created without an `inputs` source, which never vouches for a check.
+	describes_inputs: (stamp: FileMapStamp) => boolean
 	// For a record whose meaning is its existence rather than its contents — the in-flight gate marker.
 	// A record nobody removes would go on asserting a gate that ended.
 	remove: (target?: string) => void
@@ -228,7 +245,11 @@ function complete_at(target: string): string | undefined {
 // The destination is a parameter on both sides so a test can exercise the round trip without
 // overwriting the record a real run may be relying on — two commands share one path by design, and a
 // suite that wrote to it would be a second writer nobody declared.
-function create(prefix: string, root?: string): FileMapStampAccess {
+//
+// `inputs` answers the fingerprint of what the record vouches for beside its files
+// (`verification-inputs.ts`); it is read at each write and each comparison, so a tool reinstalled or an
+// environment variable changed between them leaves the record standing for nobody.
+function create(prefix: string, root?: string, inputs?: () => string): FileMapStampAccess {
 	function resolve(): string {
 		return stamp_file.stamp_path(prefix, root)
 	}
@@ -245,9 +266,11 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 				...process_identity.own_fields(),
 				base,
 				blobs,
+				inputs: inputs?.(),
 			}),
 		complete: (target = resolve()) => complete_at(target),
 		read: (source = resolve()) => read_at(source),
+		describes_inputs: (stamp) => inputs === undefined || stamp.inputs === inputs(),
 		remove: (target = resolve()) => {
 			stamp_file.remove_stamp(target)
 		},

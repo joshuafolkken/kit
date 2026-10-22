@@ -162,6 +162,19 @@ describe('reusable_green_gate', () => {
 	})
 })
 
+// joshuafolkken/kit#4495: the record carries the fingerprint of every declared tool and variable.
+describe('gate_reuse — the inputs fingerprint', () => {
+	it('refuses the record, naming why, when a declared environment variable changed', () => {
+		record_green(CHANGED_TREE, BASE)
+		vi.stubEnv('NODE_ENV', 'production')
+
+		expect(gate_skip.gate_reuse(CHANGED_TREE, BASE, STAMP_PATH)).toStrictEqual({
+			miss: 'a checked tool or environment variable changed since the green gate',
+		})
+		vi.unstubAllEnvs()
+	})
+})
+
 describe('run_verification_gate — a tree that is already green', () => {
 	beforeEach(() => {
 		record_green(CHANGED_TREE, BASE)

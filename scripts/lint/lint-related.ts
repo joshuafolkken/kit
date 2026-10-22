@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_check } from '#scripts/document/document-byte-check'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
@@ -69,7 +70,7 @@ async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), while a lintable file
 // is among it; otherwise the whole branch change, as before.
 async function since_green_scope(root: string): Promise<ChangedFileScope | undefined> {
-	const moved = await since_green.read_moved(review_stamps.lint_related_stamp)
+	const moved = await since_green.read_moved(review_stamps.lint_related_stamp, gate_plan.LINT_LABEL)
 
 	if (moved === undefined) return undefined
 
