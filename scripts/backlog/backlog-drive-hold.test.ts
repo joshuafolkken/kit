@@ -16,6 +16,8 @@ const { CONFIG, FIRST_CHILD, OFFERED, POLL_MS, harness, offer, state } = backlog
 const ONE_PASS = { ...CONFIG, window_ms: POLL_MS }
 const TWO_PASSES = { ...CONFIG, window_ms: POLL_MS + POLL_MS }
 const WAIT_REASON = 'offer:wait'
+const CHAIN_REASON = 'offer:watch:chain'
+const WAITED_ISSUE = 4496
 const WINDOW_END = { reason: 'window', token: undefined, issue: undefined }
 
 async function free(): Promise<number> {
@@ -120,7 +122,23 @@ describe('backlog_drive_hold.recorder — hold', () => {
 	it('writes the hold while a lane is free', async () => {
 		await backlog_drive_hold.recorder(free).hold(WAIT_REASON)
 
-		expect(record_held).toHaveBeenCalledWith(WAIT_REASON)
+		expect(record_held).toHaveBeenCalledWith({ reason: WAIT_REASON, waiting: undefined })
+	})
+
+	// joshuafolkken/kit#4513: the issues the offer waited on ride into the ledger with the hold.
+	it('writes the issues the offer waited on with the hold', async () => {
+		await backlog_drive_hold.recorder(free).hold(CHAIN_REASON, [WAITED_ISSUE])
+
+		expect(record_held).toHaveBeenCalledWith({ reason: CHAIN_REASON, waiting: [WAITED_ISSUE] })
+	})
+
+	it('hands the offer’s waiting issues to the hold port with its reason', async () => {
+		const hold = vi.fn(async () => undefined)
+		const read = { ...offer('watch'), answer: 'blocked', cause: 'chain', waiting: [WAITED_ISSUE] }
+
+		await backlog_drive_hold.held({ kind: 'continue', state: state() }, read, { hold })
+
+		expect(hold).toHaveBeenCalledWith(CHAIN_REASON, [WAITED_ISSUE])
 	})
 
 	it('releases the open hold once when a lane opened elsewhere fills the pool', async () => {
@@ -155,7 +173,7 @@ describe('backlog_drive_hold.recorder — end', () => {
 	it('records the hand-back of a driver end', async () => {
 		await backlog_drive_hold.recorder(free).end(WINDOW_END)
 
-		expect(record_held).toHaveBeenCalledWith('hand-back:window')
+		expect(record_held).toHaveBeenCalledWith({ reason: 'hand-back:window', waiting: undefined })
 	})
 
 	it('releases the open hold at the finished run, whatever lanes are free', async () => {

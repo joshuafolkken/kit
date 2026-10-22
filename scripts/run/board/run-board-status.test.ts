@@ -244,10 +244,11 @@ function read_closed(closed: ClosedIssue): OpenRead {
 }
 
 describe('run_board_status.settle_closed', () => {
-	it('draws a running child the open listing no longer holds as done', () => {
+	// joshuafolkken/kit#4537: a listing that came back short is no proof the child closed.
+	it('keeps a running child the open listing no longer holds running until it is read closed', () => {
 		const settled = run_board_status.settle_closed(RUNNING, GONE)
 
-		expect(settled.get(3409)).toStrictEqual({ state: 'done', started_ms: Date.parse(T0) })
+		expect(settled.get(3409)).toStrictEqual({ state: 'running', started_ms: Date.parse(T0) })
 	})
 
 	it.each<[string, Omit<OpenRead, 'labels'>]>([
@@ -332,7 +333,6 @@ describe('run_board_status settled tracks', () => {
 				is_not_planned: false,
 			}),
 		],
-		['gone from the listing', GONE],
 		['labelled stopped', read_labelled(['bug'])],
 		['labelled needs-decision', read_labelled([NEEDS_DECISION_LABEL])],
 	])('keeps the track of a child %s', (_label, read) => {

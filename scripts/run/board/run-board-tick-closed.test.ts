@@ -13,8 +13,6 @@ import { run_board_tick } from './run-board-tick'
 const { LOCAL, START, harness } = run_board_fixture
 const { FRESH_STATE, PLAN_RETRY_MS, tick } = run_board_tick
 const CHILDREN = [3439, 3444, 3446]
-// The 11-column `MM-DD HH:MM` condition column; blank where the close time is unknown.
-const CONDITION_WIDTH = 11
 const TIME_PATTERN = String.raw`\d\d-\d\d \d\d:\d\d`
 const LAUNCHED_AT = '2026-10-08T08:00:00.000Z'
 // 45 minutes 48 seconds after the launch.
@@ -36,6 +34,7 @@ const PLAN: BoardPlan = {
 function merged_closed(
 	issues: ReadonlyArray<number>,
 	labels: ReadonlyArray<string> = [],
+	closed_ms = CLOSED_MS,
 ): ClosedAnswer {
 	const closed = new Map(
 		issues.map((issue) => [
@@ -43,7 +42,7 @@ function merged_closed(
 			{
 				title: `Child ${String(issue)}`,
 				labels,
-				closed_ms: CLOSED_MS,
+				closed_ms,
 				is_merged: true,
 				is_not_planned: false,
 			},
@@ -61,13 +60,14 @@ function row_of(frame: string | undefined, issue: number): string | undefined {
 }
 
 describe('run_board_tick.tick — children that closed', () => {
-	// joshuafolkken/kit#3769: a settled row draws no phase history after it.
-	it('draws a closed child nameless with a blank time column while GitHub has not answered', async () => {
+	// joshuafolkken/kit#4537: absence from the listing alone is no proof it closed.
+	it('keeps a child the listing no longer holds unsettled while GitHub has not answered', async () => {
 		const { ports, frames } = harness(LOCAL_CLOSED, [PLAN])
 
 		await tick(FRESH_STATE, ports)
 
-		expect(row_of(frames.at(-1), 3439)?.trim()).toBe(`🏁 ${' '.repeat(CONDITION_WIDTH)} 3439`)
+		expect(row_of(frames.at(-1), 3439)).not.toContain('🏁')
+		expect(frames.at(-1)).toContain(' 0/3 ')
 	})
 
 	it('draws each child read closed with its title, time and merge', async () => {
@@ -95,6 +95,38 @@ describe('run_board_tick.tick — children that closed', () => {
 		await tick(first, ports)
 
 		expect(read_closed).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#4537: absence from the listing no longer settles a running child, so a running
+// child is asked about wherever nothing else would ever settle it.
+describe('run_board_tick.tick — running children asked closed', () => {
+	// An empty listing counts as a failed plan read, and the kept plan still lists a child that merged.
+	it('asks GitHub about a listed running child while the plan read fails', async () => {
+		const listed = { ...PLAN, context: { ...PLAN.context, open_numbers: new Set(CHILDREN) } }
+		const { ports, read_closed, clock } = harness(LOCAL_CLOSED, [listed, undefined])
+		const first = await tick(FRESH_STATE, ports)
+
+		read_closed.mockImplementation(async (issues) => merged_closed(issues))
+		clock.now_ms += PLAN_RETRY_MS
+		await tick(first, ports)
+
+		expect(read_closed).toHaveBeenCalledOnce()
+		expect(read_closed).toHaveBeenCalledWith(CHILDREN)
+	})
+
+	// A close before the launch is an earlier life of the issue, so it settles nothing.
+	it('asks again about a running child whose kept closed read predates its launch', async () => {
+		const { ports, read_closed, clock } = harness(LOCAL_CLOSED, [PLAN, PLAN])
+		const earlier = Date.parse(LAUNCHED_AT) - PLAN_RETRY_MS
+
+		read_closed.mockImplementation(async (issues) => merged_closed(issues, [], earlier))
+		const first = await tick(FRESH_STATE, ports)
+
+		clock.now_ms += PLAN_RETRY_MS
+		await tick(first, ports)
+
+		expect(read_closed).toHaveBeenCalledTimes(2)
 	})
 })
 

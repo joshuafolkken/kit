@@ -48,7 +48,8 @@ type ProcessFigures = ReadonlyMap<number, UsageFigure>
 // Each lane's figure by its issue number.
 type LaneUsages = ReadonlyMap<number, UsageFigure>
 
-// What a gauge's full width stands for: the machine's cores and its physical memory.
+// The machine's cores and its physical memory: a processes row's gauge is full at them, a lane row's
+// at its share of them.
 interface UsageScale {
 	cores: number
 	total_bytes: number

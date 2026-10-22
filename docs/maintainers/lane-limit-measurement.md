@@ -235,6 +235,9 @@ next offer in that same pass, so a freed lane is offered at once. Two passes rec
   `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing. A wait the
   `run:solo` gate caused names its cause in place of the answer, `offer:watch:solo`, so the lanes a
   solo run left empty show apart from every other `blocked` offer.
+- A `blocked` offer whose issues wait on another issue or on a start condition (`実施可能日` /
+  `実施可能条件`) names the cause: `offer:<verdict>:chain`, `:gate` or `:chain+gate`, and `waiting`
+  lists those issues. Other waits stay `blocked` (`scripts/backlog/backlog-wait-cause.ts`).
 - A driver end that hands control back to a session. The entry is `hand-back:<reason>`, for example
   `hand-back:merge` or `hand-back:window`. A finished run (`stop`, or the drain's `watch` or
   `retrospective`) is not a hold.

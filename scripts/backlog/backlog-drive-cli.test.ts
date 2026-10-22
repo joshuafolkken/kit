@@ -160,6 +160,13 @@ describe('backlog_drive_cli output — the offer’s cause', () => {
 
 		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.cause).toBe('solo')
 	})
+
+	// joshuafolkken/kit#4513: the issues a chain wait named survive the read into the hold.
+	it('reads the issues a chain or gate wait waited on', () => {
+		const offer = { verdict: 'watch', issues: [], retries: 0, cause: 'chain', waiting: [4496] }
+
+		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.waiting).toStrictEqual([4496])
+	})
 })
 
 describe('backlog_drive_cli output — the rest', () => {

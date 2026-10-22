@@ -329,10 +329,6 @@ interface OpenRead {
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
 
-function is_listed_closed(issue: number, read: OpenRead): boolean {
-	return read.open_numbers !== undefined && !read.open_numbers.has(issue)
-}
-
 // When the child last launched — what a GitHub read is weighed against.
 function launch_ms(status: ItemStatus): number | undefined {
 	return status.launched_ms ?? status.started_ms
@@ -341,11 +337,6 @@ function launch_ms(status: ItemStatus): number | undefined {
 // The listing was read after the child last launched, so what it says about the child is current.
 function is_read_after_launch(status: ItemStatus, read: OpenRead): boolean {
 	return read.read_ms !== undefined && (launch_ms(status) ?? 0) <= read.read_ms
-}
-
-// A child launched before the listing was read and missing from it has closed since.
-function is_closed_running(issue: number, status: ItemStatus, read: OpenRead): boolean {
-	return is_listed_closed(issue, read) && is_read_after_launch(status, read)
 }
 
 // What a running child's labels say it is doing, `undefined` where they agree it is running: the child
@@ -395,11 +386,7 @@ function closed_status(
 function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
 	const from_closed = closed_status(status, read.closed.get(issue))
 
-	if (from_closed !== undefined) return from_closed
-
-	if (is_closed_running(issue, status, read)) return settled_as(status, 'done')
-
-	return labelled(issue, status, read)
+	return from_closed ?? labelled(issue, status, read)
 }
 
 // The closed read is kept for the run, so a parked child a person reopened since is told apart by the
@@ -416,12 +403,13 @@ function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus 
 	return UNSETTLED_STATES.has(status.state) ? unsettled(issue, status, read) : status
 }
 
-// **The stream stays the source of truth; the listing only unsticks it.** A child whose merge never
-// reached the stream would read as running forever, so a running child the plan's open listing no
-// longer holds is drawn finished instead — merged and timed once GitHub was read for it, finished
-// without a time while that read has not answered. One the listing still holds is drawn as its labels
-// say, so a child that stopped with no parent to record it does not read as running. A parked child is
-// settled again only by a closed read; one a person released is dropped after it (`run-board-released.ts`).
+// **The stream stays the source of truth; a closed read only unsticks it.** A child whose merge never
+// reached the stream would read as running forever, so a running child GitHub reads closed is drawn
+// finished instead — merged, withdrawn or done, and timed. Absence from the open listing alone settles
+// nothing: a listing that came back short would draw live children finished (joshuafolkken/kit#4537).
+// One the listing holds is drawn as its labels say, so a child that stopped with no parent to record it
+// does not read as running. A parked child is settled again only by a closed read; one a person
+// released is dropped after it (`run-board-released.ts`).
 function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
 	read: OpenRead,

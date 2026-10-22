@@ -121,6 +121,13 @@ describe('run_board_plan.read_plan', () => {
 
 		expect(await run_board_plan.read_plan({ issues: [SINGLE], only: true }, read)).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4537: an empty listing drew every live child finished and the pool empty.
+	it('answers an empty listing as a failed plan', async () => {
+		const read = { ...ports(), fetch_open: vi.fn(async () => ({ rows: [], is_capped: false })) }
+
+		expect(await run_board_plan.read_plan({ issues: [], only: false }, read)).toBeUndefined()
+	})
 })
 
 // joshuafolkken/kit#4222: a running issue sits in no wave, yet the joined plan still holds it once.

@@ -60,10 +60,11 @@ describe('run_board_status.settle_closed with a closed read', () => {
 		})
 	})
 
+	// joshuafolkken/kit#4537: nor does its absence from the open listing settle it.
 	it('ignores a close dated before the launch', () => {
 		const read = read_closed(closed_issue({ closed_ms: T0 - 1, is_merged: true }))
 
-		expect(settle('running', read)).toStrictEqual({ state: 'done', started_ms: T0 })
+		expect(settle('running', read)).toStrictEqual({ state: 'running', started_ms: T0 })
 	})
 })
 

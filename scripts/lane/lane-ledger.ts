@@ -7,6 +7,7 @@ import {
 	lane_ledger_schema,
 	type CoreWaitRecord,
 	type GateRecord,
+	type HeldRecord,
 	type LedgerEntry,
 	type OverlapRecord,
 	type RoundTwoRecord,
@@ -126,8 +127,12 @@ async function record_overlap(overlap: OverlapRecord, path?: string): Promise<vo
 	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
 }
 
-async function record_held(reason: string, path?: string): Promise<void> {
-	await record({ kind: KIND.HELD, at: now_iso(), reason }, path)
+// `waiting` is written only when the offer named issues, so a hold that waited on none stays one short line.
+async function record_held(held: HeldRecord, path?: string): Promise<void> {
+	const waiting = held.waiting ?? []
+	const named = waiting.length > 0 ? { waiting: [...waiting] } : {}
+
+	await record({ kind: KIND.HELD, at: now_iso(), reason: held.reason, ...named }, path)
 }
 
 async function record_released(path?: string): Promise<void> {

@@ -246,4 +246,13 @@ describe('backlog_offer_cli.run --json — the cause', () => {
 
 		expect(info_lines.at(-1)).toContain('"cause":"solo"')
 	})
+
+	// joshuafolkken/kit#4513: a chain wait reaches the driver with the issues it waited on.
+	it('prints the chain cause with the issues the wait named', async () => {
+		const error = 'Waiting on a dependency chain: #4496 #4497'
+
+		await answer_for({ code: OK, out: 'wait', err: error }, 'watch', [...RUNNING, '--json'])
+
+		expect(info_lines.at(-1)).toContain('"cause":"chain","waiting":[4496,4497]')
+	})
 })

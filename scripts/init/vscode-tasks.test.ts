@@ -71,7 +71,7 @@ describe('vscode_tasks.merge_tasks — consumer tasks array', () => {
 	})
 })
 
-// joshuafolkken/kit#3438: the folder-open watch became the board; appending would open both panes.
+// joshuafolkken/kit#3438: the event watch task became the board; appending would keep both.
 describe('vscode_tasks.merge_tasks — a retired kit label', () => {
 	it('replaces a task carrying a retired kit label with its successor in place', () => {
 		const existing = JSON.stringify({ version: '2.0.0', tasks: [RETIRED_TASK, OWN_TASK] })

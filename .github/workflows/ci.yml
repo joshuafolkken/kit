@@ -532,21 +532,30 @@ jobs:
   # shell body is the pattern to keep out of a workflow regardless of the value's provenance.
   checks:
     name: Checks
-    needs: [reuse-pr-checks, static-checks, unit]
+    needs: [reuse-pr-checks, static-checks, unit, node-compat]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
     steps:
+      # `node-compat` is aggregated here rather than added to the ruleset: the ruleset holds the one
+      # `Checks` context, and a matrix check name would drift with every Node version bump. It runs on
+      # the reuse path too, so its result is required on both paths (joshuafolkken/kit#4545).
       - name: Require both halves of the verification gate
         env:
           REUSE_RESULT: ${{ needs.reuse-pr-checks.outputs.reuse }}
           STATIC_RESULT: ${{ needs.static-checks.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
+          NODE_RESULT: ${{ needs.node-compat.result }}
         run: |
           echo "Reuse PR Checks: ${REUSE_RESULT}"
           echo "Static Checks: ${STATIC_RESULT}"
           echo "Unit Tests: ${UNIT_RESULT}"
+          echo "Node builds: ${NODE_RESULT}"
+          if [ "${NODE_RESULT}" != 'success' ]; then
+            echo "::error::the Node build matrix did not pass"
+            exit 1
+          fi
           if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
             exit 0
           fi

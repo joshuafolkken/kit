@@ -53,7 +53,7 @@ missing, say so. **A field's empty value is an observation, never a state** (`re
 
 **The heartbeat is ambient, never a Telegram.** `pnpm josh run:board` is its reader, in a pane of the
 person's own; **no session relays the stream** — name the board command once, at the first cut or when
-asked; `.vscode/tasks.json` starts it on folder open once VSCode's automatic-task prompt is allowed.
+asked; the person starts it, or the `josh: run board` task in `.vscode/tasks.json`, by hand.
 `pnpm josh run:event --watch` stays for following the raw events one by one. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
 **A request for periodic progress is never a CronCreate job** — on screen, name `pnpm josh run:board`;
 off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-run.md`).

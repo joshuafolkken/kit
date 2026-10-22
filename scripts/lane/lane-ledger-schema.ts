@@ -127,7 +127,13 @@ const overlap_schema = z.object({
 // A `backlog:drive` pass that left a free lane empty: `reason` is why — the offer verdict that started
 // nothing, or the hand-back that stopped the driver. How long the lane stayed empty is derived from the
 // next `held`, `released` or `dispatch` entry, the way a stop's wait is (joshuafolkken/kit#3995).
-const held_schema = z.object({ kind: z.literal(KIND.HELD), at: z.string(), reason: z.string() })
+// `waiting` names the issues a `chain` / `gate` hold waited on (joshuafolkken/kit#4513).
+const held_schema = z.object({
+	kind: z.literal(KIND.HELD),
+	at: z.string(),
+	reason: z.string(),
+	waiting: z.array(z.number()).optional(),
+})
 // The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
 // the run finished, so no free lane is owed a child any more.
 const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
@@ -225,6 +231,9 @@ type GateCheckRecord = z.infer<typeof check_schema>
 type StageRecord = Omit<StageEntry, 'kind' | 'at'>
 type StopRecord = Omit<StopEntry, 'kind' | 'at'>
 type OverlapRecord = Omit<OverlapEntry, 'kind' | 'at'>
+type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
+	waiting?: ReadonlyArray<number> | undefined
+}
 
 const lane_ledger_schema = { KIND, entry_schema }
 
@@ -236,6 +245,7 @@ export type {
 	GateEntry,
 	GateRecord,
 	HeldEntry,
+	HeldRecord,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,

@@ -21,6 +21,7 @@ import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_overlap } from './backlog-overlap'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank, type GateScope } from './backlog-rank'
+import { backlog_wait_cause } from './backlog-wait-cause'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
 //
@@ -147,6 +148,16 @@ function warn_not_before(context: PoolContext): void {
 	}
 }
 
+// Which waiting issues hold the backlog on a dependency chain or a start condition, read back by
+// `backlog:offer` so a lane held by them is told apart in `lane:stats` (joshuafolkken/kit#4513).
+function warn_wait_causes(result: EpicNextResult, context: PoolContext): void {
+	const causes = backlog_wait_cause.classify(result.waiting, context.repo)
+
+	for (const line of backlog_wait_cause.lines_of(causes)) {
+		console.error(issue_citation.linkify(line, context.repo))
+	}
+}
+
 function report(result: EpicNextResult, context: PoolContext): number {
 	warn_gaps(context, result.verdict === 'run')
 	// The explanation names epics and children as `#N` (`tracked by epic #N`); linkified so the text a
@@ -158,7 +169,10 @@ function report(result: EpicNextResult, context: PoolContext): number {
 	console.error(issue_citation.linkify(explanation, context.repo))
 	warn_not_before(context)
 
-	for (const token of tokens_of(result, context.repo)) console.info(token)
+	const tokens = tokens_of(result, context.repo)
+
+	if (tokens[0] === VERDICT_TOKENS.wait) warn_wait_causes(result, context)
+	for (const token of tokens) console.info(token)
 
 	return SUCCESS_EXIT_CODE
 }

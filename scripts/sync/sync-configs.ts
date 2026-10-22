@@ -144,28 +144,16 @@ function sync_vscode_settings_json(destination_path: string): void {
 	)
 }
 
-// Creates the file when absent, unlike the other `.vscode` syncs: the folder-open board task is the
-// whole point of distributing it, and a consumer
-// without a tasks.json has nothing of its own to protect. An existing file keeps every task whose
-// label kit does not ship.
+// Like the other `.vscode` syncs, never creates the file: `josh init` does, and a project without it
+// opted out. An existing file keeps every task whose label kit does not ship.
 function sync_vscode_tasks_json(destination_path: string): void {
-	const kit_content = readFileSync(
-		path.join(PACKAGE_DIR, '.vscode', vscode_tasks.VSCODE_TASKS_FILENAME),
-		'utf8',
+	const kit_tasks = vscode_tasks.read_kit_tasks(
+		readFileSync(path.join(PACKAGE_DIR, '.vscode', vscode_tasks.VSCODE_TASKS_FILENAME), 'utf8'),
 	)
 
-	if (existsSync(destination_path)) {
-		const kit_tasks = vscode_tasks.read_kit_tasks(kit_content)
-
-		sync_with_merge(destination_path, '.vscode/tasks.json', (existing) =>
-			vscode_tasks.merge_tasks(existing, kit_tasks),
-		)
-
-		return
-	}
-
-	file_content.write_contained(destination_path, kit_content)
-	console.info('  ✔ created   .vscode/tasks.json')
+	sync_with_merge(destination_path, '.vscode/tasks.json', (existing) =>
+		vscode_tasks.merge_tasks(existing, kit_tasks),
+	)
 }
 
 const sync_configs = {
