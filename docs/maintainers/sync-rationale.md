@@ -352,10 +352,9 @@ rather than re-implementing it.
 
 ## The merged config files
 
-- **`.secretlintrc.json` and `.vscode/tasks.json` are created when missing.** The pre-commit secret
-  scan ships to every consumer through `lefthook/base.yml` and cannot run without the config; the
-  run board task is the point of distributing `tasks.json`, and a project without the file has no
-  tasks to protect.
+- **`.secretlintrc.json` is created when missing.** The pre-commit secret scan ships to every
+  consumer through `lefthook/base.yml` and cannot run without the config. `.vscode/tasks.json` is
+  not: its board task is started by hand, so a project without the file loses nothing it runs.
 - **The `.npmrc` credential line is kept.** kit does not distribute it — pnpm ignores an env-var
   credential in a project `.npmrc` unless `npmrcAuthFile` trusts the file — but a consumer that opted
   in owns a live credential there, often configured in a deploy platform invisible to sync. The four

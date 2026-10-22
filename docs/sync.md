@@ -150,21 +150,21 @@ The project key and organization are derived from the `owner/repo` slug:
 
 ### Config files (merged, only when already present)
 
-These files are created by `josh init`. `josh sync` refreshes them in place with the same merge `init` uses, and never creates them, so a project that opted out stays out. A file already current is logged `unchanged` and not written. `.secretlintrc.json` and `.vscode/tasks.json` are the exceptions: each is created when missing.
+These files are created by `josh init`. `josh sync` refreshes them in place with the same merge `init` uses, and never creates them, so a project that opted out stays out. A file already current is logged `unchanged` and not written. `.secretlintrc.json` is the exception: it is created when missing.
 
-| File                      | Merge strategy                                                                                                                                                                   |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.gitignore`              | Append missing kit patterns; your entries are kept                                                                                                                               |
-| `.npmrc`                  | Remove the four settings lines earlier kit releases wrote, when they match exactly; keep every other line, including a GitHub Packages `_authToken` line                         |
-| `eslint.config.js`        | Regenerated from the vanilla template, keeping your `rules` blocks; a config not built on `create_vanilla_config` is left untouched                                              |
-| `tsconfig.json`           | Prepend the kit preset to `extends`, drop `compilerOptions` keys equal to the preset, union-merge `exclude` ([tsconfig normalization](#tsconfig-normalization))                  |
-| `cspell.config.yaml`      | Prepend the kit import to `import:`, unless an `@joshuafolkken/*` preset already imports it                                                                                      |
-| `lefthook.yml`            | Prepend the kit preset to `extends:`, unless an `@joshuafolkken/*` preset already extends it                                                                                     |
-| `.secretlintrc.json`      | Created when absent; an existing file is never rewritten                                                                                                                         |
-| `package.json`            | Targeted migrations only (missing devDependencies, `devEngines`, kit's `prepare` clause) — see [What does NOT get synced](#what-does-not-get-synced)                             |
-| `.vscode/extensions.json` | Append missing kit recommendations to `recommendations`                                                                                                                          |
-| `.vscode/settings.json`   | Add missing top-level keys; inside an object-valued key you own, add kit's missing entries (yours win). Array and scalar keys you own are never touched                          |
-| `.vscode/tasks.json`      | Created when absent; otherwise a task with a label kit ships (`josh: run board`) is replaced, a missing one appended, others kept. Rename your own task if it shares a kit label |
+| File                      | Merge strategy                                                                                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.gitignore`              | Append missing kit patterns; your entries are kept                                                                                                              |
+| `.npmrc`                  | Remove the four settings lines earlier kit releases wrote, when they match exactly; keep every other line, including a GitHub Packages `_authToken` line        |
+| `eslint.config.js`        | Regenerated from the vanilla template, keeping your `rules` blocks; a config not built on `create_vanilla_config` is left untouched                             |
+| `tsconfig.json`           | Prepend the kit preset to `extends`, drop `compilerOptions` keys equal to the preset, union-merge `exclude` ([tsconfig normalization](#tsconfig-normalization)) |
+| `cspell.config.yaml`      | Prepend the kit import to `import:`, unless an `@joshuafolkken/*` preset already imports it                                                                     |
+| `lefthook.yml`            | Prepend the kit preset to `extends:`, unless an `@joshuafolkken/*` preset already extends it                                                                    |
+| `.secretlintrc.json`      | Created when absent; an existing file is never rewritten                                                                                                        |
+| `package.json`            | Targeted migrations only (missing devDependencies, `devEngines`, kit's `prepare` clause) — see [What does NOT get synced](#what-does-not-get-synced)            |
+| `.vscode/extensions.json` | Append missing kit recommendations to `recommendations`                                                                                                         |
+| `.vscode/settings.json`   | Add missing top-level keys; inside an object-valued key you own, add kit's missing entries (yours win). Array and scalar keys you own are never touched         |
+| `.vscode/tasks.json`      | A task with a label kit ships (`josh: run board`) is replaced, a missing one appended, others kept. Rename your own task if it shares a kit label               |
 
 - **`.npmrc`**: the removed lines are `engine-strict=true`, `minimum-release-age=1440`, `confirmModulesPurge=false` and `lockfile-include-tarball-url=true`, which pnpm 12 ignores there. A `//npm.pkg.github.com/:_authToken=…` line is never removed ([authentication.md §4(d)](./authentication.md#4-build-platforms-with-no-user-level-npmrc)).
 - **`.vscode/settings.json`**: kit-only keys (currently `sonarlint.connectedMode.project`) are never written. The Claude Code `bypassPermissions` keys and how to opt out are in [`init.md` → "Claude Code permission mode"](init.md#claude-code-permission-mode).
