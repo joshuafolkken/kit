@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_cpu } from './check-cpu'
 import { core_budget } from './core-budget'
+import { free_cores } from './free-cores'
 import { gate_plan } from './gate-plan'
 import { UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -26,6 +27,17 @@ const TAKEN_AT = '2026-10-16T01:02:03.000Z'
 
 async function fake_execa(): Promise<ReturnType<typeof gate_test_fixture.fake_result>> {
 	return gate_test_fixture.fake_result(0, '')
+}
+
+// The free memory is the machine's, so a reserved unit step reads a pinned one.
+function stub_memory_workers(memory_workers: number | undefined): void {
+	vi.spyOn(free_cores, 'read').mockResolvedValue({ cores: undefined, memory_workers })
+}
+
+function unit_step_args(): string | undefined {
+	return mocked_execa.mock.calls
+		.map((call) => JSON.stringify(call[1]))
+		.find((text) => text.includes(UNIT_WORKER_FLAG))
 }
 
 // joshuafolkken/kit#3903: a check whose inputs did not move since its record is reused, not run.
@@ -60,6 +72,7 @@ describe('run_gate_steps — a unit claim admitted narrowed', () => {
 	beforeEach(() => {
 		vi.restoreAllMocks()
 		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
+		stub_memory_workers(undefined)
 	})
 
 	it('marks only the unit step claim and runs it at the granted workers', async () => {
@@ -81,6 +94,38 @@ describe('run_gate_steps — a unit claim admitted narrowed', () => {
 	})
 })
 
+// joshuafolkken/kit#4528: the gate's `--maxWorkers` skipped the guard's free-memory reading.
+describe('run_gate_steps — the free memory', () => {
+	const PLAN_CAP = 5
+	const MEMORY_WORKERS = 2.5
+	const CAPPED_PLAN = { ...SERIAL_PLAN, unit_worker_cap: PLAN_CAP }
+	const RESERVED_BUDGET = { ...UNRESERVED_BUDGET, is_reserved: true }
+
+	beforeEach(() => {
+		vi.restoreAllMocks()
+		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
+		vi.spyOn(core_budget, 'with_core_reservation').mockImplementation(
+			async (_weight, run) => await run({ overflow: undefined }, ''),
+		)
+	})
+
+	it('runs the unit step at the workers the free memory holds when they are fewer', async () => {
+		stub_memory_workers(MEMORY_WORKERS)
+
+		await gate_run_steps.run_gate_steps(CAPPED_PLAN, RESERVED_BUDGET)
+
+		expect(unit_step_args()).toContain(`${UNIT_WORKER_FLAG}=${String(Math.floor(MEMORY_WORKERS))}"`)
+	})
+
+	it('keeps the plan cap where the memory could not be read', async () => {
+		stub_memory_workers(undefined)
+
+		await gate_run_steps.run_gate_steps(CAPPED_PLAN, RESERVED_BUDGET)
+
+		expect(unit_step_args()).toContain(`${UNIT_WORKER_FLAG}=${String(PLAN_CAP)}"`)
+	})
+})
+
 // joshuafolkken/kit#4451: whether a unit claim's wait for room paid off is read per run.
 describe('run_gate_steps — each check claim', () => {
 	const ASKED = 7
@@ -91,6 +136,7 @@ describe('run_gate_steps — each check claim', () => {
 	beforeEach(() => {
 		vi.restoreAllMocks()
 		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
+		stub_memory_workers(undefined)
 	})
 
 	it('returns a claimed check its asked width, its granted width and its wait', async () => {

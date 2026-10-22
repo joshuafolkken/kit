@@ -4,6 +4,7 @@ import { buffered_process } from '#scripts/lib/buffered-process'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { check_cpu, type CheckCpu } from './check-cpu'
 import { core_budget, type Admission } from './core-budget'
+import { free_cores } from './free-cores'
 import { gate_plan, type GatePlan } from './gate-plan'
 import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
 import { build_gate_step, with_granted_workers } from './gate-steps'
@@ -61,6 +62,8 @@ interface ReservedStep {
 	step: GateStep
 	weight: number
 	memory_mb: number
+	// The plan's `--maxWorkers` for the unit suite, the width the free memory bounds once it is admitted.
+	worker_cap: number | undefined
 	// When the check's own green record was taken, for a check `check-reuse.ts` found reusable.
 	reused_at: string | undefined
 }
@@ -78,6 +81,7 @@ async function build_reserved_steps(
 			step: await build_gate_step(check, process.cwd(), plan),
 			weight: gate_plan.check_weight(check, plan, available_cores),
 			memory_mb: gate_plan.check_memory(check, plan, available_cores),
+			worker_cap: plan.unit_worker_cap,
 			reused_at: reused.get(check.label),
 		})),
 	)
@@ -105,6 +109,25 @@ function claim_of(requested: number, admission: Admission): CheckClaim {
 	}
 }
 
+// **The unit step's width is bounded by the free memory too** (joshuafolkken/kit#4528). The plan's cap
+// and the granted width are sized from the cores alone, and the `--maxWorkers` they become skips the
+// guard's own reading (`test-unit-guard.ts`), so the memory is read here, once the claim is admitted
+// and the suite is about to start. The free cores are not applied: the admission has already narrowed
+// the claim to them (joshuafolkken/kit#4167).
+async function admitted_step(
+	reserved: ReservedStep,
+	admission: Admission,
+	available_cores: number,
+): Promise<GateStep> {
+	if (reserved.step.label !== gate_plan.UNIT_LABEL) return reserved.step
+
+	const { memory_workers } = await free_cores.read({ available_cores })
+	const asked = admission.granted ?? reserved.worker_cap
+	const workers = unit_worker_share.cap_to_free(asked, memory_workers, available_cores)
+
+	return with_granted_workers(reserved.step, workers)
+}
+
 // **A nested gate takes no reservation, and the budget is what makes that necessary rather than
 // merely tidy**. The unit step spawns the suite, which runs this repository's
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
@@ -121,7 +144,10 @@ async function run_reserved_step(
 	return await core_budget.with_core_reservation(
 		reserved.weight,
 		async (admission) => ({
-			...(await run_gate_step(with_granted_workers(reserved.step, admission.granted), cpu)),
+			...(await run_gate_step(
+				await admitted_step(reserved, admission, budget.available_cores),
+				cpu,
+			)),
 			budget_note: core_budget.describe_overflow(admission),
 			claim: claim_of(reserved.weight, admission),
 		}),

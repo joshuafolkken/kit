@@ -337,7 +337,7 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 		expect(unit_worker_share.current_share).toHaveBeenCalledWith(
 			expect.any(Number),
 			expect.any(Number),
-			FREE_CORES,
+			{ cores: FREE_CORES, memory_workers: undefined },
 		)
 	})
 
