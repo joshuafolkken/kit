@@ -1,0 +1,8 @@
+{
+	"reason": "The sweep closes an epic whose last child a person closed by hand (#4564), and it must skip an epic a person reopened, which needs the listing's stateReason and a filter (review round 2).",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 40,
+		"ai_cost.on_demand_bytes": 50
+	}
+}

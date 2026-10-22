@@ -4,6 +4,9 @@ import { BLOCKED_BY_COUNT_FIELD } from './git-gh-issue-rest'
 import { git_gh_issue_write } from './git-gh-issue-write'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
+// The label listing's fields. `stateReason` rides along on the same response: the epic auto-close
+// reads `reopened` off it, so its sweep leaves an epic a person reopened to them (#4564).
+const LABELLED_FIELDS = 'number,body,stateReason'
 // The backlog scan's fields. The title rides along because the pre-filing scan compares titles
 // and it costs nothing: the same listing request already carries it, so the
 // two consumers share one read rather than each making their own.
@@ -111,7 +114,7 @@ async function issue_search_body(term: string, limit: number): Promise<IssueList
 }
 
 async function issue_list_by_label(label: string, limit: number): Promise<IssueListOutcome> {
-	return await issue_list({ json_fields: NUMBER_AND_BODY_FIELDS, limit, label })
+	return await issue_list({ json_fields: LABELLED_FIELDS, limit, label })
 }
 
 // The same filter with the fields the `auto-ok` pickup needs: it orders by

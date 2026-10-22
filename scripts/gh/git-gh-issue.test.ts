@@ -41,6 +41,19 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
+// joshuafolkken/kit#4564: the epic auto-close's sweep reads `reopened` off the label listing.
+describe('issue_list_by_label', () => {
+	it('asks for stateReason', async () => {
+		mocked_open.mockResolvedValue({ json: '[]', is_capped: false })
+
+		await git_gh_issue.issue_list_by_label(LABEL, LIMIT)
+
+		expect(mocked_open).toHaveBeenCalledWith(
+			expect.objectContaining({ json_fields: expect.stringContaining('stateReason') as string }),
+		)
+	})
+})
+
 // joshuafolkken/kit#1679: the one wrapper that does not list open issues. It is asserted here rather
 // than in `issue:scout`'s own suite because what it gets wrong fails silently — a listing asked for
 // with the default state answers open issues, which is precisely the scan that already existed.

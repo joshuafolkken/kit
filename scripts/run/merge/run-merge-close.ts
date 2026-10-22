@@ -60,7 +60,7 @@ async function with_notes_on_stderr(step: () => Promise<void>): Promise<void> {
 // or `josh issue:measured` — so its epics are evaluated here, through the one entry every child close
 // takes (`epic-close.ts`, #4560). A child still OPEN after a failed close is not: the auto-close
 // treats the child as closed without reading it. An `already-done` child reads OPEN here and is
-// parked, so a person who closes it later closes its epic too (`epic-commands/SKILL.md`).
+// parked; once a person closes it, the next child close sweeps its epic (`epic-close.ts`, #4564).
 async function close_merged(merged: MergedChild): Promise<void> {
 	if (!(await close_merged_open(merged))) return
 

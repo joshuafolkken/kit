@@ -47,6 +47,8 @@ const pr_info_schema = z.object({
 const epic_issue_schema = z.object({
 	number: z.number(),
 	body: z.string().optional(),
+	// REST answers null for an issue never closed and `reopened` for one a person reopened.
+	stateReason: z.string().nullish(),
 })
 
 // One blocker as `gh` reports it inside the `blockedBy` connection. `state` comes back with the
@@ -147,6 +149,7 @@ const open_issue_schema = z.object({
 
 type RollupItemData = z.infer<typeof rollup_item_schema>
 type EpicChildData = z.infer<typeof epic_child_schema>
+type EpicIssueData = z.infer<typeof epic_issue_schema>
 type OpenIssueData = z.infer<typeof open_issue_schema>
 type RestCommentData = z.infer<typeof rest_comment_schema>
 
@@ -166,4 +169,4 @@ export {
 	blocking_issue_schema,
 	blocked_by_schema,
 }
-export type { RollupItemData, EpicChildData, OpenIssueData, RestCommentData }
+export type { RollupItemData, EpicChildData, EpicIssueData, OpenIssueData, RestCommentData }

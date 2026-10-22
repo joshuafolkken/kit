@@ -1,5 +1,10 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { epic_child_schema, epic_issue_schema, type EpicChildData } from '#scripts/git/git-schemas'
+import {
+	epic_child_schema,
+	epic_issue_schema,
+	type EpicChildData,
+	type EpicIssueData,
+} from '#scripts/git/git-schemas'
 import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import {
 	parse_json_array_or_undefined,
@@ -37,6 +42,7 @@ interface EpicIssue {
 	children: Array<number>
 	external_children: Array<ExternalChild>
 	has_declared_order: boolean
+	is_reopened: boolean
 }
 
 interface SiblingState {
@@ -44,8 +50,12 @@ interface SiblingState {
 	has_blocked_by: boolean
 }
 
-function to_epic_issue(raw: { number: number; body?: string | undefined }): EpicIssue {
+// GitHub's `state_reason` for an open issue that was closed once and reopened.
+const REOPENED = 'reopened'
+
+function to_epic_issue(raw: EpicIssueData): EpicIssue {
 	return {
+		is_reopened: raw.stateReason === REOPENED,
 		number: raw.number,
 		children: epic_parse.parse_task_list_issue_numbers(raw.body),
 		external_children: epic_parse.parse_external_task_list_children(raw.body),
@@ -167,9 +177,8 @@ const CASCADE_DEPTH_NOTE = `⚠️  Epic auto-close cascade reached its ${String
 
 // **An unreadable comment listing does not stop the close.** It is announced and closed exactly as
 // it was before the duplicate check existed, because refusing here would strand the epic: nothing
-// re-triggers the auto-close once every child is closed — `resolve_and_close` only evaluates epics
-// holding the issue that just merged, and that merge has already happened. One rate-limited read
-// would leave a finished epic open until somebody noticed.
+// re-triggers the auto-close until some later child close sweeps the open epics, and that close may
+// never come. One rate-limited read would leave a finished epic open until somebody noticed.
 //
 // The direction is chosen on what each mistake costs, and they are not symmetric. Announcing twice
 // costs one redundant comment and nothing else, because the epic *closes* — which is what ends a loop
@@ -305,22 +314,74 @@ async function close_next_level(
 	return next
 }
 
-// Breadth-first up the nesting: level 0 closes the epics holding the merged issue, and each closed
-// epic becomes the next level's completed child, so a fully-finished parent closes in the same pass.
-async function cascade_close(
+// Breadth-first up the nesting: each closed epic becomes the next level's completed child, so a
+// fully-finished parent closes in the same pass. `false` when the depth cap stopped the walk.
+async function cascade_from(
 	open_epics: ReadonlyArray<EpicIssue>,
-	merged_number: number,
-): Promise<void> {
-	const evaluated = new Set<number>()
-	let frontier: ReadonlyArray<number> = [merged_number]
+	start: ReadonlyArray<number>,
+	evaluated: Set<number>,
+): Promise<boolean> {
+	let frontier = start
 
 	for (let depth = 0; depth < MAX_CASCADE_DEPTH; depth++) {
-		if (frontier.length === 0) return
+		if (frontier.length === 0) return true
 		// eslint-disable-next-line no-await-in-loop -- the cascade closes one level before reading the next
 		frontier = await close_next_level(open_epics, frontier, evaluated)
 	}
 
 	if (frontier.length > 0) console.info(CASCADE_DEPTH_NOTE)
+
+	return frontier.length === 0
+}
+
+// An epic listing no child has nothing to be complete: with no state to read, the completion check
+// would close it — a prose epic, or one whose task list is not written yet.
+function tracks_children(epic: EpicIssue): boolean {
+	return epic.children.length + epic.external_children.length > 0
+}
+
+// Every open epic the cascade did not reach, closed when each child is: an epic whose last child
+// closed outside every josh path — an `already-done` child `run:merge` parked and a person closed by
+// hand (#4564) — is found by the next close of any child. An epic is marked evaluated only once it
+// closes, so a parent read before its child epic closed here is evaluated again by that cascade.
+//
+// A reopened epic is left out: a person reopening a finished epic has said it is not done, and only
+// a close of one of its own children — the cascade above — may close it again.
+function is_sweep_target(epic: EpicIssue, evaluated: ReadonlySet<number>): boolean {
+	return !evaluated.has(epic.number) && !epic.is_reopened && tracks_children(epic)
+}
+
+async function sweep_unreached(
+	open_epics: ReadonlyArray<EpicIssue>,
+	merged_number: number,
+	evaluated: Set<number>,
+): Promise<Array<number>> {
+	const closed: Array<number> = []
+	const unreached = open_epics.filter((epic) => is_sweep_target(epic, evaluated))
+
+	for (const epic of unreached) {
+		// eslint-disable-next-line no-await-in-loop -- a closed epic joins the evaluated set the cascade reads
+		if (await close_epic_isolated(epic, merged_number)) closed.push(epic.number)
+	}
+
+	for (const number of closed) evaluated.add(number)
+
+	return closed
+}
+
+// Level 0 closes the epics holding the merged issue; the sweep then closes any other finished epic.
+// A cascade stopped at the depth cap asks for a manual close, so the sweep does not run past it.
+async function cascade_close(
+	open_epics: ReadonlyArray<EpicIssue>,
+	merged_number: number,
+): Promise<void> {
+	const evaluated = new Set<number>()
+
+	if (!(await cascade_from(open_epics, [merged_number], evaluated))) return
+
+	const swept = await sweep_unreached(open_epics, merged_number, evaluated)
+
+	await cascade_from(open_epics, swept, evaluated)
 }
 
 const UNREADABLE_EPIC_LIST_MESSAGE =
@@ -356,7 +417,8 @@ async function resolve_and_close_safely(merged_number: number): Promise<void> {
  * **The one entry every child close goes through** (#4560): `followup` after its merge,
  * `josh issue:measured` after its own close, and `run:merge` for every child it counts as merged —
  * which also catches a merge GitHub left OPEN. Running it
- * twice for one child is harmless: a closed epic is no longer in the open listing.
+ * twice for one child is harmless: a closed epic is no longer in the open listing. Every other open
+ * epic is swept too, so one whose last child closed outside these paths closes here (#4564).
  *
  * Requires `is_merged` — the child is known closed: the linked Issue is treated as closed without
  * being queried. On a `--no-merge` run that Issue is still open, so skipping this guard would close
