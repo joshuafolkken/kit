@@ -84,6 +84,10 @@ Report whether the working-tree change needs a test — `required`, `exempt`, or
 
 Run the changed `*.test.ts` files on a temporary merge-base worktree (the pre-fix tree; the working tree and index are untouched) and print `red`, `green`, `no-test` or `test-only`. A change whose every path is a test file prints `test-only` without running anything — the merge-base runs the same code as HEAD, so its result would say nothing about the fix. A change to a doc or `prompts/` file is not test-only, because a document-rule test reads those files. On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
 
+## `josh test:pinned` in detail
+
+Answer before the review what a reviewer otherwise finds by hand: "reverting this change leaves every test green" (joshuafolkken/kit#4516). The command reads `git diff -U0` from the merge-base for the changed non-test code files (`--diff-filter=M`: an added file's one hunk is the whole module, and removing it fails every importer). In a detached worktree at HEAD with the working-tree changes copied in — the caller's checkout and index are untouched — it puts each hunk back to the merge-base's lines, runs `vitest related <file> --run`, and restores the file before the next hunk. A hunk on which nothing went red (green, or no related test) prints `unpinned <file>:<line>`. Each hunk is one vitest run, so the hunks past `--max` (default 20) print `unchecked <file>:<line>` instead of running.
+
 ## `josh start` in detail
 
 **Prerequisites:** the [gh CLI](https://cli.github.com/), installed and signed in (`gh auth login`). Without it `josh start` stops before changing anything. A run that creates a commit (the first commit, or the setup pull request) also needs a Git author identity — [Tell Git who you are](../setup/prerequisites.md#4-tell-git-who-you-are); without one it stops before changing anything and prints the two `git config` commands that set it.
