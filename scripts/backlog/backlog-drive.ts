@@ -245,6 +245,8 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 		current = result.state
 	}
 
+	await backlog_drive_hold.stopped(state, current, ports)
+
 	return { kind: 'continue', state: current }
 }
 
@@ -358,9 +360,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 // `should_offer` is the caller's throttle on the one network read; a collection always asks, because a
 // lane just freed.
 function is_offering(before: DriveState, after: DriveState, should_offer: boolean): boolean {
-	if (after.is_stopping) return false
-
-	return should_offer || after.in_flight.length !== before.in_flight.length
+	return !after.is_stopping && (should_offer || after.in_flight.length !== before.in_flight.length)
 }
 
 // A stopping run with nothing left in flight has ended.

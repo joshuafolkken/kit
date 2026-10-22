@@ -184,4 +184,15 @@ describe('backlog_drive_hold.recorder — end', () => {
 
 		expect(record_released).toHaveBeenCalledOnce()
 	})
+
+	// A full pool released the hold, then the collected children's parks tripped the merge guard: the
+	// stop's release still ends their wait for an offer answer (joshuafolkken/kit#4571).
+	it('writes the stop release after a full pool already released the hold', async () => {
+		const holds = backlog_drive_hold.recorder(full)
+
+		await holds.hold(WAIT_REASON)
+		await holds.hold(undefined)
+
+		expect(record_released).toHaveBeenCalledTimes(2)
+	})
 })
