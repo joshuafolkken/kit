@@ -1,0 +1,7 @@
+{
+	"reason": "#4505: pre-detach records its green type check and exports:unused with the gate's per-check record so the gate stage reuses them",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 38
+	}
+}
