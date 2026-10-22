@@ -14,7 +14,7 @@ import { whole_suite_files } from './whole-suite-files'
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
 // non-code file added since the recorded tree that no recorded test read, where a test read inside its
 // directory or the tree did not hold it, or a file every test
-// depends on. A non-code file the recorded tree already held and no test read is one no test reads
+// depends on — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
 // (joshuafolkken/kit#4073), and so is one added since to a directory the tree held and no test read
 // inside (joshuafolkken/kit#4303), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
@@ -95,6 +95,11 @@ interface ScopeRequest {
 	// was recorded — the ones whose having no reader in the map means no test reads them.
 	recorded: ReadonlySet<string>
 	is_present: (file_path: string) => boolean
+	// The part of `changed` that joined only because it differs from the map's tree — which another
+	// lane's branch records — not because this change moved it. It still adds the tests reading it,
+	// but never sends the run to the whole suite: this tree verified it already, or main's CI did
+	// (joshuafolkken/kit#4527).
+	since_map?: ReadonlyArray<string>
 }
 
 // What the decision narrows to: the files to hand vitest, and the changed files known to reach no
@@ -110,6 +115,10 @@ type MapResolution = Selection | { reason: string; triggers?: ReadonlyArray<stri
 
 function is_relatable(file_path: string): boolean {
 	return RELATABLE_EXTENSIONS.has(path.extname(file_path))
+}
+
+function is_moved(request: ScopeRequest, file: string): boolean {
+	return request.since_map?.includes(file) !== true
 }
 
 // A full-suite scope's `files` are the changed files that sent it there (joshuafolkken/kit#4510), as a
@@ -129,7 +138,10 @@ function resolve_through_map(others: ReadonlyArray<string>, request: ScopeReques
 
 	const unread = others.filter((file) => test_read_map.readers_of(map, file).length === 0)
 	const unknown = unread.filter(
-		(file) => !recorded.has(file) && !test_read_map.in_unread_directory(map, file),
+		(file) =>
+			is_moved(request, file) &&
+			!recorded.has(file) &&
+			!test_read_map.in_unread_directory(map, file),
 	)
 
 	if (unknown.length > 0) {
@@ -177,7 +189,7 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 
 	if (changed === undefined) return all_scope(UNREADABLE_REASON)
 
-	const whole = changed.filter((file) => WHOLE_SUITE_FILES.has(file))
+	const whole = changed.filter((file) => WHOLE_SUITE_FILES.has(file) && is_moved(request, file))
 
 	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
 
