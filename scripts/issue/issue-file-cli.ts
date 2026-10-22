@@ -22,6 +22,7 @@ import { issue_file_fold } from './issue-file-fold'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
+import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
@@ -29,7 +30,8 @@ import { issue_wip } from './issue-wip'
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
 // with every filing step run in order: the third-party refusal, the body
 // lint, the `## Origin` check for another repository, the `auto-ok` decision
-// with the run label it owes, the fold question against the run's earlier
+// with the run label it owes, the start condition read as a pull request, the fold question against
+// the run's earlier
 // filings, the WIP cap count, the
 // duplicate scout, the missing workflow labels created, the create call
 // carrying every label, the release link on `--release`, and `epic:bundle`.
@@ -253,6 +255,20 @@ function is_admitted(filing: Filing): boolean {
 	return false
 }
 
+// The start condition's citation read against GitHub — after the local refusals, before any listing.
+async function is_source_clear(filing: Filing): Promise<boolean> {
+	const is_here = issue_file.is_same_repository(filing.target, filing.current)
+	const problem = await issue_sample_source.problem(
+		filing.body,
+		is_here ? undefined : filing.target,
+	)
+
+	if (problem === undefined) return true
+	console.error(`✖ ${problem}`)
+
+	return false
+}
+
 async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<number> {
 	const url = await create(filing, labels)
 
@@ -276,7 +292,7 @@ async function is_clear(filing: Filing): Promise<boolean> {
 }
 
 async function file(filing: Filing): Promise<number> {
-	if (!is_admitted(filing)) return FAILURE_EXIT_CODE
+	if (!is_admitted(filing) || !(await is_source_clear(filing))) return FAILURE_EXIT_CODE
 	const labels = labels_of(filing)
 
 	if (labels === undefined || !(await is_clear(filing))) return FAILURE_EXIT_CODE
