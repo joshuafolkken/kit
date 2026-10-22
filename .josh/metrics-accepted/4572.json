@@ -1,0 +1,7 @@
+{
+	"reason": "Split the config-needed run-marker part out of unit-worker-share.ts into unit-run-marker.ts (new module header/imports) and added synced_data() so test:related narrows a synced non-code file instead of running the whole suite #4572",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}

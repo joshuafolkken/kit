@@ -48,6 +48,7 @@ const SCOPE_TEST = path.join('scripts', 'test', 'test-related-scope-triggers.tes
 const NARROWING_LINE = 'since its last green run'
 const MAP_TREE = 'f00dcafe'
 const PRUNED_TREE = new Error('bad object')
+const NOT_A_REPOSITORY = new Error('not a git repository')
 
 function map_with(
 	readers: Record<string, Array<string>>,
@@ -171,7 +172,7 @@ describe('test_related.run_related_tests — reading the whole branch instead', 
 	it('runs the whole suite when neither change can be read', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockRejectedValue(PRUNED_TREE)
 		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
-		mocked_changed.mockRejectedValue(new Error('not a git repository'))
+		mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
 
 		await test_related.run_related_tests([])
 
@@ -244,6 +245,39 @@ describe('test_related.run_related_tests — a test changed since the map', () =
 			absolute(SCOPE_TEST),
 			'--run',
 		])
+	})
+})
+
+// joshuafolkken/kit#4572: a sync brought in `.josh/metrics-accepted/<N>.json`, which no recorded test
+// read, and the run went to the whole suite as if this branch had added it.
+describe('test_related.run_related_tests — a non-code file a main sync brought in', () => {
+	const accepted = path.join('.josh', 'metrics-accepted', '4527.json')
+
+	it('runs no test for it rather than the whole suite', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
+		mocked_moved.mockResolvedValue({ changed: [], synced: [accepted] })
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_run).not.toHaveBeenCalled()
+	})
+
+	it('still runs the whole suite when this branch changed it too', async () => {
+		mocked_changed.mockResolvedValue([accepted])
+		mocked_moved.mockResolvedValue({ changed: [accepted], synced: [accepted] })
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['run'])
+	})
+
+	it('still runs the whole suite when the branch change cannot be read', async () => {
+		mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
+		mocked_moved.mockResolvedValue({ changed: [], synced: [accepted] })
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['run'])
 	})
 })
 

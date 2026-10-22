@@ -103,7 +103,7 @@ function marker_name(key: string): string {
 	return `${RESERVED_PREFIX}${key}${RESERVED_SUFFIX}`
 }
 
-// **"Cannot tell" counts as live**, the same direction `unit-worker-share.ts` takes: being wrong that
+// **"Cannot tell" counts as live**, the same direction `unit-run-marker.ts` takes: being wrong that
 // way costs a reservation a slower admission, while the other way admits past a run that is still there.
 function is_running(reservation: Reservation): boolean {
 	return process_identity.is_same_process(reservation.pid, reservation.process_start) !== false
@@ -119,7 +119,7 @@ function read_reservation(source: string): Reservation | undefined {
 
 // **A dead marker is removed, not merely skipped** — otherwise a reissued pid turns a leaked place into
 // a phantom that fills the budget for good. The unlink never throws: a marker this account may not
-// remove is left alone, exactly as `unit-worker-share.ts` leaves it.
+// remove is left alone, exactly as `unit-run-marker.ts` leaves it.
 function sweep_marker(source: string): void {
 	try {
 		stamp_file.remove_stamp(source)

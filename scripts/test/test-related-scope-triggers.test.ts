@@ -42,6 +42,16 @@ function scope_of(
 	})
 }
 
+// joshuafolkken/kit#4572: the worker share's bounds change often, so the vitest config imports only
+// the run markers and a change to the bounds narrows like any module.
+describe('related_scope.resolve_scope — the worker share', () => {
+	const worker_share = path.join(SCRIPTS_DIRECTORY, 'test', 'unit-worker-share.ts')
+
+	it('narrows a change to the worker share rather than running the whole suite', () => {
+		expect(scope_of([worker_share])).toMatchObject({ mode: 'related', files: [at(worker_share)] })
+	})
+})
+
 describe('related_scope.resolve_scope — the files that sent it to the whole suite', () => {
 	it('holds every changed file every test depends on, while the reason names the first', () => {
 		const scope = scope_of([SOURCE_FILE, PACKAGE_FILE, LOCK_FILE])
