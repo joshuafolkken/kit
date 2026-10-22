@@ -949,7 +949,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "reserved-run": [
-      "<weight> -- <command...>",
+      "<weight> [--memory <MB>] -- <command...>",
       "automation",
       [
         "processes",

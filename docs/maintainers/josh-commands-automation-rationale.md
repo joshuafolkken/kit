@@ -165,7 +165,7 @@ Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`]
 
 ## `josh reserved-run` in detail
 
-Runs a command while holding a place in the machine-wide core budget ([`josh gate`](../josh-commands.md#josh-gate)'s ledger, `scripts/gate/core-budget.ts`). Wired in by `lefthook/base.yml` as the pre-push `setup` install and the `audit` command, so both count toward the same budget the gate's checks reserve from — eight lanes pushing around the same time no longer spike a machine the gate thought it had to itself.
+Runs a command while holding a place in the machine-wide core budget ([`josh gate`](../josh-commands.md#josh-gate)'s ledger, `scripts/gate/core-budget.ts`). Wired in by `lefthook/base.yml` as the pre-push `setup` install and the `audit` command, so both count toward the same budget the gate's checks reserve from — eight lanes pushing around the same time no longer spike a machine the gate thought it had to itself. It reserves memory too (joshuafolkken/kit#4582): a lane ran `reserved-run 4 -- sh -c '… eslint . --concurrency 4 …'`, typed eslint holds about 2.4 GB per worker, and a 12 GB process admitted beside four lanes swapped the machine. The estimate is the largest tool on the line, not the sum, because commands on one line run one after another. A command the table does not know stays at 0 MB, so a josh command that reserves its own (`pnpm josh audit`) is not counted twice. eslint's `--concurrency auto` is read as half the cores, ESLint 10's own cap. A lane child is refused a multi-worker eslint even when reserved: one lane's 12 GB starves every other lane whatever the ledger says, so a concurrency is measured outside a lane.
 
 ## `josh pre-commit-type-check` in detail
 

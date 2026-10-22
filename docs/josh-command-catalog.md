@@ -109,7 +109,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh pre-commit-type-check` | — | automation | processes | Git hook: type-check, reusing a green gate recorded on the committed tree |
 | `josh pre-push-unit` | — | automation | processes | Git hook: run unit tests, reusing a green gate recorded on the pushed tree |
 | `josh prevent-main-commit` | — | automation | none | Git hook: block commits to main |
-| `josh reserved-run` | `<weight> -- <command...>` | automation | processes | Git hook: run a command while holding a place in the machine-wide core budget |
+| `josh reserved-run` | `<weight> [--memory <MB>] -- <command...>` | automation | processes | Git hook: run a command while holding a place in the machine-wide core budget |
 | `josh secretlint-scan` | `[paths...]` | automation | none | Git hook: scan staged files for secrets |
 
 ## AI tools

@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { core_budget } from '#scripts/gate/core-budget'
+import { core_weights } from '#scripts/gate/core-weights'
+import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { reserved_run } from './reserved-run'
 
 // joshuafolkken/kit#2351: the pre-push `pnpm install` and `pnpm josh audit` were outside the core
@@ -7,6 +10,11 @@ import { reserved_run } from './reserved-run'
 // runs and its exit code is returned while the reservation is released around it.
 
 const AUDIT_WEIGHT = 1
+const EXPLICIT_MB = 3000
+const FOUR_WORKERS = 4
+const THREE_WORKERS = 3
+const { MEMORY_MB } = core_weights
+const ESLINT_FOUR = ['pnpm', 'exec', 'eslint', '.', '--concurrency', String(FOUR_WORKERS)]
 
 describe('reserved_run.parse_arguments', () => {
 	it('reads the weight and the command it guards', () => {
@@ -25,12 +33,82 @@ describe('reserved_run.parse_arguments', () => {
 		['a zero weight', ['0', '--', 'pnpm', 'install']],
 		['a negative weight', ['-3', '--', 'pnpm', 'install']],
 		['nothing to run', ['1', '--']],
+		['a `--memory` with no value', ['1', '--memory', '--', 'pnpm', 'install']],
+		['a non-integer `--memory`', ['1', '--memory', 'lots', '--', 'pnpm', 'install']],
+		['a zero `--memory`', ['1', '--memory', '0', '--', 'pnpm', 'install']],
+		['an unknown option', ['1', '--cores', '2', '--', 'pnpm', 'install']],
 	])('rejects %s', (_label: string, argv: ReadonlyArray<string>) => {
 		expect(reserved_run.parse_arguments(argv)).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#4582: the explicit memory a caller knows better than the estimate.
+	it('reads `--memory <MB>` before the separator', () => {
+		expect(
+			reserved_run.parse_arguments(['2', '--memory', String(EXPLICIT_MB), '--', 'pnpm', 'install']),
+		).toEqual({ weight: 2, memory_mb: EXPLICIT_MB, command: ['pnpm', 'install'] })
+	})
+})
+
+// joshuafolkken/kit#4582: the reservation carried no memory, so a 12 GB four-worker eslint was admitted
+// beside four other lanes. The claim now carries the explicit `--memory`, else the estimate, else none.
+function options_of(argv: ReadonlyArray<string>): {
+	command: string
+	memory_mb: number | undefined
+} {
+	const parsed = reserved_run.parse_arguments(argv)
+
+	if (parsed === undefined) throw new Error('usage error')
+
+	return reserved_run.reservation_options(parsed)
+}
+
+describe('reserved_run.reservation_options', () => {
+	it('reserves a four-worker eslint at four times the lint memory', () => {
+		expect(options_of(['4', '--', ...ESLINT_FOUR]).memory_mb).toBe(MEMORY_MB.lint * FOUR_WORKERS)
+	})
+
+	it('reads a shell script handed through argv', () => {
+		const argv = ['4', '--', 'sh', '-c', ESLINT_FOUR.join(' ')]
+
+		expect(options_of(argv).memory_mb).toBe(MEMORY_MB.lint * FOUR_WORKERS)
+	})
+
+	it('reserves vitest at its worker count', () => {
+		const argv = ['2', '--', 'vitest', 'run', '--maxWorkers', '3']
+
+		expect(options_of(argv).memory_mb).toBe(MEMORY_MB.unit_worker * THREE_WORKERS)
+	})
+
+	it('prefers an explicit `--memory` over the estimate', () => {
+		const argv = ['4', '--memory', String(EXPLICIT_MB), '--', 'pnpm', 'exec', 'eslint', '.']
+
+		expect(options_of(argv).memory_mb).toBe(EXPLICIT_MB)
+	})
+
+	// The argv is re-read as a shell line, so a separator inside one argument must not cut it.
+	it('keeps a separator inside one argument from reading as a command', () => {
+		const argv = ['1', '--', 'git', 'commit', '-m', 'a; eslint .']
+
+		expect(options_of(argv)).toEqual({
+			command: "git commit -m 'a; eslint .'",
+			memory_mb: undefined,
+		})
+	})
+
+	// A `josh` command reserves its own place; reading it here would count it twice.
+	it('leaves a command the table does not know at no memory', () => {
+		expect(options_of([String(AUDIT_WEIGHT), '--', 'pnpm', 'josh', 'audit'])).toEqual({
+			command: 'pnpm josh audit',
+			memory_mb: undefined,
+		})
 	})
 })
 
 describe('reserved_run.run_reserved', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	// The whole path: a guarded command runs while a place is held, and its exit code is what the caller
 	// returns. `node --version` exits 0 and needs nothing installed, so it exercises the wrapper without
 	// depending on the surrounding project.
@@ -44,5 +122,18 @@ describe('reserved_run.run_reserved', () => {
 	// propagates.
 	it('returns a failure code on a usage error', async () => {
 		expect(await reserved_run.run_reserved(['not-a-weight'])).toBe(1)
+	})
+
+	// joshuafolkken/kit#4582: the estimate reaches the ledger only if the claim carries it.
+	it('hands the reservation options to the core budget', async () => {
+		vi.spyOn(unit_worker_share, 'is_nested_run').mockReturnValue(false)
+		const reserve = vi.spyOn(core_budget, 'with_core_reservation').mockResolvedValue(0)
+
+		await reserved_run.run_reserved([String(FOUR_WORKERS), '--', ...ESLINT_FOUR])
+
+		expect(reserve).toHaveBeenCalledWith(FOUR_WORKERS, expect.any(Function), {
+			command: ESLINT_FOUR.join(' '),
+			memory_mb: MEMORY_MB.lint * FOUR_WORKERS,
+		})
 	})
 })

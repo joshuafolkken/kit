@@ -1,6 +1,7 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
 // The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
@@ -55,6 +56,26 @@ function spoken_line(command: string): string {
 	return SHELL_SCRIPT_RUNNER.test(plain) ? command : plain
 }
 
+const LEADING_SHELL_SCRIPT_RUNNER = new RegExp(`^${SHELL_SCRIPT_RUNNER.source}`, 'u')
+const QUOTE_MARK = /["']/gu
+
+// The quoted script a segment's shell runs, as a line of its own: `sh -c 'pnpm exec eslint .'` reads
+// as `pnpm exec eslint .`, so a caller cutting it into commands reads the programs the script
+// launches. Only when the segment's program is the runner — `echo sh -c x` hands no script to a shell.
+// `undefined` when the segment runs no shell script.
+function shell_script_of(segment: string): string | undefined {
+	const call = git_argv.program_of(segment)
+
+	if (call === undefined) return undefined
+
+	const spoken = [call.name, ...call.args].join(' ')
+	const runner = LEADING_SHELL_SCRIPT_RUNNER.exec(spoken)
+
+	if (runner === null) return undefined
+
+	return spoken.slice(runner[0].length).replaceAll(QUOTE_MARK, '').trim()
+}
+
 function is_direct_filing(command: string): boolean {
 	const spoken = spoken_line(command)
 
@@ -74,6 +95,6 @@ function is_issue_filing(command: string): boolean {
 		.some((segment) => shell_segments.is_josh_command(segment, FILING_NAMES))
 }
 
-const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command }
+const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command, shell_script_of }
 
 export { bash_triggers }

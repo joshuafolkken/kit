@@ -24,6 +24,29 @@ const ISSUE_LIST_COMMAND = 'gh issue list --state open --limit 100'
 const LEAVES_ALONE = 'leaves %j alone'
 const READS_A_FILING = 'reads %j as a filing'
 
+// joshuafolkken/kit#4582: a quoted script handed to a shell is read as the commands it runs, so a heavy
+// tool inside `sh -c` is counted and refused like a direct one; a runner named inside quotes is not one.
+describe('shell_script_of', () => {
+	const eslint = 'pnpm exec eslint .'
+
+	it.each([
+		[`sh -c '${eslint}'`, eslint],
+		['bash -lc "cd x && vitest run"', 'cd x && vitest run'],
+		["FOO=1 /bin/sh -c 'tsc --noEmit'", 'tsc --noEmit'],
+		["eval 'tsc -p .'", 'tsc -p .'],
+	])('reads %j as %j', (command, script) => {
+		expect(bash_triggers.shell_script_of(command)).toBe(script)
+	})
+
+	// The runner has to be the segment's program, not a word anywhere in it.
+	it.each([eslint, 'git commit -m "fix sh -c eslint"', "echo sh -c 'eslint .'"])(
+		LEAVES_ALONE,
+		(command) => {
+			expect(bash_triggers.shell_script_of(command)).toBeUndefined()
+		},
+	)
+})
+
 // The `direct-filing` trigger, judged from the command alone (joshuafolkken/kit#2808). Both
 // hand-built spellings file an Issue; the reads below them use the same endpoint and create nothing.
 describe('is_direct_filing', () => {

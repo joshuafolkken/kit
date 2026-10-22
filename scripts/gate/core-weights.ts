@@ -69,6 +69,18 @@ const MEMORY_MB = {
 	install: 100,
 } as const
 
-const core_weights = { CORE_WEIGHTS, MEASURED, MEMORY_MB }
+// **The program a command launches, mapped to the `MEMORY_MB` row it holds** — the one table
+// `command-memory.ts` reads a wrapped command's memory off. `install` is `pnpm install` read past its
+// `pnpm` wrapper (`git_argv.program_of`).
+const TOOL_MEMORY: Readonly<Partial<Record<string, keyof typeof MEMORY_MB>>> = {
+	eslint: 'lint',
+	tsc: 'type_check',
+	cspell: 'spell_check',
+	vitest: 'unit_worker',
+	prettier: 'format',
+	install: 'install',
+}
+
+const core_weights = { CORE_WEIGHTS, MEASURED, MEMORY_MB, TOOL_MEMORY }
 
 export { core_weights }

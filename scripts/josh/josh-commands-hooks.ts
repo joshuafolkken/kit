@@ -50,11 +50,12 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/hooks/reserved-run.ts',
 		description: 'Git hook: run a command while holding a place in the machine-wide core budget',
 		category: 'Git hooks',
-		reference: ['<weight> -- <command...>', 'automation', ['processes']],
+		reference: ['<weight> [--memory <MB>] -- <command...>', 'automation', ['processes']],
 		usage: {
 			examples: [
 				{ arguments: '2 -- pnpm install', note: 'hold 2 cores while installing' },
 				{ arguments: '1 -- pnpm josh audit', note: 'hold 1 core while scanning' },
+				{ arguments: '1 --memory 3000 -- <command>', note: 'hold 3,000 MB beside the core' },
 			],
 		},
 	},
