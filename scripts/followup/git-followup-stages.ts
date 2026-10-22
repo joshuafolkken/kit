@@ -1,6 +1,7 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { time_format } from '#scripts/time-runtime/time-format'
+import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-coderabbit-wait'
 
 // Where `pnpm josh followup` spends its own wall clock.
 //
@@ -90,13 +91,17 @@ interface FollowupStage {
 // `last_ms` is `performance.now()`'s clock rather than `Date.now()`'s, for the reason
 // `buffered-process.ts` states: it is monotonic, so a system clock adjusted mid-wait cannot produce a
 // negative lap.
+//
+// `coderabbit` rides on the log because every check wait of the run — the merge gate's and the one the
+// merge goes back to (#4036) — adds to the same CodeRabbit time.
 interface StageLog {
 	stages: Array<FollowupStage>
 	last_ms: number
+	coderabbit: CodeRabbitWait
 }
 
 function new_log(): StageLog {
-	return { stages: [], last_ms: performance.now() }
+	return { stages: [], last_ms: performance.now(), coderabbit: followup_coderabbit_wait.new_wait() }
 }
 
 function lap(log: StageLog, name: string): void {
@@ -140,7 +145,7 @@ function print_stages(log: StageLog): void {
 
 // The wait for CI goes to the lane ledger as well, where `josh lane:stats` reads it beside the review
 // round it would overlap: the printed block reaches only this run's reader. A wait that threw is the
-// `interrupted` lap and records nothing here.
+// `interrupted` lap and records nothing here. CodeRabbit's part of the waits goes beside it.
 async function record_ci_wait(log: StageLog): Promise<void> {
 	const wait = log.stages.find((stage) => stage.name === STAGE.checks_wait)
 
@@ -152,6 +157,11 @@ async function record_ci_wait(log: StageLog): Promise<void> {
 	})
 }
 
+async function record_waits(log: StageLog): Promise<void> {
+	await record_ci_wait(log)
+	await followup_coderabbit_wait.record(log.coderabbit)
+}
+
 const git_followup_stages = {
 	STAGE,
 	STAGE_LINE_PREFIX,
@@ -161,7 +171,7 @@ const git_followup_stages = {
 	total_ms,
 	format_stages,
 	print_stages,
-	record_ci_wait,
+	record_waits,
 	stopped_lap,
 }
 

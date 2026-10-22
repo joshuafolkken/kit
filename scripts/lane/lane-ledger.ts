@@ -37,6 +37,10 @@ const LEDGER_SUFFIX = '.jsonl'
 const LINE_SEPARATOR = '\n'
 // `followup`'s wait for CI — a stage of a lane's run that no `josh ship` stage is the whole of.
 const CI_WAIT_STAGE = 'ci-wait'
+// The part of `followup`'s waits CodeRabbit spent running or rate-limited, and the rate-limited part
+// alone (joshuafolkken/kit#4574).
+const CODERABBIT_WAIT_STAGE = 'coderabbit-wait'
+const CODERABBIT_RATE_LIMIT_STAGE = 'coderabbit-rate-limit'
 // A detached `josh ship`'s fast checks in the agent's own turn — not a resumable ship stage, since the
 // supervised gate runs them again (joshuafolkken/kit#4382).
 const PRE_DETACH_STAGE = 'pre-detach'
@@ -192,6 +196,8 @@ function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 
 const lane_ledger = {
 	CI_WAIT_STAGE,
+	CODERABBIT_RATE_LIMIT_STAGE,
+	CODERABBIT_WAIT_STAGE,
 	KIND,
 	PRE_DETACH_STAGE,
 	append,

@@ -13,6 +13,7 @@ import {
 	type TelegramTaskType,
 } from '#scripts/notify/telegram-notify'
 import { followup_checks_event } from './followup-checks-event'
+import { followup_coderabbit_wait } from './followup-coderabbit-wait'
 import { git_followup_merged } from './git-followup-merged'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
@@ -241,12 +242,16 @@ function wait_for_green_of(
 	input: FollowupInput,
 	context: TelegramContext,
 	issue_number: string | undefined,
+	log: StageLog,
 ): WaitForGreen {
 	return async function wait_for_green(): Promise<PrStateSnapshot> {
 		return await run_checks({
 			branch_name: input.branch_name,
 			is_skip_watch: input.is_skip_watch,
-			observe: followup_checks_event.observer_of(issue_number, context.pr_url),
+			observe: followup_coderabbit_wait.both(
+				followup_checks_event.observer_of(issue_number, context.pr_url),
+				followup_coderabbit_wait.observer_of(log.coderabbit),
+			),
 		})
 	}
 }
@@ -262,7 +267,7 @@ async function run_review_checks(
 	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})
-	const snapshot = await wait_for_green_of(input, context, issue_number)()
+	const snapshot = await wait_for_green_of(input, context, issue_number, log)()
 
 	lap(log, STAGE.checks_wait)
 	const check_notes = read_coderabbit_skip_notes(snapshot)
@@ -318,7 +323,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			is_merged: input.is_merged,
 			is_completion_recorded,
 			checked: checks.snapshot,
-			wait_for_green: wait_for_green_of(input, context, issue_number),
+			wait_for_green: wait_for_green_of(input, context, issue_number, log),
 		},
 		log,
 	)
@@ -342,7 +347,7 @@ async function run(input: FollowupInput): Promise<string | undefined> {
 		throw error
 	} finally {
 		git_followup_stages.print_stages(log)
-		await git_followup_stages.record_ci_wait(log)
+		await git_followup_stages.record_waits(log)
 	}
 }
 

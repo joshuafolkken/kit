@@ -23,7 +23,8 @@ on the common git directory so every lane, the parent and the sampler write to t
 | `core-wait` | a command a held core-budget claim admitted after a wait      | `at`, `command`, `waited_ms`, `issue?`                               |
 
 A `stage` entry's `at` is when the stage ended, so it began `elapsed_ms` earlier. `josh followup`
-writes one of its own, `ci-wait` — the time it spent waiting for the checks — and that one carries no
+writes one of its own, `ci-wait` — the time it spent waiting for the checks — and, when its polls saw
+CodeRabbit still running or rate-limited, `coderabbit-wait` and `coderabbit-rate-limit`; these carry no
 `issue`.
 
 `unit_ms` is the unit suite's own duration, present when the gate ran it; `josh metrics` reads the
@@ -92,6 +93,8 @@ order a lane passes them, each with its median, its maximum and how many runs th
 | `implement`                   | a `dispatch` entry to the start of the same issue's first `stage` after it  | how much of a lane neither decision below can move                |
 | `review`                      | `stage` entries of `josh ship`'s round-one review                           | whether to overlap the round-one review with CI                   |
 | `ci-wait`                     | `stage` entries `josh followup` writes for its wait on the checks           | whether to overlap the round-one review with CI                   |
+| `coderabbit-wait`             | `stage` entries `josh followup` writes for CodeRabbit's part of its waits   | whether CodeRabbit is what holds a followup up                    |
+| `coderabbit-rate-limit`       | `stage` entries `josh followup` writes for the rate-limited part of that    | whether to file a remedy for CodeRabbit's rate limit              |
 | `gate`                        | `stage` entries of `josh ship`'s gate                                       | whether to lower `JOSH_LANE_LIMIT`, beside the load columns       |
 | `preflight`, `sync`, `commit` | `stage` entries of `josh ship`                                              | the rest of the time from dispatch to the pull request            |
 | `pre-detach`                  | `stage` entries of a detached `josh ship`'s fast checks in the child's turn | the time the child's own turn spends checking before the hand-off |
@@ -114,6 +117,16 @@ replacement's ship is not counted against it.
 **`ci-wait` is inside `followup`**, not beside it: the two rows overlap, and `ci-wait` is the part of
 `followup` that waited for the checks. Only a wait that ran to its end is recorded — one that was
 interrupted leaves no entry.
+
+**`coderabbit-wait` is the part of `followup`'s check waits CodeRabbit was still running or
+rate-limited, and `coderabbit-rate-limit` the rate-limited part of it**
+([#4574](https://github.com/joshuafolkken/kit/issues/4574)). CodeRabbit does not gate the merge, so
+both overlap the check waits rather than add to them. Unlike `ci-wait`, they cover every check wait of
+the run — the one the merge goes back to, and one that ended on a red check — so they are not bounded
+by `ci-wait`.
+
+Each interval between two polls counts as the state the earlier poll saw. A run whose polls never saw
+CodeRabbit waiting writes neither, so `runs` counts the followups CodeRabbit overlapped.
 
 **The two decisions the table is for.** Overlapping the round-one review with CI pays only when round
 one finds nothing to fix: CI then runs once, on the head the review passed. When round one fixes

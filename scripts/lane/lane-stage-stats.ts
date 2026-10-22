@@ -15,7 +15,9 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // dispatched, and a ship resumed after a fix cannot record the implementation twice.
 //
 // **`ci-wait` is `followup`'s own lap, inside the `followup` stage** — a row of its own so the wait for
-// CI reads beside `review`, the round-one review it would overlap.
+// CI reads beside `review`, the round-one review it would overlap. `coderabbit-wait` and
+// `coderabbit-rate-limit` follow it: how much of `followup`'s waiting CodeRabbit was still running or
+// rate-limited, a row recorded only by a run that saw it.
 
 const DECIMALS = 1
 const NOT_MEASURED = 'not measured'
@@ -33,6 +35,8 @@ const STAGES = [
 	STAGE.ROUND_TWO,
 	STAGE.FOLLOWUP,
 	lane_ledger.CI_WAIT_STAGE,
+	lane_ledger.CODERABBIT_WAIT_STAGE,
+	lane_ledger.CODERABBIT_RATE_LIMIT_STAGE,
 	STAGE.REPORT,
 ] as const
 
