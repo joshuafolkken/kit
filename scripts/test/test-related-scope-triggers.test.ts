@@ -83,3 +83,36 @@ describe('related_scope.resolve_scope — the files that sent it to the whole su
 		expect(scope_of([]).files).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#4532: a code file only the map's tree differs by reaches vitest only when it names a
+// file this change moved.
+describe('related_scope.resolve_scope — a code file that joined only from the map’s tree', () => {
+	const changed = [SOURCE_FILE, DOCUMENT_READER]
+
+	it('is left out when it names no moved file', () => {
+		expect(scope_of(changed, [DOCUMENT_READER]).files).toStrictEqual([at(SOURCE_FILE)])
+	})
+
+	it('is handed to vitest when it is a test file, whatever it names', () => {
+		const test_file = path.join(SCRIPTS_DIRECTORY, 'thing.test.ts')
+
+		expect(scope_of([SOURCE_FILE, test_file], [test_file]).files).toStrictEqual([
+			at(SOURCE_FILE),
+			at(test_file),
+		])
+	})
+
+	it('is handed to vitest when it names a moved file', () => {
+		const scope = related_scope.resolve_scope({
+			root: ROOT,
+			changed,
+			map: MAP,
+			recorded: new Set(),
+			is_present: () => true,
+			since_map: [DOCUMENT_READER],
+			naming_moved: new Set([DOCUMENT_READER]),
+		})
+
+		expect(scope.files).toStrictEqual([at(SOURCE_FILE), at(DOCUMENT_READER)])
+	})
+})
