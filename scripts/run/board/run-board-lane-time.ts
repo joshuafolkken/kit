@@ -1,4 +1,5 @@
 import { lane_spans, type IssueAt, type Span } from '#scripts/lane/lane-spans'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
@@ -56,6 +57,66 @@ function in_lane_ms(spans: ReadonlyArray<Span>, end_ms: number): number {
 	)
 }
 
-const run_board_lane_time = { LAUNCH_KINDS, in_lane_ms, spans_of }
+// The time a child ran on a lane up to `ended_ms`: its spans summed, or from `started_ms` where its
+// launch rolled off the stream and left none.
+function elapsed_of(spans: ReadonlyArray<Span>, started_ms: number, ended_ms: number): number {
+	return spans.length === 0 ? ended_ms - started_ms : in_lane_ms(spans, ended_ms)
+}
+
+interface EndingRead {
+	// The whole stream, not a run's span: the launch may predate the run now drawing the board.
+	events: ReadonlyArray<RunEvent>
+	issue: number
+	record: LaneStateRecord | undefined
+	ended_ms: number
+}
+
+// When the lane record says the child last launched; a record with no launch has none.
+function launched_ms(record: LaneStateRecord | undefined): number | undefined {
+	const launched_at = record?.launched_at
+
+	return launched_at === undefined ? undefined : Date.parse(launched_at)
+}
+
+// Where the board's count of an open lane begins: the start of the run that last launched it, whose span
+// holds every launch the running row sums (`run-board-status.ts` → `with_spans`). A record the one-off
+// migration wrote names no run, so it counts from its newest launch.
+function counted_from(run: LaneStateRecord['run'], started_ms: number): number {
+	return run === undefined ? started_ms : Date.parse(run.started_at)
+}
+
+function is_ended(spans: ReadonlyArray<Span>): boolean {
+	return spans.at(-1)?.end_ms !== undefined
+}
+
+/**
+ * The time an ending records for its child (joshuafolkken/kit#4481): computed once as it is written,
+ * from the spans the run that last launched it holds — what the board sums for an open lane
+ * (`run-board-lane-state.ts`), so the row keeps the time it drew while running. A child with no
+ * recorded launch, or whose newest span already ended, is not on a lane this ending takes it off, so it
+ * records none.
+ */
+function ending_elapsed(read: EndingRead): number | undefined {
+	const started_ms = launched_ms(read.record)
+
+	if (started_ms === undefined) return undefined
+
+	const from_ms = counted_from(read.record?.run, started_ms)
+	const spans = (spans_of(read.events).get(read.issue) ?? []).filter(
+		(span) => span.from_ms >= from_ms,
+	)
+
+	return is_ended(spans) ? undefined : elapsed_of(spans, started_ms, read.ended_ms)
+}
+
+const run_board_lane_time = {
+	LAUNCH_KINDS,
+	OFF_LANE_KINDS,
+	elapsed_of,
+	ending_elapsed,
+	in_lane_ms,
+	spans_of,
+}
 
 export { run_board_lane_time }
+export type { EndingRead }

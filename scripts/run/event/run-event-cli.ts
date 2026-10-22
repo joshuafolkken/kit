@@ -39,10 +39,6 @@ const TEXT_INDEX = 2
 const USAGE =
 	'Usage: josh run:event --append <kind> <text> | --from <position> | --follow <position> | --watch [<position>] | --last'
 
-function now_iso(): string {
-	return new Date().toISOString()
-}
-
 function report_usage(): number {
 	process.stderr.write(`${USAGE}\n`)
 
@@ -54,7 +50,7 @@ async function run_append(kind: string, text: string): Promise<number> {
 
 	if (target === undefined) return report_usage()
 
-	const result = run_event_stream.append(target, kind, text, now_iso())
+	const result = await run_event_stream_emit.append_at(target, kind, text, new Date())
 
 	if (!result.appended) {
 		process.stderr.write(`not a session-facing event kind: ${kind}\n`)
