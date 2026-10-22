@@ -449,7 +449,8 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 <!-- /usage -->
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
-child (CLOSED) is counted into the carry record (resetting the failure streak), then `main:sync`,
+child (CLOSED) closes any epic it completed, then `main:sync`, is counted into the carry record
+(resetting the failure streak),
 `lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;

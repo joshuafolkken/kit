@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { git_followup_issue_close } from '#scripts/followup/git-followup-issue-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
@@ -30,6 +29,7 @@ import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge } from './run-merge'
+import { run_merge_close } from './run-merge-close'
 import { run_merge_ship } from './run-merge-ship'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
@@ -53,8 +53,6 @@ const LANES = '--lanes'
 const REPO_FLAG = '--repo'
 const LANE_CLOSE_OCCASION = 'lane close'
 const GIT_ENTRY = '.git'
-const MERGE_CLOSER = 'pnpm josh run:merge'
-const SINGLE_READ = { attempts: 1, interval_ms: 0 }
 const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 
@@ -253,25 +251,8 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
 }
 
-// A child merged while GitHub left it OPEN is closed here, through the one close `followup` uses
-// The state was just read OPEN, so it is read once rather than waited on. A
-// close that fails is reported with its recovery and does not undo the merge being counted.
-async function close_merged_open(ctx: MergeContext): Promise<void> {
-	if (ctx.merged_pr === undefined) return
-
-	try {
-		await git_followup_issue_close.ensure_issue_closed(
-			{ issue_number: ctx.child, pr_url: ctx.merged_pr, closer: MERGE_CLOSER },
-			SINGLE_READ,
-		)
-	} catch {
-		console.error(
-			`${session_cite.issue(ctx.child)}: could not be closed — ${git_followup_issue_close.CLOSE_RECOVERY}`,
-		)
-	}
-}
-
-// A merged child: count the merge (which resets the failure streak), return to the default branch,
+// A merged child: close it if GitHub left it OPEN and close the epics it completed
+// (`run-merge-close.ts`), count the merge (which resets the failure streak), return to the default branch,
 // stash any uncommitted work the lane still holds and close it, and mirror the counters onto the epic. Returns the carry when the ownership check
 // fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child.
 // Returns `undefined` on success.
@@ -280,7 +261,7 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 
 	if (refused !== undefined) return refused
 
-	await close_merged_open(ctx)
+	await run_merge_close.close_merged(ctx)
 	await sync_main()
 	const result = await apply_carry(ctx, {
 		...run_merge.change_of('merged'),

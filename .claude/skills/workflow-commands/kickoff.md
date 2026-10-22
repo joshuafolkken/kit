@@ -61,8 +61,8 @@ gate must hold **together**. The rest of `split-assessment.md` is read when a sp
     a hand-edited epic with `pnpm josh epic:check <E>`. (3) Telegram listing every created Issue. (4)
     Present `backlogrun #<E> --only`. (5) **Stop**.
 
-  **The epic itself is never implemented** — `backlogrun` runs its *children*, and `pnpm josh followup`
-  closes it once every child is closed. Children with no required order take `None — the children are
+  **The epic itself is never implemented** — `backlogrun` runs its *children*, and it closes itself
+  once every child is closed, whichever josh path closes the last one. Children with no required order take `None — the children are
   independent; any execution order works.` under `Dependencies`. **Only when the execution order
   matters** (`execution-waves.md` → "When a wave may be declared") pass `--ordered`, which treats the
   argument order as the dependency order.

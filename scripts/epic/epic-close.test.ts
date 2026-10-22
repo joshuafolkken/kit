@@ -95,13 +95,14 @@ describe('close_completed_epics — incomplete batch', () => {
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 
-	it('leaves the epic open when a sibling state cannot be read', async () => {
+	it('leaves the epic open and says so when a sibling state cannot be read', async () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
-		mocked_get_child.mockResolvedValue(undefined)
+		mocked_get_child.mockResolvedValueOnce(CLOSED_UNLINKED).mockResolvedValueOnce(undefined)
 
 		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('state could not be read;'))
 	})
 })
 

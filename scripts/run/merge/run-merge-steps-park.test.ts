@@ -31,6 +31,12 @@ vi.mock('#scripts/followup/git-followup-issue-close', () => ({
 
 vi.mock('#scripts/lane/lane-reap', () => ({ lane_reap: { reap_child: vi.fn() } }))
 
+const close_epics_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/epic/epic-close', () => ({
+	epic_close: { close_completed_epics: close_epics_mock },
+}))
+
 const ship_cause_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./run-merge-ship', () => ({ run_merge_ship: { cause: ship_cause_mock } }))
@@ -72,6 +78,7 @@ beforeEach(() => {
 	comment_mock.mockReset().mockResolvedValue(undefined)
 	remove_label_mock.mockReset().mockResolvedValue(undefined)
 	ensure_closed_mock.mockReset().mockResolvedValue(undefined)
+	close_epics_mock.mockReset().mockResolvedValue(undefined)
 	ship_cause_mock.mockReset().mockReturnValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	stub_issue_reads()
@@ -352,5 +359,11 @@ describe('run_merge_steps.do_merged — a child merged while its issue stayed OP
 		await run_merge_steps.do_merged(CONTEXT)
 
 		expect(ensure_closed_mock).not.toHaveBeenCalled()
+	})
+
+	it('closes the epics a child closed outside followup completed', async () => {
+		await run_merge_steps.do_merged(CONTEXT)
+
+		expect(close_epics_mock).toHaveBeenCalledWith({ issue_number: CHILD, is_merged: true })
 	})
 })
