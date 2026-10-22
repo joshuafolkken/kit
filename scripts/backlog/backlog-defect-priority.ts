@@ -18,10 +18,11 @@ function above_message(measured: DefectRate): string {
 	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so defects are offered first and new mechanisms last.`
 }
 
-// An unreadable body reads as empty: the labels still classify `route:interrupt`, and anything else
-// keeps its usual place rather than being deferred on a read that failed.
+// The body the listing already carried, else one read for it (joshuafolkken/kit#4550). An unreadable
+// body reads as empty: the labels still classify `route:interrupt`, and anything else keeps its usual
+// place rather than being deferred on a read that failed.
 async function kind_of_child(child: EpicChild): Promise<IssueKind> {
-	const body = await git_gh_command.issue_get_body(String(child.number), child.repo)
+	const body = child.body ?? (await git_gh_command.issue_get_body(String(child.number), child.repo))
 
 	return defect_rate.kind_of({ body: body ?? '', labels: child.labels })
 }

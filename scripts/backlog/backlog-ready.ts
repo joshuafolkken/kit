@@ -1,6 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import type { JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -14,6 +14,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_drive_restore } from './backlog-drive-restore'
+import { backlog_next_shared } from './backlog-next-shared'
 import { backlog_occupied } from './backlog-occupied'
 import { backlog_offer_exclude } from './backlog-offer-exclude'
 import { backlog_stalled } from './backlog-stalled'
@@ -195,7 +196,7 @@ async function read_backlog_next(timeout_ms?: number): Promise<JoshResult | unde
 
 	const argv = ['backlog:next', ...backlog_offer_exclude.exclude_argv(await stream_exclude(carry))]
 
-	return await josh_command.josh_run(argv, timeout_ms === undefined, timeout_ms)
+	return await backlog_next_shared.read(argv, timeout_ms === undefined, timeout_ms)
 }
 
 // The runnable issues for this checkout, read the way a loop reads them: `backlog:next`'s numeric lines.

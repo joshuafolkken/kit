@@ -103,8 +103,8 @@ function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): Open
 	return { ...row, labels: names.map((name) => ({ name })) }
 }
 
-// The shape a `number,state,labels,blockedBy` read answers with — `blockedBy` is a connection rather
-// than a bare array, exactly as `epic-fetch.test.ts` records.
+// The shape a `number,state,labels,blockedBy,body` read answers with — `blockedBy` is a connection
+// rather than a bare array, exactly as `epic-fetch.test.ts` records.
 function child_labels(
 	input: ChildInput,
 	untriaged: ReadonlyArray<number>,
@@ -117,6 +117,7 @@ function gh_child(input: ChildInput, untriaged: ReadonlyArray<number> = []): str
 		number: input.number,
 		state: input.state ?? 'OPEN',
 		labels: child_labels(input, untriaged),
+		body: input.body,
 		blockedBy: {
 			nodes: (input.blocked_by ?? []).map((number) => ({ number })),
 			totalCount: (input.blocked_by ?? []).length,

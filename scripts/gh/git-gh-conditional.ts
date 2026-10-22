@@ -19,7 +19,8 @@ const ETAG_HEADER = /^etag: *(?<etag>[^\r\n]+)/imu
 type ConditionalRead =
 	| { kind: 'unchanged' }
 	| { kind: 'changed'; etag: string | undefined; body: string }
-	| { kind: 'unreadable' }
+	// `cause` is gh's own failure where there was one, for a caller that reports it.
+	| { kind: 'unreadable'; cause?: unknown }
 
 const UNCHANGED: ConditionalRead = { kind: 'unchanged' }
 const UNREADABLE: ConditionalRead = { kind: 'unreadable' }
@@ -56,7 +57,9 @@ async function read_conditional(
 	try {
 		return to_read(await git_gh_exec.exec_gh_command(to_args(path, etag), timeout_ms))
 	} catch (error) {
-		return failure_status(error) === NOT_MODIFIED_STATUS ? UNCHANGED : UNREADABLE
+		return failure_status(error) === NOT_MODIFIED_STATUS
+			? UNCHANGED
+			: { kind: 'unreadable', cause: error }
 	}
 }
 

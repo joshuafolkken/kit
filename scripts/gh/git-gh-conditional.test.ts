@@ -71,13 +71,14 @@ describe('git_gh_conditional.read_conditional — everything else', () => {
 		await expect(read()).resolves.toStrictEqual({ kind: 'unchanged' })
 	})
 
-	it('answers unreadable on any other failure', async () => {
-		mocked_command()
-			.mockRejectedValueOnce(failure_with_stdout('HTTP/2.0 403 Forbidden\n\n{}'))
-			.mockRejectedValueOnce(new Error('network down'))
+	it('answers unreadable on any other failure, carrying gh failure as the cause', async () => {
+		const forbidden = failure_with_stdout('HTTP/2.0 403 Forbidden\n\n{}')
+		const network = new Error('network down')
 
-		await expect(read()).resolves.toStrictEqual(UNREADABLE)
-		await expect(read()).resolves.toStrictEqual(UNREADABLE)
+		mocked_command().mockRejectedValueOnce(forbidden).mockRejectedValueOnce(network)
+
+		await expect(read()).resolves.toStrictEqual({ kind: 'unreadable', cause: forbidden })
+		await expect(read()).resolves.toStrictEqual({ kind: 'unreadable', cause: network })
 	})
 
 	it('answers unreadable on a non-200 success', async () => {
