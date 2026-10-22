@@ -14,20 +14,18 @@ import {
 	type ShapeExpectations,
 	type ShellShapeId,
 } from './shell-shape-corpus-fixture'
-import { shell_shape_filing_fixture } from './shell-shape-filing-fixture'
-import { shell_shape_guard_fixture } from './shell-shape-guard-fixture'
-import { shell_shape_lane_fixture } from './shell-shape-lane-fixture'
 import { shell_shape_readers_fixture } from './shell-shape-readers-fixture'
+import { shell_shape_rules_fixture } from './shell-shape-rules-fixture'
 
 const { SHELL_SHAPES } = shell_shape_corpus_fixture
 const SHAPE_IDS = Object.keys(SHELL_SHAPES)
 
 const RULE_FIXTURES = [
-	shell_shape_filing_fixture.RULES,
-	shell_shape_guard_fixture.RULES,
-	shell_shape_lane_fixture.RULES,
+	shell_shape_rules_fixture.FILING_RULES,
+	shell_shape_rules_fixture.GUARD_RULES,
+	shell_shape_rules_fixture.LANE_RULES,
 ]
-const RULE_ANSWERS: Record<string, ShapeExpectations<boolean>> = Object.fromEntries(
+const RULE_FIRING_SHAPES: Record<string, ReadonlyArray<ShellShapeId>> = Object.fromEntries(
 	RULE_FIXTURES.flatMap((rules) => Object.entries(rules)),
 )
 
@@ -67,12 +65,12 @@ function cases_of<T>(answers: ShapeExpectations<T>): Array<[ShellShapeId, string
 }
 
 function rule_cases(): Array<[string, ShellShapeId, string, boolean]> {
-	return Object.entries(RULE_ANSWERS).flatMap(([rule_id, answers]) =>
-		cases_of(answers).map(([id, command, fires]): [string, ShellShapeId, string, boolean] => [
+	return Object.entries(RULE_FIRING_SHAPES).flatMap(([rule_id, firing]) =>
+		Object.entries(SHELL_SHAPES).map(([id, command]): [string, ShellShapeId, string, boolean] => [
 			rule_id,
-			id,
+			id as ShellShapeId,
 			command,
-			fires,
+			firing.includes(id as ShellShapeId),
 		]),
 	)
 }
@@ -89,17 +87,17 @@ describe('the shell shape corpus', () => {
 	it('declares an answer set for every delivered rule, and for no rule that is gone', () => {
 		const delivered = delivered_rules.DELIVERED_RULES.map((rule) => rule.id)
 
-		expect(sorted(Object.keys(RULE_ANSWERS))).toStrictEqual(sorted(delivered))
+		expect(sorted(Object.keys(RULE_FIRING_SHAPES))).toStrictEqual(sorted(delivered))
 	})
 
 	it('declares each rule in one fixture only', () => {
 		const declared = RULE_FIXTURES.flatMap((rules) => Object.keys(rules))
 
-		expect(sorted(declared)).toStrictEqual(sorted(Object.keys(RULE_ANSWERS)))
+		expect(sorted(declared)).toStrictEqual(sorted(Object.keys(RULE_FIRING_SHAPES)))
 	})
 
-	it.each(Object.entries(RULE_ANSWERS))('%s answers every shape and no other', (_id, answers) => {
-		expect(sorted(Object.keys(answers))).toStrictEqual(sorted(SHAPE_IDS))
+	it.each(Object.entries(RULE_FIRING_SHAPES))('%s lists each firing shape once', (_id, firing) => {
+		expect(new Set(firing).size).toBe(firing.length)
 	})
 
 	it.each([

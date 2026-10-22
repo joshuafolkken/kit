@@ -1,8 +1,9 @@
 // The shell shapes every command-text rule is run against (joshuafolkken/kit#4517). Each shape here
 // was first found by one rule's review — a multi-line quote, a heredoc, a substitution, a wrapper and
 // its flag value, a mention inside quotes — and is listed once so every other rule has to say what it
-// does with it. `shell-shape-corpus.test.ts` refuses a reader that leaves one row undeclared, so a
-// shape added here turns every reader red until each declares its answer.
+// does with it. `shell-shape-corpus.test.ts` runs every rule on a shape added here and refuses one that
+// fires where `shell-shape-rules-fixture.ts` does not list it, and refuses a reader in
+// `shell-shape-readers-fixture.ts` that leaves the shape undeclared.
 
 // One plain trigger for each rule whose trigger needs no body, loop, issue URL or tree state, so each
 // has its own trigger to find, or to ignore, inside the mention shapes below.
