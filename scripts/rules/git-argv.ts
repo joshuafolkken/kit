@@ -195,3 +195,4 @@ function short_cluster_has(token: string, letters: string): boolean {
 const git_argv = { arguments_of, parse, program_of, short_cluster_has }
 
 export { git_argv }
+export type { ProgramCall }

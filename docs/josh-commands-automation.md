@@ -925,18 +925,20 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pre-
 Git hook: run a command while holding a place in the machine-wide core budget.
 
 ```bash
-pnpm josh reserved-run 2 -- pnpm install      # hold 2 cores while installing
-pnpm josh reserved-run 1 -- pnpm josh audit   # hold 1 core while scanning
+pnpm josh reserved-run 2 -- pnpm install              # hold 2 cores while installing
+pnpm josh reserved-run 1 -- pnpm josh audit           # hold 1 core while scanning
+pnpm josh reserved-run 1 --memory 3000 -- <command>   # hold 3,000 MB beside the core
 ```
 
 <!-- /usage -->
 
 The budget is [`josh gate`](josh-commands.md#josh-gate)'s; the pre-push install and audit use it.
 
-- `<weight> -- <command...>`: the cores to reserve, then the command.
+- `<weight> [--memory <MB>] -- <command...>`: the cores, optionally the memory, then the command.
+- Memory: `--memory`, else the wrapped tool's `MEMORY_MB` times its `--concurrency` / `--maxWorkers`, `sh -c` read too (`scripts/gate/command-memory.ts`); a command it does not know reserves none.
 - Claims a place before the command starts and waits while the budget is full, as a gate check does; the place is released when the command exits, and its exit code is forwarded.
-- A missing separator, a non-integer weight, or no command is a usage error (exit `1`).
-- A dispatched lane child that launches `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`) is refused by the `lane-direct-tool` row of `pnpm josh rule:list` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
+- A missing separator, a non-integer weight, a malformed `--memory`, or no command is a usage error (exit `1`).
+- A dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`, `sh -c`), or eslint above `--concurrency 1` by any path, is refused by the `lane-direct-tool` row of `pnpm josh rule:list` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh reserved-run` in detail".
 

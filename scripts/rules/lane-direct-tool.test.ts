@@ -18,6 +18,8 @@ const ISSUE = '4357'
 const PNPM_EXEC_ESLINT = 'pnpm exec eslint .'
 const LINT_RELATED = 'pnpm josh lint:related'
 const JOSH_RESERVED = 'pnpm josh reserved-run 1 -- vitest run'
+const RESERVED_ESLINT = `pnpm josh reserved-run 4 -- ${PNPM_EXEC_ESLINT}`
+const ESLINT_FOUR = `${PNPM_EXEC_ESLINT} --concurrency 4`
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
 const REASON = lane_direct_tool.LANE_DIRECT_TOOL_REASON
@@ -86,6 +88,7 @@ describe('runs_heavy_tool', () => {
 		['a josh check', LINT_RELATED],
 		['the budgeted wrapper', JOSH_RESERVED],
 		['a quoted tool name', 'git commit -m "run eslint and vitest"'],
+		['a quoted shell runner', 'git commit -m "fix sh -c eslint"'],
 		['another `npx` program', 'npx tsx scripts/josh/josh.ts'],
 		['an unrelated command', 'git status'],
 	])('does not match %s', (_name, command) => {
@@ -106,6 +109,38 @@ describe('is_lane_direct_tool', () => {
 	it('says nothing about the budgeted wrapper in a lane child', () => {
 		expect(lane_direct_tool.is_lane_direct_tool(JOSH_RESERVED, true)).toBe(false)
 	})
+})
+
+// joshuafolkken/kit#4582: a four-worker typed eslint held 12 GB through `reserved-run` and `sh -c`.
+describe('is_lane_direct_tool — multi-worker eslint and shell scripts', () => {
+	it.each([
+		['a reserved four-worker eslint', `${RESERVED_ESLINT} --concurrency 4`],
+		['a reserved `auto` eslint', `${RESERVED_ESLINT} --concurrency auto`],
+		['a reserved `=4` eslint', `${RESERVED_ESLINT} --concurrency=4`],
+		['a reserved eslint in `sh -c`', `pnpm josh reserved-run 4 -- sh -c '${ESLINT_FOUR}'`],
+		['a multi-worker eslint in `sh -c`', `sh -c 'cd x && ${ESLINT_FOUR}'`],
+		['a direct tool in `sh -c`', `sh -c '${PNPM_EXEC_ESLINT}'`],
+		['a direct tool in `bash -c`', 'bash -c "npx vitest run"'],
+	])('fires on %s in a lane child', (_name, command) => {
+		expect(lane_direct_tool.is_lane_direct_tool(command, true)).toBe(true)
+	})
+
+	it.each([
+		['`--concurrency off`', `${RESERVED_ESLINT} --concurrency off`],
+		['`--concurrency 1`', `${RESERVED_ESLINT} --concurrency 1`],
+		['no `--concurrency`', RESERVED_ESLINT],
+		['a reserved single-worker eslint in `sh -c`', `pnpm josh reserved-run 2 -- sh -c 'eslint .'`],
+		['the related lint', LINT_RELATED],
+	])('says nothing about %s in a lane child', (_name, command) => {
+		expect(lane_direct_tool.is_lane_direct_tool(command, true)).toBe(false)
+	})
+
+	it.each([[`sh -c '${PNPM_EXEC_ESLINT}'`], [`${RESERVED_ESLINT} --concurrency 4`]])(
+		'says nothing about `%s` outside a lane child',
+		(command) => {
+			expect(lane_direct_tool.is_lane_direct_tool(command, false)).toBe(false)
+		},
+	)
 })
 
 describe('delivered_rules.delivery — inside a lane checkout', () => {

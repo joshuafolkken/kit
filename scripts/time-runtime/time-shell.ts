@@ -436,6 +436,7 @@ const time_shell = {
 	josh_signatures_of,
 	leading_word,
 	unquoted,
+	without_heredoc_bodies,
 }
 
 export { time_shell }
