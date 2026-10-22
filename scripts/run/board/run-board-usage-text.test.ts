@@ -4,11 +4,10 @@ import type { UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
 // joshuafolkken/kit#4171: a lane row's and a processes row's CPU, MEM and CMPRS cells — a figure and
-// a gauge each, full at the whole machine and shaded at the header's thresholds unless a
-// lane row passes its share, which also fills its gauge.
+// a gauge each, full at the whole machine unless a lane row passes its share, and shaded at its fill.
 
 const { GAUGE_SHADES, bar_of } = run_board_labels
-const { cell_widths, cells_of, lane_limits, lane_thresholds, plain_of } = run_board_usage_text
+const { cell_widths, cells_of, lane_limits, lane_share, plain_of } = run_board_usage_text
 const GB = 1024 * 1024 * 1024
 const GAUGE = 5
 const SCALE: UsageScale = { cores: 10, total_bytes: 20 * GB }
@@ -57,7 +56,7 @@ describe('run_board_usage_text.cells_of', () => {
 		)
 	})
 
-	it('shades each gauge at the header’s thresholds', () => {
+	it('shades each gauge at its fill of the whole machine', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const [cpu, memory] = cells_of(figure(9.5, 15), SCALE, GAUGE)
 
@@ -78,15 +77,15 @@ describe('run_board_usage_text.cell_widths', () => {
 	})
 })
 
-// joshuafolkken/kit#4283: a lane row's thresholds are its share of the header's yellow threshold.
-describe('run_board_usage_text.lane_thresholds', () => {
-	it('turns yellow at three quarters of the share and red past the share itself', () => {
-		expect(lane_thresholds(70, 1)).toStrictEqual({ yellow: 52.5, red: 70 })
-		expect(lane_thresholds(70, 2)).toStrictEqual({ yellow: 26.25, red: 35 })
+// joshuafolkken/kit#4283: a lane row's gauge is full at its share of the header's yellow threshold.
+describe('run_board_usage_text.lane_share', () => {
+	it('divides the pool among the running lanes', () => {
+		expect(lane_share(70, 1)).toBe(70)
+		expect(lane_share(70, 2)).toBe(35)
 	})
 
 	it('treats no running lane as one', () => {
-		expect(lane_thresholds(70, 0)).toStrictEqual(lane_thresholds(70, 1))
+		expect(lane_share(70, 0)).toBe(lane_share(70, 1))
 	})
 
 	it('shades a lane row at its share where the machine’s thresholds would leave it green', () => {
@@ -97,13 +96,66 @@ describe('run_board_usage_text.lane_thresholds', () => {
 		expect(memory).toBe(` 6.0 ${bar_of(6, 7, GAUGE, GAUGE_SHADES.yellow)}`)
 	})
 
-	it('keeps the machine’s thresholds where no limits are passed', () => {
+	it('fills and shades at the whole machine where no limits are passed', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(cells_of(figure(5.95), SCALE, GAUGE)[0]).toBe(
-			`59.5 ${bar_of(5.95, 10, GAUGE, GAUGE_SHADES.normal)}`,
+		expect(cells_of(figure(4.95), SCALE, GAUGE)[0]).toBe(
+			`49.5 ${bar_of(4.95, 10, GAUGE, GAUGE_SHADES.normal)}`,
 		)
 	})
+})
+
+// joshuafolkken/kit#4570: a lane row and a processes row turn yellow past half of the full gauge and
+// red past nine tenths, in each of the CPU, MEM and CMPRS cells. Seven lanes make a lane's share of
+// `SCALE` one core and 2 GB; a processes row's full is 10 cores and 20 GB.
+const SEVEN = lane_limits(7)
+
+type Shade = keyof typeof GAUGE_SHADES
+
+function shaded_cells(
+	cores: number,
+	gb: number,
+	full: [number, number],
+	shade: Shade,
+): Array<string> {
+	const values = [cores, gb, gb]
+	const fulls = [full[0], full[1], full[1]]
+
+	return cells_of(figure(cores, gb, gb), SCALE, 0).map(
+		(text, index) =>
+			`${text} ${bar_of(values[index] ?? 0, fulls[index] ?? 0, GAUGE, GAUGE_SHADES[shade])}`,
+	)
+}
+
+describe('run_board_usage_text.cells_of — a row’s colors at half and nine tenths of its full', () => {
+	it.each([
+		[0.5, 1, 'normal'],
+		[0.51, 1.02, 'yellow'],
+		[0.9, 1.8, 'yellow'],
+		[0.91, 1.82, 'red'],
+	] as const)('shades a lane row at %s cores and %s GB of its share %s', (cores, gb, shade) => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(cells_of(figure(cores, gb, gb), SCALE, GAUGE, SEVEN)).toStrictEqual(
+			shaded_cells(cores, gb, [1, 2], shade),
+		)
+	})
+
+	it.each([
+		[5, 10, 'normal'],
+		[5.1, 10.2, 'yellow'],
+		[9, 18, 'yellow'],
+		[9.1, 18.2, 'red'],
+	] as const)(
+		'shades a processes row at %s cores and %s GB of the machine %s',
+		(cores, gb, shade) => {
+			vi.stubEnv('FORCE_COLOR', '1')
+
+			expect(cells_of(figure(cores, gb, gb), SCALE, GAUGE)).toStrictEqual(
+				shaded_cells(cores, gb, [10, 20], shade),
+			)
+		},
+	)
 })
 
 // joshuafolkken/kit#4546: a lane row's gauge is full at its share, so its length agrees with its color.
