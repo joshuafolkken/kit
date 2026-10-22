@@ -1,0 +1,8 @@
+{
+	"reason": "#4563 adds run-ship-removed-rows (surface removed tests at green test:related) and a one-line pointer to it in report-format.md",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 55,
+		"ai_cost.on_demand_bytes": 162
+	}
+}

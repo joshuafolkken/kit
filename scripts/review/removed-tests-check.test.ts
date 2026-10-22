@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import ts from 'typescript'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { removed_tests } from './removed-tests'
 
 const base_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const changed_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
@@ -97,6 +98,17 @@ describe('removed_tests_check.refusal — the merge gate', () => {
 		].join('\n')
 
 		await expect(removed_tests_check.body_refusal(body)).resolves.toBeUndefined()
+	})
+
+	// joshuafolkken/kit#4563: the pending rows `josh test:related` writes into the draft are no disposition.
+	it('still refuses a body holding only the pending rows the draft was given', async () => {
+		const removed = (await removed_tests_check.read()) ?? []
+		const body = removed_tests.with_pending_rows('', removed)
+
+		expect(removed).toHaveLength(2)
+		await expect(removed_tests_check.body_refusal(body)).resolves.toBe(
+			removed_tests.refusal_message(removed),
+		)
 	})
 
 	it('refuses, rather than passes, when the base cannot be resolved', async () => {

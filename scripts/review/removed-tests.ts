@@ -16,6 +16,8 @@ import { test_titles } from './test-titles'
 // its own copy.
 
 const DISPOSITION_HEADING = '## 消えたテストの処置'
+// The heading as a line of its own, never the mention of it inside a format hint.
+const HEADING_LINE = new RegExp(String.raw`^${DISPOSITION_HEADING}[ \t]*$`, 'mu')
 const REPLACED = '置き換え'
 const RETIRED = '廃止'
 const PENDING_SUFFIX = '— 未記入'
@@ -94,6 +96,23 @@ function pending_rows(titles: ReadonlyArray<string>): ReadonlyArray<string> {
 	return titles.map((title) => `- \`${title}\` ${PENDING_SUFFIX}`)
 }
 
+function has_row(lines: ReadonlyArray<string>, title: string): boolean {
+	return lines.some((line) => line.trim().startsWith(`- \`${title}\` `))
+}
+
+// The pending rows a body still lacks, put under its disposition heading — added at the end when the
+// body has none — so a run fills them in before `josh ship` rather than meeting them at its preflight
+// (joshuafolkken/kit#4563). A title with any row already, pending or filled, is left as it is.
+function with_pending_rows(body: string, titles: ReadonlyArray<string>): string {
+	const lines = markdown_section.section_lines(body, DISPOSITION_HEADING)
+	const rows = pending_rows(titles.filter((title) => !has_row(lines, title))).join('\n')
+
+	if (rows === '') return body
+	if (!HEADING_LINE.test(body)) return `${body.trimEnd()}\n\n${DISPOSITION_HEADING}\n\n${rows}\n`
+
+	return body.replace(HEADING_LINE, () => `${DISPOSITION_HEADING}\n\n${rows}`)
+}
+
 // Nothing when the change removed no test, so an ordinary brief is not one line longer.
 function brief_block(removed_titles: ReadonlyArray<string>): ReadonlyArray<string> {
 	if (removed_titles.length === 0) return []
@@ -124,6 +143,7 @@ const removed_tests = {
 	removed,
 	ROW_FORMAT,
 	undisposed,
+	with_pending_rows,
 }
 
 export { removed_tests }
