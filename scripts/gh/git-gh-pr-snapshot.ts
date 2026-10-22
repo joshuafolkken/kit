@@ -1,8 +1,9 @@
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_branch_rules } from './git-gh-branch-rules'
 import { git_gh_exec } from './git-gh-exec'
-import { read_pull, require_pr_number } from './git-gh-pr-read'
-import type { RestPull } from './git-gh-pr-rest'
+import { git_gh_poll_read } from './git-gh-poll-read'
+import { require_pr_number } from './git-gh-pr-read'
+import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 import { git_gh_pr_review } from './git-gh-pr-review'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 import { to_gh_state } from './git-gh-rest-state'
@@ -19,17 +20,6 @@ import { to_gh_state } from './git-gh-rest-state'
 // `git-pr-checks-parse.ts`, `git-pr-checks-eval.ts`, `git-pr-followup.ts` — changes.
 
 const NO_HEAD_SHA_MESSAGE = 'gh api answered a pull request with no head commit'
-
-// Both commit endpoints answer an *object* wrapping the listing, so `--paginate` alone would emit
-// one document per page and `JSON.parse` would reject the pair; `--slurp` wraps the pages in one
-// outer array instead (`git-gh-exec.ts` → `GhApiRequest`).
-async function read_object_pages(path: string): Promise<string> {
-	return await git_gh_exec.exec_gh_api({
-		path: `${path}${FULL_PAGE_QUERY}`,
-		should_paginate: true,
-		should_slurp: true,
-	})
-}
 
 // The reviews endpoint answers a bare array, whose pages `gh` merges into one array on its own —
 // slurping it would produce `[[…],[…]]`, which the listing schema then rejects.
@@ -48,11 +38,12 @@ function read_head_sha(pull: RestPull): string {
 }
 
 // One pull request's rollup: the check runs and the status contexts, read from the head commit and
-// merged back into the single array `gh` answered with.
+// merged back into the single array `gh` answered with. Both endpoints answer an *object* wrapping the
+// listing, so their pages arrive slurped into one outer array (`git-gh-poll-read.ts`).
 async function read_status_check_rollup(commit_sha: string): Promise<Array<object>> {
 	const [check_runs_json, status_json] = await Promise.all([
-		read_object_pages(git_gh_api_path.commit_check_runs_api_path(commit_sha)),
-		read_object_pages(git_gh_api_path.commit_status_api_path(commit_sha)),
+		git_gh_poll_read.read_object_pages(git_gh_api_path.commit_check_runs_api_path(commit_sha)),
+		git_gh_poll_read.read_object_pages(git_gh_api_path.commit_status_api_path(commit_sha)),
 	])
 
 	return git_gh_pr_rollup.to_status_check_rollup({ check_runs_json, status_json })
@@ -96,12 +87,13 @@ interface ResolvedPull {
 	pull: RestPull
 }
 
-// The resolution and the detail read, which every path below needs and which the branch → number
-// memo in `git-gh-pr-read.ts` makes free after the first poll.
+// The resolution and the detail read, which every path below needs. The branch → number memo in
+// `git-gh-pr-read.ts` makes the first free after the first poll, and the ETag the second.
 async function resolve_pull(branch_name: string): Promise<ResolvedPull> {
 	const pr_number = await require_pr_number(branch_name)
+	const json = await git_gh_poll_read.read(git_gh_api_path.pull_api_path(String(pr_number)))
 
-	return { pr_number, pull: await read_pull(pr_number) }
+	return { pr_number, pull: git_gh_pr_rest.parse_rest_pull(json) }
 }
 
 // Everything the snapshot carries except the review decision: three requests rather than four.

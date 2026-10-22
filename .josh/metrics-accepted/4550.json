@@ -1,0 +1,7 @@
+{
+	"reason": "#4550 adds the shared disk cache, the backlog:next share, the merge gate's ETag poll reads that cut backlogrun's GitHub reads, and the fixture that keeps each test's shared record apart from a concurrent lane's",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 207
+	}
+}

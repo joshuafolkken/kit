@@ -10,9 +10,16 @@ vi.mock('#scripts/rules/rule-value-cache', () => ({
 	rule_value_cache: { emit: rule_value_emit_mock },
 }))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit_once: emit_once_mock, emit: emit_mock },
+	run_event_stream_emit: {
+		emit_once: emit_once_mock,
+		emit: emit_mock,
+		stream_target: vi.fn(async () => undefined),
+	},
 }))
 
+const { shared_cache } = await import('#scripts/josh/shared-cache')
+const { shared_cache_fixture } = await import('#scripts/josh/shared-cache-fixture')
+const { backlog_next_shared } = await import('./backlog-next-shared')
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
 
 const OK = 0
@@ -45,6 +52,8 @@ beforeEach(() => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	return shared_cache_fixture.isolate_shared_cache(backlog_next_shared.NEXT_CACHE)
 })
 
 // Stub `backlog:next`, then `backlog:budget`, run the command, and read back the `--answer` word the
@@ -55,6 +64,8 @@ async function answer_for(
 	budget_verdict: string,
 	argv: ReadonlyArray<string> = [],
 ): Promise<string> {
+	// Each answer is a fresh `backlog:next` read, never the one an earlier call in the same case kept.
+	shared_cache.clear(backlog_next_shared.NEXT_CACHE)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValueOnce(next)
 	josh_run_mock.mockResolvedValueOnce({

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { forget_branch_rules } from './git-gh-branch-rules'
+import { git_gh_conditional } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
+import { git_gh_poll_read } from './git-gh-poll-read'
 import {
 	check_runs_pages,
 	commit_check_runs_path,
 	commit_status_path,
+	conditional_read_over,
 	gh_api_routes,
 	gh_failure,
 	PR_BRANCH,
@@ -38,7 +41,14 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
 }))
 
+vi.mock('./git-gh-conditional', () => ({
+	git_gh_conditional: { read_conditional: vi.fn() },
+}))
+
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
+
+// The per-poll reads, answered by the same router (joshuafolkken/kit#4550).
+vi.mocked(git_gh_conditional.read_conditional).mockImplementation(conditional_read_over(mocked_api))
 
 const SONAR_QUBE = 'SonarQube'
 const CODE_RABBIT = 'CodeRabbit'
@@ -46,6 +56,7 @@ const PASSING_RUN = { name: SONAR_QUBE, status: 'completed', conclusion: 'succes
 const APPROVED_REVIEW = { state: 'APPROVED', user: { login: 'alice' } }
 const NO_REVIEWS = '[]'
 const RATE_LIMITED = '{"message":"rate limited"}'
+const LONGER_THAN_A_PAGE = 101
 
 function routes(input: {
 	pull?: Record<string, unknown>
@@ -72,6 +83,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	forget_pr_numbers()
 	forget_branch_rules()
+	git_gh_poll_read.forget_poll_reads()
 })
 
 describe('pr_get_state_snapshot — the three fields', () => {
@@ -159,21 +171,28 @@ describe('pr_get_state_snapshot — an optional check still running', () => {
 })
 
 describe('pr_get_state_snapshot — which endpoints it reads', () => {
-	it('pages every listing a full page at a time', async () => {
+	it('asks every listing a full page at a time', async () => {
 		await read_snapshot()
 
-		const paged = mocked_api.mock.calls
-			.map(([request]) => request)
-			.filter((request) => request.should_paginate === true)
+		const listings = mocked_api.mock.calls
+			.map(([request]) => request.path)
+			.filter((path) => path.endsWith(FULL_PAGE_QUERY))
 
-		expect(paged).toHaveLength(3)
+		expect(listings).toStrictEqual([
+			commit_check_runs_path(),
+			commit_status_path(),
+			pr_reviews_path(),
+		])
 	})
 
 	// The two commit endpoints answer an object wrapping the listing, so `--paginate` alone would emit
 	// one document per page and `JSON.parse` would reject the pair. The reviews endpoint answers a
 	// bare array, whose pages `gh` merges on its own — slurping it would wrap them again.
 	it('slurps the two commit endpoints and not the review listing', async () => {
-		await read_snapshot()
+		await read_snapshot({
+			check_runs: JSON.stringify([{ total_count: LONGER_THAN_A_PAGE, check_runs: [PASSING_RUN] }]),
+			statuses: JSON.stringify([{ total_count: LONGER_THAN_A_PAGE, statuses: [] }]),
+		})
 
 		const slurped = mocked_api.mock.calls
 			.map(([request]) => request.path)
