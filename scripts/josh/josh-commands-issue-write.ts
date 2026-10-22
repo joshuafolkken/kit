@@ -2,8 +2,10 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 const REPO = '--repo <owner/repo>'
 const BODY_FILE = '--body-file <path>'
+const EVIDENCE_FILE = '--evidence-file <path>'
+const EVIDENCE_REFERENCE = `<issue> ${EVIDENCE_FILE}`
 
-// The commands that write to an issue — comment, plan, already-done and file — split out of
+// The commands that write to an issue — comment, plan, already-done, measured and file — split out of
 // `josh-commands-issue.ts` when each command's usage moved onto its entry (#4185). `ISSUE_COMMANDS`
 // spreads this in at the same place, so the map keeps its order.
 
@@ -81,7 +83,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		reference: ['<issue> --evidence-file <path>', 'automation', ['network', 'files']],
+		reference: [EVIDENCE_REFERENCE, 'automation', ['network', 'files']],
 		usage: {
 			examples: [
 				{
@@ -91,9 +93,33 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			],
 			flags: [
 				{
-					names: ['--evidence-file <path>'],
+					names: [EVIDENCE_FILE],
 					description:
 						'the evidence comment: the merging PR or commit and, per acceptance criterion, its `file:line`. An empty file is refused before anything is written.',
+				},
+			],
+		},
+	},
+	'issue:measured': {
+		script: 'scripts/issue/issue-measured-cli.ts',
+		description:
+			'Complete a measurement-only issue: post the result, label it measured, close it, release the hold',
+		category: 'AI tools',
+		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		reference: [EVIDENCE_REFERENCE, 'automation', ['network', 'files']],
+		usage: {
+			examples: [
+				{
+					arguments: '4452 --evidence-file .josh/tmp/measured.md',
+					note: 'comment, label, close, release — in that order',
+				},
+			],
+			flags: [
+				{
+					names: [EVIDENCE_FILE],
+					description:
+						'the result comment: per acceptance criterion, the measurement and the run it came from. An empty file is refused before anything is written.',
 				},
 			],
 		},

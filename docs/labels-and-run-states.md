@@ -22,6 +22,7 @@ The labels you put on an Issue to steer the agent, the labels a run puts on it f
 | `needs-decision` | The run parked the Issue: it waits for your answer and the backlog skips it until you give one.                                                         |
 | `run:stalled`    | The run parked the Issue on a mechanical failure: fix the cause, then resume it with `fullrun #N` or remove the label; the backlog skips it until then. |
 | `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                          |
+| `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                 |
 | `epic`           | The Issue tracks child Issues and the order they land in.                                                                                               |
 
 ### `needs-human-review` — the opposite label

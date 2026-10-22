@@ -70,6 +70,21 @@ describe('classify_child', () => {
 	})
 })
 
+// joshuafolkken/kit#4475: a measurement-only child changes no code, so it has no pull request; it
+// completes by `josh issue:measured` closing it. CLOSED with no merged pull request is a merge — not
+// the `failed` that parks it with `run:stalled` and counts against the failure streak.
+describe('classify_child — a measurement-only child closed with no pull request', () => {
+	const closed = issue_state_of({ state: CLOSED, labels: ['run:lane'] })
+
+	it('reads it as merged', () => {
+		expect(run_merge.classify_child(closed)).toBe(MERGED)
+	})
+
+	it('counts it as a merge, never a failure', () => {
+		expect(run_merge.change_of(run_merge.classify_child(closed))).toStrictEqual({ merged: 1 })
+	})
+})
+
 describe('classify_child — a split epic', () => {
 	it.each([
 		{ labels: [EPIC], signals: OUTAGE },

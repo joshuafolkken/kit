@@ -292,6 +292,26 @@ pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # 
 
 See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. The Issue is never closed.
 
+### `josh issue:measured`
+
+<!-- usage: issue:measured -->
+
+Complete a measurement-only issue: post the result, label it measured, close it, release the hold.
+
+```bash
+pnpm josh issue:measured 4452 --evidence-file .josh/tmp/measured.md   # comment, label, close, release — in that order
+```
+
+**Options:**
+
+- `--evidence-file <path>` — the result comment: per acceptance criterion, the measurement and the run it came from. An empty file is refused before anything is written.
+
+<!-- /usage -->
+
+See `issue-comments.md` → "A measurement-only Issue". Steps stop at the first failure. No pull request closes such an Issue, so the run does; `run:merge` reads it CLOSED as merged, never `run:stalled`.
+
+The `measured` label tells this close from a person's, so `run:carry --end` and `run:tidy` still count it as merged. A criterion that needs a code change is not a measurement — that Issue takes the pull request.
+
 ### `josh pkg:scout`
 
 <!-- usage: pkg:scout -->

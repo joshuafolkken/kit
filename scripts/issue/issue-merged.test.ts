@@ -10,6 +10,8 @@ const CLOSED = 'closed\t'
 const CLOSED_COMPLETED = 'closed\tcompleted'
 const CLOSED_NOT_PLANNED = 'closed\tnot_planned'
 const REOPENED = 'reopened\t'
+const LABELED = 'labeled\t'
+const UNLABELED = 'unlabeled\t'
 const READ_FAILURE = new Error('rate limited')
 
 function rows(...lines: ReadonlyArray<string>): ReturnType<typeof issue_merged.parse_rows> {
@@ -42,6 +44,26 @@ describe('issue_merged.is_merged_close', () => {
 	})
 })
 
+// joshuafolkken/kit#4475: a measurement-only issue has no pull request; `josh issue:measured` labels it
+// `measured` and closes it, and every sweep reading this answer must count that close as the merge.
+describe('issue_merged.is_merged_close — a measurement-only issue', () => {
+	it.each([
+		['labeled measured, then closed', [LABELED, CLOSED]],
+		['labeled measured, then closed as completed', [LABELED, CLOSED_COMPLETED]],
+	])('counts it as merged when %s', (_label, lines) => {
+		expect(issue_merged.is_merged_close(rows(...lines))).toBe(true)
+	})
+
+	it.each([
+		['labeled measured, then closed as not planned', [LABELED, CLOSED_NOT_PLANNED]],
+		['labeled measured, closed, then reopened', [LABELED, CLOSED, REOPENED]],
+		['labeled measured, then unlabeled before the close', [LABELED, UNLABELED, CLOSED]],
+		['labeled measured and still open', [LABELED]],
+	])('does not count it as merged when %s', (_label, lines) => {
+		expect(issue_merged.is_merged_close(rows(...lines))).toBe(false)
+	})
+})
+
 describe('issue_merged.read_merged', () => {
 	it('reads the paged timeline of the issue', async () => {
 		exec_gh_api.mockResolvedValue([MERGED, CLOSED].join('\n'))
@@ -53,6 +75,14 @@ describe('issue_merged.read_merged', () => {
 				should_paginate: true,
 			}),
 		)
+	})
+
+	it('asks the timeline for the measured label events', async () => {
+		exec_gh_api.mockResolvedValue('')
+
+		await issue_merged.read_merged('2606')
+
+		expect(exec_gh_api.mock.calls[0]?.[0].jq_filter).toContain('.label.name == "measured"')
 	})
 
 	it('answers false when the read fails, so nothing is deleted on doubt', async () => {
