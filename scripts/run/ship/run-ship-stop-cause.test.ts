@@ -31,9 +31,21 @@ describe('run_ship_stop_cause.cause_of', () => {
 	)
 })
 
+const RED_CHECK = 'CI / test failed'
+
+// joshuafolkken/kit#4589: a failed stage's body carries its stderr, where a poll warns of a transient
+// rate limit it then recovered from.
+describe('run_ship_stop_cause.cause_of — the standard output a stage kept', () => {
+	it('reads a red check whose stderr names a rate limit as a check', () => {
+		const failed = { body: `${RED_CHECK}\n${RATE_LIMITED}`, out: RED_CHECK }
+
+		expect(cause_of('followup', failed)).toBe(CAUSE.CHECK)
+	})
+})
+
 describe('run_ship_stop_cause.cause_of — every stop that is not the infrastructure', () => {
 	it('reads a followup on a red check as a check', () => {
-		expect(cause_of('followup', { body: 'CI / test failed' })).toBe(CAUSE.CHECK)
+		expect(cause_of('followup', { body: RED_CHECK })).toBe(CAUSE.CHECK)
 	})
 
 	it.each(['gate', 'preflight'] as const)(

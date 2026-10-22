@@ -88,10 +88,16 @@ interface ResolvedPull {
 }
 
 // The resolution and the detail read, which every path below needs. The branch → number memo in
-// `git-gh-pr-read.ts` makes the first free after the first poll, and the ETag the second.
+// `git-gh-pr-read.ts` makes the first free after the first poll.
+//
+// **The detail is read without an ETag.** GitHub computes `mergeable_state` lazily and can change it
+// under an unchanged ETag, so a 304 answered from the poll cache kept the gate reading a stale
+// `blocked` on a pull request that had turned `clean` (joshuafolkken/kit#4589).
 async function resolve_pull(branch_name: string): Promise<ResolvedPull> {
 	const pr_number = await require_pr_number(branch_name)
-	const json = await git_gh_poll_read.read(git_gh_api_path.pull_api_path(String(pr_number)))
+	const json = await git_gh_exec.exec_gh_api({
+		path: git_gh_api_path.pull_api_path(String(pr_number)),
+	})
 
 	return { pr_number, pull: git_gh_pr_rest.parse_rest_pull(json) }
 }

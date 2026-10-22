@@ -10,6 +10,7 @@
 // composite ends at the failure, and the report names the step that failed so the run reads only it.
 
 import { run_section, type Section } from '#scripts/run/run-section'
+import { run_tail } from '#scripts/run/run-tail'
 import type { Cause } from './run-ship-stop-cause'
 import type { StepResult } from './run-ship-sync'
 
@@ -28,6 +29,8 @@ const STOPPED_PREFIX = 'stopped at: '
 const SKIPPED_BODY = 'skipped — already done'
 
 type ShipSection = Section & {
+	// The stage's standard output alone, the text an infrastructure stop is read on.
+	out?: string
 	// The paths a stopped merge left unmerged, handed to the stop prompt.
 	conflicts?: ReadonlyArray<string>
 	// The kinds of the preconditions a stopped preflight found unmet, recorded with the stop.
@@ -43,8 +46,9 @@ function section_of(header: string, result: StepResult): ShipSection {
 
 	return {
 		header,
-		body: result.out,
+		body: run_tail.section_body(result.out, result.err, result.code),
 		code: result.code,
+		out: result.out,
 		...(conflicts !== undefined && { conflicts }),
 		...(preconditions !== undefined && { preconditions }),
 		...(cause !== undefined && { cause }),

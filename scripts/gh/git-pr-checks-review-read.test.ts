@@ -184,9 +184,10 @@ describe('default_fetch_pr_state — requests per poll', () => {
 })
 
 // joshuafolkken/kit#4550: a poll that finds nothing changed sends the same three requests, and GitHub
-// answers every one 304, so it costs nothing against the rate limit.
+// answers the two commit listings 304, so they cost nothing against the rate limit. The pull detail is
+// read fresh: its `mergeable_state` can move under an unchanged ETag (joshuafolkken/kit#4589).
 describe('default_fetch_pr_state — a poll that finds nothing changed', () => {
-	it('is answered 304 on every request, so it costs nothing', async () => {
+	it('is answered 304 on every request but the pull detail', async () => {
 		arrange({ is_green: false })
 
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
@@ -194,7 +195,7 @@ describe('default_fetch_pr_state — a poll that finds nothing changed', () => {
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
 		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
-		expect(unchanged_reads()).toBe(CHECKS_ONLY_REQUESTS)
+		expect(unchanged_reads()).toBe(CHECKS_ONLY_REQUESTS - 1)
 	})
 })
 

@@ -42,9 +42,12 @@ const SERVING_POLLS = 60
 
 type ReturnOutcome = 'relaunched' | 'recorded' | 'parked' | 'redispatch'
 
-function stop_text(issue: string, stage: Stage, resume: ShipResume, output: string): string {
+// The failed stage's output, and its standard output alone where the stage kept it apart.
+type StageOutput = Pick<ShipSection, 'body' | 'out'>
+
+function stop_text(issue: string, stage: Stage, resume: ShipResume, output: StageOutput): string {
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
-	const cause = run_ship_stop_cause.cause_of(stage, { ...resume, body: output })
+	const cause = run_ship_stop_cause.cause_of(stage, { ...resume, ...output })
 
 	return run_ship_stop_text.format(issue, reason, cause)
 }
@@ -134,12 +137,13 @@ async function parked(issue: string, stage: Stage, resume: ShipResume): Promise<
 	return 'recorded'
 }
 
-// `output` is the failed stage's own output: the relaunched child's prompt carries its tail.
-async function return_control(
+// `output` is the failed stage's own output: the relaunched child's prompt carries the body's tail, and
+// the stop is classified on its standard output (`run-ship-stop-cause.ts`).
+async function stopped(
 	issue: string,
 	stage: Stage,
 	resume: ShipResume,
-	output: string,
+	output: StageOutput,
 ): Promise<ReturnOutcome> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.SHIP_STOP,
@@ -155,7 +159,8 @@ async function return_control(
 	// re-dispatch would lose (`run-ship-place.ts`).
 	await run_ship_place.await_place(lane, stage)
 
-	const stop = { stage, ...resume, context: await run_ship_stop_context.build(issue, output) }
+	const context = await run_ship_stop_context.build(issue, output.body)
+	const stop = { stage, ...resume, context }
 	// **A broker that stopped serving before the stop is waited for**: one that died during the review left
 	// the lane unserved at the stop, and a child started here cannot sign in on a token (joshuafolkken/kit#4344).
 	const server = await await_server(lane)
@@ -163,7 +168,16 @@ async function return_control(
 	return server === undefined ? relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
-type FailedSection = Pick<ShipSection, 'body' | 'conflicts' | 'cause'>
+async function return_control(
+	issue: string,
+	stage: Stage,
+	resume: ShipResume,
+	output: string,
+): Promise<ReturnOutcome> {
+	return await stopped(issue, stage, resume, { body: output })
+}
+
+type FailedSection = Pick<ShipSection, 'body' | 'out' | 'conflicts' | 'cause'>
 
 // The section's conflicts and the cause its review round tagged, only where it has them.
 function stopped_resume(resume: ShipResume, failed: FailedSection | undefined): ShipResume {
@@ -176,8 +190,8 @@ function stopped_resume(resume: ShipResume, failed: FailedSection | undefined): 
 	}
 }
 
-// The stopped ship's arguments and its failed section, as `return_control` takes them: the section's
-// conflicts and tagged cause ride on the resume, its body is the output the prompt carries. A stale
+// The stopped ship's arguments and its failed section, as `stopped` takes them: the section's conflicts
+// and tagged cause ride on the resume, its body and standard output are the stage's output. A stale
 // review rides on it too, so the relaunched child re-detaches with `--review` (joshuafolkken/kit#4221).
 async function hand_back(
 	args: ShipArguments,
@@ -187,12 +201,7 @@ async function hand_back(
 	const is_review_stale = await run_ship_probe.read_review_stale()
 	const resume = { ...run_ship_next.resume_of(args), is_review_stale }
 
-	return await return_control(
-		args.number,
-		stage,
-		stopped_resume(resume, failed),
-		failed?.body ?? '',
-	)
+	return await stopped(args.number, stage, stopped_resume(resume, failed), failed ?? { body: '' })
 }
 
 const run_ship_return = { hand_back, return_control }

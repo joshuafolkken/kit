@@ -8,9 +8,12 @@ import { git_gh_exec } from './git-gh-exec'
 // The merge gate's per-poll reads, each sent with the ETag of this process's previous answer
 // (joshuafolkken/kit#4550).
 //
+// **Never a pull request's detail**: GitHub computes its `mergeable_state` lazily, under an unchanged
+// ETag, so a 304 would keep a stale state (joshuafolkken/kit#4589).
+//
 // **`pnpm josh followup` reads the same pull request every 10 seconds** while its checks run, and
 // every lane waiting on its merge does so at once. A `304 Not Modified` does not count against the
-// rate limit, so a poll that finds nothing changed costs nothing.
+// rate limit, so a poll that finds nothing changed costs only its pull detail read.
 //
 // **A listing is read one page at a time only while it fits in one.** A listing longer than a page is
 // read through `--paginate --slurp` as before; the conditional read cannot page, and a partial
