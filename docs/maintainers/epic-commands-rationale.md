@@ -109,8 +109,9 @@ steps with the body template (joshuafolkken/kit#3178).
 inside the issue a batch merges and closes first, burying the plan for the rest. An earlier caveat
 ("with few children, the epic costs more than it organizes") lost its ground once josh began
 auto-closing an epic whose children are all closed (`scripts/epic/epic-close.ts`, run by `followup`
-after its merge, `issue:measured` after its close and `run:merge` for every merged child; a person
-who closes an `already-done` child closes its epic too): with no abandoned
+after its merge, `issue:measured` after its close and `run:merge` for every merged child; an epic
+whose last child a person closed — an `already-done` child — closes at the next of those closes,
+for any child, unless a person reopened it): with no abandoned
 epic left to manage, the only risk is misjudging the branch. A `closes #<epic>` in the last PR was
 rejected because it also fires when a batch fails midway.
 

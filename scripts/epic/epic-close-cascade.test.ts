@@ -124,7 +124,10 @@ describe('close_completed_epics — nested epic cascade, incomplete parent', () 
 				{ number: 400, children: [300] },
 			]),
 		)
-		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+		// The refused close leaves #300 open, so the sweep reads it OPEN too (#4564).
+		mocked_get_child.mockImplementation(async (number) =>
+			number === '300' ? child_json({ state: 'OPEN' }) : CLOSED_UNLINKED,
+		)
 		mocked_close.mockImplementation(async (number) => number !== '300')
 
 		await close_completed_epics(MERGED)

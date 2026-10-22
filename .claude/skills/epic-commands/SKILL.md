@@ -57,8 +57,9 @@ pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered  # argument order is the d
 
 After any hand edit run `pnpm josh epic:check <E>` (exit 1 when the body no longer parses).
 The epic closes once every task-list child is closed, whichever path closes the last child
-(`pnpm josh followup`, `josh issue:measured`, `josh run:merge`); one with a child whose state
-cannot be read, or whose last child a person closed (`already-done`), is closed by hand. Without `josh`: `issue-template.md`.
+(`pnpm josh followup`, `josh issue:measured`, `josh run:merge`); one whose last child a person
+closed (`already-done`) closes at the next of those closes, for any child. One with a child whose
+state cannot be read is closed by hand. Without `josh`: `issue-template.md`.
 
 ## `josh epic:audit <E>` — contradictions across the children
 
