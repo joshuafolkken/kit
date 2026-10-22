@@ -155,7 +155,8 @@ function apply_line(open: Set<string>, line: string, launched_ids: LaunchedIds):
 }
 
 // The launches `launched_ids` reads off the transcript tail that never saw their finish. A launch is
-// read off its own tool result and a finish off the harness notice, both by `time_transcript_line`.
+// read off its own tool result and a finish off the harness notice or a `TaskStop` result, both by
+// `time_transcript_line`.
 //
 // **Read in order, so the later word on an id wins.** A subagent resumed by `SendMessage` runs again
 // under the id its first run's notice already named; a set of every finish ever seen would read the

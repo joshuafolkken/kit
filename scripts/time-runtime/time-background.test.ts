@@ -134,6 +134,21 @@ describe('time_background.finished_id', () => {
 	})
 })
 
+describe('time_background.stopped_id', () => {
+	const stopped = JSON.stringify({
+		message: `Successfully stopped task: ${GATE_ID} (pnpm josh gate)`,
+		task_id: GATE_ID,
+	})
+
+	it('reads the id out of the result a TaskStop call writes', () => {
+		expect(time_background.stopped_id(stopped)).toBe(GATE_ID)
+	})
+
+	it('ignores a stop result quoted inside a longer body', () => {
+		expect(time_background.stopped_id(`see ${stopped}`)).toBe(time_background.NO_BACKGROUND)
+	})
+})
+
 describe('time_background.finished_at', () => {
 	it('keys the instant a task ended by the id the launch announced', () => {
 		const lines = [{ finished_background: GATE_ID, timestamp_ms: at(8) }]
