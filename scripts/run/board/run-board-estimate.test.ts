@@ -127,10 +127,10 @@ describe('run_board_estimate.left_ms with nothing to estimate', () => {
 })
 
 describe('run_board_estimate.part_of', () => {
-	it('draws the estimate to the minute after 🏁', () => {
+	it('draws the estimate to the minute after 🎯', () => {
 		const active = [running(1, 'implement', 5)]
 
-		expect(run_board_estimate.part_of(read({ active }))).toBe('🏁 ~25′')
+		expect(run_board_estimate.part_of(read({ active }))).toBe('🎯 ~25′')
 	})
 
 	it('draws nothing for an ended run', () => {

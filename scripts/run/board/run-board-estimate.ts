@@ -83,7 +83,7 @@ function left_ms(read: EstimateRead): number | undefined {
 	return run_board_estimate_schedule.end_of(waiting, lanes_of(running, read, usual))
 }
 
-// `🏁 ~25′`, `undefined` for an ended run or one with nothing to estimate.
+// `🎯 ~25′`, `undefined` for an ended run or one with nothing to estimate.
 function part_of(read: EstimateRead): string | undefined {
 	const left = read.ended_ms === undefined ? left_ms(read) : undefined
 
