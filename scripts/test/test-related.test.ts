@@ -48,6 +48,7 @@ const CHANGED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const ABSOLUTE_SOURCE = path.join(REPOSITORY_ROOT, CHANGED_SOURCE)
 const ADDED_TEST = path.join('scripts', 'test', 'test-related.test.ts')
 const MISSING_FILE = 'no-such-file.ts'
+const PACKAGE_FILE = 'package.json'
 const GIT_FAILURE = 'not a git repository'
 
 // The reading taken before vitest starts, which the recorder compares against the tree afterwards.
@@ -249,8 +250,25 @@ describe('test_related.run_related_tests — the change a map answers for', () =
 		await test_related.run_related_tests([])
 
 		expect(mocked_since).toHaveBeenCalledWith(MAP_COMMIT)
-		expect(mocked_changed).not.toHaveBeenCalled()
 		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+
+	// joshuafolkken/kit#4527: the map's tree is another lane's, whose own branch change is no trigger here.
+	it('sends nothing this branch did not change to the whole suite', async () => {
+		mocked_since.mockResolvedValue([CHANGED_SOURCE, PACKAGE_FILE])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+
+	it('reads every file as moved when the branch change cannot be read', async () => {
+		mocked_since.mockResolvedValue([CHANGED_SOURCE, PACKAGE_FILE])
+		mocked_changed.mockRejectedValue(new Error(GIT_FAILURE))
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['run'])
 	})
 
 	it('counts what already differed from the map’s tree as changed', async () => {
@@ -278,6 +296,7 @@ describe('test_related.run_related_tests — a change no test reads', () => {
 
 	beforeEach(() => {
 		vi.mocked(test_read_map.read_map).mockReturnValue({ ...MAP, dirty: {} })
+		mocked_changed.mockResolvedValue([UNREAD_DOCUMENT])
 		mocked_since.mockResolvedValue([UNREAD_DOCUMENT])
 		mocked_held.mockResolvedValue([UNREAD_DOCUMENT])
 	})
