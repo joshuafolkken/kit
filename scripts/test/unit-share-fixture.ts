@@ -14,9 +14,12 @@ function stub_share(share: number | undefined): void {
 	vi.spyOn(unit_worker_share, 'current_share').mockReturnValue(share)
 }
 
-// The free cores are the machine's too, so they are pinned for the share's reason.
-function stub_free(free: number | undefined): MockInstance<typeof free_cores.read> {
-	return vi.spyOn(free_cores, 'read').mockResolvedValue(free)
+// The free cores and memory are the machine's too, so they are pinned for the share's reason.
+function stub_free(
+	free: number | undefined,
+	memory_workers?: number,
+): MockInstance<typeof free_cores.read> {
+	return vi.spyOn(free_cores, 'read').mockResolvedValue({ cores: free, memory_workers })
 }
 
 // So is the claim this run holds: the suite itself runs inside one (joshuafolkken/kit#4235).

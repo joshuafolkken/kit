@@ -42,8 +42,9 @@ async function build_gate_step(
 	return { label: check.label, command_args, cwd, skip_reason }
 }
 
-// The unit step at the narrower worker count its claim was admitted at past the wait cap
-// (`core_admission.narrowed_weight`); any other step, or one admitted as asked, is returned unchanged.
+// The unit step at a narrower worker count: the one its claim was admitted at past the wait cap
+// (`core_admission.narrowed_weight`), or the one the free memory holds (`gate-run-steps.ts`). Any
+// other step, or one left as asked, is returned unchanged.
 function with_granted_workers(step: GateStep, granted: number | undefined): GateStep {
 	if (granted === undefined || step.label !== UNIT_LABEL) return step
 

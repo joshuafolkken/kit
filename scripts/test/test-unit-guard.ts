@@ -183,12 +183,13 @@ function isolated_unit_environment(
 // (joshuafolkken/kit#4235).
 //
 // **The machine is read only when no count was typed.** The reading waits out a sample window, and a
-// caller's `--maxWorkers` — the gate's cap among them, already bounded by the same reading — wins
-// whatever it says.
+// caller's `--maxWorkers` wins whatever it says. The gate's cap is one: its admission narrows it to the
+// free cores, and its unit step bounds it by the free memory once admitted (`gate-run-steps.ts`).
 async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
 	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
 
 	const available_cores = availableParallelism()
+	// The cores and the memory free right now (joshuafolkken/kit#4528), from one reading.
 	const free = await free_cores.read({ available_cores })
 	const share = unit_worker_share.current_share(
 		available_cores,

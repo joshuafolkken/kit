@@ -4,6 +4,7 @@ import path from 'node:path'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
+import { core_weights } from './core-weights'
 import { free_cores } from './free-cores'
 import type { MachineReading } from './machine-capacity'
 
@@ -16,6 +17,8 @@ const LEDGER_WEIGHT = 4
 // The ledger's claim and five cores from outside it.
 const OUTSIDE_LOAD = 5
 const BUSY_CORES = LEDGER_WEIGHT + OUTSIDE_LOAD
+const MEMORY_WORKERS = 3
+const AVAILABLE_MB = MEMORY_WORKERS * core_weights.MEMORY_MB.unit_worker
 
 const ctx = { directory: '' }
 
@@ -39,7 +42,7 @@ describe('free_cores.read', () => {
 			directory: ctx.directory,
 		})
 
-		expect(free).toBeUndefined()
+		expect(free).toStrictEqual({ cores: undefined, memory_workers: undefined })
 	})
 
 	it('subtracts the busy cores no ledger claim accounts for', async () => {
@@ -49,7 +52,7 @@ describe('free_cores.read', () => {
 			directory: ctx.directory,
 		})
 
-		expect(free).toBe(CORES - OUTSIDE_LOAD)
+		expect(free.cores).toBe(CORES - OUTSIDE_LOAD)
 	})
 
 	// Another run's admitted claim is load already divided between the runs; only the rest is subtracted.
@@ -65,7 +68,30 @@ describe('free_cores.read', () => {
 			{ directory: ctx.directory, read_machine: reading_of(undefined) },
 		)
 
-		expect(free).toBe(CORES - OUTSIDE_LOAD)
+		expect(free.cores).toBe(CORES - OUTSIDE_LOAD)
+	})
+})
+
+// joshuafolkken/kit#4528: the same reading carries the memory the share is bounded by.
+describe('free_cores.read — the workers the free memory holds', () => {
+	it('divides the available memory by one worker’s peak', async () => {
+		const free = await free_cores.read({
+			available_cores: CORES,
+			read_machine: async () => ({ busy_cores: OUTSIDE_LOAD, available_mb: AVAILABLE_MB }),
+			directory: ctx.directory,
+		})
+
+		expect(free).toStrictEqual({ cores: CORES - OUTSIDE_LOAD, memory_workers: MEMORY_WORKERS })
+	})
+
+	it('answers no memory bound where the memory could not be read', async () => {
+		const free = await free_cores.read({
+			available_cores: CORES,
+			read_machine: reading_of(OUTSIDE_LOAD),
+			directory: ctx.directory,
+		})
+
+		expect(free.memory_workers).toBeUndefined()
 	})
 })
 
@@ -94,6 +120,6 @@ describe('free_cores.read — inside the claim its own command holds', () => {
 			{ directory: ctx.directory, budget: CORES, read_machine: reading_of(undefined) },
 		)
 
-		expect(free).toBe(CORES - OUTSIDE_LOAD)
+		expect(free.cores).toBe(CORES - OUTSIDE_LOAD)
 	})
 })

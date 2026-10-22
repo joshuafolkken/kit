@@ -172,6 +172,29 @@ function cap_to_free(
 	return Math.max(MIN_WORKERS, Math.floor(free_cores))
 }
 
+// What the machine has free for this run's workers, both from `free-cores.ts`'s one reading: the free
+// cores, and the workers the free memory holds. Either is `undefined` where it could not be read.
+interface FreeCapacity {
+	cores: number | undefined
+	memory_workers: number | undefined
+}
+
+const UNREAD_CAPACITY: FreeCapacity = { cores: undefined, memory_workers: undefined }
+
+// **The free memory bounds the share as the free cores do** (joshuafolkken/kit#4528). Lanes running
+// their suites at once each sized workers from the cores alone, so their workers' memory piled up
+// until the batch stopped opening lanes. Both bounds go through `cap_to_free`, so an unread one leaves
+// the share as it was.
+function cap_to_capacity(
+	workers: number | undefined,
+	free: FreeCapacity,
+	available_cores: number,
+): number | undefined {
+	const core_capped = cap_to_free(workers, free.cores, available_cores)
+
+	return cap_to_free(core_capped, free.memory_workers, available_cores)
+}
+
 // The core-budget claim a unit run holds: the weight it reserved, and the narrower one it was admitted
 // at past the wait cap.
 interface UnitClaim {
@@ -203,12 +226,12 @@ function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): 
 function current_share(
 	available_cores: number = availableParallelism(),
 	live_runs: number = live_run_count(),
-	free_cores?: number,
+	free: FreeCapacity = UNREAD_CAPACITY,
 ): number | undefined {
 	const own_run = is_nested_run() ? 0 : SOLO_RUNS
 	const share = resolve_unit_workers(available_cores, live_runs + own_run)
 
-	return cap_to_free(share, free_cores, available_cores)
+	return cap_to_capacity(share, free, available_cores)
 }
 
 function is_worker_flag(argument: string): boolean {
@@ -275,6 +298,7 @@ const unit_worker_share = {
 	NESTED_VALUE,
 	RUN_PREFIX,
 	SOLO_RUNS,
+	cap_to_capacity,
 	cap_to_claim,
 	cap_to_free,
 	current_share,
@@ -289,5 +313,5 @@ const unit_worker_share = {
 	worker_arguments,
 }
 
-export type { UnitClaim }
+export type { FreeCapacity, UnitClaim }
 export { unit_worker_share }

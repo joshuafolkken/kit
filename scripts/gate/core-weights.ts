@@ -54,13 +54,16 @@ const CORE_WEIGHTS = {
 // 2026-10-07: the type check 1,244 MB, the spell check 330 MB, and one unit worker 319 MB over 54 test
 // files. Typed eslint was 1,207 MB over one directory and was observed at 1.6–2.4 GB per whole-tree
 // `eslint .` with three lanes running the same day, so lint and the whole-tree scan take that peak.
-// On 2026-10-17: prettier 260 MB, the retrospective 862 MB and a lane install 65 MB.
+// On 2026-10-17: prettier 260 MB, the retrospective 862 MB and a lane install 65 MB. On 2026-10-22
+// (joshuafolkken/kit#4528) the whole suite, 1,830 files at `--maxWorkers=3` beside four lanes, sampled
+// each worker's resident size once a second: the largest peaked at 381 MB, so the 54-file
+// measurement had read a worker short of the files it lives through.
 const MEMORY_MB = {
 	lint: 2400,
 	type_check: 1300,
 	spell_check: 350,
 	eslint_scan: 2400,
-	unit_worker: 350,
+	unit_worker: 400,
 	format: 300,
 	retrospective: 900,
 	install: 100,
