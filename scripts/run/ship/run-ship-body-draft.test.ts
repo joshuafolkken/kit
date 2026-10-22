@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
+import { removed_tests } from '#scripts/review/removed-tests'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShipArguments } from './run-ship-steps'
 
@@ -23,6 +25,7 @@ const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-body-draft-'))
 const OWN_BODY = path.join(TEMPORARY, 'own-body.md')
 const GIT_DIRECTORY = path.join(TEMPORARY, 'git')
 const BODY_FLAG = '--body-file'
+const RUNTIME_PATH = 'scripts/run/ship/run-ship-body-draft.ts'
 const ARGS: ShipArguments = {
 	title: 'Satisfy the preconditions #4168',
 	number: ISSUE,
@@ -48,9 +51,11 @@ afterAll(() => {
 describe('run_ship_body_draft.prepare — the draft in the work tree git directory', () => {
 	it('writes the rows and an evidence heading under the work tree git directory', async () => {
 		const draft = await run_ship_body_draft.prepare(ISSUE, ROWS)
+		const text = readFileSync(draft, 'utf8')
 
 		expect(path.dirname(draft)).toBe(GIT_DIRECTORY)
-		expect(readFileSync(draft, 'utf8')).toBe(`${ROWS}\n\n${live_evidence.EVIDENCE_HEADING}\n`)
+		expect(text.startsWith(`${ROWS}\n\n`)).toBe(true)
+		expect(text.endsWith(`\n\n${live_evidence.EVIDENCE_HEADING}\n`)).toBe(true)
 	})
 
 	it('keeps a draft the run already filled in', async () => {
@@ -66,6 +71,28 @@ describe('run_ship_body_draft.prepare — the draft in the work tree git directo
 		directories_mock.mockResolvedValue([])
 
 		await expect(run_ship_body_draft.prepare(ISSUE, ROWS)).rejects.toThrow('no git directory')
+	})
+})
+
+// joshuafolkken/kit#4478: lanes met each format only at the refusal and shipped into it twice.
+describe('run_ship_body_draft.prepare — the formats the preflight asks for', () => {
+	it.each([
+		['the acceptance rows', acceptance_map.ROW_FORMAT],
+		['the live evidence', live_evidence.EVIDENCE_FORMAT],
+		['the removed tests', removed_tests.ROW_FORMAT],
+	])('names the format of %s in a comment', async (_label, format) => {
+		const text = readFileSync(await run_ship_body_draft.prepare(ISSUE, ROWS), 'utf8')
+		const lines = text.split('\n')
+
+		expect(lines.some((line) => line.startsWith('<!--') && line.includes(format))).toBe(true)
+	})
+
+	it('meets no acceptance row and no live evidence by its comments alone', async () => {
+		const text = readFileSync(await run_ship_body_draft.prepare(ISSUE, ROWS), 'utf8')
+		const output_only = `${text}\n\`\`\`text\nok\n\`\`\`\n`
+
+		expect(acceptance_map.rows_of(text).met.size).toBe(0)
+		expect(live_evidence.verdict_for([RUNTIME_PATH], output_only)).toBe('required')
 	})
 })
 

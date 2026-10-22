@@ -1,7 +1,9 @@
 import { access, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
+import { removed_tests } from '#scripts/review/removed-tests'
 import type { ShipArguments } from './run-ship-steps'
 
 // **The pull-request body a run fills in before `josh ship`, written where ship reads it.** The
@@ -33,8 +35,23 @@ function is_exists_error(error: unknown): boolean {
 	return error instanceof Error && 'code' in error && error.code === EXISTS_CODE
 }
 
+// The formats the preflight refuses on, as comments a rendered body hides: lanes that wrote the rows and
+// the evidence in shapes of their own met them only at the refusal (joshuafolkken/kit#4478). They sit
+// above the evidence heading, so their backticks are never read as that section's command.
+const FORMAT_HINTS: ReadonlyArray<string> = [
+	acceptance_map.ROW_FORMAT,
+	live_evidence.EVIDENCE_FORMAT,
+	`when the change removes or renames a test, ${removed_tests.ROW_FORMAT}`,
+]
+
+function hint_line(format: string): string {
+	return `<!-- ${format} -->`
+}
+
 function draft_text(acceptance_rows: string): string {
-	return `${acceptance_rows}\n\n${live_evidence.EVIDENCE_HEADING}\n`
+	const hints = FORMAT_HINTS.map((format) => hint_line(format)).join('\n')
+
+	return `${acceptance_rows}\n\n${hints}\n\n${live_evidence.EVIDENCE_HEADING}\n`
 }
 
 // Written once: a draft the run has already filled in is never replaced by pending rows.

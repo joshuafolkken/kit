@@ -52,9 +52,11 @@ function section_of(header: string, result: StepResult): ShipSection {
 }
 
 // The step that stopped the ship, or `undefined` when every executed step was green. Because the
-// composite breaks at the first failure, this is the last section whenever one exists.
+// composite breaks at the first failure, this is the last section whenever one exists. The pre-detach
+// report runs on past a red check and prints the preflight refusal last (joshuafolkken/kit#4478), so
+// the last failed section is the one named.
 function failed_section(sections: ReadonlyArray<ShipSection>): ShipSection | undefined {
-	return sections.find((section) => section.code !== run_section.SUCCESS_EXIT_CODE)
+	return sections.findLast((section) => section.code !== run_section.SUCCESS_EXIT_CODE)
 }
 
 // The executed steps under their headers, closed with the name of the step that stopped the run so the

@@ -1,0 +1,2 @@
+- rf:comments | low | scripts/test/test-related-scope.test.ts:279 | 2026-10-22 | #4465
+- rf:assumptions | low | scripts/test/test-related-scope.ts:72 | 2026-10-22 | #4465
