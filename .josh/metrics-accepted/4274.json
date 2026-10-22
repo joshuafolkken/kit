@@ -1,0 +1,7 @@
+{
+	"reason": "Property test fixtures for lane and run lifecycle combinations, and the board's earlier-run filter extracted so the fixture runs the real one (#4274)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 376
+	}
+}

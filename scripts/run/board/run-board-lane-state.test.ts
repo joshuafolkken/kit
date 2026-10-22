@@ -129,6 +129,26 @@ describe('run_board_lane_state.lanes_of — an ending on the stream', () => {
 	})
 })
 
+describe('run_board_lane_state.earlier_occupied — an earlier run’s lane on the board', () => {
+	it('keeps an earlier run’s lane that holds a place', () => {
+		const lanes = lanes_of([record_of('running', EARLIER_RUN)])
+
+		expect(run_board_lane_state.earlier_occupied([ISSUE], lanes)).toStrictEqual([ISSUE])
+	})
+
+	it('drops an earlier run’s lane that holds no place', () => {
+		const lanes = lanes_of([record_of('running', EARLIER_RUN)])
+
+		expect(run_board_lane_state.earlier_occupied([], lanes)).toStrictEqual([])
+	})
+
+	it('drops this run’s own lane though it holds a place', () => {
+		const lanes = lanes_of([record_of('running')])
+
+		expect(run_board_lane_state.earlier_occupied([ISSUE], lanes)).toStrictEqual([])
+	})
+})
+
 describe('run_board_status.statuses_of — an earlier run’s lane in this run’s span', () => {
 	it('keeps what the span says of an earlier run’s lane out of this run’s statuses', () => {
 		const events = [event_of(1, LATER, KIND.CHILD_LAUNCH)]
