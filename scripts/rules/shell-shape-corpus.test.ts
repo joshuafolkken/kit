@@ -7,6 +7,8 @@ import { lane_transcript_stats } from '#scripts/lane/lane-transcript-stats'
 import { run_board_usage_listing } from '#scripts/run/board/run-board-usage-listing'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_park } from '#scripts/run/park/run-park'
+import { test_declared_changed } from '#scripts/test/test-declared-changed'
+import type { Verdict } from '#scripts/test/test-declared-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import {
@@ -31,15 +33,17 @@ const RULE_FIRING_SHAPES: Record<string, ReadonlyArray<ShellShapeId>> = Object.f
 
 const LANE_ISSUE = '9'
 const OVER_THRESHOLD: CostVerdict = 'over'
+const UNTESTED_TREE: Verdict = 'required'
 
 function sorted(keys: ReadonlyArray<string>): Array<string> {
 	return keys.toSorted((left, right) => left.localeCompare(right))
 }
 
-// A dispatched lane child, uncut, unparked and over its context threshold — the world in which every
-// lane-scoped rule goes on to read the command, so its answer on a shape is about the shape and not
-// about where the test happens to run.
+// A dispatched lane child, uncut, unparked and over its context threshold, on a working tree holding
+// an untested runtime change — the world in which every rule that reads the world goes on to read the
+// command, so its answer on a shape is about the shape and not about where the test happens to run.
 function pin_lane_world(): void {
+	vi.spyOn(test_declared_changed, 'current_verdict').mockReturnValue(UNTESTED_TREE)
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 	vi.spyOn(lane_child_marker, 'marked_issue').mockReturnValue(LANE_ISSUE)
 	vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(LANE_ISSUE)
