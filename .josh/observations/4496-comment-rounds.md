@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/build/build-hooks.ts:27 | 2026-10-22 | #4496
+- rf:bug-risks | low | scripts/lint/eslint-daemon.ts:210 | 2026-10-22 | #4496
+- rf:comments | low | .github/workflows/ci.yml:290 | 2026-10-22 | #4496
+- rf:tests | low | scripts/hooks/format-edited-file.test.ts:50 | 2026-10-22 | #4496
