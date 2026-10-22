@@ -170,7 +170,8 @@ const unit_files_schema = z.object({
 // One `josh test:related` run (joshuafolkken/kit#4465): `scope` is `related`, `none` or the full-suite
 // fallback kind; the four counts are its input — the change itself, what a main sync brought into it,
 // what the change since the test-read map's tree joined to it and the map's readers — and `test_files`
-// how many vitest ran, absent where none reported.
+// how many vitest ran, absent where none reported. `trigger_files` are the changed files that sent a
+// full-suite run there, absent where none did and on rows written before it (joshuafolkken/kit#4510).
 const test_related_schema = z.object({
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
@@ -180,6 +181,7 @@ const test_related_schema = z.object({
 	since_map: z.number(),
 	readers: z.number(),
 	test_files: z.number().optional(),
+	trigger_files: z.array(z.string()).optional(),
 	elapsed_ms: z.number(),
 })
 const entry_schema = z.discriminatedUnion('kind', [

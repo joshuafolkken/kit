@@ -79,6 +79,13 @@ function part_of(part: ReadonlyArray<string>, changed: ReadonlySet<string>): num
 	return part.filter((file) => changed.has(file)).length
 }
 
+// The changed files that sent a full-suite run there, repository-root-relative, or none.
+function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
+	if (input.scope.mode !== 'all' || input.scope.files.length === 0) return {}
+
+	return { trigger_files: input.scope.files.map((file) => path.relative(input.root, file)) }
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const changed = new Set(input.changed)
 	const synced = part_of(input.synced, changed)
@@ -89,6 +96,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		synced,
 		since_map,
 		readers: readers_of(input, changed),
+		...triggers_of(input),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 

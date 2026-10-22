@@ -22,6 +22,22 @@ describe('lane_ledger_schema.entry_schema', () => {
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
 	})
 
+	it('parses a full-suite test-related run with the files that sent it there', () => {
+		const run = {
+			kind: KIND.TEST_RELATED,
+			at: AT,
+			scope: 'whole-suite-file',
+			changed: 2,
+			synced: 0,
+			since_map: 0,
+			readers: 0,
+			trigger_files: ['package.json', 'pnpm-lock.yaml'],
+			elapsed_ms: 5,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+
 	it('rejects a line of a kind it does not know', () => {
 		expect(entry_schema.safeParse({ kind: 'unknown', at: AT }).success).toBe(false)
 	})

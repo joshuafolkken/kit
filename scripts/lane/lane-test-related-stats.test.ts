@@ -74,3 +74,39 @@ describe('lane_test_related_stats.table', () => {
 		expect(row_of([run(NARROW, OUTSIDE)], RELATED)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#4510: the changed files that sent a run to the whole suite, one row each.
+const PACKAGE_FILE = 'package.json'
+const LOCK_FILE = 'pnpm-lock.yaml'
+const WHOLE: TestRelatedRecord = { ...NARROW, scope: 'whole-suite-file', elapsed_ms: 100_000 }
+
+function trigger_rows(entries: ReadonlyArray<LedgerEntry>): Array<Array<string>> {
+	return lane_test_related_stats
+		.trigger_table(entries, WINDOW)
+		.split('\n')
+		.slice(2)
+		.map((line) => line.slice(2, -2).split(' | '))
+}
+
+describe('lane_test_related_stats.trigger_table', () => {
+	it('counts each file under every run it sent there, most runs first, with their median', () => {
+		const entries = [
+			run({ ...WHOLE, trigger_files: [PACKAGE_FILE, LOCK_FILE], elapsed_ms: 200_000 }),
+			run({ ...WHOLE, trigger_files: [LOCK_FILE] }),
+			run({ ...WHOLE, trigger_files: [LOCK_FILE], elapsed_ms: 150_000 }),
+		]
+
+		expect(trigger_rows(entries)).toStrictEqual([
+			[LOCK_FILE, '3', '150.0'],
+			[PACKAGE_FILE, '1', '200.0'],
+		])
+	})
+
+	it('reads a row written before the files were recorded as naming none', () => {
+		expect(trigger_rows([run(WHOLE), run(NARROW)])).toStrictEqual([])
+	})
+
+	it('counts no file a run outside the window named', () => {
+		expect(trigger_rows([run({ ...WHOLE, trigger_files: [LOCK_FILE] }, OUTSIDE)])).toStrictEqual([])
+	})
+})

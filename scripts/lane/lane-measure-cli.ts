@@ -146,6 +146,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
 		lane_test_related_stats.table(entries, window),
+		lane_test_related_stats.trigger_table(entries, window),
 		lane_transcript_stats.table(calls, window),
 	]
 }
