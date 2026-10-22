@@ -1,0 +1,7 @@
+{
+	"reason": "New run-board-snapshot module persists the board's last GitHub read (#4484)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 121
+	}
+}

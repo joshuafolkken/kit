@@ -8,6 +8,7 @@ import { run_board_idle } from './run-board-idle'
 import type { KeyInput } from './run-board-keys'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
+import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
 import type { Spot } from './run-board-spin'
 import type { Thanks } from './run-board-thanks-csv'
 
@@ -21,6 +22,8 @@ interface BoardPorts {
 	gather: Gatherer
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
+	// Where the last GitHub reads are kept between boards (`run-board-snapshot.ts`); none keeps nothing.
+	snapshot?: SnapshotStore | undefined
 	now: () => number
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
@@ -58,6 +61,8 @@ interface BoardState extends GatherRead {
 	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
 	run_started_ms: number | undefined
 	plan: BoardPlan | undefined
+	// The titles and labels drawn before this board's first plan lands — the last board's snapshot.
+	known: Known
 	// The plan read in flight, `undefined` once it has been folded in.
 	plan_fetch: Fetch<BoardPlan | undefined> | undefined
 	attempted_ms: number | undefined
@@ -86,6 +91,7 @@ const FRESH_STATE: BoardState = {
 	idle_since: run_board_idle.NO_IDLE,
 	run_started_ms: undefined,
 	plan: undefined,
+	known: run_board_snapshot.NO_KNOWN,
 	plan_fetch: undefined,
 	attempted_ms: undefined,
 	fetched_ms: undefined,

@@ -15,6 +15,7 @@ import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
 import { run_board_screen, type Screen } from './run-board-screen'
+import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
@@ -50,6 +51,7 @@ function on_exit(leave: () => void): void {
 const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
+	snapshot: run_board_snapshot.file_store(),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
