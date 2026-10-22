@@ -92,6 +92,7 @@ describe('test_read_map.parse_map', () => {
 	it.each([
 		['malformed JSON', '{'],
 		['another version', JSON.stringify({ ...MAP, version: test_read_map.MAP_VERSION + 1 })],
+		['an older version', JSON.stringify({ ...MAP, version: test_read_map.MAP_VERSION - 1 })],
 		['a reader list that is not strings', JSON.stringify({ ...MAP, readers: { a: [1] } })],
 		['no commit', JSON.stringify({ ...MAP, commit: undefined })],
 		['a dirty list without digests', JSON.stringify({ ...MAP, dirty: [DIRTY] })],

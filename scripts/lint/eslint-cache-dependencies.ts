@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 import { parse, stringify } from 'flatted'
@@ -61,14 +61,24 @@ function parsed_or_undefined(content: string): unknown {
 	}
 }
 
-// Undefined for a missing file and for one this cannot read as eslint writes it: eslint starts a
-// cache it cannot read afresh, so there is nothing stale to drop.
+// Undefined for a missing file and for one this cannot read as eslint writes it.
 function read_entries(cache_file: string): Array<CacheEntry> | undefined {
 	const content = file_reader.read_optional(cache_file)
 	if (content === undefined) return undefined
 	const parsed = parsed_or_undefined(content)
 
 	return is_entries(parsed) ? parsed : undefined
+}
+
+// A cache file this cannot read — a corrupt one, or one another layout wrote into a cache lanes share —
+// is removed before the run rather than left to eslint, so the run rebuilds it whole and every entry it
+// writes carries a hash (joshuafolkken/kit#4497).
+function read_or_discard(cache_file: string): Array<CacheEntry> {
+	const entries = read_entries(cache_file)
+
+	if (entries === undefined) rmSync(cache_file, { force: true })
+
+	return entries ?? []
 }
 
 function write_entries(cache_file: string, entries: ReadonlyArray<CacheEntry>): void {
@@ -85,7 +95,7 @@ function recorded_hash(entry: CacheEntry): string | undefined {
 
 // Drops every entry whose imports no longer hash as recorded, and answers the hashes it took.
 function drop_stale(cache_file: string, graph: ImportGraph): Hashes {
-	const entries = read_entries(cache_file) ?? []
+	const entries = read_or_discard(cache_file)
 	const hashes = new Map(entries.map((entry) => [entry.key, graph.closure_hash(entry.key)]))
 	const kept = entries.filter((entry) => recorded_hash(entry) === hashes.get(entry.key))
 
