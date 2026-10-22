@@ -25,6 +25,8 @@ const NEWER_S = 2000
 const MS_PER_S = 1000
 const RULE_MODULE = 'eslint/rules/a-rule.js'
 const CONFIG_ENTRY = 'eslint.config.js'
+const TSCONFIG = 'tsconfig.json'
+const TSCONFIG_BASE = 'tsconfig/base.json'
 const PNPM_PRETTIER = ['exec', 'prettier', TARGET]
 // What `git rev-parse --git-path logs/HEAD` prints in a main checkout: relative to the work tree.
 const HEAD_REFLOG = '.git/logs/HEAD'
@@ -75,12 +77,25 @@ describe('eslint_daemon.eslint_arguments_of', () => {
 })
 
 describe('eslint_daemon.is_config_input', () => {
-	it.each([RULE_MODULE, CONFIG_ENTRY, 'eslint.config.mts'])('reads %s', (file) => {
-		expect(eslint_daemon.is_config_input(file)).toBe(true)
-	})
+	it.each([RULE_MODULE, CONFIG_ENTRY, 'eslint.config.mts', TSCONFIG, TSCONFIG_BASE])(
+		'reads %s',
+		(file) => {
+			expect(eslint_daemon.is_config_input(file)).toBe(true)
+		},
+	)
 
 	it('leaves a source file alone', () => {
 		expect(eslint_daemon.is_config_input('scripts/eslint.ts')).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4494: the type program's compiler options, which the project service never watches.
+describe('eslint_daemon.newest_config_mtime — the type program config', () => {
+	it.each([TSCONFIG, 'tsconfig.app.json', TSCONFIG_BASE])('reads %s', (config) => {
+		write_file(CONFIG_ENTRY, OLDER_S)
+		write_file(config, NEWER_S)
+
+		expect(eslint_daemon.newest_config_mtime(project_root)).toBe(NEWER_S * MS_PER_S)
 	})
 })
 
