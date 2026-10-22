@@ -21,9 +21,14 @@ const PNPM_EXEC = 'exec'
 const ESLINT_BIN = 'eslint'
 const PNPM_ESLINT_PREFIX_LENGTH = 2
 // The two shapes a flat config is built from here and in every consumer of this kit: the root
-// `eslint.config.*` entry, and the rule modules under `eslint/` that it imports.
-const ESLINT_CONFIG_DIR = 'eslint'
-const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
+// `eslint.config.*` entry, and the rule modules under `eslint/` that it imports. The type program the
+// typed rules run on reads the root `tsconfig*.json` and what it extends under `tsconfig/`, and
+// typescript-eslint's project service never watches them (joshuafolkken/kit#4494).
+const CONFIG_DIRECTORIES: ReadonlySet<string> = new Set(['eslint', 'tsconfig'])
+const CONFIG_ENTRIES: ReadonlyArray<RegExp> = [
+	/^eslint\.config\.[cm]?[jt]s$/u,
+	/^tsconfig(?:\.[\w-]+)?\.json$/u,
+]
 // A consumer's config imports its rules from installed packages (`@joshuafolkken/app-kit/eslint…`),
 // so an install is a config input too: pnpm rewrites `node_modules/.modules.yaml` on every install,
 // and the lockfile on every dependency change a checkout or merge brings in.
@@ -77,10 +82,13 @@ function resolve_daemon_cli(project_root: string): string | undefined {
 	)
 }
 
+function is_config_entry(name: string): boolean {
+	return CONFIG_ENTRIES.some((entry) => entry.test(name))
+}
+
 function is_config_input(relative_path: string): boolean {
 	return (
-		relative_path.split(path.sep)[0] === ESLINT_CONFIG_DIR ||
-		ESLINT_CONFIG_ENTRY.test(relative_path)
+		CONFIG_DIRECTORIES.has(relative_path.split(path.sep)[0] ?? '') || is_config_entry(relative_path)
 	)
 }
 
@@ -103,15 +111,20 @@ function head_reflog_paths(project_root: string): ReadonlyArray<string> {
 	return reflog === undefined ? [] : [path.resolve(project_root, reflog)]
 }
 
+// Files only: a directory's mtime moves on every entry created in it, an editor's temp file too.
+function files_under(directory: string): ReadonlyArray<string> {
+	if (!existsSync(directory)) return []
+
+	return readdirSync(directory, { recursive: true, withFileTypes: true })
+		.filter((entry) => entry.isFile())
+		.map((entry) => path.join(entry.parentPath, entry.name))
+}
+
 function config_input_paths(project_root: string): ReadonlyArray<string> {
-	const entries = readdirSync(project_root).filter((name) => ESLINT_CONFIG_ENTRY.test(name))
-	const config_directory = path.join(project_root, ESLINT_CONFIG_DIR)
-	// Files only: a directory's mtime moves on every entry created in it, an editor's temp file too.
-	const modules = existsSync(config_directory)
-		? readdirSync(config_directory, { recursive: true, withFileTypes: true })
-				.filter((entry) => entry.isFile())
-				.map((entry) => path.join(entry.parentPath, entry.name))
-		: []
+	const entries = readdirSync(project_root).filter((name) => is_config_entry(name))
+	const modules = [...CONFIG_DIRECTORIES].flatMap((name) =>
+		files_under(path.join(project_root, name)),
+	)
 
 	return [
 		...[...entries, ...DEPENDENCY_INPUTS].map((name) => path.join(project_root, name)),
