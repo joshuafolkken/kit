@@ -9,11 +9,13 @@ import { create_spawn_error } from './git-execa-error'
 vi.mock('./git-command', () => ({
 	git_command: {
 		branch: vi.fn(),
+		diff_main_numstat: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
 		merge_branch: vi.fn(),
 		merge_fast_forward: vi.fn(),
 		status: vi.fn(),
+		untracked_names: vi.fn(),
 	},
 }))
 
@@ -23,6 +25,7 @@ vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 const { git_command } = await import('./git-command')
 const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
+const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
 
 const CHANGED_FILE = 'scripts/a.ts'
@@ -56,6 +59,13 @@ beforeEach(() => {
 	merge_branch.mockResolvedValue()
 	vi.mocked(git_command.status).mockResolvedValue('')
 	vi.mocked(git_spawn.read).mockResolvedValue('')
+})
+
+// The split notice's diff read, empty by default so no merge below prints one.
+beforeEach(() => {
+	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+	vi.mocked(git_command.diff_main_numstat).mockResolvedValue('')
+	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 })
 
 describe('merging the default branch into the current branch', () => {
@@ -122,6 +132,17 @@ describe('the outcome of one merge', () => {
 		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
 
 		expect(await main_merge.merge()).toStrictEqual({ kind: 'conflict', files: [CHANGED_FILE] })
+	})
+
+	// joshuafolkken/kit#3922: a conflict only on generated files is regenerated rather than stopped on.
+	it('answers merged once a conflict on generated files alone is regenerated', async () => {
+		merge_branch.mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
+		vi.mocked(git_spawn.read).mockResolvedValue(CHANGED_FILE)
+		const resolve = vi.spyOn(main_merge_regenerate, 'resolve').mockResolvedValueOnce(true)
+
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'merged', branch: 'main' })
+		expect(resolve).toHaveBeenCalledWith([CHANGED_FILE])
 	})
 
 	it('rethrows a merge failure that left no unmerged path', async () => {
@@ -193,5 +214,42 @@ describe('refusing extra arguments', () => {
 
 		expect(fetch_branch).not.toHaveBeenCalled()
 		expect(merge_branch).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4302: the merge that precedes the gate tells the run when its diff has outgrown the
+// split guide, and stays silent — and successful — otherwise.
+const OVER_GUIDE_FILES = 11
+const LINES_PER_FILE = 50
+const UNDER_GUIDE_NUMSTAT = `${String(LINES_PER_FILE)}\t0\t${CHANGED_FILE}`
+
+function over_guide_numstat(): string {
+	return Array.from(
+		{ length: OVER_GUIDE_FILES },
+		(_unused, index) => `${String(LINES_PER_FILE)}\t0\tscripts/thing-${String(index)}.ts`,
+	).join('\n')
+}
+
+describe('the split notice before the gate', () => {
+	it('warns when the diff clearly exceeds the split guide', async () => {
+		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(over_guide_numstat())
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('split notice'))
+	})
+
+	it('prints nothing for a diff under the guide', async () => {
+		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
+
+		await main_merge.run(NO_ARGUMENTS)
+
+		expect(console.warn).not.toHaveBeenCalled()
+	})
+
+	it('keeps a finished merge successful and says the diff was unmeasured when it cannot be read', async () => {
+		vi.mocked(git_command.diff_main_numstat).mockRejectedValue(MERGE_FAILURE)
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('could not be measured'))
 	})
 })

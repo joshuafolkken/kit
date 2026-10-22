@@ -1,43 +1,36 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import type { PollOptions } from '#scripts/lib/poll'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { z } from 'zod'
-import {
-	epic_bundle,
-	type BacklogIssue,
-	type BundleAction,
-	type BundleDecision,
-	type MembershipContext,
-} from './epic-bundle'
-import { epic_bundle_evidence } from './epic-bundle-evidence'
+import { epic_bundle, type BacklogIssue, type MembershipContext } from './epic-bundle'
+import { epic_bundle_apply } from './epic-bundle-apply'
+import { epic_bundle_format } from './epic-bundle-format'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
 import { epic_bundle_poll } from './epic-bundle-poll'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
-import { format_dependency_links, type IssueReference } from './epic-reference'
+import type { IssueReference } from './epic-reference'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
 // belongs with something already there.
 //
 // The machine finds the candidates; the decision to bundle is the caller's. This command prints what
-// it found and what it recommends, and writes nothing.
+// it found and what it recommends, and writes nothing — unless `--apply` asks it to write the answers
+// whose placement is settled (`epic-bundle-apply.ts`).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 // The open backlog was 13 issues when this was written. Scanning all of them is instant, so there is
 // no index and no cache; add one when the number makes it necessary, not before.
 const BACKLOG_LIMIT = 200
-const USAGE = 'Usage: josh epic:bundle <issue-number>'
+const APPLY_FLAG = '--apply'
+const USAGE = 'Usage: josh epic:bundle <issue-number> [--apply]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
@@ -202,95 +195,13 @@ async function fetch_backlog(
 	}
 }
 
-const ACTION_LINES: Readonly<Record<string, string>> = {
-	add_to_epic: 'Add it to the epic that already tracks a related issue (Tier A — do it).',
-	create_epic: 'Create an epic for these (Tier A — do it).',
-	ask: 'Related issues sit in more than one epic: choose the one you recommend, add it, and record why (Tier A — do it).',
-	none: 'Nothing to bundle.',
-}
-
-// `Nothing to bundle.` is right when nothing was found, and wrong when an epic already tracks the
-// issue — there the answer is actionable: a caller looking for somewhere to put a prerequisite adds
-// it to *that* epic rather than creating a second one.
-const ALREADY_TRACKED_LINE = 'Already in an epic — add to that one, do not create a second.'
-
-function headline(decision: BundleDecision): string {
-	if (decision.action === 'none' && decision.epics.length > 0) return ALREADY_TRACKED_LINE
-
-	return ACTION_LINES[decision.action] ?? ''
-}
+const { format_decision } = epic_bundle_format
 
 // The epics currently open, at this command's own listing limit. A failed read stays `undefined` and
 // is reported: without the list, an issue an epic already tracks is told to create a second one —
 // confidently, and with exit 0.
 async function fetch_epics(): Promise<FetchedEpics | undefined> {
 	return await epic_index.fetch_epics(BACKLOG_LIMIT)
-}
-
-function format_numbers(numbers: ReadonlyArray<number>): string {
-	return numbers.map((issue_number) => issue_cite.plain(issue_number)).join(', ')
-}
-
-// The order to record alongside the bundle. Bundling without it records the batch and loses the
-// reason it is a batch, so the recommendation carries it rather than leaving it to be remembered.
-function format_links(links: ReadonlyArray<{ blocker: number; blocked: number }>): string {
-	if (links.length === 0) return '  Order: none declared — do not invent one'
-
-	return `  Order: ${format_dependency_links(links)}`
-}
-
-function format_order(
-	decision: BundleDecision,
-	subject: BacklogIssue,
-	backlog: ReadonlyArray<BacklogIssue>,
-): Array<string> {
-	if (decision.action !== 'add_to_epic' && decision.action !== 'create_epic') return []
-	const members = backlog.filter((issue) => decision.candidates.includes(issue.number))
-	const children = epic_bundle.bundle_children(subject, members)
-
-	// The evidence goes under the order rather than beside the verdict: what it explains is the
-	// order, and a reader checking one reads straight on into the other.
-	return [
-		`  Children: ${format_numbers(children)}`,
-		format_links(epic_bundle.bundle_dependency_links(subject, members)),
-		...epic_bundle_evidence.format_evidence(subject, members),
-	]
-}
-
-// The verdicts that put the subject into an epic. Each one asserts that no epic already tracks it —
-// `create_epic` asserts as much about the candidates too — and that negative is exactly what a cut
-// epic listing cannot establish. `none` is absent on purpose: it either
-// names the epic it *found* tracking the subject, which a cut cannot unseat, or reports no candidate
-// at all, which says nothing about epics.
-const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
-	'add_to_epic',
-	'create_epic',
-	'ask',
-])
-
-// `is_membership_established` is what separates "no epic tracks these" from "their epics were never
-// read".
-function format_decision(
-	decision: BundleDecision,
-	subject: BacklogIssue,
-	backlog: ReadonlyArray<BacklogIssue>,
-	is_membership_established: boolean,
-): string {
-	if (!is_membership_established && PLACING_ACTIONS.has(decision.action)) {
-		return epic_bundle_gaps.unconfirmed_membership(format_numbers(decision.candidates)).join('\n')
-	}
-
-	const lines = [headline(decision), `  ${decision.reason}`]
-
-	if (decision.candidates.length > 0) {
-		lines.push(`  Related: ${format_numbers(decision.candidates)}`)
-	}
-
-	if (decision.epics.length > 1) {
-		lines.push(`  Epics involved: ${format_numbers(decision.epics)}`)
-	}
-
-	return [...lines, ...format_order(decision, subject, backlog)].join('\n')
 }
 
 // The open backlog and the epics tracking it, read once.
@@ -366,7 +277,13 @@ function warn_about_gaps(backlog: FetchedBacklog): void {
 	warn_cutoff(epic_bundle_gaps.epic_gap(backlog.epic_cutoff ?? NO_CUTOFF, BACKLOG_LIMIT))
 }
 
-function report_decision(subject: BacklogIssue, backlog: FetchedBacklog, repo: string): number {
+// The report always prints; `--apply` then writes what it settled (`epic-bundle-apply.ts`).
+async function report_decision(
+	subject: BacklogIssue,
+	backlog: FetchedBacklog,
+	repo: string,
+	is_apply: boolean,
+): Promise<number> {
 	const others = backlog.issues.filter((issue) => issue.number !== subject.number)
 	const is_established = epic_bundle_gaps.is_membership_established(backlog.epic_cutoff)
 	const decision = epic_bundle.decide_bundle(subject, others)
@@ -376,8 +293,14 @@ function report_decision(subject: BacklogIssue, backlog: FetchedBacklog, repo: s
 	const report = format_decision(decision, subject, others, is_established)
 
 	console.info(issue_citation.linkify(report, repo))
+	if (!is_apply) return SUCCESS_EXIT_CODE
 
-	return SUCCESS_EXIT_CODE
+	return await epic_bundle_apply.apply_decision({
+		decision,
+		subject,
+		members: epic_bundle_format.members_of(decision, others),
+		is_membership_established: is_established,
+	})
 }
 
 // Widen, report what the read could not cover, then decide. Split out of `report_for`, which is
@@ -386,12 +309,13 @@ async function report_widened(
 	subject: BacklogIssue,
 	backlog: FetchedBacklog,
 	repo: string,
+	is_apply: boolean,
 ): Promise<number> {
 	const widened = await widen_with_referenced(subject, backlog)
 
 	warn_about_gaps(widened)
 
-	return report_decision(subject, widened, repo)
+	return await report_decision(subject, widened, repo, is_apply)
 }
 
 // The recommendation for one issue, from the open backlog around it. `options` is the poll a caller
@@ -400,6 +324,7 @@ async function report_for(
 	issue_number: number,
 	repo: string,
 	options?: PollOptions,
+	is_apply = false,
 ): Promise<number> {
 	const backlog = await epic_bundle_poll.read_until_listed(
 		async () => await read_backlog(repo),
@@ -423,11 +348,12 @@ async function report_for(
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report_widened(subject, backlog, repo)
+	return await report_widened(subject, backlog, repo, is_apply)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_number = epic_issue.parse_epic_number(argv[0])
+	const raw_issue = argv.find((argument) => argument !== APPLY_FLAG)
+	const issue_number = epic_issue.parse_epic_number(raw_issue)
 
 	if (issue_number === undefined) {
 		console.error(USAGE)
@@ -448,25 +374,14 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report_for(issue_number, repo)
-}
-
-// `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
-// a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
-// command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
+	return await report_for(issue_number, repo, undefined, argv.includes(APPLY_FLAG))
 }
 
 const epic_bundle_cli = {
 	USAGE,
 	BACKLOG_LIMIT,
-	ACTION_LINES,
-	ALREADY_TRACKED_LINE,
+	...epic_bundle_format,
 	build_epic_index,
-	format_numbers,
-	format_order,
 	unreadable_backlog_message,
 	read_backlog,
 	report_for,
@@ -474,11 +389,7 @@ const epic_bundle_cli = {
 	fetch_backlog,
 	widen_with_referenced,
 	warn_about_gaps,
-	format_decision,
 	run,
-	main,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { epic_bundle_cli }

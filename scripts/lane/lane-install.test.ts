@@ -1,15 +1,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-	INSTALL_ARGUMENTS,
-	lane_install,
-	MANIFEST_FILE_NAME,
-	NO_MANIFEST_OUTPUT,
-} from './lane-install'
+import { INSTALL_ARGUMENTS, lane_install, NO_MANIFEST_OUTPUT } from './lane-install'
 
 // joshuafolkken/kit#1554: opening a lane has to leave dependencies in it, so what is asserted here is
 // what this module asks for and how it reads the answer — never pnpm itself, nor the spawning that
@@ -50,11 +47,11 @@ function process_answers(exit_code: number | undefined, output: string): void {
 }
 
 function write_manifest(): void {
-	writeFileSync(path.join(lane.directory, MANIFEST_FILE_NAME), '{}')
+	writeFileSync(path.join(lane.directory, PACKAGE_JSON), '{}')
 }
 
 function remove_manifest(): void {
-	rmSync(path.join(lane.directory, MANIFEST_FILE_NAME), { force: true })
+	rmSync(path.join(lane.directory, PACKAGE_JSON), { force: true })
 }
 
 beforeEach(() => {
@@ -86,6 +83,36 @@ describe('install_dependencies — what it asks for', () => {
 	// nothing committed, so the flag is pinned rather than left to whatever pnpm defaults to.
 	it('refuses to let the install rewrite the lock it was cut from', () => {
 		expect(INSTALL_ARGUMENTS).toStrictEqual(['install', '--frozen-lockfile'])
+	})
+})
+
+// joshuafolkken/kit#3944: a batch opens its lanes together, and each install ran off the ledger.
+describe('install_dependencies — the core budget it claims', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('claims the install weight around the install', async () => {
+		process_answers(SUCCESS_EXIT_CODE, DONE_LINE)
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		const result = await lane_install.install_dependencies(lane.directory)
+
+		expect(reservation).toHaveBeenCalledWith(
+			core_budget.CORE_WEIGHTS.install,
+			expect.any(Function),
+			expect.objectContaining({ memory_mb: core_budget.MEMORY_MB.install }),
+		)
+		expect(result.is_installed).toBe(true)
+	})
+
+	it('claims nothing for a lane with no manifest', async () => {
+		remove_manifest()
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await lane_install.install_dependencies(lane.directory)
+
+		expect(reservation).not.toHaveBeenCalled()
 	})
 })
 
@@ -160,7 +187,7 @@ describe('install_dependencies — no manifest to install', () => {
 	// still reaches the real install, which fails as before, so a genuinely broken repository is never
 	// passed silently.
 	it('runs the install for a present-but-broken manifest, which still fails', async () => {
-		writeFileSync(path.join(lane.directory, MANIFEST_FILE_NAME), '{ not valid json')
+		writeFileSync(path.join(lane.directory, PACKAGE_JSON), '{ not valid json')
 		process_answers(FAILING_EXIT_CODE, FROZEN_LOCKFILE_ERROR)
 
 		const result = await lane_install.install_dependencies(lane.directory)

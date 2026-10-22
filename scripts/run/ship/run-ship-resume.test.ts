@@ -11,13 +11,20 @@ import type { ShipState } from './run-ship-stage'
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
 const probe = vi.hoisted(() => ({
 	read_state: vi.fn(),
+	read_review_stale: vi.fn(),
 	record_target: vi.fn(),
 	repository_directory: vi.fn(),
+}))
+// Only `--review` ships reach these; their own branches are pinned in `run-ship-review-steps.test.ts`.
+const review = vi.hoisted(() => ({
+	review_stage: vi.fn(async () => ({ code: 0, out: 'review clean' })),
+	round_two_stage: vi.fn(async () => ({ code: 0, out: 'round 2 not due' })),
 }))
 const emit_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({ run_ship_probe: probe }))
+vi.mock('./run-ship-review-steps', () => ({ run_ship_review_steps: review }))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
 }))
@@ -59,6 +66,7 @@ vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
 const { run_ship_stage } = await import('./run-ship-stage')
+const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2426: a ship re-run after it died resumes rather than restarts. The stage record is
 // the real file module writing to a temp path, so each restart reads what the previous call left; the
@@ -115,6 +123,34 @@ afterEach(() => {
 
 afterAll(() => {
 	rmSync(TEMPORARY, { force: true, recursive: true })
+})
+
+// joshuafolkken/kit#4221: a followup refused because the issue changed after the review's brief used to
+// resume past the review, so the relaunched followup was refused again.
+describe('josh ship — a restart after a stale review', () => {
+	it('reviews a pushed ship again, then follows up', async () => {
+		josh_run_mock
+			.mockResolvedValueOnce({ code: OK, out: '' })
+			.mockResolvedValueOnce({ code: OK, out: '' })
+			.mockResolvedValueOnce({ code: FAILED, out: 'the issue changed after the review' })
+		await run_ship_cli.run([TITLE, '--review'])
+		josh_run_mock.mockClear()
+		probe.read_state.mockResolvedValueOnce({ ...SHIPPED, is_review_stale: true })
+		probe.read_state.mockResolvedValue(SHIPPED)
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(review.review_stage).toHaveBeenLastCalledWith('2426', true)
+		expect(commands()).toStrictEqual([`followup ${TITLE}`, REPORT])
+	})
+
+	it('re-reads the branch after the review, so a review that changed the tree gates and commits again', async () => {
+		probe.read_state.mockResolvedValueOnce({ ...SHIPPED, is_review_stale: true })
+		probe.read_state.mockResolvedValue(NOTHING)
+
+		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(commands()).toContain('gate')
+		expect(commands()).toContain(`git -y ${TITLE}`)
+	})
 })
 
 describe('josh ship — a restart with a record', () => {
@@ -180,6 +216,32 @@ describe('josh ship — a restart with no record', () => {
 
 		expect(await run_ship_cli.run([TITLE])).toBe(FAILED)
 		expect(commands()).toStrictEqual(['gate'])
+	})
+})
+
+// joshuafolkken/kit#3998: an infrastructure retry re-reads the state as a resume does, so a commit whose
+// push failed on the network is retried with the commit skipped rather than refused as nothing to commit.
+describe('josh ship — an infrastructure retry of the commit', () => {
+	it('retries a commit whose push failed with the commit skipped', async () => {
+		const { retried } = run_ship_infra_retry
+		const instant = { wait: async (): Promise<void> => undefined, note: (): void => undefined }
+
+		const spy = vi
+			.spyOn(run_ship_infra_retry, 'retried')
+			.mockImplementation(async (stage, attempt) => await retried(stage, attempt, instant))
+
+		josh_run_mock.mockResolvedValueOnce({ code: OK, out: '' }).mockResolvedValueOnce({
+			code: FAILED,
+			out: 'fatal: unable to access: Could not resolve host: github.com',
+		})
+		probe.read_state.mockResolvedValueOnce(NOTHING).mockResolvedValue(COMMITTED)
+
+		expect(await run_ship_cli.run([TITLE])).toBe(OK)
+		expect(commands().slice(1, 3)).toStrictEqual([
+			`git -y ${TITLE}`,
+			`git -y --skip-commit ${TITLE}`,
+		])
+		spy.mockRestore()
 	})
 })
 

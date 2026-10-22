@@ -1,11 +1,10 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { decision_oracle } from './decision-oracle'
 import { delivered_rules } from './delivered-rules'
-import { delivered_rules_harness } from './delivered-rules-harness'
 import { oracle_consulted } from './oracle-consulted'
 import { oracle_firing } from './oracle-firing'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2324: the generic oracle-consulted rule refuses a governed action the run has not
 // consulted the oracle for, and stands down once it has. This suite pins the generation (one row per
@@ -39,7 +38,7 @@ function consulted_tail(command: string): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 })
 
 afterAll(() => {
@@ -79,7 +78,7 @@ describe('reason_for — assembled from the registry, not hand-written', () => {
 
 describe('pkg:scout — refused on a package add, stood down after the scout', () => {
 	it('refuses `pnpm add` with no prior scout', () => {
-		expect(rule_delivery(payload_of('pkg-refuse', PKG_ADD_COMMAND), NOW_MS)).toBe(
+		expect(delivered_rules.delivery(payload_of('pkg-refuse', PKG_ADD_COMMAND), NOW_MS)).toBe(
 			reason_of(PKG_SCOUT),
 		)
 	})
@@ -88,19 +87,21 @@ describe('pkg:scout — refused on a package add, stood down after the scout', (
 	it('keeps refusing the reissued `pnpm add` until the scout runs', () => {
 		const payload = payload_of('pkg-repeat', PKG_ADD_COMMAND)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(reason_of(PKG_SCOUT))
-		expect(rule_delivery(payload, A_LATER_MS)).toBe(reason_of(PKG_SCOUT))
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(reason_of(PKG_SCOUT))
+		expect(delivered_rules.delivery(payload, A_LATER_MS)).toBe(reason_of(PKG_SCOUT))
 	})
 
 	it('stands down once the scout is on the tail', () => {
 		const tail = consulted_tail('pnpm josh pkg:scout lodash')
 
 		expect(
-			rule_delivery(payload_of('pkg-ok', PKG_ADD_COMMAND, 'Bash', tail), NOW_MS),
+			delivered_rules.delivery(payload_of('pkg-ok', PKG_ADD_COMMAND, 'Bash', tail), NOW_MS),
 		).toBeUndefined()
 	})
 
 	it('is silent on a bare install', () => {
-		expect(rule_delivery(payload_of('pkg-install', 'pnpm install'), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('pkg-install', 'pnpm install'), NOW_MS),
+		).toBeUndefined()
 	})
 })

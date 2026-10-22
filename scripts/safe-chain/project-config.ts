@@ -2,16 +2,14 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 import { yaml_document } from '#scripts/lib/yaml-document'
-import { release_age } from '#scripts/version/release-age'
+import { release_window } from '#scripts/version/release-window'
 import { dump } from 'js-yaml'
-import { z } from 'zod'
 
 const WORKSPACE_FILE = 'pnpm-workspace.yaml'
 const PROJECT_CONFIG_FILE = '.aikido'
 const EXCLUSIONS_FIELD = 'minimumPackageAgeExclusions'
 const AGE_FIELD = 'minimumPackageAgeHours'
 const MINUTES_PER_HOUR = 60
-const workspace_schema = z.object({ minimumReleaseAgeExclude: z.array(z.string()).optional() })
 
 function read_mapping(value: unknown, label: string): Record<string, unknown> {
 	if (value === undefined) return {}
@@ -82,7 +80,7 @@ function replace_safe_chain_block(existing: string, safe_chain: Record<string, u
 // undeclared window writes nothing; an explicit `0` opt-out is written as 0 so an earlier
 // synchronized age cannot outlive it.
 function package_age_hours(workspace: string): number | undefined {
-	const minutes = release_age.parse_declared_minimum_release_age(workspace)
+	const { minutes } = release_window.parse_release_window(workspace)
 	if (minutes === undefined) return undefined
 
 	return Math.floor(minutes / MINUTES_PER_HOUR)
@@ -117,12 +115,8 @@ function has_nothing_to_write(
 	)
 }
 
-function read_exclusions(workspace: string): ReadonlyArray<string> {
-	return workspace_schema.parse(yaml_document.parse_yaml(workspace)).minimumReleaseAgeExclude ?? []
-}
-
 function merge_project_config(existing: string, workspace: string): string {
-	const exclusions = read_exclusions(workspace)
+	const { exclusions } = release_window.parse_release_window(workspace)
 	const aikido = yaml_document.parse_yaml(existing)
 	const safe_chain = read_mapping(aikido['safe-chain'], 'safe-chain')
 	const merged = merge_age(merge_exclusions(safe_chain, exclusions), workspace)

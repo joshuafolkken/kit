@@ -1,8 +1,12 @@
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2769: the driver's park is explained on the issue, and a child GitHub merged but
@@ -54,6 +58,15 @@ function serve_labels(...names: ReadonlyArray<string>): void {
 	)
 }
 
+function stub_issue_reads(): void {
+	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [IN_PROGRESS], is_human_review: false },
+	})
+}
+
 beforeEach(() => {
 	add_label_mock.mockReset().mockResolvedValue(true)
 	comment_mock.mockReset().mockResolvedValue(undefined)
@@ -61,7 +74,8 @@ beforeEach(() => {
 	ensure_closed_mock.mockReset().mockResolvedValue(undefined)
 	ship_cause_mock.mockReset().mockReturnValue(undefined)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
-	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	stub_issue_reads()
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	serve_labels(IN_PROGRESS)
 })
 
@@ -89,18 +103,18 @@ describe('run_merge_steps.do_failed — the stale in-progress goes through the s
 })
 
 describe('run_merge_steps.do_failed — the park is explained on the issue', () => {
-	it('comments the reason when it parks the child with needs-decision', async () => {
-		await run_merge_steps.do_failed(CONTEXT, run_merge_steps.CUT_RELAUNCH_CAUSE)
+	it('comments the reason when it parks the child with run:stalled', async () => {
+		await run_merge_steps.do_failed(CONTEXT, run_stalled.CUT_NOT_RELAUNCHED)
 
 		expect(comment_mock).toHaveBeenCalledOnce()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`- Why: ${run_merge_steps.CUT_RELAUNCH_CAUSE}`),
+			expect.stringContaining(`- Why: ${run_stalled.CUT_NOT_RELAUNCHED.why}`),
 		)
 		expect(comment_mock).toHaveBeenCalledWith(CHILD, expect.stringContaining(`fullrun #${CHILD}`))
 	})
 
-	it('comments nothing when the needs-decision label could not be written', async () => {
+	it('comments nothing when the run:stalled label could not be written', async () => {
 		add_label_mock.mockResolvedValue(false)
 
 		await run_merge_steps.do_failed(CONTEXT)
@@ -111,26 +125,31 @@ describe('run_merge_steps.do_failed — the park is explained on the issue', () 
 
 // joshuafolkken/kit#3808: the ship's stop is the reason a person needs, not the ended session.
 describe('run_merge_steps.do_failed — a child whose detached ship ended', () => {
-	const SHIP_CAUSE = 'its detached ship stopped and was not fixed: #2761 review.'
+	const SHIP_CAUSE = {
+		short: 'review failed',
+		why: 'its detached ship stopped and was not fixed: #2761 review.',
+	}
 
 	it('parks it for the ship’s stop', async () => {
 		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
 
-		await run_merge_steps.do_failed(CONTEXT)
+		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(ship_cause_mock).toHaveBeenCalledWith(CHILD)
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`- Why: ${SHIP_CAUSE}`),
+			expect.stringContaining(`- Why: ${SHIP_CAUSE.why}`),
 		)
+		expect(result.cause).toBe(SHIP_CAUSE.short)
 	})
 
 	it('keeps the caller’s cause over the ship’s', async () => {
-		ship_cause_mock.mockReturnValue('ship cause')
+		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
 
-		await run_merge_steps.do_failed(CONTEXT, run_merge_steps.CUT_RELAUNCH_CAUSE)
+		const result = await run_merge_steps.do_failed(CONTEXT, run_stalled.CUT_NOT_RELAUNCHED)
 
 		expect(ship_cause_mock).not.toHaveBeenCalled()
+		expect(result.cause).toBe(run_stalled.CUT_NOT_RELAUNCHED.short)
 	})
 
 	it('falls back to the ended session when no ship ended', async () => {
@@ -147,7 +166,9 @@ describe('run_merge_steps.do_failed — a child whose detached ship ended', () =
 // blocker — nothing for a person to decide, so no `needs-decision` and no failure counted.
 const KIT = 'joshuafolkken/kit'
 const BLOCKER = 3501
-const NEEDS_DECISION = 'needs-decision'
+// joshuafolkken/kit#4102: a mechanical park carries `run:stalled`, never a person's `needs-decision`.
+const RUN_STALLED = 'run:stalled'
+const NOT_BEFORE = 'not-before'
 const OWN_CARRY = {
 	invocation: 'backlogrun #3435',
 	started_at: new Date().toISOString(),
@@ -181,13 +202,13 @@ describe('run_merge_steps.do_failed — a child waiting on an open blocker', () 
 			carry: undefined,
 			is_parked: false,
 			is_refused: false,
-			blockers: [`${KIT}#${String(BLOCKER)}`],
+			waits: [`${KIT}#${String(BLOCKER)}`],
 		})
 		expect(add_label_mock).not.toHaveBeenCalled()
 		expect(apply_spy).not.toHaveBeenCalled()
 		expect(comment_mock).toHaveBeenCalledWith(
 			CHILD,
-			expect.stringContaining(`open blockers: ${KIT}#${String(BLOCKER)}`),
+			expect.stringContaining(`waits on: ${KIT}#${String(BLOCKER)}`),
 		)
 		expect(remove_label_mock).toHaveBeenCalledWith(CHILD, IN_PROGRESS)
 	})
@@ -210,8 +231,8 @@ describe('run_merge_steps.do_failed — a child with no open blocker is parked a
 
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
-		expect(result.blockers).toStrictEqual([])
-		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+		expect(result.waits).toStrictEqual([])
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
 	})
 
 	it('parks the child when its blockers cannot be read', async () => {
@@ -220,7 +241,92 @@ describe('run_merge_steps.do_failed — a child with no open blocker is parked a
 		const result = await run_merge_steps.do_failed(CONTEXT)
 
 		expect(result.is_parked).toBe(true)
-		expect(add_label_mock).toHaveBeenCalledWith(CHILD, NEEDS_DECISION)
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
+	})
+})
+
+// joshuafolkken/kit#4076: a child whose body declares a start date still ahead was released by its
+// session to wait for it — the date is recorded, so nothing for a person to decide and no failure.
+const DAY_MS = 86_400_000
+
+function start_date_body(offset_ms: number): string {
+	const date = new Date(Date.now() + offset_ms).toISOString().slice(0, '2026-10-24T23:29'.length)
+
+	return `## 背景\n\n- 種別: 不具合\n- 実施可能日: ${date}Z\n\n## 現象\n`
+}
+
+describe('run_merge_steps.do_failed — a child waiting on its declared start date', () => {
+	it('releases the child to wait, naming the date, without needs-decision or a count', async () => {
+		const body = start_date_body(DAY_MS)
+		const date = /実施可能日: (?<date>\S+)/u.exec(body)?.groups?.['date']
+
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
+		spy_carry(OWN_CARRY)
+		const apply_spy = vi.spyOn(run_carry, 'apply_change').mockReturnValue(OWN_CARRY)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual([`not before ${String(date)}`])
+		expect(add_label_mock).not.toHaveBeenCalled()
+		expect(apply_spy).not.toHaveBeenCalled()
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining(`waits on: not before ${String(date)}`),
+		)
+	})
+
+	it.each([
+		['a date already past', start_date_body(-DAY_MS)],
+		['no declaration', '## 背景\n\n- 種別: 不具合\n'],
+		['an unreadable body', undefined],
+	])('parks the child for %s', async (_label, body) => {
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual([])
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
+	})
+})
+
+describe('run_merge_steps.do_failed — a child waiting on its declared samples', () => {
+	it('releases the child to wait, naming the pull request it waits on', async () => {
+		const body = '## 背景\n\n- 種別: 不具合\n- 実施可能条件: #4313 のマージ後 10 マージ\n'
+
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
+		vi.spyOn(issue_sample_gate, 'prime').mockResolvedValue()
+		spy_carry(OWN_CARRY)
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual(['until the merge of #4313 is read'])
+		expect(add_label_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4102: the `not-before` label stands in for the body only where the body is unreadable.
+describe('run_merge_steps.do_failed — a child carrying the not-before label', () => {
+	beforeEach(() => {
+		vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+			kind: 'state',
+			state: { state: 'OPEN', labels: [IN_PROGRESS, NOT_BEFORE], is_human_review: false },
+		})
+	})
+
+	it('releases the child to wait on its not-before label when the body cannot be read', async () => {
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual(['a start date still ahead (`not-before`)'])
+		expect(add_label_mock).not.toHaveBeenCalled()
+	})
+
+	it('parks the child carrying a stale not-before label when its body declares no date', async () => {
+		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue('## 背景\n')
+
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result.waits).toStrictEqual([])
+		expect(add_label_mock).toHaveBeenCalledWith(CHILD, RUN_STALLED)
 	})
 })
 

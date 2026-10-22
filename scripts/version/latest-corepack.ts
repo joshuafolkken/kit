@@ -42,14 +42,14 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { json_value } from '#scripts/lib/json-value'
-import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
+import { npm_registry } from './npm-registry'
 import { package_manager_version } from './package-manager-version'
 import { release_age } from './release-age'
 
-const PACKAGE_JSON_PATH = 'package.json'
 const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
 const PINNED_VERSION_RE = /"packageManager"\s*:\s*"pnpm@([^"+]+)/u
 const TARGET_PREFIX = 'pnpm@'
@@ -133,13 +133,10 @@ function extract_times_json(stdout: string): Record<string, string> | undefined 
 // The registry's publish timestamps for every pnpm release (version → ISO date, plus the
 // created/modified bookkeeping keys the selector ignores).
 function query_release_times(): Record<string, string> | undefined {
-	const result = execaSync('pnpm', ['view', 'pnpm', 'time', '--json'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
+	const answer = npm_registry.view('pnpm', 'time', 'json')
+	if (answer.exit_code !== 0) return undefined
 
-	return extract_times_json(result.stdout)
+	return extract_times_json(answer.stdout)
 }
 
 function to_resolution(
@@ -179,13 +176,10 @@ function parse_latest_version(stdout: string): string | undefined {
 }
 
 function query_latest_version(): string | undefined {
-	const result = execaSync('pnpm', ['view', 'pnpm', 'version', '--json'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
+	const answer = npm_registry.view('pnpm', 'version', 'json')
+	if (answer.exit_code !== 0) return undefined
 
-	return parse_latest_version(result.stdout)
+	return parse_latest_version(answer.stdout)
 }
 
 // The target handed to pnpm self-update: an exact registry-resolved version on the pinned major, or
@@ -239,7 +233,7 @@ function run_pnpm_update(target: string): number {
 // match). Runs on every path, not just after a successful bump: a repository that arrives
 // with the two fields already out of step sits in the no-bump steady state forever, so an
 // alignment gated on a bump would never repair it.
-function sync_development_engines(package_json_path: string = PACKAGE_JSON_PATH): void {
+function sync_development_engines(package_json_path: string = PACKAGE_JSON): void {
 	const content = readFileSync(package_json_path, 'utf8')
 	const aligned = package_manager_version.align_development_engines_version(content)
 	if (aligned === content) return
@@ -249,10 +243,7 @@ function sync_development_engines(package_json_path: string = PACKAGE_JSON_PATH)
 }
 
 // Restore the pre-run manifest if self-update fails after changing it.
-function restore_package_json(
-	content: string,
-	package_json_path: string = PACKAGE_JSON_PATH,
-): void {
+function restore_package_json(content: string, package_json_path: string = PACKAGE_JSON): void {
 	writeFileSync(package_json_path, content)
 	console.info('✔ Restored package.json pin (pnpm bump failed)')
 }
@@ -274,20 +265,17 @@ function extract_encoded_integrity(stdout: string): string | undefined {
 }
 
 function query_integrity(target: string): string | undefined {
-	const result = execaSync('pnpm', ['view', target, 'dist.integrity', '--json'], {
-		reject: false,
-		timeout: COMMAND_TIMEOUT_MS,
-	})
-	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
+	const answer = npm_registry.view(target, 'dist.integrity', 'json')
+	if (answer.exit_code !== 0) return undefined
 
-	const encoded = extract_encoded_integrity(result.stdout)
+	const encoded = extract_encoded_integrity(answer.stdout)
 	if (encoded === undefined) return undefined
 
 	return decode_integrity(encoded)
 }
 
 function restore_integrity(target: string, integrity: string): void {
-	const content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const content = readFileSync(PACKAGE_JSON, 'utf8')
 	const version = target.slice(TARGET_PREFIX.length)
 	const expected = `pnpm@${version}`
 	const current = PACKAGE_MANAGER_VALUE_RE.exec(content)?.[0]
@@ -303,10 +291,7 @@ function restore_integrity(target: string, integrity: string): void {
 		},
 	)
 
-	writeFileSync(
-		PACKAGE_JSON_PATH,
-		package_manager_version.align_development_engines_version(pinned),
-	)
+	writeFileSync(PACKAGE_JSON, package_manager_version.align_development_engines_version(pinned))
 }
 
 // The equal case is the steady state of every up-to-date run, so it logs as success; only
@@ -342,7 +327,7 @@ function pin_unpinned_manifest(original: string, target: string, integrity: stri
 	)
 
 	writeFileSync(
-		PACKAGE_JSON_PATH,
+		PACKAGE_JSON,
 		package_manager_version.align_development_engines_version(`${pinned}\n`),
 	)
 
@@ -403,7 +388,7 @@ function bump_to_registry_target(original: string, major: string | undefined): n
 }
 
 function main(): number {
-	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const original = readFileSync(PACKAGE_JSON, 'utf8')
 	const status = bump_to_registry_target(original, extract_pnpm_major(original))
 
 	sync_development_engines()

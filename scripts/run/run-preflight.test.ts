@@ -7,8 +7,9 @@ import {
 	type TreeState,
 } from './run-preflight'
 
-// `git_command` is mocked rather than `run_hold`: `run_hold.is_tree_dirty` reads through
-// `git_command.status`, so mocking the one module exercises the reuse instead of replacing it.
+// `git_command` is mocked rather than `run_hold`: `run_hold.is_tree_dirty` reads a lane's tree through
+// `git_command.status`, so mocking the one module exercises the reuse instead of replacing it. This
+// checkout's own tree is asked what `stash:push` would take, through `git_stash`.
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		branch: vi.fn(),
@@ -21,6 +22,10 @@ vi.mock('#scripts/git/git-command', () => ({
 	},
 }))
 
+vi.mock('#scripts/git/stash/git-stash', () => ({
+	git_stash: { has_stashable_changes: vi.fn() },
+}))
+
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 	git_gh_pr_read: { pr_exists: vi.fn(), pr_view: vi.fn() },
 }))
@@ -30,6 +35,7 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
+const { git_stash } = await import('#scripts/git/stash/git-stash')
 const { git_gh_pr_read } = await import('#scripts/gh/git-gh-pr-read')
 const { lane_registry } = await import('#scripts/lane/lane-registry')
 
@@ -40,6 +46,7 @@ const commit_count_beyond = vi.mocked(git_command.commit_count_beyond)
 const default_branch_reference = vi.mocked(git_command.default_branch_reference)
 const default_branch = vi.mocked(git_command.get_default_branch)
 const status = vi.mocked(git_command.status)
+const has_stashable_changes = vi.mocked(git_stash.has_stashable_changes)
 const pr_exists = vi.mocked(git_gh_pr_read.pr_exists)
 const pr_view = vi.mocked(git_gh_pr_read.pr_view)
 const find_open_lane = vi.mocked(lane_registry.find_open_lane)
@@ -58,6 +65,7 @@ function verdict_of(tree: TreeState, state: ChildState): PreflightVerdict {
 }
 
 function arrange_clean_tree(): void {
+	has_stashable_changes.mockResolvedValue(false)
 	status.mockResolvedValue('')
 	branch.mockResolvedValue('main')
 	default_branch.mockResolvedValue('main')
@@ -119,7 +127,7 @@ async function verdict_from_check(): Promise<PreflightVerdict> {
 }
 
 function arrange_dirty_tree(): void {
-	status.mockResolvedValue(' M scripts/run/run-preflight.ts')
+	has_stashable_changes.mockResolvedValue(true)
 	branch.mockResolvedValue('main')
 	default_branch.mockResolvedValue('main')
 }
@@ -325,7 +333,7 @@ describe('check refuses to read an absence into a failed read', () => {
 	})
 
 	it('treats an unreadable status as a dirty tree, the way run_hold does', async () => {
-		status.mockRejectedValue(new Error('no git here'))
+		has_stashable_changes.mockRejectedValue(new Error('no git here'))
 		branch.mockResolvedValue('main')
 		default_branch.mockResolvedValue('main')
 
@@ -338,5 +346,16 @@ describe('check refuses to read an absence into a failed read', () => {
 		expect(await verdict_from_check()).toBe('reclaim')
 		expect(branch_names).not.toHaveBeenCalled()
 		expect(pr_view).not.toHaveBeenCalled()
+	})
+})
+
+// `stash:push` leaves the observation ledger, so a ledger-only tree is not one to tell it to push.
+describe('check reads this tree as dirty only through what stash:push would take', () => {
+	it('asks git_stash rather than the raw status', async () => {
+		arrange_clean_tree()
+
+		expect(await verdict_from_check()).toBe('clean')
+		expect(has_stashable_changes).toHaveBeenCalledExactlyOnceWith()
+		expect(status).not.toHaveBeenCalled()
 	})
 })

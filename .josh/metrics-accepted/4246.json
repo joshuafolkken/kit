@@ -1,0 +1,7 @@
+{
+	"reason": "One ps snapshot shared by the lane count and the usage columns; the executable is cut from the full command line, checking which run of words names an existing file so a relative argument is not read as part of a spaced path",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 97
+	}
+}

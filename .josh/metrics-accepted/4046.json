@@ -1,0 +1,7 @@
+{
+	"reason": "#4046 adds the filed-this-run collapse (span grouping, row lookup) and its tests in run-board-render-notes",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 59
+	}
+}

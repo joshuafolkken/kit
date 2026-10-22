@@ -5,10 +5,7 @@ description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlo
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun` are the shorthand commands this
-package's collaboration workflow is built on. **This file is their manifest — triggers and pointers,
-never a procedure**: each rule is stated once, in the file its row names. History:
-`docs/maintainers/workflow-commands-rationale.md` → "Where each rule came from".
+Each rule is stated once, in the file its row names.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
@@ -19,8 +16,9 @@ alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 ## 1. Which file to read
 
 Read this file, then the files the typed command's row names. A command file is a **manifest** of
-terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action, computed
-from the event stream, the carry record and the issue state, never the conversation.
+terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action and the
+section that governs it, computed from the event stream, the carry record and the issue state, never
+the conversation; a section it prints is not fetched again.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -31,8 +29,8 @@ from the event stream, the carry record and the issue state, never the conversat
 | `backlogrun` / `backlogrun #N…` / `backlogrun #E…` | `backlogrun.md` — its dispatched child reads `fullrun.md` + `split-assessment.md` in its own unit, not the parent at entry |
 
 `entry-sequence.md` holds the entry sequence and stop branches `fullrun`, `halfrun` and `prrun` share;
-each manifest carries only its difference. `split-assessment.md` → "The question" is read at the
-entry as a section, its split-handling detail only when a split is found.
+each manifest carries only its difference. `split-assessment.md` → "The question" is printed by
+`pnpm josh run:entry` at the entry, its split-handling detail read only when a split is found.
 
 ### The fetch is one `Read` call per file
 
@@ -47,12 +45,12 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 
 | Document                | Read it when                                                                   |
 | ----------------------- | ------------------------------------------------------------------------------ |
-| `latest-gate.md`        | `pnpm josh latest:scope` answers `required` — before `josh latest` runs         |
+| `latest-gate.md`        | `run:prep` answers `latest: required` — before `josh latest:if-required` runs  |
 | `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
 | `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`) — the gate overlaps the review, so the section is read before it |
 | `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
-A `skip` answer from `latest:scope` reads nothing. **A lane child that parks reads
+A `latest: skip` answer reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run reads
 `progress-watcher.md` → "Progress while the run is quiet"** before starting `pnpm josh run:progress
 --wait` once its hold is claimed.
@@ -81,9 +79,9 @@ from — read at that trigger, never restated here.
 | An entry typed with an `owner/repo#` prefix or a short `repo#` name | Resolve the target and its checkout; an explicit foreign owner stops the run | `target-repository.md` |
 | A `new` entry typed with an `into <target>` suffix | Insert the artifact into the named epic with `pnpm josh epic --add <E> <N>` | `into-target.md` |
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
-| Before implementing (every `#N` entry) | `pnpm josh issue:read <N>` — the body and the comments; the later of a body and a comment wins | `issue-comments.md` |
-| `pnpm josh issue:state <N>` answers `human_review: yes` | Implement and gate, then stop before the commit; the label is applied only by a person | `needs-human-review.md` |
-| Before implementing (every implementing entry) | `pnpm josh latest:scope`; on `required` read the doc and run `josh latest`, then load the `dependency-update` skill; `kickoff` never reaches it | `latest-gate.md` (read whole, only on `required`) |
+| Before implementing (every implementing entry) | `pnpm josh run:prep <N>` (`run:entry` bundles it; `kickoff` reads `pnpm josh issue:read <N>`) — the body and the comments; the later of a body and a comment wins | `issue-comments.md` |
+| `run:prep` answers `human_review: yes` | Implement and gate, run `pnpm josh test:e2e`, then stop before the commit with `pnpm josh run:hold <N> --human-review-stop`; the label is applied only by a person | `needs-human-review.md` |
+| `run:prep` answers `latest: required` | Read the doc and run `pnpm josh latest:if-required`, then load the `dependency-update` skill | `latest-gate.md` (read whole, only on `required`) |
 | Before delegating any run step | `pnpm josh delegate <step>` decides eligibility, never you | `delegation.md` |
 | The pre-implementation reading reaches 3 unedited files | Delegate the unread investigation; a file this run will edit is read in the main line | `delegation.md` → "The pre-implementation reading" |
 | Immediately before implementation | Present the two-layer work summary (once per Issue); `kickoff` posts a plan instead | `prompts/collaboration-workflow/report-format.md` |
@@ -100,7 +98,7 @@ from — read at that trigger, never restated here.
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
 | `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | `retrospective.md` |
 | Any artifact prose (Issue bodies, comments, Telegram) | Session language (`JOSH_SESSION_LANG`, default `ja`); Issue/PR titles stay English | `prompts/collaboration-workflow/overview.md` |
-| Any mid-workflow stop | Send a `confirmation` Telegram first, so the user is alerted off-screen | `CLAUDE.md` → "Mid-workflow stop notification" |
+| Any mid-workflow stop | `stop:guard` sends the `confirmation` Telegram; on its refusal, send it | `CLAUDE.md` → "Mid-workflow stop notification" |
 
 ## 3. What stays resident, and what is read from here
 

@@ -1,7 +1,6 @@
+import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
-import { delivered_rules_harness } from './delivered-rules-harness'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 import { third_party_write } from './third-party-write'
 
 // The `gh api` write to a repository we do not own, refused before the backlog count speaks
@@ -101,7 +100,7 @@ const { payload_of } = harness
 const NOW_MS = 1_700_000_000_000
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 })
 
 afterAll(() => {
@@ -116,29 +115,33 @@ function claiming_ids(command: string): Array<string> {
 
 describe('third-party-write — delivered through the guard', () => {
 	it('delivers on a third-party comment write', () => {
-		expect(rule_delivery(payload_of('3p-comment', THIRD_PARTY_COMMENT), NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload_of('3p-comment', THIRD_PARTY_COMMENT), NOW_MS)).toBe(
+			REASON,
+		)
 	})
 
 	it('is silent on a third-party read', () => {
 		const command = 'gh api repos/sveltejs/svelte/issues/5 --jq .state'
 
-		expect(rule_delivery(payload_of('3p-read', command), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('3p-read', command), NOW_MS)).toBeUndefined()
 	})
 
 	it('is silent on a first-party comment write', () => {
 		const command = `gh api repos/${SESSION}/kit/issues/5/comments -f body=x`
 
-		expect(rule_delivery(payload_of('fp-comment', command), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('fp-comment', command), NOW_MS)).toBeUndefined()
 	})
 
 	it('is silent on a placeholder label write', () => {
-		expect(rule_delivery(payload_of('fp-placeholder', PLACEHOLDER_LABEL), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('fp-placeholder', PLACEHOLDER_LABEL), NOW_MS),
+		).toBeUndefined()
 	})
 
 	it('is refused before wip-cap on a third-party filing', () => {
 		const command = 'gh api repos/sveltejs/svelte/issues -f title=x'
 
-		expect(rule_delivery(payload_of('3p-filing', command), NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload_of('3p-filing', command), NOW_MS)).toBe(REASON)
 	})
 
 	it('names the command and that it fires every time', () => {

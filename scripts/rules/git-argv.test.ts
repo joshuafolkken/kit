@@ -5,6 +5,8 @@ import { git_argv } from './git-argv'
 // that it skips the wrapper and git's globals to reach the subcommand — and that `pnpm josh git` is not
 // mistaken for one, since that is the authorized node route the deny list already leaves alone.
 
+const TIMED_PUSHES = ['/usr/bin/time -p git push -f', '/usr/bin/time -o /tmp/t -p git push -f']
+
 describe('git_argv.parse', () => {
 	it('reads the subcommand of a bare git command', () => {
 		expect(git_argv.parse('git push origin main')?.subcommand).toBe('push')
@@ -29,6 +31,18 @@ describe('git_argv.parse', () => {
 		expect(git_argv.parse('env GIT_EDITOR=true git commit -m x')?.subcommand).toBe('commit')
 	})
 
+	it('reads a git named by its path', () => {
+		expect(git_argv.parse('/usr/bin/git push -f')?.subcommand).toBe('push')
+	})
+
+	it('skips a wrapper named by its path', () => {
+		expect(git_argv.parse('/usr/bin/env git stash')?.subcommand).toBe('stash')
+	})
+
+	it.each(TIMED_PUSHES)('skips a time wrapper, its flags and their values in %j', (command) => {
+		expect(git_argv.parse(command)?.subcommand).toBe('push')
+	})
+
 	it('is not a git command when josh stands between the wrapper and git', () => {
 		expect(git_argv.parse('pnpm josh git -y "title #1"')).toBeUndefined()
 	})
@@ -45,6 +59,25 @@ describe('git_argv.arguments_of', () => {
 
 	it('is undefined when the segment invokes another command', () => {
 		expect(git_argv.arguments_of('echo rm -rf x', 'rm')).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#4091: a quoted span is one word, so an assignment's value is not a program.
+	it('reads a quoted assignment value as part of the wrapper', () => {
+		expect(git_argv.arguments_of("c='x gh pr create'", 'gh')).toBeUndefined()
+	})
+
+	it('keeps a quoted argument whole, quotes included', () => {
+		expect(git_argv.arguments_of('X="a b" gh pr view "1 2"', 'gh')).toStrictEqual([
+			'pr',
+			'view',
+			'"1 2"',
+		])
+	})
+
+	it('reads an escaped quote outside quotes as a plain character, opening no span', () => {
+		expect(
+			git_argv.arguments_of(String.raw`git push origin a\'b --force 'x'`, 'git'),
+		).toStrictEqual(['push', 'origin', String.raw`a\'b`, '--force', "'x'"])
 	})
 })
 

@@ -1,4 +1,5 @@
 import { git_spawn } from '#scripts/git/git-spawn'
+import { LEDGER_EXCLUSION_PATHSPEC } from '#scripts/observations/observation-ledger'
 
 // The one place a sanctioned `git stash pop` is targeted by its message rather than its stack
 // position. The stash is a single repository-wide stack shared by every
@@ -97,14 +98,34 @@ async function has_conflict(directory?: string): Promise<boolean> {
 
 // Uncommitted work is anything `git status --porcelain` lists — untracked files included, which is what
 // `push` below carries with `-u`, so the two agree on what "work" means.
-async function has_changes(directory?: string): Promise<boolean> {
-	return (await git_spawn.read(git_args(directory, ['status', '--porcelain']))) !== ''
+// A `pathspec` narrows both to the same paths, so a push never finds nothing where this found work.
+async function has_changes(
+	directory?: string,
+	pathspec: ReadonlyArray<string> = [],
+): Promise<boolean> {
+	const status = await git_spawn.read(git_args(directory, ['status', '--porcelain', ...pathspec]))
+
+	return status !== ''
+}
+
+// What `josh stash:push` sets aside: everything but the observation ledger, whose lines ride on the
+// run's own commit (`stash-push-cli.ts`).
+const STASHABLE_PATHSPEC: ReadonlyArray<string> = ['--', ...LEDGER_EXCLUSION_PATHSPEC]
+
+// Whether `josh stash:push` would push anything — the question to ask before telling someone to run it,
+// so a ledger-only tree is never sent to a push that answers `clean`.
+async function has_stashable_changes(directory?: string): Promise<boolean> {
+	return await has_changes(directory, STASHABLE_PATHSPEC)
 }
 
 // Push with a message `josh stash:pop` can later target — the stack is shared by every work tree, so an
 // entry pushed from a lane outlives the lane's own tree.
-async function push(message: string, directory?: string): Promise<void> {
-	await git_spawn.read(git_args(directory, ['stash', 'push', '-u', '-m', message]))
+async function push(
+	message: string,
+	directory?: string,
+	pathspec: ReadonlyArray<string> = [],
+): Promise<void> {
+	await git_spawn.read(git_args(directory, ['stash', 'push', '-u', '-m', message, ...pathspec]))
 }
 
 // The stack keyed by commit rather than position: a sweep that reads the
@@ -181,6 +202,7 @@ const git_stash = {
 	drop_by_hash,
 	has_changes,
 	has_conflict,
+	has_stashable_changes,
 	list,
 	list_by_hash,
 	matches,
@@ -188,6 +210,7 @@ const git_stash = {
 	pop,
 	push,
 	select,
+	STASHABLE_PATHSPEC,
 	work_message,
 }
 

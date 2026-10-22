@@ -1,14 +1,15 @@
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
+import { epic_bundle_fixture } from './epic-bundle-fixture'
 import type { IssueReference } from './epic-reference'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
-const FOLLOWS_TWO = 'follows #2'
-const FOLLOWS_TWO_AND_THREE = 'follows #2 and #3'
-const FOLLOWS_THREE_ISSUES = 'follows #2, #3 and #4'
+const { in_acceptance } = epic_bundle_fixture
+const FOLLOWS_TWO = in_acceptance('follows #2')
+const FOLLOWS_TWO_AND_THREE = in_acceptance('follows #2 and #3')
+const FOLLOWS_THREE_ISSUES = in_acceptance('follows #2, #3 and #4')
 const PARENT_LINE = 'parent: #900'
 const CREATE_DECISION = { action: 'create_epic' as const, epics: [], candidates: [2], reason: '' }
 
@@ -43,7 +44,9 @@ describe('epic_bundle.is_strong_signal', () => {
 	})
 
 	it('accepts a reference written the other way round', () => {
-		expect(epic_bundle.is_strong_signal(issue(1), issue(2, { body: 'blocks #1' }))).toBe(true)
+		const other = issue(2, { body: in_acceptance('blocks #1') })
+
+		expect(epic_bundle.is_strong_signal(issue(1), other)).toBe(true)
 	})
 
 	it('accepts a recorded dependency', () => {
@@ -68,13 +71,13 @@ describe('epic_bundle.is_strong_signal', () => {
 	})
 
 	it('reads a reference qualified with this repository', () => {
-		const subject = issue(1, { body: `follows ${REPO}#2` })
+		const subject = issue(1, { body: in_acceptance(`follows ${REPO}#2`) })
 
 		expect(epic_bundle.is_strong_signal(subject, issue(2))).toBe(true)
 	})
 
 	it('does not read another repository reference as a local one', () => {
-		const subject = issue(1, { body: 'follows joshuafolkken/app-kit#2' })
+		const subject = issue(1, { body: in_acceptance('follows joshuafolkken/app-kit#2') })
 
 		expect(epic_bundle.is_strong_signal(subject, issue(2))).toBe(false)
 	})
@@ -333,14 +336,6 @@ describe('epic_bundle_cli.build_epic_index', () => {
 		const index = epic_bundle_cli.build_epic_index([{ number: 900, body: '- [ ] #1' }])
 
 		expect(index.get(2)).toBeUndefined()
-	})
-})
-
-describe('josh epic:bundle registration', () => {
-	it('is registered as a command', () => {
-		const entry = COMMAND_MAP['epic:bundle']
-
-		expect(entry?.script).toBe('scripts/epic/epic-bundle-cli.ts')
 	})
 })
 

@@ -26,8 +26,9 @@ interface DelegatableStep {
 // Where the pre-implementation reading stops being cheaper in the main line.
 //
 // **A count, not a forecast.** The reads are counted as they are made rather than predicted before
-// the investigation starts, so nothing here rests on guessing how large it will be. Two files the run
-// will not edit stay in the main line, because delegating costs two extra main-line turns — one to
+// the investigation starts, so nothing here rests on guessing how large it will be. It is where the
+// guard refuses, not a budget: a run that knows its subject needs reading delegates before the first
+// read (`run:prep`, #4345). Two stray files the run will not edit are tolerated, because delegating costs two extra main-line turns — one to
 // write the brief, one to read the result, about 18 seconds at roughly 8.8 s of model
 // wait per turn — and below the threshold that round trip costs more than carrying the text.
 const INVESTIGATION_FILE_THRESHOLD = 3
@@ -37,6 +38,15 @@ const INVESTIGATION_FILE_THRESHOLD = 3
 // edit or delegation re-reads the whole main-line context all the same. Three keeps the first two searches, which locate an edit
 // target, in the main line and sends the continuing sweep to a unit.
 const INVESTIGATION_SEARCH_TURN_THRESHOLD = 3
+
+// `.claude/agents/investigator.md`; a consumer receives it through the plugin as `kit:investigator`.
+const INVESTIGATOR_AGENT = 'investigator'
+
+// The limit and the remedy, worded once: the guard's refusal and `run:prep`'s entry notice both print
+// them, so a run told the step up front is told the same step the refusal would name.
+const INVESTIGATION_LIMIT = `${String(INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit`
+// Only the dispatch resets the count, so the step names no `josh delegate` call before it (#4345).
+const INVESTIGATION_STEP = `Dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer); it returns \`file:line\` citations, never the file text.`
 
 // The enumeration. Short on purpose: every entry had to name a verifier, and most candidates could
 // not (below).
@@ -59,12 +69,12 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 	{
 		name: 'followup-filing',
 		// The late-run follow-up filing chain — `issue:file` (which scouts, lints, labels and runs
-		// epic:bundle itself) → epic --add — is a dependency chain `batch:guard`
+		// epic:bundle itself) → epic --add — is a dependency chain the batching guard
 		// correctly keeps one call per step, and what makes it expensive is the ~340k context it runs in
 		// at the tail of a run, not the step count. A fresh unit runs the same
 		// chain at a small context, and the review round cap already composed the finding text, so what
 		// the unit is handed is mechanical: run the commands and act on their deterministic answers. This
-		// is not `batch:guard`'s business — delegation only moves the chain to a cheaper context.
+		// is not the batching guard's business — delegation only moves the chain to a cheaper context.
 		does: 'run the late-run follow-up filing chain in an isolated unit — issue:file (scout, lint, labels, epic:bundle), then epic --add — given the finding text the parent already composed, and return the new Issue number and the epic:bundle answer',
 		verifier:
 			"the parent reads the filed Issue from GitHub with `pnpm josh issue:state <new>`, not the unit's summary; a follow-up reported filed but not created is still absent, the way `epic-child`'s reported-done-but-not-merged child is still open. The finding text came from the parent and `issue:file`'s steps are deterministic, so the unit's work is the mechanical execution `issue:state` confirms",
@@ -181,7 +191,10 @@ function reason_for(name: string): string {
 const delegation_policy = {
 	DELEGATE_VERDICT,
 	INVESTIGATION_FILE_THRESHOLD,
+	INVESTIGATION_LIMIT,
 	INVESTIGATION_SEARCH_TURN_THRESHOLD,
+	INVESTIGATION_STEP,
+	INVESTIGATOR_AGENT,
 	KEEP_VERDICT,
 	DELEGATABLE_STEPS,
 	REJECTED_STEPS,

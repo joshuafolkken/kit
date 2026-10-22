@@ -13,8 +13,9 @@
 
 // The wrapper words that may stand in front of `git`, the same ones `run-tail-rule.ts` skips in front of
 // `josh`: environment assignments, the package-manager launchers, `sudo`, `env`, and an opening
-// subshell parenthesis. Left in, `sudo git push --force`, `env git commit` and `(git push -f)` are
-// silently not a git command.
+// subshell parenthesis — plus `time` with its flags, read here only. Left in, `sudo git push --force`,
+// `env git commit` and `(git push -f)` are silently not a git command, and
+// `/usr/bin/time -p pnpm exec eslint .` is not an `eslint` run (joshuafolkken/kit#4356).
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
 const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'pnpm',
@@ -24,7 +25,13 @@ const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'sudo',
 	'command',
 	'env',
+	'time',
 ])
+// The wrappers whose own flags stand between them and the program (`time -p`), skipped with them.
+const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time'])
+// Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`), so the
+// value is not read as the program.
+const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set(['-o', '-f', '--output', '--format'])
 const SUBSHELL_OPEN = '('
 
 // The git global options that consume a **separate** following token as their value, so the parser
@@ -50,18 +57,50 @@ interface GitCall {
 	args: ReadonlyArray<string>
 }
 
-// Split on whitespace alone. A refspec such as `:branch` and a short cluster such as `-uf` are single
-// tokens with no inner spaces, and neither force detection nor stash detection needs to look inside a
-// quoted argument — the one place a quote matters (a commit message) belongs to a subcommand neither
-// caller judges.
-const WHITESPACE = /\s+/u
+// Split on whitespace outside quotes, keeping each quote in its word. A quoted span is one word, so
+// `c='x; gh pr create'` is one environment assignment rather than an assignment followed by a `gh`
+// call (joshuafolkken/kit#4091); a backslash-escaped character outside quotes opens no span, and a
+// quote left unclosed is read as a plain character.
+const WORD = /(?:\\.|'[^']*'|"(?:\\.|[^"\\])*"|\S)+/gsu
 
 function words_of(segment: string): Array<string> {
-	return segment.split(WHITESPACE).filter((word) => word !== '')
+	return segment.match(WORD) ?? []
+}
+
+const PATH_SEPARATOR = '/'
+
+// The program a word launches, read off the path's last component, so `/usr/bin/git` is `git`.
+function program_name(word: string): string {
+	return word.slice(word.lastIndexOf(PATH_SEPARATOR) + NEXT)
 }
 
 function is_wrapper_token(word: string): boolean {
-	return word === SUBSHELL_OPEN || ENV_ASSIGNMENT.test(word) || WRAPPER_WORDS.has(word)
+	return (
+		word === SUBSHELL_OPEN || ENV_ASSIGNMENT.test(word) || WRAPPER_WORDS.has(program_name(word))
+	)
+}
+
+// The words a flagged wrapper's flag spans, its value included; 0 when the word is not a flag.
+function wrapper_flag_width(word = ''): number {
+	if (!word.startsWith(FLAG_PREFIX)) return 0
+
+	return WRAPPER_VALUE_FLAGS.has(word) ? AFTER_VALUE : NEXT
+}
+
+// The index after the wrapper word at `index`, past its own flags when it is a flagged wrapper.
+function after_wrapper_word(words: ReadonlyArray<string>, index: number): number {
+	let next = index + NEXT
+
+	if (!FLAGGED_WRAPPERS.has(program_name(words[index] ?? ''))) return next
+
+	let width = wrapper_flag_width(words[next])
+
+	while (width > 0) {
+		next += width
+		width = wrapper_flag_width(words[next])
+	}
+
+	return next
 }
 
 // Skip the wrapper: environment assignments, a launcher word, and a leading subshell parenthesis. The
@@ -69,7 +108,9 @@ function is_wrapper_token(word: string): boolean {
 function after_wrapper(words: ReadonlyArray<string>): number {
 	let index = 0
 
-	while (index < words.length && is_wrapper_token(words[index] ?? '')) index += NEXT
+	while (index < words.length && is_wrapper_token(words[index] ?? '')) {
+		index = after_wrapper_word(words, index)
+	}
 
 	return index
 }
@@ -94,14 +135,30 @@ function after_globals(words: ReadonlyArray<string>, start: number): number {
 	return index
 }
 
+interface ProgramCall {
+	name: string
+	args: Array<string>
+}
+
+// The program the segment launches once the wrapper is skipped, with the words after it, or
+// `undefined` for a segment with no program word.
+function program_of(segment: string): ProgramCall | undefined {
+	const words = words_of(segment)
+	const command_index = after_wrapper(words)
+	const word = words[command_index]
+
+	if (word === undefined) return undefined
+
+	return { name: program_name(word), args: words.slice(command_index + NEXT) }
+}
+
 // The words after `command` once the wrapper is skipped, or `undefined` when the segment does not
 // invoke it. `gh` and `rm` are judged by the same wrapper cut as `git`, so
 // `env gh pr close` and `sudo rm -rf` are read as the calls they are.
 function arguments_of(segment: string, command: string): Array<string> | undefined {
-	const words = words_of(segment)
-	const command_index = after_wrapper(words)
+	const call = program_of(segment)
 
-	return words[command_index] === command ? words.slice(command_index + NEXT) : undefined
+	return call?.name === command ? call.args : undefined
 }
 
 // The subcommand and the arguments after it, or `undefined` when the segment is not a git invocation.
@@ -135,6 +192,6 @@ function short_cluster_has(token: string, letters: string): boolean {
 	return false
 }
 
-const git_argv = { arguments_of, parse, short_cluster_has }
+const git_argv = { arguments_of, parse, program_of, short_cluster_has }
 
 export { git_argv }

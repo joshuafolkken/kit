@@ -21,6 +21,13 @@ it('reads an issue labelled needs-decision as parked', async () => {
 	expect(read_mock).toHaveBeenCalledWith(ISSUE)
 })
 
+// joshuafolkken/kit#4102: a mechanical park is a park too.
+it('reads an issue labelled run:stalled as parked', async () => {
+	labelled(['run:stalled'])
+
+	expect(await lane_parked.is_parked(ISSUE)).toBe(true)
+})
+
 it('reads an issue without needs-decision as not parked', async () => {
 	labelled(['bug', 'in-progress'])
 

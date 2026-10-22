@@ -1,8 +1,10 @@
 # @joshuafolkken/kit
 
-**AI assistant setup, plus an optional GitHub workflow.**
+The hand-off kit for Claude Code and Codex.
 
-kit gives Claude Code or Codex your project's rules and checks.
+**Hand it off. Walk away. Come back to done.**
+
+Not "almost done" — tested, checked, finished.
 
 ## The workflow
 

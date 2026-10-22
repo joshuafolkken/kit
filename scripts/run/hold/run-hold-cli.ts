@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
@@ -7,7 +5,10 @@ import { run_label } from '#scripts/run/run-label'
 import { run_preflight, type PreflightDecision } from '#scripts/run/run-preflight'
 import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
 import { run_tidy_cli } from '#scripts/run/tidy/run-tidy-cli'
+import { test_e2e_stamp } from '#scripts/test/test-e2e-stamp'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
+import { run_hold_adopt } from './run-hold-adopt'
+import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
 // entry points ask before they start.
@@ -37,7 +38,6 @@ import { run_hold, type HoldRead, type RunHold } from './run-hold'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const RELEASE_FLAG = '--release'
 // What removes a record this run did not write. **Deliberate friction**: every release names the run
 // it belongs to, and the one act that cannot — clearing a record somebody else left behind — is
@@ -49,10 +49,14 @@ const FULLRUN_FLAG = '--fullrun'
 const HALFRUN_STOP_FLAG = '--halfrun-stop'
 // A `prrun`'s stop before merge: its record keeps the commit it stopped on.
 const PRRUN_STOP_FLAG = '--prrun-stop'
+// A `needs-human-review` stop: marked as a `halfrun` stop is, with its own confirmation.
+const HUMAN_REVIEW_STOP_FLAG = '--human-review-stop'
+// A `new` run's hand-over of its unnumbered record to the Issue it filed (`run-hold-adopt.ts`).
+const ADOPT_FLAG = '--adopt'
 // The most a claim reads: the issue number and the one flag after it.
 const MAX_CLAIM_ARGUMENTS = 2
 const USAGE =
-	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --prrun-stop]] | josh run:release [<issue-number> | --force]'
+	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --human-review-stop | --prrun-stop]] | josh run:hold --adopt <issue-number> | josh run:release [<issue-number> | --force]'
 
 const COMMAND = 'run:hold'
 
@@ -64,10 +68,16 @@ const NONE_VERDICT = 'none'
 // The record is another run's, so nothing was removed. **It is not `none`**: a release that did not
 // happen must never read to a script as a tree it has just freed.
 const HELD_VERDICT = 'held'
+// A stop before commit asked on a tree `josh test:e2e` has not answered green on: nothing was marked.
+const E2E_OWED_VERDICT = 'e2e-owed'
 
 const FORCE_RELEASE_KIND = 'force-release'
 const HALFRUN_STOP_KIND = 'halfrun-stop'
+const HUMAN_REVIEW_STOP_KIND = 'human-review-stop'
 const PRRUN_STOP_KIND = 'prrun-stop'
+const ADOPT_KIND = 'adopt'
+
+type StopKind = typeof HALFRUN_STOP_KIND | typeof HUMAN_REVIEW_STOP_KIND | typeof PRRUN_STOP_KIND
 
 interface ClaimRequest {
 	kind: 'claim'
@@ -76,18 +86,25 @@ interface ClaimRequest {
 }
 
 interface StopRequest {
-	kind: typeof HALFRUN_STOP_KIND | typeof PRRUN_STOP_KIND
+	kind: StopKind
 	issue: string
 }
 
 type HoldRequest =
 	| ClaimRequest
 	| StopRequest
+	| { kind: typeof ADOPT_KIND; issue: string }
 	| { kind: 'release'; claimant: string }
 	| { kind: typeof FORCE_RELEASE_KIND }
 
+const STOP_KINDS: ReadonlySet<string> = new Set([
+	HALFRUN_STOP_KIND,
+	HUMAN_REVIEW_STOP_KIND,
+	PRRUN_STOP_KIND,
+])
+
 function is_stop_request(request: HoldRequest): request is StopRequest {
-	return request.kind === HALFRUN_STOP_KIND || request.kind === PRRUN_STOP_KIND
+	return STOP_KINDS.has(request.kind)
 }
 
 const FORCE_RELEASE_REQUEST: HoldRequest = { kind: FORCE_RELEASE_KIND }
@@ -96,14 +113,14 @@ function release_request(claimant: string): HoldRequest {
 	return { kind: 'release', claimant }
 }
 
-const STOP_KIND_BY_FLAG: ReadonlyMap<string, typeof HALFRUN_STOP_KIND | typeof PRRUN_STOP_KIND> =
-	new Map([
-		[HALFRUN_STOP_FLAG, HALFRUN_STOP_KIND],
-		[PRRUN_STOP_FLAG, PRRUN_STOP_KIND],
-	])
+const STOP_KIND_BY_FLAG: ReadonlyMap<string, StopKind> = new Map([
+	[HALFRUN_STOP_FLAG, HALFRUN_STOP_KIND],
+	[HUMAN_REVIEW_STOP_FLAG, HUMAN_REVIEW_STOP_KIND],
+	[PRRUN_STOP_FLAG, PRRUN_STOP_KIND],
+])
 
-// The flag after a numbered claim: absent, `--fullrun`, `--halfrun-stop` or `--prrun-stop`. Anything
-// else is a usage error.
+// The flag after a numbered claim: absent, `--fullrun`, `--halfrun-stop`, `--human-review-stop` or
+// `--prrun-stop`. Anything else is a usage error.
 function numbered_claim(issue: string, flag: string | undefined): HoldRequest | undefined {
 	if (flag === undefined) return { kind: 'claim', issue }
 
@@ -142,8 +159,20 @@ function parse_release(argv: ReadonlyArray<string>): HoldRequest | undefined {
 	return argv.length > 1 ? undefined : parse_release_argument(first)
 }
 
+function parse_adopt(argv: ReadonlyArray<string>): HoldRequest | undefined {
+	const [issue] = argv
+
+	if (issue === undefined || argv.length > 1) return undefined
+
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)
+		? { kind: ADOPT_KIND, issue }
+		: undefined
+}
+
 function parse_request(argv: ReadonlyArray<string>): HoldRequest | undefined {
 	if (argv[0] === RELEASE_FLAG) return parse_release(argv.slice(1))
+
+	if (argv[0] === ADOPT_FLAG) return parse_adopt(argv.slice(1))
 
 	return parse_claim(argv)
 }
@@ -339,24 +368,72 @@ function report_usage(): number {
 	return FAILURE_EXIT_CODE
 }
 
+const SEND_BY_KIND: Readonly<Record<StopKind, (target: string, issue: string) => Promise<void>>> = {
+	[HALFRUN_STOP_KIND]: run_stop_notify.send_halfrun,
+	[HUMAN_REVIEW_STOP_KIND]: run_stop_notify.send_human_review,
+	[PRRUN_STOP_KIND]: run_stop_notify.send_prrun,
+}
+
 // **A `halfrun` stop marks its own record** — the positive "this run has ended over its verified diff"
-// that `run:entry` adopts on `fullrun #N`. Another run's record is left alone. A `prrun` stop marks
-// its record the same way, with the commit it stopped on.
+// that `run:entry` adopts on `fullrun #N`. Another run's record is left alone. A `needs-human-review`
+// stop is the same mark, since its resume is `halfrun`'s. A `prrun` stop marks its record the same
+// way, with the commit it stopped on. **A marked stop then sends its own `confirmation`**
+// (`run-stop-notify.ts`), after the mark, since the mark rewrites the record its send is stamped on.
+async function marked_stop(target: string, request: StopRequest): Promise<number> {
+	await SEND_BY_KIND[request.kind](target, request.issue)
+
+	return report_hold()
+}
+
+// **A stop before commit has no CI E2E job behind it**, so it is refused until `josh test:e2e` has
+// answered green on this exact tree (`test-e2e-stamp.ts`). A `prrun` stop has a pull request, and CI's.
+async function e2e_refusal(request: StopRequest): Promise<number | undefined> {
+	if (request.kind === PRRUN_STOP_KIND || (await test_e2e_stamp.is_current_tree())) return undefined
+
+	return report(
+		'run:hold: `pnpm josh test:e2e` has not answered green on this tree — run it, then mark the stop again.',
+		E2E_OWED_VERDICT,
+		FAILURE_EXIT_CODE,
+	)
+}
+
 async function mark_stop(target: string, request: StopRequest): Promise<number> {
+	const refusal = await e2e_refusal(request)
+
+	if (refusal !== undefined) return refusal
+
 	const mark =
 		request.kind === PRRUN_STOP_KIND
 			? await run_prrun_resume.mark_stop_at(target, request.issue)
 			: run_halfrun_resume.mark_stop_at(target, request.issue)
 
-	if (mark === run_halfrun_resume.MARKED) return report_hold()
+	if (mark === run_halfrun_resume.MARKED) return await marked_stop(target, request)
 
 	if (mark === run_halfrun_resume.UNREADABLE) return report_unreadable_record()
 
 	return report_busy(run_hold.race_message(run_hold.read_hold(target), target))
 }
 
+// The re-keyed record answers `hold`; no record answers `none` and another issue's `busy`, each a
+// failure, since the run asking holds nothing it can stop on.
+async function adopt(target: string, issue: string): Promise<number> {
+	const result = await run_hold_adopt.adopt(target, issue)
+
+	if (result === run_hold_adopt.ADOPTED) return report_hold()
+
+	if (result === run_hold_adopt.UNREADABLE) return report_unreadable_record()
+
+	if (result === run_hold_adopt.NO_RECORD) {
+		return report(run_hold_adopt.no_record_message(issue), NONE_VERDICT, FAILURE_EXIT_CODE)
+	}
+
+	return report(run_hold_adopt.foreign_message(issue), BUSY_VERDICT, FAILURE_EXIT_CODE)
+}
+
 async function dispatch(request: HoldRequest, target: string, is_linked: boolean): Promise<number> {
 	if (request.kind === 'claim') return await claim(target, request, is_linked)
+
+	if (request.kind === ADOPT_KIND) return await adopt(target, request.issue)
 
 	if (is_stop_request(request)) return await mark_stop(target, request)
 
@@ -392,10 +469,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_hold_cli = {
 	BUSY_VERDICT,
 	HELD_VERDICT,
@@ -407,7 +480,5 @@ const run_hold_cli = {
 	parse_request,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { run_hold_cli }

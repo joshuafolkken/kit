@@ -1,4 +1,5 @@
 import { report_format_reference } from './report-format-reference'
+import { report_labels, type ReportLabels } from './report-labels'
 
 // The mechanical half of the two-layer work summary (`CLAUDE.md` Step 0, single-sourced in
 // `prompts/collaboration-workflow/report-format.md`) is a fixed shape, yet only an advisory echo in
@@ -8,21 +9,13 @@ import { report_format_reference } from './report-format-reference'
 // the overview. The judgement half — whether the subject is concrete — is deliberately left out,
 // because a machine cannot answer it.
 
+// The labels come from `report-labels.ts` in the session language — the same table
+// `report:template` prints the skeleton from, so a skeleton it printed always passes.
 const TEMPLATE_HEADING = report_format_reference.SUMMARY_TEMPLATE_HEADING
 
-// The session-facing labels are Japanese because that is the form the summary is written in
-// (`JOSH_SESSION_LANG` defaults to `ja`); `report-format.md`'s template is the single source and the
-// document test pins that these match it.
-const OVERVIEW_LABEL = '■ 概要'
-const OVERVIEW_ITEM_LABELS = ['今こうなっている', 'こう直す', '確かめ方'] as const
-const DETAILS_LABEL = '技術詳細'
-const CHANGES_LABEL = '変更とテスト'
-const REQUIRED_LABELS: ReadonlyArray<string> = [
-	OVERVIEW_LABEL,
-	...OVERVIEW_ITEM_LABELS,
-	DETAILS_LABEL,
-	CHANGES_LABEL,
-]
+function required_labels(labels: ReportLabels): ReadonlyArray<string> {
+	return [labels.overview, labels.now, labels.change, labels.check, labels.details, labels.changes]
+}
 
 // 80–100 chars is the guide; the ceiling is what a machine can enforce, so an overview sentence over
 // this many characters is the violation and the lower bound stays the writer's judgement.
@@ -36,28 +29,13 @@ const FILE_EXTENSION_PATTERN = /\.(?:ts|tsx|js|jsx|mjs|cjs|svelte|json|yaml|yml|
 const CLI_FLAG_PATTERN = /(?:^|\s)--[a-z]/u
 const BOLD_MARKER = '**'
 const LEADING_LABEL_PUNCTUATION = /^[\s:：]+/u
+const LETTER_PATTERN = /^\p{L}/u
 
 // The case-based test declaration: the changes section carries a first tier
 // of fixed-vocabulary cases — each non-applicable one crossed out with a reason — and a second tier
 // of at-least-three "if it breaks" conditions. This checks the mechanical half: the two tier markers
 // are present, an N/A cross-out carries a reason, and the second tier holds enough conditions (or the
 // "never breaks" escape). Whether the cases are the right ones stays the judgement half.
-// `report-format.md` is the single source and the document test pins these against it.
-const CASE_LABEL = 'ケース'
-const CASE_VOCABULARY: ReadonlyArray<string> = [
-	'正常',
-	'空・0件',
-	'1件',
-	'多数',
-	'境界',
-	'不正入力',
-	'重複',
-	'順序',
-	'null',
-]
-const BREAK_LABEL = '壊れるとしたら'
-const NA_LABEL = '該当なし'
-const NO_BREAK_ESCAPE = 'どう呼ばれても壊れない'
 const MIN_BREAK_CONDITIONS = 3
 const LIST_ITEM_PATTERN = /^\s*(?:\d+\.|[-*])\s+/u
 const REASON_SEPARATORS = /^[\s:：—|、,.。-]+/u
@@ -75,23 +53,37 @@ function is_fenced(summary: string): boolean {
 	return first_content_line(summary).startsWith('```')
 }
 
-function missing_labels(summary: string): ReadonlyArray<string> {
-	return REQUIRED_LABELS.filter((label) => !summary.includes(label))
+// A label counts only where no letter follows it, so `Change` is not found inside `Changes and tests`.
+function has_label(summary: string, label: string): boolean {
+	return summary
+		.split(label)
+		.slice(1)
+		.some((rest) => !LETTER_PATTERN.test(rest))
+}
+
+function missing_labels(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	return required_labels(labels).filter((label) => !has_label(summary, label))
 }
 
 function line_index_of(lines: ReadonlyArray<string>, label: string): number {
 	return lines.findIndex((line) => line.includes(label))
 }
 
-// The overview region is the lines between OVERVIEW_LABEL and DETAILS_LABEL; the length and intrusion
-// checks apply there alone, since the CHANGES_LABEL region legitimately carries file paths.
-function overview_lines(summary: string): ReadonlyArray<string> {
+// A section heading is a non-item line carrying the label, so an overview sentence that merely
+// contains the word (`- **Now**: Details panel …`) does not end the region.
+function heading_index_of(lines: ReadonlyArray<string>, label: string): number {
+	return lines.findIndex((line) => !line.startsWith(ITEM_LINE_PREFIX) && line.includes(label))
+}
+
+// The overview region is the lines between the overview and details headings; the length and
+// intrusion checks apply there alone, since the changes region legitimately carries file paths.
+function overview_lines(summary: string, labels: ReportLabels): ReadonlyArray<string> {
 	const lines = summary.split('\n')
-	const start = line_index_of(lines, OVERVIEW_LABEL)
+	const start = line_index_of(lines, labels.overview)
 	if (start < 0) return []
 
 	const after = lines.slice(start + 1)
-	const end = line_index_of(after, DETAILS_LABEL)
+	const end = heading_index_of(after, labels.details)
 
 	return (end < 0 ? after : after.slice(0, end)).filter((line) => line.startsWith(ITEM_LINE_PREFIX))
 }
@@ -107,10 +99,8 @@ function item_sentence(line: string): string {
 	return raw.replace(LEADING_LABEL_PUNCTUATION, '').trim()
 }
 
-function over_length_sentences(summary: string): ReadonlyArray<string> {
-	return overview_lines(summary)
-		.map((line) => item_sentence(line))
-		.filter((sentence) => sentence.length > MAX_OVERVIEW_CHARS)
+function overview_sentences(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	return overview_lines(summary, labels).map((line) => item_sentence(line))
 }
 
 function has_path_or_flag(sentence: string): boolean {
@@ -121,124 +111,114 @@ function has_path_or_flag(sentence: string): boolean {
 	)
 }
 
-function intruding_sentences(summary: string): ReadonlyArray<string> {
-	return overview_lines(summary)
-		.map((line) => item_sentence(line))
-		.filter((sentence) => has_path_or_flag(sentence))
-}
-
 function fence_violation(summary: string): ReadonlyArray<string> {
 	return is_fenced(summary)
 		? ['✖ the summary is wrapped in a code fence — write it as plain markdown']
 		: []
 }
 
-function label_violations(summary: string): ReadonlyArray<string> {
-	return missing_labels(summary).map((label) => `✖ missing label: ${label}`)
+function label_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	return missing_labels(summary, labels).map((label) => `✖ missing label: ${label}`)
 }
 
-function length_violations(summary: string): ReadonlyArray<string> {
-	return over_length_sentences(summary).map(
-		(sentence) => `✖ overview line over ${String(MAX_OVERVIEW_CHARS)} chars: ${sentence}`,
-	)
+function length_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	return overview_sentences(summary, labels)
+		.filter((sentence) => sentence.length > MAX_OVERVIEW_CHARS)
+		.map((sentence) => `✖ overview line over ${String(MAX_OVERVIEW_CHARS)} chars: ${sentence}`)
 }
 
-function intrusion_violations(summary: string): ReadonlyArray<string> {
-	return intruding_sentences(summary).map(
-		(sentence) => `✖ file path or CLI flag in the overview: ${sentence}`,
-	)
+function intrusion_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	return overview_sentences(summary, labels)
+		.filter((sentence) => has_path_or_flag(sentence))
+		.map((sentence) => `✖ file path or CLI flag in the overview: ${sentence}`)
 }
 
-// The changes region is every line after CHANGES_LABEL; the case checks apply there, since the two
-// tiers and their markers live under the changes section alone.
-function changes_region_lines(summary: string): ReadonlyArray<string> {
+// The changes region is every line after the changes label; the case checks apply there, since the
+// two tiers and their markers live under the changes section alone. A wholly missing section is
+// already a missing label, so an empty region keeps one absence from printing as two violations.
+function changes_region_lines(summary: string, labels: ReportLabels): ReadonlyArray<string> {
 	const lines = summary.split('\n')
-	const start = line_index_of(lines, CHANGES_LABEL)
+	const start = line_index_of(lines, labels.changes)
 
 	return start < 0 ? [] : lines.slice(start + 1)
 }
 
-// The case checks run only when the section exists — a wholly missing section is already a missing
-// label, so gating here keeps one absence from printing as two violations.
-function has_changes_section(summary: string): boolean {
-	return summary.includes(CHANGES_LABEL)
-}
-
 // The text after the N/A marker in a segment, with separators stripped — empty means no reason given.
-function reason_after_na(segment: string): string {
+function reason_after_na(segment: string, marker: string): string {
 	return segment
-		.slice(segment.indexOf(NA_LABEL) + NA_LABEL.length)
+		.slice(segment.indexOf(marker) + marker.length)
 		.replace(REASON_SEPARATORS, '')
 		.trim()
 }
 
 // Cases are listed on one line separated by `/`, so each N/A cross-out is checked in its own segment
 // — a reasonless second cross-out on a line whose first one carries a reason must not escape.
-function line_has_reasonless_na(line: string): boolean {
+function line_has_reasonless_na(line: string, marker: string): boolean {
 	return line
 		.split('/')
-		.some((segment) => segment.includes(NA_LABEL) && reason_after_na(segment).length === 0)
+		.some((segment) => segment.includes(marker) && reason_after_na(segment, marker).length === 0)
 }
 
-function na_lines_without_reason(lines: ReadonlyArray<string>): ReadonlyArray<string> {
-	return lines.filter((line) => line_has_reasonless_na(line))
-}
-
-function break_marker_index(lines: ReadonlyArray<string>): number {
-	return lines.findIndex((line) => line.includes(BREAK_LABEL))
+function break_marker_index(lines: ReadonlyArray<string>, labels: ReportLabels): number {
+	return lines.findIndex((line) => line.includes(labels.if_it_breaks))
 }
 
 // The count of list items after the second-tier marker. Over-counting a later change block's items
 // only relaxes the check, never fires a false violation, so the simple whole-tail count is enough.
-function break_condition_count(lines: ReadonlyArray<string>): number {
-	const start = break_marker_index(lines)
+function break_condition_count(lines: ReadonlyArray<string>, labels: ReportLabels): number {
+	const start = break_marker_index(lines, labels)
 	if (start < 0) return 0
 
 	return lines.slice(start + 1).filter((line) => LIST_ITEM_PATTERN.test(line)).length
 }
 
-function case_line_violations(summary: string): ReadonlyArray<string> {
+function case_line_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
 	if (
-		!has_changes_section(summary) ||
-		changes_region_lines(summary).some((line) => line.includes(CASE_LABEL))
+		!summary.includes(labels.changes) ||
+		changes_region_lines(summary, labels).some((line) => line.includes(labels.cases))
 	) {
 		return []
 	}
 
-	return [`✖ no case tier (${CASE_LABEL}:) in ${CHANGES_LABEL}`]
+	return [`✖ no case tier (${labels.cases}:) in ${labels.changes}`]
 }
 
-function na_reason_violations(summary: string): ReadonlyArray<string> {
-	if (!has_changes_section(summary)) return []
-
-	return na_lines_without_reason(changes_region_lines(summary)).map(
-		() => `✖ ${NA_LABEL} without a reason — say why the case does not apply`,
-	)
+function na_reason_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	return changes_region_lines(summary, labels)
+		.filter((line) => line_has_reasonless_na(line, labels.not_applicable))
+		.map(() => `✖ ${labels.not_applicable} without a reason — say why the case does not apply`)
 }
 
-function break_violations(summary: string): ReadonlyArray<string> {
-	if (!has_changes_section(summary)) return []
+function break_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+	if (!summary.includes(labels.changes)) return []
 
-	const lines = changes_region_lines(summary)
-	if (lines.some((line) => line.includes(NO_BREAK_ESCAPE))) return []
-	if (break_marker_index(lines) < 0) return [`✖ no ${BREAK_LABEL} tier in ${CHANGES_LABEL}`]
-	if (break_condition_count(lines) >= MIN_BREAK_CONDITIONS) return []
+	const lines = changes_region_lines(summary, labels)
+	if (lines.some((line) => line.includes(labels.never_breaks))) return []
 
-	return [
-		`✖ ${BREAK_LABEL} needs ${String(MIN_BREAK_CONDITIONS)} conditions or "${NO_BREAK_ESCAPE}"`,
-	]
+	if (break_marker_index(lines, labels) < 0) {
+		return [`✖ no ${labels.if_it_breaks} tier in ${labels.changes}`]
+	}
+
+	if (break_condition_count(lines, labels) >= MIN_BREAK_CONDITIONS) return []
+
+	const needed = `${String(MIN_BREAK_CONDITIONS)} conditions or "${labels.never_breaks}"`
+
+	return [`✖ ${labels.if_it_breaks} needs ${needed}`]
 }
 
 // Every violation the mechanical checks find, in a fixed order; an empty array is a clean summary.
-function lint_report(summary: string): ReadonlyArray<string> {
+function lint_report(
+	summary: string,
+	labels: ReportLabels = report_labels.session_labels(),
+): ReadonlyArray<string> {
 	return [
 		...fence_violation(summary),
-		...label_violations(summary),
-		...length_violations(summary),
-		...intrusion_violations(summary),
-		...case_line_violations(summary),
-		...na_reason_violations(summary),
-		...break_violations(summary),
+		...label_violations(summary, labels),
+		...length_violations(summary, labels),
+		...intrusion_violations(summary, labels),
+		...case_line_violations(summary, labels),
+		...na_reason_violations(summary, labels),
+		...break_violations(summary, labels),
 	]
 }
 
@@ -254,13 +234,8 @@ function with_reference(violations: ReadonlyArray<string>): ReadonlyArray<string
 const report_lint = {
 	lint_report,
 	with_reference,
-	REQUIRED_LABELS,
+	required_labels,
 	MAX_OVERVIEW_CHARS,
-	CASE_LABEL,
-	CASE_VOCABULARY,
-	BREAK_LABEL,
-	NA_LABEL,
-	NO_BREAK_ESCAPE,
 	MIN_BREAK_CONDITIONS,
 }
 

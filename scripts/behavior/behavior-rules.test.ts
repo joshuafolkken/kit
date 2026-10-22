@@ -17,6 +17,8 @@ const {
 } = behavior_test_fixture
 const OTHER_TOOL_ID = 'tool-2'
 const EXECUTION_ERROR = 'fatal: unable to write index'
+const PR_CREATE = 'gh pr create --title t --body b'
+const DENIED_PR_HOOK = 'PreToolUse:Bash hook error: ⛔ direct PR creation: use `pnpm josh pr`.'
 
 describe('behavior_rules.is_index_mutation', () => {
 	it('flags direct staging and commit commands', () => {
@@ -173,5 +175,63 @@ describe('behavior_rules.index_mutation_assertion existing coverage', () => {
 		)
 
 		expect(findings).toEqual([])
+	})
+})
+
+describe('behavior_rules.pr_create_assertion', () => {
+	it.each([
+		PR_CREATE,
+		'gh pr new --fill',
+		'gh api repos/o/r/pulls -f title=x -f head=b -f base=main',
+		`git push && ${PR_CREATE}`,
+	])('flags a direct PR creation that ran: %s', (command) => {
+		const findings = behavior_rules.pr_create_assertion.scan(
+			behavior_assertion.parse_transcript(bash_line(command)),
+		)
+
+		expect(findings).toEqual([
+			{ assertion: behavior_rules.PR_CREATE_ASSERTION_NAME, position: 1, detail: command },
+		])
+	})
+
+	it('stays green on josh pr and on read-only gh calls', () => {
+		const text = [
+			bash_line('pnpm josh pr'),
+			bash_line('gh pr view 1', OTHER_TOOL_ID),
+			bash_line('gh api repos/o/r/pulls/1'),
+		].join('\n')
+
+		const findings = behavior_rules.pr_create_assertion.scan(
+			behavior_assertion.parse_transcript(text),
+		)
+
+		expect(findings).toEqual([])
+	})
+
+	it('ignores a direct PR creation the guard refused before it ran', () => {
+		const text = [bash_line(PR_CREATE), bash_result_line(TOOL_ID, true, DENIED_PR_HOOK)].join('\n')
+
+		const findings = behavior_rules.pr_create_assertion.scan(
+			behavior_assertion.parse_transcript(text),
+		)
+
+		expect(findings).toEqual([])
+	})
+})
+
+describe('behavior_rules.ALL_ASSERTIONS', () => {
+	it('reports each broken assertion by its own name', () => {
+		const text = [bash_line(GIT_COMMIT), bash_line(PR_CREATE, OTHER_TOOL_ID)].join('\n')
+
+		const violations = behavior_assertion.check_transcript(
+			text,
+			'run',
+			behavior_rules.ALL_ASSERTIONS,
+		)
+
+		expect(violations.map((violation) => [violation.assertion, violation.position])).toEqual([
+			[behavior_rules.INDEX_ASSERTION_NAME, 1],
+			[behavior_rules.PR_CREATE_ASSERTION_NAME, 2],
+		])
 	})
 })

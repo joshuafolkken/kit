@@ -1,4 +1,4 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { time_batch_guard } from './time-batch-guard'
 import { EDIT_TOOL, transcript } from './time-batch-guard-fixtures'

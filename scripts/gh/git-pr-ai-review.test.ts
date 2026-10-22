@@ -38,14 +38,15 @@ const CONTEXT: TelegramContext = {
 	pr_url: 'https://github.com/owner/repo/pull/2',
 }
 
+const CLAUDE_BOT = 'claude[bot]'
 const CLAUDE_BLOCKER_COMMENT = {
-	author: { login: 'claude' },
+	author: { login: CLAUDE_BOT },
 	body: '## Code Review\n\n### Issues\n\n#### Logic bug — oops\n\n```ts\nconst x = 1\n```',
 	url: 'https://github.com/owner/repo/pull/2#issuecomment-1',
 }
 
 const CLAUDE_CLEAN_COMMENT = {
-	author: { login: 'claude' },
+	author: { login: CLAUDE_BOT },
 	body: '## Code Review\n\nAll previous issues are resolved ✓',
 	url: 'https://github.com/owner/repo/pull/2#issuecomment-2',
 }

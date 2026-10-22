@@ -17,6 +17,7 @@ import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_output, type ReadOutcome, type RecordOutcome } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
+import { lane_residents } from './lane-residents'
 import { lane_seed_policy } from './lane-seed'
 import type { KeptLane } from './lane-spent'
 import { lane_stray } from './lane-stray'
@@ -111,15 +112,24 @@ function report_issues(issues: ReadonlyArray<string>): number {
 	return SUCCESS_EXIT_CODE
 }
 
+// What the close terminated: the lane child that had not ended, and what else ran from the checkout.
+function report_terminated(outcome: CloseOutcome): void {
+	const cited = session_cite.issue(outcome.issue)
+
+	if (outcome.reaped.length > 0) {
+		console.error(
+			`Terminated the lane child for ${cited} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
+		)
+	}
+
+	lane_residents.report(outcome.residents, cited)
+}
+
 // A close that left something behind exits non-zero and names it. Reported as a success, it would
 // send the caller to the next `lane:open`, which then fails on git's own message about a branch that
 // still exists.
 function report_close(outcome: CloseOutcome): number {
-	if (outcome.reaped.length > 0) {
-		console.error(
-			`Terminated the lane child for ${session_cite.issue(outcome.issue)} that had not ended by itself: process ${outcome.reaped.join(', ')}.`,
-		)
-	}
+	report_terminated(outcome)
 
 	if (outcome.kind !== 'incomplete') {
 		return report_issues(outcome.kind === 'closed' ? [outcome.issue] : [])

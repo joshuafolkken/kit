@@ -22,15 +22,15 @@ const UNEVEN_SPANS = [
 		shorter: '💓',
 		ran: 10 * HOUR,
 		silent: 10 * HOUR - SECOND,
-		elapsed: '⏰ 10:00:00',
-		beat: '💓  9:59:59',
+		elapsed: '⏰ 10°00′00″',
+		beat: '💓  9°59′59″',
 	},
 	{
 		shorter: '⏰',
 		ran: 10 * HOUR - SECOND,
 		silent: 10 * HOUR,
-		elapsed: '⏰  9:59:59',
-		beat: '💓 10:00:00',
+		elapsed: '⏰  9°59′59″',
+		beat: '💓 10°00′00″',
 	},
 ]
 const BEATING = { last_event_ms: NOW - MINUTE, is_stopped: false }
@@ -66,7 +66,7 @@ function start_of(line: string | undefined, text: string): number {
 
 // The column the time after `icon` ends in on `line`.
 function time_end_of(line: string | undefined, icon: string): number {
-	const [drawn = ''] = new RegExp(String.raw`^.*${icon} +[\d:]+`, 'u').exec(line ?? '') ?? []
+	const [drawn = ''] = new RegExp(String.raw`^.*${icon} +[\d°′″]+`, 'u').exec(line ?? '') ?? []
 
 	expect(drawn).not.toBe('')
 
@@ -89,8 +89,8 @@ describe('run_board_header.header_lines — the time column', () => {
 	it('draws the run’s age after its name and the 💓 under it, in one column', () => {
 		const [first, second] = header_of({ repo: KIT })
 
-		expect(first).toMatch(/^⏸ backlogrun {2}⏰ 2:10:00 {2}✅/u)
-		expect(second).toMatch(/^ {2}kit {9}💓 0:01:00 {2}⚡/u)
+		expect(first).toMatch(/^⏸ backlogrun {2}⏰ 2°10′00″ {2}✅/u)
+		expect(second).toMatch(/^ {2}kit {9}💓 {4}1′00″ {2}💪/u)
 		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
 	})
 
@@ -110,8 +110,8 @@ describe('run_board_header.header_lines — the time column once the run has end
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms, repo: KIT }))
 
-		expect(lines[0]).toMatch(/^■ backlogrun {2}⏰ 1:30:00 {2}✅/u)
-		expect(lines[1]).toMatch(/^ {2}kit {9}🔚 \d{2}:\d{2} {4}\S/u)
+		expect(lines[0]).toMatch(/^■ backlogrun {2}⏰ 1°30′00″ {2}✅/u)
+		expect(lines[1]).toMatch(/^ {2}kit {9}🔚 \d{2}:\d{2} {5}\S/u)
 		expect(lines[2]).toBe('')
 		expect(lines.join('\n')).not.toContain('💓')
 	})
@@ -121,7 +121,7 @@ describe('run_board_header.header_lines — the time column once the run has end
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms, repo: KIT, machine: machine(9) }))
 
-		expect(bar_start_of(lines[1], '⚡')).toBe(bar_start_of(lines[0], '✅'))
+		expect(bar_start_of(lines[1], '💪')).toBe(bar_start_of(lines[0], '✅'))
 	})
 })
 
@@ -165,7 +165,7 @@ describe('run_board_header.header_lines — the gauge column', () => {
 
 		expect(first).toContain(`${String(settled)}/${String(total)} `)
 		expect(second).toContain(`${String(cpu)}% `)
-		expect(bar_start_of(second, '⚡')).toBe(bar_start_of(first, '✅'))
+		expect(bar_start_of(second, '💪')).toBe(bar_start_of(first, '✅'))
 	})
 
 	it('keeps the progress bar where it is as the count and the percent gain a digit', () => {
@@ -188,7 +188,7 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const screen = header_of({ machine: machine(11), repo: KIT })
 		const chat = header_of({ machine: machine(11), repo: KIT, form: 'chat' })
 
-		expect(chat[1]).not.toContain('⚡')
+		expect(chat[1]).not.toContain('💪')
 		expect(start_of(chat[1], '💓')).toBe(start_of(screen[1], '💓'))
 		expect(time_end_of(chat[1], '💓')).toBe(time_end_of(chat[0], '⏰'))
 		expect(bar_start_of(chat[1], '🧠')).toBe(bar_start_of(chat[0], '✅'))
@@ -202,7 +202,7 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const layout = plan(settled, total)
 		const [first, second] = header_of({ layout, machine: machine(11), form: 'chat' })
 
-		expect(second).not.toContain('⚡')
+		expect(second).not.toContain('💪')
 		expect(bar_start_of(second, '🧠')).toBe(bar_start_of(first, '✅'))
 	})
 
@@ -211,6 +211,6 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const [first, second] = header_of({ activity })
 
 		expect(second).not.toContain('💓')
-		expect(start_of(second, '⚡')).toBe(start_of(first, '✅'))
+		expect(start_of(second, '💪')).toBe(start_of(first, '✅'))
 	})
 })

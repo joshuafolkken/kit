@@ -1,0 +1,10 @@
+{
+	"reason": "Round-2 review fix: cut the Telegram summary on a reference-safe boundary before linking, so a #N near the cut is never halved into a wrong-Issue link",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 175,
+		"ai_cost.on_demand_bytes": 180,
+		"prose.long_paragraphs": 3,
+		"prose.excess_bold": 1
+	}
+}

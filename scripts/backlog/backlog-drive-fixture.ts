@@ -25,26 +25,38 @@ interface Harness {
 	calls: Array<string>
 	offers: Array<DriveState>
 	states: Array<DriveState>
+	holds: Array<string | undefined>
+	idles: Array<DriveState>
+	pauses: Array<string>
 }
 
 interface Script {
 	finished?: ReadonlyArray<string>
+	// Lanes this run launched outside the loop, adopted on the first offered pass that does not hold them.
+	adoptable?: ReadonlyArray<string>
 	// A scripted token is `run:merge`'s control verdict unless the child is in `offered`, whose token is
 	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
 	offered?: ReadonlyArray<string>
-	// Children `run:merge` handled as parked rather than merged; every other reads as merged.
+	// Children `run:merge` handled as parked, withdrawn or failed rather than merged; every other reads as
+	// merged.
 	parked?: ReadonlyArray<string>
+	withdrawn?: ReadonlyArray<string>
+	unmerged?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
 	unopened_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
+	// The limit-room answers in order, the last repeating; unset reads as the free-lane answers.
+	limit_room?: ReadonlyArray<number>
 	// The issues that already hold a kept lane; unset reads as none.
 	kept_lanes?: ReadonlyArray<string>
 	// How many open issues owe an `auto-ok` judgement; unset reads as none.
 	judgement_owed?: number
+	// The memory-hold answers in order, the last repeating; unset reads as memory to spare.
+	memory_held?: ReadonlyArray<boolean>
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -59,22 +71,40 @@ function merge_token(script: Script, issue: string): MergeTokenRead {
 	return { token, is_offer: script.offered?.includes(issue) === true }
 }
 
+type MergeOutcome = Awaited<ReturnType<LoopPorts['merge']>>['outcome']
+
+function merge_outcome(script: Script, issue: string): MergeOutcome {
+	const scripted: ReadonlyArray<[ReadonlyArray<string> | undefined, MergeOutcome]> = [
+		[script.parked, 'parked'],
+		[script.withdrawn, 'withdrawn'],
+		[script.unmerged, 'failed'],
+	]
+
+	return scripted.find(([issues]) => issues?.includes(issue) === true)?.[1] ?? 'merged'
+}
+
 // The child-facing ports: a finished child is merged once and then reads as gone.
 function child_ports(
 	script: Script,
 	calls: Array<string>,
-): Pick<LoopPorts, 'is_finished' | 'merge'> {
+): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
 	const finished = new Set(script.finished)
+	const adoptable = new Set(script.adoptable)
 
 	return {
 		is_finished: (issue) => finished.has(issue),
+		adoptable: async (in_flight) => {
+			const adopting = [...adoptable].filter((issue) => !in_flight.includes(issue))
+
+			for (const issue of adopting) adoptable.delete(issue)
+
+			return adopting
+		},
 		merge: async (issue) => {
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
 
-			const outcome = script.parked?.includes(issue) === true ? 'parked' : 'merged'
-
-			return { ...merge_token(script, issue), outcome }
+			return { ...merge_token(script, issue), outcome: merge_outcome(script, issue) }
 		},
 	}
 }
@@ -90,13 +120,10 @@ function dispatch_ports(
 	script: Script,
 	calls: Array<string>,
 	offers: Array<DriveState>,
-): Pick<LoopPorts, 'offer' | 'launch' | 'free_lanes' | 'has_lane' | 'judgement_owed'> {
+): Pick<LoopPorts, 'offer' | 'launch' | 'judgement_owed'> {
 	const queue = [...(script.offers ?? [])]
-	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
 
 	return {
-		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
-		has_lane: async (issue) => script.kept_lanes?.includes(issue) === true,
 		judgement_owed: async () => {
 			calls.push('judgement')
 
@@ -113,6 +140,27 @@ function dispatch_ports(
 
 			return launch_outcome(script, issue)
 		},
+	}
+}
+
+// The lane room, each read answered from the script's queue, the last answer repeating.
+function room_ports(script: Script): Pick<LoopPorts, 'free_lanes' | 'limit_room' | 'has_lane'> {
+	const free = [...(script.free_lanes ?? [ROOMY_POOL])]
+	const room = [...(script.limit_room ?? script.free_lanes ?? [ROOMY_POOL])]
+
+	return {
+		free_lanes: async () => (free.length > 1 ? free.shift() : free[0]) ?? ROOMY_POOL,
+		limit_room: async () => (room.length > 1 ? room.shift() : room[0]) ?? ROOMY_POOL,
+		has_lane: async (issue) => script.kept_lanes?.includes(issue) === true,
+	}
+}
+
+// The memory hold, answered from the script's queue, the last answer repeating.
+function memory_port(script: Script): Pick<LoopPorts, 'memory_held'> {
+	const memory = [...(script.memory_held ?? [false])]
+
+	return {
+		memory_held: async () => (memory.length > 1 ? memory.shift() : memory[0]) ?? false,
 	}
 }
 
@@ -137,19 +185,47 @@ function loop_ports(
 	}
 }
 
+// The reports an offered pass leaves, kept for the suite to read.
+function report_ports(
+	holds: Array<string | undefined>,
+	idles: Array<DriveState>,
+	pauses: Array<string>,
+): Pick<LoopPorts, 'hold' | 'idle' | 'paused'> {
+	return {
+		hold: async (reason) => {
+			holds.push(reason)
+		},
+		idle: async (idle_state) => {
+			idles.push(idle_state)
+		},
+		paused: async () => {
+			pauses.push('paused')
+		},
+	}
+}
+
 function harness(script: Script): Harness {
 	const calls: Array<string> = []
 	const offers: Array<DriveState> = []
 	const states: Array<DriveState> = []
+	const holds: Array<string | undefined> = []
+	const idles: Array<DriveState> = []
+	const pauses: Array<string> = []
 
 	return {
 		calls,
 		offers,
 		states,
+		holds,
+		idles,
+		pauses,
 		ports: {
 			...child_ports(script, calls),
 			...dispatch_ports(script, calls, offers),
+			...room_ports(script),
+			...memory_port(script),
 			...loop_ports(calls, states),
+			...report_ports(holds, idles, pauses),
 		},
 	}
 }

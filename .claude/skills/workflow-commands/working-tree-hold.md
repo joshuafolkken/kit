@@ -1,7 +1,6 @@
 # The working-tree hold — one run per tree
 
-**The single source of the hold**, read at its point of use — the moment a run is about to claim or
-release the tree. History: `docs/maintainers/working-tree-hold-rationale.md` → "Where each rule came from".
+Read the moment a run is about to claim or release the tree.
 
 **Ask `pnpm josh run:hold` before anything else, and obey what it answers** — the first call of
 `fullrun` and `halfrun`, before the title, before `pnpm josh ms`, and **before a `new` entry files its
@@ -23,8 +22,7 @@ pnpm josh run:release --force # a record left behind by a run that has ended
 
 **The unit is the working tree** — one branch, one index and one uncommitted diff, and a linked work
 tree has its own three. **`backlogrun`'s per-repository guard (`epic-busy.ts`) is a separate layer.** **`kickoff`
-does not claim it** (`docs/maintainers/working-tree-hold-rationale.md` → "Why the unit is the working
-tree").
+does not claim it.**
 
 **Claim it in the checkout the run will edit** — a cross-repository `fullrun owner/repo#N` resolves
 that checkout from `pnpm josh doctor` **first** (a read) and claims there.
@@ -34,17 +32,17 @@ that checkout from `pnpm josh doctor` **first** (a read) and claims there.
 josh run:release --force` is the one spelling that removes a record this run did not write**, and the
 `busy` message names it.
 
-**Release what the claim recorded.** A `#N` entry releases `<N>`; a **`new` entry claimed before its
-Issue existed**, so it releases with the **bare** form — a `fullrun new` that stops on a split types
-`pnpm josh run:release`. The bare form removes no label, so every `new` stop that releases also runs
-`gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
+**Release what the claim recorded.** A `#N` entry releases `<N>`. A **`new` entry claimed before its
+Issue existed**, so once it files `<N>` it runs `pnpm josh run:hold --adopt <N>`, which re-keys the
+record to `<N>` and applies `in-progress`; from then on every stop releases with `run:release <N>`.
+A `new` stop before filing releases with the **bare** form.
 
 **Releasing is the run's, not a person's memory.** `pnpm josh followup` releases on a merged run; an
 abandoned record expires after 8 hours. **A stop that leaves the tree clean releases it explicitly** —
 a split, a prerequisite or a third-party target ends with `pnpm josh run:release <N>` (bare for a `new`
-entry, plus the label DELETE). **`halfrun`'s stop before commit keeps the hold**, as does a
-`needs-human-review` stop: the release command goes in the stop report and the Telegram for the person
-to type. **`fullrun #<N>` of the same issue adopts a `halfrun`'s kept hold** — "The halfrun resume"
+entry not yet adopted). **`halfrun`'s stop before commit keeps the hold** (`run:hold <N>
+--halfrun-stop`), as does a `needs-human-review` stop (`run:hold <N> --human-review-stop`); each is
+refused until `pnpm josh test:e2e` answered green on this tree, and sends its own `confirmation`. **`fullrun #<N>` of the same issue adopts a `halfrun`'s kept hold** — "The halfrun resume"
 below. **An expired record over a tree that still has uncommitted changes does not free it** — it
 answers `busy`; only an expired record over a clean tree is replaced.
 
@@ -56,10 +54,10 @@ run:hold` / `josh run:release`".
 
 **`fullrun #<N>` or `prrun #<N>` after a `halfrun` stop resumes it instead of claiming.** The stop is
 **recorded, never inferred**: the `halfrun` ends with `pnpm josh run:hold <N> --halfrun-stop`, marking
-its record (re-keying a `halfrun new`'s unnumbered one) — a `halfrun` still implementing or a
+its record (a `halfrun new` adopted its unnumbered one at filing) — a `halfrun` still implementing or a
 `backlogrun` child leaves the same dirty tree and is not adopted. On a marked hold for `#<N>`,
 `run:entry` asks the session budget, adopts the hold and prints `entry #<N> — resume: halfrun`. **Skip
-the title, the plan, the split assessment, `pnpm josh ms`, `latest:scope` and the implementation**;
+the title, the plan, the split assessment, `pnpm josh ms`, `latest:if-required` and the implementation**;
 re-read the issue (`pnpm josh issue:read <N>`), run the gate **in full** from the refactor
 (`chain-rule.md` → "Run the review-to-merge chain"), and ship as any `fullrun` does.
 

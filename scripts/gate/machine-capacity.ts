@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { availableParallelism, cpus, totalmem } from 'node:os'
+import { availableParallelism, cpus, loadavg, totalmem } from 'node:os'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
@@ -24,19 +24,20 @@ import { execa } from 'execa'
 // admits without looking at memory, exactly as before.
 //
 // **`run:board` draws its machine gauges from the same reading**, so what the
-// board shows a person is what the gate admits against. The board takes a sample with no window and
+// board shows a person is what the gate admits against — the gate reading the free memory as none
+// while the board's pressure and swap gauges show why. The board takes a sample with no window and
 // draws the difference from its previous one. `lane:sample` records the memory half of it, so the
 // lane-limit measurement sets the same figures beside the lane count.
 
 // The window the busy cores are measured over: long enough that one scheduler tick does not dominate it,
 // short enough that a solo admission is not visibly delayed.
 const SAMPLE_WINDOW_MS = 250
-// **The background a developer machine always carries, which the gate's weights were measured beside.**
-// On 2026-10-07 the 11-core machine idled at about 1.5 cores outside `josh` — Claude sessions 0.55, the
-// window server 0.47, a browser 0.5. The solo gate's weights sum to exactly the core count and were
-// measured with that load present, so only what exceeds it is load the budget must give way to;
-// counting the baseline would defer a solo gate's unit suite on every run.
-const BASELINE_CORES = 2
+// **Run-queue load outside the ledger past this many times the cores holds the first waiter too**
+// (joshuafolkken/kit#4361). The first waiter ignores outside load (joshuafolkken/kit#4313), and lanes took
+// the 11-core machine to a load average of 25–34. Twice the cores is loose on purpose: the one-core
+// editor load #4313 stopped holding a solo gate stays far below it, so neither its starvation nor the
+// lanes' speed comes back, while a machine whose queue beyond the ledger passes two per core waits.
+const OVERLOAD_FACTOR = 2
 const BYTES_PER_MB = 1_048_576
 const KB_PER_MB = 1024
 const PERCENT = 100
@@ -50,29 +51,56 @@ const PAGE_SIZE_ARGUMENTS = ['PAGESIZE']
 // every second. `kern.memorystatus_level` is the kernel's own memory-pressure figure: the percentage of
 // memory still available, compressible and purgeable pages included — what `os.freemem()` leaves out on
 // macOS, where it reads near zero on a machine with gigabytes to spare. The swapper counters are the
-// pages swapped in and out since boot, `vm_stat`'s `Swapins` / `Swapouts`. The names stay in the output
+// pages swapped in and out since boot, `vm_stat`'s `Swapins` / `Swapouts`; `vm.compressor_input_bytes` is
+// the bytes the compressor has taken in since boot, `vm_stat`'s `Compressions`. The names stay in the output
 // (no `-n`), so a name an older macOS lacks drops only its own line.
 const LEVEL_NAME = 'kern.memorystatus_level'
 const SWAP_IN_NAME = 'vm.compressor.swapper.swapins_total'
 const SWAP_OUT_NAME = 'vm.compressor.swapper.swapouts_total'
+const COMPRESSED_NAME = 'vm.compressor_input_bytes'
 const PAGE_SIZE_NAME = 'hw.pagesize'
 // The kernel's memory-pressure verdict — 1 normal, 2 warning, 4 critical — the one Activity Monitor
 // colors its "memory pressure" graph by.
 const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
-const SYSCTL_ARGUMENTS = [LEVEL_NAME, SWAP_IN_NAME, SWAP_OUT_NAME, PAGE_SIZE_NAME, PRESSURE_NAME]
+// **Only critical holds; warning is sticky** (joshuafolkken/kit#4199). On macOS the verdict can stay at
+// warning for hours after the pressure passed, so a hold on warning never lifts. What is pressured right
+// now shows in the free figure and the swap and compressor traffic; the verdict adds only critical.
+const PRESSURE_HOLD = 4
+// The swap traffic across one window that reads as pressure — 64 MB a second paged to disk. A machine
+// that swapped once still pages a few megabytes back in as old pages are touched.
+const SWAP_PRESSURE_MB = 16
+// The compressor traffic across one window that reads as pressure. An idle machine compresses nothing
+// across a window; the 2026-10-16 thrash compressed about 240,000 16 KB pages every three seconds, about
+// 310 MB a window, with no swap figure to show for it.
+const COMPRESSION_PRESSURE_MB = 64
+const SYSCTL_ARGUMENTS = [
+	LEVEL_NAME,
+	SWAP_IN_NAME,
+	SWAP_OUT_NAME,
+	COMPRESSED_NAME,
+	PAGE_SIZE_NAME,
+	PRESSURE_NAME,
+]
 const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
 
+// `memory_pressured` says why `available_mb` read none, so a claim that waits can name the pressure.
+// `run_queue` is the one-minute load average: the busy cores stop at the core count, so only the queue
+// tells a machine at twice its cores from one at once (`is_overloaded`).
 interface MachineReading {
 	busy_cores: number | undefined
 	available_mb: number | undefined
+	memory_pressured?: boolean | undefined
+	run_queue?: number | undefined
 }
 
 // The memory half of a reading. `swapped_mb` is a counter — every page swapped in or out since boot —
-// so a rate is the difference between two readings. `pressure_level` is read on macOS only.
+// so a rate is the difference between two readings, and so is `compressed_mb`, every byte compressed
+// since boot. `pressure_level` and `compressed_mb` are read on macOS only.
 interface MemoryReading {
 	available_mb: number | undefined
 	swapped_mb: number | undefined
 	pressure_level: number | undefined
+	compressed_mb?: number | undefined
 }
 
 // What the ledger's admitted reservations declare — the part of the machine's load already accounted for.
@@ -81,9 +109,15 @@ interface LedgerLoad {
 	memory_mb: number
 }
 
+// `busy_excess` is the measured cores beyond what the ledger declares — what `cores` gave up to load the
+// ledger does not hold, so a claim that waits on it can name the CPU as saturated. `is_overloaded` lifts
+// the first waiter's exemption from that load (`core_admission.is_admitted`).
 interface MachineBudget {
 	cores: number
 	memory_mb: number
+	memory_pressured?: boolean | undefined
+	busy_excess?: number | undefined
+	is_overloaded?: boolean | undefined
 }
 
 interface CpuTimes {
@@ -141,10 +175,10 @@ function swapped_pages(
 	return pages_in === undefined || pages_out === undefined ? undefined : pages_in + pages_out
 }
 
-function swapped_mb(pages: number | undefined, page_bytes: number | undefined): number | undefined {
-	if (pages === undefined || page_bytes === undefined) return undefined
+function mb_of(units: number | undefined, unit_bytes: number | undefined): number | undefined {
+	if (units === undefined || unit_bytes === undefined) return undefined
 
-	return (pages * page_bytes) / BYTES_PER_MB
+	return (units * unit_bytes) / BYTES_PER_MB
 }
 
 // What was swapped between two readings of the counter. A counter that went back — a reboot between
@@ -163,11 +197,12 @@ function parse_darwin_memory(output: string, total_bytes: number): MemoryReading
 	return {
 		available_mb:
 			level === undefined ? undefined : (level / PERCENT) * (total_bytes / BYTES_PER_MB),
-		swapped_mb: swapped_mb(
+		swapped_mb: mb_of(
 			swapped_pages(values.get(SWAP_IN_NAME), values.get(SWAP_OUT_NAME)),
 			values.get(PAGE_SIZE_NAME),
 		),
 		pressure_level: values.get(PRESSURE_NAME),
+		compressed_mb: mb_of(values.get(COMPRESSED_NAME), 1),
 	}
 }
 
@@ -187,7 +222,7 @@ function pages_of(pattern: RegExp, vmstat: string): number | undefined {
 function parse_linux_swapped(vmstat: string, page_bytes: number): number | undefined {
 	const pages = swapped_pages(pages_of(LINUX_SWAP_IN, vmstat), pages_of(LINUX_SWAP_OUT, vmstat))
 
-	return swapped_mb(pages, page_bytes)
+	return mb_of(pages, page_bytes)
 }
 
 async function settled<T>(read: () => Promise<T>): Promise<T | undefined> {
@@ -256,56 +291,114 @@ async function default_sleep(ms: number): Promise<void> {
 	})
 }
 
+// Whether a counter gained more than `limit` MB across the window; an unread counter gained nothing.
+function moved_over(from: number | undefined, to: number | undefined, limit: number): boolean {
+	return (swapped_between(from, to) ?? 0) > limit
+}
+
+function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
+	return (
+		(after.pressure_level ?? 0) >= PRESSURE_HOLD ||
+		moved_over(before.swapped_mb, after.swapped_mb, SWAP_PRESSURE_MB) ||
+		moved_over(before.compressed_mb, after.compressed_mb, COMPRESSION_PRESSURE_MB)
+	)
+}
+
+// **Only a reading the kernel calls critical has nothing free to admit against.** Swap and compressor
+// traffic across the window used to answer no free memory too (joshuafolkken/kit#3943), but this machine
+// swaps out 0.4–1.3 TB a day as a matter of course, so that traffic held about a third of every wait
+// with memory to spare (joshuafolkken/kit#4313). A claim now waits on memory only when the free figure
+// falls short of what it declares; the traffic still names the wait as pressure (`memory_pressured`),
+// and holds a claim past the shortfall that running alone or the wait cap would otherwise start
+// (`core_admission.is_swap_held`, joshuafolkken/kit#4451).
+function pressured_available(after: MemoryReading): number | undefined {
+	if (after.available_mb === undefined) return undefined
+
+	return (after.pressure_level ?? 0) >= PRESSURE_HOLD ? 0 : after.available_mb
+}
+
+// Memory is read at both ends of the window, so the swap counter's difference is the activity during it.
 async function read_machine(
 	sleep: (ms: number) => Promise<void> = default_sleep,
 ): Promise<MachineReading> {
 	const before = cpu_times()
-	const [memory] = await Promise.all([read_memory(), sleep(SAMPLE_WINDOW_MS)])
-	const busy_cores = is_unquoted()
-		? busy_cores_between(before, cpu_times(), cpus().length)
-		: undefined
+	const [memory_before] = await Promise.all([read_memory(), sleep(SAMPLE_WINDOW_MS)])
+	const memory_after = await read_memory()
+	const is_host = is_unquoted()
+	const busy_cores = is_host ? busy_cores_between(before, cpu_times(), cpus().length) : undefined
 
-	return { busy_cores, available_mb: memory.available_mb }
+	return {
+		busy_cores,
+		run_queue: is_host ? loadavg()[0] : undefined,
+		available_mb: pressured_available(memory_after),
+		memory_pressured: is_pressured(memory_before, memory_after),
+	}
 }
 
 async function read_sample(): Promise<MachineSample> {
 	return { cpu: cpu_times(), memory: await read_memory(), total_mb: totalmem() / BYTES_PER_MB }
 }
 
-// The busy cores the ledger does not account for, beyond the baseline the weights were measured beside,
-// in whole cores — the budget is in whole cores, and a fraction of a core is not a core to give up.
+// The busy cores the ledger does not account for, in whole cores — the budget is in whole cores, and a
+// fraction of a core is not a core to give up.
+//
+// **Every busy core counts, the background included** (joshuafolkken/kit#4238). A baseline of two cores
+// used to be exempt, so with 10 cores reserved and all 11 busy the reading saw no excess and admitted
+// another claim onto a saturated CPU.
 function external_cores(busy_cores: number | undefined, ledger_cores: number): number {
 	if (busy_cores === undefined) return 0
 
-	return Math.floor(Math.max(0, busy_cores - ledger_cores - BASELINE_CORES))
+	return Math.floor(Math.max(0, busy_cores - ledger_cores))
 }
 
-// **The budget the ledger admits against: what is free plus what the ledger itself already holds.**
-// The admitted reservations' load is inside the reading, and the admission walk counts their declared
-// weight again, so it is added back — what is subtracted is only the load from outside the ledger. The
-// caller passes every admitted claim's cores but only the memory of claims past
-// `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
+// The run queue beyond what the ledger declares, past `OVERLOAD_FACTOR` times the cores. The ledger's own
+// claims running past their weight count as outside load. The load average trails by a minute, so a
+// first waiter held here waits out the decay — only at a load already this far past the machine. A queue
+// that could not be read, and Windows' constant zero, never hold.
+function is_overloaded(
+	run_queue: number | undefined,
+	ledger_cores: number,
+	cores: number,
+): boolean {
+	if (run_queue === undefined) return false
+
+	return run_queue - ledger_cores > cores * OVERLOAD_FACTOR
+}
+
+// **The budget the ledger admits against: `cores − max(ledger, busy)` free, plus what the ledger itself
+// already holds.** The admission walk counts the ledger's declared weight again, so it is added back —
+// what is subtracted is only the busy load beyond it. A claim admitted moments ago is not busy yet, and
+// the ledger's declared cores cover it. The caller passes every admitted claim's cores but only the
+// memory of claims past `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
 // Memory that could not be read is no limit at all, the behavior before memory was read.
 function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLoad): MachineBudget {
+	const busy_excess = external_cores(reading.busy_cores, ledger.cores)
+
 	return {
-		cores: cores - external_cores(reading.busy_cores, ledger.cores),
+		cores: Math.max(0, cores - busy_excess),
 		memory_mb:
 			reading.available_mb === undefined ? Infinity : reading.available_mb + ledger.memory_mb,
+		memory_pressured: reading.memory_pressured,
+		busy_excess,
+		is_overloaded: is_overloaded(reading.run_queue, ledger.cores, cores),
 	}
 }
 
 const machine_capacity = {
-	BASELINE_CORES,
 	busy_cores_between,
 	busy_share_between,
+	COMPRESSION_PRESSURE_MB,
 	external_cores,
 	machine_budget,
 	parse_darwin_memory,
 	parse_linux_available,
 	parse_linux_swapped,
+	PRESSURE_HOLD,
+	pressured_available,
 	read_machine,
 	read_memory,
 	read_sample,
+	SWAP_PRESSURE_MB,
 	swapped_between,
 }
 

@@ -1,14 +1,6 @@
 # `backlogrun` — running a child (shared mechanics, delegation, liveness, session setup)
 
-Point-of-use, read one section at a time from `backlogrun.md` → "The route table". Reasons:
-
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the file is read by section"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why a bare Issue promotes itself under `backlogrun` but not under `fullrun`"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why each child runs in a delegated unit"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the summary is bounded the way it is"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the audit runs before the first child"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why `josh latest` is hoisted to the session"
-- `docs/maintainers/backlogrun-child-rationale.md` → "Why the preflight is part of the claim"
+Point-of-use, read one section at a time from `backlogrun.md` → "The manifest — the ordered flow".
 
 ## Running a child — the shared mechanics
 
@@ -23,8 +15,9 @@ or a split found mid-run does **not** stop it:
 
 1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
    confirmation.
-2. **Stash and remove `in-progress`**, as steps 2 and 4 of "A prerequisite discovered mid-run" do:
-   `git stash push -u -m "..."`, a `gh api repos/{owner}/{repo}/issues/<N>/comments` post recording the
+2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
+   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
+   `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
 
@@ -52,7 +45,7 @@ or a split found mid-run does **not** stop it:
 5. **Do not stop.** Continue into the loop against `#<E>`.
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
-- **Every guard applies unchanged** — 30 children, 10 Issues filed, 3 consecutive failures.
+- **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a
   split mid-run stops the run"). `josh epic:next` still refuses an Issue with no task list.
 - **A bare Issue named beside an epic is a mistyped command.** Named alone, the refusal is the answer;
@@ -89,7 +82,8 @@ is unchanged.
 
 ## A delegated unit that stopped without reporting
 
-**Hand the child off without blocking, and poll** — a stopped unit leaves no notification. Once its
+**Hand the child off without blocking, and wait on `pnpm josh lane:await <N>`** — a stopped unit
+leaves no notification, so the await's exit is the wake. Once its
 output is unchanged for the silent-unit window, read `backlogrun-recovery.md` → "A delegated unit that
 stopped without reporting" and ask `pnpm josh run:liveness`.
 
@@ -100,14 +94,13 @@ creates the epic. Errors stop the run; warnings are read and passed. Fixing a fi
 
 ## `josh latest` runs once per session, not once per child
 
-Ask once, the first time the loop hands back a child number, before implementing it:
+Run once, the first time the loop hands back a child number, before implementing it:
 
 ```bash
-pnpm josh latest:scope   # → required | skip ; the reason on stderr
-git stash push -u -m "backlogrun: josh latest #<N>"        # only if the tree has staged or modified files — never conditional on the answer
+pnpm josh stash:push "backlogrun: ms #<N>"   # `clean` when nothing changed
 pnpm josh ms
-pnpm josh latest         # on `required` only
-pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only if you stashed above — by message, not a positional pop
+pnpm josh stash:pop "backlogrun: ms #<N>"    # only after `stashed` above
+pnpm josh latest:if-required                 # stash → josh latest → pop; nothing on `skip`
 ```
 
 On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed

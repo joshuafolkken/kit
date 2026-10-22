@@ -7,7 +7,6 @@ import type { execaSync } from 'execa'
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
-const PACKAGE_JSON_PATH = 'package.json'
 const WORKSPACE_PATH = 'pnpm-workspace.yaml'
 const WORKSPACE_AGE_1440 = 'minimumReleaseAge: 1440\n'
 // Published long enough ago to clear any quarantine window / far enough in the future to
@@ -24,11 +23,4 @@ function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSync
 	return result as unknown as ExecaSyncResult
 }
 
-export {
-	AGED_PUBLISH,
-	fake_sync_result,
-	WORKSPACE_AGE_1440,
-	WORKSPACE_PATH,
-	PACKAGE_JSON_PATH,
-	QUARANTINED_PUBLISH,
-}
+export { AGED_PUBLISH, fake_sync_result, WORKSPACE_AGE_1440, WORKSPACE_PATH, QUARANTINED_PUBLISH }

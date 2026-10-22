@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { latest_lane_guard } from './latest-lane-guard'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
 
@@ -14,7 +12,6 @@ import { latest_stamp, type LatestStamp } from './latest-stamp'
 // paths*, and this decides from *when the last run happened*. The flag parsing and the printing are the small half;
 // the read of the diff is what that module exists for, and this command never makes one.
 
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh latest:scope [--record] [--json]'
 const JSON_KEY = 'scope'
 const JSON_FLAG = '--json'
@@ -124,10 +121,6 @@ function run(argv: ReadonlyArray<string>): number {
 	return 0
 }
 
-function main(argv: ReadonlyArray<string>): void {
-	process.exitCode = run(argv)
-}
-
 const latest_scope_cli = {
 	decide,
 	JSON_KEY,
@@ -139,7 +132,5 @@ const latest_scope_cli = {
 	SKIPPED_SCOPE,
 	USAGE,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
 export { latest_scope_cli }

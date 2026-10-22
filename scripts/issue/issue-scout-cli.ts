@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
@@ -34,7 +32,6 @@ const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const SCORE_DIGITS = 2
 const USAGE = 'Usage: josh issue:scout "<title>" [--body "<draft>" | --body-file <path>]'
 const UNKNOWN_REPO_MESSAGE =
@@ -103,7 +100,7 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 }
 
 // The epic beside a candidate is the placement answer for a draft that cites nothing: the epic half
-// below decides from prose references, and a title-only draft has none to give it.
+// below decides from signal references, and a title-only draft has none to give it.
 function format_duplicate(candidate: DuplicateCandidate): string {
 	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
 	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`
@@ -162,12 +159,13 @@ function format_epic(decision: BundleDecision): Array<string> {
 	return lines
 }
 
-// A draft cites nothing, so the epic half has nothing to decide from: its two signals are prose
-// references and recorded dependencies, and a title carries neither. Saying "file it standalone" there
-// reports a scan that found nothing when none was possible — the confident wrong answer the gap
+// A draft cites nothing where a citation counts, so the epic half has nothing to decide from: its two
+// signals are references in the acceptance criteria or the `parent: #N` line and recorded
+// dependencies, and a title or a background mention carries neither. Saying "file it standalone"
+// there reports a scan that found nothing when none was possible — the confident wrong answer the gap
 // warnings exist to prevent everywhere else in this command.
 const NO_REFERENCE_LINE =
-	'Epic: not asked — no issue number in the summary. Pass --body "…#<N>…", or take the epic printed beside a duplicate above.'
+	'Epic: not asked — no issue number in the summary\'s acceptance criteria or parent line. Pass --body "parent: #<N>", or take the epic printed beside a duplicate above.'
 
 // Every placing verdict above asserts that no epic already tracks the draft's relatives, and a cut
 // epic listing cannot support that: `epic:bundle` withholds them for it,
@@ -195,18 +193,22 @@ function format_epic_decision(
 	return format_epic(decision).join('\n')
 }
 
-// Whether the summary names an issue at all, read through the same parser the decision itself uses —
-// a second reading of "does this body cite anything" could disagree with the one that matters.
-function has_reference(draft: BacklogIssue): boolean {
-	return epic_audit_logic.parse_references(draft.body, draft.repo).length > 0
+// The issue numbers the summary names where `decide_bundle` counts a reference — its acceptance
+// criteria and its `parent: #N` line — read through the same parser the decision itself uses: a
+// second reading of "does this body cite anything" could disagree with the one that matters, and an
+// issue cited only as the background of the filing is not one the draft belongs with.
+function signal_numbers(draft: BacklogIssue): Array<number> {
+	return epic_audit_logic
+		.signal_references(draft.body, draft.repo)
+		.map((reference) => reference.number)
 }
 
 // The open epics the summary names outright. `decide_bundle` excludes an epic from the candidate pool
-// — a container is not a sibling — so a draft saying "part of epic #1153", which is the phrasing the
-// workflow documents themselves suggest, otherwise reaches `none` and is told to file standalone with
-// the epic it named never mentioned.
+// — a container is not a sibling — so a draft whose `parent: #1153` line names the epic, which is the
+// phrasing the workflow documents themselves suggest, otherwise reaches `none` and is told to file
+// standalone with the epic it named never mentioned.
 function named_epics(draft: BacklogIssue, issues: ReadonlyArray<BacklogIssue>): Array<number> {
-	const named = new Set(epic_audit_logic.parse_references(draft.body, draft.repo))
+	const named = new Set(signal_numbers(draft))
 
 	return issues
 		.filter((issue) => issue.is_epic === true && named.has(issue.number))
@@ -241,7 +243,7 @@ function format_epic_answer(
 
 	if (named.length > 0) return format_named_epics(named, decision).join('\n')
 
-	return format_epic_decision(decision, has_reference(draft), is_membership_established)
+	return format_epic_decision(decision, signal_numbers(draft).length > 0, is_membership_established)
 }
 
 // The closed rows reach the duplicate half only. `decide_bundle` places a draft among issues that
@@ -389,12 +391,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await report(args, repo)
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
-// a pipe is asynchronous on macOS, so exiting can tear the process down before it drains.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_scout_cli = {
 	USAGE,
 	UNKNOWN_REPO_MESSAGE,
@@ -409,8 +405,6 @@ const issue_scout_cli = {
 	scout,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { ScoutArguments, ScoutOutcome }
 export { issue_scout_cli }

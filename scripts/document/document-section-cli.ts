@@ -1,7 +1,7 @@
-#!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { find_package_directory } from '#scripts/josh/package-directory'
 import { capped_output } from './capped-print'
 import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
@@ -21,7 +21,6 @@ import { entry_read_set } from './entry-read-set'
 // renamed would otherwise print nothing and read as a section with nothing in it — the one outcome
 // that is worse than reading the whole file.
 
-const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const FILE_ARGUMENT = 0
 const HEADING_ARGUMENT = 1
@@ -35,14 +34,25 @@ const USAGE = 'Usage: josh doc:section <file.md> "<heading>"'
 // directory, a bare name that happened to exist beside the caller would beat the document under
 // `root` and print a section of the wrong file — silently, which is the failure this command exists
 // to refuse.
-function resolve_document(name: string, root: string = process.cwd()): string {
+//
+// **The kit package is the fallback.** A consumer keeps no `prompts/` of its own — the package ships
+// it under `node_modules/@joshuafolkken/kit/` — so `prompts/review.md` resolves there when `root` has
+// no copy, exactly as `review:brief` resolves the rubric.
+const PACKAGE_DIRECTORY = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
+
+function candidates_under(directory: string, name: string): Array<string> {
+	return [path.resolve(directory, name), entry_read_set.document_path(directory, name)]
+}
+
+function resolve_document(
+	name: string,
+	root: string = process.cwd(),
+	package_directory: string = PACKAGE_DIRECTORY,
+): string {
 	const named = path.resolve(root, name)
+	const candidates = [...candidates_under(root, name), ...candidates_under(package_directory, name)]
 
-	if (existsSync(named)) return named
-
-	const in_skill = entry_read_set.document_path(root, name)
-
-	return existsSync(in_skill) ? in_skill : named
+	return candidates.find((candidate) => existsSync(candidate)) ?? named
 }
 
 function report_missing(markdown: string, heading: string): number {
@@ -89,12 +99,6 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 	return markdown === undefined ? FAILURE_EXIT_CODE : print_section(markdown, heading, root)
 }
 
-function main(argv: ReadonlyArray<string>): void {
-	process.exitCode = run(argv)
-}
-
 const document_section_cli = { FAILURE_EXIT_CODE, USAGE, resolve_document, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
 export { document_section_cli }

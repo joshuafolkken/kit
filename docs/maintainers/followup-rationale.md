@@ -1,9 +1,6 @@
 # Finishing a run with `followup` — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/followup.md`: where each
-rule came from and the reasons behind the ones whose reason is not self-evident. It is never read
-during a run — every rule, table and command an agent acts on stays in the procedure document, and a
-change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/followup.md`.
 
 ## Where each rule came from
 

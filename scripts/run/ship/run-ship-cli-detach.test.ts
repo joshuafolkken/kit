@@ -1,5 +1,6 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
@@ -22,6 +23,7 @@ vi.mock('./run-ship-probe', () => ({
 			is_pushed: false,
 			is_merged: false,
 		}),
+		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
 	},
@@ -70,13 +72,17 @@ vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } })
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 	git_gh_pr_read: { pr_get_merge_state: vi.fn().mockResolvedValue(undefined) },
 }))
-vi.mock('./run-ship-return', () => ({ run_ship_return: { return_control: return_mock } }))
+vi.mock('./run-ship-return', () => ({ run_ship_return: { hand_back: return_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_lane_child_mock },
 }))
 
+// No ship body draft unless a test hands one (the draft itself: `run-ship-body-draft.test.ts`).
+const with_draft_spy = vi.spyOn(run_ship_body_draft, 'with_draft')
+
 const { run_ship_cli } = await import('./run-ship-cli')
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2428: the CLI side of the detached supervisor — `--detach` hands the region over and
 // runs nothing itself, `--log <N>` prints what a stopped supervisor left, `--cite` carries follow-ups so
@@ -88,6 +94,7 @@ const TITLE = 'Hand the region over #2428'
 const NUMBER = '2428'
 const REPOSITORY = '/repo/.git'
 const STOPPED_REPORT = '=== gate ===\nred'
+const DRAFT = '/repo/.git/worktrees/2428/josh-ship-body-2428.md'
 const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
 
 const info_lines: Array<string> = []
@@ -112,6 +119,21 @@ beforeEach(() => {
 	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
 	pre_detach_mock.mockReset().mockResolvedValue({ code: OK, out: 'passed' })
 	merge_mock.mockReset().mockResolvedValue({ kind: 'current', branch: 'main' })
+	with_draft_spy.mockReset().mockImplementation(async (args) => args)
+})
+
+// joshuafolkken/kit#4168: with `--body-file` omitted, the run's ship body draft is the body — the
+// preflight asks it and the supervisor is handed it.
+describe('run_ship_cli.run — the ship body draft', () => {
+	it('hands the draft to the preflight and the supervisor', async () => {
+		const body = run_ship_body_draft.body_arguments(DRAFT)
+
+		with_draft_spy.mockImplementation(async (args) => ({ ...args, body, body_path: DRAFT }))
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
+		expect(preflight_mock).toHaveBeenCalledWith({ title: TITLE, body_path: DRAFT })
+		expect(detach_mock).toHaveBeenCalledWith(expect.objectContaining({ body, body_path: DRAFT }))
+	})
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
@@ -190,7 +212,20 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
 		expect(detach_mock).not.toHaveBeenCalled()
-		expect(pre_detach_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4305: a lane shipped seven times to see one failure at a time.
+describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
+	it('reports the preflight refusal and the pre-detach failures together', async () => {
+		const type_error = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
+
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: type_error })
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+		expect(info_lines.join('\n')).toContain(PREFLIGHT_REFUSAL)
+		expect(info_lines.join('\n')).toContain(type_error)
 	})
 
 	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
@@ -201,7 +236,21 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
 		await run_ship_cli.run([TITLE])
 
-		expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'preflight' }]])
+		expect(record.mock.calls).toStrictEqual([
+			[{ issue: Number(NUMBER), reason: 'preflight', cause: 'check' }],
+		])
+	})
+})
+
+// joshuafolkken/kit#3998: every stage runs through the retry that re-runs an infrastructure stop.
+describe('run_ship_cli.run — the infrastructure retry', () => {
+	it('runs a stage through the infrastructure retry', async () => {
+		const retried = vi.spyOn(run_ship_infra_retry, 'retried')
+
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		await run_ship_cli.run([TITLE])
+
+		expect(retried).toHaveBeenCalledWith('preflight', expect.any(Function))
 	})
 })
 
@@ -285,11 +334,12 @@ describe('run_ship_cli.run — only a supervised ship hands a failed stage back'
 		const flags = ['--body-file', 'evidence.md', '--cite', '2500']
 
 		expect(await run_ship_cli.run([TITLE, ...flags])).toBe(FAILED)
-		expect(return_mock).toHaveBeenCalledWith(NUMBER, 'gate', {
-			title: TITLE,
-			flags,
-			is_review: false,
-		})
+		expect(return_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ number: NUMBER, title: TITLE, is_review: false }),
+			'gate',
+			expect.anything(),
+		)
+		expect(JSON.stringify(return_mock.mock.calls[0]?.[2])).toContain('lint red')
 	})
 
 	it('hands nothing back from a ship run in the agent’s own turn', async () => {

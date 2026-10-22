@@ -6,6 +6,8 @@ const HEADINGS: ReadonlyArray<string> = [
 	report_format_reference.SUMMARY_RULES_HEADING,
 	report_format_reference.SUMMARY_TEMPLATE_HEADING,
 	report_format_reference.COMPLETION_REPORT_HEADING,
+	report_format_reference.ACCEPTANCE_MAP_HEADING,
+	report_format_reference.REMOVED_TESTS_HEADING,
 ]
 
 describe('report_format_reference.pointer', () => {

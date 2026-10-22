@@ -1,0 +1,7 @@
+{
+	"reason": "A direct vitest run now registers its own run marker so later runs divide the machine with it, and the native-loader pin walks the configs' whole import graph instead of a fixed file list (review round 1 of #4262)",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}

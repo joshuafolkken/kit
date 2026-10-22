@@ -1,0 +1,8 @@
+{
+	"reason": "Unit-step reuse through the test-read map (#4314): a set-level reach check in test-related.ts and its scope in check-inputs.ts; the josh-commands gate line names the new reused check",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 21,
+		"prose.long_paragraphs": 1
+	}
+}

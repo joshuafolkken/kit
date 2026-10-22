@@ -40,6 +40,7 @@ interface World {
 function drive_ports(world: World): DrivePorts {
 	return {
 		is_finished: () => world.started,
+		adoptable: async () => [],
 		merge: async () => {
 			world.merged = true
 
@@ -57,8 +58,13 @@ function drive_ports(world: World): DrivePorts {
 			return 'launched'
 		},
 		free_lanes: async () => FREE_LANES,
+		limit_room: async () => FREE_LANES,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
+		memory_held: async () => false,
+		hold: async () => undefined,
+		idle: async () => undefined,
+		paused: async () => undefined,
 		now: () => NOW,
 		sleep: async () => undefined,
 		on_state: () => undefined,
@@ -91,6 +97,7 @@ function wake_ports(world: World): LoopPorts {
 		},
 		sleep: async () => undefined,
 		now: () => NOW,
+		retry_closes: async () => undefined,
 	}
 }
 

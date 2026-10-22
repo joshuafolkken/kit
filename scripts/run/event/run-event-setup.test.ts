@@ -7,6 +7,7 @@ import { run_event_scope } from './run-event-scope'
 import { run_event_setup } from './run-event-setup'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
+import { run_event_stream_fixture } from './run-event-stream-fixture'
 
 // joshuafolkken/kit#3696: the stages of a run's start, each one `setup` event. Pinned here — the words
 // each stage writes, that only a lane opening names an issue, that the event is a trace the position
@@ -32,9 +33,7 @@ const STAGES_WRITTEN = 2
 
 // A stream of positions alone — a note rolls off only with them — as this repository's live one is.
 function fill(target: string, count: number): void {
-	for (let index = 0; index < count; index += 1) {
-		run_event_stream.append(target, KIND.NOTE, `note ${String(index)}`, AT)
-	}
+	run_event_stream_fixture.fill(target, KIND.NOTE, count, (index) => `note ${String(index)}`)
 }
 
 function stages_on(target: string): Array<string> {

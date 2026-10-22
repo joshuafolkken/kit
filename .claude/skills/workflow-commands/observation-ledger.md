@@ -1,14 +1,11 @@
 # The observation ledger — grammar, commit path and promotion
 
 **Read only when the depth test in `observation-filing.md` turns an observation away, or a user
-reports a bug** (its kind of miss, below), in the turn that appends the line. Single source of the
-ledger's grammar, commit path and second-sighting promotion. Provenance:
-`docs/maintainers/observation-ledger-rationale.md` → "Where each rule came from".
+reports a bug** (its kind of miss, below), in the turn that appends the line.
 
 ## The ledger — where an observation that cannot cite a blockage goes
 
-**An observation the depth test turns away is recorded in the ledger, not discarded.** Rationale:
-`docs/maintainers/observation-ledger-rationale.md` → "Why the ledger exists".
+**An observation the depth test turns away is recorded in the ledger, not discarded.**
 
 - **The destination is the `.josh/observations/` directory in the repository the observation is
   about**, **one file per issue**: `<N>.md` for the issue the run is executing (its branch's number,
@@ -60,8 +57,7 @@ blocked depth-0 work is filed as before.
 
 ## The commit path — how an appended line reaches the default branch
 
-**An append nobody commits is an append nobody can count.** Rationale:
-`docs/maintainers/observation-ledger-rationale.md` → "Why the ledger has a commit path".
+**An append nobody commits is an append nobody can count.**
 
 - **A run's appended lines ride its own commit** — `pnpm josh git` stages `.josh/observations/`
   (`scripts/git/git-staging.ts`). **Record before the commit, not after the merge:** a finding recorded
@@ -87,13 +83,12 @@ blocked depth-0 work is filed as before.
 
 ## The second sighting is what files it
 
-**A repeat is the citation** — counted, not judged (`docs/maintainers/observation-ledger-rationale.md`
-→ "Why a second sighting files"):
+**A repeat is the citation** — counted, not judged:
 
 - **On `observation:record` answering `file`, the observation is filed**, at depth 1 or deeper, with
   no depth-0 citation (only when exactly one earlier sighting exists).
 - **The Issue quotes the ledger's own dates — the first sighting's and this one's.**
-- **Both ceilings still apply** (`observation-filing.md`): the 10-per-run cap and the WIP cap.
+- **Both ceilings still apply** (`observation-filing.md`): the per-run filing cap and the WIP cap.
 
 **A third and later sighting appends a line and files nothing more** — `pnpm josh issue:scout` finds
 the open Issue.

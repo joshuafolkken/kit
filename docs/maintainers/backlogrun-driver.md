@@ -4,7 +4,7 @@ This document is maintainer-only: it describes what `pnpm josh run:wake`, `backl
 `backlog:offer`, `run:carry` and `run:merge` do on their own, so that the procedure documents an AI
 parent reads carry only the branches it has to judge (joshuafolkken/kit#3396). It is never read during a
 run — each command prints its own answer, and the route the parent follows is `backlogrun.md` →
-"The route table". A change to a rule is made in the procedure document first.
+"The manifest — the ordered flow". A change to a rule is made in the procedure document first.
 
 ## The carry record across a cut
 
@@ -98,9 +98,9 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **`pnpm josh backlog:budget` answering `stop`** — an idle watch running out, the maximum reached,
   and, only with the watch turned off by `--idle 0`, an empty backlog, a parked backlog or an
   unreadable listing. With the watch on, all three wait instead — **right after a merge too**: the
-  offer `run:merge` passes through is never read by the driver, so its `stop` (only person-waiting
-  issues left) is not a stop; the next pass asks `backlog:offer`, and `backlog:budget` decides
-  (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — the failure guard, or a failed
+  driver asks `run:merge --driver` for no offer (it answers `deferred`, joshuafolkken/kit#4406), so
+  no `backlog:next` `stop` (only person-waiting issues left) reaches it; the next pass asks
+  `backlog:offer`, and `backlog:budget` decides (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — the failure guard, or a failed
   child left unparked — ends the run there (`run_merge_token.is_control_stop`).
 - **The guards in `backlogrun.md` → "Guards"**, counted over the whole `backlogrun`; whichever binds
   first ends the run.
@@ -133,7 +133,7 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   waited on. After a failed send the stop-time detector leaves the marker and
   notifies instead, and a run `run:carry --end` closed gets none. `run:board` then draws
   the run `■` rather than `⏸` — it reads the same owner-gone, no-supervisor judgement as
-  `run:stranded` — so a run nobody is polling for is never drawn as one still waiting. Recovery is
+  the `Stop` hook's strand report — so a run nobody is polling for is never drawn as one still waiting. Recovery is
   `pnpm josh run:wake --start`.
 
 ## Running a named epic's children — the loop `backlog:drive` walks

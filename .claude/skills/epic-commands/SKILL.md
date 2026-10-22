@@ -5,9 +5,6 @@ description: Procedures for `josh epic:audit`, `epic:next` and `epic:bundle`. Re
 
 # The `josh epic:*` commands
 
-This skill is the single source for the three commands. Reasons: `docs/maintainers/epic-commands-rationale.md`
-→ "Where each rule came from".
-
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `prrun`, `backlogrun` — live in the
 `workflow-commands` skill.
 
@@ -32,9 +29,8 @@ Recording a decision removes that child's `needs-decision` label (Tier A; `backl
 
 - **Decided as a child joins the epic**: `pnpm josh epic --add … --decision-file` writes both
   (`epic-bundle.md`).
-- **About a child the epic already tracks**: that flag refuses an insertion with nothing to add.
-  Comment on each child with `pnpm josh issue:comment <N> --body-file <path>`, and **say in the report
-  that the epic's `## Decisions` entry is still pending**.
+- **About a child the epic already tracks**: `pnpm josh epic --decide <E> <N...> --decision-file
+  <path|->` writes the entry, the comments and the label removal; a rerun writes nothing twice.
 
 ```md
 ## Decisions
@@ -61,28 +57,14 @@ pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered  # argument order is the d
 
 After any hand edit run `pnpm josh epic:check <E>` (exit 1 when the body no longer parses).
 `pnpm josh followup` closes the epic once every task-list child is closed; one tracking a
-cross-repository child is closed by hand. Without `josh`: `issue-template.md`; the format's history:
-`docs/maintainers/epic-commands-rationale.md` → "Creating an epic by hand".
+cross-repository child is closed by hand. Without `josh`: `issue-template.md`.
 
 ## `josh epic:audit <E>` — contradictions across the children
 
 `epic:check` verifies the format; this verifies the children agree. Run it **without being asked**
 when a `backlogrun` starts a named epic's children, and right after a child is added or a dependency
-changed. Cycle and declaration checks are reused from `epic:next`; it adds:
-
-| Check | Level |
-| --- | --- |
-| A child's body names another child, nothing orders the two | warning |
-| A child's **acceptance criteria** name another child, nothing orders the two | **error**; a warning once both are closed or when the pair spans two repositories — the child is still offered as runnable until the relation is recorded |
-| A body cites a missing or already-closed issue | warning |
-| A task-list row points at another **epic** | warning — `epic:next` already withholds the row; a person should look |
-| An issue names this epic as parent that the task list does not track | warning |
-| The search for those issues could not read the open backlog | **error** |
-| That search stopped before the end of the backlog | warning |
-
-**Only errors fail it** (exit 1). A forward reference the other child already depends on is not
-reported. A pair is demoted to a warning only when the closed state is **confirmed** (any state but
-`CLOSED` normalizes to `OPEN`).
+changed. **Only errors fail it** (exit 1); the checks are `docs/josh-commands-backlog.md` →
+"`josh epic:audit`".
 
 **Fixing what it finds is Tier A** — fix it and record why on the issue. Park with `needs-decision`
 only for a design choice nobody has made.
@@ -91,39 +73,24 @@ The two `orphan search` findings are about the search, not the children:
 
 - `✖ orphan search: Could not list the open issues…` — **re-run the audit**; nothing to fix or decide.
   If it keeps failing, check `gh auth status` and the rate limit.
-- `⚠ orphan search: The open-issue scan hit its …` — only the newest 500 issues (or 50 bodies) were
-  covered; the audit passes. Look further by hand if an orphan is expected.
+- `⚠ orphan search: The open-issue scan hit its …` — the audit passes. Look further by hand if an
+  orphan is expected.
 
-**It cannot check** that when a child introduces a new label, command, state or artifact, some child
-owns updating the existing code referencing that concept — do that at planning. Label names live in
-`scripts/issue/issue-labels.ts`.
-
-History: `docs/maintainers/epic-commands-rationale.md` → "`epic:audit` — why the children are read across".
+**That a child introducing a new label, command, state or artifact updates the existing code
+referencing it is checked at planning**, not here: each plan's `### 影響を受ける既存の利用者` section,
+drafted by `pnpm josh plan:consumers` and required by `issue:plan`, names every consumer and which
+issue fixes it. Label names live in `scripts/issue/issue-labels.ts`.
 
 ## `josh epic:next <E…>` — what is runnable
 
-Returns **every** runnable child, bundled per repository with its local checkout. `--repo <owner/repo>`
-narrows to one and prints a single token (an issue number or the verdict); `--lanes` beside it prints
-one number per line, **up to the number of free lanes in that repository**.
+Returns **every** runnable child, bundled per repository with its local checkout; several epics answer
+as one pool, prioritized in the order they were named. How it weighs blockers, lanes and nested epics:
+`docs/josh-commands-backlog.md` → "`josh epic:next`".
 
-- **Several epics answer as one**: every argument before the first flag is an epic; their runnable
-  children merge into one pool per repository. **Priority is the order the epics were named**, then
-  each epic's own task-list order (its declared chain still decides what is runnable).
 - **Reorder with `pnpm josh epic --add <E> <N> --order-before <M>`** (or `--order-after <M>`), never a
-  hand edit; declarations and `blocked-by` relations stay as they were. Moving a row does not free a
-  child a chain still holds — the command prints a ⚠️ line instead.
-- **A child two epics track enters once**, kept by the epic named earlier.
-- **One unusable graph refuses the whole answer**; **one reference that does not parse fails the
-  read**. Worked form: `docs/josh-commands-backlog.md` → "`josh epic:next`".
-
-**An `in-progress` issue occupies a lane, not the repository.** Free lanes are `JOSH_LANE_LIMIT`
-(**default 4**) minus that repository's `in-progress` listing. At zero the answer is `wait`, with the
-holders on standard error. A parked child releases its lane; a `needs-human-review` stop keeps it.
-
-**A child that is itself an epic is never offered** and waits on a *person*. The test is the child's
-`epic` label, never how its row is written: a cross-repository `owner/repo#N` row that is not an epic
-stays runnable. **A parent epic over another epic never auto-closes** (a grandchild's merge never
-reaches it); `epic:audit` reports the row.
+  hand edit. Moving a row does not free a child a chain still holds — the command prints a ⚠️ line.
+- **Order two epics with a native `blocked-by` relation and name both** — `epic:next <E1> <E2>`, or
+  `backlog:next`.
 
 Children that are not runnable are sorted by **whether waiting helps**, never by label:
 
@@ -133,55 +100,35 @@ Children that are not runnable are sorted by **whether waiting helps**, never by
 | Waiting on time | Wait and ask again |
 | Waiting on a person | Stop and report |
 
-**A blocker outside every named epic is weighed**: closed, it resolves (cross-repository: after its
-release); open and tracked by an epic named in the same call, the child waits on time (or on a person,
-if the blocker does); open and untracked, the child waits on a person and the blocker is named on
-standard error; an unknown state reads as waiting. **Order two epics with a native `blocked-by`
-relation and name both** — `epic:next <E1> <E2>`, or `backlog:next`.
-
 Two things stop the command: a **circular dependency**, and a **disagreement between the epic body
 and the `blocked-by` relations**. Only a line that is *nothing but* a chain is a declaration — a prose
 line recommending an execution order is a suggestion, not a dependency.
 
-Why: `docs/maintainers/epic-commands-rationale.md` → "`epic:next` — why it answers as it does".
-
 ## Epics that span repositories
 
-Write cross-repository children as `owner/repo#N` or a full issue URL. Their state is read through
-`gh api`, so **no local clone is needed to learn it** — only to implement.
+Write cross-repository children as `owner/repo#N` or a full issue URL; **no local clone is needed to
+learn their state** — only to implement.
 
 - **The owner restriction is inherited unchanged**: a different owner is never a target.
-- **The epic auto-closes only when every cross-repository child's state could be read.**
 - **An epic in another repository is referenced as `owner/repo#N`** — `backlogrun
   joshuafolkken/kit#<E> --only`, `epic:next joshuafolkken/kit#<E> --repo joshuafolkken/app-kit`. A
   bare `#N` is this repository's issue.
-- **`epic:next` prints each candidate's local checkout**; none prints `(no local checkout)` and is
-  **never cloned on its own**.
-
-**A cross-repository dependency resolves only when the blocker is closed and the version its default
-branch declares is in the registry** (checked in that order; that exact version). A child no longer
-bumps the version, so the target is the release that includes the blocker. **Unless that repository
-publishes nothing**: no `package.json` on its default branch, or `private`, resolves on close — read
-from its manifest, never the registry; a failed manifest read (not a 404) still waits. The publish
-check is `josh propagate`'s. History: `docs/maintainers/epic-commands-rationale.md` → "Cross-repository epics".
+- **A candidate printed `(no local checkout)` is never cloned on its own.**
 
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
 Runs right after any filing; **`pnpm josh issue:file` runs it as its last step** — run it by hand only
-when that step printed `⚠`. **It recommends; it writes nothing.**
+when that step printed `⚠`. **It recommends and writes nothing; `--apply` writes an `add_to_epic` /
+`create_epic` answer.**
 
 | Candidates | Do | Tier |
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
 | Spread across an epic and its **own parent** | Add to the inner epic — the parent already contains it | A |
-| Spread across **different** epics | **Choose the one you recommend, add to it, and record why** | **A** |
+| Spread across **different** epics | **Choose the one you recommend** (`epic-bundle.md`) | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
 | **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |
 
 **A placing answer is acted on with `epic-bundle.md`**. `Nothing to bundle.` needs no further read.
-
-History: `docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why issues filed apart are bundled afterwards";
-the reasons behind `epic-bundle.md`: `docs/maintainers/epic-commands-rationale.md` → "`epic:bundle` — why each answer reads as it does";
-behind `execution-waves.md`: `docs/maintainers/epic-commands-rationale.md` → "Execution waves — why a wave is not a mechanism".

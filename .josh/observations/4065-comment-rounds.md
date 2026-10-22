@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/test/test-read-capture.test.ts | 2026-10-17 | #4065
+- rf:comments | low | scripts/test/test-related-scope.ts:15 | 2026-10-17 | #4065

@@ -5,6 +5,7 @@ import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { backlog_pool } from './backlog-pool'
@@ -56,6 +57,14 @@ describe('backlog_pool.to_child', () => {
 	it('stamps the row itself with the reading repository', () => {
 		expect(backlog_pool.to_child(row([]), READING_REPO).repo).toBe(READING_REPO)
 	})
+
+	// joshuafolkken/kit#4014: the body was dropped here, so a standalone row's declared start time
+	// never reached the board's waiting row.
+	it('carries the row’s body, where a declared start time is read from', () => {
+		const body = '## 背景\n\n- 実施可能日: 2999-01-01T00:00Z\n'
+
+		expect(backlog_pool.to_child({ ...row([]), body }, READING_REPO).body).toBe(body)
+	})
 })
 
 // joshuafolkken/kit#1679: `already-done` names work that is already merged, and the close that is
@@ -92,6 +101,13 @@ describe('backlog_pool.classify_standalone — the rows a person has to resolve'
 	// `backlogrun` would start the very issue it has just been told is already merged.
 	it('does not offer an already-done row', () => {
 		const issues = [opted_in(ROW_NUMBER, [ALREADY_DONE_LABEL])]
+
+		expect(backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable).toEqual([])
+	})
+
+	// joshuafolkken/kit#4102: a mechanical park is withheld like a decision park until its label is removed.
+	it('does not offer a run:stalled row', () => {
+		const issues = [opted_in(ROW_NUMBER, [RUN_STALLED_LABEL])]
 
 		expect(backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable).toEqual([])
 	})

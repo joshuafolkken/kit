@@ -1,0 +1,7 @@
+{
+	"reason": "Per-round reviewer profile (#3926): resolve_review/describe_review, verification overrides and the round passed through both review launch paths",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 71
+	}
+}

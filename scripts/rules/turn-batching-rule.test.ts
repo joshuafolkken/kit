@@ -33,7 +33,8 @@ const RESIDENCY_RATIONALE = 'docs/maintainers/residency-rationale.md'
 const SUITE_PATH = 'scripts/rules/turn-batching-rule.test.ts'
 // The trigger that now delivers the rule. Named once: the enumeration, the residency list and this
 // suite have to agree on the command, and a string kept correct in one of three places is not kept.
-const GUARD_COMMAND = 'pnpm josh batch:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
+const ROW_REFERENCE = '`batching` row of `pnpm josh rule:list`'
 // The figures the issue was filed on. Quotable enough to be the first thing pasted back into an
 // always-loaded document, which is what makes them the marker for "the reasoning stayed put".
 const MEASUREMENTS: ReadonlyArray<string> = ['600–850', '1.13']
@@ -135,7 +136,7 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 })
 
 // joshuafolkken/kit#1452: the first rejection above read as a rejection of `PreToolUse` itself, which
-// this package ships as `pnpm josh batch:guard` (joshuafolkken/kit#1390). What was rejected is
+// this package ships as `pnpm josh pretool:guard` (joshuafolkken/kit#1390). What was rejected is
 // judging independence from the single call in hand; the guard judges from closed history instead.
 // **The reconciliation has to sit with the rejection**, not 30 lines below it: a reader who stops at
 // the bullet meets a distributed mechanism described as impossible to build, and then reads the
@@ -174,7 +175,7 @@ describe.each([RESIDENCY_RATIONALE])('%s — lists the rule as delivered', (list
 	})
 
 	it('names the trigger that delivers it', () => {
-		expect(content).toContain(GUARD_COMMAND)
+		expect(content).toContain(ROW_REFERENCE)
 	})
 
 	// Recorded so the relocation cannot later read as a cull: the prose was resident and not obeyed, and

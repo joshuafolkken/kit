@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { forget_branch_rules } from './git-gh-branch-rules'
 import { git_gh_exec } from './git-gh-exec'
 import {
 	check_runs_pages,
@@ -7,6 +9,7 @@ import {
 	gh_api_routes,
 	gh_failure,
 	PR_BRANCH,
+	PR_HEAD_SHA,
 	pr_lookup_path,
 	pr_reviews_path,
 	pr_routes,
@@ -68,6 +71,7 @@ async function read_snapshot(
 beforeEach(() => {
 	vi.clearAllMocks()
 	forget_pr_numbers()
+	forget_branch_rules()
 })
 
 describe('pr_get_state_snapshot — the three fields', () => {
@@ -131,6 +135,29 @@ describe('pr_get_state_snapshot — mergeable_state is upper-cased', () => {
 	})
 })
 
+// joshuafolkken/kit#4351 end to end: the required CI has passed and default-setup CodeQL is still
+// running — `conclusion: null`, GitHub's `unstable` — and the snapshot reaches the merge.
+describe('pr_get_state_snapshot — an optional check still running', () => {
+	it('reaches success once the base branch rules are read', async () => {
+		const rules_path = `${git_gh_api_path.branch_rules_api_path('main')}${FULL_PAGE_QUERY}`
+		const rule = {
+			type: 'required_status_checks',
+			parameters: { required_status_checks: [{ context: SONAR_QUBE }] },
+		}
+		const passing = JSON.stringify(PASSING_RUN)
+		const running = '{"name":"CodeQL","status":"in_progress","conclusion":null}'
+		const check_runs = `[{"check_runs":[${passing},${running}]}]`
+		const pull = { mergeable_state: 'unstable', base: { ref: 'main' } }
+		const answers = { ...routes({ pull, check_runs }), [rules_path]: JSON.stringify([rule]) }
+
+		mocked_api.mockImplementation(gh_api_routes(answers))
+
+		const snapshot = parse_pr_state_snapshot(await pr_get_state_snapshot(PR_BRANCH))
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
+	})
+})
+
 describe('pr_get_state_snapshot — which endpoints it reads', () => {
 	it('pages every listing a full page at a time', async () => {
 		await read_snapshot()
@@ -182,6 +209,14 @@ describe('the snapshot split into its checks half and its review half', () => {
 		const checks = await pr_get_checks_snapshot(PR_BRANCH)
 
 		await expect(pr_get_review_decision(checks.pr_number)).resolves.toBe('')
+	})
+
+	// #4036: the merge names this head, so a checks half without it leaves no commit to bind to.
+	it('carries the head commit the rollup was read from', async () => {
+		mocked_api.mockImplementation(gh_api_routes(routes({})))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		expect(parse_pr_state_snapshot(checks.snapshot_json).head_sha).toBe(PR_HEAD_SHA)
 	})
 
 	it('folds the review history when the review half is read', async () => {

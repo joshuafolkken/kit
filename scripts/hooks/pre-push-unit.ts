@@ -130,10 +130,12 @@ function format_miss(reason: string): string {
 // as foreign load (joshuafolkken/kit#3874). Only the miss reserves: a reused record runs nothing, and a
 // claim there could make a push wait out a full ledger for a suite it then skips.
 async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Promise<number> {
+	const claim = gate_plan.DIRECT_UNIT_CLAIM
+
 	return await core_budget.with_command_reservation(
-		gate_plan.direct_unit_weight(),
+		claim.core_weight(),
 		async () => await test_unit_guard.run_guarded_unit(process.cwd(), vitest_arguments),
-		{ memory_mb: gate_plan.direct_unit_memory() },
+		{ memory_mb: claim.memory_mb(), command: 'pre-push test:unit', is_unit: claim.is_unit_claim },
 	)
 }
 

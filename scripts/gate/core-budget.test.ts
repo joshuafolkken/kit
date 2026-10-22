@@ -56,8 +56,8 @@ describe('core_budget.admitted_keys — FIFO admission within the budget', () =>
 		expect(core_budget.admitted_keys(gate, MEASURED_CORES).size).toBe(gate.length)
 	})
 
-	// A place is never jumped: the first claim that does not fit stops the walk, so admission follows
-	// claim order rather than seizing whatever fits.
+	// Claim order: a claim that fits neither after the claims ahead of it nor beside the running ones
+	// waits, so admission does not seize whatever fits.
 	it('defers the claims past the budget in claim order', () => {
 		const reservations = [
 			reservation(8, 1, 'first'),
@@ -75,6 +75,13 @@ describe('core_budget.admitted_keys — FIFO admission within the budget', () =>
 		const reservations = [reservation(20, 1, 'huge'), reservation(1, 2, 'next')]
 
 		expect(core_budget.admitted_keys(reservations, MEASURED_CORES)).toEqual(new Set(['huge']))
+	})
+
+	// joshuafolkken/kit#4313: work outside the ledger fills the machine, and the lone claim still runs.
+	it('admits the head when the CPU is busier than the ledger declares', () => {
+		const budget = { cores: 0, memory_mb: Infinity, busy_excess: MEASURED_CORES }
+
+		expect(core_admission.is_admitted('only', [reservation(1, 1, 'only')], budget)).toBe(true)
 	})
 })
 
@@ -157,13 +164,14 @@ function marker_count(directory: string): number {
 		.length
 }
 
-// A live place that fills the whole budget on its own, claimed before anything this run does, so a new
-// reservation cannot fit until it is freed.
+// A running place that fills the whole budget on its own, claimed before anything this run does, so a
+// new reservation cannot fit until it is freed.
 function write_blocking_marker(directory: string): void {
 	write_marker(directory, ALIVE_MARKER, {
 		...process_identity.own_fields(),
 		weight: MEASURED_CORES,
 		claimed_at: 0,
+		admitted_at: 0,
 	})
 }
 
@@ -187,6 +195,7 @@ async function reserve_admits_solo_without_waiting(): Promise<void> {
 		const handle = await core_budget.reserve(SOLO_UNIT_WEIGHT, {
 			directory,
 			budget: MEASURED_CORES,
+			read_machine: unread_machine,
 			sleep,
 		})
 
@@ -245,9 +254,11 @@ async function reserve_admits_at_wait_cap(): Promise<void> {
 		expect(handle.admission.overflow).toEqual({
 			waited_ms: TEST_WAIT_CAP_MS,
 			ledger: { cores: MEASURED_CORES + SOLO_UNIT_WEIGHT, memory_mb: 0 },
-			budget: { cores: MEASURED_CORES, memory_mb: Infinity },
+			budget: { cores: MEASURED_CORES, memory_mb: Infinity, busy_excess: 0, is_overloaded: false },
 		})
 		expect(core_budget.describe_overflow(handle.admission)).toContain('past the core budget')
+		// joshuafolkken/kit#4451: the wait reaches the gate ledger's check row on the admission.
+		expect(handle.admission.waited_ms).toBe(TEST_WAIT_CAP_MS)
 	})
 }
 
@@ -261,6 +272,9 @@ describe('core_budget.reserve — waiting on the machine-wide budget', () => {
 // eslint runs started together and swapped. A claim now also waits while its tool's memory is not free.
 const TOOL_MEMORY_MB = 2400
 const LOW_AVAILABLE_MB = 500
+
+// A claim made at time 1 on a machine it cannot read, so the test machine's own load never holds it.
+const UNREAD_AT_ONE = { read_machine: unread_machine, now: (): number => 1 }
 
 function marker_payload(directory: string, name: string): unknown {
 	return JSON.parse(readFileSync(path.join(directory, name), 'utf8'))
@@ -314,7 +328,7 @@ describe('core_budget memory admission', () => {
 		const replace = vi.spyOn(stamp_file, 'replace_stamp')
 
 		await with_probe(async (directory) => {
-			const handle = await core_budget.reserve(1, { directory, now: () => 1 })
+			const handle = await core_budget.reserve(1, { directory, ...UNREAD_AT_ONE })
 
 			expect(replace).toHaveBeenLastCalledWith(
 				handle.target,
@@ -326,7 +340,7 @@ describe('core_budget memory admission', () => {
 
 	it('records when its marker was admitted once it runs', async () => {
 		await with_probe(async (directory) => {
-			const options = { directory, memory_mb: TOOL_MEMORY_MB, now: () => 1 }
+			const options = { directory, memory_mb: TOOL_MEMORY_MB, ...UNREAD_AT_ONE }
 			const handle = await core_budget.reserve(1, options)
 
 			expect(marker_payload(directory, path.basename(handle.target))).toMatchObject({
@@ -353,7 +367,7 @@ async function run_command_reservation(directory: string): Promise<CommandRun> {
 	return await core_budget.with_command_reservation(
 		core_budget.CORE_WEIGHTS.lint,
 		async () => ({ places: marker_count(directory), mark: process.env[core_budget.HELD_KEY] }),
-		{ directory, budget: MEASURED_CORES, sleep },
+		{ directory, budget: MEASURED_CORES, read_machine: unread_machine, sleep },
 	)
 }
 

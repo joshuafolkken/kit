@@ -38,6 +38,9 @@ const WORKER_FLAG = '--maxWorkers'
 const WORKER_FLAGS: ReadonlyArray<string> = [WORKER_FLAG, '--max-workers']
 // Never below one: a share of zero would run no test at all and report the suite green.
 const MIN_WORKERS = 1
+// The core vitest's own process — the pool, the reporter and Vite's transforms — keeps busy beside its
+// workers (joshuafolkken/kit#4362). A direct run's claim holds it above its worker count.
+const MAIN_PROCESS_CORES = 1
 // One run in flight is this run alone, which is the case that changes nothing.
 const SOLO_RUNS = 1
 
@@ -153,6 +156,43 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 	return Math.max(MIN_WORKERS, Math.floor(available_cores / runs))
 }
 
+// **The run count divides the machine; the free cores bound what that division hands out.** The
+// share counts only unit runs, so load from outside the core budget's ledger — Claude sessions, other
+// tools — went unseen: 22 of 38 ledger samples at a load average of 20 or more had vitest as their
+// heaviest process, one at 381% over 30 processes. `free_cores` is `free-cores.ts`'s reading, the
+// cores less that outside load. `undefined` — a CI runner, a CPU quota — and a reading at or above
+// the ceiling both leave `workers` as it was, so an unread or quiet machine changes nothing.
+function cap_to_free(
+	workers: number | undefined,
+	free_cores: number | undefined,
+	available_cores: number,
+): number | undefined {
+	if (free_cores === undefined || free_cores >= (workers ?? available_cores)) return workers
+
+	return Math.max(MIN_WORKERS, Math.floor(free_cores))
+}
+
+// The core-budget claim a unit run holds: the weight it reserved, and the narrower one it was admitted
+// at past the wait cap.
+interface UnitClaim {
+	weight: number
+	granted?: number | undefined
+}
+
+// **The share never exceeds the claim the run was admitted on** (joshuafolkken/kit#4235). The share is
+// read after admission, when fewer runs may be in flight than when the weight was sized, and a share
+// wider than the claim puts workers on the machine the ledger does not hold. The claim bounds a solo
+// share too: vitest's own choice is one worker per core but one, wider than any weight the ledger
+// reserves for a unit run, so leaving it in place would open workers no claim holds. The claim holds
+// vitest's own process as well, so its workers are the claim less that core.
+function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): number | undefined {
+	if (claim === undefined) return share
+
+	const bound = Math.max(MIN_WORKERS, (claim.granted ?? claim.weight) - MAIN_PROCESS_CORES)
+
+	return Math.min(share ?? bound, bound)
+}
+
 // The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
 // one stays a pure function of two numbers and every test of it can pass them.
 //
@@ -163,10 +203,12 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 function current_share(
 	available_cores: number = availableParallelism(),
 	live_runs: number = live_run_count(),
+	free_cores?: number,
 ): number | undefined {
 	const own_run = is_nested_run() ? 0 : SOLO_RUNS
+	const share = resolve_unit_workers(available_cores, live_runs + own_run)
 
-	return resolve_unit_workers(available_cores, live_runs + own_run)
+	return cap_to_free(share, free_cores, available_cores)
 }
 
 function is_worker_flag(argument: string): boolean {
@@ -182,13 +224,15 @@ function is_worker_flag(argument: string): boolean {
 // would make this function's own answer depend on what happened to be running while it was asked, and
 // `f(args, undefined)` takes the default rather than the value — so the case that matters most, "this
 // run is alone", would be the one case no test could express.
+function has_worker_flag(vitest_arguments: ReadonlyArray<string>): boolean {
+	return vitest_arguments.some((argument) => is_worker_flag(argument))
+}
+
 function worker_arguments(
 	vitest_arguments: ReadonlyArray<string>,
 	share: number | undefined,
 ): Array<string> {
-	if (share === undefined || vitest_arguments.some((argument) => is_worker_flag(argument))) {
-		return []
-	}
+	if (share === undefined || has_worker_flag(vitest_arguments)) return []
 
 	return [`${WORKER_FLAG}=${String(share)}`]
 }
@@ -225,14 +269,19 @@ async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
 }
 
 const unit_worker_share = {
+	MAIN_PROCESS_CORES,
 	MIN_WORKERS,
 	NESTED_KEY,
 	NESTED_VALUE,
 	RUN_PREFIX,
 	SOLO_RUNS,
+	cap_to_claim,
+	cap_to_free,
 	current_share,
+	has_worker_flag,
 	is_nested_run,
 	live_run_count,
+	mark_run_started,
 	marker_path,
 	read_marker,
 	resolve_unit_workers,
@@ -240,4 +289,5 @@ const unit_worker_share = {
 	worker_arguments,
 }
 
+export type { UnitClaim }
 export { unit_worker_share }

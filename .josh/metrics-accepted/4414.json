@@ -1,0 +1,10 @@
+{
+	"reason": "The sample gate reads the source pull request's closing issue so its own run:merge ledger entry is not counted as a sample",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 143,
+		"rules.lines": 8,
+		"ai_cost.on_demand_bytes": 1321,
+		"prose.long_paragraphs": 1
+	}
+}

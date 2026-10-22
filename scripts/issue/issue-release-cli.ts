@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
@@ -27,7 +25,6 @@ import { session_cite } from './session-cite'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh issue:release <issue-number> [--wait]'
 const NONE = 'none'
 const UNKNOWN_REPO_MESSAGE =
@@ -199,13 +196,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return (await record(request, current)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
-// `process.exitCode` rather than `process.exit()`, so the report on standard output drains first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_release_cli = { find_open, link, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_release_cli, NONE }

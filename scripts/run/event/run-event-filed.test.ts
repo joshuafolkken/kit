@@ -10,18 +10,20 @@ const FROM_LANE: Filed = {
 	kind: 'bug',
 	title: 'Count the seats again',
 	found_during: '3415',
+	is_run: true,
 }
 const ELSEWHERE: Filed = {
 	reference: 'joshuafolkken/app-kit#12',
 	kind: undefined,
 	title: 'Fix (the) port',
 	found_during: undefined,
+	is_run: false,
 }
 
 describe('run_event_filed', () => {
-	it('writes the reference, the kind, the title and the child that found it', () => {
+	it('writes the reference, the kind, the run’s mark, the title and the child that found it', () => {
 		expect(run_event_filed.text_of(FROM_LANE)).toBe(
-			'#3438[bug] Count the seats again (found during #3415)',
+			'#3438[bug][run] Count the seats again (found during #3415)',
 		)
 	})
 
@@ -33,7 +35,7 @@ describe('run_event_filed', () => {
 	// joshuafolkken/kit#3494: an event written before the kind was recorded still reads, with no kind.
 	it('reads an event written before the kind as one with no kind', () => {
 		expect(run_event_filed.parse('#3438 Count the seats again (found during #3415)')).toStrictEqual(
-			{ ...FROM_LANE, kind: undefined },
+			{ ...FROM_LANE, kind: undefined, is_run: false },
 		)
 	})
 
@@ -71,5 +73,24 @@ describe('run_event_filed with a title that opens with a kind', () => {
 
 	it('reads it as the title on an event written before the kind', () => {
 		expect(run_event_filed.parse(`#7 ${UNCLASSIFIED.title}`)).toStrictEqual(UNCLASSIFIED)
+	})
+})
+
+// joshuafolkken/kit#4099: a filing outside the run carries no mark, and an event written before the
+// mark reads as one filed outside.
+describe('run_event_filed run mark', () => {
+	it('writes no mark for a filing outside the run and reads it back as outside', () => {
+		const outside = { ...FROM_LANE, is_run: false }
+
+		expect(run_event_filed.text_of(outside)).toBe(
+			'#3438[bug] Count the seats again (found during #3415)',
+		)
+		expect(run_event_filed.parse(run_event_filed.text_of(outside))).toStrictEqual(outside)
+	})
+
+	it('reads a title that opens with the mark on an event written before the kind as the title', () => {
+		const parsed = run_event_filed.parse('#7 [run] Lap')
+
+		expect(parsed).toStrictEqual({ ...ELSEWHERE, reference: '#7', title: '[run] Lap' })
 	})
 })

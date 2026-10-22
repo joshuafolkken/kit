@@ -1,8 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { z } from 'zod'
-import { package_path } from './init-paths'
-
-const PACKAGE_JSON = 'package.json'
+import { PACKAGE_DIR } from './init-paths'
 
 const kit_manifest_schema = z.object({
 	peerDependencies: z.record(z.string(), z.string()).default({}),
@@ -12,9 +10,7 @@ const kit_manifest_schema = z.object({
 type KitManifest = z.infer<typeof kit_manifest_schema>
 
 function read_kit_manifest(): KitManifest {
-	const content = readFileSync(package_path(PACKAGE_JSON), 'utf8')
-
-	return kit_manifest_schema.parse(JSON.parse(content))
+	return package_manifest.read_manifest(PACKAGE_DIR, kit_manifest_schema)
 }
 
 // The version kit's own devDependencies carry for each name, so a consumer runs the toolchain kit

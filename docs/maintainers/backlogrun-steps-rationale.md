@@ -1,10 +1,6 @@
 # `backlogrun` steps — the rationale behind the procedure
 
-This document is maintainer-only: it holds the reasons, history and measurements behind the rules in
-`.claude/skills/workflow-commands/backlogrun-steps.md`. The procedure document states what a run does;
-this one records why it does it that way, so a change to a rule can be weighed against the reason it
-was written. It is never read during a run — nothing here is an instruction, and a rule stated only
-here binds nobody.
+Rationale behind `.claude/skills/workflow-commands/backlogrun-steps.md`.
 
 ## Why the authorization boundary is shaped this way
 
@@ -38,7 +34,7 @@ terminates: after them the run ends and the next one waits for a person to type 
 
 **Why the end-of-run retrospective's filings may carry `auto-ok`** (joshuafolkken/kit#2328). They are
 judged by the same criteria as every other filing (joshuafolkken/kit#3853), and they are not the
-self-widening the rule guards against because every brake bounds them with no exception: its filings count against the ten-per-invocation ceiling, the
+self-widening the rule guards against because every brake bounds them with no exception: its filings count against the ten-per-run ceiling, the
 WIP cap, `--max` and the session budget exactly as any other filing does.
 A retrospective that judges nothing worth carrying files nothing, so "file → drain → file again"
 converges the moment improvements run out.

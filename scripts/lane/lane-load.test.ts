@@ -1,5 +1,5 @@
 import type { machine_capacity } from '#scripts/gate/machine-capacity'
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_load } from './lane-load'
 import { lane_process_load } from './lane-process-load'
@@ -10,7 +10,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 // zero on macOS, and a second swap parser measured a different figure for the same machine.
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })
@@ -61,13 +61,13 @@ describe('lane_load.sample', () => {
 
 		const sample = await lane_load.sample(AT)
 		const available_mb = await read_admission()
-		const [sampled, admitted] = hanging_execa.calls()
+		// The admission reads the memory at both ends of its window, to see swapping across it.
+		const [sampled, ...admitted] = hanging_execa.calls()
 
 		expect(available_mb).toBeGreaterThan(0)
 		expect(sample.available_mb).toBe(Math.round(available_mb ?? 0))
 		expect(sample.swapped_mb).toBe(SWAPPED_MB)
-		expect(hanging_execa.calls()).toHaveLength(2)
-		expect(sampled).toStrictEqual(admitted)
+		expect(admitted).toStrictEqual([sampled, sampled])
 	})
 
 	it('records the sample without memory on a platform the reading does not cover', async () => {

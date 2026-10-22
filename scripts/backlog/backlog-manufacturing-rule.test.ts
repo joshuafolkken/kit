@@ -43,7 +43,6 @@ const SPLIT_MARKERS: ReadonlyArray<string> = [
 	SPLIT_GUIDE,
 	// Test files are excluded so that adding tests does not push a change past the split threshold.
 	'(test files excluded)',
-	`${SPLIT_RATIONALE}\` → "Why the default is not to split"`,
 ]
 
 // The reason, without which the next reader restores the old test as an obvious simplification. It
@@ -303,7 +302,13 @@ const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
 	{
 		doc: LANES_DOC,
 		marker:
-			'Does it, on `main` now, make unrelated PRs answer wrongly (a false green or a false red)?',
+			'Does it, on `main` now, make unrelated PRs answer wrongly (a false green or a false red) **on every run**?',
+	},
+	// joshuafolkken/kit#4396: a wrong answer that comes only some of the time leads the offer instead.
+	{
+		doc: LANES_DOC,
+		marker:
+			'A wrong answer that only comes some of the time — a flaky test, a timeout under load — is not a solo run.** It carries `run:lane` and `priority:critical`',
 	},
 ]
 

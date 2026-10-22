@@ -1,11 +1,6 @@
 # Independent calls go in the same turn — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/turn-batching.md`: the
-measurements, history and argument that justify the procedure's boundaries, the guard's scope and the
-measurement. It is never read during a run. Every trigger, action, criterion, threshold and guard
-blind spot an agent obeys stays in the procedure document, so a change to this file changes no rule.
-The measurements, the rejected mechanisms and the history moved here from the procedure in
-joshuafolkken/kit#3177, and the text already here was brought to English at the same time.
+Rationale behind `prompts/collaboration-workflow/turn-batching.md`.
 
 ## Why the number of turns is the cost
 
@@ -37,7 +32,7 @@ least — which is why the procedure says `Edit` is covered exactly as reads are
   on real data".
 
   **What was rejected is that way of judging, not the `PreToolUse` mechanism itself.**
-  joshuafolkken/kit#1390 implemented `pnpm josh batch:guard` **as exactly a `PreToolUse` hook**, shipped
+  joshuafolkken/kit#1390 implemented the batching guard **as exactly a `PreToolUse` hook**, shipped
   in `.claude/settings.json`. It judges from **closed history** — the sequence of turns whose results
   have come back — rather than from the one call in hand. Two single-call turns in a row are invisible
   from one call and visible from the history. Each concern above is avoided by design: dependence is
@@ -64,7 +59,7 @@ result visible as a number** — the same three that moved output tokens in `fil
 
 **The refusal window.** A refusal fires **once** per run of single-call turns. A run that continues past
 the window the hook reads gets one per window, since its start leaves the window — details in
-`docs/josh-commands-automation.md` → "`josh batch:guard`".
+`docs/josh-commands-automation.md` → "The batching guard".
 
 **Delivery to forks (joshuafolkken/kit#1424).** Since joshuafolkken/kit#1424 the judgement and the
 "once only" record key on **the fork's own transcript**, not the parent's.
@@ -107,7 +102,7 @@ extends a run, and `Read` / `Glob` / `Grep` / `Write` all extend it. So only the
 leading-word allow-list (`READ_COMMANDS`) and a mutation deny-list, so **every `pnpm josh …` starting
 with `pnpm` was non-bundleable** — the `pnpm` that kept out writing josh commands (`gate` / `followup` /
 `git`) also dropped read-only ones such as `issue:state` / `release:scope`. Administrative round trips
-never appeared in `Bundling:`'s recoverable count or in `batch:guard`'s judgement, and the largest
+never appeared in `Bundling:`'s recoverable count or in the batching guard's judgement, and the largest
 administrative category, in the most expensive late part of a run, was always out of reach. **The
 judgement was fixed, not the rule** (that Issue's acceptance condition). What stays off the allow-list
 follows the module's consistent asymmetry: a miss costs a floor, a wrong inclusion a claim. **It
@@ -128,13 +123,13 @@ Round trips:
 ```
 
 The `tool-less turns` line (`turn_count − round_trips`, joshuafolkken/kit#1875) exists because
-`batch:guard` cannot refuse a speech-only turn — with no tool call, `PreToolUse` never fires — and
+the batching guard cannot refuse a speech-only turn — with no tool call, `PreToolUse` never fires — and
 `Bundling:` structurally cannot see one. Measured: run #1864 had 149 turns with calls out of 177, and
 **28 with no tool at all**.
 
 ## The composite commands
 
-**`read:files` (joshuafolkken/kit#2202).** `pnpm josh batch:guard` (the refusal) moved density on the
+**`read:files` (joshuafolkken/kit#2202).** The batching guard (the refusal) moved density on the
 main line, but in a lane child (headless `claude -p`) a refusal ends the turn and kills the child, so
 it could not fire (#2138); the notice that replaced it did not move the numbers (#2164), so #2178 set
 the guard to `off` in children. What remained was the 9-turn sequence of alternating `Read` → `Edit`
@@ -188,7 +183,7 @@ the 1.50 floor, which is the state of the rule being kept.
 `prompts/collaboration-workflow/turn-batching.md` → "ガードが見えないところ". The guard judges from the
 closed history (the sequence of turns whose results have returned) and treats calls sharing a target as
 dependent, so it does not stop them. The mechanism is `docs/josh-commands-automation.md` →
-"`josh batch:guard`".
+"The batching guard".
 
 - **The turn in progress is invisible.** Only the head of the same turn's edits may be refused; it
   fails rather than breaks — a reissue either matches the body or reports the mismatch

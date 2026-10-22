@@ -24,11 +24,12 @@ import { tail_commands } from './tail-commands'
 // `josh epic`, named canonically — `shell_segments.is_josh_command` expands an alias before the match.
 const EPIC_COMMANDS: ReadonlySet<string> = new Set(['epic'])
 const PROMOTED_ISSUE = /--promote[=\s]+["']?(?<issue>\d+)\b/u
-// The issue a label write targets, in the two spellings `lane_park.records_the_park` accepts: the REST
-// path `…/issues/<N>/labels` and `gh issue edit <N>`.
+// The issue a label write targets, in the spellings `lane_park.records_the_park` accepts: the REST
+// path `…/issues/<N>/labels`, `gh issue edit <N>` and `josh run:park <N>`.
 const LABEL_TARGETS: ReadonlyArray<RegExp> = [
 	/\/issues\/(?<issue>\d+)\/labels\b/u,
 	/\bissue\s+edit\s+["']?(?<issue>\d+)\b/u,
+	/\brun:park\s+["']?(?<issue>\d+)\b/u,
 ]
 // The issue a confirmation notify is about, read off its `--issue-url` the way `stop-rules.ts` spells it.
 const ISSUE_URL = /--issue-url[=\s]+["']?([^\s"']+)/u
@@ -111,6 +112,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_candidate),
 	reason: LANE_SPLIT_PARK_REASON,
 	decide,
+	about: {
+		title: 'A split is not a park',
+		topic: '`.claude/skills/workflow-commands/backlogrun-park.md` → "Splitting a child mid-run"',
+		fires:
+			'a lane child that promoted its Issue to an epic this run parking it (`needs-decision`, `confirmation` notify). Every occurrence',
+		quiet: 'no promotion this run',
+	},
 }
 
 const lane_split_park = {

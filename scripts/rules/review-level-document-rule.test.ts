@@ -125,11 +125,10 @@ describe('documentation is stated as not inert', () => {
 		expect(read_unwrapped(document_path)).toContain('documentation')
 	})
 
-	// The evidence, not just the claim: a reader who disagrees needs to be able to check it. The
-	// measurement moved to the review history, one pointer away (joshuafolkken/kit#3180).
-	it('the review prompt points at the measurement the rule rests on', () => {
-		expect(read_unwrapped(REVIEW_PROMPT)).toContain(REVIEW_HISTORY)
-
+	// The evidence, not just the claim: a maintainer who disagrees needs to be able to check it. The
+	// measurement lives in the review history (joshuafolkken/kit#3180), which the review prompt no
+	// longer points at (joshuafolkken/kit#3928).
+	it('the review history keeps the measurement the rule rests on', () => {
 		const history = read_unwrapped(REVIEW_HISTORY)
 
 		expect(history).toContain('joshuafolkken/kit#963')

@@ -1,0 +1,8 @@
+{
+	"reason": "kit #4090 adds josh lockfile:policy, its tests, and its doc entry in the standard command-entry template (bold field labels)",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 44,
+		"prose.excess_bold": 2
+	}
+}

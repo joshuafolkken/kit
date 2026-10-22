@@ -13,6 +13,12 @@ const { hook_launch_command, PROJECT_ROOT_PREFIX, RUN_HOOK_SCRIPT } = hook_launc
 const AT_ROOT = 'at root'
 const ROOT_PROBE = `test -f .git/HEAD || test -d metadata && echo ${AT_ROOT}`
 const PRETOOL_GUARD = 'pretool-guard'
+const LEAKED_GIT_DIRECTORIES = ['.git', '/elsewhere'] as const
+// Whether each agent names the project root for a hook command.
+const AGENTS: ReadonlyArray<readonly [string, boolean]> = [
+	['Claude Code', true],
+	['Codex', false],
+]
 
 // The four settings.json hooks, each named by its bundle under `dist/hooks`.
 const HOOKS = [PRETOOL_GUARD, 'format-edited', 'session-lang', 'stop-guard'] as const
@@ -37,29 +43,50 @@ describe('hook_launch_command', () => {
 	})
 })
 
+function probe_from_subdirectory(
+	is_project_directory_named: boolean,
+	is_external_git = false,
+): string {
+	const result = hook_command_bootstrap.run_in_temporary_checkout(
+		`${PROJECT_ROOT_PREFIX}${ROOT_PROBE}`,
+		false,
+		true,
+		{ is_external_git, is_project_directory_named },
+	)
+
+	return result.stdout.trim()
+}
+
 // joshuafolkken/kit#2984: every path after the prefix is relative, so a hook fired from a subdirectory
-// has to reach the root rather than stay where the session stands.
+// has to reach the root rather than stay where the session stands — the root Claude Code names, or
+// git's where Codex names none (joshuafolkken/kit#4187).
 describe('the project-root prefix', () => {
-	it('moves to the root from a project subdirectory', () => {
-		const result = hook_command_bootstrap.run_in_temporary_checkout(
-			`${PROJECT_ROOT_PREFIX}${ROOT_PROBE}`,
-			false,
-			true,
-		)
-
-		expect(result.stdout.trim()).toBe(AT_ROOT)
+	it.each(AGENTS)('moves to the root from a project subdirectory under %s', (_agent, is_named) => {
+		expect(probe_from_subdirectory(is_named)).toBe(AT_ROOT)
 	})
 
-	it('moves to the work tree when Git metadata is outside it', () => {
-		const result = hook_command_bootstrap.run_in_temporary_checkout(
-			`${PROJECT_ROOT_PREFIX}${ROOT_PROBE}`,
-			false,
-			true,
-			{ is_external_git: true },
-		)
+	it.each(AGENTS)(
+		'moves to the work tree when Git metadata is outside it under %s',
+		(_agent, is_named) => {
+			expect(probe_from_subdirectory(is_named, true)).toBe(AT_ROOT)
+		},
+	)
 
-		expect(result.stdout.trim()).toBe(AT_ROOT)
-	})
+	// A git hook in a subdirectory leaks a `GIT_DIR` that names no repository from there: the checkout's
+	// own `.git`, relative, or another checkout's.
+	it.each(LEAKED_GIT_DIRECTORIES)(
+		'moves to the root under Codex despite a leaked GIT_DIR of %s',
+		(git_directory) => {
+			const result = hook_command_bootstrap.run_in_temporary_checkout(
+				`${PROJECT_ROOT_PREFIX}${ROOT_PROBE}`,
+				false,
+				true,
+				{ git_overrides: { GIT_DIR: git_directory } },
+			)
+
+			expect(result.stdout.trim()).toBe(AT_ROOT)
+		},
+	)
 })
 
 describe('a hook fired outside any checkout', () => {

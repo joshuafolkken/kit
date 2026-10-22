@@ -1,8 +1,9 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import { backlog_budget, type BacklogAnswer, type BudgetInput } from './backlog-budget'
 
 const NOW_MS = Date.parse('2026-09-09T12:00:00Z')
-const MINUTE_MS = backlog_budget.MS_PER_MINUTE
+const MINUTE_MS = MS_PER_MINUTE
 const IDLE_BUDGET_MINUTES = 30
 const IDLE_HALFWAY_MINUTES = 15
 const RUN_AGE_MINUTES = 60
@@ -76,7 +77,7 @@ describe('backlog_budget — the ask interval a watch names', () => {
 	it('names no second poll while children are still running', () => {
 		const reason = backlog_budget.running_watch_reason('exhausted', 1, LAST_MINUTE_MS)
 
-		expect(reason).toContain('poll at the polling interval')
+		expect(reason).toContain('wait on `pnpm josh lane:await` until they merge')
 		expect(reason).not.toContain('idle poll')
 	})
 })

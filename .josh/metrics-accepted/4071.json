@@ -1,0 +1,7 @@
+{
+	"reason": "The map now records the directories its commit holds, so a directory no test read is no longer mistaken for a new one; the growth is that recording and the tests pinning both cases",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 56
+	}
+}

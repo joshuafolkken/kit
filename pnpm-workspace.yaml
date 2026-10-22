@@ -8,8 +8,10 @@ allowBuilds:
   '@joshuafolkken/kit': false # project postinstall handles lefthook install
 
 # pnpm 12 reads these settings from this file only; the same lines in .npmrc are ignored (kit #3267).
-# A release must be a day old before pnpm resolves it, and an unsatisfied `engines` fails the install.
-minimumReleaseAge: 1440
+# A release must be three days old before pnpm resolves it, and an unsatisfied `engines` fails the
+# install. `josh init` / `josh sync` mirror the window to `.aikido` and to Dependabot's `cooldown`
+# (kit #4023): an upstream hijack can take days to come to light, so one day is not enough.
+minimumReleaseAge: 4320
 engineStrict: true
 
 # Skip the install-time supply-chain re-verification of the already-committed, reviewed lockfile.

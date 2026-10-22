@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
-const resolve_in_mock = vi.hoisted(() => vi.fn())
+const review_in_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
@@ -14,7 +14,7 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 		write_text_stamp: vi.fn(),
 	},
 }))
-vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: resolve_in_mock } }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: review_in_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
 vi.mock('#scripts/gate/gate-tree', () => ({
 	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
@@ -42,6 +42,7 @@ const ISSUE = '2427'
 const OPEN = 'run:review'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
 const ROUND_ONE = { kind: 'review', round: '1' }
+const UNSERVED = 'no broker serves this lane'
 const ANTHROPIC_REVIEWER_PROFILE = {
 	provider: 'anthropic',
 	role: 'reviewer',
@@ -60,7 +61,7 @@ function commands(): ReadonlyArray<string> {
 }
 
 function reviewer_on(profile: typeof ANTHROPIC_REVIEWER_PROFILE): void {
-	resolve_in_mock.mockReturnValue({ kind: 'argv', argv: ARGV, profile })
+	review_in_mock.mockReturnValue({ kind: 'argv', argv: ARGV, profile })
 }
 
 async function stage_code(): Promise<number> {
@@ -77,26 +78,38 @@ beforeEach(() => {
 	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
 	reviewer_on(ANTHROPIC_REVIEWER_PROFILE)
 	is_child_mock.mockReset().mockReturnValue(true)
-	broker_request.mockReset().mockResolvedValue(false)
+	broker_request.mockReset().mockResolvedValue({ is_success: false, reason: UNSERVED })
 	broker_serving.mockReset().mockReturnValue(false)
 })
 
 describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 	it('uses the registered reviewer broker instead of a nested Codex launch', async () => {
 		reviewer_on(OPENAI_REVIEWER_PROFILE)
-		broker_request.mockResolvedValue(true)
+		broker_request.mockResolvedValue({ is_success: true })
 
 		expect(await stage_code()).toBe(OK)
 		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, ROUND_ONE)
 		expect(launch).not.toHaveBeenCalled()
 	})
 
+	// joshuafolkken/kit#4431: a reviewer the broker could not start is the infrastructure, no finding.
 	it('stops before attestation when the isolated reviewer is unavailable', async () => {
 		reviewer_on(OPENAI_REVIEWER_PROFILE)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject({
+			code: FAILED,
+			cause: 'infra',
+		})
 		expect(commands()).toStrictEqual([OPEN])
 		expect(launch).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#3974: the broker's reason reaches the ship log instead of a bare failure.
+	it("names the broker's reason when the isolated reviewer fails", async () => {
+		reviewer_on(OPENAI_REVIEWER_PROFILE)
+		const result = await run_ship_review_steps.review_stage(ISSUE)
+
+		expect(result.out).toContain(`isolated reviewer failed: ${UNSERVED}`)
 	})
 })
 
@@ -105,7 +118,7 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 describe('run_ship_review_steps.review_stage — Claude lane child', () => {
 	it('asks the serving broker for the reviewer instead of launching it', async () => {
 		broker_serving.mockReturnValue(true)
-		broker_request.mockResolvedValue(true)
+		broker_request.mockResolvedValue({ is_success: true })
 
 		expect(await stage_code()).toBe(OK)
 		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, ROUND_ONE)

@@ -1,23 +1,18 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { error_text } from '#scripts/lib/error-message'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
-import { detached_launch } from '#scripts/run/detached-launch'
-import { run_ship_review } from '#scripts/run/ship/run-ship-review'
-import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 import { lane_broker_server, type BrokerServer } from './lane-broker-server'
-import { lane_child_invocation, type ShipStop } from './lane-child-invocation'
-import { lane_child_marker } from './lane-child-marker'
-import { lane_parked } from './lane-parked'
 import type { LaneInfo } from './lane-registry'
-import { lane_relaunch } from './lane-relaunch'
+import { lane_session_action, type BrokerAction, type BrokerAnswer } from './lane-session-action'
 
 // The sessions a lane child's detached `josh ship` cannot start itself, started for it by a process
 // that can: the round-1 and round-2 reviewer, and the fresh child a stopped ship hands back to. An
@@ -25,13 +20,11 @@ import { lane_relaunch } from './lane-relaunch'
 // Claude lane is served by the `run:wake` supervisor (`claude-lane-broker.ts`), because Claude Code removes its
 // token from what its Bash tool starts, so a token-only credential never reaches the ship the child
 // launched (joshuafolkken/kit#3817). **The request names an action, never a command**: the server
-// rebuilds the argv from the registered lane, so a child can ask for nothing but these two sessions.
+// rebuilds the argv from the registered lane, so a child can ask for nothing but these two sessions
+// (`lane-session-action.ts`).
 
 const REQUEST_PREFIX = '.josh-review-request-'
 const RESPONSE_PREFIX = '.josh-review-response-'
-const BRIEF_PREFIX = 'josh-ship-review-brief-'
-const FINDINGS_PREFIX = 'josh-ship-review-findings-'
-const LOG_PREFIX = 'josh-ship-review-log-'
 const CACHE_DIRECTORY = ['node_modules', '.cache']
 const POLL_MS = 100
 // The heartbeat is kept for a ship branched before the server record, and read only where a
@@ -39,25 +32,21 @@ const POLL_MS = 100
 const LEGACY_HEARTBEAT_MS = 500
 const LEGACY_HEARTBEAT_LIMIT_MS = 3000
 const MINUTE_MS = 60_000
-const REQUEST_LIMIT_MINUTES = 30
-const REQUEST_LIMIT_MS = REQUEST_LIMIT_MINUTES * MINUTE_MS
-const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
-const stop_schema = z
-	.object({
-		stage: z.enum(run_ship_stage.STAGE),
-		title: z.string(),
-		flags: z.array(z.string()).readonly(),
-		is_review: z.boolean(),
-		conflicts: z.array(z.string()).readonly().default([]),
-	})
-	.strict()
-const action_schema = z.discriminatedUnion('kind', [
-	z.object({ kind: z.literal('review'), round: z.enum(['1', '2']) }).strict(),
-	z.object({ kind: z.literal('relaunch'), stop: stop_schema }).strict(),
-])
+// **A relaunch is answered once the session has started, a review once it has finished**: waiting out a
+// review's limit on a relaunch left the stopped lane idle for half an hour (joshuafolkken/kit#4344).
+const REQUEST_LIMIT_MINUTES: Readonly<Record<BrokerAction['kind'], number>> = {
+	review: 30,
+	relaunch: 2,
+}
 const request_schema = z
-	.object({ session: z.uuid(), nonce: z.uuid(), action: action_schema })
+	.object({ session: z.uuid(), nonce: z.uuid(), action: lane_session_action.action_schema })
 	.strict()
+// **A request this broker cannot read is still answered**: the supervisor keeps the code it started
+// with while a lane's ship runs a newer main, so a field the ship added made the request unreadable and
+// the ship waited out the whole limit on a server that had dropped it (joshuafolkken/kit#4230).
+const envelope_schema = z.looseObject({ session: z.uuid(), nonce: z.uuid() })
+const UNREADABLE_REASON =
+	"the broker could not read the request — the supervisor runs older code than the lane's ship"
 const response_schema = z
 	.object({
 		session: z.uuid(),
@@ -66,18 +55,13 @@ const response_schema = z
 		heartbeat_at: z.number().int().positive(),
 	})
 	.strict()
-type BrokerRequest = z.infer<typeof request_schema>
+// **A failure's reason sits beside the response, never in it**: a ship branched before the reason parses
+// the response strictly, so a new field would read as no server (joshuafolkken/kit#3974).
+const reason_schema = z.object({ nonce: z.string(), reason: z.string() }).strict()
+type BrokerEnvelope = z.infer<typeof envelope_schema>
 type BrokerResponse = z.infer<typeof response_schema>
-type ReviewRound = Extract<z.infer<typeof action_schema>, { kind: 'review' }>['round']
-type BrokerAction = { kind: 'review'; round: ReviewRound } | { kind: 'relaunch'; stop: ShipStop }
 
-function review_paths(directory: string): { brief: string; findings: string; log: string } {
-	return {
-		brief: stamp_file.stamp_path(BRIEF_PREFIX, directory, '.md'),
-		findings: stamp_file.stamp_path(FINDINGS_PREFIX, directory, '.txt'),
-		log: stamp_file.stamp_path(LOG_PREFIX, directory, '.log'),
-	}
-}
+const { failure } = lane_session_action
 
 function request_path(directory: string, issue: string): string {
 	return path.join(directory, ...CACHE_DIRECTORY, `${REQUEST_PREFIX}${issue}.json`)
@@ -90,6 +74,10 @@ function response_path(directory: string, issue: string): string | undefined {
 	return path.join(path.dirname(common), ...CACHE_DIRECTORY, `${RESPONSE_PREFIX}${issue}.json`)
 }
 
+function reason_path(response: string): string {
+	return `${response}.reason`
+}
+
 function read_record<T>(target: string, schema: z.ZodType<T>): T | undefined {
 	try {
 		return json_value.parse_with(readFileSync(target, 'utf8'), schema)
@@ -98,102 +86,30 @@ function read_record<T>(target: string, schema: z.ZodType<T>): T | undefined {
 	}
 }
 
-// The reviewer runs on the lane's own provider, so a Claude lane's server never starts a Codex reviewer
-// and an OpenAI lane's never starts a Claude one.
-function provider_of(lane: LaneInfo): AgentProvider {
-	return lane.profile?.provider ?? ANTHROPIC_PROVIDER
+function write_record(target: string, body: BrokerResponse | z.infer<typeof reason_schema>): void {
+	atomic_write.replace_file(target, JSON.stringify(body))
 }
 
-// **The reviewer carries the lane's mark explicitly**: the supervisor serving a Claude lane is no lane child,
-// so a reviewer inheriting its environment would descend from the carry record's owner unmarked and be
-// read as the `backlogrun` parent by every hook. **Its prompt ends with the review invocation**, so the
-// lane's liveness read and the park's reap find it as they find the child (joshuafolkken/kit#3878).
+async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
+	const parsed = request_schema.safeParse(received)
 
-function review_prompt(lane: LaneInfo, round: ReviewRound): string {
-	const target = review_paths(lane.directory)
-	const prompt_of =
-		round === '1' ? run_ship_review.reviewer_prompt : run_ship_review.verification_prompt
-	const tail = lane_child_invocation.review_invocation(lane.issue)
-
-	return `${prompt_of(target.brief, target.findings, lane.issue)} This is ${tail}`
-}
-
-async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<boolean> {
-	const target = review_paths(lane.directory)
-	const built = agent_argv.resolve_in(
-		review_prompt(lane, round),
-		agent_role_profile.REVIEWER,
-		lane.directory,
-	)
-	if (built.kind === 'rejected' || built.profile.provider !== provider_of(lane)) return false
-
-	const result = await detached_launch.launch_attached(
-		{
-			argv: built.argv,
-			cwd: lane.directory,
-			log_path: target.log,
-			profile: built.profile,
-			env: lane_child_marker.env_for(lane.issue),
-		},
-		console.error,
-	)
-
-	return result.kind === 'completed' && result.exit_code === 0
-}
-
-// An OpenAI lane's successor is its supervisor's to start, never a relaunch's.
-function relaunch(lane: LaneInfo, stop: ShipStop): boolean {
-	if (lane_relaunch.is_openai_lane(lane)) return false
-
-	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
-	const phase = agent_role_profile.IMPLEMENTATION_PHASE
-	const result = lane_relaunch.relaunch(lane, invocation, phase, console.error)
-
-	return result.kind === 'launched'
-}
-
-// **A parked issue gets no session**: a request can be read long after it was written, so the park is
-// read when the action runs, never when it was asked for (joshuafolkken/kit#3878).
-async function perform(lane: LaneInfo, action: BrokerAction): Promise<boolean> {
-	if (await lane_parked.is_parked(lane.issue)) return false
-
-	if (action.kind === 'relaunch') return relaunch(lane, action.stop)
-
-	return await launch_review(lane, action.round)
-}
-
-function write_response(target: string, body: BrokerResponse): void {
-	const temporary = `${target}.${String(process.pid)}.tmp`
-
-	writeFileSync(temporary, JSON.stringify(body))
-	renameSync(temporary, target)
-}
-
-async function launched(lane: LaneInfo, action: BrokerAction): Promise<boolean> {
-	try {
-		return await perform(lane, action)
-	} catch (error) {
-		error_text.trace_swallowed('lane_session_broker.launched', error)
-
-		return false
-	}
+	return parsed.success
+		? await lane_session_action.answer(lane, parsed.data.action)
+		: failure(UNREADABLE_REASON)
 }
 
 async function process_request(
 	lane: LaneInfo,
 	response: string,
-	received: BrokerRequest,
+	received: BrokerEnvelope,
 	state: { current: BrokerResponse },
 ): Promise<void> {
-	const is_success = await launched(lane, received.action)
+	const answer = await answer_request(lane, received)
+	const { session, nonce } = received
 
-	state.current = {
-		session: received.session,
-		nonce: received.nonce,
-		is_success,
-		heartbeat_at: Date.now(),
-	}
-	write_response(response, state.current)
+	if (!answer.is_success) write_record(reason_path(response), { nonce, reason: answer.reason })
+	state.current = { session, nonce, is_success: answer.is_success, heartbeat_at: Date.now() }
+	write_record(response, state.current)
 }
 
 async function serve(
@@ -206,7 +122,7 @@ async function serve(
 	const target = request_path(lane.directory, lane.issue)
 
 	while (state.is_running) {
-		const received = read_record(target, request_schema)
+		const received = read_record(target, envelope_schema)
 
 		if (received?.session === session && received.nonce !== last_nonce) {
 			last_nonce = received.nonce
@@ -236,7 +152,7 @@ function prepare(lane: LaneInfo): { response: string; current: BrokerResponse } 
 		heartbeat_at: Date.now(),
 	}
 
-	write_response(response, current)
+	write_record(response, current)
 
 	return { response, current }
 }
@@ -244,7 +160,7 @@ function prepare(lane: LaneInfo): { response: string; current: BrokerResponse } 
 function start_heartbeat(state: { current: BrokerResponse }, response: string): NodeJS.Timeout {
 	const heartbeat = setInterval(() => {
 		state.current = { ...state.current, heartbeat_at: Date.now() }
-		write_response(response, state.current)
+		write_record(response, state.current)
 	}, LEGACY_HEARTBEAT_MS)
 
 	heartbeat.unref()
@@ -264,6 +180,7 @@ async function stop_server(
 	await serving
 	clearInterval(heartbeat)
 	unlinkSync(response)
+	rmSync(reason_path(response), { force: true })
 	lane_broker_server.remove(response)
 }
 
@@ -306,31 +223,49 @@ function session_response(target: string, session: string): BrokerResponse | und
 	return response?.session === session ? response : undefined
 }
 
+// A failure from a server that predates the reason leaves none.
+function answer_of(target: string, response: BrokerResponse): BrokerAnswer {
+	if (response.is_success) return lane_session_action.SUCCESS
+
+	const record = read_record(reason_path(target), reason_schema)
+	const reason = record?.nonce === response.nonce ? record.reason : 'it gave no reason'
+
+	return failure(`the broker answered a failure: ${reason}`)
+}
+
+// The server's answer to this request, or `undefined` while it is still being served.
 function response_verdict(
 	target: string,
 	session: string,
 	nonce: string,
-): 'wait' | 'success' | 'failure' {
+): BrokerAnswer | undefined {
 	const response = session_response(target, session)
 
-	if (!is_live_response(target, response, lane_broker_server.is_running)) return 'failure'
-	if (response.nonce !== nonce) return 'wait'
+	if (!is_live_response(target, response, lane_broker_server.is_running)) {
+		return failure('the broker stopped serving before it answered')
+	}
 
-	return response.is_success ? 'success' : 'failure'
+	return response.nonce === nonce ? answer_of(target, response) : undefined
 }
 
-async function wait_response(target: string, session: string, nonce: string): Promise<boolean> {
-	const deadline = Date.now() + REQUEST_LIMIT_MS
+async function wait_response(
+	target: string,
+	session: string,
+	nonce: string,
+	kind: BrokerAction['kind'],
+): Promise<BrokerAnswer> {
+	const limit_minutes = REQUEST_LIMIT_MINUTES[kind]
+	const deadline = Date.now() + limit_minutes * MINUTE_MS
 
 	while (Date.now() < deadline) {
 		const verdict = response_verdict(target, session, nonce)
-		if (verdict !== 'wait') return verdict === 'success'
+		if (verdict !== undefined) return verdict
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(POLL_MS)
 	}
 
-	return false
+	return failure(`the broker gave no answer within ${String(limit_minutes)} minutes`)
 }
 
 function live_response(target: string): BrokerResponse | undefined {
@@ -341,12 +276,18 @@ function live_response(target: string): BrokerResponse | undefined {
 		: undefined
 }
 
+// The session of the server answering for this lane now, or `undefined` while none does. A new session
+// means the server that held the lane before has ended.
+function serving_session(directory: string, issue: string): string | undefined {
+	const target = response_path(directory, issue)
+
+	return target === undefined ? undefined : live_response(target)?.session
+}
+
 // Whether a server answers for this lane now — what a Claude lane's ship asks before it hands a session
 // over rather than starting the session itself.
 function is_serving(directory: string, issue: string): boolean {
-	const target = response_path(directory, issue)
-
-	return target !== undefined && live_response(target) !== undefined
+	return serving_session(directory, issue) !== undefined
 }
 
 // **A request nobody waits for any more is taken back**: a server busy with an earlier request reads the
@@ -356,22 +297,44 @@ function withdraw(pending: string, nonce: string): void {
 	if (read_record(pending, request_schema)?.nonce === nonce) stamp_file.remove_stamp(pending)
 }
 
-async function request(directory: string, issue: string, action: BrokerAction): Promise<boolean> {
+// A failure is put on the run's stream as well as the ship's output, so a broker that cannot serve the
+// lane is seen from `run:board` rather than only from the ship log (joshuafolkken/kit#4230).
+async function record_failure(issue: string, answer: BrokerAnswer): Promise<void> {
+	if (answer.is_success) return
+
+	const text = `${issue_cite.plain(issue)} lane broker: ${answer.reason}`
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.NOTE, text)
+}
+
+async function send(directory: string, issue: string, action: BrokerAction): Promise<BrokerAnswer> {
 	const target = response_path(directory, issue)
 	const response = target === undefined ? undefined : live_response(target)
 
-	if (target === undefined || response === undefined) return false
+	if (target === undefined || response === undefined) return failure('no broker serves this lane')
 
 	const nonce = randomUUID()
 	const body = { session: response.session, nonce, action }
 	const pending = request_path(directory, issue)
 
 	stamp_file.replace_stamp(pending, body)
-	const is_success = await wait_response(target, response.session, nonce)
+	const answer = await wait_response(target, response.session, nonce, action.kind)
 
 	withdraw(pending, nonce)
 
-	return is_success
+	return answer
+}
+
+async function request(
+	directory: string,
+	issue: string,
+	action: BrokerAction,
+): Promise<BrokerAnswer> {
+	const answer = await send(directory, issue, action)
+
+	await record_failure(issue, answer)
+
+	return answer
 }
 
 const lane_session_broker = {
@@ -379,9 +342,11 @@ const lane_session_broker = {
 	request,
 	request_path,
 	response_path,
-	review_paths,
+	review_paths: lane_session_action.review_paths,
+	serving_session,
 	with_server,
 }
 
-export type { BrokerAction, ReviewRound }
 export { lane_session_broker }
+
+export { type ReviewRound, type BrokerAction, type BrokerAnswer } from './lane-session-action'

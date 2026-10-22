@@ -1,0 +1,7 @@
+{
+	"reason": "#4084 adds the memory hold to backlog:drive (gauge, hysteresis, kept swap rate, loop re-offer) and its run:board reason with a capped open hold",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 169
+	}
+}

@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { import_closure, SCRIPTS_DIR } from '#scripts/build/import-closure-fixture'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_MAP } from './josh-command-map'
-import { read_script } from './josh-script-reader'
 
 // The argument synopsis is the half of the reference metadata nothing else can check. A description
 // is prose nobody can contradict, but a synopsis is a claim about a parser, and the parser is in the
@@ -36,6 +38,8 @@ const ESCAPED_NEWLINE = String.raw`\n`
 const STRING_QUOTES: ReadonlySet<string> = new Set(["'", '"', '`'])
 // One usage line can name a sibling command (`run:hold`'s names `run:release`); only this one's count.
 const USAGE_ALTERNATIVE = ' | josh '
+const PACKAGE_DIR = path.join(SCRIPTS_DIR, '..')
+const MAIN_ENTRY_SUFFIX = '-main.ts'
 
 // A flag reaches its script under one of two spellings: written out in a usage string or compared
 // literally, or as a bare `parseArgs` option key, which carries no dashes. Both count — checking
@@ -50,6 +54,19 @@ function mentions_flag(source: string, flag: string): boolean {
 // before what is left is read for positionals. Without this, `--task-type <type>` reads as one.
 function positional_part(synopsis: string): string {
 	return synopsis.replaceAll(FLAG_VALUE_PATTERN, '')
+}
+
+// A command's parser is its script, or for a `*-main.ts` entry the modules it imports directly: that
+// entry is split out of a module other modules import (joshuafolkken/kit#4186) and is only a main
+// guard calling that module's `run`, so reading it alone would check its synopsis against nothing.
+// Any other script is read alone: a flag a library it imports mentions would otherwise stand in for
+// one the script never parses — `run:prep` advertising `--repo` would pass on `issue-state-cli.ts`.
+function command_source(script: string): string {
+	const entry = path.join(PACKAGE_DIR, script)
+	const imports = script.endsWith(MAIN_ENTRY_SUFFIX) ? import_closure.imports_of(entry) : []
+	const sources = [entry, ...imports]
+
+	return sources.map((file) => readFileSync(file, 'utf8')).join('\n')
 }
 
 function script_commands(): ReadonlyArray<readonly [string, string, string]> {
@@ -92,7 +109,7 @@ function does_read_positional(source: string): boolean {
 describe('command reference — the synopsis matches the script it describes', () => {
 	it('never advertises a flag the script does not mention', () => {
 		for (const [name, script, synopsis] of script_commands()) {
-			const source = read_script(script)
+			const source = command_source(script)
 
 			for (const flag of flags_of(synopsis)) {
 				const is_mentioned = mentions_flag(source, flag)
@@ -107,7 +124,7 @@ describe('command reference — the synopsis matches the script it describes', (
 			if (synopsis.includes(ABBREVIATED_SYNOPSIS)) return []
 
 			const listed = new Set(flags_of(synopsis))
-			const flags = usage_flags(read_script(script), name)
+			const flags = usage_flags(command_source(script), name)
 			const missing = flags.filter((flag) => !listed.has(flag) && !UNIVERSAL_FLAGS.has(flag))
 
 			if (missing.length === 0) return []
@@ -123,7 +140,7 @@ describe('command reference — the synopsis matches the script it describes', (
 		for (const [name, script, synopsis] of script_commands()) {
 			if (!POSITIONAL_PATTERN.test(positional_part(synopsis))) continue
 
-			const is_read = does_read_positional(read_script(script))
+			const is_read = does_read_positional(command_source(script))
 
 			expect(is_read, `${name} advertises a positional ${script} discards`).toBe(true)
 		}

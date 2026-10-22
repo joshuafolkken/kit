@@ -7,6 +7,8 @@ import {
 	HOOK_PROCESS_TIMEOUT_MS,
 	INSTALL_TIMEOUT_MS,
 	LINT_TIMEOUT_MS,
+	MS_PER_MINUTE,
+	MS_PER_SECOND,
 	PROBE_TIMEOUT_MS,
 	SUITE_TIMEOUT_MS,
 } from './timeouts'
@@ -28,6 +30,10 @@ const EXPECTED_LIMITS: ReadonlyArray<readonly [string, number, number]> = [
 describe('timeouts', () => {
 	it.each(EXPECTED_LIMITS)('keeps %s at the value its callers had', (_name, actual, expected) => {
 		expect(actual).toBe(expected)
+	})
+
+	it('keeps the unit conversions at a second and a minute in milliseconds', () => {
+		expect([MS_PER_SECOND, MS_PER_MINUTE]).toStrictEqual([1000, 60_000])
 	})
 
 	it('keeps an install well under a suite, since a person waits on the install', () => {

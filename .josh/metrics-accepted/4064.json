@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #4064 adds a lane ledger kind, reason codes on the round-2 decision and a new lane:stats table module; the growth is the feature itself",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 107
+	}
+}

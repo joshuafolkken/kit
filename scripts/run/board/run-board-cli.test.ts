@@ -13,6 +13,7 @@ const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ backlogrun'
+const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
 // A link as a terminal that opens one draws it, so a chat frame is seen to strip it.
@@ -51,7 +52,7 @@ describe('run_board_cli.run', () => {
 		await run_board_cli.run(['--once'], { ...ports, is_tty: true })
 
 		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
-		expect(frames[0]).toContain('  🔍 1    a')
+		expect(frames[0]).toContain(LANE_ROW)
 	})
 })
 
@@ -67,7 +68,7 @@ describe('run_board_cli.run --chat', () => {
 
 		expect(frames).toHaveLength(1)
 		expect(frames[0]).not.toContain(ESCAPE)
-		expect(frames[0]).toContain('  🔍 1    a')
+		expect(frames[0]).toContain(LANE_ROW)
 		expect(marks).toStrictEqual([clock.now_ms])
 	})
 
@@ -231,7 +232,7 @@ describe('run_board_cli.run terminal size', () => {
 
 		await run_board_cli.run(['--once'], { ...ports, size: () => ({ rows: 2, columns: 80 }) })
 
-		expect(frames[0]).toContain('  🔍 1    a')
+		expect(frames[0]).toContain(LANE_ROW)
 		expect(frames[0]).not.toContain('more ')
 	})
 
@@ -244,7 +245,7 @@ describe('run_board_cli.run terminal size', () => {
 
 			await run_board_cli.run([flag], ports)
 
-			expect(frames[0]).toContain('  🔍 1    a')
+			expect(frames[0]).toContain(LANE_ROW)
 			expect(frames[0]).toContain('seen')
 			expect(frames[0]).not.toMatch(JAPANESE)
 			vi.unstubAllEnvs()

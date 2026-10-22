@@ -1,0 +1,9 @@
+{
+	"reason": "Round-2 fix: parent-line signals read only the reference written directly after the marker (#3956)",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 57,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 443
+	}
+}

@@ -1,4 +1,4 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { delegation_policy } from './delegation-policy'
 import { investigation_reads } from './investigation-reads'
@@ -243,7 +243,7 @@ describe('investigation_reads — the run’s own instructions are not the subje
 	// repository an instruction document for a checkout sitting under a directory called `prompts`.
 	it.each([
 		'docs/josh-commands.md',
-		'scripts/eval/prompts/x.ts',
+		'tools/eval/prompts/x.ts',
 		'MY_CLAUDE.md',
 		'/Users/someone/prompts/kit/scripts/one.ts',
 	])('still counts %s, which is subject material', (target) => {
@@ -437,7 +437,8 @@ describe('investigation_reads.should_block — and its second firing', () => {
 
 	it('names the count, the command and the return shape in the reason', () => {
 		expect(investigation_reads.REASON).toContain(String(THRESHOLD))
-		expect(investigation_reads.REASON).toContain('pnpm josh delegate investigation')
+		expect(investigation_reads.REASON).toContain('Dispatch the `investigator` agent')
+		expect(investigation_reads.REASON).not.toContain('pnpm josh delegate investigation')
 		expect(investigation_reads.REASON).toContain('never the file text')
 	})
 })

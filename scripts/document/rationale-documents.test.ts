@@ -1,15 +1,16 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { agent_read_documents, linked_paths } from './ai-document-fixture'
 import { document_scan } from './document-scan'
 import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
 
-// joshuafolkken/kit#2762. The rationale behind a workflow procedure document lives beside it under
-// `docs/maintainers/`, off every run's read path. These pins keep the move honest: each rationale
-// document is cited by the procedure it explains, every section in it is reachable from there, and
-// no entry's read set ever counts one — so the reasons are one hop away rather than lost, and the
-// tokens a run no longer reads stay unread.
+// joshuafolkken/kit#2762, joshuafolkken/kit#3928. The rationale behind a workflow procedure document
+// lives beside it under `docs/maintainers/`, off every run's read path. The reference runs one way
+// only, rationale to procedure: each rationale document names the procedure it explains, no document
+// an agent reads cites a rationale document, and no entry's read set ever counts one — so a pointer
+// never invites a run to spend tokens on history.
 
 const ROOT = process.cwd()
 const RATIONALE_DIRECTORY = path.join('docs', 'maintainers')
@@ -19,6 +20,7 @@ const SKILL_ROOT = path.join('.claude', 'skills')
 const SKILL_FILE = 'SKILL.md'
 const TOPIC_DIRECTORY = path.join('prompts', 'collaboration-workflow')
 const DOCS_DIRECTORY = 'docs'
+const RATIONALE_POINTER = /docs\/maintainers\/[\w.-]+\.md/gu
 
 function rationale_files(): Array<string> {
 	return readdirSync(path.join(ROOT, RATIONALE_DIRECTORY))
@@ -57,21 +59,23 @@ function section_titles(markdown: string): Array<string> {
 		.map((heading) => document_scan.normalize_reference(heading.title))
 }
 
-function cited_headings(procedure_text: string, rationale: string): Array<string> {
-	return document_scan
-		.section_references(procedure_text)
-		.filter((reference) => reference.file === rationale)
-		.map((reference) => document_scan.normalize_reference(reference.heading))
+// Named as a path in the text, or as a markdown link resolved against the rationale's directory.
+function names_procedure(rationale: string): boolean {
+	const procedure = procedure_of(rationale)
+
+	return read(rationale).includes(procedure) || linked_paths(rationale).includes(procedure)
 }
 
-function uncited_sections(
-	rationale: string,
-	procedure_text: string,
-	markdown: string,
-): Array<string> {
-	const cited = cited_headings(procedure_text, rationale)
+// A concrete rationale path only: the `<topic>` placeholder and the bare directory name a convention
+// and point nowhere.
+function rationale_pointers(markdown: string): Array<string> {
+	return markdown.match(RATIONALE_POINTER) ?? []
+}
 
-	return section_titles(markdown).filter((title) => !cited.includes(title))
+// The command references under `docs/` still carry their pointers; they are agent-read but outside
+// joshuafolkken/kit#3928, so the prompts, the skills and the rule document are what this pins.
+function pointer_free_documents(): Array<string> {
+	return agent_read_documents().filter((file) => !file.startsWith(`${DOCS_DIRECTORY}/`))
 }
 
 function files_read_by(entry: string): Array<string> {
@@ -91,10 +95,12 @@ describe('workflow rationale documents sit off the read path', () => {
 		expect(section_titles(read(rationale)).length).toBeGreaterThan(0)
 	})
 
-	it.each(RATIONALE_FILES)('%s — every section is cited by its procedure', (rationale) => {
-		const procedure_text = read(procedure_of(rationale))
+	it.each(RATIONALE_FILES)('%s — names the procedure it explains', (rationale) => {
+		expect(names_procedure(rationale), procedure_of(rationale)).toBe(true)
+	})
 
-		expect(uncited_sections(rationale, procedure_text, read(rationale))).toStrictEqual([])
+	it.each(pointer_free_documents())('%s — cites no rationale document', (document) => {
+		expect(rationale_pointers(read(document))).toStrictEqual([])
 	})
 
 	it.each(entry_read_set.entries(ROOT))('%s — reads no rationale document', (entry) => {
@@ -104,12 +110,16 @@ describe('workflow rationale documents sit off the read path', () => {
 		expect(read_files.filter((file) => rationale_names.has(file))).toStrictEqual([])
 	})
 
-	it('flags a rationale section its procedure never cites', () => {
-		const rationale = 'docs/maintainers/example-rationale.md'
-		const markdown = '# Example\n\n## Cited\n\n## Orphaned\n'
-		const procedure_text = `Rationale: \`${rationale}\` → "Cited".`
+	it('flags a pointer to a rationale document', () => {
+		const markdown = 'Rationale: `docs/maintainers/example-rationale.md` → "Why".'
 
-		expect(uncited_sections(rationale, procedure_text, markdown)).toStrictEqual(['Orphaned'])
+		expect(rationale_pointers(markdown)).toStrictEqual(['docs/maintainers/example-rationale.md'])
+	})
+
+	it('ignores the topic placeholder and the bare directory', () => {
+		const markdown = 'Put it in `docs/maintainers/<topic>-rationale.md` under `docs/maintainers/`.'
+
+		expect(rationale_pointers(markdown)).toStrictEqual([])
 	})
 })
 

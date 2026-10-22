@@ -2,9 +2,15 @@
 import { existsSync, globSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { environment_flags } from '@joshuafolkken/kit/env'
+import { core_budget } from '#scripts/gate/core-budget'
+import { gate_tree } from '#scripts/gate/gate-tree'
 import { execa } from 'execa'
+import { test_e2e_stamp } from './test-e2e-stamp'
 
 const PNPM = 'pnpm'
+// `--workers`, `--workers=<n>` and Playwright's `-j` short form.
+const WORKER_FLAGS = /^(?:--workers(?:=|$)|-j)/u
 const FAIL_EXIT_CODE = 1
 const ARGV_START = 2
 const PLAYWRIGHT_PACKAGE = path.join('node_modules', '@playwright', 'test')
@@ -45,13 +51,34 @@ function has_e2e_tests(project_directory: string): boolean {
 	return matches.length > 0
 }
 
+// **A local run's worker count is the weight it reserved** (joshuafolkken/kit#3944). Playwright's own
+// default is half the cores, which no ledger entry stood for; CI keeps its config's count, and a
+// count the caller names wins.
+function playwright_arguments(extra_arguments: ReadonlyArray<string>): ReadonlyArray<string> {
+	const is_count_named = extra_arguments.some((argument) => WORKER_FLAGS.test(argument))
+
+	if (is_count_named || environment_flags.is_ci_enabled(process.env['CI'])) return extra_arguments
+
+	return [`--workers=${String(core_budget.CORE_WEIGHTS.e2e)}`, ...extra_arguments]
+}
+
 async function run_playwright(extra_arguments: ReadonlyArray<string>): Promise<number> {
-	const result = await execa(PNPM, ['exec', 'playwright', 'test', ...extra_arguments], {
-		stdio: 'inherit',
-		reject: false,
-	})
+	const result = await execa(
+		PNPM,
+		['exec', 'playwright', 'test', ...playwright_arguments(extra_arguments)],
+		{ stdio: 'inherit', reject: false },
+	)
 
 	return result.exitCode ?? FAIL_EXIT_CODE
+}
+
+// Only a run reserves: a skip starts nothing, and a claim there could wait out a full ledger for it.
+async function run_reserved_playwright(extra_arguments: ReadonlyArray<string>): Promise<number> {
+	return await core_budget.with_command_reservation(
+		core_budget.CORE_WEIGHTS.e2e,
+		async () => await run_playwright(extra_arguments),
+		{ command: 'test:e2e' },
+	)
 }
 
 async function run_guarded_e2e(
@@ -61,16 +88,37 @@ async function run_guarded_e2e(
 	const is_installed = is_playwright_installed(project_directory)
 	const has_tests = has_e2e_tests(project_directory)
 	const action = resolve_guard_action(is_installed, has_tests)
-	if (action === 'run') return await run_playwright(extra_arguments)
+	if (action === 'run') return await run_reserved_playwright(extra_arguments)
 
 	console.info(`josh test:e2e: ${SKIP_REASONS[action]} — skipping Playwright e2e.`)
 
 	return 0
 }
 
+// A filter (`--grep`, a file, `--project`) answers for part of the suite, so only a run whose every
+// argument is a worker count answers for the whole of it.
+function is_whole_suite(extra_arguments: ReadonlyArray<string>): boolean {
+	return extra_arguments.every((argument) => WORKER_FLAGS.test(argument))
+}
+
+// A green answer — a pass or a printed skip — is recorded against the tree it ran on, which is what a
+// stop before commit asks (`test-e2e-stamp.ts`). The tree is read before the run, so an edit made while
+// the suite ran leaves a record that matches nothing.
+async function run_and_record(
+	project_directory: string,
+	extra_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	const tree = await gate_tree.read_gate_tree()
+	const exit_code = await run_guarded_e2e(project_directory, extra_arguments)
+
+	if (exit_code === 0 && is_whole_suite(extra_arguments)) test_e2e_stamp.record(tree)
+
+	return exit_code
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const extra_arguments = process.argv.slice(ARGV_START)
-	const exit_code = await run_guarded_e2e(process.cwd(), extra_arguments)
+	const exit_code = await run_and_record(process.cwd(), extra_arguments)
 
 	process.exit(exit_code)
 }
@@ -79,6 +127,7 @@ const test_e2e_guard = {
 	resolve_guard_action,
 	is_playwright_installed,
 	has_e2e_tests,
+	is_whole_suite,
 	run_guarded_e2e,
 }
 

@@ -1,0 +1,7 @@
+{
+	"reason": "Borrowed-node_modules guard in eslint_daemon.resolve_daemon_cli keeps harness fixtures off a lane's eslint_d daemon (#4386)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

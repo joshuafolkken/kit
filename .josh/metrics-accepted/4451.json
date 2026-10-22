@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 fix: the wait cap no longer releases a lone claim a swap stall holds (is_swap_held), and the wait timing moved to core-budget-timing.ts with its colocated test to keep core-budget.ts under the file-length cap",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 128
+	}
+}

@@ -1,9 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { backlog_ready } from '#scripts/backlog/backlog-ready'
+import { backlog_ready, type LaneUse } from '#scripts/backlog/backlog-ready'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity, type LimitChoice } from './lane-capacity'
 import { lane_limit_override } from './lane-limit-override'
+import { lane_state } from './lane-state'
 
 // `josh lane:limit [<limit>] [--reset]` — change a live `backlogrun`'s lane limit without stopping it.
 // A running parent keeps the environment it started with, so `JOSH_LANE_LIMIT`
@@ -37,13 +39,13 @@ interface LimitPorts {
 	read_override: () => Promise<number | undefined>
 	write_override: (limit: number | undefined) => Promise<boolean>
 	emit_raise: (text: string) => Promise<void>
-	live_lane_count: () => Promise<number>
+	lane_use: () => Promise<LaneUse>
 }
 
 interface LimitStatus {
 	limit: number
 	override: number | undefined
-	in_use: number
+	use: LaneUse
 }
 
 const SHOW: LimitRequest = { kind: 'show' }
@@ -55,7 +57,7 @@ const DEFAULT_PORTS: LimitPorts = {
 	read_override: lane_limit_override.read_override,
 	write_override: lane_limit_override.write_override,
 	emit_raise: lane_limit_override.emit_raise,
-	live_lane_count: backlog_ready.live_lane_count,
+	lane_use: backlog_ready.lane_use,
 }
 
 function refuse(message: string): number {
@@ -96,11 +98,21 @@ function limit_text(limit: number): string {
 		: `${String(seated)} (${String(limit)} capped at the seats)`
 }
 
+// The lanes with no state record, counted in use since their state is unknown.
+function unknown_text(unknown: ReadonlyArray<string>): string {
+	if (unknown.length === 0) return ''
+
+	const issues = unknown.map((issue) => session_cite.issue(issue)).join(' ')
+
+	return ` · ${issues}: ${lane_state.NO_STATE_HINT}`
+}
+
 function status_line(status: LimitStatus): string {
 	const source = status.override === undefined ? lane_capacity.LANE_LIMIT_KEY : OVERRIDE_SOURCE
-	const free = lane_capacity.free_lanes(status.limit, status.in_use)
+	const { occupied, seated } = status.use
+	const free = lane_capacity.free_lanes(status.limit, occupied, seated)
 
-	return `lane limit ${limit_text(status.limit)} (${source}) · in use ${String(status.in_use)} · free ${String(free)}`
+	return `lane limit ${limit_text(status.limit)} (${source}) · in use ${String(occupied)} · free ${String(free)}${unknown_text(status.use.unknown)}`
 }
 
 async function show(ports: LimitPorts): Promise<number> {
@@ -110,9 +122,7 @@ async function show(ports: LimitPorts): Promise<number> {
 
 	const override = await ports.read_override()
 
-	console.info(
-		status_line({ limit: choice.limit, override, in_use: await ports.live_lane_count() }),
-	)
+	console.info(status_line({ limit: choice.limit, override, use: await ports.lane_use() }))
 
 	return SUCCESS_EXIT_CODE
 }

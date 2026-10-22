@@ -1,23 +1,24 @@
-#!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
 import { styleText } from 'node:util'
-import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
+import { run_board_fold } from './run-board-fold'
+import { run_board_gather } from './run-board-gather'
+import { run_board_gather_live } from './run-board-gather-live'
+import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan } from './run-board-plan'
-import { run_board_read } from './run-board-read'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_thanks_read } from './run-board-thanks-read'
 import { run_board_tick } from './run-board-tick'
-import { run_board_usage_read } from './run-board-usage-read'
 
 // `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
 // spinners turned between redraws, for a person to keep open beside the run. What one redraw reads,
@@ -25,7 +26,6 @@ import { run_board_usage_read } from './run-board-usage-read'
 // terminal around it. A run that ended stays on screen until the next one starts; with no run in this
 // checkout it reads nothing from GitHub and waits.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ONCE_FLAG = '--once'
@@ -47,11 +47,8 @@ function on_exit(leave: () => void): void {
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
 }
 
-const LIVE_PORTS: BoardPorts = {
+const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	read_plan: async (scope) => await run_board_plan.read_plan(scope),
-	read_local: run_board_read.read_local,
-	read_machine: machine_capacity.read_sample,
-	read_usage: run_board_usage_read.usage_reader(),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
 	now: () => Date.now(),
@@ -62,6 +59,20 @@ const LIVE_PORTS: BoardPorts = {
 	// Read on every redraw, so a resized pane is fitted on the next one.
 	size: () => ({ rows: process.stdout.rows, columns: process.stdout.columns }),
 	form: 'screen',
+	keys: {
+		is_tty: process.stdin.isTTY,
+		raw: (is_raw) => {
+			process.stdin.setRawMode(is_raw)
+		},
+		listen: (on_data) => {
+			process.stdin.setEncoding('utf8').on('data', on_data).resume()
+		},
+		// Stops reading, so stdin no longer holds the process open.
+		close: () => {
+			process.stdin.pause()
+		},
+		interrupt: () => process.exit(SIGINT_EXIT_CODE),
+	},
 	mark: async () => {
 		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
 	},
@@ -74,14 +85,27 @@ const LIVE_PORTS: BoardPorts = {
 	},
 }
 
+// A live board reads on its worker thread, so no read stops its spinner; a single frame has no spinner
+// to stop, and reads where it draws.
+function live_ports(is_live: boolean): BoardPorts {
+	const gather = is_live
+		? run_board_gather_thread.worker_gatherer()
+		: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false))
+
+	return { ...LIVE_PORTS, gather }
+}
+
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
 // close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
 // so a frame that fills the pane never scrolls the header off the top.
+// The keys are named under it where a person can type them.
 function framed(ports: BoardPorts, screen: Screen): BoardPorts {
+	const keys = ports.folded === undefined ? [] : [run_board_fold.KEYS_LINE]
+
 	return {
 		...ports,
-		footer: ['', styleText('dim', WORDS.keeps_running)],
+		footer: ['', ...[WORDS.keeps_running, ...keys].map((line) => styleText('dim', line))],
 		write: (frame) => {
 			ports.write(`${screen.frame}${frame.replace(TRAILING_NEWLINE, '')}`)
 		},
@@ -89,13 +113,15 @@ function framed(ports: BoardPorts, screen: Screen): BoardPorts {
 }
 
 // Leaves the alternate screen once, whichever path gets there first: a second leave would restore the
-// cursor saved on entering and draw over whatever was printed after the first.
-function leaver(ports: BoardPorts, screen: Screen): () => void {
+// cursor saved on entering and draw over whatever was printed after the first. The terminal leaves raw
+// mode with it.
+function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void {
 	let has_left = false
 
 	return () => {
 		if (has_left) return
 		has_left = true
+		keys.stop?.()
 		ports.write(screen.leave)
 	}
 }
@@ -119,13 +145,14 @@ async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> 
 // lands on the normal screen rather than vanishing with the alternate one.
 async function watch(ports: BoardPorts): Promise<void> {
 	const screen = run_board_screen.screen_of('live')
-	const leave = leaver(ports, screen)
+	const keys = run_board_keys.read_keys(ports.keys)
+	const leave = leaver(ports, screen, keys)
 
 	ports.write(screen.enter)
 	ports.on_exit(leave)
 
 	try {
-		await redraw_forever(ports, screen)
+		await redraw_forever({ ...ports, folded: keys.folded }, screen)
 	} finally {
 		leave()
 	}
@@ -160,25 +187,35 @@ async function push_every(minutes: string | undefined, ports: BoardPorts): Promi
 		return SUCCESS_EXIT_CODE
 	}
 
-	await run_board_every.push_until_ended(ports, interval * run_progress.MS_PER_MINUTE)
+	await run_board_every.push_until_ended(ports, interval * MS_PER_MINUTE)
 
 	return SUCCESS_EXIT_CODE
 }
 
-async function draw(flag: string, ports: BoardPorts): Promise<void> {
+// The ports a test hands in, else the live ones.
+function ports_for(ports: BoardPorts | undefined, is_live: boolean): BoardPorts {
+	return ports ?? live_ports(is_live)
+}
+
+async function draw(flag: string, ports: BoardPorts | undefined): Promise<void> {
 	if (flag === CHAT_FLAG) {
-		await answer(ports)
+		await answer(ports_for(ports, false))
 
 		return
 	}
 
-	const mode = run_board_screen.mode_of({ is_tty: ports.is_tty, is_once: flag === ONCE_FLAG })
+	const { is_tty } = ports ?? LIVE_PORTS
+	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
+
+	if (mode === 'live') {
+		await watch(ports_for(ports, true))
+
+		return
+	}
 
 	// One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 	// spinner frame frozen mid-turn.
-	const once_ports = { ...ports, is_tty: false, size: undefined }
-
-	await (mode === 'live' ? watch(ports) : tick(FRESH_STATE, once_ports))
+	await tick(FRESH_STATE, { ...ports_for(ports, false), is_tty: false, size: undefined })
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -189,10 +226,10 @@ function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
 	return rest.length > 0 || !FLAGS.has(flag)
 }
 
-async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS): Promise<number> {
+async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
 	const [flag = '', ...rest] = argv
 
-	if (is_every(flag, rest)) return await push_every(rest[0], ports)
+	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
 	await draw(flag, ports)
@@ -201,9 +238,5 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts = LIVE_PORTS):
 }
 
 const run_board_cli = { DISABLED_NOTICE, USAGE, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
-}
 
 export { run_board_cli }

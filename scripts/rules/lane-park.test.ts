@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { run_park } from '#scripts/run/park/run-park'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_park } from './lane-park'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#2034: a dispatched lane child that stopped for a decision left no question on the
 // Issue, so this suite owns the two halves that decide whether the refusal fires — the command match
@@ -24,6 +24,7 @@ const CONFIRMATION_EQUALS = 'pnpm josh notify --task-type=confirmation --body-fi
 const PROGRESS_NOTIFY = 'pnpm josh notify --task-type progress --body-file /tmp/b.md'
 const APPLY_PARK = `gh api repos/o/r/issues/${ISSUE}/labels -f 'labels[]=needs-decision'`
 const APPLY_PARK_EDIT = `gh issue edit ${ISSUE} --add-label needs-decision`
+const RUN_PARK = `pnpm josh run:park ${ISSUE} --body-file /tmp/b.md`
 const NOW_MS = 1_700_000_000_000
 const SAYS_NOTHING = 'says nothing about %j'
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-park-'))
@@ -57,7 +58,7 @@ function payload_of(name: string, command: string, tool_name = BASH): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// Every test starts with no dispatch mark; the lane block sets it in its own beforeEach.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
@@ -166,21 +167,60 @@ describe('is_parking_child', () => {
 	})
 })
 
-describe('records_the_park', () => {
-	it.each([[APPLY_PARK], [APPLY_PARK_EDIT]])('reads %j as recording the park', (command) => {
-		expect(lane_park.records_the_park(command)).toBe(true)
+// joshuafolkken/kit#4132: the guard reads `run:park`'s local record, so a child that parked is silent.
+describe('is_unparked_child', () => {
+	beforeEach(() => {
+		process.env[lane_child_marker.KEY] = ISSUE
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+		vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(false)
 	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads a parking child with no park record as unparked', () => {
+		vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(false)
+
+		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(true)
+	})
+
+	it('reads a parking child whose park is recorded as parked', () => {
+		const parked = vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(true)
+
+		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
+		expect(parked).toHaveBeenCalledWith(ISSUE, WORK_DIRECTORY)
+	})
+
+	it('reads a session that is not a parking child as not unparked, without the record', () => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+		const parked = vi.spyOn(run_park, 'is_parked_sync')
+
+		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
+		expect(parked).not.toHaveBeenCalled()
+	})
+})
+
+describe('records_the_park', () => {
+	it.each([[APPLY_PARK], [APPLY_PARK_EDIT], [RUN_PARK], [`git status && ${RUN_PARK}`]])(
+		'reads %j as recording the park',
+		(command) => {
+			expect(lane_park.records_the_park(command)).toBe(true)
+		},
+	)
 
 	// A different label is not the park, and a comment alone records nothing the parent reads as parked.
 	it.each([
 		[`gh api repos/o/r/issues/${ISSUE}/labels -f 'labels[]=in-progress'`],
 		[`gh api repos/o/r/issues/${ISSUE}/comments --field body=@/tmp/b.md`],
+		// Taking the park off is not recording it.
+		[`pnpm josh run:park ${ISSUE} --clear`],
 	])(SAYS_NOTHING, (command) => {
 		expect(lane_park.records_the_park(command)).toBe(false)
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
 	beforeEach(() => {
@@ -197,7 +237,10 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 
 	it('delivers the rule on a confirmation stop that has not parked', () => {
-		const reason = rule_delivery(payload_of('lane-park-stop', CONFIRMATION_NOTIFY), NOW_MS)
+		const reason = delivered_rules.delivery(
+			payload_of('lane-park-stop', CONFIRMATION_NOTIFY),
+			NOW_MS,
+		)
 
 		expect(reason).toBe(delivered_rules.LANE_PARK_REASON)
 	})
@@ -207,12 +250,14 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('says nothing on the reissued stop', () => {
 		const payload = payload_of('lane-park-once', CONFIRMATION_NOTIFY)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_PARK_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_PARK_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBeUndefined()
 	})
 
 	it('says nothing about a progress notification, which is not a stop', () => {
-		expect(rule_delivery(payload_of('lane-park-progress', PROGRESS_NOTIFY), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('lane-park-progress', PROGRESS_NOTIFY), NOW_MS),
+		).toBeUndefined()
 	})
 
 	it('is claimed by exactly one rule in the enumeration', () => {
@@ -220,27 +265,27 @@ describe('rule_delivery — inside a lane checkout', () => {
 	})
 })
 
-describe('rule_delivery — outside a lane checkout', () => {
+describe('delivered_rules.delivery — outside a lane checkout', () => {
 	// **The ordinary case is silence.** A person's own `fullrun`, in the main checkout, sends the same
 	// confirmation Telegram when it stops and must never be refused for it.
 	it('says nothing about a confirmation stop in a checkout that is not a lane', () => {
 		expect(
-			rule_delivery(payload_of('lane-park-plain', CONFIRMATION_NOTIFY), NOW_MS),
+			delivered_rules.delivery(payload_of('lane-park-plain', CONFIRMATION_NOTIFY), NOW_MS),
 		).toBeUndefined()
 	})
 
 	it('says nothing about a write tool whose input looks like a stop', () => {
 		const payload = payload_of('lane-park-write', CONFIRMATION_NOTIFY, 'Edit')
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 
 describe('LANE_PARK_REASON', () => {
 	it.each([
-		// The park it asks for, and the commands that record it — the only thing that makes it actionable.
+		// The park it asks for, and the command that records it — the only thing that makes it actionable.
 		['needs-decision'],
-		["-f 'labels[]=needs-decision'"],
+		['pnpm josh run:park <N> --body-file <path>'],
 		// The other stops that already carry their label, so the child is not sent to add a second one.
 		['needs-human-review'],
 		['already-done'],

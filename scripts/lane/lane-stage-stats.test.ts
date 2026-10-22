@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -8,7 +9,6 @@ import { lane_stats } from './lane-stats'
 
 const NOW = Date.parse('2026-10-10T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
-const MS_PER_MINUTE = 60_000
 const ISSUE = 3643
 const OTHER_ISSUE = 3644
 const REVIEW_MINUTES = [2, 4, 9]
@@ -66,6 +66,14 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 
 		expect(row_of(entries, REVIEW)).toStrictEqual(['2.0', '2.0', '1'])
 		expect(row_of(entries, CI_WAIT)).toStrictEqual(['3.0', '3.0', '1'])
+	})
+
+	// joshuafolkken/kit#4382: the pre-detach checks are timed apart from the preflight.
+	it('keeps the pre-detach checks on a row of their own', () => {
+		const pre_detach = 'pre-detach'
+		const entries = [stage('preflight', 1, 2), stage(pre_detach, 3, 1)]
+
+		expect(row_of(entries, pre_detach)).toStrictEqual(['3.0', '3.0', '1'])
 	})
 
 	it('prints not measured, never zero, for a stage nothing recorded', () => {

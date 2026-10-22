@@ -1,0 +1,7 @@
+{
+	"reason": "Merging main's held-check fitted parameter (#4052) into the RowCut fitted signature adds four lines",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}

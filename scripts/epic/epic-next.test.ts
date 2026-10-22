@@ -1,5 +1,4 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -82,6 +81,13 @@ describe('epic_issue.parse_epic_reference', () => {
 	it('refuses a half-written qualification', () => {
 		expect(epic_issue.parse_epic_reference(REPO)).toBeUndefined()
 	})
+
+	it.each(['../..#858', 'owner/..#858', '-owner/repo#858'])(
+		'refuses a dot or dash segment that would walk the API path: %j',
+		(raw) => {
+			expect(epic_issue.parse_epic_reference(raw)).toBeUndefined()
+		},
+	)
 })
 
 describe('epic_next.parse_options — a qualified epic', () => {
@@ -350,14 +356,6 @@ describe('epic_next.is_order_declared', () => {
 
 	it('counts the sentence declaring the children independent', () => {
 		expect(epic_next.is_order_declared(UNORDERED_BODY, [])).toBe(true)
-	})
-})
-
-describe('josh epic:next registration', () => {
-	it('is registered as a command', () => {
-		const entry = COMMAND_MAP['epic:next']
-
-		expect(entry?.script).toBe('scripts/epic/epic-next.ts')
 	})
 })
 

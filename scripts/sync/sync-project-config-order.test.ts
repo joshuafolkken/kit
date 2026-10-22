@@ -15,13 +15,20 @@ function artifacts_body(): string {
 // `.aikido`'s Safe Chain age is derived from `pnpm-workspace.yaml`, which `sync_ai_copy_all` may add
 // the window to; syncing `.aikido` first would copy the pre-sync window until a second run
 // (joshuafolkken/kit#2743, #3267).
+// The copy also overwrites `.github/dependabot.yml` with kit's template, so the cooldown is derived after
+// it for the same reason (kit #4023).
 describe('sync_project_artifacts ordering', () => {
-	it('syncs the Safe Chain project config after the workspace file', () => {
+	it('syncs the release-window mirrors after the copied files', () => {
 		const body = artifacts_body()
-		const config_files_at = body.indexOf('sync_ai_files.sync_ai_copy_all(')
-		const project_config_at = body.indexOf('project_config.sync_project_config(')
+		const copy_at = body.indexOf('sync_ai_files.sync_ai_copy_all(')
+		const mirrors_at = body.indexOf('sync_release_window_mirrors(')
 
-		expect(config_files_at).toBeGreaterThan(-1)
-		expect(project_config_at).toBeGreaterThan(config_files_at)
+		expect(copy_at).toBeGreaterThan(-1)
+		expect(mirrors_at).toBeGreaterThan(copy_at)
+	})
+
+	it('mirrors the window into both .aikido and the Dependabot cooldown', () => {
+		expect(SYNC_SOURCE).toContain('project_config.sync_project_config(root)')
+		expect(SYNC_SOURCE).toContain('dependabot_cooldown.sync_dependabot_cooldown(root)')
 	})
 })

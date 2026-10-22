@@ -1,6 +1,9 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
+
+type StartRead = (pid: number) => string | undefined
 
 // Whether a lane has handed its post-implementation region to the detached ship.
 //
@@ -24,6 +27,36 @@ function is_ship_running(issue: string, directory: string): boolean {
 	)
 }
 
+// A detached ship for `issue` launched at or after `since_ms` ended in success — it merged, so no cut
+// hand-off follows it. The record outlives its run until the next `ship --detach` replaces it, so a
+// success launched earlier belongs to a past dispatch of the issue and never counts.
+function is_ship_succeeded(issue: string, directory: string, since_ms: number): boolean {
+	const repository = git_common_directory.repository(directory)
+	const reading =
+		repository === undefined ? undefined : run_ship_detach.read_result(repository, issue)
+
+	return reading?.result === 'success' && (reading.launched_at ?? since_ms - 1) >= since_ms
+}
+
+async function read_repository(): Promise<string | undefined> {
+	try {
+		return await run_carry.repository_directory()
+	} catch {
+		return undefined
+	}
+}
+
+// `is_ship_running` for this checkout, for a reader that must not block its event loop
+// (joshuafolkken/kit#4245): the repository is read asynchronously once and every recorded start time
+// through `read`, so no answer starts a synchronous process.
+async function ship_reader(read: StartRead): Promise<(issue: string) => boolean> {
+	const repository = await read_repository()
+
+	return (issue) =>
+		repository !== undefined &&
+		run_ship_detach.read_result(repository, issue, read)?.result === 'running'
+}
+
 // When the detached ship for `issue` that is still live was launched, or `undefined` where none is.
 function ship_running_since(issue: string, directory: string): number | undefined {
 	const repository = git_common_directory.repository(directory)
@@ -40,6 +73,12 @@ function is_handed_off(directory: string, source: MarkerSource = process.env): b
 	return is_ship_running(issue, directory)
 }
 
-const lane_handoff = { is_handed_off, is_ship_running, ship_running_since }
+const lane_handoff = {
+	is_handed_off,
+	is_ship_running,
+	is_ship_succeeded,
+	ship_reader,
+	ship_running_since,
+}
 
 export { lane_handoff }

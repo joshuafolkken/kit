@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
 import { review_code_tree } from './review-code-tree'
+import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 
@@ -36,6 +37,7 @@ const FIXED = 'bbb'
 // record taken against a *different* base is not comparable at all since joshuafolkken/kit#1537, and
 // `review-round2-target-scope.test.ts` is where real git moves it.
 const BASE = '0123456789abcdef0123456789abcdef01234567'
+const BLOBS = { [SOURCE]: '89abcdef0123456789abcdef0123456789abcdef' }
 
 // The tree round 1 read, and the tree round 1's fixes left behind. The fix added a file as well as
 // changing one, because both sides of the comparison have to reach the delta.
@@ -63,6 +65,8 @@ beforeEach(() => {
 	rmSync(RECORD_PATH, { force: true })
 	// The kept-record note goes to stderr on purpose; silenced here so a passing suite stays readable.
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+	// No blob is written into the repository the suite runs in.
+	vi.spyOn(review_round_one_blobs, 'capture').mockReturnValue(undefined)
 })
 
 afterEach(() => {
@@ -107,6 +111,22 @@ describe('review_brief_cli.record_round_one — written once per run, never reta
 			expect.stringContaining(review_brief_cli.KEPT_NOTE_PREFIX),
 		)
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(taken_at))
+	})
+})
+
+// joshuafolkken/kit#4165: the blobs round 2 carries onto a moved base are recorded with the map.
+describe('review_brief_cli.record_round_one — the round-1 blobs', () => {
+	it('records the round-1 blobs beside the map', () => {
+		vi.spyOn(review_round_one_blobs, 'capture').mockReturnValue(BLOBS)
+
+		review_brief_cli.record_round_one(
+			review_brief_cli.FIRST_ROUND,
+			IMPLEMENTATION,
+			BASE,
+			RECORD_PATH,
+		)
+
+		expect(review_stamps.round_one_stamp.read(RECORD_PATH)?.blobs).toStrictEqual(BLOBS)
 	})
 })
 

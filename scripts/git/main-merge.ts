@@ -1,11 +1,12 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { error_text } from '#scripts/lib/error-message'
+import { split_assess } from '#scripts/split/split-assess'
+import { split_measure } from '#scripts/split/split-measure'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
+import { main_merge_regenerate } from './main-merge-regenerate'
 
 // `josh main:merge` (`josh mm`) — bring the default branch into the branch this checkout is on.
 //
@@ -29,8 +30,9 @@ import { main_merge_guard } from './main-merge-guard'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const COMMAND_NAME = 'main:merge'
+const SPLIT_UNMEASURED =
+	'split notice: the diff could not be measured — run `pnpm josh split:assess`'
 
 // git's default merge message carries no `#N`, so on an issue branch the `commit-msg` hook refuses
 // it and leaves the index mid-merge. The number is read with the hook's
@@ -62,18 +64,26 @@ interface MergeTarget {
 }
 
 // A failure that left no unmerged path — a remote that cannot be reached, a hook that refused — is not
-// a conflict, so it is rethrown rather than reported as one with nothing to resolve.
+// a conflict, so it is rethrown rather than reported as one with nothing to resolve. A conflict only on
+// generated files is regenerated and committed (`main-merge-regenerate.ts`), so it answers `undefined`
+// and the merge reads as finished.
+async function unresolved_conflict(error: unknown): Promise<MergeOutcome | undefined> {
+	const files = main_merge_guard.unmerged_paths(await git_command.status())
+
+	if (files.length === 0) throw error
+
+	return (await main_merge_regenerate.resolve(files)) ? undefined : { kind: 'conflict', files }
+}
+
 async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
 	const { default_branch, current_branch } = target
 
 	try {
 		await git_command.merge_branch(default_branch, merge_message(default_branch, current_branch))
 	} catch (error) {
-		const files = main_merge_guard.unmerged_paths(await git_command.status())
+		const conflict = await unresolved_conflict(error)
 
-		if (files.length === 0) throw error
-
-		return { kind: 'conflict', files }
+		if (conflict !== undefined) return conflict
 	}
 
 	return { kind: target.is_current ? 'current' : 'merged', branch: default_branch }
@@ -106,6 +116,25 @@ function failure_text(outcome: MergeOutcome): string | undefined {
 	return undefined
 }
 
+// joshuafolkken/kit#4302: every implementing run merges the default branch immediately before the
+// gate, so this is where a diff that outgrew the entry's split estimate is told so. The notice is
+// advisory: a finished merge never fails on it, and an unreadable diff says so rather than reading as
+// under the guide. It sits on the command, not on `merge()`, because `josh ship` merges again past the
+// point a run can act on it.
+async function split_notice(): Promise<string | undefined> {
+	try {
+		return split_assess.notice(await split_measure.read_branch())
+	} catch (error) {
+		return `${SPLIT_UNMEASURED}: ${error_text.message_of(error)}`
+	}
+}
+
+async function warn_over_split_guide(): Promise<void> {
+	const notice = await split_notice()
+
+	if (notice !== undefined) console.warn(notice)
+}
+
 async function merge_default_branch(): Promise<number> {
 	const outcome = await merge()
 	const failure = failure_text(outcome)
@@ -117,6 +146,8 @@ async function merge_default_branch(): Promise<number> {
 	}
 
 	if ('branch' in outcome) console.info(outcome.branch)
+
+	await warn_over_split_guide()
 
 	return SUCCESS_EXIT_CODE
 }
@@ -145,13 +176,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const main_merge = { merge, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { main_merge }
 export type { MergeOutcome }

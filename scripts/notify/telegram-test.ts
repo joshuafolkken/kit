@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '#scripts/gh/github-issue-url'
@@ -112,6 +110,14 @@ async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 	return { repo_name, issue_title }
 }
 
+// The send behind the command line, for a caller that already holds the values — the `Stop` hook's
+// own confirmation (`stop-actions.ts`). It throws as `telegram_notify.send` does.
+async function send_values(values: CliValues): Promise<void> {
+	const context = await resolve_context(values)
+
+	await telegram_notify.send(telegram_test_logic.build_input({ values, context }))
+}
+
 async function main(): Promise<void> {
 	josh_environment_file.load_environment_file()
 	const values = parse_cli_arguments()
@@ -122,10 +128,7 @@ async function main(): Promise<void> {
 		return
 	}
 
-	const context = await resolve_context(values)
-	const input = telegram_test_logic.build_input({ values, context })
-
-	await telegram_notify.send(input)
+	await send_values(values)
 }
 
 // **A notification nobody received must not read as success**. This command
@@ -136,8 +139,8 @@ async function main(): Promise<void> {
 // and exits non-zero. Both the message and the `cause` whose text `handle` also prints reach it
 // already free of the bot token and the chat id — `telegram_notify` redacts each before throwing.
 //
-// Separated from the `import.meta.url` guard so the wiring is reachable from a unit test; the guard
-// itself stays the canonical one the in-process dispatcher matches on.
+// The `josh notify` entry is `telegram-test-main.ts`, kept apart because other modules import this one
+// (joshuafolkken/kit#4186).
 async function run_cli(): Promise<void> {
 	try {
 		await main()
@@ -146,8 +149,6 @@ async function run_cli(): Promise<void> {
 	}
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await run_cli()
-
-const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context, run_cli }
+const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context, run_cli, send_values }
 
 export { telegram_test }

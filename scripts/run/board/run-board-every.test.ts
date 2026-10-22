@@ -30,21 +30,19 @@ afterEach(() => {
 
 describe('run_board_cli.run --every', () => {
 	it('pushes one chat frame per interval and ends after pushing the ended run', async () => {
-		const { ports, pushes, frames } = harness(LOCAL, PLANS)
-		const slept: Array<number> = []
+		const { ports, pushes, frames, clock, read_local } = harness(LOCAL, PLANS)
 		const sleep = vi.fn(async (ms: number) => {
-			slept.push(ms)
+			clock.now_ms += ms
 		})
 
-		await expect(
-			run_board_cli.run(['--every', '5'], { ...ports, read_local: ending_after(2), sleep }),
-		).resolves.toBe(0)
+		read_local.mockImplementation(ending_after(2))
+		await expect(run_board_cli.run(['--every', '5'], { ...ports, sleep })).resolves.toBe(0)
 
 		expect(pushes).toHaveLength(3)
 		expect(pushes.join('')).not.toContain(ESCAPE)
 		expect(pushes.slice(0, 2).join('')).not.toContain('■ backlogrun')
 		expect(pushes[2]).toMatch(/^■ backlogrun/u)
-		expect(slept).toStrictEqual([FIVE_MINUTES_MS, FIVE_MINUTES_MS])
+		expect(sleep.mock.calls).toStrictEqual([[FIVE_MINUTES_MS], [FIVE_MINUTES_MS]])
 		expect(frames).toHaveLength(0)
 	})
 

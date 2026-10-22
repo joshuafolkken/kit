@@ -8,7 +8,6 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { pre_gate_cut, type LaneCutState } from './pre-gate-cut'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
 
@@ -119,7 +118,7 @@ function payload_of(name: string, command: string, tool_name = BASH): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	// Every test starts with no dispatch mark, so a leak from the lane-checkout block below cannot fire
 	// the refusal in a case that expects silence; the lane block sets it in its own beforeEach.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
@@ -323,15 +322,17 @@ describe('is_uncut_gate', () => {
 	})
 })
 
-describe('rule_delivery — the pre-gate cut at the call that runs the gate', () => {
+describe('delivered_rules.delivery — the pre-gate cut at the call that runs the gate', () => {
 	// **The ordinary case is silence, and it is the assertion that matters most.** This suite runs in
 	// the repository's own checkout, which is not a lane — exactly where a `fullrun` runs its gate.
 	it('says nothing about a gate run in a checkout that is not a lane', () => {
-		expect(rule_delivery(payload_of('pre-gate-cut-plain', GATE), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('pre-gate-cut-plain', GATE), NOW_MS)).toBeUndefined()
 	})
 
 	it('says nothing about a write tool whose input looks like a gate run', () => {
-		expect(rule_delivery(payload_of('pre-gate-cut-write', GATE, 'Edit'), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('pre-gate-cut-write', GATE, 'Edit'), NOW_MS),
+		).toBeUndefined()
 	})
 
 	// The gate is never a candidate of the batching guard, so this row makes no stand-aside — which is
@@ -351,7 +352,7 @@ describe('rule_delivery — the pre-gate cut at the call that runs the gate', ()
 	})
 })
 
-describe('rule_delivery — inside a lane checkout', () => {
+describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
 	beforeEach(() => {
@@ -375,7 +376,7 @@ describe('rule_delivery — inside a lane checkout', () => {
 	// The temporary lane sits outside any repository, so the git directory cannot be read and the cut
 	// reads as not taken — which is the same answer a real lane gives before its cut.
 	it('delivers the rule on a gate run that has not cut', () => {
-		const reason = rule_delivery(payload_of('pre-gate-cut-lane', GATE), NOW_MS)
+		const reason = delivered_rules.delivery(payload_of('pre-gate-cut-lane', GATE), NOW_MS)
 
 		expect(reason).toBe(delivered_rules.PRE_GATE_CUT_REASON)
 	})
@@ -386,12 +387,14 @@ describe('rule_delivery — inside a lane checkout', () => {
 	it('says nothing on the reissued gate run', () => {
 		const payload = payload_of('pre-gate-cut-once', GATE)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.PRE_GATE_CUT_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.PRE_GATE_CUT_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBeUndefined()
 	})
 
 	it('says nothing about the cut command itself', () => {
-		expect(rule_delivery(payload_of('pre-gate-cut-take', TAKE_THE_CUT), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('pre-gate-cut-take', TAKE_THE_CUT), NOW_MS),
+		).toBeUndefined()
 	})
 })
 

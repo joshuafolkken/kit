@@ -49,6 +49,12 @@ vi.mock('node:path', () => ({
 		resolve: (path_: string) => path_,
 	},
 }))
+// The symlink containment is `file-content.test.ts`'s subject; here the write lands on the fs stub.
+vi.mock('#scripts/sync/file-content', async (import_original) => {
+	const { file_content } = await import_original<Record<'file_content', object>>()
+
+	return { file_content: { ...file_content, write_contained: write_file_mock } }
+})
 vi.mock('./init-copy-content', () => ({
 	transform_copied_content: transform_copied_content_mock,
 }))
@@ -69,9 +75,7 @@ vi.mock('./init-paths', () => ({
 	PROJECT_ROOT: '/project',
 	package_path: (name: string) => `/pkg/${name}`,
 }))
-vi.mock('./init-sonar', () => ({
-	init_sonar: { copy_sonar_with_template: copy_sonar_mock },
-}))
+vi.mock('./init-sonar', () => ({ init_sonar: { copy_sonar_with_template: copy_sonar_mock } }))
 
 const { managed_marker_logic } = await import('#scripts/managed-marker/managed-marker-logic')
 const { KIT_PACKAGE_NAME } = await import('#scripts/version/kit-descriptor')
@@ -115,12 +119,6 @@ describe('init_ai_copy.copy_ai_file — write behavior', () => {
 		init_ai_copy.copy_ai_file(SRC_PATH, DEST_PATH)
 
 		expect(write_file_mock).toHaveBeenCalledWith(DEST_PATH, RAW_CONTENT)
-	})
-
-	it('creates destination directory before writing', () => {
-		init_ai_copy.copy_ai_file(SRC_PATH, DEST_PATH)
-
-		expect(mkdir_mock).toHaveBeenCalledWith('/project', { recursive: true })
 	})
 
 	// The destination decides whether workflow action pins get resolved, so it has to reach

@@ -1,9 +1,6 @@
 # Retrospective — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/retrospective.md`: why the
-procedure is read where it is, why it files two improvements, and where its rules came from. It is
-never read during a run — every step, command and bound an agent acts on stays in the procedure
-document, and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/retrospective.md`.
 
 ## Why the retrospective is read at its step
 

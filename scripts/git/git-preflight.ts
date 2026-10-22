@@ -13,6 +13,19 @@ import { git_issue, type IssueInfo } from './git-issue'
 // anything changes, and all of them are reported at once.** No rule is new: each
 // answer comes from the function the later stage refuses with, so the two cannot drift apart.
 
+// Which precondition a problem leaves unmet, so a stopped `josh ship` records the kind beside the text
+// (joshuafolkken/kit#4166).
+const PRECONDITION = {
+	ISSUE: 'issue',
+	BRANCH: 'branch',
+	CLASSIFICATION: 'classification',
+} as const
+
+interface Unmet {
+	kind: string
+	problem: string
+}
+
 interface PreflightInput {
 	cli_input: string | undefined
 	will_open_pr: boolean
@@ -26,14 +39,20 @@ interface Target {
 
 interface Resolution {
 	target: Target | undefined
-	problems: Array<string>
+	problems: Array<Unmet>
+}
+
+function unmet(kind: string, problem: string): Unmet {
+	return { kind, problem }
 }
 
 function resolve_from_branch(current_branch: string): Resolution {
 	const number = git_issue.branch_number(current_branch)
 
 	if (number === undefined) {
-		return { target: undefined, problems: [git_issue.branch_derivation_error(current_branch)] }
+		const problem = unmet(PRECONDITION.ISSUE, git_issue.branch_derivation_error(current_branch))
+
+		return { target: undefined, problems: [problem] }
 	}
 
 	return { target: { number, branch_name: current_branch }, problems: [] }
@@ -55,7 +74,10 @@ function resolve_parsed(
 	return {
 		target,
 		problems: [
-			`Branch mismatch: on "${current_branch}", but the title resolves to "${parsed.branch_name}".`,
+			unmet(
+				PRECONDITION.BRANCH,
+				`Branch mismatch: on "${current_branch}", but the title resolves to "${parsed.branch_name}".`,
+			),
 		],
 	}
 }
@@ -68,7 +90,10 @@ function resolve_from_title(
 	try {
 		return resolve_parsed(git_issue.parse(cli_input), current_branch, default_branch)
 	} catch (error) {
-		return { target: undefined, problems: [error_text.message_of(error)] }
+		return {
+			target: undefined,
+			problems: [unmet(PRECONDITION.ISSUE, error_text.message_of(error))],
+		}
 	}
 }
 
@@ -80,13 +105,13 @@ async function resolve_target(cli_input: string | undefined): Promise<Resolution
 	return resolve_from_title(cli_input, current_branch, await git_command.get_default_branch())
 }
 
-async function classification_problems(target: Target): Promise<Array<string>> {
+async function classification_problems(target: Target): Promise<Array<Unmet>> {
 	try {
 		await git_pr.release_classification(target.number, target.branch_name)
 
 		return []
 	} catch (error) {
-		return [error_text.message_of(error)]
+		return [unmet(PRECONDITION.CLASSIFICATION, error_text.message_of(error))]
 	}
 }
 
@@ -106,8 +131,8 @@ async function announce_evidence(branch_name: string): Promise<void> {
 	)
 }
 
-function refusal(problems: ReadonlyArray<string>): Error {
-	const lines = problems.map((problem) => `  - ${problem}`)
+function refusal(problems: ReadonlyArray<Unmet>): Error {
+	const lines = problems.map(({ problem }) => `  - ${problem}`)
 
 	return new Error(
 		[
@@ -119,7 +144,7 @@ function refusal(problems: ReadonlyArray<string>): Error {
 
 interface PreflightAnswer {
 	pr_target: Target | undefined
-	problems: Array<string>
+	problems: Array<Unmet>
 }
 
 async function answer(input: PreflightInput): Promise<PreflightAnswer> {
@@ -131,9 +156,9 @@ async function answer(input: PreflightInput): Promise<PreflightAnswer> {
 	return { pr_target, problems: [...problems, ...pr_problems] }
 }
 
-// The unmet preconditions as a list, so `josh ship` can ask them before its
+// The unmet preconditions as a list, each with its kind, so `josh ship` can ask them before its
 // review and gate start instead of meeting the refusal at the commit stage.
-async function problems_of(input: PreflightInput): Promise<Array<string>> {
+async function problems_of(input: PreflightInput): Promise<Array<Unmet>> {
 	const { problems } = await answer(input)
 
 	return problems
@@ -149,5 +174,5 @@ async function check(input: PreflightInput): Promise<void> {
 
 const git_preflight = { check, problems_of }
 
-export type { PreflightInput }
+export type { PreflightInput, Unmet }
 export { git_preflight }

@@ -164,6 +164,10 @@ async function run_marked_gate<T>(
 // The concurrent-run count is read here rather than inside `gate-plan.ts` for the reason the core
 // count already is: that module stays a pure function of its inputs, and the machine is asked once and
 // handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate.
+//
+// **The free cores do not cap the plan** (joshuafolkken/kit#4167). The unit claim's admission narrows it
+// to the room the outside load leaves, read over its wait rather than once at the gate's start — a
+// width fixed off one busy instant held for the whole suite (`core_admission.is_too_narrow`).
 function announce_gate_plan(is_unit_included: boolean, available_cores: number): GatePlan {
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
 	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
@@ -340,17 +344,30 @@ function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | un
 	return gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
 }
 
+// The reuse leaves its line in the ledger too, so `josh lane:stats` counts the gates it saved
+// (joshuafolkken/kit#4397).
+async function reuse_gate(
+	stamp: FileMapStamp,
+	options: GateOptions,
+	started_at: number,
+): Promise<number> {
+	process.stdout.write(`${gate_skip.format_skip(stamp.taken_at)}\n`)
+	await gate_ledger.record_reused(options.ledger_path, performance.now() - started_at)
+
+	return 0
+}
+
 // The two ways a gate ends before it runs a check: a green record it can reuse (exit 0), and the
 // scoped pre-check refusing a tree the pair has not been green on (exit 1). `undefined` means neither
 // fired and the checks run. **Nothing else stands between the skip and the checks.**
-function short_circuit_gate(tree: GateTree, options: GateOptions): number | undefined {
+async function short_circuit_gate(
+	tree: GateTree,
+	options: GateOptions,
+	started_at: number,
+): Promise<number | undefined> {
 	const reusable = reusable_stamp(tree, options)
 
-	if (reusable !== undefined) {
-		process.stdout.write(`${gate_skip.format_skip(reusable.taken_at)}\n`)
-
-		return 0
-	}
+	if (reusable !== undefined) return await reuse_gate(reusable, options, started_at)
 
 	const scoped_refusal = scoped_precheck_refusal(tree, options)
 
@@ -366,7 +383,7 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
 	const started_at = performance.now()
 	const tree = await gate_tree.read_gate_tree()
-	const short_circuit = short_circuit_gate(tree, options)
+	const short_circuit = await short_circuit_gate(tree, options, started_at)
 
 	if (short_circuit !== undefined) return short_circuit
 

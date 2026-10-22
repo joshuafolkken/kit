@@ -16,7 +16,7 @@ import { run_wake_restart } from './run-wake-restart'
 // supervisor's own process, so every restarted pass read that owner as a session at work and waited
 // on itself — the driver ran once, the restart bound was never reached and nothing was reported.
 // These cases run the supervisor's real ports, loop, restart and driver; only the driver's command,
-// the clock between passes and the event stream are stood in for.
+// the clock between passes, the event stream and the lane-close retry are stood in for.
 
 const LIMIT = run_wake_restart.RESTART_LIMIT
 const INVOCATION = 'backlogrun #2509 --max 5 --only'
@@ -52,6 +52,8 @@ async function supervise(): Promise<LoopStop> {
 	const ports: LoopPorts = {
 		...run_wake_cli.ports_for(context(), PROFILE),
 		sleep: stop_at_the_first_wait,
+		// The retry reads and closes the checkout's own lanes, which are a live run's: never from a test.
+		retry_closes: async () => undefined,
 	}
 
 	return await run_wake_restart.supervise({

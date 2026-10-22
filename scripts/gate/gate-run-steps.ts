@@ -2,17 +2,23 @@ import { availableParallelism } from 'node:os'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { core_budget } from './core-budget'
+import { check_cpu, type CheckCpu } from './check-cpu'
+import { core_budget, type Admission } from './core-budget'
 import { gate_plan, type GatePlan } from './gate-plan'
-import type { GateStep, GateStepResult } from './gate-report'
-import { build_gate_step } from './gate-steps'
+import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
+import { build_gate_step, with_granted_workers } from './gate-steps'
 import { project_checks } from './project-checks'
 
 // Running the gate's checks: each one under its place in the machine-wide budget, a reused one
 // (`check-reuse.ts`) without starting it. `verification-gate.ts` decides what runs and records the
 // outcome; this module only runs it.
 
-async function run_gate_step(step: GateStep): Promise<GateStepResult> {
+// `cpu` is the gate's shared reader, so concurrent checks each take their own growth; a lone call
+// reads its child alone from a baseline of its own.
+async function run_gate_step(
+	step: GateStep,
+	cpu: CheckCpu = check_cpu.check_cpu_reader(),
+): Promise<GateStepResult> {
 	if (step.skip_reason !== undefined) {
 		return {
 			label: step.label,
@@ -28,7 +34,7 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 		step.cwd === undefined ? {} : { cwd: step.cwd },
 	)
 
-	return { label: step.label, command: step.command_args.join(' '), ...result }
+	return { label: step.label, command: step.command_args.join(' '), ...result, cpu_ms: cpu() }
 }
 
 // This gate's share of the machine, resolved once at the gate's entry and carried down as one value.
@@ -90,6 +96,15 @@ function reused_result(step: GateStep, reused_at: string): GateStepResult {
 	}
 }
 
+// What the check asked the budget for and what it ran at, for its ledger row (`gate-ledger.ts`).
+function claim_of(requested: number, admission: Admission): CheckClaim {
+	return {
+		requested,
+		granted: admission.granted ?? requested,
+		waited_ms: admission.waited_ms ?? 0,
+	}
+}
+
 // **A nested gate takes no reservation, and the budget is what makes that necessary rather than
 // merely tidy**. The unit step spawns the suite, which runs this repository's
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
@@ -98,17 +113,24 @@ function reused_result(step: GateStep, reused_at: string): GateStepResult {
 async function run_reserved_step(
 	reserved: ReservedStep,
 	budget: BudgetContext,
+	cpu: CheckCpu,
 ): Promise<GateStepResult> {
 	if (reserved.reused_at !== undefined) return reused_result(reserved.step, reserved.reused_at)
-	if (!budget.is_reserved) return await run_gate_step(reserved.step)
+	if (!budget.is_reserved) return await run_gate_step(reserved.step, cpu)
 
 	return await core_budget.with_core_reservation(
 		reserved.weight,
 		async (admission) => ({
-			...(await run_gate_step(reserved.step)),
+			...(await run_gate_step(with_granted_workers(reserved.step, admission.granted), cpu)),
 			budget_note: core_budget.describe_overflow(admission),
+			claim: claim_of(reserved.weight, admission),
 		}),
-		{ budget: budget.available_cores, memory_mb: reserved.memory_mb },
+		{
+			budget: budget.available_cores,
+			memory_mb: reserved.memory_mb,
+			command: `gate ${reserved.step.label}`,
+			is_unit: reserved.step.label === gate_plan.UNIT_LABEL,
+		},
 	)
 }
 
@@ -125,6 +147,7 @@ async function run_gate_steps(
 	reused: ReusedChecks = new Map(),
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(plan, budget.available_cores, reused)
+	const cpu = check_cpu.check_cpu_reader()
 
 	// **The checks run under the held mark, so a check's own dispatch claims nothing**.
 	// Each check is a `pnpm josh <target>` child, and a target that declares
@@ -135,7 +158,7 @@ async function run_gate_steps(
 			await bounded_pool.bounded_map(
 				reserved,
 				plan.concurrency,
-				async (entry) => await run_reserved_step(entry, budget),
+				async (entry) => await run_reserved_step(entry, budget, cpu),
 			),
 	)
 }

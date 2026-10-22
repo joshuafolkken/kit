@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createServer, type Server } from 'node:net'
 import path from 'node:path'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // Whether the process a record names is still the one that wrote it.
 //
@@ -237,11 +237,16 @@ function beacon_target(token: string): string | undefined {
 }
 
 // No status is a probe killed by its timeout or a signal — unknown, the same as its own timeout.
-function run_socket_probe(target: string): number | undefined {
+// `kill_after_ms` is a parameter so a test can ask what the probe itself reports for a socket
+// without a loaded machine's slow start turning the answer into the timeout's.
+function run_socket_probe(
+	target: string,
+	kill_after_ms: number = PROBE_TIMEOUT_MS,
+): number | undefined {
 	return (
 		spawnSync(process.execPath, ['-e', SOCKET_PROBE_SOURCE, target], {
 			stdio: 'ignore',
-			timeout: PROBE_TIMEOUT_MS,
+			timeout: kill_after_ms,
 		}).status ?? undefined
 	)
 }
@@ -359,6 +364,9 @@ function is_own_process(pid: number | undefined, recorded_start: string | undefi
 }
 
 const process_identity = {
+	PROBE_ENVIRONMENT,
+	START_PROBES,
+	START_TIME_FORMAT,
 	close_beacon,
 	is_live_beacon,
 	is_live_pid,
@@ -371,6 +379,7 @@ const process_identity = {
 	own_start,
 	read_start,
 	resolve_own_start,
+	run_socket_probe,
 }
 
 export { process_identity }

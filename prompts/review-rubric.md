@@ -171,7 +171,7 @@ switching `no-restricted-syntax` off.
 ### 6. Tests
 
 - Every code change has a corresponding test (unit or E2E) per `CLAUDE.md` Code Change Rules Step 0
-- Test titles are English only and describe behavior, not implementation
+- Test titles describe behavior, not implementation
 - **Mutation check**: for the most critical test added or changed — if the key assertion/condition in
   the implementation were inverted or removed, would it fail? If no or uncertain, rewrite it.
 - **Requirement check**: does the test verify the behavior the issue/task describes, or only that code
@@ -179,7 +179,6 @@ switching `no-restricted-syntax` off.
 
 ### 7. Comments & content
 
-- Comments are English only
 - No narration comments (`// Added for issue #123`, `// TODO: refactor later`) — only non-obvious _why_
 - No duplicated logic that should be extracted
 

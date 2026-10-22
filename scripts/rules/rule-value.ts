@@ -5,6 +5,7 @@ import {
 } from '#scripts/time-runtime/time-transcript-line'
 import { delivered_rules, type MeasuredRule } from './delivered-rules'
 import { hook_context_line } from './hook-context-line'
+import { rule_rewrite } from './rule-rewrite'
 
 // What a rule is worth on the channel that carries it when its delivery has not fired.
 //
@@ -39,7 +40,7 @@ const PERCENT = 100
 // **A refusal is an errored result, which is what separates it from a read of the file it is written
 // in.** Every signature exists verbatim in the module its rule is written in — the six delivered
 // rules in `scripts/rules/delivered-rules.ts`, the batching row's in
-// `scripts/time/time-batch-guard.ts` — so a session that
+// `tools/time/time-batch-guard.ts` — so a session that
 // merely opened that file carries the text too — and did so in a result whose `is_error` is false.
 //
 // **That fact is read off the parsed block, never off the raw line**. The
@@ -287,7 +288,7 @@ function rewritten_id(text: string): string | undefined {
 	return found?.id
 }
 
-function observe_rewrite(states: Map<string, RuleState>, text: string): void {
+function observe_note(states: Map<string, RuleState>, text: string): void {
 	const id = rewritten_id(text)
 	const state = id === undefined ? undefined : states.get(id)
 
@@ -295,6 +296,11 @@ function observe_rewrite(states: Map<string, RuleState>, text: string): void {
 
 	state.is_rewritten = true
 	state.is_triggered = true
+}
+
+// One line can be rewritten by several rows, whose notes `rule-rewrite.ts` joins into one context.
+function observe_rewrite(states: Map<string, RuleState>, text: string): void {
+	for (const note of text.split(rule_rewrite.NOTE_SEPARATOR)) observe_note(states, note)
 }
 
 function observe_for_rule(

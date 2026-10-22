@@ -4,18 +4,19 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 
 Only these load `.env` themselves, and only when it exists:
 
-- **Workflow** — `josh notify`, `josh followup`, `josh backlogrun`, `josh backlog:drive`, `josh backlog:stalled`, `josh epic:next`.
-- **Run state** — `josh run:entry`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:stranded`.
-- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:sample`, `josh lane:stats`.
-- **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:update`, `josh port`, `josh session:lang`.
-- **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; the same guards run on their own, `josh rule:guard`, `josh batch:guard`, `josh investigation:guard` and `josh duplicate-read:guard`; and `josh codex:hook-adapter`.
+- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh epic:next`.
+- **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:merge`, and `josh issue:already-done`, which releases the hold.
+- **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:pause`, `josh lane:resume`, `josh lane:sample`, `josh lane:stats`.
+- **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:if-required`, `josh latest:update`, `josh port`, `josh session:lang`.
+- **Reports** — `josh report:template`, `josh report:lint` and `josh run:report`, whose labels follow `JOSH_SESSION_LANG`; `run:report --handoff` also sends its report to Telegram.
+- **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; and `josh codex:hook-adapter`.
 - `playwright.config.ts`.
 
 `scripts/document/environment-file-reference.test.ts` checks this list against the command registry, both ways.
 
-Every other command — `josh gate`, `josh ship`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read (`JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`, the two `*_FORCE` switches) in the shell that runs them.
+Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read (`JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`, the two `*_FORCE` switches) in the shell that runs them.
 
-Set `JOSH_PROGRESS_INTERVAL_MINUTES` in the shell, or commit `josh.progress_interval_minutes` in `package.json`: in `.env` it reaches only the `josh rule:guard` heartbeat, not `josh run:progress`.
+Set `JOSH_PROGRESS_INTERVAL_MINUTES` in the shell, or commit `josh.progress_interval_minutes` in `package.json`: in `.env` it reaches only the `josh pretool:guard` heartbeat, not `josh run:progress`.
 
 All of them are optional except the two Telegram credentials, which notifications need unless `JOSH_NOTIFY=off`. A blank value (`KEY=`) means the same as leaving the key out.
 
@@ -61,16 +62,18 @@ A missing `.env` file is not itself an error: both commands also read the two va
 
 Each role's model and effort for a `backlogrun`. The invoking CLI picks the provider. Model overrides apply to Claude Code only — Codex always runs `gpt-6.1-sol`; effort accepts `low`, `medium`, `high`, `xhigh` or `max` for either provider.
 
-| Variable                | Required | Default                                            | Used when                                                   |
-| ----------------------- | -------- | -------------------------------------------------- | ----------------------------------------------------------- |
-| `JOSH_SCHEDULER_MODEL`  | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.              |
-| `JOSH_SCHEDULER_EFFORT` | No       | `medium`                                           | The effort of the run that schedules the batch.             |
-| `JOSH_WORKER_MODEL`     | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.            |
-| `JOSH_WORKER_EFFORT`    | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.           |
-| `JOSH_REVIEWER_MODEL`   | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.               |
-| `JOSH_REVIEWER_EFFORT`  | No       | `high`                                             | The effort of the review a lane's change gets.              |
-| `JOSH_LANE_MODEL`       | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.  |
-| `JOSH_LANE_EFFORT`      | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead. |
+| Variable                            | Required | Default                                            | Used when                                                                  |
+| ----------------------------------- | -------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
+| `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                             |
+| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                            |
+| `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.                           |
+| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                          |
+| `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                              |
+| `JOSH_REVIEWER_EFFORT`              | No       | `high`                                             | The effort of the review a lane's change gets.                             |
+| `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.  |
+| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`. |
+| `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                 |
+| `JOSH_LANE_EFFORT`                  | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead.                |
 
 ### Runs
 
@@ -83,19 +86,20 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_DEBUG`                     | No       | off                                                              | Any non-blank value writes the error a run, lane, git or GitHub state check swallowed to stderr as `josh debug: <where>: <message>`; verdicts are unchanged.                                                       |
 | `JOSH_TEMP_ROOT`                 | No       | `/tmp` (`os.tmpdir()` on Windows or when `/tmp` is not writable) | The directory every host-wide record goes to, the run's state among them. Point it at a fresh `mktemp -d` to take live evidence of `run:carry` without touching the running run (it does not isolate `run:merge`). |
 | `JOSH_CORE_RESERVED`             | No       | unset                                                            | Set by josh, never by hand: `1` marks a child whose parent already holds its share of the machine-wide core budget, so it does not reserve a second time.                                                          |
+| `JOSH_CORE_RESERVATION`          | No       | unset                                                            | Set by josh, never by hand: the ledger key of the claim a command holds for its children, so a unit suite reading the machine's free cores leaves its own not-yet-busy claim out of the ledger.                    |
 
 ### Merge, release and dependency updates
 
-| Variable                                      | Required | Default        | Used when                                                                                                                                                                                                                  |
-| --------------------------------------------- | -------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_CI_TIMEOUT_SECONDS`                     | No       | 32 minutes     | How long `josh followup` waits for CI ([`josh followup`](./josh-commands-automation.md#josh-followup)).                                                                                                                    |
-| `JOSH_REQUIRED_CHECKS`                        | No       | `SonarQube`    | The checks a merge waits for, comma-separated.                                                                                                                                                                             |
-| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its tag ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                                |
-| `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its version on npm ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                     |
-| `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` | No       | 30 minutes     | How long `josh release` watches for its GitHub Release ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                     |
-| `JOSH_LATEST_MAX_AGE_HOURS`                   | No       | `12`           | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)).                                                           |
-| `JOSH_PLAYWRIGHT_BROWSERS`                    | No       | `chromium`     | The browsers `josh latest:update` installs after it moves `@playwright/test`, space-separated ([`josh latest:update`](./josh-commands.md#josh-latestupdate)).                                                              |
-| `JOSH_METRICS_BASE`                           | No       | the merge-base | The commit `josh metrics` measures the totals from, where no merge-base can be asked for — kit's CI names `HEAD^1`. A name that resolves to no commit fails the check ([`josh metrics`](./josh-commands.md#josh-metrics)). |
+| Variable                                      | Required | Default        | Used when                                                                                                                                                                                                                                                                         |
+| --------------------------------------------- | -------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_CI_TIMEOUT_SECONDS`                     | No       | 32 minutes     | How long `josh followup` waits for CI ([`josh followup`](./josh-commands-automation.md#josh-followup)).                                                                                                                                                                           |
+| `JOSH_REQUIRED_CHECKS`                        | No       | `SonarQube`    | The checks a merge waits for, comma-separated.                                                                                                                                                                                                                                    |
+| `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its tag ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                                                                                       |
+| `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`            | No       | 30 minutes     | How long `josh release` watches for its version on npm ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                                                                            |
+| `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` | No       | 30 minutes     | How long `josh release` watches for its GitHub Release ([`josh release`](./josh-commands-automation.md#josh-release)).                                                                                                                                                            |
+| `JOSH_LATEST_MAX_AGE_HOURS`                   | No       | `12`           | How old the last dependency update may be before `josh latest:scope` answers `required` ([`josh latest:scope`](./josh-commands-automation.md#josh-latestscope)).                                                                                                                  |
+| `JOSH_PLAYWRIGHT_BROWSERS`                    | No       | `chromium`     | The browsers `josh latest:update` installs after it moves `@playwright/test`, space-separated ([`josh latest:update`](./josh-commands.md#josh-latestupdate)).                                                                                                                     |
+| `JOSH_METRICS_BASE`                           | No       | the merge-base | The commit `josh metrics` measures the totals from, and `josh lockfile:policy` diffs the lockfile against, where no merge-base can be asked for — kit's CI names `HEAD^1`. A name that resolves to no commit fails the check ([`josh metrics`](./josh-commands.md#josh-metrics)). |
 
 ### Git hooks
 
@@ -108,16 +112,17 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard off.
 
-| Variable                    | Required | Default | Used when                                                                                                                 |
-| --------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_BATCH_GUARD`          | No       | on      | [`josh batch:guard`](./josh-commands-automation.md#josh-batchguard) — calls that could have gone out together.            |
-| `JOSH_INVESTIGATION_GUARD`  | No       | on      | [`josh investigation:guard`](./josh-commands-automation.md#josh-investigationguard) — reading too much before delegating. |
-| `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh duplicate-read:guard`](./josh-commands-automation.md#josh-duplicate-readguard) — reading the same file twice.      |
-| `JOSH_RULE_GUARD`           | No       | on      | [`josh rule:guard`](./josh-commands-automation.md#josh-ruleguard) — a rule delivered at the call that breaks it.          |
-| `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                   |
-| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-run.md#josh-runwatcherguard) — a run whose progress watcher stopped.           |
-| `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                            |
-| `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).          |
+| Variable                    | Required | Default | Used when                                                                                                              |
+| --------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_BATCH_GUARD`          | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — calls that could have gone out together.     |
+| `JOSH_INVESTIGATION_GUARD`  | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — reading too much before delegating.          |
+| `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — reading the same file twice.                 |
+| `JOSH_RULE_GUARD`           | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — a rule delivered at the call that breaks it. |
+| `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                |
+| `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-run.md#josh-runwatcherguard) — a run whose progress watcher stopped.        |
+| `JOSH_PARENT_CUT_GUARD`     | No       | on      | A `backlogrun` parent over its session budget.                                                                         |
+| `JOSH_POLL_GUARD`           | No       | on      | A `backlogrun` parent or wake session repeating a state read with nothing decided in between.                          |
+| `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree its scoped checks were never green on ([`josh gate`](./josh-commands.md#josh-gate)).       |
 
 ### Rule evaluation
 
@@ -130,24 +135,26 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 
 kit sets these for the processes it starts, or writes them into a lane's own `.env`. They are listed so every variable the code reads is named here; do not set them by hand.
 
-| Variable                   | Set by                         | Meaning                                                                                                                                 |
-| -------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_LANE_CHILD`          | a `backlogrun` dispatch        | This session is a dispatched lane child.                                                                                                |
-| `JOSH_LANE_SEAT`           | `josh lane:open`               | The lane's seat (`1`–`9`), added to the port offset.                                                                                    |
-| `JOSH_LANE_OUTPUT`         | `josh lane:open`               | Where the lane's child writes its output.                                                                                               |
-| `JOSH_LANE_AGENT_PROVIDER` | a `backlogrun` dispatch        | The provider the lane's child was launched with.                                                                                        |
-| `JOSH_LANE_AGENT_ROLE`     | a `backlogrun` dispatch        | The role the lane's child was launched as.                                                                                              |
-| `JOSH_LANE_AGENT_MODEL`    | a `backlogrun` dispatch        | The model the lane's child was launched with.                                                                                           |
-| `JOSH_LANE_AGENT_EFFORT`   | a `backlogrun` dispatch        | The effort the lane's child was launched with.                                                                                          |
-| `JOSH_AGENT_PROVIDER`      | a detached launcher            | The provider handed to a process that is not itself an agent session; unset outside a session, the provider defaults to `anthropic`.    |
-| `JOSH_AGENT_HEADLESS`      | every kit agent launch         | This agent session was launched by kit, so no person reads its reply.                                                                   |
-| `JOSH_AGENT_ROLE`          | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                   |
-| `JOSH_RUN_HEADLESS`        | the run supervisor             | This session was launched headless by the supervisor.                                                                                   |
-| `JOSH_SHIP_SUPERVISED`     | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
-| `JOSH_SHIP_LAUNCH_ID`      | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |
-| `JOSH_INIT_HANDED_OFF`     | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                     |
-| `JOSH_WORKFLOW`            | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                   |
-| `JOSH_UNIT_RUN_MARKED`     | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                        |
-| `JOSH_UNIT_GUARD_LOG`      | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                     |
-| `JOSH_PROJECT_TEST_SCRIPT` | `josh test:unit`               | A `basic` project's own `test` script is running, so a call back into the unit check from inside it skips instead of starting it again. |
-| `JOSH_GIT_BINARY`          | the unit suite's network guard | The `git` every spawn runs in place of the platform's own binary.                                                                       |
+| Variable                    | Set by                         | Meaning                                                                                                                                 |
+| --------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_LANE_CHILD`           | a `backlogrun` dispatch        | This session is a dispatched lane child.                                                                                                |
+| `JOSH_LANE_SEAT`            | `josh lane:open`               | The lane's seat (`1`–`9`), added to the port offset.                                                                                    |
+| `JOSH_LANE_OUTPUT`          | `josh lane:open`               | Where the lane's child writes its output.                                                                                               |
+| `JOSH_LANE_AGENT_PROVIDER`  | a `backlogrun` dispatch        | The provider the lane's child was launched with.                                                                                        |
+| `JOSH_LANE_AGENT_ROLE`      | a `backlogrun` dispatch        | The role the lane's child was launched as.                                                                                              |
+| `JOSH_LANE_AGENT_MODEL`     | a `backlogrun` dispatch        | The model the lane's child was launched with.                                                                                           |
+| `JOSH_LANE_AGENT_EFFORT`    | a `backlogrun` dispatch        | The effort the lane's child was launched with.                                                                                          |
+| `JOSH_AGENT_PROVIDER`       | a detached launcher            | The provider handed to a process that is not itself an agent session; unset outside a session, the provider defaults to `anthropic`.    |
+| `JOSH_AGENT_HEADLESS`       | every kit agent launch         | This agent session was launched by kit, so no person reads its reply.                                                                   |
+| `JOSH_AGENT_ROLE`           | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                   |
+| `JOSH_RUN_HEADLESS`         | the run supervisor             | This session was launched headless by the supervisor.                                                                                   |
+| `JOSH_SHIP_SUPERVISED`      | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
+| `JOSH_SHIP_LAUNCH_ID`       | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |
+| `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                     |
+| `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                   |
+| `JOSH_UNIT_RUN_MARKED`      | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                        |
+| `JOSH_UNIT_GUARD_LOG`       | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                     |
+| `JOSH_PROJECT_TEST_SCRIPT`  | `josh test:unit`               | A `basic` project's own `test` script is running, so a call back into the unit check from inside it skips instead of starting it again. |
+| `JOSH_GIT_BINARY`           | the unit suite's network guard | The `git` every spawn runs in place of the platform's own binary.                                                                       |
+| `JOSH_TEST_READS_DIRECTORY` | a whole-suite `josh test:unit` | Where each worker's read recorder writes the repository paths its test files read, merged into the test-read map after a green run.     |
+| `JOSH_TEST_READS_ROOT`      | a whole-suite `josh test:unit` | The repository root the read recorder resolves read paths against; a path outside it is not recorded.                                   |

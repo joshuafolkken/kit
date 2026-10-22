@@ -1,9 +1,6 @@
 # `fullrun` step lists — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/fullrun-steps.md`: where its
-steps came from and why a lane child skips one of them. It is never read during a run — every step,
-stop and command an agent acts on stays in the procedure document, and a change to this file changes
-no rule.
+Rationale behind `.claude/skills/workflow-commands/fullrun-steps.md`.
 
 ## Where each rule came from
 
@@ -17,9 +14,9 @@ no rule.
   the clean path — joshuafolkken/kit#2398.
 - `run:tail` folding the post-merge bookkeeping (`observations:flush`, `issue:cite`, `release:scope`)
   into one round trip — joshuafolkken/kit#2372.
-- The `-- ':!.josh/observations'` pathspec on the `fullrun new` pre-existing-changes stash, and
+- The `fullrun new` pre-existing-changes stash leaving the observation ledger in the tree, and
   `observations:flush` committing ledger lines written outside any issue's run —
-  joshuafolkken/kit#2919.
+  joshuafolkken/kit#2919; the exclusion moved into `josh stash:push` — joshuafolkken/kit#4131.
 
 ## Why a lane child skips `josh ms`
 

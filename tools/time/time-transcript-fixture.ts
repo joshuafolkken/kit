@@ -1,0 +1,360 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { time_markers } from '#scripts/time-runtime/time-markers'
+import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
+
+// The transcript files the timing tests measure, written once rather than in each test file
+// (joshuafolkken/kit#1284).
+//
+// `time-corpus.ts` walks the directory and `time-run.ts` reports on what the walk found, so both
+// suites need the same fixtures: a session, a delegated unit under it, and the three line shapes a
+// span is derived from. Restating them beside each suite would be the clone `CLAUDE.md` prohibits,
+// in the one place where a drift would make the two suites disagree about what a transcript is.
+
+const CWD = '/Users/someone/Development/kit'
+const MINUTE_MS = 60_000
+const BRANCH = '1268-measure-a-run'
+const CALL_ID = 'a'
+// The tool a fixture call names unless a case says otherwise. Reading is what most of these
+// transcripts are made of, and a case about writes names its own.
+const READ_TOOL = 'Read'
+
+// The day every fixture minute is an offset into. Fixed rather than `Date.now()`, so a failure reads
+// the same on the day it is written and a year later.
+const FIXTURE_YEAR = 2026
+const FIXTURE_MONTH = 0
+const FIXTURE_DAY = 1
+const FIXTURE_HOUR = 0
+
+// The shape one measured stretch has: a prompt, a call one minute later, its result two minutes
+// after that. Named because three files assert against the totals they produce.
+const CALL_MINUTE = 1
+const RESULT_MINUTE = 3
+// The minute grid one `turn_lines` group occupies: the calls on the first, their results on the
+// second.
+const TURN_MINUTES = 2
+// How many turns a density fixture holds — comfortably past `time_density.MIN_ROUND_TRIPS`, so a case
+// about the density is never answered by the sample-size guard instead. Named here rather than in
+// each suite because three of them assert against the round-trip count it produces.
+const DENSITY_TURNS = 12
+// The braces a serialized payload is wrapped in, dropped so another field can be put in front of the
+// ones already there.
+const OPENING_BRACE = 1
+const CLOSING_BRACE = -1
+
+function at(minute: number): string {
+	return new Date(
+		Date.UTC(FIXTURE_YEAR, FIXTURE_MONTH, FIXTURE_DAY, FIXTURE_HOUR, minute),
+	).toISOString()
+}
+
+function ms(minute: number): number {
+	return Date.parse(at(minute))
+}
+
+function prompt_line(minute: number, branch: string): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: 'go' },
+	})
+}
+
+function call_line(minute: number, branch: string, name = READ_TOOL, id = CALL_ID): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_use', name, id }] },
+	})
+}
+
+// `content` is a parameter so a suite can hand the result a body worth reading — the stage block
+// `pnpm josh followup` prints, which `time-followup-stage.ts` reads back off it
+// (joshuafolkken/kit#1445). Defaulted, so every existing caller is unchanged.
+function result_line(minute: number, branch: string, id = CALL_ID, content = 'ok'): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content }] },
+	})
+}
+
+// The same result the harness writes back for a call it denied, or one that threw: a `tool_result`
+// carrying `is_error` (joshuafolkken/kit#1764). A refused read is written to the transcript exactly
+// like any other call, so a suite about what a guard counts needs to be able to say one failed.
+function error_result_line(
+	minute: number,
+	branch: string,
+	id = CALL_ID,
+	content = 'denied',
+): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content, is_error: true }] },
+	})
+}
+
+// Minutes 0→1 model wait, 1→3 tool execution, all on the given branch.
+function issue_lines(offset: number, branch: string = BRANCH): Array<string> {
+	return [
+		prompt_line(offset, branch),
+		call_line(offset + CALL_MINUTE, branch),
+		result_line(offset + RESULT_MINUTE, branch),
+	]
+}
+
+// One `tool_use` line carrying its input, named by the tool (joshuafolkken/kit#1472). `call_line`
+// above carries no input at all, and the three builders below each used to write this same object
+// with one field changed — a clone that would have needed a fourth copy the moment a suite wanted a
+// tool none of them names, which `MultiEdit` and `NotebookEdit` now do.
+interface ToolLine {
+	name: string
+	input: unknown
+	id?: string
+}
+
+function tool_call_line(minute: number, branch: string, call: ToolLine): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: {
+			content: [{ type: 'tool_use', name: call.name, id: call.id ?? CALL_ID, input: call.input }],
+		},
+	})
+}
+
+// A `pnpm josh <cmd>` call, which is what a phase is read off (joshuafolkken/kit#1384). `call_line`
+// above carries no tool input, so every span it writes belongs to no command phase at all — and a
+// suite measuring where the merge command sat cannot express its subject without one.
+function josh_call_line(minute: number, branch: string, command: string, id = CALL_ID): string {
+	return tool_call_line(minute, branch, { name: 'Bash', input: { command }, id })
+}
+
+// An `Edit` call naming the file it edits (joshuafolkken/kit#1387). `call_line` above carries no tool
+// input, so every span it writes names no target at all — and a suite measuring which edits reached the
+// merged diff cannot express its subject without one.
+function edit_call_line(minute: number, branch: string, file_path: string, id = CALL_ID): string {
+	return tool_call_line(minute, branch, { name: 'Edit', input: { file_path }, id })
+}
+
+// The same assistant line, tagged with the message it belongs to (joshuafolkken/kit#1329). Claude
+// Code writes one line per content block and repeats the message id on each, which is what lets a
+// turn's calls be counted exactly. `call_line` above stays untagged: every existing caller measures
+// spans, where the id plays no part, and giving each of them a distinct one would say nothing.
+// The call below rides along for the suites that need a turn's call to name something
+// (joshuafolkken/kit#1390): the batching guard reads the target off the input, so a case about a call
+// that depends on an earlier one cannot be expressed without it. Defaulted, so every caller predating
+// it writes exactly the line it always did.
+
+// What a fixture turn's call is, beyond its position on the grid. **The tool name is a field rather
+// than a fifth parameter** because a write-span sequence is what pins the batching guard's target test
+// (joshuafolkken/kit#1762): with `Read` spans alone, both the shipped test and the one it replaced
+// answer the same, so the case proves nothing.
+interface FixtureCall {
+	name?: string
+	input?: unknown
+}
+
+function turn_call_line(
+	minute: number,
+	message_id: string,
+	id: string,
+	call: FixtureCall = {},
+): string {
+	const content = { type: 'tool_use', name: call.name ?? READ_TOOL, id, input: call.input ?? {} }
+
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: BRANCH,
+		message: { id: message_id, content: [content] },
+	})
+}
+
+// The two pieces every turn builder below is assembled from, so the minute grid and the id scheme are
+// written once. A drift between them would put a turn's results on a minute its calls do not precede.
+function turn_minute(turn: number): number {
+	return turn * TURN_MINUTES + 1
+}
+
+function call_ids(turn: number, count: number): Array<string> {
+	return Array.from({ length: count }, (_unused, index) => `t${String(turn)}-c${String(index)}`)
+}
+
+// One turn: `calls` tool calls issued together under one message id, then their results.
+function turn_lines(turn: number, calls: number): Array<string> {
+	const ids = call_ids(turn, calls)
+
+	return [
+		...ids.map((id) => turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id)),
+		...ids.map((id) => result_line(turn_minute(turn) + 1, BRANCH, id)),
+	]
+}
+
+// A turn whose calls have gone out and none has come back — the shape a transcript has at the instant
+// a `PreToolUse` hook reads it (joshuafolkken/kit#1390). One call per target, so a case can say which
+// of them a later call would depend on.
+function open_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
+	return call_ids(turn, targets.length).map((id, index) =>
+		turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, {
+			name,
+			input: { file_path: targets[index] },
+		}),
+	)
+}
+
+// The same turn, closed by the results that give its calls spans. A span exists only once its result
+// has come back, which is exactly why the open half above is a builder of its own.
+function target_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
+	const results = call_ids(turn, targets.length).map((id) =>
+		result_line(turn_minute(turn) + 1, BRANCH, id),
+	)
+
+	return [...open_turn_lines(turn, targets, name), ...results]
+}
+
+// The body the harness writes back for a call this guard denied (joshuafolkken/kit#1979). It opens
+// with the ⛔ and the `batching` token `time-transcript-line.ts` reads a refusal's guard off, so a span
+// built from it carries `refusal_guard: 'batching'`.
+const BATCHING_REFUSAL_BODY = '⛔ batching: reissue this in one turn'
+
+// A refused turn: the same open-then-result shape as `target_turn_lines`, but each result is the ⛔
+// body above rather than `ok` — so `time_spans` reads it as a span carrying this guard's refusal label.
+// A refused call is written to the transcript like any other, and the batch guard's re-issue test looks
+// for exactly this shape when it decides not to refuse the identical call a second time.
+function refused_turn_lines(
+	turn: number,
+	targets: ReadonlyArray<string>,
+	name: string = READ_TOOL,
+): Array<string> {
+	const results = call_ids(turn, targets.length).map((id) =>
+		error_result_line(turn_minute(turn) + 1, BRANCH, id, BATCHING_REFUSAL_BODY),
+	)
+
+	return [...open_turn_lines(turn, targets, name), ...results]
+}
+
+// A whole stretch of identical turns, which is what the live-density reading is measured against: at
+// `calls` of 1 the density is 1.00 and every turn is its own round trip, at 3 it is 3.00 over a third
+// as many.
+function density_text(turns: number, calls: number): string {
+	const groups = Array.from({ length: turns }, (_unused, turn) => turn_lines(turn, calls))
+
+	return [prompt_line(0, BRANCH), ...groups.flat()].join('\n')
+}
+
+// A hook payload whose `agent_id` is the JSON literal `null` (joshuafolkken/kit#1424).
+//
+// **Spliced in as text rather than set as a value**, for two reasons that point the same way: it is
+// what the harness sends, and a `null` written in TypeScript source is what `unicorn/no-null` forbids.
+// What the cases built on it assert is that a hook's schema reads that spelling as "no fork" instead of
+// rejecting the whole payload — which would take the hook off every call of the main line, in silence.
+//
+// **Shared rather than restated in each suite**: both hook suites need it, and the guard and the
+// density line must not come to disagree about what an absent agent looks like.
+// **The field goes in first and the separator is decided from what is left**, rather than a comma
+// appended after the last field: a payload of `{}` would then yield `{,"agent_id":null}`, which is not
+// JSON at all — and a hook's outer catch makes that indistinguishable from the schema having rejected
+// the payload, so the case would pass or fail for the wrong reason.
+function with_null_agent(payload_json: string): string {
+	const fields = payload_json.slice(OPENING_BRACE, CLOSING_BRACE).trim()
+	const separator = fields === '' ? '' : ','
+
+	return `{"agent_id":null${separator}${fields}}`
+}
+
+function project_directory(home: string): string {
+	return path.join(home, cost_transcript.project_slug(CWD))
+}
+
+function write_transcript(directory: string, name: string, lines: ReadonlyArray<string>): void {
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(
+		path.join(directory, `${name}${cost_transcript.TRANSCRIPT_EXTENSION}`),
+		lines.join('\n'),
+	)
+}
+
+function write_session(home: string, name: string, lines: ReadonlyArray<string>): void {
+	write_transcript(project_directory(home), name, lines)
+}
+
+// One tool span, named and placed on the minute grid, for the suites that test the arithmetic rather
+// than the reading. Here rather than beside each of them because two suites now assert against spans
+// built exactly this way, and a builder that drifted would let them disagree about what a span is.
+// The fields no case varies, written once so a new `Span` field lands in one literal — the pattern
+// `time-span-fixture.ts` and `time-phase-fixture.ts` use, and what keeps `span` inside its line limit.
+const UNVARIED_SPAN = {
+	category: time_spans.TOOL_CATEGORY,
+	josh_command: '',
+	josh_commands: [],
+	josh_signatures: [],
+	refusal_guard: '',
+	check_key: '',
+	marker: time_markers.NO_MARKER,
+	is_bundleable: false,
+	is_writing: false,
+	may_write: false,
+	has_prior_reference: false,
+	targets: [],
+	writes: [],
+	message_id: time_spans.NO_MESSAGE_ID,
+	issue: time_markers.NO_ISSUE,
+	branch: 'main',
+	call_id: '',
+	outcome: time_spans.UNKNOWN_OUTCOME,
+	followup_stages: [],
+	is_continuation: false,
+	...time_spans.no_background(),
+} satisfies Partial<Span>
+
+function span(label: string, ended_minute: number, duration_minutes: number): Span {
+	return {
+		...UNVARIED_SPAN,
+		label,
+		ended_ms: ended_minute * MINUTE_MS,
+		...time_spans.equal_durations(duration_minutes * MINUTE_MS),
+	}
+}
+
+const time_transcript_fixture = {
+	BRANCH,
+	DENSITY_TURNS,
+	at,
+	ms,
+	prompt_line,
+	call_line,
+	edit_call_line,
+	josh_call_line,
+	error_result_line,
+	result_line,
+	tool_call_line,
+	turn_call_line,
+	turn_lines,
+	open_turn_lines,
+	target_turn_lines,
+	refused_turn_lines,
+	density_text,
+	issue_lines,
+	with_null_agent,
+	project_directory,
+	write_session,
+	span,
+}
+
+export { time_transcript_fixture }

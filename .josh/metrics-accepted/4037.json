@@ -1,0 +1,7 @@
+{
+	"reason": "Write-permission lookups for MEMBER / COLLABORATOR authors, plus review round 1-2 fixes: tri-state trust_of so a failed lookup never drops a comment round or a member's comment (announced with its body withheld), the hook timeout threaded into each lookup, and EMU logins accepted",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 103
+	}
+}

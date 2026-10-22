@@ -47,6 +47,30 @@ test('offers the declared item past an added issue already in flight', () => {
 	expect(backlog_drive_named.offer(CARRY, declared, true)?.verdict).toBe('wait')
 })
 
+// joshuafolkken/kit#4206: the issue a held one starts after, as `run:board` names it on the queued row.
+test('names the declared issue just before one the declared order holds', () => {
+	const carry = {
+		...CARRY,
+		invocation: 'backlogrun #1 #2 #3 --only',
+		added: [{ issue: 9, is_priority: false }],
+	}
+
+	expect(backlog_drive_named.held_after(carry, ['1'], 2)).toBe(1)
+	expect(backlog_drive_named.held_after(carry, ['1'], 3)).toBe(2)
+	expect(backlog_drive_named.held_after(carry, ['1'], 9)).toBeUndefined()
+	expect(backlog_drive_named.held_after(carry, ['1'], 1)).toBeUndefined()
+})
+
+// joshuafolkken/kit#4279: before the first declared issue started, the one after it said nothing.
+test('holds the declared order before its first issue starts, and never an issue in flight', () => {
+	expect(backlog_drive_named.held_after(CARRY, [], 2)).toBe(1)
+	expect(backlog_drive_named.held_after(CARRY, [], 1)).toBeUndefined()
+	expect(backlog_drive_named.held_after(CARRY, ['2'], 2)).toBeUndefined()
+	const unnamed = { ...CARRY, invocation: 'backlogrun' }
+
+	expect(backlog_drive_named.held_after(unnamed, ['1'], 2)).toBeUndefined()
+})
+
 test('stops after all named issues when only mode is declared', () => {
 	const carry = { ...CARRY, done: [1, 2] }
 	const state = backlog_drive.initial_state([], ACTIVE)

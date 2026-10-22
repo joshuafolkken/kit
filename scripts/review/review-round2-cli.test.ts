@@ -81,3 +81,30 @@ describe('review_round2_cli.run', () => {
 		expect(await review_round2_cli.run(['--nope'])).toBe(1)
 	})
 })
+
+// joshuafolkken/kit#4064: `--json` carries the reason code; the plain answer stays the bare verdict.
+describe('review_round2_cli.print', () => {
+	const ANSWER = { verdict: 'skip', code: 'empty', reason: 'why' } as const
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('prints the verdict, the code and the reason as one JSON object under --json', () => {
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		review_round2_cli.print(ANSWER, true)
+
+		expect(info).toHaveBeenCalledWith('{"round2":"skip","code":"empty","reason":"why"}')
+	})
+
+	it('prints the bare verdict on stdout and the reason on stderr otherwise', () => {
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
+
+		review_round2_cli.print(ANSWER, false)
+
+		expect(info).toHaveBeenCalledWith('skip')
+		expect(error).toHaveBeenCalledWith('why')
+	})
+})

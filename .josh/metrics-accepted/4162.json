@@ -1,0 +1,7 @@
+{
+	"reason": "#4162 adds the table-row catalog renderer and the generated summary line; the four reference pages shrink by about 16 KB in exchange",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}

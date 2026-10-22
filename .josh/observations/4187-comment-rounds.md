@@ -1,0 +1,7 @@
+- rf:none | none | - | 2026-10-19 | #4187
+- rf:comments | medium | scripts/init/hook-launch.ts:6 | 2026-10-19 | #4187
+- rf:bug-risks | low | scripts/init/hook-launch.ts:26 | 2026-10-19 | #4187
+- rf:bug-risks | low | scripts/init/hook-command-rewrite.ts:20 | 2026-10-19 | #4187
+- rf:assumptions | low | scripts/init/hook-launch.ts:28 | 2026-10-20 | #4187
+- rf:tests | low | scripts/release/release-approval-prune.test.ts:16 | 2026-10-20 | #4187
+- rf:assumptions | low | scripts/init/init-ai-copy.ts:50 | 2026-10-20 | #4187

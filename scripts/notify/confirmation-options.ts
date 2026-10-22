@@ -15,7 +15,6 @@ interface Headings {
 	none: string
 }
 
-const JAPANESE_LANG_PREFIX = 'ja'
 const JAPANESE_HEADINGS: Headings = {
 	recommended: '推奨:',
 	alternatives: '他の選択肢:',
@@ -31,7 +30,7 @@ const ENGLISH_HEADINGS: Headings = {
 function headings(): Headings {
 	const { lang } = session_language.resolve_session_lang()
 
-	return lang.toLowerCase().startsWith(JAPANESE_LANG_PREFIX) ? JAPANESE_HEADINGS : ENGLISH_HEADINGS
+	return session_language.is_japanese(lang) ? JAPANESE_HEADINGS : ENGLISH_HEADINGS
 }
 
 // An empty list is stated as none, so a confirmation with no other option says so rather than

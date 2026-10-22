@@ -43,12 +43,33 @@ type CommandReference = readonly [
 	side_effects: ReadonlyArray<CommandSideEffect>,
 ]
 
+// One `pnpm josh <command> <arguments>` line of a usage block, with the comment printed after it.
+interface CommandExample {
+	arguments: string
+	note?: string
+}
+
+// Spellings of one option — `-y` and `--yes` — rendered side by side.
+interface CommandFlag {
+	names: ReadonlyArray<string>
+	description: string
+}
+
+// What `josh help <command>` prints and what the reference pages render between their usage
+// markers — one source for both, so the page and the terminal cannot disagree (#3932). Each command's
+// entry carries its own, so a command cannot be registered without one (#4185).
+interface CommandUsage {
+	examples: ReadonlyArray<CommandExample>
+	flags?: ReadonlyArray<CommandFlag>
+}
+
 interface CommandEntry {
 	script?: string
 	shell?: ReadonlyArray<string>
 	description: string
 	category: CommandCategory
 	reference: CommandReference
+	usage: CommandUsage
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
@@ -74,6 +95,8 @@ interface CommandEntry {
 	// The memory the command's tools hold, claimed with its cores; read like
 	// `core_weight`, and none declared is none waited for.
 	memory_mb?: number | (() => number)
+	// A unit suite's claim, whose weight is its worker count (`gate_plan.DIRECT_UNIT_CLAIM`).
+	is_unit_claim?: boolean
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a
@@ -109,6 +132,13 @@ const TS_BUILD_INFO_FILE = '.tsbuildinfo'
 const CSPELL_CACHE_FILE = '.cspellcache'
 const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
 const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
+const PRETTIER_CACHE_FILE = '.prettiercache'
+const PRETTIER_RELATED_CACHE_FILE = '.prettiercache.related'
+// The pre-commit hook's own, because a staged-files run on the gate's file degrades it: cspell prunes
+// every entry the run did not visit (measured 892 KB down to 18 KB), and `eslint --quiet` stores a
+// report without its warnings under the same config hash the gate reads.
+const CSPELL_COMMIT_CACHE_FILE = '.cspellcache.commit'
+const ESLINT_COMMIT_CACHE_FILE = '.eslintcache.commit'
 
 type GateCachePortability = 'raw' | 'rooted-json'
 
@@ -139,6 +169,10 @@ const ESLINT_RELATED_CACHE_SPEC: GateCacheSpec = {
 	cache_file: ESLINT_RELATED_CACHE_FILE,
 	portability: ROOTED_JSON_PORTABILITY,
 }
+// **Prettier's caches are in neither list: they do not survive a move to another checkout.**
+// Prettier 3 hashes each file's resolved options, *its absolute `filepath` included*, into the entry,
+// so rebasing the keys as ESLint's are still leaves every entry a miss — two checkouts of one tree
+// were measured sharing none of their 3,526 option hashes. Each checkout keeps a warm cache of its own.
 const GATE_CACHE_SPECS: ReadonlyArray<GateCacheSpec> = [
 	ESLINT_CACHE_SPEC,
 	TS_CACHE_SPEC,
@@ -154,7 +188,7 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // The `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file at `--cache-location`
 // whenever it is started without `--cache` — so a shared file would be wiped by every single edit,
 // leaving the gate a cold lint. The hook is given a location of its own rather than the
-// gate's because the two run at the same time: `josh gate` lints the whole tree beside the review
+// gate's because the two run at the same time: `josh gate` lints beside the review
 // while this hook fires on every edit, and each eslint run rewrites its cache file whole from the
 // copy it loaded at start-up — so two writers silently discard each other's entries. A file of its
 // own makes the hook structurally unable to degrade the cache this exists to protect.
@@ -163,7 +197,7 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
 // file would keep the entries that run never visited.
 // The same reasoning for the scoped lint. `josh lint:related` is what an implementation loop calls
-// between edits, and `josh gate` lints the whole tree beside the review — so those two run at the
+// between edits, and `josh gate` lints beside the review — so those two run at the
 // same time as readily as the hook and the gate do. Whichever of a pair sharing one file wrote last
 // would replace it with "the copy I loaded at start-up plus what I visited", so a narrowed run
 // finishing during a whole-tree run would roll the cache back to its pre-gate state, and a
@@ -174,15 +208,21 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // warm from its own second call onwards, and the gate's stays exactly as the gate left it.
 //
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
-// `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
-// whole tree before any commit.
+// `josh lint:related` and the gate's `josh lint --changed` each narrow to the change, on caches of
+// their own. The scoped lint's prettier cache is its own for the same reason:
+// prettier rewrites its cache file whole as well.
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
-// written from. The gate's three, the edit hook's, and the scoped lint's — a cache file that is not
-// ignored is committed, or spell-checked, which is a red gate with nothing misspelled in the tree.
+// written from. The gate's, the edit hook's, the scoped lint's and the pre-commit hook's — a cache
+// file that is not ignored is committed, or spell-checked, which is a red gate with nothing
+// misspelled in the tree.
 const IGNORED_CACHE_FILES: ReadonlyArray<string> = [
 	...GATE_CACHE_FILES,
 	ESLINT_EDIT_CACHE_FILE,
 	ESLINT_RELATED_CACHE_FILE,
+	PRETTIER_CACHE_FILE,
+	PRETTIER_RELATED_CACHE_FILE,
+	CSPELL_COMMIT_CACHE_FILE,
+	ESLINT_COMMIT_CACHE_FILE,
 ]
 
 // `--cache --cache-strategy content` is one convention rather than two coincidences: cspell adopted
@@ -190,11 +230,11 @@ const IGNORED_CACHE_FILES: ReadonlyArray<string> = [
 const CONTENT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
 const CACHE_LOCATION_FLAG = '--cache-location'
 
-// Four locations are written with these same four flags — the gate's eslint cache, the scoped lint's,
-// the edit hook's and the spell check's — so the sequence is built here once. Spelled out per
-// location, a fix to the order would have to be made four times and each copy fails silently: a flag
-// and its value are one unit, and a wrong order makes the tool read `--cache-strategy` as the file
-// name rather than erroring.
+// Every location is written with these same four flags — the eslint, prettier and spell-check caches
+// of the gate, the scoped lint, the edit hook and the pre-commit hook — so the sequence is built here
+// once. Spelled out per location, a fix to the order would have to be made once per location and
+// each copy fails silently: a flag and its value are one unit, and a wrong order makes the tool read
+// `--cache-strategy` as the file name rather than erroring.
 function content_cache_flags(cache_file: string): ReadonlyArray<string> {
 	return [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, cache_file]
 }
@@ -204,20 +244,28 @@ const ESLINT_EDIT_CACHE_FLAGS = content_cache_flags(ESLINT_EDIT_CACHE_FILE)
 const ESLINT_RELATED_CACHE_FLAGS = content_cache_flags(ESLINT_RELATED_CACHE_FILE)
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
 const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
+const PRETTIER_CACHE_FLAGS = content_cache_flags(PRETTIER_CACHE_FILE)
+const PRETTIER_RELATED_CACHE_FLAGS = content_cache_flags(PRETTIER_RELATED_CACHE_FILE)
+const CSPELL_COMMIT_CACHE_FLAGS = content_cache_flags(CSPELL_COMMIT_CACHE_FILE)
+const ESLINT_COMMIT_CACHE_FLAGS = content_cache_flags(ESLINT_COMMIT_CACHE_FILE)
 
-export type { CommandCategory, CommandEntry, GateCacheSpec }
+export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target: the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache
 // stays private; the scoped lint cache is exported because #2060 shares its completed file between
-// worktrees, but it still never overlaps the gate's distinct cache location.
+// worktrees, but it still never overlaps the gate's distinct cache location. The pre-commit hook's
+// eslint cache is exported because the hook re-reads a red report against it (#4407).
 export {
 	COMMAND_AUDIENCES,
 	COMMAND_SIDE_EFFECTS,
 	CSPELL_CACHE_FILE,
 	CSPELL_CACHE_FLAGS,
+	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
+	ESLINT_COMMIT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FILE,
@@ -226,6 +274,10 @@ export {
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
 	OPTIONAL_ENV_FILE_FLAGS,
+	PRETTIER_CACHE_FILE,
+	PRETTIER_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FILE,
+	PRETTIER_RELATED_CACHE_FLAGS,
 	SHARED_CACHE_SPECS,
 	TS_BUILD_INFO_FILE,
 	TS_CACHE_FLAGS,

@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 review fixes: issue:plan prints a refused write as one line instead of a stack trace, and the --repo paths of issue_edit_body/issue_edit_title/issue_comment gain write-layer tests",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 170,
+		"prose.long_paragraphs": 1
+	}
+}

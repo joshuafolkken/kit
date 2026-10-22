@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_ledger, type DispatchEntry, type LedgerEntry, type StageEntry } from './lane-ledger'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -16,7 +17,6 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // **`ci-wait` is `followup`'s own lap, inside the `followup` stage** — a row of its own so the wait for
 // CI reads beside `review`, the round-one review it would overlap.
 
-const MS_PER_MINUTE = 60_000
 const DECIMALS = 1
 const NOT_MEASURED = 'not measured'
 const IMPLEMENT = 'implement'
@@ -25,6 +25,7 @@ const { STAGE } = run_ship_stage
 const STAGES = [
 	IMPLEMENT,
 	STAGE.PREFLIGHT,
+	lane_ledger.PRE_DETACH_STAGE,
 	STAGE.REVIEW,
 	STAGE.SYNC,
 	STAGE.GATE,

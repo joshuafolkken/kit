@@ -76,6 +76,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 			await Promise.resolve()
 		},
 		now: () => new Date(clock.now),
+		retry_closes: async () => undefined,
 	}
 
 	return { ports, wakes, wake_times, sleeps, work_asks }

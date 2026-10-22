@@ -90,7 +90,7 @@ saying nobody was notified while the merge carries on. See
 
 **Every GitHub call this package makes is `gh api` (REST).** A cloud session's egress is answered
 `403` for GitHub's GraphQL endpoint, so the subcommand forms — `gh issue view`, `gh pr list`,
-`gh repo view --json` and the rest — do not work there. `scripts/gh/gh-subcommand-guard.ts` and
+`gh repo view --json` and the rest — do not work there. `tools/gh/gh-subcommand-guard.ts` and
 `scripts/gh/gh-document-guard.test.ts` hold the code and the shipped documents to that rule, and
 `prompts/collaboration-workflow/gh-rest.md` is the rule itself.
 

@@ -17,7 +17,7 @@ import { clone_fingerprint } from './clone-fingerprint'
 // which is what makes two identical relative paths in different repositories a cross-repository clone.
 
 // The directories a package keeps its source in; whichever exist are scanned.
-const SOURCE_ROOTS = ['scripts', 'src']
+const SOURCE_ROOTS = ['scripts', 'tools', 'src']
 const SOURCE_EXTENSION = '.ts'
 // Test files and declarations are not product code, so a shared test helper is not a clone to report.
 const IGNORED_SUFFIXES = ['.test.ts', '.svelte.test.ts', '.d.ts']

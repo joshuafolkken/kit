@@ -7,7 +7,7 @@
 - Background `pnpm josh gate` beside the review; join it before commit.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
-- Keep `pnpm josh followup` in the foreground — nearly every following step reads its result.
+- `pnpm josh followup` stays in the foreground (`followup.md`).
 - **Record before the CI wait ends, never after the merge**: the commit
   carries the observation ledger lines recorded so far, and while CI runs the run makes the records
   that need no CI result — observation Issues, the completion report draft.
@@ -17,7 +17,6 @@
 - A lane child's hand-off or pre-gate cut is the sole turn boundary before the push (`chain-rule.md`).
 
 Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
-Where each rule came from: `docs/maintainers/background-commands-rationale.md` → "Where each rule came from".
 
 ## How the wait ends — the task's exit, never a regex over its output
 
@@ -26,9 +25,8 @@ when it *exits* — that completion notification is what ends the wait, not a re
 limit.
 
 **Never hand-write a `while`/`until` … `sleep` loop over the output file** — a regex that never matches
-waits to the block limit, one that matches a mid-run line exits early. `pnpm josh rule:guard` refuses it
-(`prompts/collaboration-workflow/rule-delivery.md`; `docs/maintainers/background-commands-rationale.md`
-→ "Why a poll loop is refused").
+waits to the block limit, one that matches a mid-run line exits early. the `poll-loop` row of `pnpm josh rule:list` refuses it
+(`prompts/collaboration-workflow/rule-delivery.md`).
 
 **To glance at interim output, `Read` the output file once**, never in a sleep loop. CI is waited on by
 `pnpm josh followup`; a progress heartbeat is `run:progress --wait`'s job (`early-heartbeat` refuses a
@@ -37,8 +35,7 @@ hand-armed timer).
 ## The tail and what overlaps each wait
 
 **Never give a foreground call a timeout above the harness cap** — a larger number detaches it without
-the completion notification (`docs/maintainers/background-commands-rationale.md` → "Why the tail
-collects idle time").
+the completion notification.
 
 **The tail is emptied before `followup` is issued.** Each step is asked one question: **does it read the
 merge result?**
@@ -62,17 +59,16 @@ merge result?**
 | `pnpm josh followup` | Nothing — it is foreground. **The post-merge tail is taken before the call**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --cut` |
 
 **The turn never ends at the push.** The `pnpm josh git -y` completion resumes the run, and that turn
-goes straight through any branch-2 filing and `pnpm josh epic:bundle` to `pnpm josh followup`. `pnpm
-josh rule:guard` refuses the foreground push (`prompts/collaboration-workflow/rule-delivery.md`); the
-push reissued detached is not refused again (`docs/maintainers/background-commands-rationale.md` → "Why
-the push is guarded").
+goes straight through any branch-2 filing and `pnpm josh epic:bundle` to `pnpm josh followup`. the
+`run-tail` row of `pnpm josh rule:list` refuses the foreground push (`prompts/collaboration-workflow/rule-delivery.md`); the
+push reissued detached is not refused again.
 
 **One turn does end before the push: a dispatched lane child's pre-gate cut** — `pre-gate-cut.md` →
 "Taking the cut".
 
 **A headless lane child (`claude -p`) is where "a background command re-invokes the run" does not
 hold: its background Bash tasks are killed when its turn ends.** It hands the gate-to-merge region to a
-foreground `pnpm josh ship --detach` (`chain-rule.md` step 0); `pnpm josh rule:guard` refuses a
+foreground `pnpm josh ship --detach` (`chain-rule.md` step 0); the `lane-background` row of `pnpm josh rule:list` refuses a
 backgrounded `josh gate` / `git` / `followup` / `ship` there, and the `Stop` hook sends a child with a
 task still running back to wait.
 

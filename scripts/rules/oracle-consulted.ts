@@ -55,6 +55,15 @@ function reason_for(oracle: Oracle, firing_point: FiringPoint): string {
 	)
 }
 
+// One description for every generated row: the rule is the same act whichever oracle it names.
+const ABOUT: DeliveredRule['about'] = {
+	title: 'An act its oracle was not asked about',
+	topic: '`decision-oracle.ts`',
+	fires:
+		'a `Bash` governed by an oracle that declared a firing point (`pkg:scout` governs `pnpm add`), issued without that `pnpm josh <command>`. Refused until it ran',
+	quiet: 'no governed act, or the oracle already ran',
+}
+
 function row_for(oracle: Oracle, firing_point: FiringPoint): DeliveredRule {
 	const names = command_names(oracle)
 
@@ -65,6 +74,7 @@ function row_for(oracle: Oracle, firing_point: FiringPoint): DeliveredRule {
 		already_satisfied: (tail: string, _call: GuardedCall): boolean =>
 			tail_commands.prior_bash_commands(tail).some((command) => runs_the_oracle(command, names)),
 		keeps: bash_triggers.on_bash_command((command: string) => runs_the_oracle(command, names)),
+		about: ABOUT,
 	}
 }
 

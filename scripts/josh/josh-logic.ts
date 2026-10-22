@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
-import { ancestor_directories } from '#scripts/lib/ancestor-directories'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
@@ -18,13 +18,13 @@ import {
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
+import { find_package_directory } from './package-directory'
 import { run_github_prerequisite } from './run-github-prerequisite'
 
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const TSX_PACKAGE = 'tsx'
-const PACKAGE_JSON = 'package.json'
 // Not an exit code the shell ever sees: `josh.ts` reads it as "no such command" and answers with
 // the listing on stderr. It is named because `run_command` now reports through a promise, where a
 // bare `-1` is one step further from the check that reads it.
@@ -33,17 +33,6 @@ const UNKNOWN_COMMAND_EXIT_CODE = -1
 interface TsxRunner {
 	executable: string
 	leading_arguments: ReadonlyArray<string>
-}
-
-// Resolve the kit package root by ascending to the nearest package.json. This works both
-// from the bundled dist/josh.js (one level under the root) and from the tsx source at
-// scripts/josh/ (two levels), so this file's depth no longer has to be hard-coded.
-function find_package_directory(start_directory: string): string {
-	return (
-		ancestor_directories.nearest(start_directory, (directory) =>
-			existsSync(path.join(directory, PACKAGE_JSON)),
-		) ?? start_directory
-	)
 }
 
 const PACKAGE_DIR = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
@@ -82,9 +71,7 @@ function resolve_tsx_runner(): TsxRunner {
 }
 
 function read_package_version(): string {
-	const raw = readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')
-
-	return package_version_schema.parse(JSON.parse(raw)).version
+	return package_manifest.read_manifest(PACKAGE_DIR, package_version_schema).version
 }
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
@@ -176,16 +163,11 @@ function format_unknown_command(cmd: string): string {
 	return `Unknown command: ${cmd}.${hint} Run 'josh --help' for common commands or 'josh --all' for the full list.`
 }
 
-// A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and
-// running it through the shell would break on the spaces in a typical Windows install path.
-function should_use_shell(executable: string): boolean {
-	return process.platform === 'win32' && executable !== process.execPath
-}
-
+// No `shell` option on purpose: execa runs a Windows `.cmd` shim itself and escapes the arguments
+// for cmd.exe, which the shell would receive unescaped.
 function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
 	const result = execaSync(tsx_executable, script_arguments, {
 		stdio: 'inherit',
-		shell: should_use_shell(tsx_executable),
 		reject: false,
 	})
 
@@ -287,6 +269,7 @@ function declared(value: number | (() => number) | undefined): number | undefine
 // without claiming a place. A command under a parent that already holds its cores claims nothing:
 // `core_budget.with_command_reservation` reads the mark that parent set.
 async function dispatch_entry(
+	command: string,
 	entry: CommandEntry,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
@@ -297,7 +280,7 @@ async function dispatch_entry(
 	return await core_budget.with_command_reservation(
 		weight,
 		async () => await run_entry(entry, subcommand_arguments),
-		{ memory_mb: declared(entry.memory_mb) },
+		{ memory_mb: declared(entry.memory_mb), command, is_unit: entry.is_unit_claim },
 	)
 }
 
@@ -314,7 +297,7 @@ async function run_command(
 	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
 	if (early_exit !== undefined) return early_exit
 
-	return await dispatch_entry(entry, subcommand_arguments)
+	return await dispatch_entry(resolved, entry, subcommand_arguments)
 }
 
 const josh_logic = {
@@ -330,10 +313,11 @@ export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {
-	find_package_directory,
 	josh_logic,
 	resolve_alias,
 	resolve_tsx_executable,
 	resolve_tsx_runner,
 	UNKNOWN_COMMAND_EXIT_CODE,
 }
+
+export { find_package_directory } from './package-directory'

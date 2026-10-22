@@ -1,9 +1,6 @@
 # Output bounds — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/output-bounds.md`: the
-measurements behind the Bash output cap, the alternatives rejected on the way, and the incident that
-produced the pipe rule. It is never read during a run, and a change to this file changes no rule. It
-moved out of the procedure in joshuafolkken/kit#3177.
+Rationale behind `prompts/collaboration-workflow/output-bounds.md`.
 
 ## Why 8,000
 
@@ -68,7 +65,7 @@ would have committed a red tree.
   placed a detector instead. joshuafolkken/kit#1344 and joshuafolkken/kit#1460 also measured prose that
   moved no number.
 
-**Triggered delivery was adopted** (`rule-delivery.md`): `pnpm josh rule:guard` refuses, on the spot, a
+**Triggered delivery was adopted** (`rule-delivery.md`): the `piped-verification` row of `pnpm josh rule:list` refuses, on the spot, a
 `Bash` call where a pass/fail josh check stands before a pipe. **A refusal cannot be skimmed past.**
 
 **The commonest shape is rewritten instead of refused** (joshuafolkken/kit#3570). Almost every

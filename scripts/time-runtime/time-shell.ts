@@ -32,8 +32,9 @@ const SEGMENT_PATTERN = /&&|\|\||;|\|/u
 // last, while `||` keeps the first command's and runs the second only when it failed. `|&` is a pipe
 // and is cut here, its `&` left in the fragment that follows.
 const PIPE_PATTERN = /(?<!\|)\|(?!\|)/u
-// What `SEGMENT_PATTERN` cuts on minus the pipe, for reading *inside* one pipe segment.
-const CHAIN_PATTERN = /&&|\|\||;/u
+// What `SEGMENT_PATTERN` cuts on minus the pipe, for reading *inside* one pipe segment — plus the
+// newline, which ends a command as `;` does, so a line typed before the piped check is not read as it.
+const CHAIN_PATTERN = /&&|\|\||;|\n/u
 // A quoted span is text, not shell syntax, and it is removed before the pipe reading below. This
 // repository's issue bodies, comment bodies and commit messages quote command chains constantly, so
 // `--body "cd x && pnpm josh gate | tail"` is a `gh` call and nothing else — a reader that split its
@@ -299,8 +300,8 @@ function drop_redirections(words: ReadonlyArray<string>): Array<string> {
 // **The match's own text is what is sliced off, not a fixed word count.** The prefix is two words in
 // `josh lint`, three in `pnpm josh lint` and four in `pnpm exec josh lint`, so counting words would
 // leave `josh` itself in the argument list for one of the three spellings.
-function josh_arguments(command: string): Array<string> {
-	const text = command_words(command_segment(command)).join(' ')
+function josh_arguments_of_segment(segment: string): Array<string> {
+	const text = command_words(segment).join(' ')
 	const match = JOSH_PATTERN.exec(text)
 
 	if (match === null) return []
@@ -313,6 +314,29 @@ function josh_arguments(command: string): Array<string> {
 	return drop_redirections(words)
 }
 
+function josh_arguments(command: string): Array<string> {
+	return josh_arguments_of_segment(command_segment(command))
+}
+
+// The josh subcommand one segment runs plus every argument it passes, redirections dropped, or `''`
+// for a segment that runs none. **Flags are kept**: which of them ask nothing new (`run:board --chat`)
+// and which turn a read into a write (`run:carry --cut`) is the reader's rule, not this one's.
+function josh_signature_of_segment(segment: string): string {
+	const name = josh_command_of_segment(segment)
+
+	if (name === '') return ''
+
+	return [name, ...josh_arguments_of_segment(segment)].join(' ')
+}
+
+// Every segment's signature, read over the same unquoted chain `josh_commands_of` walks.
+function josh_signatures_of(command: string): Array<string> {
+	return unquoted(command)
+		.split(SEGMENT_PATTERN)
+		.map((segment) => josh_signature_of_segment(segment))
+		.filter((signature) => signature !== '')
+}
+
 const time_shell = {
 	JOSH_PREFIX,
 	bash_command,
@@ -323,6 +347,7 @@ const time_shell = {
 	josh_arguments,
 	josh_command_of,
 	josh_commands_of,
+	josh_signatures_of,
 	leading_word,
 	unquoted,
 }

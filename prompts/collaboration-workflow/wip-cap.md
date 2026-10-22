@@ -1,6 +1,6 @@
 # オープン Issue の WIP 上限
 
-常駐も配送もされず（joshuafolkken/kit#1524）、起票コマンドが守らせる（直接起票は `direct-filing` が拒否する）。保留文は `scripts/issue/issue-wip.ts` の `HELD_MESSAGE`（`docs/maintainers/wip-cap-rationale.md` → "Tests that pin the wording"）、背景は `docs/maintainers/wip-cap-rationale.md` → "Why a cap is needed — the measurement"。
+常駐も配送もされず（joshuafolkken/kit#1524）、起票コマンドが守らせる（直接起票は `direct-filing` が拒否する）。保留文は `scripts/issue/issue-wip.ts` の `HELD_MESSAGE`。
 
 ## 規則
 
@@ -30,13 +30,13 @@
 
 前提 Issue（`prerequisite.md`）、別パッケージ起因の割り込み Issue、ユーザーが `new` と打った入口、`issue:scout` が重複無しと答えた新規作業、そして分割判定が作る子 Issue と epic。
 
-- **上限を理由に止めない。** 理由は `docs/maintainers/wip-cap-rationale.md` → "Why a filing a run is blocked by is not stopped"。
+- **上限を理由に止めない。**
 - **分割の子がここに入る理由**: 分割を検出した `fullrun` / `halfrun` は「子と epic を起票して STOP」と定められており（`fullrun.md` / `halfrun.md`）、分割するかは分割判定の側が決める。
 - 超過した事実は完了報告に 1 行書く（例: 「オープン 34 件で起票した」）。
 
 ### 割り込み起票 — 上限が効かない側（3 条件で機械的に決める）
 
-重大な欠陥の発見は、ランを止めていなくても捨てない（`docs/maintainers/wip-cap-rationale.md` → "Where the interrupt category comes from"）。対象はこのリポジトリの欠陥で、発見したランをブロックしていないもの（別パッケージ起因は `upstream-interrupt.md`、実行が詰まる側）。
+重大な欠陥の発見は、ランを止めていなくても捨てない。対象はこのリポジトリの欠陥で、発見したランをブロックしていないもの（別パッケージ起因は `upstream-interrupt.md`、実行が詰まる側）。
 
 #### 3 条件 — 該当するかは判断ではない
 
@@ -48,20 +48,20 @@
 
 **3 つのいずれにも当たらない発見は、従来どおり裁量側の出口を取る。** 改善案、設計上の好み、未検証の疑い、「あとで直したい」がこれに当たる。
 
-**深刻さの自己申告は条件ではない。** 理由は `docs/maintainers/wip-cap-rationale.md` → "Why self-reported severity is not a condition"。
+**深刻さの自己申告は条件ではない。**
 
 #### 該当したときの手順
 
 1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。本文の検査、分類ラベルの付与、重複探し、`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。
 
    ```bash
-   pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route interrupt
+   pnpm josh issue:file "<title>" --body-file <body-file> --route interrupt
    ```
 
 2. 超過している事実と当たった条件の番号を、両方とも本文に 1 行書く（例:「オープン 37 件で起票。3 条件のうち 2（文書化された手順が完了できない）に該当」）。
-3. 次に実行されるものとして挿入する。epic の下なら `pnpm josh epic --add <E> <N>` で**位置を指定せずに**追加する（`<E>` が epic、`<N>` が割り込み）。**`--before` / `--after` を使ってはならない。** それらは `blocked-by` を書き込み、**偽の依存関係**になる。**順序は実行側が持つ** — 先に提示させたいときは行だけを動かす `--order-before <M>` を使う（`docs/maintainers/wip-cap-rationale.md` → "Why an addition names no position"）。**epic の下に無いなら挿入先そのものが無い**ので、4 だけを行う。
+3. 次に実行されるものとして挿入する。epic の下なら `pnpm josh epic --add <E> <N>` で**位置を指定せずに**追加する（`<E>` が epic、`<N>` が割り込み）。**`--before` / `--after` を使ってはならない。** それらは `blocked-by` を書き込み、**偽の依存関係**になる。**順序は実行側が持つ** — 先に提示させたいときは行だけを動かす `--order-before <M>` を使う。**epic の下に無いなら挿入先そのものが無い**ので、4 だけを行う。
 4. 着手は既にある承認の内側でのみ、指示を待たずに行う。`backlogrun` の中なら次の子として着手してよい。バッチの外では `CLAUDE.md` →「Explicit invocation required」が効き、起票と挿入まで済ませて打つべきコマンド（`fullrun #<N>`）を報告して止まる。**割り込みは上限の例外であって、明示起動規則の例外ではない。**
 
 起票と、実行されるようにするところまでが 1 つのまとまりである — epic の下で追加しなければ `epic:next` は候補に出さない。**epic の外にある割り込みでは、まとまりの後半は 4 の報告そのもの**である。
 
-割り込みを単独で走らせるか並列レーンで走らせるかは `.claude/skills/workflow-commands/backlogrun-lanes.md` → "A solo run" に従う（`docs/maintainers/wip-cap-rationale.md` → "Why a solo run"）。上限の数字の変え方は `docs/maintainers/wip-cap-rationale.md` → "Changing the cap itself"、分割判定・レビュー上限と一緒に動く理由は `docs/maintainers/wip-cap-rationale.md` → "The three move together" と `docs/maintainers/wip-cap-rationale.md` → "Why the three landed in one commit"。
+割り込みを単独で走らせるか並列レーンで走らせるかは `.claude/skills/workflow-commands/backlogrun-lanes.md` → "A solo run" に従う。

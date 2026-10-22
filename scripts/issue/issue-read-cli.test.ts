@@ -33,8 +33,15 @@ const ISSUE = '1715'
 const OTHER_ISSUE = '1567'
 const FIELDS_JSON = JSON.stringify({ title: 'A title', state: 'open', body: 'The body' })
 const READ = { kind: 'read', json: FIELDS_JSON }
+// An author with write access, whose comment body `issue:read` prints whole.
+const TRUSTED = 'OWNER'
 const COMMENTS_JSON = JSON.stringify([
-	{ user: { login: 'someone' }, created_at: 'then', body: 'A comment' },
+	{
+		user: { login: 'someone' },
+		author_association: TRUSTED,
+		created_at: 'then',
+		body: 'A comment',
+	},
 ])
 
 function printed(): string {
@@ -134,7 +141,12 @@ describe('issue_read_cli.run — a thread past the Bash output cap', () => {
 	const cap = bash_output_cap_reader.bash_output_cap(process.cwd())
 	const long_body = 'a line of a long issue thread\n'.repeat(cap / LINE_FRACTION)
 	const long_comments = JSON.stringify([
-		{ user: { login: 'someone' }, created_at: 'then', body: long_body },
+		{
+			user: { login: 'someone' },
+			author_association: TRUSTED,
+			created_at: 'then',
+			body: long_body,
+		},
 	])
 
 	it('prints under the cap and loses none of the thread', async () => {
@@ -152,6 +164,6 @@ describe('josh issue:read registration', () => {
 		const source = readFileSync('scripts/josh/josh-commands-issue.ts', 'utf8')
 
 		expect(source).toContain("'issue:read'")
-		expect(source).toContain('scripts/issue/issue-read-cli.ts')
+		expect(source).toContain('scripts/issue/issue-read-main.ts')
 	})
 })

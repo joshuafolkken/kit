@@ -1,9 +1,12 @@
+import { constants } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const execa_sync_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
+// `constants` stays real: the lane ledger reads its open flags at import.
 vi.mock('node:fs', () => ({
+	constants,
 	existsSync: vi.fn().mockReturnValue(false),
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
 }))
@@ -129,6 +132,8 @@ const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
 	'cspell:dot',
 	'test:unit',
 	'test:related',
+	// joshuafolkken/kit#3944
+	'retrospective',
 ]
 
 function declared_weight(command: string): number | undefined {
@@ -192,7 +197,25 @@ describe('josh_logic.run_command — the memory a command claims', () => {
 
 		await josh_logic.run_command('lint', [])
 
-		expect(reservation.mock.calls[0]?.[2]).toEqual({ memory_mb: core_budget.MEMORY_MB.lint })
+		expect(reservation.mock.calls[0]?.[2]).toEqual({
+			memory_mb: core_budget.MEMORY_MB.lint,
+			command: 'lint',
+		})
+	})
+
+	// joshuafolkken/kit#4235: a unit suite's claim is marked so it can be narrowed past the wait cap.
+	it.each([
+		['test:unit', true],
+		['lint', undefined],
+	])('marks a unit suite claim on %s', async (command, is_unit) => {
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockResolvedValue(SPAWN_SUCCESS.exitCode)
+
+		await josh_logic.run_command(command, [])
+
+		expect(reservation.mock.calls[0]?.[2]?.is_unit).toBe(is_unit)
 	})
 })
 

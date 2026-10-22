@@ -44,10 +44,21 @@ interface ReferencedLookups {
 	dropped: Array<number>
 }
 
+// Every number the body names, the ones a bundle signal counts first: the cap below must not leave a
+// signal unread because twenty background mentions came ahead of it in the body.
+function signal_first(subject: BacklogIssue): Array<number> {
+	const signals = epic_audit_logic
+		.signal_references(subject.body, subject.repo)
+		.map((reference) => reference.number)
+	const all = epic_audit_logic.parse_references(subject.body, subject.repo)
+
+	return [...new Set([...signals, ...all])]
+}
+
 function referenced_lookups(subject: BacklogIssue, known: ReadonlySet<number>): ReferencedLookups {
-	const candidates = epic_audit_logic
-		.parse_references(subject.body, subject.repo)
-		.filter((number) => number !== subject.number && !known.has(number))
+	const candidates = signal_first(subject).filter(
+		(number) => number !== subject.number && !known.has(number),
+	)
 
 	return {
 		numbers: candidates.slice(0, REFERENCED_LOOKUP_LIMIT),

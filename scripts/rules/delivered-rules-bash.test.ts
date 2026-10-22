@@ -1,13 +1,13 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
-import { delivered_rules_harness } from './delivered-rules-harness'
 import { destructive_command } from './destructive-command'
 import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { josh_git_bare } from './josh-git-bare'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
+import { pr_merge } from './pr-merge'
 
 // joshuafolkken/kit#2120: the three Bash-string rows fire through the real delivery path, and stay
 // silent on the safe forms — the doctrine that a relocation which does not fire is not a relocation.
@@ -35,7 +35,7 @@ const EXISTING_TARGET = path.join(work, 'target.md')
 writeFileSync(EXISTING_TARGET, 'existing body\n')
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 })
 
 afterAll(() => {
@@ -44,7 +44,7 @@ afterAll(() => {
 
 // The delivered reason, or undefined, for a command run once through the guard on a fresh transcript.
 function delivered_for(name: string, command: string): string | undefined {
-	return rule_delivery(payload_of(name, command), NOW_MS)
+	return delivered_rules.delivery(payload_of(name, command), NOW_MS)
 }
 
 // How many rows' triggers claim a command. One refusal can leave a `PreToolUse` hook, so a command two
@@ -164,6 +164,23 @@ describe('direct-pr-create — the PR opened outside pnpm josh pr', () => {
 
 	it.each(['pnpm josh pr', 'gh pr view 12'])(SILENT_TITLE, (command) => {
 		expect(delivered_for(`pr-silent-${command}`, command)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4038: the merge outside `pnpm josh followup`, delivered through the real path and
+// claimed by one row.
+describe('pr-merge — the PR merged outside pnpm josh followup', () => {
+	it.each([
+		['cli', 'gh pr merge 5 --squash'],
+		['curl', 'curl -X PUT https://api.github.com/repos/joshuafolkken/kit/pulls/5/merge'],
+		['graphql', 'gh api graphql -F query=@merge.graphql'],
+	])(DELIVERS_TITLE, (name, command) => {
+		expect(delivered_for(`merge-${name}`, command)).toBe(pr_merge.PR_MERGE_REASON)
+		expect(rules_claiming(command)).toBe(ONE_RULE)
+	})
+
+	it.each(['pnpm josh followup', 'pnpm josh observations:flush'])(SILENT_TITLE, (command) => {
+		expect(delivered_for(`merge-silent-${command}`, command)).toBeUndefined()
 	})
 })
 

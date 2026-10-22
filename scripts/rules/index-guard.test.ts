@@ -20,6 +20,7 @@ describe('index_guard.is_index_mutation — refuses', () => {
 		'git -C . restore --staged src/app.ts',
 		'git restore -S src/app.ts',
 		'git status && git -C . add -A',
+		'git status | git add -A',
 	])('refuses %j', (command) => {
 		expect(index_guard.is_index_mutation(command)).toBe(true)
 	})

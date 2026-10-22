@@ -34,7 +34,9 @@ const TIMESTAMP = '2026-09-29T03:00:00.000Z'
 const TASK_ID = 'bxj18z032'
 const AGENT_ID = 'a6b97a47275a1a193'
 const DROPS_FINISHED_AGENT = 'drops a subagent whose finish notice is on the tail'
-const { context } = stop_rules_fixture
+const { action_kinds, context } = stop_rules_fixture
+// A held stop whose reply names its decision — the one a notify is sent for (joshuafolkken/kit#3961).
+const HELD_DECISION = { hold_issue: '7', message: stop_rules_fixture.DECISION_MESSAGE }
 
 function background_call(command: string): { name: string; input: Record<string, unknown> } {
 	return { name: BASH, input: { command, run_in_background: true } }
@@ -47,8 +49,8 @@ function launch_line(id: string, content = `Command running in background with I
 }
 
 // The result the harness writes when a foreground call outruns its timeout (joshuafolkken/kit#3304).
-function moved_line(id: string): string {
-	const content = `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}).`
+function moved_line(id: string, seconds = 600): string {
+	const content = `Command did not complete within its ${String(seconds)}s timeout and was moved to the background (ID: ${id}).`
 
 	return launch_line(id, content)
 }
@@ -166,11 +168,44 @@ describe('lane_background.foreground_input', () => {
 			lane_background.foreground_input(background_call(GATE_AND_SHIP), in_lane),
 		).toBeUndefined()
 	})
+})
 
-	it('does not rewrite a foreground ship, nor read the lane mark for it', () => {
+// joshuafolkken/kit#4101: the #4091 child's foreground ship ran at the two-minute default, was moved to
+// the background by it, and died with the turn before its supervisor existed.
+describe('lane_background.foreground_input — a foreground ship', () => {
+	it('gives a foreground ship with no timeout the foreground cap in a lane child', () => {
 		const call = { name: BASH, input: { command: DETACHED_SHIP } }
 
+		expect(lane_background.foreground_input(call, in_lane)).toStrictEqual({
+			command: DETACHED_SHIP,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('raises a foreground ship timeout under the cap to it', () => {
+		const input = { command: SHIP, timeout: 120_000 }
+		const rewritten = lane_background.foreground_input({ name: BASH, input }, in_lane)
+
+		expect(rewritten?.['timeout']).toBe(FOREGROUND_TIMEOUT_MS)
+	})
+
+	it('leaves a foreground ship already at the cap alone, without reading the lane mark', () => {
+		const call = { name: BASH, input: { command: DETACHED_SHIP, timeout: FOREGROUND_TIMEOUT_MS } }
+
 		expect(lane_background.foreground_input(call, never)).toBeUndefined()
+	})
+
+	it('leaves a foreground ship outside a lane child untouched', () => {
+		const call = { name: BASH, input: { command: DETACHED_SHIP } }
+
+		expect(lane_background.foreground_input(call, outside_lane)).toBeUndefined()
+	})
+
+	it('does not rewrite a command other than ship, nor read the lane mark for it', () => {
+		expect(
+			lane_background.foreground_input({ name: BASH, input: { command: GATE } }, never),
+		).toBeUndefined()
 	})
 })
 
@@ -226,6 +261,13 @@ describe('lane_background.pending_background_ids', () => {
 		expect(lane_background.pending_background_ids(moved_line(TASK_ID))).toStrictEqual([TASK_ID])
 	})
 
+	// joshuafolkken/kit#4101: the #4091 ship was moved aside at the two-minute default.
+	it('reports a call moved to the background at the two-minute default', () => {
+		expect(lane_background.pending_background_ids(moved_line(TASK_ID, 120))).toStrictEqual([
+			TASK_ID,
+		])
+	})
+
 	it('drops a moved call whose finish notice is on the tail', () => {
 		const tail = [moved_line(TASK_ID), finish_line(TASK_ID)].join('\n')
 
@@ -253,9 +295,12 @@ describe('lane_background.pending_agent_ids', () => {
 
 describe('stop_rules.stop_outcome — lane background wait', () => {
 	it('sends a lane child with a running task back to wait instead of to notify', () => {
-		const held = context({ lane_child: true, background_pending: true, hold_present: true })
+		const held = context({ lane_child: true, background_pending: true, hold_issue: '7' })
 
-		expect(stop_rules.stop_outcome(held).reason).toBe(lane_background.LANE_BACKGROUND_STOP_REASON)
+		expect(stop_rules.stop_outcome(held)).toEqual({
+			...stop_rules.NO_OUTCOME,
+			reason: lane_background.LANE_BACKGROUND_STOP_REASON,
+		})
 	})
 
 	it('stays silent outside a lane child', () => {
@@ -269,26 +314,23 @@ describe('stop_rules.stop_outcome — lane background wait', () => {
 		'asks no notify or release of a held run waiting on a subagent (tree clean: %s)',
 		(tree_clean) => {
 			const pending = { background_pending: true, agent_pending: true }
-			const held = context({ ...pending, hold_present: true, tree_clean })
+			const held = context({ ...pending, hold_issue: '7', tree_clean })
 
-			expect(stop_rules.stop_outcome(held).reason).toBeUndefined()
+			expect(stop_rules.stop_outcome(held)).toEqual(stop_rules.NO_OUTCOME)
 		},
 	)
 
 	it.each([
 		['nothing running', {}],
 		['only a command running, which may never end', { background_pending: true }],
-	])('still asks the notify of a held run with %s', (_label, pending) => {
-		const held = context({ ...pending, hold_present: true })
-
-		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+	])('still sends the notify of a held run with %s', (_label, pending) => {
+		expect(action_kinds({ ...pending, ...HELD_DECISION })).toEqual(['notify'])
 	})
 
-	it('still refuses a bare issue number while a subagent runs', () => {
+	it('still cites a bare issue number while a subagent runs', () => {
 		const pending = { background_pending: true, agent_pending: true }
-		const stop = context({ ...pending, hold_present: true, message: 'See #2774.' })
 
-		expect(stop_rules.stop_outcome(stop).reason).toContain('issue citation')
+		expect(action_kinds({ ...pending, hold_issue: '7', message: 'See #2774.' })).toEqual(['cite'])
 	})
 
 	it('honours the loop-breaker', () => {

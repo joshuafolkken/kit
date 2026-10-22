@@ -18,6 +18,7 @@ function ports_of(pool: Pool): ArrivalPorts {
 		free_lane_count: vi.fn(async () => FREE),
 		ready_issues: vi.fn(async () => [...pool.issues]),
 		is_added_since: vi.fn(async () => false),
+		observe_offerable: vi.fn<ArrivalPorts['observe_offerable']>(),
 	}
 }
 

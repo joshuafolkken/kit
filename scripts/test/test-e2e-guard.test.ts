@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_e2e_guard } from './test-e2e-guard'
@@ -13,6 +14,7 @@ type ExecaResult = Awaited<ReturnType<typeof execa>>
 
 const E2E_BASENAME = 'home.e2e.ts'
 const E2E_FILE = path.join('tests', E2E_BASENAME)
+const LOCAL_WORKERS = `--workers=${String(core_budget.CORE_WEIGHTS.e2e)}`
 
 function fake_result(exit_code: number | undefined): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
@@ -55,6 +57,22 @@ describe('test_e2e_guard.resolve_guard_action', () => {
 	it('runs when the package and e2e tests are both present', () => {
 		expect(test_e2e_guard.resolve_guard_action(true, true)).toBe('run')
 	})
+})
+
+describe('test_e2e_guard.is_whole_suite', () => {
+	it.each([[[]], [[LOCAL_WORKERS]], [['-j2']]])(
+		'answers for the whole suite with %j',
+		(argv: Array<string>) => {
+			expect(test_e2e_guard.is_whole_suite(argv)).toBe(true)
+		},
+	)
+
+	it.each([[['--grep', 'login']], [[E2E_FILE]], [[LOCAL_WORKERS, '--project=chromium']]])(
+		'answers for part of the suite with %j',
+		(argv: Array<string>) => {
+			expect(test_e2e_guard.is_whole_suite(argv)).toBe(false)
+		},
+	)
 })
 
 describe('test_e2e_guard.is_playwright_installed', () => {
@@ -120,6 +138,11 @@ describe('test_e2e_guard.run_guarded_e2e — run path', () => {
 	beforeEach(() => {
 		add_playwright_package()
 		add_e2e_file(E2E_FILE)
+		vi.stubEnv('CI', '')
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
 	})
 
 	it('runs Playwright and returns its exit code when both are present', async () => {
@@ -133,7 +156,7 @@ describe('test_e2e_guard.run_guarded_e2e — run path', () => {
 		expect(exit_code).toBe(0)
 		expect(mocked_execa).toHaveBeenCalledWith(
 			'pnpm',
-			['exec', 'playwright', 'test', '--grep', 'smoke'],
+			['exec', 'playwright', 'test', LOCAL_WORKERS, '--grep', 'smoke'],
 			expect.objectContaining({ reject: false }),
 		)
 	})
@@ -144,5 +167,68 @@ describe('test_e2e_guard.run_guarded_e2e — run path', () => {
 		const exit_code = await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
 
 		expect(exit_code).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#3944: a local run's workers are the cores it reserved, so the ledger holds what runs.
+function prepare_reserved_run(): void {
+	add_playwright_package()
+	add_e2e_file(E2E_FILE)
+	mocked_execa.mockResolvedValue(fake_result(0))
+	vi.stubEnv('CI', '')
+}
+
+function release_reserved_run(): void {
+	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
+}
+
+function playwright_arguments(): unknown {
+	return mocked_execa.mock.calls[0]?.[1]
+}
+
+describe('test_e2e_guard.run_guarded_e2e — the core budget it claims', () => {
+	beforeEach(prepare_reserved_run)
+	afterEach(release_reserved_run)
+
+	it('claims the e2e weight before Playwright runs', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
+
+		expect(reservation).toHaveBeenCalledWith(
+			core_budget.CORE_WEIGHTS.e2e,
+			expect.any(Function),
+			expect.anything(),
+		)
+	})
+
+	it('claims nothing when it skips', async () => {
+		rmSync(path.join(ctx.project_directory, 'tests'), { recursive: true, force: true })
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
+
+		expect(reservation).not.toHaveBeenCalled()
+	})
+})
+
+describe('test_e2e_guard.run_guarded_e2e — the worker count it passes', () => {
+	beforeEach(prepare_reserved_run)
+	afterEach(release_reserved_run)
+
+	it.each(['--workers=4', '--workers', '-j'])('leaves a worker count named by %s', async (flag) => {
+		await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [flag])
+
+		expect(playwright_arguments()).toEqual(['exec', 'playwright', 'test', flag])
+	})
+
+	it('leaves CI to its config’s worker count', async () => {
+		vi.stubEnv('CI', 'true')
+
+		await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
+
+		expect(playwright_arguments()).toEqual(['exec', 'playwright', 'test'])
 	})
 })

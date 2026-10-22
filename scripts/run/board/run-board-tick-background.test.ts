@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_gather } from './run-board-gather'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import { run_board_tick } from './run-board-tick'
@@ -10,7 +11,8 @@ import { run_board_tick } from './run-board-tick'
 // spinner after ⏳ while the plan read is in flight, and draws the plan on the redraw after it lands.
 
 const { LOCAL, SPINNING, START, WORDS, harness, plan_titled } = run_board_fixture
-const { FRESH_STATE, MACHINE_SAMPLE_MS, tick } = run_board_tick
+const { FRESH_STATE, tick } = run_board_tick
+const { MACHINE_SAMPLE_MS } = run_board_gather
 const { spinner_of } = run_board_labels
 const LOADING = '⏳'
 // The progress line's count, not its bare icon: the legend draws ✅ too whenever a layout exists.
@@ -90,8 +92,8 @@ describe('run_board_tick.tick in the background', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, live, 'background')
 
-		expect(frames[0]).toContain('⏰ 0:00:00')
-		expect(frames[1]).toContain('⏰ 0:00:01')
+		expect(frames[0]).toContain('⏰ 0″')
+		expect(frames[1]).toContain('⏰ 1″')
 		expect(read_plan).toHaveBeenCalledOnce()
 	})
 })
@@ -108,7 +110,7 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 	it('warns as for a failed read when the read rejects', async () => {
 		const [, landed] = await across_landing(rejecting)
 
-		expect(title_of(landed)).toContain(`⚠ ${WORDS.plan}`)
+		expect(title_of(landed)).toContain(`❗ ${WORDS.plan}`)
 		expect(title_of(landed)).not.toMatch(SPINNING)
 	})
 })

@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
@@ -14,6 +13,7 @@ import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { removed_tests_check } from './removed-tests-check'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -21,6 +21,7 @@ import { review_code_tree } from './review-code-tree'
 import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
 import { review_level, type ReviewLevel } from './review-level'
+import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -33,7 +34,6 @@ import { review_tree } from './review-tree'
 // so "still running" is the usual answer at this point), how this project runs its unit tests, and —
 // on round 2 — which files the first round's fixes touched.
 
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
 
 // The rubric's absolute path, resolved against the kit package rather than the review checkout root.
@@ -132,7 +132,12 @@ function record_round_one(
 			return false
 		}
 
-		review_stamps.round_one_stamp.write(tree, target, base)
+		review_stamps.round_one_stamp.write(
+			tree,
+			target,
+			base,
+			review_round_one_blobs.capture(Object.keys(tree)),
+		)
 
 		return true
 	} catch {
@@ -221,6 +226,16 @@ async function read_diff(
 	}
 }
 
+// **Swallowed, and the brief omits the list**: `josh ship` and `followup` read the same list again
+// and refuse on a failure, so the merge never rests on this reading.
+async function read_removed_tests(): Promise<ReadonlyArray<string>> {
+	try {
+		return (await removed_tests_check.read()) ?? []
+	} catch {
+		return []
+	}
+}
+
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile } = request
 	const contract = await open_contract()
@@ -245,6 +260,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		rubric_path: RUBRIC_PATH,
 		...contract,
 		diff: await read_diff(contract.checkout.root, base, paths),
+		removed_tests: await read_removed_tests(),
 	})
 }
 
@@ -330,7 +346,7 @@ async function run_review(round: number, reading: ChangeReading): Promise<number
 	const refusal = scoped_green.refusal_for(tree, commit)
 
 	if (refusal !== undefined) return report_error(refusal)
-	const resolved = agent_role_profile.resolve(agent_role_profile.REVIEWER)
+	const resolved = agent_role_profile.resolve_review(round)
 
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
 	agent_role_profile.warn_of_default()
@@ -350,10 +366,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_review(round, await read_change())
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const review_brief_cli = {
 	FIRST_ROUND,
 	format_reason,
@@ -364,7 +376,5 @@ const review_brief_cli = {
 	report_error,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { review_brief_cli }

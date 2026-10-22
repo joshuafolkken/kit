@@ -1,9 +1,7 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
-import { git_command } from '#scripts/git/git-command'
 import { path_decision } from '#scripts/josh/path-decision'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { split_assess, type SplitVerdict } from '#scripts/split/split-assess'
+import { split_measure } from '#scripts/split/split-measure'
 import { issue_fold, type FoldVerdict } from './issue-fold'
 
 // `josh issue:fold "<title>" "<title>" …` — before a run files a second finding, answer whether the
@@ -15,7 +13,6 @@ import { issue_fold, type FoldVerdict } from './issue-fold'
 // `--not-separable` when the findings are really one deliverable. The verdict logic is in
 // `issue-fold.ts`; everything here is the invocation.
 
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh issue:fold "<title>" "<title>" … [--not-separable] [--json]'
 const JSON_KEY = 'fold'
 const FAILURE_EXIT_CODE = 1
@@ -58,7 +55,7 @@ function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined 
 // rather than folding on no evidence. `issue:file` asks it too.
 async function size_verdict(): Promise<SplitVerdict | undefined> {
 	try {
-		const measurement = split_assess.assess(await git_command.diff_main_numstat())
+		const measurement = await split_measure.read_branch()
 
 		return measurement.files === 0 ? undefined : measurement.verdict
 	} catch {
@@ -91,12 +88,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return 0
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_fold_cli = { REASONS, read_arguments, size_verdict, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_fold_cli }

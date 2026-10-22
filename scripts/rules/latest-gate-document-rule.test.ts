@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest'
 // reads. Each is pinned here.
 
 const COMMAND = 'pnpm josh latest:scope'
+// joshuafolkken/kit#4163: a procedure runs the stash, the update and the pop as one command and reads
+// `run:prep`'s `latest:` line rather than asking `latest:scope` again.
+const FLOW_COMMAND = 'pnpm josh latest:if-required'
 const GATE = '.claude/skills/workflow-commands/latest-gate.md'
 const COMMAND_DOC = 'docs/josh-commands-automation.md'
 const RECORD_STEP = 'pnpm josh latest:scope --record'
@@ -30,9 +33,20 @@ const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 ]
 
 describe('the dependency update is routed to the command', () => {
-	it.each([...FLOW_DOCUMENTS, COMMAND_DOC])('%s names the command', (document_path) => {
+	it.each([GATE, COMMAND_DOC])('%s names the command', (document_path) => {
 		expect(read_repo_file(document_path)).toContain(COMMAND)
 	})
+
+	it.each([...FLOW_DOCUMENTS, COMMAND_DOC])('%s names the one-call update', (document_path) => {
+		expect(read_repo_file(document_path)).toContain(FLOW_COMMAND)
+	})
+
+	it.each(FLOW_DOCUMENTS.filter((document_path) => document_path !== GATE))(
+		'%s does not ask latest:scope again',
+		(document_path) => {
+			expect(read_repo_file(document_path)).not.toContain(COMMAND)
+		},
+	)
 
 	// The point of a command is that the answer is not an agent's to reach. joshuafolkken/kit#1925
 	// deduplicates the gate → procedure narrative into the single source, so the procedures invoke the
@@ -95,6 +109,6 @@ describe('the josh latest chain records the run it just made', () => {
 	})
 
 	it('registers the command that reads it', () => {
-		expect(COMMAND_MAP['latest:scope']?.script).toBe('scripts/version/latest-scope-cli.ts')
+		expect(COMMAND_MAP['latest:scope']?.script).toBe('scripts/version/latest-scope-main.ts')
 	})
 })

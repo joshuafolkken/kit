@@ -1,12 +1,14 @@
 ## Step 1: Issue 作成テンプレ
 
-タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` で書き換える。本文は次のテンプレートの節をすべて含める:
+タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `pnpm josh issue:plan <N> --body-file <path> --title "<title>"` で計画と一緒に書き換える。本文は次のテンプレートの節をすべて含める:
 
 ````md
 ## 背景
 
 <不具合なら `- 種別: 不具合`、そうでなければ `- 種別: 非不具合` を宣言する>
+<不具合なら `- 原因: #<PR>`、追えなければ `- 原因: 不明（<理由>）` を宣言する>
 <人の判断が要らなければ `- 人の判断: 不要`、要るなら `- 人の判断: 要（<方針の判断 / 外部アカウント / 目視確認>）` を宣言する>
+<任意。`- 優先度: 緊急（条件 <1-3> / 短縮 <値>）`、`- 優先度: 高（<根拠>）`、`- 優先度: 通常` のどれか。無ければ通常>
 
 <なぜ必要か>
 
@@ -51,6 +53,7 @@
 - 1 回あたりの得: <値>
 - 外れたときの損: <値>
 - 出典: <`pnpm josh lane:stats` → 値>
+- 1 マージあたりの短縮: <分>（レーン中央値 <分> の <%>）
 
 ## Origin
 
@@ -59,17 +62,32 @@
 
 ### `## 背景` 直下の宣言と分類ラベル
 
-起票は `pnpm josh issue:file "<title>" --body-file <本文ファイル> --depth <n>` で行い、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証の不具合なら `run:solo`）も付ける — 無ければ `issue:file` が拒否する。
+起票は `pnpm josh issue:file "<title>" --body-file <本文ファイル>` で行い、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証が `main` で毎回決まって誤った答えを出す不具合なら `run:solo`。時々出る誤判定は `run:lane` と `priority:critical`）も付ける — 無ければ `issue:file` が拒否する。
 
-| 宣言                   | 付くラベル                        | 選ぶ基準                                                   |
-| ---------------------- | --------------------------------- | ---------------------------------------------------------- |
-| `- 種別: 不具合`       | `bug`                             | 報告された症状を直す（無ければ `- 種別: 非不具合`）        |
-| `- 目的: 機能追加`     | `enhancement`                     | 新しい機能。修正・文書・依存更新・保守には書かない         |
-| `- 目的: 機能改善`     | `enhancement`                     | 既存機能の改善。目的が曖昧なら受け入れ条件を具体化してから |
-| `- 目的: 時間短縮`     | `enhancement`                     | 所要時間を短くする。`## 期待効果` の 4 行が必須            |
-| `- 互換性: 破壊的変更` | `breaking-change`                 | 契約を変える。移行措置があっても書き、廃止対象と影響を書く |
-| `- 種別: 振る舞い変更` | なし                              | AI の振る舞いを変える。下の 3 見出しが必須                 |
-| `- 人の判断: 不要`     | `auto-ok`（除外ラベルが無ければ） | 方針の判断・外部アカウント・目視確認のどれも要らない       |
+| 宣言                                          | 付くラベル                        | 選ぶ基準                                                                              |
+| --------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------- |
+| `- 種別: 不具合`                              | `bug`                             | 報告された症状を直す（無ければ `- 種別: 非不具合`）                                   |
+| `- 目的: 機能追加`                            | `enhancement`                     | 新しい機能。修正・文書・依存更新・保守には書かない                                    |
+| `- 目的: 機能改善`                            | `enhancement`                     | 既存機能の改善。目的が曖昧なら受け入れ条件を具体化してから                            |
+| `- 目的: 時間短縮`                            | `enhancement`                     | 所要時間を短くする。`## 期待効果` の 4 行が必須                                       |
+| `- 互換性: 破壊的変更`                        | `breaking-change`                 | 契約を変える。移行措置があっても書き、廃止対象と影響を書く                            |
+| `- 種別: 振る舞い変更`                        | なし                              | AI の振る舞いを変える。下の 3 見出しが必須                                            |
+| `- 人の判断: 不要`                            | `auto-ok`（除外ラベルが無ければ） | 方針の判断・外部アカウント・目視確認のどれも要らない                                  |
+| `- 実施可能条件: #<PR> のマージ後 <K> マージ` | `not-before`（待つ間）            | 追跡計測。元の PR のマージ後に lane ledger が K 件のマージを記録するまで着手しない    |
+| `- 実施可能日: <UTC>`                         | `not-before`（待つ間）            | 外部の期限など暦そのものに意味がある待ち（`YYYY-MM-DDTHH:MMZ`）。追跡計測には使わない |
+| `- 優先度: 緊急（…）`                         | `priority:critical`               | 下の A か B。条件番号か短縮値を括弧に書く                                             |
+| `- 優先度: 高（…）`                           | `priority:high`                   | 下の C・D・E のどれか。根拠を括弧に書く                                               |
+| `- 優先度: 通常`                              | なし                              | どれにも当たらない（宣言が無いときも同じ）                                            |
+
+優先度の基準（`scripts/issue/issue-priority.ts`）。`kickoff new critical` / `high` と打った優先度があれば本文は判定しない:
+
+- A. 割り込み起票の 3 条件のどれか（`wip-cap.md` →「3 条件 — 該当するかは判断ではない」）
+- B. 1 マージあたりの短縮がレーン中央値の 10% 以上
+- C. 同じく 3% 以上 10% 未満
+- D. 人が示した期限や方針がある
+- E. ほかの open Issue 2 件以上の前提（blocked-by）になっている
+- 短縮は `効く率 × 1 回あたりの得 × 1 マージあたりの回数`、中央値は `pnpm josh lane:stats` の `lane median` 列。`- 目的: 時間短縮` の Issue は `- 1 マージあたりの短縮:` 行に % を書く。`issue:file` は行が無いか % が無ければ拒否し、その % から下限（B なら緊急、C なら高）を出して、それより低い宣言も拒否する
+- 根拠の無い `緊急` / `高` も `issue:file` が拒否する
 
 - **持ち主の意図と違う動きは、コード・コメント・テストに書かれた設計どおりでも `- 種別: 不具合` とする。** 例: コメントとテストに固定されたまま意図より広く働く自動付与、文書だけでも意図と違う分類を生む基準
 - `- 種別: 不具合` の回帰テストは、利用者が症状を見たのと同じ粒度で書く。修正前のツリーでも緑になるテストは `pnpm josh git -y` が拒否する（joshuafolkken/kit#2448）
@@ -100,9 +118,8 @@
 
 `josh` が使えない環境での手作業手順:
 
-1. 子 Issue をすべて起票し、番号を控える。
-2. ラベルを用意する: `gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent 2>/dev/null || true`
-3. epic を作り、`id` ではなく **number** を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file> --jq .number`。本文は次の形にする（順序がなければ `Dependencies` に `None — the children are independent; any execution order works.` と書く）:
+1. 子 Issue をすべて起票し、番号を控える。`epic` ラベルは `josh sync` が用意する。
+2. epic を作り、`id` ではなく **number** を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file> --jq .number`。本文は次の形にする（順序がなければ `Dependencies` に `None — the children are independent; any execution order works.` と書く）:
 
    ```md
    ## Split rationale
@@ -123,6 +140,4 @@
    - [ ] #102 <title>
    ```
 
-4. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`
-
-各手順の理由は kit の `docs/maintainers/epic-commands-rationale.md` →「Creating an epic by hand」。
+3. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す。失敗しても止めない）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`

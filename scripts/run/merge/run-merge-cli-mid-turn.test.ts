@@ -1,6 +1,7 @@
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { run_merge_driver } from './run-merge-driver'
 import { run_merge_ship } from './run-merge-ship'
 
 // A child interrupted by its environment — its session killed inside a turn, or its ship stopped with
@@ -24,7 +25,7 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 }))
 
 vi.mock('#scripts/run/run-ending', () => ({
-	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn() },
+	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn(), read_transcript: vi.fn() },
 }))
 
 vi.mock('./run-merge-ship', () => ({ run_merge_ship: { is_unanswered: vi.fn() } }))
@@ -49,7 +50,7 @@ const { run_merge_cli } = await import('./run-merge-cli')
 
 const CHILD = '3867'
 const OUTPUT = '/Users/runner/.kit-lanes/3867/transcript.log'
-const FAILED = { carry: { failures: 1 }, is_parked: true, is_refused: false, blockers: [] }
+const FAILED = { carry: { failures: 1 }, is_parked: true, is_refused: false, waits: [] }
 const OUTAGE = { pos: 1, at: '2026-10-15T00:00:00.000Z', kind: 'outage', text: `#${CHILD} outage` }
 
 async function merge_child(): Promise<void> {
@@ -81,6 +82,16 @@ it('re-dispatches a child whose ship stopped with no relaunch to fix it', async 
 	await merge_child()
 
 	expect(do_outage_mock).toHaveBeenCalledOnce()
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_unanswered: true }))
+})
+
+// joshuafolkken/kit#3974: a child that reached the API is not booked as the environment being down.
+it('books a child killed inside a turn as an outage the streak counts', async () => {
+	vi.mocked(run_ending.ended_mid_turn).mockReturnValue(true)
+	vi.mocked(run_merge_ship.is_unanswered).mockResolvedValue(true)
+	await merge_child()
+
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_unanswered: false }))
 })
 
 it('parks a child once it has been re-dispatched as an outage three times', async () => {
@@ -96,4 +107,15 @@ it('parks a child that ended on its own', async () => {
 	await merge_child()
 
 	expect(do_failed_mock).toHaveBeenCalledOnce()
+})
+
+// joshuafolkken/kit#4102: `backlog:drive` branches on the outcome `run` prints under `--driver`.
+it('prints the whole result as the line the driver reads back under --driver', async () => {
+	const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+	await run_merge_cli.run([CHILD, '--output', OUTPUT, run_merge_driver.DRIVER_FLAG])
+
+	const line: unknown = info.mock.lastCall?.at(0)
+
+	expect(run_merge_driver.read(String(line))).toMatchObject({ outcome: 'failed' })
 })

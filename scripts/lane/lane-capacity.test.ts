@@ -133,4 +133,24 @@ describe('lane_capacity.free_lanes', () => {
 		expect(lane_capacity.free_lanes(LIMIT_ABOVE_SEATS, NO_LANES)).toBe(LANE_SEATS)
 		expect(lane_capacity.free_lanes(LIMIT_ABOVE_SEATS, LANE_SEATS)).toBe(NO_LANES)
 	})
+
+	// joshuafolkken/kit#3967: a lane the limit no longer counts still holds its port seat, so the free
+	// count never offers a launch `lane:open` would refuse for want of one.
+	it('offers no more lanes than seats are left by every open lane', () => {
+		expect(lane_capacity.free_lanes(LANE_SEATS, NO_LANES, LANE_SEATS)).toBe(NO_LANES)
+		expect(lane_capacity.free_lanes(LANE_SEATS, OCCUPIED_LANES, LANE_SEATS - 1)).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4107: resuming a kept lane reuses its port seat, so only the limit bounds it.
+describe('lane_capacity.limit_room', () => {
+	it('is the limit less the occupied lanes whatever seats are held', () => {
+		expect(lane_capacity.limit_room(LANE_SEATS, NO_LANES)).toBe(LANE_SEATS)
+		expect(lane_capacity.limit_room(DEFAULT_LIMIT, OCCUPIED_LANES)).toBe(REMAINING_LANES)
+	})
+
+	it('is never negative and capped at the seats', () => {
+		expect(lane_capacity.limit_room(CONFIGURED_LIMIT, DEFAULT_LIMIT)).toBe(NO_LANES)
+		expect(lane_capacity.limit_room(LIMIT_ABOVE_SEATS, NO_LANES)).toBe(LANE_SEATS)
+	})
 })

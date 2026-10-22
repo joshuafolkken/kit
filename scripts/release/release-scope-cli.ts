@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { path_decision } from '#scripts/josh/path-decision'
 import { release_plan } from './release-plan'
@@ -22,7 +20,6 @@ import { release_plan } from './release-plan'
 // The flag parse and the printing come from `path_decision`, the contract every mechanically-decided
 // command here shares. Only its `parse_options` / `run_path_decision` are path-specific, and this
 // decision is not made from changed paths, so those two are the ones left alone.
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh release:scope [--json]'
 const JSON_KEY = 'scope'
 // Not `path_decision.KNOWN_FLAGS`: that set carries `--staged`, which means nothing here, and a
@@ -76,13 +73,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const release_scope_cli = {
 	decide,
-	main,
 	run,
 	JSON_KEY,
 	NOTHING_PENDING_REASON,
@@ -93,8 +85,6 @@ const release_scope_cli = {
 	UNKNOWN_SCOPE,
 	USAGE,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { Decision }
 export { release_scope_cli }

@@ -42,6 +42,18 @@ function is_mid_turn(transcript: string): boolean {
 	return TURN_TYPES.has(last)
 }
 
-const agent_exit_record = { is_mid_turn, read_exit_record }
+// Whether the transcript's last line is its exit record. A log appended across launches keeps an
+// earlier session's record, so a later session that died before finishing — inside a turn, or on a
+// start-up error that is not JSON — leaves something else last and its own ending unread.
+function ends_on_exit_record(transcript: string): boolean {
+	const last = transcript.split('\n').findLast((line) => line.trim() !== '')
+
+	return (
+		last !== undefined &&
+		claude_result_event.decode(json_value.parse_or_undefined(last)) !== undefined
+	)
+}
+
+const agent_exit_record = { ends_on_exit_record, is_mid_turn, read_exit_record }
 
 export { agent_exit_record }

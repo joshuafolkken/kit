@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	BUG_LABEL,
 	INTERRUPT_ROUTE_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_SOLO_LABEL,
 } from './issue-labels'
@@ -24,6 +25,7 @@ function names_of(rows: ReadonlyArray<Row>): Array<string> {
 
 const PLAIN = 'plain'
 const URGENT = 'urgent'
+const CRITICAL = 'critical'
 const DEFECT = 'defect'
 const WAITED_ON = 'waited-on'
 const PLAIN_SECOND = 'plain-second'
@@ -62,6 +64,19 @@ describe('issue_rank.rank', () => {
 
 	it('matches the labels case-insensitively', () => {
 		expect(names_of([row(PLAIN), row(URGENT, ['Priority:High'])])).toStrictEqual([URGENT, PLAIN])
+	})
+})
+
+// joshuafolkken/kit#4383: priority:critical is the key above priority:high.
+describe('issue_rank.rank priority:critical', () => {
+	it('puts priority:critical ahead of priority:high and a verification-path defect', () => {
+		const rows = [
+			row(URGENT, [PRIORITY_HIGH_LABEL]),
+			row(DEFECT, [BUG_LABEL, RUN_SOLO_LABEL]),
+			row(CRITICAL, [PRIORITY_CRITICAL_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([CRITICAL, URGENT, DEFECT])
 	})
 })
 

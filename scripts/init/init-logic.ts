@@ -83,7 +83,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.coderabbit.yaml',
 	'.gitattributes',
 	'.mcp.json',
-	'.ncurc.json',
 	'.prettierignore',
 	'SECURITY.md',
 	'pnpm-workspace.yaml',
@@ -100,7 +99,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/actions/setup-node/action.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
-	'.github/dependabot.yml',
 	'.claude/settings.json',
 	'.codex/config.toml',
 	'.codex/hooks.json',
@@ -117,6 +115,9 @@ interface FileCopyMapping {
 // hand-edit stay here.
 const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' },
+	// A template rather than a copy of kit's own file: kit groups its github-actions bumps, which a
+	// consumer's auto-merge would hold whole once one bump touches an upstream-managed workflow.
+	{ src: 'templates/dependabot.yml', dest: '.github/dependabot.yml' },
 	// The counterpart to the distributed `.github/dependabot.yml`: without it a consumer receives
 	// the machinery that opens Dependabot pull requests and none of the machinery that closes them,
 	// so every github-actions bump sits green and unmerged.

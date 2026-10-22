@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/test/test-unit-guard.ts:188 | 2026-10-16 | #3945
+- rf:performance | low | scripts/gate/gate-plan.ts:343 | 2026-10-16 | #3945

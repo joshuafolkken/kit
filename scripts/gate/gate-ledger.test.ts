@@ -4,9 +4,11 @@ import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import type { ProcessOwner } from '#scripts/josh/process-owner'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { related_scope } from '#scripts/test/test-related-scope'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
 import { gate_ledger } from './gate-ledger'
+import { gate_plan } from './gate-plan'
 import { machine_capacity } from './machine-capacity'
 
 // joshuafolkken/kit#3501: a gate records the load it ran beside, read where none of its own checks
@@ -14,12 +16,14 @@ import { machine_capacity } from './machine-capacity'
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'gate-ledger-test-'))
 const read_machine = vi.spyOn(machine_capacity, 'read_machine')
-const QUIET_BUSY = machine_capacity.BASELINE_CORES
+const QUIET_BUSY = gate_ledger.BACKGROUND_CORES
 const BUSY_EXTERNAL = 3
 const OUTCOME = { elapsed_ms: 1000, is_passed: true }
 const live_reservations = vi.spyOn(core_budget, 'live_reservations')
 const MID_GATE_CORES = 2
 const SAMPLES = 3
+const CHECK_CPU_MS = 6812.4
+const CHECK_CPU_ROUNDED = 6812
 const OWN: ProcessOwner = process_identity.own_fields()
 const FOREIGN: ProcessOwner = { pid: process.pid + 1, process_start: 'another lane' }
 
@@ -110,6 +114,97 @@ describe('gate_ledger — the external load a gate ran beside', () => {
 	})
 })
 
+// joshuafolkken/kit#4362: without each check's CPU, a core weight could not be re-measured.
+describe('gate_ledger — each check CPU', () => {
+	it('records the CPU a check spent, in whole milliseconds, where the gate read it', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'cpu.jsonl')
+		const lint = { label: 'lint', command: 'josh lint', exit_code: 0, output: '', elapsed_ms: 5 }
+		const measured = { ...lint, cpu_ms: CHECK_CPU_MS }
+		const unread = { ...lint, label: 'check', cpu_ms: undefined }
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [measured, unread], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry?.kind === 'gate' ? entry.checks : undefined).toStrictEqual([
+			{
+				label: 'lint',
+				elapsed_ms: 5,
+				is_passed: true,
+				is_reused: false,
+				cpu_ms: CHECK_CPU_ROUNDED,
+			},
+			{ label: 'check', elapsed_ms: 5, is_passed: true, is_reused: false },
+		])
+	})
+
+	// joshuafolkken/kit#4451: the unit claim's asked and granted width and its wait, per run.
+	it('records the core-budget claim a check ran under, and none for one that claimed none', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'claim.jsonl')
+		const claim = { requested: 7, granted: 3, waited_ms: 120_000 }
+		const lint = { label: 'lint', command: 'josh lint', exit_code: 0, output: '', elapsed_ms: 5 }
+
+		await gate_ledger.record(
+			await gate_ledger.start(ledger_path),
+			[{ ...lint, claim }, lint],
+			OUTCOME,
+		)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry).toMatchObject({ checks: [{ claim }, { label: 'lint' }] })
+		expect(entry?.kind === 'gate' ? entry.checks?.[1] : undefined).not.toHaveProperty('claim')
+	})
+})
+
+// joshuafolkken/kit#4397: a whole-gate reuse and the unit leg's full-suite fallback both reach the ledger.
+describe('gate_ledger — the reuses and the fallbacks', () => {
+	it('records the reason kind the unit leg fell back to the whole suite for', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'fallback.jsonl')
+		const scope = { mode: 'all' as const, files: [], reason: related_scope.UNREADABLE_REASON }
+		const output = related_scope.describe_scope(scope, scratch)
+		const unit = {
+			label: gate_plan.UNIT_LABEL,
+			command: 'josh test:related',
+			exit_code: 0,
+			output,
+			elapsed_ms: 9,
+		}
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [unit], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+
+		expect(entry?.kind === 'gate' ? entry.checks : undefined).toMatchObject([
+			{ label: gate_plan.UNIT_LABEL, fallback: 'unreadable' },
+		])
+	})
+
+	it('records a reused whole gate as a passed, reused line with no checks', async () => {
+		const ledger_path = path.join(scratch, 'reused.jsonl')
+
+		await gate_ledger.record_reused(ledger_path, OUTCOME.elapsed_ms)
+
+		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
+			{ kind: 'gate', elapsed_ms: OUTCOME.elapsed_ms, is_passed: true, is_reused: true },
+		])
+	})
+
+	it('writes no reused line when no ledger was resolved', async () => {
+		const record_gate = vi.spyOn(lane_ledger, 'record_gate')
+
+		await gate_ledger.record_reused(undefined, OUTCOME.elapsed_ms)
+
+		expect(record_gate).not.toHaveBeenCalled()
+	})
+})
+
 // joshuafolkken/kit#3556: two end readings missed every lane whose lint, tests or `ship` ran only while
 // the gate did, so the gate samples the core budget's ledger between its ends as well.
 describe('gate_ledger — the load between the ends', () => {
@@ -149,5 +244,25 @@ describe('gate_ledger — the load between the ends', () => {
 		vi.advanceTimersByTime(gate_ledger.SAMPLE_INTERVAL_MS * SAMPLES)
 
 		expect(live_reservations).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4457: the since-green no-op ran no test, so it is told apart from a unit run.
+describe('gate_ledger — the unit leg no-op', () => {
+	it('records the unit leg since-green no-op as unmoved, with no fallback', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+
+		const ledger_path = path.join(scratch, 'unmoved.jsonl')
+		const scope = { mode: 'none' as const, files: [], reason: related_scope.UNMOVED_REASON }
+		const output = related_scope.describe_scope(scope, scratch)
+		const unit = { label: gate_plan.UNIT_LABEL, command: '', exit_code: 0, output, elapsed_ms: 9 }
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [unit], OUTCOME)
+
+		const [entry] = lane_ledger.read_entries(ledger_path)
+		const [unit_check] = entry?.kind === 'gate' ? (entry.checks ?? []) : []
+
+		expect(unit_check).toMatchObject({ is_unmoved: true })
+		expect(unit_check?.fallback).toBeUndefined()
 	})
 })

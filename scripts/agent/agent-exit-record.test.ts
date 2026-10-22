@@ -58,6 +58,24 @@ describe('a transcript the exit record cannot be read from', () => {
 	})
 })
 
+describe('whether the transcript ends on its exit record', () => {
+	it('reads a transcript whose last line is its result event', () => {
+		const transcript = `${lines({ type: 'system' }, { type: 'result', is_error: true })}\n`
+
+		expect(agent_exit_record.ends_on_exit_record(transcript)).toBe(true)
+	})
+
+	it('does not read a result followed by a later launch’s non-JSON error', () => {
+		const transcript = `${lines({ type: 'result', is_error: true })}\nError: unexpected start-up failure`
+
+		expect(agent_exit_record.ends_on_exit_record(transcript)).toBe(false)
+	})
+
+	it('does not read an empty transcript', () => {
+		expect(agent_exit_record.ends_on_exit_record('')).toBe(false)
+	})
+})
+
 describe('whether the session was killed inside a turn', () => {
 	it('reads a session that a background task woke after its result, then lost, as mid-turn', () => {
 		const transcript = lines(

@@ -1,5 +1,5 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -17,13 +17,13 @@ const NOW = STARTED + 10 * SECOND
 const SPINNER = '⠋'
 const { STAGE } = run_event_setup
 const OPENING = run_event_setup.opening_lane('278')
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
-const STALE_MS = 40 * backlog_budget.MS_PER_MINUTE
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
+const STALE_MS = 40 * MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
 // The third line's blank under the run's mark and name, then the gap before its words.
 const NOW_INDENT = ' '.repeat('▶ backlogrun'.length + 2)
-const PROGRESS_0_OF_1 = /^▶ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/1 /u
-const JUDGING_LINE = '⠋  0:02:31  🤔 waiting on judgment — 1 waiting'
+const PROGRESS_0_OF_1 = /^▶ backlogrun {2}⏰ 10″ {2}✅ +0\/1 /u
+const JUDGING_LINE = '⠋  2′31″  🤔 waiting on judgment — 1 waiting'
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -100,10 +100,10 @@ describe('run_board_header.header_lines before the first child launches', () => 
 	it('draws the progress, and turns the spinner beside the stage on the third line', () => {
 		const [first, second, third] = lines_of(header())
 
-		expect(first).toMatch(/^▶ backlogrun {2}⏰ 0:00:10 {2}✅ +0\/- /u)
+		expect(first).toMatch(/^▶ backlogrun {2}⏰ 10″ {2}✅ +0\/- /u)
 		expect(first).not.toContain(STAGE.STARTING)
 		expect(second).toMatch(/^ {2}app-kit {5}💓 /u)
-		expect(third).toBe(`${NOW_INDENT}⠋  0:00:00  🚀 starting session`)
+		expect(third).toBe(`${NOW_INDENT}⠋   0″  🚀 starting session`)
 	})
 
 	it('draws the still mark of a working run where the frame has no spinner', () => {
@@ -114,7 +114,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 		const board = planned(ONE_PLANNED, standing(STAGE.HANDING_OFF))
 
 		expect(title_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe('⠋  0:00:00  🤝 handing off — 1 waiting')
+		expect(now_of(board)).toBe('⠋   0″  🤝 handing off — 1 waiting')
 	})
 
 	it('keeps the first two lines where they are whatever the stage’s length', () => {
@@ -128,8 +128,8 @@ describe('run_board_header.header_lines before the first child launches', () => 
 	it('says a plan read failed on the first line, not after the stage', () => {
 		const board = header({ plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(/ {2}⚠ /u)
-		expect(now_of(board)).toBe('⠋  0:00:00  🚀 starting session')
+		expect(title_of(board)).toMatch(/ {2}❗ /u)
+		expect(now_of(board)).toBe('⠋   0″  🚀 starting session')
 	})
 })
 
@@ -144,7 +144,7 @@ describe('run_board_header.header_lines beside the stage', () => {
 	it('writes no reason where the plan is not read yet', () => {
 		const activity = standing(STAGE.STARTING, STAGE_AGE_MS)
 
-		expect(now_of(header({ activity }))).toBe('⠋  0:02:31  🚀 starting session')
+		expect(now_of(header({ activity }))).toBe('⠋  2′31″  🚀 starting session')
 	})
 
 	// A chat is no terminal, so it draws no spinner: its place stands blank.
@@ -156,10 +156,10 @@ describe('run_board_header.header_lines beside the stage', () => {
 	})
 
 	it('writes the hours once the stage has stood for one', () => {
-		const hour = 60 * backlog_budget.MS_PER_MINUTE
+		const hour = 60 * MS_PER_MINUTE
 		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, hour + STAGE_AGE_MS))
 
-		expect(now_of(board)).toBe('⠋  1:02:31  🤔 waiting on judgment — 1 waiting')
+		expect(now_of(board)).toBe('⠋  1°02′31″  🤔 waiting on judgment — 1 waiting')
 	})
 })
 
@@ -168,28 +168,28 @@ describe('run_board_header.header_lines once a child has launched', () => {
 		const board = planned(ONE_RUNNING, merged())
 
 		expect(title_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe(`⠋${' '.repeat(11)}🔄 1 running`)
+		expect(now_of(board)).toBe(`⠋${' '.repeat(7)}🔄 1 running`)
 	})
 
 	it('turns the spinner and writes the stage while a lane opens for a later child', () => {
 		const board = planned(NEXT_OPENING, standing(OPENING, SECOND))
 
-		expect(title_of(board)).toMatch(/^▶ backlogrun {2}⏰ 0:00:10 {2}✅ +1\/2 /u)
-		expect(now_of(board)).toBe('⠋  0:00:01  🚪 opening lane #278 — 1 waiting')
+		expect(title_of(board)).toMatch(/^▶ backlogrun {2}⏰ 10″ {2}✅ +1\/2 /u)
+		expect(now_of(board)).toBe('⠋   1″  🚪 opening lane #278 — 1 waiting')
 	})
 
 	it('turns the spinner and writes the stage while a judgment session runs', () => {
 		const board = planned(NEXT_OPENING, standing(STAGE.SESSION, 72 * SECOND))
 
 		expect(title_of(board)).toMatch(/^▶ backlogrun /u)
-		expect(now_of(board)).toBe('⠋  0:01:12  💭 judgment session running — 1 waiting')
+		expect(now_of(board)).toBe('⠋  1′12″  💭 judgment session running — 1 waiting')
 	})
 
 	it('stands idle between children, and writes how long it has watched and why', () => {
 		const board = planned(NEXT_OPENING, merged(STAGE_AGE_MS))
 
 		expect(title_of(board)).toMatch(/^⏸ backlogrun .*✅ +1\/2 /u)
-		expect(now_of(board)).toBe('0:02:31  🔭 watching — 1 waiting')
+		expect(now_of(board)).toBe('2′31″  🔭 watching — 1 waiting')
 	})
 })
 
@@ -199,14 +199,23 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const board = planned(ONE_PLANNED, activity)
 
 		expect(title_of(board)).toMatch(/^■ backlogrun .*✅ +0\/1 /u)
-		expect(now_of(board)).toBe('0:00:01  🔚 #278 merged')
+		expect(now_of(board)).toBe('1″  🔚 #278 merged')
 	})
 
 	it('draws a plan left only to people as waiting on a person', () => {
 		const board = planned(PEOPLE, merged(SECOND))
 
 		expect(title_of(board)).toMatch(/^✋ backlogrun/u)
-		expect(now_of(board)).toBe('0:00:01  🔭 watching — 1 waiting on a person')
+		expect(now_of(board)).toBe('1″  🔭 watching — 1 waiting on a person')
+	})
+
+	// joshuafolkken/kit#4099: a child parked on a decision waits on a person as an untouched one does.
+	it('draws a plan left to a child parked on a decision as waiting on a person', () => {
+		const asked: BoardLayout = { ...PEOPLE, active: [row(1, 'human')] }
+		const board = planned(asked, merged(SECOND))
+
+		expect(title_of(board)).toMatch(/^✋ backlogrun/u)
+		expect(now_of(board)).toBe('1″  🔭 watching — 2 waiting on a person')
 	})
 
 	it('draws a run at a stage as working, though all its plan has left waits on a person', () => {
@@ -222,6 +231,6 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 			header({ now_ms: NOW + STALE_MS, activity: standing(STAGE.PLANNING) }),
 		)
 
-		expect(second).toContain(styleText('red', '💓 0:40:00'))
+		expect(second).toContain(styleText('red', '💓 40′00″'))
 	})
 })

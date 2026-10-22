@@ -90,6 +90,13 @@ describe('to_gh_issue — the timestamps', () => {
 		})
 	})
 
+	// joshuafolkken/kit#3958: `run:board` draws a child closed as not planned withdrawn.
+	it('reads stateReason from state_reason', () => {
+		expect(map('stateReason', { state_reason: 'not_planned' })).toEqual({
+			stateReason: 'not_planned',
+		})
+	})
+
 	// joshuafolkken/kit#3854: `auto-ok:judge` re-reads an issue's comments only once it moves.
 	it('reads updatedAt from updated_at', () => {
 		expect(map('updatedAt', { updated_at: ISSUE_CREATED_AT })).toEqual({

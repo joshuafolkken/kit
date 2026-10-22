@@ -22,6 +22,20 @@ function require_issue_number(issue: string): void {
 	if (!is_issue_number(issue)) throw new Error(`${BAD_ISSUE_MESSAGE}${issue}`)
 }
 
-const issue_number_shape = { ISSUE_NUMBER_PATTERN, is_issue_number, require_issue_number }
+// A command whose one positional is the issue it writes to: a missing, malformed or second number
+// answers `undefined`, so the caller refuses the whole call rather than writing to some other issue.
+function single_of(positionals: ReadonlyArray<string>): string | undefined {
+	const [issue_number, ...rest] = positionals
+	const is_single = rest.length === 0 && issue_number !== undefined
+
+	return is_single && ISSUE_NUMBER_PATTERN.test(issue_number) ? issue_number : undefined
+}
+
+const issue_number_shape = {
+	ISSUE_NUMBER_PATTERN,
+	is_issue_number,
+	require_issue_number,
+	single_of,
+}
 
 export { issue_number_shape }

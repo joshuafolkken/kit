@@ -92,6 +92,20 @@ async function drain_events(): Promise<ReadonlyArray<{ kind: string }>> {
 	return await events_of_kind(DRAIN)
 }
 
+// joshuafolkken/kit#4269: a launch event carries the instant the lane's state record takes too.
+describe('run_event_stream_emit.emit — the caller’s instant', () => {
+	it('stamps the event with the instant it is given', async () => {
+		const at = new Date('2026-10-08T09:10:00.000Z')
+
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged', at)
+
+		expect(await events_of_kind(run_event_stream.EVENT_KIND.MERGE)).toStrictEqual([
+			expect.objectContaining({ at: at.toISOString() }),
+		])
+	})
+})
+
 describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 	it('appends the first time, then skips while it is still the newest event', async () => {
 		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
@@ -133,6 +147,7 @@ describe('run_event_stream_emit.emit_once — the drain marker past trace events
 const { STALL, CHILD_LAUNCH, MERGE, HEARTBEAT } = run_event_stream.EVENT_KIND
 const STALL_TEXT = '3 ready, 2 free lane(s), 12m since the last dispatch'
 const EARLIER_ISO = '2026-01-01T00:00:00.000Z'
+const DISPATCH_TEXT = '#8 dispatched'
 
 async function stall_count(): Promise<number> {
 	const stalls = await events_of_kind(STALL)
@@ -156,7 +171,7 @@ describe('run_event_stream_emit.emit_once_since — one marker until the reset k
 		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
 
 		await run_event_stream_emit.emit_once_since(STALL, STALL_TEXT, CHILD_LAUNCH)
-		await run_event_stream_emit.emit(CHILD_LAUNCH, '#8 dispatched')
+		await run_event_stream_emit.emit(CHILD_LAUNCH, DISPATCH_TEXT)
 		expect(await run_event_stream_emit.emit_once_since(STALL, STALL_TEXT, CHILD_LAUNCH)).toBe(true)
 
 		expect(await stall_count()).toBe(2)
@@ -181,6 +196,32 @@ describe('run_event_stream_emit.emit_once_since — one marker until the reset k
 		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
 
 		expect(await run_event_stream_emit.emit_once_since(STALL, STALL_TEXT, CHILD_LAUNCH)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4015: the idle marker composes its text — a network read — only for a new episode.
+describe('run_event_stream_emit.emit_once_since_with — the text composed once per episode', () => {
+	const { IDLE_NOTICE: IDLE } = run_event_stream.EVENT_KIND
+	const IDLE_TEXT = 'nothing left to dispatch'
+
+	it('composes and appends once, then again only after a dispatch', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+		const compose = vi.fn(async () => IDLE_TEXT)
+
+		expect(await run_event_stream_emit.emit_once_since_with(IDLE, CHILD_LAUNCH, compose)).toBe(
+			IDLE_TEXT,
+		)
+		await run_event_stream_emit.emit(MERGE, '#9 merged')
+		expect(
+			await run_event_stream_emit.emit_once_since_with(IDLE, CHILD_LAUNCH, compose),
+		).toBeUndefined()
+		await run_event_stream_emit.emit(CHILD_LAUNCH, DISPATCH_TEXT)
+		expect(await run_event_stream_emit.emit_once_since_with(IDLE, CHILD_LAUNCH, compose)).toBe(
+			IDLE_TEXT,
+		)
+
+		expect(compose).toHaveBeenCalledTimes(2)
+		expect(await events_of_kind(IDLE)).toHaveLength(2)
 	})
 })
 

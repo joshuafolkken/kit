@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
 const DOCS = 'docs/josh-commands-run.md'
 
 const SECTION_COMMAND = 'doc:section'
-const SECTION_SCRIPT = 'scripts/document/document-section-cli.ts'
+const SECTION_SCRIPT = 'scripts/document/document-section-main.ts'
 const SET_COMMAND = 'read:set'
 const SET_SCRIPT = 'scripts/document/read-set-cli.ts'
 

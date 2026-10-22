@@ -3,6 +3,7 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_residents } from '#scripts/lane/lane-residents'
 import { error_text } from '#scripts/lib/error-message'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_tidy, type Outcome, type Verdict } from './run-tidy'
@@ -71,6 +72,8 @@ async function lane_verdict(lane: LaneInfo, hold_path: string): Promise<Verdict>
 
 async function close(issue: string, hold_path: string): Promise<Verdict> {
 	const outcome = await lane_close.close_lane(issue)
+
+	lane_residents.report(outcome.residents, session_cite.issue(issue))
 
 	if (outcome.kind !== CLOSED_KIND) return run_tidy.keep(INCOMPLETE_REASON)
 

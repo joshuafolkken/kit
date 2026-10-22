@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -16,7 +15,6 @@ import { test_red_logic, type RedVerdict } from './test-red-logic'
 // (`base-tree.ts`). The tests are copied in from the working tree, so what runs is the new test
 // against the old code.
 
-const ARGV_OFFSET = 2
 const TREE_PREFIX = 'josh-test-red-'
 const REPORT_NAME = 'report.json'
 const VITEST_BIN = path.join(base_tree.NODE_MODULES, '.bin', 'vitest')
@@ -117,11 +115,7 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 	return 0
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await main(process.argv.slice(ARGV_OFFSET))
-}
-
-const test_red = { run }
+const test_red = { main, run }
 
 export type { RedRun }
 export { test_red }

@@ -1,7 +1,6 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
@@ -10,8 +9,10 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_label } from '#scripts/run/run-label'
+import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
+import { run_merge_auth } from './run-merge-auth'
+import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
@@ -26,15 +27,12 @@ import { run_merge_token, type MergeToken } from './run-merge-token'
 // (stop — the child's own ending), `stop` (the consecutive-failure guard tripped, or a failed child could not be parked) and `retry` (the
 // child's state could not be read; re-read before deciding).
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const FIRST = 0
 const MIN_PID = 1
 const { MERGE_TOKEN } = run_merge_token
-const PARK_FAILURE_NOTE = 'The failed child could not be parked with needs-decision; stopping.'
-// The same digit shape `run-carry-args.ts` reads an owner pid under; a count is a bare run of digits.
-const DIGITS = /^\d+$/u
+const PARK_FAILURE_NOTE = `The failed child could not be parked with ${RUN_STALLED_LABEL}; stopping.`
 // A GitHub `owner/repo` slug: an owner and a repository name around a single slash, each starting with
 // an alphanumeric so neither half can begin with `-`. `epic` and `repo` flow into `pnpm josh`
 // subprocess arguments, so a value shaped like an option (`--foo`, or `--evil/x`) would be read as a
@@ -43,9 +41,10 @@ const DIGITS = /^\d+$/u
 // itself forbids (names cannot start with a hyphen) and which the taint analyzer keeps flagging.
 const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/u
 const USAGE =
-	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>]'
+	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>] [--driver]'
 
 const OPTIONS = {
+	driver: { type: 'boolean' },
 	epic: { type: 'string' },
 	output: { type: 'string' },
 	over: { type: 'string' },
@@ -55,7 +54,9 @@ const OPTIONS = {
 
 interface ParsedArguments {
 	positionals: ReadonlyArray<string>
-	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>>
+	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>> & {
+		driver?: boolean
+	}
 }
 
 // Absent owner is "no owner declared", which the carry guard reads as not provably foreign; a present
@@ -63,11 +64,10 @@ interface ParsedArguments {
 function to_owner(raw: string | undefined): CarryOwner | undefined {
 	if (raw === undefined) return run_carry.NO_OWNER
 
-	if (!DIGITS.test(raw)) return undefined
+	// The same count shape `run-carry-args.ts` reads an owner pid under.
+	const pid = cli_flags.to_count(raw)
 
-	const pid = Number(raw)
-
-	return pid < MIN_PID ? undefined : run_carry.owner_of(pid)
+	return pid === undefined || pid < MIN_PID ? undefined : run_carry.owner_of(pid)
 }
 
 // The epic form needs a repository (`epic:next --lanes` refuses without one), so an epic named with
@@ -116,7 +116,7 @@ function has_invalid_offer(values: ParsedArguments['values']): boolean {
 function has_invalid_legacy_over(raw: string | undefined): boolean {
 	if (raw === undefined) return false
 
-	return !DIGITS.test(raw) || !Number.isSafeInteger(Number(raw))
+	return cli_flags.to_count(raw) === undefined
 }
 
 function valid_child(parsed: ParsedArguments): string | undefined {
@@ -125,6 +125,11 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 	if (child === undefined) return undefined
 
 	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(child) ? child : undefined
+}
+
+// `backlog:drive` has no context to cut, so its merge is never handed back `over`.
+function threshold_of(values: ParsedArguments['values']): number | undefined {
+	return values.driver === true ? undefined : CONTEXT_CUT_THRESHOLD
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
@@ -144,7 +149,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 		child,
 		epic: valid_epic(parsed.values.epic),
 		repo: valid_repo(parsed.values.repo),
-		over: CONTEXT_CUT_THRESHOLD,
+		over: threshold_of(parsed.values),
 		owner,
 		output: parsed.values.output,
 	}
@@ -156,8 +161,8 @@ function parse(argv: ReadonlyArray<string>): MergeContext | undefined {
 	return parsed === undefined ? undefined : to_context(parsed)
 }
 
-// One handled return: the stdout token and the exit code. Returned rather than printed, so the
-// in-process caller (`backlog:drive`) reads the same verdict the CLI prints.
+// One handled return: the stdout token and the exit code. Returned rather than printed, so
+// `merge_child` carries the verdict to `run_merge_driver.printed`, which prints it.
 interface ControlVerdict {
 	token: MergeToken
 	code: number
@@ -183,8 +188,13 @@ function emit(token: MergeToken, code: number): ControlVerdict {
 	return { token, code, is_offer: false }
 }
 
+// No threshold is `backlog:drive`, which asks `backlog:offer` itself in the pass that collected the
+// child: `backlog:next` here would only hold back its next launch (joshuafolkken/kit#4406).
 async function offered(ctx: MergeContext): Promise<OfferVerdict> {
-	return { token: await run_merge_steps.ask_next(ctx), code: SUCCESS_EXIT_CODE, is_offer: true }
+	const token =
+		ctx.over === undefined ? run_merge_driver.DEFERRED_OFFER : await run_merge_steps.ask_next(ctx)
+
+	return { token, code: SUCCESS_EXIT_CODE, is_offer: true }
 }
 
 // A refused count means this session is not the carry record's owner, so the whole operation is
@@ -197,7 +207,8 @@ function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 
 // A merged child counted and its lane closed, the merge put on the stream and in the ledger. Returns the
 // carry when the ownership check refused it, `undefined` once recorded. `run:carry --end` records the
-// merges a run ended with through it too (`run-merge-collect.ts`).
+// merges a run ended with through it too (`run-merge-collect.ts`). The lane's `ended` record is
+// `lane:close`'s alone: an `incomplete` close leaves the lane open on it (joshuafolkken/kit#4300).
 async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	const refused = await run_merge_steps.do_merged(ctx)
 
@@ -226,16 +237,13 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child released to wait on its open blockers: settled for this run like a parked one, so it goes on
-// the stream the same way, but nothing was counted — the failure guard is not read, and the next child
-// is offered.
-async function on_waiting(
-	ctx: MergeContext,
-	blockers: ReadonlyArray<string>,
-): Promise<MergeVerdict> {
+// A child released to wait on its open blockers or its start date: settled for this run like a parked
+// one, so it goes on the stream the same way, but nothing was counted — the failure guard is not read,
+// and the next child is offered.
+async function on_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Promise<MergeVerdict> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} waiting on ${blockers.join(', ')}`,
+		`${issue_cite.plain(ctx.child)} waiting on ${waits.join(', ')}`,
 	)
 
 	return await offered(ctx)
@@ -248,9 +256,11 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 		return emit(MERGE_TOKEN.STOP, FAILURE_EXIT_CODE)
 	}
 
+	const cause = result.cause ?? run_stalled.SESSION_UNFINISHED.short
+
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} parked (needs-decision)`,
+		run_stalled.park_event(ctx.child, cause),
 	)
 
 	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
@@ -260,12 +270,12 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 	return await offered(ctx)
 }
 
-async function on_failed(ctx: MergeContext, cause?: string): Promise<MergeVerdict> {
+async function on_failed(ctx: MergeContext, cause?: StallCause): Promise<MergeVerdict> {
 	const result = await run_merge_steps.do_failed(ctx, cause)
 
 	if (result.is_refused) return report_count_refused(result.carry)
 
-	if (result.blockers.length > 0) return await on_waiting(ctx, result.blockers)
+	if (result.waits.length > 0) return await on_waiting(ctx, result.waits)
 
 	return await on_parked_failure(ctx, result)
 }
@@ -290,6 +300,14 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
+// A child whose session could not authenticate: the run stops with nothing counted or parked
+// (`run-merge-auth.ts`).
+async function on_unauthenticated(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_auth.stop(ctx.child)
+
+	return emit(MERGE_TOKEN.ENVIRONMENT, SUCCESS_EXIT_CODE)
+}
+
 // A child that ended its session with a cut no successor adopted: its successor is relaunched,
 // nothing is counted and nothing is parked, and `resumed` tells the parent to await the same lane
 // again rather than dispatch into it. A successor that could not be started — or a cut the
@@ -301,7 +319,7 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 	if (refused !== undefined) return report_count_refused(refused)
 
 	if (!(await run_merge_steps.resume_cut(ctx.child))) {
-		return await on_failed(ctx, run_merge_steps.CUT_RELAUNCH_CAUSE)
+		return await on_failed(ctx, run_stalled.CUT_NOT_RELAUNCHED)
 	}
 
 	await run_event_stream_emit.emit(
@@ -314,10 +332,10 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 // A child that parked itself: nothing is counted, but the park is written to the stream as a failed
 // child's is, so a reader restoring the run from its events sees the child settled. Its `in-progress`
-// is dropped as a failed child's is: left on, it would outlive the `needs-decision` a person later
-// lifts, and a `run:solo` child would then hold the whole backlog.
+// is dropped as a failed child's is: left on, it would outlive the park label a person later
+// lifts, and a `run:solo` child would then hold the whole backlog. A lane it left empty is closed.
 async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
-	await run_label.unmark(ctx.child)
+	await run_merge_steps.release_child(ctx.child)
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
 		`${issue_cite.plain(ctx.child)} parked`,
@@ -338,9 +356,9 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its issue
-// and lane and put itself on the stream, so nothing is counted or written here and its seat goes to the
-// next child.
+// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its lane
+// and put itself on the stream, leaving its issue open for the next run, so nothing is counted or
+// written here and its seat goes to the next child.
 async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
@@ -366,6 +384,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	'human-review': on_human_review,
 	merged: on_merged,
 	outage: on_outage,
+	unauthenticated: on_unauthenticated,
 	parked: on_parked,
 	split: on_skipped,
 	unresolved: on_unresolved,
@@ -373,8 +392,9 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	withdrawn: on_withdrawn,
 }
 
-// The whole merge event for one returned child, in-process: read its state, classify it, and run the
-// handler. The CLI prints the token; `backlog:drive` branches on the outcome.
+// The whole merge event for one returned child: read its state, classify it, and run the handler.
+// The CLI prints the token and the outcome; `backlog:drive` runs it as a child process
+// (`run-merge-driver.ts`) and branches on the printed outcome.
 async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	if (lane_handoff.is_ship_running(ctx.child, process.cwd())) {
 		return { outcome: 'shipping', ...(await on_shipping()) }
@@ -384,7 +404,9 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	const signals = await run_merge_signals.read_signals(ctx, read)
 	const outcome = run_merge_signals.outcome_of(read, signals)
 
-	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr: signals.merged_pr })) }
+	const { merged_pr, is_unanswered } = signals
+
+	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr, is_unanswered })) }
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -398,13 +420,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const result = await merge_child(ctx)
 
-	console.info(result.token)
+	console.info(run_merge_driver.printed(argv, result))
 
 	return result.code
-}
-
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
 }
 
 const run_merge_cli = {
@@ -414,8 +432,6 @@ const run_merge_cli = {
 	record_merged,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { MergeResult }
 export { run_merge_cli }

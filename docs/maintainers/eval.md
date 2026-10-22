@@ -48,7 +48,7 @@ part of CI**, and it is wired into no verification or completion gate at all
 **What is worth measuring** is a change under the paths a scenario can see: `CLAUDE.md`, `AGENTS.md`,
 `GEMINI.md`, `.claude/skills/**`, `prompts/**`, `.claude/settings.json`. That set is what the sandbox
 copies, so nothing outside it can be observed by a run. A change to only the harness or the scenarios
-(`scripts/eval/**`, `evals/scenarios/**`) changes the ruler rather than what it measures, and is not
+(`tools/eval/**`, `evals/scenarios/**`) changes the ruler rather than what it measures, and is not
 worth a run.
 
 One entry is coarser than what the suite can see. `.claude/settings.json` is copied through a filter
@@ -261,7 +261,7 @@ Drop a JSON file in `evals/scenarios/`:
 `input_matches` narrows a tool by a regular expression over its JSON-encoded input, which is how
 an issue _creation_ is told apart from an issue _read_.
 
-A unit suite (`scripts/eval/eval-scenario.test.ts`) holds the file to the shape above and refuses a
+A unit suite (`tools/eval/eval-scenario.test.ts`) holds the file to the shape above and refuses a
 scenario that declares no expectation — one would pass every run and read as coverage.
 
 ## Where a run happens

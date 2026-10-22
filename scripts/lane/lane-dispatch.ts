@@ -7,9 +7,10 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
-import { detached_launch } from '#scripts/run/detached-launch'
+import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_park } from '#scripts/run/park/run-park'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
@@ -19,6 +20,7 @@ import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
+import { lane_state } from './lane-state'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 // `josh lane:dispatch <issue-number>` — start a lane's child as an operating-system process of its own.
@@ -197,7 +199,7 @@ function existing_dispatch(request: StartRequest): DispatchOutcome | undefined {
 	return dispatched_of(request, active.pid, [])
 }
 
-function launch_argv(request: StartRequest, nonce: string | undefined): AgentArgv {
+function launch_argv(request: StartRequest, nonce: string | undefined): LaunchArgv {
 	if (request.profile.provider !== 'openai') return request.argv
 	if (nonce === undefined) throw new Error('OpenAI supervisor nonce is missing')
 
@@ -244,10 +246,15 @@ async function dispatched_start(
 		: dispatched_of(request, pid, notes)
 }
 
+// **A dispatch takes back any park the issue's earlier child recorded**: the issue is offered
+// again only once `needs-decision` is off, so a record still on disk is one a person cleared by hand on
+// GitHub, and left in place it would silence `lane-park` on this child's own stop
+// (joshuafolkken/kit#4132).
 async function started(request: StartRequest): Promise<DispatchOutcome> {
 	const notes: Array<string> = []
 	const existing = existing_dispatch(request)
 	if (existing !== undefined) return existing
+	run_park.clear(request.lane.issue, request.lane.directory)
 	const nonce =
 		request.profile.provider === 'openai' ? openai_lane_supervisor.new_nonce() : undefined
 	const result = detached_launch.launch(
@@ -327,13 +334,27 @@ async function mark_in_progress(issue: string): Promise<LabelWrite> {
 // removal warns and never throws, so it cannot turn a launch failure into a thrown error.
 //
 // The lane ledger takes the same instant: `lane:stats` times a lane's implementation from it, and the
-// stream is capped, so a period's earlier dispatches would be gone from there.
-async function record_started(issue: string): Promise<void> {
+// stream is capped, so a period's earlier dispatches would be gone from there. The lane's state record
+// takes the stream's launch instant as its own, so `run:board`, which reads the lane's events from
+// the record's launch on, keeps the launch event that opens them (joshuafolkken/kit#4269).
+async function record_started(issue: string, start: DispatchStart): Promise<void> {
+	const now = new Date()
+
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 		`${issue_cite.plain(issue)} dispatched`,
+		now,
 	)
 	await lane_ledger.record_dispatch(Number(issue))
+	await lane_state.record_change(
+		{
+			issue,
+			state: 'running',
+			command: start === RESTART_START ? 'lane:restart' : 'lane:dispatch',
+			is_launch: true,
+		},
+		{ now },
+	)
 }
 
 // How a dispatch begins. A `resumable` one claims the marker itself and resumes an `outage` session; a
@@ -359,7 +380,7 @@ async function finish_dispatch(
 
 	const is_failed = outcome.kind === 'failed'
 
-	await (is_failed ? run_label.unmark(issue) : record_started(issue))
+	await (is_failed ? run_label.unmark(issue) : record_started(issue, start))
 
 	return outcome
 }
@@ -404,7 +425,7 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`
 	}
 
-	return ` It writes to ${outcome.log_path}. To poll it, ${poll}.`
+	return ` It writes to ${outcome.log_path}. Wait on it with \`pnpm josh lane:await ${issue} --owner "$PPID"\` in the background and end the turn; once that output falls silent, ${poll}.`
 }
 
 // Whether this dispatch resumed the disconnected child's session or started fresh — the report the

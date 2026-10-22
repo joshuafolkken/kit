@@ -1,0 +1,8 @@
+{
+	"reason": "New josh cost:audit command (#3930): the scripts/cost-audit module adds the code lines (including the review fix that refuses an unknown flag or a valueless --period instead of defaulting), and its generated catalog entry carries the catalog's fixed three bold labels",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 534,
+		"prose.excess_bold": 2
+	}
+}

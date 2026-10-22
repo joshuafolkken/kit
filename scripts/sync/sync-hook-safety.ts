@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import semver from 'semver'
@@ -18,20 +17,15 @@ import semver from 'semver'
 
 const NODE_MODULES = 'node_modules'
 
-function read_version_at(package_json_path: string): string | undefined {
-	if (!existsSync(package_json_path)) return undefined
-	const parsed = package_version_schema.safeParse(
-		json_value.parse_or_undefined(readFileSync(package_json_path, 'utf8')),
-	)
-
-	return parsed.success ? parsed.data.version : undefined
+function read_version_at(package_directory: string): string | undefined {
+	return package_manifest.read_manifest_if_valid(package_directory, package_version_schema)?.version
 }
 
 // The version of kit installed in the consumer's node_modules — the bundle the rewritten hooks
 // actually run. Undefined before the first install, which is safe: a fresh install receives the
 // matching bundle, so there is nothing older to break.
 function installed_consumer_version(project_root: string): string | undefined {
-	return read_version_at(path.join(project_root, NODE_MODULES, KIT_PACKAGE_NAME, 'package.json'))
+	return read_version_at(path.join(project_root, NODE_MODULES, KIT_PACKAGE_NAME))
 }
 
 // Unsafe only when both versions are known AND the installed bundle the hooks run is older than the

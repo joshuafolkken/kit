@@ -1,3 +1,4 @@
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2769: `run:merge` over a child GitHub merged but left OPEN, and over a cut that
@@ -30,7 +31,6 @@ vi.mock('#scripts/lane/lane-ledger', () => ({
 
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
-		CUT_RELAUNCH_CAUSE: 'cut cause',
 		ask_next: vi.fn().mockResolvedValue('2039'),
 		do_failed: do_failed_mock,
 		do_merged: do_merged_mock,
@@ -62,7 +62,7 @@ beforeEach(() => {
 	do_merged_mock.mockReset().mockResolvedValue(undefined)
 	do_failed_mock
 		.mockReset()
-		.mockResolvedValue({ carry: undefined, is_parked: true, is_refused: false, blockers: [] })
+		.mockResolvedValue({ carry: undefined, is_parked: true, is_refused: false, waits: [] })
 	has_resumable_cut_mock.mockReset().mockResolvedValue(false)
 	resume_cut_mock.mockReset().mockResolvedValue(false)
 	emit_mock.mockReset()
@@ -113,6 +113,6 @@ describe('run_merge_cli.merge_child — a cut that could not be relaunched', () 
 
 		await run_merge_cli.merge_child(context())
 
-		expect(do_failed_mock).toHaveBeenCalledWith(expect.anything(), 'cut cause')
+		expect(do_failed_mock).toHaveBeenCalledWith(expect.anything(), run_stalled.CUT_NOT_RELAUNCHED)
 	})
 })

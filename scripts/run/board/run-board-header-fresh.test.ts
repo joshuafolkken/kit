@@ -15,7 +15,9 @@ const INVERSE = 'inverse'
 const BOLD_COLOR = 'bold-color'
 const SPINNER = '⠙'
 const SAID = '#278 merged'
-const RESET_BEAT = '💓 0:00:00'
+// A span of seconds right-aligned under the run's `2°10′00″`.
+const SECONDS_PAD = ' '.repeat(6)
+const RESET_BEAT = `💓 ${SECONDS_PAD}0″`
 const RUNNING_LAYOUT: BoardLayout = {
 	...EMPTY_LAYOUT,
 	active: [
@@ -59,16 +61,16 @@ describe('run_board_header.header_lines fresh heartbeat', () => {
 	it('fades the reset heartbeat through the three stages, then draws it plain', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(beating(0)[1]).toContain(`💓 ${paint('0:00:00', INVERSE)}`)
-		expect(beating(SECOND)[1]).toContain(`💓 ${paint('0:00:01', BOLD_COLOR)}`)
-		expect(beating(2 * SECOND)[1]).toContain(`💓 ${paint('0:00:02', 'bold')}`)
-		expect(beating(3 * SECOND)[1]).toContain('💓 0:00:03')
+		expect(beating(0)[1]).toContain(`💓 ${SECONDS_PAD}${paint('0″', INVERSE)}`)
+		expect(beating(SECOND)[1]).toContain(`💓 ${SECONDS_PAD}${paint('1″', BOLD_COLOR)}`)
+		expect(beating(2 * SECOND)[1]).toContain(`💓 ${SECONDS_PAD}${paint('2″', 'bold')}`)
+		expect(beating(3 * SECOND)[1]).toContain(`💓 ${SECONDS_PAD}3″`)
 	})
 
 	it('keeps the stale colors, and draws no emphasis in a chat or with no spinner', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(beating(20 * MINUTE)[1]).toContain(styleText('yellow', '💓 0:20:00'))
+		expect(beating(20 * MINUTE)[1]).toContain(styleText('yellow', '💓   20′00″'))
 		expect(beating(0, { form: 'chat' })[1]).toContain(RESET_BEAT)
 		expect(beating(0, { spinner: undefined })[1]).toContain(RESET_BEAT)
 	})
@@ -90,7 +92,7 @@ describe('run_board_header.header_lines fresh third line', () => {
 	it('emphasizes the third line time and words as they update, then draws them plain', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(said(0)).toContain(paint('0:00:00', INVERSE))
+		expect(said(0)).toContain(paint('0″', INVERSE))
 		expect(said(0)).toContain(paint(SAID, INVERSE))
 		expect(said(SECOND)).toContain(paint(SAID, BOLD_COLOR))
 		expect(said(3 * SECOND)).toContain(` ${SAID}`)
@@ -106,6 +108,6 @@ describe('run_board_header.header_lines fresh third line', () => {
 
 		expect(third).toContain(` ${SAID}`)
 		expect(third).not.toContain(paint(SAID, INVERSE))
-		expect(third).not.toContain(paint('0:00:00', INVERSE))
+		expect(third).not.toContain(paint('0″', INVERSE))
 	})
 })

@@ -1,0 +1,9 @@
+{
+	"reason": "Acceptance-criteria map per #3954, plus round-2 review fixes: CRLF-safe line split and a fence-only line view in markdown_section so wrapped criteria keep indented continuation lines",
+	"date": "2026-10-16",
+	"growth": {
+		"scripts.code_lines": 232,
+		"rules.lines": 9,
+		"ai_cost.on_demand_bytes": 560
+	}
+}

@@ -1,12 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
-import {
-	ALREADY_DONE_LABEL,
-	has_any_label,
-	IN_PROGRESS_LABEL,
-	NEEDS_DECISION_LABEL,
-} from '#scripts/issue/issue-labels'
+import { has_any_label, IN_PROGRESS_LABEL, PARKED_LABELS } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // How much of a repository's parallelism is already spoken for — asked of the *repository*, never of
@@ -34,12 +29,10 @@ const LISTING_LIMIT = 100
 // Read through `has_any_label` rather than compared directly, for the casing reason
 // `issue-labels.ts` records: GitHub keeps the spelling a label was created with.
 //
-// `already-done` joins `needs-decision` here for the same reason it joins it in
-// `epic_classify.local_category`: the run that applied it committed
-// nothing, so the checkout it ran in is clean and there is no uncommitted work for the next child to
-// start on top of. That is exactly what separates both from `needs-human-review`, which is
-// deliberately not parked because its work is still sitting in the tree.
-const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])
+// The park labels (`PARKED_LABELS`): `already-done` and `run:stalled` join `needs-decision` here for
+// the same reason they join it in `epic_classify.local_category`: the run that applied one leaves no
+// uncommitted work for the next child to start on top of. That is exactly what separates them from
+// `needs-human-review`, which is deliberately not parked because its work is still sitting in the tree.
 
 // What one repository answered. `unreadable` is kept apart from `idle` because reading a failed
 // read as an empty listing is a confident absence

@@ -1,7 +1,7 @@
-import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { has_parked_label } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 
-// Whether an issue is parked for a person — the `needs-decision` label — read live, so a session a
+// Whether an issue is parked for a person — any park label (`PARKED_LABELS`) — read live, so a session a
 // lane's broker would start for it is refused once the run has parked it (joshuafolkken/kit#3878).
 //
 // **An issue whose state cannot be read is not parked**: the read gates every brokered review, so
@@ -10,7 +10,7 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 async function is_parked(issue: string): Promise<boolean> {
 	const read = await issue_state_cli.read_issue(issue)
 
-	return read.kind === 'state' && has_label_name(read.state.labels, NEEDS_DECISION_LABEL)
+	return read.kind === 'state' && has_parked_label(read.state.labels)
 }
 
 const lane_parked = { is_parked }

@@ -13,6 +13,9 @@ import { run_board_tick } from './run-board-tick'
 const { LOCAL, START, harness } = run_board_fixture
 const { FRESH_STATE, PLAN_RETRY_MS, tick } = run_board_tick
 const CHILDREN = [3439, 3444, 3446]
+// The 11-column `MM-DD HH:MM` condition column; blank where the close time is unknown.
+const CONDITION_WIDTH = 11
+const TIME_PATTERN = String.raw`\d\d-\d\d \d\d:\d\d`
 const LAUNCHED_AT = '2026-10-08T08:00:00.000Z'
 // 45 minutes 48 seconds after the launch.
 const CLOSED_MS = Date.parse('2026-10-08T08:45:48.000Z')
@@ -37,7 +40,13 @@ function merged_closed(
 	const closed = new Map(
 		issues.map((issue) => [
 			issue,
-			{ title: `Child ${String(issue)}`, labels, closed_ms: CLOSED_MS, is_merged: true },
+			{
+				title: `Child ${String(issue)}`,
+				labels,
+				closed_ms: CLOSED_MS,
+				is_merged: true,
+				is_not_planned: false,
+			},
 		]),
 	)
 
@@ -53,12 +62,12 @@ function row_of(frame: string | undefined, issue: number): string | undefined {
 
 describe('run_board_tick.tick — children that closed', () => {
 	// joshuafolkken/kit#3769: a settled row draws no phase history after it.
-	it('draws a closed child nameless and timeless while GitHub has not answered', async () => {
+	it('draws a closed child nameless with a blank time column while GitHub has not answered', async () => {
 		const { ports, frames } = harness(LOCAL_CLOSED, [PLAN])
 
 		await tick(FRESH_STATE, ports)
 
-		expect(row_of(frames.at(-1), 3439)?.trim()).toBe('🏁 3439')
+		expect(row_of(frames.at(-1), 3439)?.trim()).toBe(`🏁 ${' '.repeat(CONDITION_WIDTH)} 3439`)
 	})
 
 	it('draws each child read closed with its title, time and merge', async () => {
@@ -71,7 +80,7 @@ describe('run_board_tick.tick — children that closed', () => {
 
 		for (const issue of CHILDREN) {
 			expect(row_of(frames.at(-1), issue)).toMatch(
-				new RegExp(`✅ ${String(issue)} +Child ${String(issue)} +45:48`, 'u'),
+				new RegExp(`✅ ${TIME_PATTERN} ${String(issue)} +Child ${String(issue)} +45′48″`, 'u'),
 			)
 		}
 	})
@@ -97,8 +106,11 @@ describe('run_board_tick.tick — the release kind of a closed child', () => {
 		read_closed.mockImplementation(async (issues) => merged_closed(issues, ['bug']))
 		await tick(FRESH_STATE, ports)
 
-		expect(row_of(frames.at(-1), CHILDREN[0] ?? 0)).toContain(
-			`✅ ${String(CHILDREN[0])} 🐛 Child ${String(CHILDREN[0])}`,
+		expect(row_of(frames.at(-1), CHILDREN[0] ?? 0)).toMatch(
+			new RegExp(
+				`✅ ${TIME_PATTERN} ${String(CHILDREN[0])} {4}🐛 Child ${String(CHILDREN[0])}`,
+				'u',
+			),
 		)
 	})
 })

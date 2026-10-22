@@ -1,9 +1,6 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_citation } from '#scripts/rules/issue-citation'
@@ -31,7 +28,6 @@ import { epic_report, type EpicNextResult } from './epic-report'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 // Asking for every free lane (`--lanes`) is opt-in, so the answer stays one token for a caller that
 // has not been changed. `--repo` alone prints exactly one number.
 const OPTIONS = { repo: { type: 'string' }, lanes: { type: 'boolean' } } as const
@@ -416,14 +412,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_epics(options)
 }
 
-// `process.exitCode` rather than `process.exit()`, for the reason `scripts/cost-runtime/cost-cli.ts` records:
-// the answer goes to standard output and a write to a pipe is asynchronous on macOS, so exiting can
-// tear the process down before it drains. This command's contract is `answer=$(pnpm josh epic:next
-// <E>)`, which is exactly that pipe.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const epic_next = {
 	EXTERNAL_NOTICE,
 	FOREIGN_EPIC,
@@ -433,18 +421,10 @@ const epic_next = {
 	parse_options,
 	refuse_reads,
 	views_of,
+	run,
 	run_epics,
 	decide,
 	report,
-}
-
-// `.env` is read here rather than through the dispatcher's `tsx_arguments`: declaring any would
-// disqualify this command from in-process dispatch, and an unattended `epicrun` asks it every sixty
-// seconds for the whole life of a run (`josh-environment-file.ts` records the measurement). Inside the guard
-// rather than in `main`, so a developer's own `.env` cannot decide what the unit tests see.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	josh_environment_file.load_environment_file()
-	await main(process.argv.slice(ARGV_OFFSET))
 }
 
 export type { NextOptions }

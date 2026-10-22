@@ -1,0 +1,7 @@
+{
+	"reason": "joshuafolkken/kit#4439 interrupt fix on this branch: the network guard's teardown restores the git location variables it clears, plus its regression test helper",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 51
+	}
+}

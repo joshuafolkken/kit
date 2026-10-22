@@ -4,6 +4,7 @@ import { agent_launch_environment } from '#scripts/agent/agent-launch-environmen
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { launch_priority } from '#scripts/run/launch-priority'
 
 // Starting a process that outlives this one, and keeping what it writes.
 //
@@ -34,13 +35,18 @@ const UNSAFE_NOTE =
 //
 // A NUL byte is what `execve` treats as the end of a string, so a value carrying one executes as a
 // prefix of itself; the other control characters have no business in a command line and their presence
-// means the value did not come from where it was supposed to.
+// means the value did not come from where it was supposed to. **An agent's prompt is the one element a
+// line break belongs in** — a ship-stop prompt carries the failed output's lines — so a vector marked
+// `ends_with_prompt` lets it into its last element alone (joshuafolkken/kit#3964).
 //
 // The shared value validation lives with the role policy so environment overrides and argv elements
 // cannot disagree about which control characters or lengths are safe.
 interface LaunchArgv {
 	command: string
 	args: ReadonlyArray<string>
+	// Set by an agent argv builder, whose prompt is the last element: that one element may carry line
+	// breaks (`is_safe_prompt`), and every other element is checked as before.
+	ends_with_prompt?: boolean
 }
 
 type LaunchResult = { kind: 'launched'; pid: number } | { kind: 'failed'; note: string }
@@ -65,12 +71,23 @@ interface LaunchRequest {
 	profile?: AgentProfile | undefined
 }
 
-const { is_safe_value } = agent_role_profile
+const { is_safe_prompt, is_safe_value } = agent_role_profile
+const LAST = -1
+
+// An agent vector's prompt, the last element, may break lines; every other element is a value.
+function is_safe_element(argv: LaunchArgv, value: string, index: number): boolean {
+	const is_prompt = argv.ends_with_prompt === true && index === argv.args.length + LAST
+
+	return is_prompt ? is_safe_prompt(value) : is_safe_value(value)
+}
 
 // The single gate every argument vector passes before it reaches the operating system, whoever
 // composed it.
 function is_safe_argv(argv: LaunchArgv): boolean {
-	return is_safe_value(argv.command) && argv.args.every((value) => is_safe_value(value))
+	return (
+		is_safe_value(argv.command) &&
+		argv.args.every((value, index) => is_safe_element(argv, value, index))
+	)
 }
 
 function note_of(error: unknown): string {
@@ -251,6 +268,7 @@ async function attached_spawn(
 		child.once('exit', (exit_code) => {
 			resolve({ kind: 'completed', pid: child.pid ?? 0, exit_code })
 		})
+		launch_priority.lower(child.pid)
 		notify_spawn(child.pid, on_spawn, on_error)
 	})
 }
@@ -287,6 +305,7 @@ function spawned(
 		on_error(note_of(error))
 	})
 	child.unref()
+	launch_priority.lower(child.pid)
 
 	return child.pid === undefined ? { kind: 'failed', note: NO_PID_NOTE } : launched(child.pid)
 }
@@ -341,5 +360,5 @@ const detached_launch = {
 	note_of,
 }
 
-export type { LaunchArgv, LaunchRequest, LaunchResult }
+export type { AttachedLaunchResult, LaunchArgv, LaunchRequest, LaunchResult }
 export { detached_launch }

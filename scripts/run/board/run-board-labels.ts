@@ -1,22 +1,19 @@
 import { WriteStream } from 'node:tty'
 import { styleText } from 'node:util'
+import { figure_format } from '#scripts/lib/figure-format'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import cli_spinners from 'cli-spinners'
+import { run_board_length } from './run-board-length'
 import type { BoardNote } from './run-board-notes'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
 // The words and the clock `run:board` draws with. A moment on the board is a local clock, `HH:MM`
-// where a person reads it to the minute; how long a row or the heartbeat has run is a short `MM:SS`,
-// and how long the run has run or its wait has left is `H:MM:SS` — two separators are a length and one
-// is a time of day, so the header's time column never reads a length as a moment.
+// where a person reads it to the minute; every length — how long the run, a row, a phase or the
+// heartbeat has run — is degree-minute-second style (`1°15′57″`), so `:` is a time of day alone and
+// the board never reads a length as a moment.
 
-const CLOCK_WIDTH = 2
-const CLOCK_PAD = '0'
-const MS_PER_SECOND = 1000
-const SECONDS_PER_MINUTE = 60
-const MINUTES_PER_HOUR = 60
 // Every gauge is this wide — the plan, the machine and a row's phase.
 const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
@@ -40,15 +37,43 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 const WORDS = {
 	no_run: 'no run',
 	plan: 'plan',
+	// The reads off this machine — the run's stream, its lanes and the gauges — that last failed.
+	read: 'read',
 	merged: 'merged',
 	parked: 'parked',
 	done: 'done',
 	withdrawn: 'withdrawn',
 	in_progress: 'running',
 	stopped: 'stopped',
+	paused: 'paused',
+	earlier: 'earlier run',
+	unknown: 'lane state unknown',
 	waiting: 'waiting',
+	queued: 'queued',
+	not_before: 'not before',
 	decision: 'decision',
 	waits: 'waits on',
+	// What a waiting row waits on, where the legend names its icon.
+	opening: 'opening lane',
+	installing: 'installing',
+	dispatching: 'dispatching',
+	lane: 'free lane',
+	path: 'path held',
+	named: 'named order',
+	held: 'held by triage',
+	headroom: 'memory headroom',
+	untriaged: 'untriaged',
+	solo: 'runs alone',
+	solo_ahead: 'behind solo',
+	solo_running: 'solo running',
+	// A blocker this run will not finish, which a person has to move (joshuafolkken/kit#4292).
+	on_human: 'needs a person',
+	// A lane held back by the machine-wide core budget, and why.
+	held_check: 'held',
+	memory: 'waits for memory',
+	cores: 'waits for CPU',
+	// How long a lane has run, which the lanes rule's ⏰ stands over.
+	elapsed: 'elapsed',
 	investigate: 'investigate',
 	implement: 'implement',
 	ship: 'ship',
@@ -60,9 +85,10 @@ const WORDS = {
 	followup: 'followup',
 	report: 'report',
 	failed: 'failed',
-	notes: 'findings and decisions',
+	notes: 'findings',
 	more: 'more',
 	filed: 'filed',
+	filed_run: 'filed this run',
 	breaking: 'breaking',
 	feature: 'feature',
 	fix: 'fix',
@@ -75,6 +101,7 @@ const WORDS = {
 	on_person: 'waiting on a person',
 	operation: 'operation',
 	ended: 'ended',
+	estimate: 'estimated finish',
 	// The session a stopped run waits in, and what closing the board leaves.
 	resume: 'stopped — resume with',
 	keeps_running: 'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
@@ -105,11 +132,20 @@ const STATE_ICONS: Readonly<Record<ItemState, string>> = {
 	waiting: '⏳',
 	human: '🙋',
 	stopped: '🛑',
+	paused: '🧊',
 	withdrawn: '🚫',
+	unknown: '❔',
 }
 
 // The blocking edge, chosen on the same rule: ⛓ is a text symbol.
 const WAITS_ICON = '🔗'
+
+// A waiting row that waits on the start time its body declares rather than on a blocker
+// (joshuafolkken/kit#4079), chosen on the same rule: 🗓 is a text symbol.
+const NOT_BEFORE_ICON = '📅'
+
+// The lanes section's rule, and a waiting row that waits on a free lane.
+const LANES_ICON = '🧵'
 
 // A running row's phases as icons, chosen on the same rule; the row draws every phase it has passed,
 // so the rightmost icon is what it is doing now. Each of `josh ship`'s stages has its own; ⚓ rather
@@ -149,6 +185,9 @@ const PHASE_WORDS: Readonly<Record<Phase, keyof Words>> = {
 // phase and state icon, so the legend names them and a row needs no word. 🆕 is a filed issue whose
 // kind is none of `FILED_KIND_ICONS`.
 const NOTES_ICON = '📌'
+// A plan row the run filed leads its title with it, in place of a findings line naming it again
+// (joshuafolkken/kit#4099).
+const FILED_RUN_MARK = '✚'
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
@@ -171,25 +210,31 @@ const KIND_WORDS: Readonly<Record<FiledKind, keyof Words>> = {
 	bug: 'fix',
 }
 
-// The header's gauges and marks. ⚡ rather than 🔥: a fire beside a gauge drawn green reads as an
-// alarm. ⏰ rather than ⏱, a text symbol some terminals draw one column wide: under it the 💓's digits
-// would stand a column off.
+// The header's gauges and marks. 💪 for the CPU: ⚡ is drawn too thin to see, a 🔥 beside a gauge
+// drawn green reads as an alarm, and 💻 is hard to tell from 💾. ⏰ rather than ⏱, a text symbol
+// some terminals draw one column wide: under it the 💓's digits would stand a column off.
 const HEADER_ICONS = {
-	cpu: '⚡',
+	cpu: '💪',
 	memory: '🧠',
 	swap: '💾',
 	ended: '🔚',
 	loading: '⏳',
 	elapsed: '⏰',
 	heartbeat: '💓',
+	// A failed plan read: ❗ rather than ⚠, a text symbol drawn two columns wide over the blank after it.
+	warning: '❗',
+	// The estimated finish: a done row's own mark, as the run's end is what it estimates.
+	estimate: STATE_ICONS.done,
 } as const
 
-// The kind of what the header's third line says, under the `⚡` (joshuafolkken/kit#3767): a call a
+// The kind of what the header's third line says, under the `💪` (joshuafolkken/kit#3767): a call a
 // session made, the run watching its pool, the run ended, or each of the run's own stages, keyed by the
 // stage's words before any issue. A child's event draws its row's phase icon instead. The run ended
 // draws the header's own end mark — 🏁 is already a done row's state icon.
 const NOW_ICONS = { operation: '🔧', watching: '🔭', ended: HEADER_ICONS.ended } as const
 const { STAGE, LANE_STAGE } = run_event_setup
+// The stages a lane's launch passes, which a queued row waiting on its lane leads with too.
+const LANE_STAGE_ICONS = { opening: '🚪', installing: '📥', dispatching: '📤' } as const
 const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.STARTING]: '🚀',
 	[STAGE.PLANNING]: '📝',
@@ -197,10 +242,49 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.JUDGING]: '🤔',
 	[STAGE.SESSION]: '💭',
 	[STAGE.NO_CHILD]: '🚫',
-	[LANE_STAGE.OPENING]: '🚪',
-	[LANE_STAGE.INSTALLING]: '📥',
-	[LANE_STAGE.DISPATCHING]: '📤',
+	[LANE_STAGE.OPENING]: LANE_STAGE_ICONS.opening,
+	[LANE_STAGE.INSTALLING]: LANE_STAGE_ICONS.installing,
+	[LANE_STAGE.DISPATCHING]: LANE_STAGE_ICONS.dispatching,
 }
+
+// What a queued or waiting row leads with (joshuafolkken/kit#4288), in place of ⏳: 📂 a path a
+// running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
+// judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
+// held check's) and 🔒 a row a running `run:solo` issue holds (#4391), chosen on the same rule as
+// every row icon. The rest are the board's own, shared rather than copied.
+const WAIT_ICONS = {
+	path: '📂',
+	named: '📋',
+	held: '✋',
+	untriaged: '❓',
+	solo: '🧍',
+	solo_ahead: '🙅',
+	solo_running: '🔒',
+	lane: LANES_ICON,
+	memory: HEADER_ICONS.memory,
+	blocker: WAITS_ICON,
+	not_before: NOT_BEFORE_ICON,
+} as const
+
+// The legend's word for each icon a waiting row can lead with — a lane's stage among them. 📝, the
+// planning a row waits on, is the plan phase's icon, which the legend names already.
+const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
+	[LANE_STAGE_ICONS.opening, 'opening'],
+	[LANE_STAGE_ICONS.installing, 'installing'],
+	[LANE_STAGE_ICONS.dispatching, 'dispatching'],
+	[WAIT_ICONS.lane, 'lane'],
+	[WAIT_ICONS.path, 'path'],
+	[WAIT_ICONS.named, 'named'],
+	[WAIT_ICONS.held, 'held'],
+	[WAIT_ICONS.solo, 'solo'],
+	[WAIT_ICONS.solo_ahead, 'solo_ahead'],
+	[WAIT_ICONS.solo_running, 'solo_running'],
+	[WAIT_ICONS.memory, 'headroom'],
+	[WAIT_ICONS.untriaged, 'untriaged'],
+	[WAIT_ICONS.blocker, 'waits'],
+	[STATE_ICONS.human, 'on_human'],
+	[WAIT_ICONS.not_before, 'not_before'],
+]
 
 // **The machine gauges' three colors, decided here alone**: Activity Monitor's green, yellow and red
 // in the system's dark-mode values. A palette's `green` draws blue and its `red` orange in a VSCode
@@ -211,60 +295,16 @@ const GAUGE_SHADES = {
 	red: { rgb: '255;69;58', named: 'red' },
 } as const satisfies Readonly<Record<string, Shade>>
 
-function two_digits(value: number): string {
-	return String(value).padStart(CLOCK_WIDTH, CLOCK_PAD)
-}
+const { two_digits, clock_of, minute_of } = figure_format
+const { minute_span_of, span_of } = run_board_length
 
-// The local wall-clock `HH:MM:SS` of a moment.
-function clock_of(ms: number): string {
+// The local `MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
+// start, in the condition column it is the widest value of (joshuafolkken/kit#4288).
+function day_minute_of(ms: number): string {
 	const date = new Date(ms)
+	const day = [date.getMonth() + 1, date.getDate()].map((value) => two_digits(value))
 
-	return [date.getHours(), date.getMinutes(), date.getSeconds()]
-		.map((value) => two_digits(value))
-		.join(':')
-}
-
-// The local wall-clock `HH:MM` of a moment, for one a person reads to the minute — when a run ended, or
-// when a finding was filed.
-function minute_of(ms: number): string {
-	const date = new Date(ms)
-
-	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
-}
-
-// How long a row's child has run, as `MM:SS` whose minutes never carry into hours (`61:05`), so every
-// row reads one short column; a negative span reads as zero.
-function elapsed_of(ms: number): string {
-	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
-	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
-
-	return `${two_digits(minutes)}:${two_digits(seconds % SECONDS_PER_MINUTE)}`
-}
-
-// A length as its hours, and its minutes and seconds within the hour; a negative span reads as zero.
-function span_fields(ms: number): [hours: number, minutes: number, seconds: number] {
-	const seconds = Math.floor(Math.max(0, ms) / MS_PER_SECOND)
-	const minutes = Math.floor(seconds / SECONDS_PER_MINUTE)
-	const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-
-	return [hours, minutes % MINUTES_PER_HOUR, seconds % SECONDS_PER_MINUTE]
-}
-
-// How long the run has run or its stream has been silent, as `H:MM:SS` with the hours not padded; a negative
-// span reads as zero. Always three fields, so a run under an hour (`0:03:25`) never reads as a time.
-function span_of(ms: number): string {
-	const [hours, ...tail] = span_fields(ms)
-
-	return [String(hours), ...tail.map((value) => two_digits(value))].join(':')
-}
-
-// How long the run has stood at its stage, as `M:SS` with the minutes not padded, and as `span_of`'s
-// `H:MM:SS` from an hour on. It stands beside the stage's words, never in the header's time column, so
-// its one separator is not read there as a time of day.
-function stage_span_of(ms: number): string {
-	const [hours, minutes, seconds] = span_fields(ms)
-
-	return hours === 0 ? `${String(minutes)}:${two_digits(seconds)}` : span_of(ms)
+	return `${day.join('-')} ${minute_of(ms)}`
 }
 
 function is_shade(color: Paint): color is Shade {
@@ -317,6 +357,7 @@ function spinner_of(now_ms: number): string {
 
 const run_board_labels = {
 	FILED_KIND_ICONS,
+	FILED_RUN_MARK,
 	GAUGE_SHADES,
 	HEADER_ICONS,
 	KIND_BLANK,
@@ -332,13 +373,16 @@ const run_board_labels = {
 	WAITS_ICON,
 	WORDS,
 	bar_of,
+	LANES_ICON,
+	WAIT_ICONS,
+	WAIT_WORDS,
 	clock_of,
-	elapsed_of,
+	day_minute_of,
 	minute_of,
+	minute_span_of,
 	painted,
 	span_of,
 	spinner_of,
-	stage_span_of,
 }
 
 export { run_board_labels }

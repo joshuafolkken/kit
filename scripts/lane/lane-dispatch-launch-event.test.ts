@@ -7,12 +7,14 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_park } from '#scripts/run/park/run-park'
 import { run_label } from '#scripts/run/run-label'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
 import { lane_ledger } from './lane-ledger'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_state, type RecordOutcome } from './lane-state'
 
 // joshuafolkken/kit#2464: the stall detector ages the last dispatch from the stream's `child-launch`, and
 // nothing wrote one — so minutes after a launch every stall read "hours since the last dispatch". This
@@ -23,6 +25,7 @@ const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`
 const LOG_PATH = path.join(os.tmpdir(), `josh-lane-dispatch-${ISSUE}.log`)
 const PID = 2464
 const SPAWN_FAILURE = 'spawn claude ENOENT'
+const SKIPPED: RecordOutcome = { kind: 'skipped', reason: 'test' }
 
 const launch = vi.spyOn(detached_launch, 'launch')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
@@ -69,6 +72,7 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 		expect(emit).toHaveBeenCalledExactlyOnceWith(
 			run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 			`#${ISSUE} dispatched`,
+			expect.any(Date),
 		)
 	})
 
@@ -101,6 +105,61 @@ describe('lane_dispatch.dispatch_child — the dispatch the implementation is ti
 		await lane_dispatch.dispatch_child(ISSUE)
 
 		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4268: the lane's state record takes the start as a launch, named by the command that
+// made it.
+describe('lane_dispatch.dispatch_child — the lane state record', () => {
+	it.each([
+		['resumable', 'lane:dispatch'],
+		['restart', 'lane:restart'],
+	] as const)('records a %s start as a running launch by %s', async (start, command) => {
+		const record = vi.spyOn(lane_state, 'record_change').mockResolvedValue(SKIPPED)
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE, start)
+
+		expect(record).toHaveBeenCalledOnce()
+		expect(record.mock.calls[0]?.[0]).toStrictEqual({
+			issue: ISSUE,
+			state: 'running',
+			command,
+			is_launch: true,
+		})
+	})
+
+	// joshuafolkken/kit#4269: run:board reads the lane's events from the record's launch on, so a launch
+	// event stamped before the record's launch fell out of them.
+	it('stamps the record’s launch with the launch event’s instant', async () => {
+		const record = vi.spyOn(lane_state, 'record_change').mockResolvedValue(SKIPPED)
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(record.mock.calls[0]?.[1]?.now).toBe(emit.mock.calls[0]?.[2])
+	})
+
+	it('records no state when the launch started no child', async () => {
+		const record = vi.spyOn(lane_state, 'record_change').mockResolvedValue(SKIPPED)
+
+		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4132: a park a person cleared by hand on GitHub left its record behind, and the
+// re-dispatched child's stop then read as parked.
+describe('lane_dispatch.dispatch_child — a park left by an earlier child', () => {
+	it('clears the issue park record before the child starts', async () => {
+		const clear = vi.spyOn(run_park, 'clear').mockReturnValue()
+
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(clear).toHaveBeenCalledExactlyOnceWith(ISSUE, LANE_DIRECTORY)
 	})
 })
 
@@ -140,5 +199,16 @@ describe('lane_dispatch.describe — a dispatch on the default provider', () => 
 
 		expect(outcome.kind).toBe('dispatched')
 		expect(lane_dispatch.describe(outcome, ISSUE)).not.toContain(DEFAULTED)
+	})
+})
+
+describe('lane_dispatch.describe — the wait it hands the parent', () => {
+	it('names the blocking lane:await in the background, never a poll', async () => {
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+
+		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
+
+		expect(message).toContain(`lane:await ${ISSUE} --owner "$PPID"\` in the background`)
+		expect(message).not.toContain('poll')
 	})
 })

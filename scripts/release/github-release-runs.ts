@@ -96,20 +96,31 @@ async function is_release_lost(source: RunSource, tag: string): Promise<boolean>
 	return run.status === 'completed' && (await is_release_over(source, tag))
 }
 
-// A run not listed yet is pending too: the announcement that starts this release also starts the
-// publication, so the release can ask before GitHub has queued that run.
-async function publication_state(
+async function publish_run(
 	source: RunSource,
 	workflow: string,
 	tag: string,
-): Promise<PollState> {
-	const run = await find_run(source, workflow, `Publish ${tag}`)
+): Promise<Run | undefined> {
+	return await find_run(source, workflow, `Publish ${tag}`)
+}
+
+// A run not listed yet is pending too: the announcement that starts this release also starts the
+// publication, so the release can ask before GitHub has queued that run.
+function run_state(run: Run | undefined): PollState {
 	if (run?.status !== 'completed') return 'pending'
 
 	return run.conclusion === 'success' ? 'ready' : 'failed'
 }
 
-const github_release_runs = { is_release_lost, publication_state }
+async function publication_state(
+	source: RunSource,
+	workflow: string,
+	tag: string,
+): Promise<PollState> {
+	return run_state(await publish_run(source, workflow, tag))
+}
 
-export type { PollState, RunSource }
+const github_release_runs = { is_release_lost, publication_state, publish_run, run_state }
+
+export type { PollState, Run, RunSource }
 export { github_release_runs }

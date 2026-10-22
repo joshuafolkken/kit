@@ -16,6 +16,7 @@ function count_occurrences(content: string, needle: string): number {
 const AUTO_TAG_PATH = '../../.github/workflows/auto-tag.yml'
 const PRODUCTION_PATH = '../../.github/workflows/production.yml'
 const CI_TEMPLATE_PATH = '../../templates/workflows/ci.yml'
+const GITHUB_RELEASE_TEMPLATE_PATH = '../../templates/workflows/github-release.yml'
 
 describe('auto-tag.yml — remote tag awareness', () => {
 	it('fetches remote tags before checking whether the tag exists', () => {
@@ -63,14 +64,32 @@ describe('production.yml — release merge source', () => {
 	})
 })
 
-describe('templates/workflows/ci.yml — checkout credential hygiene', () => {
-	it('sets persist-credentials: false on every checkout step', () => {
-		const content = read_workflow(CI_TEMPLATE_PATH)
+// `auto-tag.yml` and `production.yml` push with the checkout's credentials, so they keep them.
+describe('checkout credential hygiene in workflows that never push', () => {
+	it.each([
+		CI_TEMPLATE_PATH,
+		GITHUB_RELEASE_TEMPLATE_PATH,
+		'../../.github/workflows/ci.yml',
+		'../../.github/workflows/publish.yml',
+		'../../.github/workflows/sonar-qube.yml',
+		'../../.github/workflows/pr-classification.yml',
+	])('sets persist-credentials: false on every checkout step of %s', (workflow_path) => {
+		const content = read_workflow(workflow_path)
 		const checkout_count = count_occurrences(content, 'actions/checkout@')
 		const persist_count = count_occurrences(content, 'persist-credentials: false')
 
 		expect(checkout_count).toBeGreaterThan(0)
 		expect(persist_count).toBe(checkout_count)
+	})
+})
+
+describe('github-release.yml — dispatched tag validation', () => {
+	it('validates the tag with the pattern production.yml uses', () => {
+		const pattern = /=~ (\^v\S+\$) \]\]/u
+		const production_pattern = pattern.exec(read_workflow(PRODUCTION_PATH))?.[1]
+
+		expect(production_pattern).toBeDefined()
+		expect(pattern.exec(read_workflow(GITHUB_RELEASE_TEMPLATE_PATH))?.[1]).toBe(production_pattern)
 	})
 })
 

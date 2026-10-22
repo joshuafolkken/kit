@@ -6,6 +6,8 @@
 !.claude/.claude-plugin/
 # Prettier pads every Markdown table column, which grows the skills past their byte budgets (joshuafolkken/kit#3325)
 .claude/**/*.md
+# Generated one-row-per-command table, pinned by its generator's test; padding would multiply its size (#4162)
+docs/josh-command-catalog.md
 
 # Package Managers
 package-lock.json

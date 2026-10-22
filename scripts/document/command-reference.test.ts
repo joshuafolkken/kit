@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import {
+	CATALOG_FILE,
+	format_command_entry,
+	generate_catalog,
+} from '#tools/document/generate-catalog'
 import { describe, expect, it } from 'vitest'
 import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
-import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 
 // Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker
 // suite used to pin a handful of command names by hand; this checks all of them at once, and a
@@ -57,86 +61,6 @@ describe('every josh command a document names exists', () => {
 	})
 })
 
-// The command reference must stay in step with the command map both ways: every command has a
-// section, and no section documents a command that no longer exists (joshuafolkken/kit#1929). A
-// section is a heading whose code span names the command, so a grouped heading
-// (`` `josh run:hold` / `josh run:release` ``) covers each command it names.
-// The reference is two pages — the commands a person types, and the ones automation calls
-// (joshuafolkken/kit#2998) — and together they cover the map.
-function documented_commands(paths: ReadonlyArray<string> = COMMAND_REFERENCE_DOCS): Set<string> {
-	const headings = paths
-		.map((path) => read_document(path))
-		.join('\n')
-		.split('\n')
-		.filter((line) => /^#{2,4} /u.test(line))
-	const names = new Set<string>()
-
-	for (const heading of headings) {
-		for (const name of document_scan.command_references(heading)) names.add(name)
-	}
-
-	return names
-}
-
-describe('the command reference covers exactly the command map', () => {
-	it('gives every command map entry a section', () => {
-		const documented = documented_commands()
-		const missing = Object.keys(COMMAND_MAP).filter((name) => !documented.has(name))
-
-		expect(missing).toStrictEqual([])
-	})
-
-	it('documents no section for a command that does not exist', () => {
-		const unknown: Array<string> = []
-
-		for (const name of documented_commands()) if (!KNOWN_COMMANDS.has(name)) unknown.push(name)
-
-		expect(unknown).toStrictEqual([])
-	})
-})
-
-// A command's audience decides its page: the commands a person types (`developer`) are documented on
-// the developer reference and nowhere else, and every other command stays off it — so the audience
-// the catalog prints and the page a reader is sent to cannot disagree (joshuafolkken/kit#3278).
-const DEVELOPER_REFERENCE = 'docs/josh-commands.md'
-
-function developer_commands(): Array<string> {
-	return Object.entries(COMMAND_MAP)
-		.filter(([, entry]) => entry.reference[1] === 'developer')
-		.map(([name]) => name)
-}
-
-describe('the audience decides the reference page', () => {
-	it('documents every developer command on the developer reference', () => {
-		const documented = documented_commands([DEVELOPER_REFERENCE])
-
-		expect(developer_commands().filter((name) => !documented.has(name))).toStrictEqual([])
-	})
-
-	it('documents no other command on the developer reference', () => {
-		const developer = new Set(developer_commands())
-		const misplaced = [...documented_commands([DEVELOPER_REFERENCE])].filter(
-			(name) => Object.hasOwn(COMMAND_MAP, name) && !developer.has(name),
-		)
-
-		expect(misplaced).toStrictEqual([])
-	})
-
-	it('documents no developer command on an automation page', () => {
-		const others = COMMAND_REFERENCE_DOCS.filter((path) => path !== DEVELOPER_REFERENCE)
-		const documented = documented_commands(others)
-
-		expect(developer_commands().filter((name) => documented.has(name))).toStrictEqual([])
-	})
-
-	it.each(['latest', 'latest:corepack', 'latest:update', 'overrides'])(
-		'treats %s as a command a person types',
-		(name) => {
-			expect(developer_commands()).toContain(name)
-		},
-	)
-})
-
 describe('the command catalog is up to date', () => {
 	const catalog = generate_catalog()
 
@@ -150,6 +74,27 @@ describe('the command catalog is up to date', () => {
 		const missing = Object.keys(COMMAND_MAP).filter((name) => !catalog.includes(`\`josh ${name}\``))
 
 		expect(missing).toStrictEqual([])
+	})
+
+	// A table row per command, not a section of ten lines each (#4162).
+	it('gives every command exactly one table row', () => {
+		const rows = catalog.split('\n').filter((line) => line.startsWith('| `josh '))
+
+		expect(rows).toHaveLength(Object.keys(COMMAND_MAP).length)
+	})
+
+	it('renders a command as one row with its aliases and an escaped pipe', () => {
+		const row = format_command_entry('gate', {
+			category: 'Development',
+			description: 'Run the checks',
+			reference: ['[--a|--b]', 'developer', ['none']],
+			usage: { examples: [] },
+			script: 'gate.ts',
+		})
+
+		expect(row).toBe(
+			'| `josh gate` · `josh ga` | `[--a\\|--b]` | developer | none | Run the checks |',
+		)
 	})
 })
 

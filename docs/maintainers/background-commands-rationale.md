@@ -1,9 +1,6 @@
 # Background commands — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/background-commands.md`:
-the measurements and history behind backgrounding the gate and the push. It is never read during a run
-— every rule, table and refusal an agent acts on stays in the procedure document, and a change to this
-file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/background-commands.md`.
 
 The procedure is read at its point of use, not at the entry: it binds only after the first edit — at
 the gate, the push, the CI wait and `pnpm josh followup` — so it is fetched in full, in the turn that
@@ -82,3 +79,7 @@ region to a foreground `pnpm josh ship --detach`. Because a foreground `ship` in
 detaches itself after its preflight, the `PreToolUse` hook rewrites a backgrounded `ship` issued alone
 into that foreground call (`updatedInput`) instead of refusing it — the refusal only ever asked for the
 same call again (joshuafolkken/kit#3154).
+
+A foreground `ship` left at the two-minute default is moved to the background once its preflight
+outruns it and dies the same way, so the hook sets the 600000 ms cap on it too
+(joshuafolkken/kit#4101).

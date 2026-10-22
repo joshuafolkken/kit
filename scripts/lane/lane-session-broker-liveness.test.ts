@@ -6,7 +6,7 @@ import { process_identity_fixture } from '#scripts/josh/process-identity-fixture
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_broker_server } from './lane-broker-server'
 import type { LaneInfo } from './lane-registry'
-import { lane_session_broker } from './lane-session-broker'
+import { lane_session_broker, type BrokerAnswer } from './lane-session-broker'
 
 // Whether a ship reads the server as live: the server record, the legacy heartbeat beside it, and a
 // review the server is still running however long it writes nothing (joshuafolkken/kit#3840).
@@ -44,7 +44,7 @@ vi.mock('#scripts/git/git-common-directory', () => ({
 }))
 vi.mock('#scripts/agent/agent-argv', () => ({
 	agent_argv: {
-		resolve_in: () => ({
+		review_in: () => ({
 			kind: 'argv',
 			argv: { command: 'claude', args: [] },
 			profile: ANTHROPIC_PROFILE,
@@ -55,6 +55,9 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: vi.fn().mockResolvedValue(false) } }))
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const state = { directory: '' }
 
@@ -96,7 +99,10 @@ describe('lane_session_broker — a response whose server is gone', () => {
 	it('rejects it once its process is gone, however fresh its heartbeat', async () => {
 		leave_response(Date.now(), { pid: process_identity_fixture.DEAD_PID })
 
-		expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
+		expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toStrictEqual({
+			is_success: false,
+			reason: 'no broker serves this lane',
+		})
 		expect(launch_mock).not.toHaveBeenCalled()
 	})
 
@@ -124,7 +130,9 @@ describe('lane_session_broker — a response from a supervisor that predates the
 	it('rejects a response after its heartbeat expires', async () => {
 		leave_response(Date.now() - EXPIRED_MS)
 
-		expect(await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)).toBe(false)
+		await expect(
+			lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE),
+		).resolves.toMatchObject({ is_success: false })
 		expect(launch_mock).not.toHaveBeenCalled()
 	})
 })
@@ -139,6 +147,18 @@ function response_fields(): ReadonlyArray<string> {
 
 it('publishes a response in the shape a ship that predates the server record reads', async () => {
 	const fields = await lane_session_broker.with_server(LANE, async () => response_fields())
+
+	expect(fields).toStrictEqual(['heartbeat_at', 'is_success', 'nonce', 'session'])
+})
+
+// joshuafolkken/kit#3974: the failure's reason is kept out of the response an older ship parses.
+it('keeps that shape after answering a failure with its reason', async () => {
+	launch_mock.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 1 })
+	const fields = await lane_session_broker.with_server(LANE, async () => {
+		await lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)
+
+		return response_fields()
+	})
 
 	expect(fields).toStrictEqual(['heartbeat_at', 'is_success', 'nonce', 'session'])
 })
@@ -176,7 +196,7 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 		const reviewer = held_reviewer()
 
 		vi.useFakeTimers(SILENT_TIMERS)
-		const is_success = await lane_session_broker.with_server(LANE, async () => {
+		const answer = await lane_session_broker.with_server(LANE, async () => {
 			const pending = lane_session_broker.request(LANE.directory, ISSUE, ROUND_ONE)
 
 			await review_started()
@@ -186,14 +206,14 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 			return await pending
 		})
 
-		expect(is_success).toBe(true)
+		expect(answer.is_success).toBe(true)
 	})
 
 	// joshuafolkken/kit#3817: a server told to stop while its reviewer still runs keeps its response
 	// until the reviewer answers, so the waiting ship reads the verdict rather than a dead server.
 	it('answers the review it was serving when it was told to stop', async () => {
 		const reviewer = held_reviewer()
-		const asked = { pending: Promise.resolve(false) }
+		const asked = { pending: Promise.resolve<BrokerAnswer>({ is_success: false, reason: '' }) }
 
 		vi.useFakeTimers(SILENT_TIMERS)
 		const stopping = lane_session_broker.with_server(LANE, async () => {
@@ -204,8 +224,33 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 		await stay_silent()
 		reviewer.finish()
 
-		expect(await asked.pending).toBe(true)
+		await expect(asked.pending).resolves.toStrictEqual({ is_success: true })
 		await stopping
+	})
+})
+
+// joshuafolkken/kit#4344: a relaunch waited out the review's 30 minutes on a broker that never answered.
+describe('lane_session_broker — a relaunch the server never answers', () => {
+	const RELAUNCH = {
+		kind: 'relaunch',
+		stop: { stage: 'review', title: 'Fix the review', flags: [], is_review: true },
+	} as const
+	const PAST_RELAUNCH_LIMIT_MS = 3 * 60_000
+
+	it('gives up after the relaunch limit, well inside the review limit', async () => {
+		leave_response(Date.now(), { pid: process.pid })
+		mkdirSync(path.dirname(lane_session_broker.request_path(LANE.directory, ISSUE)), {
+			recursive: true,
+		})
+		vi.useFakeTimers(SILENT_TIMERS)
+		const pending = lane_session_broker.request(LANE.directory, ISSUE, RELAUNCH)
+
+		vi.setSystemTime(Date.now() + PAST_RELAUNCH_LIMIT_MS)
+
+		await expect(pending).resolves.toStrictEqual({
+			is_success: false,
+			reason: 'the broker gave no answer within 2 minutes',
+		})
 	})
 })
 
@@ -222,5 +267,29 @@ describe('lane_session_broker.is_serving', () => {
 		await lane_session_broker.with_server(LANE, async () => undefined)
 
 		expect(lane_session_broker.is_serving(LANE.directory, ISSUE)).toBe(false)
+	})
+})
+
+async function session_of(): Promise<string | undefined> {
+	return await lane_session_broker.with_server(LANE, async () =>
+		lane_session_broker.serving_session(LANE.directory, ISSUE),
+	)
+}
+
+// joshuafolkken/kit#4344: a ship asks a failed relaunch again only of a server that replaced the one that failed.
+describe('lane_session_broker.serving_session', () => {
+	it('names a new session for each server that holds the lane', async () => {
+		const first = await session_of()
+		const second = await session_of()
+
+		expect(first).toBeDefined()
+		expect(second).toBeDefined()
+		expect(second).not.toBe(first)
+	})
+
+	it('names none once the server has stopped', async () => {
+		await lane_session_broker.with_server(LANE, async () => undefined)
+
+		expect(lane_session_broker.serving_session(LANE.directory, ISSUE)).toBeUndefined()
 	})
 })

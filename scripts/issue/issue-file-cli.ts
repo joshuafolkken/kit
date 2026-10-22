@@ -14,20 +14,24 @@ import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_hold_member } from '#scripts/run/hold/run-hold-member'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_lint_cli } from './issue-lint-cli'
+import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
+import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
-// `josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>]…
+// `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
 // with every filing step run in order: the third-party refusal, the body
 // lint, the `## Origin` check for another repository, the `auto-ok` decision
-// with the run label it owes, the fold question against the run's earlier
+// with the run label it owes, the start condition read as a pull request, the fold question against
+// the run's earlier
 // filings, the WIP cap count, the
 // duplicate scout, the missing workflow labels created, the create call
 // carrying every label, the release link on `--release`, and `epic:bundle`.
@@ -37,7 +41,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> --depth <0|1|2> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
+	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -77,6 +81,7 @@ function refusals_of(filing: Filing): ReadonlyArray<string> {
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
+		issue_priority.problem(filing.body, filing.args.labels),
 		issue_file.origin_problem(filing.body, filing.target, filing.current),
 	]
 
@@ -223,8 +228,9 @@ async function place(url: string, target: string): Promise<void> {
 }
 
 // Every filing lands on the run's event stream: this is the one filing path, so
-// one append here reaches `run:board` from every route. A filing outside a run lands too and is left
-// out by the board's own scope to the invocation; the append is best-effort, as every emit is.
+// one append here reaches `run:board` from every route. A filing outside a run lands too, unmarked as
+// the run's (`run_hold_member`), and the board counts only the marked ones; the append is best-effort,
+// as every emit is.
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain(
@@ -233,7 +239,9 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 	)
 	const found_during = await issue_file_fold.finder()
 	const kind = run_event_filed.kind_of(labels)
-	const text = run_event_filed.text_of({ reference, kind, title: filing.args.title, found_during })
+	const is_run = await run_hold_member.is_run_member()
+	const { title } = filing.args
+	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
 }
@@ -243,6 +251,20 @@ function is_admitted(filing: Filing): boolean {
 
 	if (refusals.length === 0) return true
 	console.error(refusals.join('\n'))
+
+	return false
+}
+
+// The start condition's citation read against GitHub — after the local refusals, before any listing.
+async function is_source_clear(filing: Filing): Promise<boolean> {
+	const is_here = issue_file.is_same_repository(filing.target, filing.current)
+	const problem = await issue_sample_source.problem(
+		filing.body,
+		is_here ? undefined : filing.target,
+	)
+
+	if (problem === undefined) return true
+	console.error(`✖ ${problem}`)
 
 	return false
 }
@@ -270,7 +292,7 @@ async function is_clear(filing: Filing): Promise<boolean> {
 }
 
 async function file(filing: Filing): Promise<number> {
-	if (!is_admitted(filing)) return FAILURE_EXIT_CODE
+	if (!is_admitted(filing) || !(await is_source_clear(filing))) return FAILURE_EXIT_CODE
 	const labels = labels_of(filing)
 
 	if (labels === undefined || !(await is_clear(filing))) return FAILURE_EXIT_CODE

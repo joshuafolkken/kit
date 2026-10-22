@@ -1,0 +1,8 @@
+{
+	"reason": "#4244: ship preflight prints the acceptance-map skeleton early (only for a body still to be written); report-format.md names the ship --body-file path",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 25,
+		"ai_cost.on_demand_bytes": 214
+	}
+}

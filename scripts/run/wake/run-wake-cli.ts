@@ -1,9 +1,10 @@
-#!/usr/bin/env tsx
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { lane_close } from '#scripts/lane/lane-close'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -29,24 +30,22 @@ import { run_wake_supervise } from './run-wake-supervise'
 // The stdout/stderr split is the contract every `run:*` command shares: exactly one verdict token on
 // stdout on every path, the reason and the advice on stderr, so a loop branches on one token.
 //
-// **`--start` and `--loop` are two halves of one thing.** `--start` spawns this same script detached
+// **`--start` and `--loop` are two halves of one thing.** `--start` spawns the command's entry detached
 // with `--loop` and returns immediately, which is what leaves the supervisor outside the conversation;
 // `--loop` is the body, and running it in the foreground is how a person watches what it does.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const ONE_GROUP = 1
-const MS_PER_SECOND = 1000
-// Whole and positive. A zero interval is a busy loop against the temp directory, not a faster
-// supervisor.
-const INTERVAL_PATTERN = /^[1-9]\d*$/u
+// The interval is whole and positive (`cli_flags.to_positive`): a zero interval is a busy loop against
+// the temp directory, not a faster supervisor.
 // **Bounded above as well as below, and for the same reason.** `setTimeout` clamps any delay past
 // 2^31−1 ms to *one millisecond*, so a number large enough to look like "poll rarely" produces exactly
 // the busy loop the lower bound exists to prevent. An hour is far past any useful polling interval and
 // nowhere near the clamp.
 const MAX_INTERVAL_SECONDS = 3600
-const SCRIPT_PATH = fileURLToPath(import.meta.url)
+// The command's entry, not this module: the guard that runs `main` lives in `run-wake-main.ts`.
+const SCRIPT_PATH = fileURLToPath(new URL('run-wake-main.ts', import.meta.url))
 
 const STARTED_VERDICT = 'started'
 const RUNNING_VERDICT = 'running'
@@ -121,11 +120,11 @@ function note_to_stderr(note: string): void {
 
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
 	if (typeof value !== 'string') return backlog_budget.OFFER_INTERVAL_MS
-	if (!INTERVAL_PATTERN.test(value)) return undefined
+	const seconds = cli_flags.to_positive(value)
 
-	const seconds = Number(value)
-
-	return seconds > MAX_INTERVAL_SECONDS ? undefined : seconds * MS_PER_SECOND
+	return seconds === undefined || seconds > MAX_INTERVAL_SECONDS
+		? undefined
+		: seconds * MS_PER_SECOND
 }
 
 // Exactly one verb, never a guessed order between two.
@@ -201,6 +200,9 @@ function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
 			await new Promise((resolve) => setTimeout(resolve, milliseconds))
 		},
 		now: () => new Date(),
+		retry_closes: async () => {
+			await lane_close.retry_closes()
+		},
 	}
 }
 
@@ -317,8 +319,12 @@ function start_for_launch(git_directory: string, provider: AgentProvider): Launc
 	return launch_supervisor(context_of(git_directory), undefined, resolved.profile)
 }
 
-function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
-	const result = launch_supervisor(context, interval, run_wake_session.scheduler_profile())
+function spawn_supervisor(
+	context: WakeContext,
+	interval: string | undefined,
+	profile: AgentProfile | undefined,
+): number {
+	const result = launch_supervisor(context, interval, profile)
 
 	if (result.kind === 'failed') {
 		console.error(`Could not start the supervisor: ${result.note}`)
@@ -346,7 +352,15 @@ function start(context: WakeContext, interval: string | undefined): number {
 		return report(RUNNING_VERDICT)
 	}
 
-	return spawn_supervisor(context, interval)
+	return spawn_supervisor(context, interval, run_wake_session.scheduler_profile())
+}
+
+// The supervisor `josh backlogrun --restart` starts in place of the one it stopped, on that one's
+// profile, so the shell the restart was typed in does not choose it; the shell's where none was running.
+function restart_supervisor(git_directory: string, profile: AgentProfile | undefined): number {
+	const chosen = profile ?? run_wake_session.scheduler_profile()
+
+	return spawn_supervisor(context_of(git_directory), undefined, chosen)
 }
 
 // **The loop removes its record on the way out, and only its own.** A loop that ended after its record
@@ -436,14 +450,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await dispatch(values, context, interval_ms)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_wake_cli = {
 	FAILED_VERDICT,
 	NONE_VERDICT,
 	RUNNING_VERDICT,
+	SCRIPT_PATH,
 	STALE_VERDICT,
 	STOPPED_VERDICT,
 	SUPERVISING_VERDICT,
@@ -452,12 +463,11 @@ const run_wake_cli = {
 	finish,
 	ports_for,
 	record_failure,
+	restart_supervisor,
 	run,
 	start_for_launch,
 	stop_body,
 	warning_body,
 }
-
-if (process.argv[1] === SCRIPT_PATH) await main(process.argv.slice(ARGV_OFFSET))
 
 export { run_wake_cli }

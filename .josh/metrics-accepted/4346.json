@@ -1,0 +1,7 @@
+{
+	"reason": "CompositeAction fixture gains the outputs field the new node-version test reads (#4346)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 1
+	}
+}

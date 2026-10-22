@@ -24,9 +24,10 @@ first review counts), whichever comes first. Round 2 is a verification pass over
 
 ## Before round 1 — the implementer's self-check
 
-Answer these five over your own diff before the scoped pair that precedes round 1, and fix what an
-answer turns up (about two in three of 135 sampled round-1 High/Medium findings fell under one). The
-review, its severity tests and the round cap are unchanged.
+Answer these eight over your own diff before the scoped pair that precedes round 1, and fix what an
+answer turns up (about four in five of 100 sampled High/Medium findings that stopped lane reviews
+fell under one; `pnpm josh lane:stats` counts the kinds that still stop). The review, its severity
+tests and the round cap are unchanged.
 
 1. **Tests pin the change** — for each condition, branch or call added or changed, name the test that
    turns red when it is deleted or inverted, and check its fixture reaches that branch (no assert on a
@@ -40,6 +41,17 @@ review, its severity tests and the round cap are unchanged.
    update each sibling path (the other CLI, the registry, the consumer side) in the same change.
 5. **The Issue is met on HEAD** — the premises you relied on hold on the current tree, and each
    acceptance criterion is checked against the diff.
+6. **State is read fresh** — for every record, stamp, snapshot, memo or ledger a decision reads, name
+   its writer and check it cannot be older than the decision (a past `success`, a tick's shared
+   snapshot, a sync before the commit) or written by another run in between.
+7. **The rule covers its whole input space** — list every kind of input a scan, pattern, matcher or
+   lookup must accept or reject (the sibling file type, the consumer's config beside the root, quoted
+   text, a subshell, a pipe, a heredoc) and pin one test row per kind.
+8. **Edge inputs and environments** — say what the change does when its input is empty, absent or
+   new, and outside a TTY, a lane or the default agent runtime.
+
+The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
+merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".
 
 ---
 
@@ -48,8 +60,7 @@ review, its severity tests and the round cap are unchanged.
 Run `pnpm josh review:brief --level-only` and use what it prints — `low` or `medium`, from the changed
 paths only, never "this one is small". `--staged` classifies the staged diff, `--json` adds the reason;
 inside a workflow `pnpm josh review:brief` prints the level on its first line. `low` gets 1 round,
-`medium` up to 2. Derivation (inert paths, documentation at `medium`):
-`docs/maintainers/review-history.md` → "The level is decided from the changed paths".
+`medium` up to 2. A diff that touches documentation is not inert: it stays at `medium`.
 
 ```bash
 pnpm josh review:brief --level-only            # the branch diff
@@ -94,16 +105,10 @@ deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot i
   as code).
 
 One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
-code line, or a source file whose comment-free text cannot be read. Why: `docs/maintainers/review-history.md`
-→ "The two skip arms".
+code line, or a source file whose comment-free text cannot be read.
 
-Record a skipped round on the Issue:
-
-1. Label the Issue `review-round2-skipped`, created once per repository:
-   `gh api repos/{owner}/{repo}/labels -f name=review-round2-skipped -f color=c5def5 -f description="Review round 2 was skipped under the condition in prompts/review.md" --silent 2>/dev/null || true`,
-   then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=review-round2-skipped'`.
-2. Comment under `## Round 2 skipped`, naming which arm fired and quoting the command's reason line
-   verbatim.
+Record a skipped round on the Issue with a comment under `## Round 2 skipped`, naming which arm fired
+and quoting the command's reason line verbatim.
 
 ### Three-way disposition after the cap
 
@@ -129,7 +134,8 @@ Findings that reduce to one root judgement are filed as one Issue with a section
 
 Branch 2 only:
 
-- File a follow-up Issue referencing the current one; the current Issue completes.
+- File a follow-up Issue whose `parent: #N` line names the current one — a mention in its background
+  is not read by `epic:bundle`; the current Issue completes.
 - An Issue in no epic is never offered by `epic:next`, so filing continues to the epic. Run these steps
   inside the CI wait: in `fullrun` / `backlogrun` after `pnpm josh git -y` and before
   `pnpm josh followup`; in `halfrun` or a standalone pre-commit self-review as soon as the disposition
@@ -140,19 +146,17 @@ Branch 2 only:
   a `fold`; the first filing asks nothing.
 
   1. Before the current Issue closes, file it tagged `route:review-cap`:
-     `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route review-cap`. It lints
+     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap`. It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
      (`docs/josh-commands-backlog.md` → `josh issue:file`). `epic:bundle` reads open issues only, so
      after the parent closes it answers `none` permanently.
-  2. Act on the printed `epic:bundle` answer by running the write command yourself — `epic:bundle`
-     writes nothing, and a hand edit of the epic body leaves the task list and `blocked-by` relations
-     disagreeing (`epic:next` returns `error`). Tier A, no confirmation:
-     - `add_to_epic` → `pnpm josh epic --add <E> <new>`, with `--before <M>` / `--after <M>` when the
-       relation carries an order.
-     - `create_epic` → `pnpm josh epic "<title>" <new> <other> [--ordered]`.
-     - `ask` (candidates across two or more epics) → run the recommended epic's write command and record
-       what was taken, what was rejected and why on the new Issue and that epic's `## Decisions`. Stop
-       only where the two epics are genuinely too close to separate.
+  2. Act on the printed `epic:bundle` answer with `pnpm josh epic:bundle <new> --apply` — never a
+     hand edit of the epic body, which leaves the task list and `blocked-by` relations disagreeing
+     (`epic:next` returns `error`). Tier A, no confirmation:
+     - `add_to_epic` / `create_epic` → `--apply` writes it, with any recorded order.
+     - `ask` (candidates across two or more epics) → `--apply` writes nothing; place it in the
+       recommended epic with `pnpm josh epic --add <E> <new> --decision-file <path>`
+       (`.claude/skills/epic-commands/epic-bundle.md`).
      - `none` → nothing.
      - Non-zero exit, or any ⚠ warning above `Nothing to bundle.` → stop and report what it said; a
        `none` after such a warning is not "nothing to bundle".

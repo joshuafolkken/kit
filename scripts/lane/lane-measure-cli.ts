@@ -1,15 +1,25 @@
 #!/usr/bin/env tsx
 import { setInterval as every } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
+import { lane_core_wait_stats } from './lane-core-wait-stats'
+import { lane_gap_stats } from './lane-gap-stats'
+import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_process_stats } from './lane-process-stats'
+import { lane_round_two_stats } from './lane-round-two-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
-import { lane_stats } from './lane-stats'
+import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stop_stats } from './lane-stop-stats'
+import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
 //
@@ -23,7 +33,6 @@ import { lane_stop_stats } from './lane-stop-stats'
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const MS_PER_SECOND = 1000
 const SAMPLE_VERB = 'sample'
 const STATS_VERB = 'stats'
 const USAGE = [
@@ -102,6 +111,43 @@ async function read_ledger(
 	return path === undefined ? [] : lane_ledger.read_entries(path)
 }
 
+// The run's event stream, read for the parks that end a stop's wait.
+async function read_events(context: MeasureContext): Promise<ReadonlyArray<RunEvent>> {
+	if (context.events_path !== undefined) return run_event_stream.read_events(context.events_path)
+
+	return await run_event_stream_emit.all_events()
+}
+
+// Every lane's transcript directory under this checkout's lane root, read from a lane or the main checkout.
+function transcript_directories(context: MeasureContext): ReadonlyArray<string> {
+	if (context.transcript_directories !== undefined) return context.transcript_directories
+
+	const main_cwd = cost_transcript.session_cwd(process.cwd())
+
+	return cost_transcript.lane_transcript_directories(main_cwd, cost_transcript.home_directory())
+}
+
+interface PeriodRecords {
+	entries: ReturnType<typeof lane_ledger.read_entries>
+	events: ReadonlyArray<RunEvent>
+	calls: ReadonlyArray<ToolCall>
+}
+
+// The tables under the period's row, in the order `lane:stats` prints them.
+function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
+	return [
+		lane_stage_stats.table(entries, window),
+		lane_stop_stats.table(entries, window, events),
+		lane_gap_stats.table(entries, window, events),
+		lane_round_two_stats.table(entries, window),
+		lane_held_stats.table(entries, window),
+		lane_core_wait_stats.table(entries, window),
+		lane_process_stats.table(entries, window),
+		lane_check_stats.table(entries, window),
+		lane_transcript_stats.table(calls, window),
+	]
+}
+
 async function stats_command(
 	rest: ReadonlyArray<string>,
 	context: MeasureContext,
@@ -115,16 +161,13 @@ async function stats_command(
 	const label = { limit: await limit_label(values.limit), period_days }
 	const entries = await read_ledger(context)
 	const row = lane_stats.row(entries, window, label)
+	const records = {
+		entries,
+		events: await read_events(context),
+		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+	}
 
-	console.info(
-		[
-			`${lane_stats.header()}\n${row}`,
-			lane_stage_stats.table(entries, window),
-			lane_stop_stats.table(entries, window),
-			lane_process_stats.table(entries, window),
-			lane_check_stats.table(entries, window),
-		].join('\n\n'),
-	)
+	console.info([`${lane_stats.header()}\n${row}`, ...tables_of(records, window)].join('\n\n'))
 
 	return 0
 }

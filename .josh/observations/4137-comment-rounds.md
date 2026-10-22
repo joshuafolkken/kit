@@ -1,0 +1,1 @@
+- rf:project-conventions | low | scripts/run/board/run-board-render-legend.ts:57 | 2026-10-18 | #4137

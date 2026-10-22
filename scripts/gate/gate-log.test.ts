@@ -37,9 +37,8 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const PASS = 0
 const FAIL = 1
 const LINT_TARGET = 'lint'
-// The two checks whose sub-command name is also the last argument they are spawned with, so the
-// stub's body can be matched by name. The unit check is not one of them — the gate appends
-// `--maxWorkers=<n>` to it — and its section is asserted by header instead.
+// Two checks whose bodies are asserted by sub-command name. The unit check's section is asserted by
+// header instead.
 const SUPPRESSED_TARGETS: ReadonlyArray<string> = ['check', 'cspell:dot']
 const FIRST_HEADER = '✗ lint (pnpm josh lint) 1.0s'
 const FIRST_BODY = 'first body'
@@ -53,6 +52,14 @@ const RECORDS = gate_test_fixture.suite_records('gate-log')
 const EXPLICIT_TARGET = RECORDS.log_path
 const UNWRITABLE = path.join(`${RECORDS.log_path}-absent-directory`, 'gate.log')
 
+// The josh sub-command a check is spawned with — the argument after `josh`, ahead of any the gate
+// hands it (`lint --changed`, `test:related --maxWorkers=<n>`).
+function sub_command_of(arguments_: unknown): string {
+	const argv = arguments_ as ReadonlyArray<string>
+
+	return argv[argv.indexOf('josh') + 1] ?? ''
+}
+
 function output_of(sub_command: string): string {
 	return `output of ${sub_command}`
 }
@@ -62,7 +69,7 @@ function output_of(sub_command: string): string {
 function lint_fails(): void {
 	mocked_execa.mockImplementation(
 		as_execa_implementation(async (_file: unknown, arguments_: unknown): Promise<ExecaResult> => {
-			const sub_command = (arguments_ as ReadonlyArray<string>).at(-1) ?? ''
+			const sub_command = sub_command_of(arguments_)
 			const is_failing = sub_command === LINT_TARGET
 
 			return fake_result(is_failing ? FAIL : PASS, output_of(sub_command))
@@ -73,7 +80,7 @@ function lint_fails(): void {
 function every_step_passes(): void {
 	mocked_execa.mockImplementation(
 		as_execa_implementation(async (_file: unknown, arguments_: unknown): Promise<ExecaResult> => {
-			const sub_command = (arguments_ as ReadonlyArray<string>).at(-1) ?? ''
+			const sub_command = sub_command_of(arguments_)
 
 			return fake_result(PASS, output_of(sub_command))
 		}),

@@ -4,7 +4,6 @@ import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 import { test_declared_commit } from './test-declared-commit'
 
 // joshuafolkken/kit#2118: the verdict is read from the real working tree, so this suite drives real git
@@ -69,7 +68,7 @@ function push_payload(name: string, is_background: boolean): string {
 }
 
 beforeEach(async () => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	state.fixture = git_fixture_workspace.open_workspace('test-declared-rule-repo-')
 	await build_repository()
 	process.chdir(state.fixture.workspace)
@@ -90,23 +89,25 @@ afterAll(() => {
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
-describe('rule_delivery — the test-declared rule at the commit stage', () => {
+describe('delivered_rules.delivery — the test-declared rule at the commit stage', () => {
 	it('delivers on a foreground commit that changes a runtime file with no test', () => {
 		write_file(RUNTIME_FILE, A_CHANGED_LINE)
 
-		expect(rule_delivery(push_payload('required', false), NOW_MS)).toBe(test_declared_commit.REASON)
+		expect(delivered_rules.delivery(push_payload('required', false), NOW_MS)).toBe(
+			test_declared_commit.REASON,
+		)
 	})
 
 	it('says nothing when a test file changed', () => {
 		write_file('scripts/thing.test.ts', A_RUNTIME_LINE)
 
-		expect(rule_delivery(push_payload('satisfied', true), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(push_payload('satisfied', true), NOW_MS)).toBeUndefined()
 	})
 
 	it('says nothing when only documentation changed', () => {
 		write_file(README, 'second\n')
 
-		expect(rule_delivery(push_payload('exempt', true), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(push_payload('exempt', true), NOW_MS)).toBeUndefined()
 	})
 
 	// The deliberate overlap with run-tail, in the order that makes it safe: test-declared decides
@@ -116,8 +117,8 @@ describe('rule_delivery — the test-declared rule at the commit stage', () => {
 		write_file(RUNTIME_FILE, A_CHANGED_LINE)
 		const payload = push_payload('overlap', false)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(test_declared_commit.REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.RUN_TAIL_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(test_declared_commit.REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBe(delivered_rules.RUN_TAIL_REASON)
 	})
 })
 

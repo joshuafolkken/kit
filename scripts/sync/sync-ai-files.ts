@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_ai_copy } from '#scripts/init/init-ai-copy'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
@@ -16,7 +16,6 @@ import { skill_migration, type MigrationResult } from './skill-migration'
 import { sync_hook_safety } from './sync-hook-safety'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
-const PACKAGE_JSON = 'package.json'
 const CLAUDE_MD_FILENAME = 'CLAUDE.md'
 const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
 const CODEX_HOOKS_FILE = '.codex/hooks.json'
@@ -37,7 +36,7 @@ function should_skip_hook_file(filename: string): boolean {
 	if (filename !== CLAUDE_SETTINGS_FILE && filename !== CODEX_HOOKS_FILE) return false
 	const warning = sync_hook_safety.hook_write_warning(
 		PROJECT_ROOT,
-		sync_hook_safety.read_version_at(path.join(PACKAGE_DIR, PACKAGE_JSON)),
+		sync_hook_safety.read_version_at(PACKAGE_DIR),
 		filename,
 	)
 	if (warning === undefined) return false
@@ -191,8 +190,7 @@ function sync_claude_md(destination_path: string, shape?: ProjectShape): void {
 		return
 	}
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, ensured)
+	file_content.write_contained(destination_path, ensured)
 	console.info(`  ✔ synced    ${CLAUDE_MD_FILENAME}`)
 }
 

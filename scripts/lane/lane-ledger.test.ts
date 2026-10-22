@@ -1,6 +1,7 @@
 import { appendFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger } from './lane-ledger'
@@ -45,6 +46,31 @@ describe('lane_ledger.read_entries', () => {
 
 	it('reads an absent file as an empty ledger', () => {
 		expect(lane_ledger.read_entries(ledger('absent'))).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4263: `run:board` reads the ledger on every local read; an unchanged file is not
+// parsed again.
+describe('lane_ledger.read_entries over an unchanged ledger', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('parses the ledger once while it is unchanged, and again once it is appended to', () => {
+		const target = ledger('unchanged')
+
+		lane_ledger.append(target, { kind: 'merge', at: AT, issue: 1 })
+		const parse = vi.spyOn(json_value, 'parse_or_undefined')
+
+		lane_ledger.read_entries(target)
+		const parsed = parse.mock.calls.length
+
+		lane_ledger.read_entries(target)
+		expect(parsed).toBeGreaterThan(0)
+		expect(parse).toHaveBeenCalledTimes(parsed)
+
+		lane_ledger.append(target, { kind: 'merge', at: AT, issue: 2 })
+		expect(lane_ledger.read_entries(target)).toHaveLength(2)
 	})
 })
 
@@ -154,10 +180,10 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 	it('records a stopped ship naming the issue and the stop reason', async () => {
 		const target = ledger('stop')
 
-		await lane_ledger.record_stop({ issue: 7, reason: 'conflict' }, target)
+		await lane_ledger.record_stop({ issue: 7, reason: 'conflict', cause: 'conflict' }, target)
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([
-			{ kind: 'stop', issue: 7, reason: 'conflict' },
+			{ kind: 'stop', issue: 7, reason: 'conflict', cause: 'conflict' },
 		])
 	})
 
@@ -170,6 +196,76 @@ describe('lane_ledger — the stage and dispatch entries', () => {
 		await lane_ledger.record_overlap(overlap, target)
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'overlap', ...overlap }])
+	})
+})
+
+// joshuafolkken/kit#3995: a free lane the driver left empty is recorded with why.
+// joshuafolkken/kit#4166: a preflight stop keeps the kinds of the preconditions it found unmet.
+describe('lane_ledger.record_stop — the unmet preconditions', () => {
+	it('keeps the unmet preconditions of a preflight stop', async () => {
+		const target = ledger('stop-preconditions')
+		const stop = { issue: 7, reason: 'preflight', cause: 'check', preconditions: ['lock', 'issue'] }
+
+		await lane_ledger.record_stop(stop, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'stop', ...stop }])
+	})
+})
+
+describe('lane_ledger.record_held', () => {
+	it('records a dispatch hold naming its reason', async () => {
+		const target = ledger('held')
+		const reason = 'offer:wait:blocked'
+
+		await lane_ledger.record_held(reason, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'held', reason }])
+	})
+
+	it('records the release that ends a hold without a dispatch', async () => {
+		const target = ledger('released')
+
+		await lane_ledger.record_released(target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'released' }])
+	})
+})
+
+// joshuafolkken/kit#4382: a claim's wait for the core budget reads back as one entry.
+describe('lane_ledger.record_core_wait', () => {
+	it('writes the command, the wait and the lane, read back as a core-wait entry', async () => {
+		const target = ledger('core-wait')
+		const wait = { command: 'lint', waited_ms: 500, issue: 4382 }
+
+		await lane_ledger.record_core_wait(wait, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'core-wait', ...wait }])
+	})
+})
+
+// joshuafolkken/kit#4451: a unit run's slowest files read back as one entry.
+describe('lane_ledger.record_unit_files', () => {
+	it('writes each file and its wall time, read back as a unit-files entry', async () => {
+		const target = ledger(lane_ledger.KIND.UNIT_FILES)
+		const files = [{ file: 'scripts/stalled.test.ts', elapsed_ms: 370_000 }]
+
+		await lane_ledger.record_unit_files(files, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: lane_ledger.KIND.UNIT_FILES, files },
+		])
+	})
+})
+
+describe('lane_ledger.record_offerable', () => {
+	it('records whether offerable work and a free lane coexist', async () => {
+		const target = ledger('offerable')
+
+		await lane_ledger.record_offerable(true, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: 'offerable', is_offerable: true },
+		])
 	})
 })
 

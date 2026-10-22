@@ -45,9 +45,9 @@ interface LaneGuardEntry {
 const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 	{
 		id: 'investigation',
-		mode_in_lane_child: 'notice',
+		mode_in_lane_child: 'refuse',
 		because:
-			'a refusal ends a child turn, yet lane children were measured reading files they never edited, so the child is nudged to delegate by a notice rather than killed',
+			'the notice was measured not to move the reading — 52% of lane cost stayed in main-line exploration — and the refusal fires once per accumulation, a round trip the child survives as it survives the rule row, so the child is refused like the main line',
 	},
 	{
 		id: 'batching',

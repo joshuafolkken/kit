@@ -90,6 +90,7 @@ const NOT_NAMED: ReadonlyMap<string, string> = new Map([
 	['run:cut:gate', SELF],
 	['backlog:budget', READ],
 	['run:liveness', READ],
+	['stash:push', SELF],
 	['stash:pop', SELF],
 	['backlog:next', READ],
 	['auto-ok:next', READ],

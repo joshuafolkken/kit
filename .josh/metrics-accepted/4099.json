@@ -1,0 +1,7 @@
+{
+	"reason": "Review round 1 fixes for #4099: people_of counts decision-parked children as a person's, the fit yields rows under the notes before them, and a filed row's ✚ lead is measured when its title narrows",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 87
+	}
+}

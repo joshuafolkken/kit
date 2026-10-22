@@ -36,7 +36,6 @@ const LABEL_NAMES_FILTER = '.[].name'
 const LABELS_SEGMENT = '/labels'
 const COMMENTS_SEGMENT = '/comments'
 const CLOSED_STATE = 'closed'
-const NOT_PLANNED_REASON = 'not_planned'
 const COLOR_HASH = '#'
 const UNPROCESSABLE_STATUS = 422
 const ALREADY_EXISTS_CODE = 'already_exists'
@@ -57,21 +56,39 @@ async function did_write_succeed(write: () => Promise<unknown>): Promise<boolean
 	}
 }
 
-async function issue_edit_body(issue_number: string, body: string): Promise<string> {
+async function issue_patch(
+	issue_number: string,
+	fields: Readonly<Record<string, string>>,
+	repo?: string,
+): Promise<string> {
 	return await git_gh_exec.exec_gh_api({
-		path: git_gh_api_path.issue_api_path(issue_number),
+		path: git_gh_api_path.issue_api_path(issue_number, repo),
 		method: PATCH_METHOD,
-		body: JSON.stringify({ body }),
+		body: JSON.stringify(fields),
 		jq_filter: HTML_URL_FILTER,
 	})
+}
+
+// The optional `repo` (`owner/name`) on these writes addresses an issue in another repository; left
+// out, the path keeps gh's `{owner}/{repo}` placeholder — the checkout's own repository.
+async function issue_edit_body(issue_number: string, body: string, repo?: string): Promise<string> {
+	return await issue_patch(issue_number, { body }, repo)
+}
+
+async function issue_edit_title(
+	issue_number: string,
+	title: string,
+	repo?: string,
+): Promise<string> {
+	return await issue_patch(issue_number, { title }, repo)
 }
 
 // **Every comment josh posts carries `RUN_MARKER`**, an HTML comment GitHub does not render. A run
 // posts under the person's own `gh` login, so the marker is the only thing that tells the issue watch
 // (`issue-watch-diff.ts`) a run's comment from a person's update.
-async function issue_comment(issue_number: string, body: string): Promise<string> {
+async function issue_comment(issue_number: string, body: string, repo?: string): Promise<string> {
 	return await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.issue_api_path(issue_number)}${COMMENTS_SEGMENT}`,
+		path: `${git_gh_api_path.issue_api_path(issue_number, repo)}${COMMENTS_SEGMENT}`,
 		body: JSON.stringify({ body: `${body}\n\n${issue_watch_diff.RUN_MARKER}` }),
 		jq_filter: HTML_URL_FILTER,
 	})
@@ -117,18 +134,6 @@ async function close_with(
 
 async function issue_close(issue_number: string, comment: string | undefined): Promise<boolean> {
 	return await close_with(issue_number, comment, { state: CLOSED_STATE })
-}
-
-// The same close as "not planned" — the reason `issue-merged.ts` reads as no merge, so a closed issue
-// that was withdrawn is never taken for one whose work landed.
-async function issue_close_not_planned(
-	issue_number: string,
-	comment: string | undefined,
-): Promise<boolean> {
-	return await close_with(issue_number, comment, {
-		state: CLOSED_STATE,
-		state_reason: NOT_PLANNED_REASON,
-	})
 }
 
 // REST answers 422 `{"resource":"Label","code":"invalid","field":"color"}` for a color carrying a
@@ -225,12 +230,16 @@ async function issue_create_with_label(input: {
 // say why it refused.
 type LabelWrite = { is_applied: true } | { is_applied: false; reason: string }
 
-// The issue's label names, read back after a failed write. A read that itself fails answers
-// `undefined`, which the caller treats as "not applied" — the write's own error is the reason then.
-async function read_label_names(issue_number: string): Promise<Array<string> | undefined> {
+// The issue's label names, every page of them — read back after a failed write, and by a pull
+// request's classification read. A read that itself fails answers `undefined`, which the write
+// treats as "not applied" — its own error is the reason then.
+async function read_label_names(
+	issue_number: string,
+	repo?: string,
+): Promise<Array<string> | undefined> {
 	try {
 		const raw = await git_gh_exec.exec_gh_api({
-			path: `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`,
+			path: git_gh_api_path.issue_labels_api_path(issue_number, repo),
 			should_paginate: true,
 			jq_filter: LABEL_NAMES_FILTER,
 		})
@@ -247,15 +256,19 @@ async function read_label_names(issue_number: string): Promise<Array<string> | u
 // after the write or a secondary rate limit can each throw after the label landed — which refused a
 // lane dispatch whose label was in fact applied. So a throw is confirmed by
 // reading the labels back, and only a label that is really absent answers `is_applied: false`.
-async function issue_apply_label(issue_number: string, label: string): Promise<LabelWrite> {
-	const labels_path = `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`
+async function issue_apply_label(
+	issue_number: string,
+	label: string,
+	repo?: string,
+): Promise<LabelWrite> {
+	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number, repo)
 
 	try {
 		await git_gh_exec.exec_gh_api({ path: labels_path, body: JSON.stringify({ labels: [label] }) })
 
 		return { is_applied: true }
 	} catch (error) {
-		const names = await read_label_names(issue_number)
+		const names = await read_label_names(issue_number, repo)
 
 		if (names?.includes(label) === true) return { is_applied: true }
 		error_text.trace_swallowed('git_gh_issue_write.issue_apply_label', error)
@@ -271,8 +284,12 @@ async function issue_apply_label(issue_number: string, label: string): Promise<L
 // Applied after the body edit so a failure leaves an issue with the epic sections and no label,
 // which `epic:check` reports — rather than a labelled issue with nothing to track. The caller checks
 // the return: the label is what the auto-close filters on.
-async function issue_add_label(issue_number: string, label: string): Promise<boolean> {
-	const write = await issue_apply_label(issue_number, label)
+async function issue_add_label(
+	issue_number: string,
+	label: string,
+	repo?: string,
+): Promise<boolean> {
+	const write = await issue_apply_label(issue_number, label, repo)
 
 	return write.is_applied
 }
@@ -287,12 +304,31 @@ async function issue_add_label(issue_number: string, label: string): Promise<boo
 // a `false` swallowed here would reach that guard as a success and the step would be reported as
 // done.
 async function issue_remove_label(issue_number: string, label: string): Promise<void> {
-	const labels_path = `${git_gh_api_path.issue_api_path(issue_number)}${LABELS_SEGMENT}`
+	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number)
 
 	await git_gh_exec.exec_gh_api({
 		path: `${labels_path}/${encodeURIComponent(label)}`,
 		method: DELETE_METHOD,
 	})
+}
+
+// **The removal for a caller that wants the label gone, not removed by this call** — a release that
+// may find the label already off. A failed DELETE is confirmed against the labels the issue carries,
+// the read `issue_apply_label` confirms an addition with, so an absent label answers `true` and a
+// failure that left the label on answers `false`.
+async function issue_clear_label(issue_number: string, label: string): Promise<boolean> {
+	try {
+		await issue_remove_label(issue_number, label)
+
+		return true
+	} catch (error) {
+		const names = await read_label_names(issue_number)
+
+		if (names?.includes(label) === false) return true
+		error_text.trace_swallowed('git_gh_issue_write.issue_clear_label', error)
+
+		return false
+	}
 }
 
 // The blocker's **database id**, which is the only thing the dependencies endpoint accepts — and the
@@ -354,16 +390,18 @@ async function issue_remove_blocked_by(issue_number: string, blocker: string): P
 
 const git_gh_issue_write = {
 	issue_edit_body,
+	issue_edit_title,
 	issue_comment,
 	issue_try_comment,
 	issue_close,
-	issue_close_not_planned,
 	label_ensure,
 	issue_create_request,
 	issue_create_with_label,
+	read_label_names,
 	issue_apply_label,
 	issue_add_label,
 	issue_remove_label,
+	issue_clear_label,
 	issue_add_blocked_by,
 	issue_remove_blocked_by,
 }

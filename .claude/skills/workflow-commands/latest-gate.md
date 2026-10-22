@@ -1,9 +1,7 @@
 # The dependency update — when `josh latest` runs
 
 `josh latest` updates every dependency, the published ranges, `pnpm audit` and pnpm, in that
-order and over the network. This file is the **single source** of when it runs; every entry point
-references it and none restates it. History: `docs/maintainers/latest-gate-rationale.md` → "Where
-each rule came from".
+order and over the network.
 
 ## Ask the command; do not decide
 
@@ -28,26 +26,21 @@ judgement that the dependencies are probably still fresh.
 ## What runs when the answer is `required`
 
 ```bash
-git stash push -u -m "josh latest"    # only if the working tree has staged or modified files
-pnpm josh ms
-pnpm josh latest     # on `required` only
-pnpm josh stash:pop "josh latest"     # only if you stashed above — by message, never a positional pop
+pnpm josh latest:if-required   # stash → josh latest → pop by message; nothing on `skip`
 ```
 
-**The pop is by message, never a bare `git stash pop`** — the stash is a repository-wide stack every
-work tree shares.
+It asks `latest:scope` itself, so a run reads `run:prep`'s `latest:` line and never asks again. A
+failed update or a conflicted pop stops with the stash kept and names the pop to run.
 
 Then **load the `dependency-update` skill and follow its procedure** — the overrides in **both**
 `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines` pnpm bump — in every run in
 which `josh latest` actually ran; never report the pins intact without having run it.
 
-**On `skip`, one line of that block goes away and no more.** `pnpm josh latest` does not run, and
-the `dependency-update` skill is not read, because nothing rewrote a pin for it to check.
+**On `skip`, the command does nothing** and the `dependency-update` skill is not read, because
+nothing rewrote a pin for it to check.
 
-**Two of those steps are not this gate's, and making either conditional breaks something.**
-`pnpm josh ms` runs per issue and per child either way — it brings the previous merge into the tree.
-The stash before it is the branch switch's, not the update's, so it is conditional on the **tree**,
-never on the answer.
+**`pnpm josh ms` is not this gate's** — it runs per issue and per child either way, bringing the
+previous merge into the tree, before the update.
 
 ## The vulnerability net is not what moved
 
@@ -59,8 +52,6 @@ merge is CI**: the `Security Audit` job runs on every pull request and is one of
 
 **The lock file the update rewrites lands with whichever issue ran it.** `josh latest` leaves
 `pnpm-lock.yaml` modified and that issue's `pnpm josh git -y` commits it. Should the issue then fail
-CI on a bump rather than on its own change, fix it forward before parking the issue for it. Rationale
-for the elapsed-time window: `docs/maintainers/latest-gate-rationale.md` → "Why an elapsed-time
-window rather than once per batch".
+CI on a bump rather than on its own change, fix it forward before parking the issue for it.
 
 `docs/josh-commands-automation.md` documents the command itself.

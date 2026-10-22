@@ -1,0 +1,3 @@
+- rf:project-conventions | low | scripts/eval/eval-scenario.test.ts:299 | 2026-10-16 | #3926
+- rf:tests | low | scripts/review/review-brief-cli.ts:333 | 2026-10-16 | #3926
+- rf:confidence | low | scripts/agent/agent-role-profile.ts:47 | 2026-10-16 | #3926

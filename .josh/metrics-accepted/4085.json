@@ -1,0 +1,7 @@
+{
+	"reason": "Gate lint narrowed to the branch's changed files (josh lint --changed) with its fallback rules and tests, and a shared toolchain-config module (#4085)",
+	"date": "2026-10-18",
+	"growth": {
+		"scripts.code_lines": 143
+	}
+}

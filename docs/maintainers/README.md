@@ -34,8 +34,9 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 
 ## Why the rules and commands are the way they are
 
-The history behind a procedure, kept off every run's read path. Each one is cited section by section
-from the page it explains.
+Each `*-rationale.md` opens by naming the procedure it explains and holds the measurements, history
+and arguments behind it. No run reads one: every trigger, command and bound an agent acts on stays in
+the procedure, so a change to a rationale page changes no rule.
 
 - [claude-md-history.md](./claude-md-history.md) — `CLAUDE.md`
 - [overview-rationale.md](./overview-rationale.md) — the workflow overview and session language
@@ -104,7 +105,7 @@ from the page it explains.
 
 ## Directories that are never published
 
-`scripts/cost`, `scripts/time`, `scripts/retrospective` and `scripts/eval` are excluded by
+`tools/cost`, `tools/time`, `tools/retrospective` and `tools/eval` are excluded by
 `package.json` `files` because they run only in this repository; a `*-runtime` sibling
 (`scripts/cost-runtime`, `scripts/time-runtime`) holds the part the published `josh` commands import,
 so a split is a publish boundary, not a topic one.

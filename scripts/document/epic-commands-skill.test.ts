@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { skill_meta } from '#scripts/claude/skill-meta'
+import { skill_meta } from '#tools/claude/skill-meta'
 import { describe, expect, it } from 'vitest'
 
 const SKILL_DIRECTORY = '.claude/skills/epic-commands'

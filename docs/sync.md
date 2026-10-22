@@ -23,8 +23,8 @@ These files are copied verbatim from the package, with one path transformation a
 AGENTS.md           GEMINI.md
 CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
-.mcp.json           .ncurc.json         .prettierignore
-SECURITY.md         tsconfig.sonar.json
+.mcp.json           .prettierignore     SECURITY.md
+tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml
@@ -110,6 +110,14 @@ What else a consumer should know about the files above. Each item is the behavio
 - `minimumReleaseAge` (minutes, floored to whole hours) → `safe-chain.minimumPackageAgeHours`. With no window declared, the field is left alone.
 - Other `.aikido` sections are kept byte-for-byte.
 
+They write each `.github/dependabot.yml` entry's `cooldown` from the same window:
+
+- `minimumReleaseAge` (minutes, rounded up to whole days, kept within 1–90) → `cooldown.default-days`. With no window declared, or no `pnpm-workspace.yaml`, the default is 3 days.
+- `minimumReleaseAgeExclude` → the npm entry's `cooldown.exclude` only.
+- Only the `cooldown` keys are rewritten; every other key and comment is kept. `josh sync` first replaces the file with kit's copy, so only `josh init` on an existing file keeps your own keys.
+
+`minimumReleaseAge` is the one place to change the window.
+
 Safe Chain reads these settings from 1.5.15. If it still reports a minimum-age block despite an exclusion, update the Safe Chain your shell uses (`safe-chain --version`).
 
 If `josh version --upgrade` fails during project re-resolution, its final error lists the failed command; the steps that succeeded stay applied, so check both versions before retrying.
@@ -125,6 +133,7 @@ These are fully-managed files whose package source has a different name than the
 | Package source                                  | Destination                                   |
 | ----------------------------------------------- | --------------------------------------------- |
 | `templates/workflows/ci.yml`                    | `.github/workflows/ci.yml`                    |
+| `templates/dependabot.yml`                      | `.github/dependabot.yml`                      |
 | `templates/workflows/dependabot-auto-merge.yml` | `.github/workflows/dependabot-auto-merge.yml` |
 | `templates/workflows/github-release.yml`        | `.github/workflows/github-release.yml`        |
 

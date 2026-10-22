@@ -4,6 +4,7 @@ import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { backlog_next, type OptedIn } from './backlog-next'
 import type { PlanContext } from './backlog-plan'
 import type { GateScope } from './backlog-rank'
@@ -60,7 +61,7 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		scope: backlog_next.gate_scope(context),
+		scope: await backlog_next.gate_scope(context),
 	}
 }
 
@@ -74,7 +75,10 @@ async function fetch_open(): Promise<OpenListing | undefined> {
 
 	const read = read_json_listing(json, open_issue_schema)
 
-	return read.kind === 'read' ? { rows: read.rows, is_capped } : undefined
+	if (read.kind !== 'read') return undefined
+	await issue_sample_gate.prime(read.rows.map((row) => row.body))
+
+	return { rows: read.rows, is_capped }
 }
 
 // A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is

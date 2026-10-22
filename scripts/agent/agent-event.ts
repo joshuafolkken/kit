@@ -1,15 +1,11 @@
 import { json_value } from '#scripts/lib/json-value'
+import { transcript_record, type TranscriptRecord } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 import type { AgentProvider } from './agent-role-profile'
 import { claude_result_event } from './claude-result-event'
 
-const TEXT_BLOCK_SCHEMA = z.looseObject({ type: z.literal('text'), text: z.string() })
-const CLAUDE_MESSAGE_SCHEMA = z.looseObject({ content: z.array(z.unknown()).optional() })
+const ASSISTANT_TYPE = 'assistant'
 const CLAUDE_INIT_SCHEMA = z.looseObject({ type: z.literal('system'), subtype: z.literal('init') })
-const CLAUDE_ASSISTANT_SCHEMA = z.looseObject({
-	type: z.literal('assistant'),
-	message: CLAUDE_MESSAGE_SCHEMA,
-})
 const USAGE_SCHEMA = z.looseObject({
 	input_tokens: z.number().optional(),
 	cached_input_tokens: z.number().optional(),
@@ -58,12 +54,16 @@ function usable_text(value: unknown): string | undefined {
 	return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
-function claude_progress(content: ReadonlyArray<unknown>): string | undefined {
-	return content
-		.map((block) => TEXT_BLOCK_SCHEMA.safeParse(block))
-		.filter((parsed) => parsed.success)
-		.map((parsed) => parsed.data.text)
-		.findLast((text) => text.trim() !== '')
+function claude_progress(record: TranscriptRecord): string | undefined {
+	return transcript_record
+		.blocks_of(record)
+		.filter((block) => block.type === transcript_record.TEXT_TYPE)
+		.map((block) => usable_text(block.text))
+		.findLast((text) => text !== undefined)
+}
+
+function is_claude_assistant(record: TranscriptRecord | undefined): record is TranscriptRecord {
+	return record?.type === ASSISTANT_TYPE && record.message !== undefined && record.message !== null
 }
 
 function claude_result(value: unknown, state: AgentEventState): AgentEventState | undefined {
@@ -80,9 +80,9 @@ function claude_result(value: unknown, state: AgentEventState): AgentEventState 
 }
 
 function claude_assistant(value: unknown, state: AgentEventState): AgentEventState | undefined {
-	const assistant = CLAUDE_ASSISTANT_SCHEMA.safeParse(value)
-	if (!assistant.success) return undefined
-	const progress = claude_progress(assistant.data.message.content ?? []) ?? state.progress
+	const record = transcript_record.read(value)
+	if (!is_claude_assistant(record)) return undefined
+	const progress = claude_progress(record) ?? state.progress
 
 	return { ...state, provider: 'anthropic', progress }
 }

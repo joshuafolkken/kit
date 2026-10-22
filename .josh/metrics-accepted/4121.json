@@ -1,0 +1,7 @@
+{
+	"reason": "shell-body.md names .josh/tmp/ as the one scratch directory for --body-file drafts (#4121 acceptance criterion)",
+	"date": "2026-10-18",
+	"growth": {
+		"ai_cost.on_demand_bytes": 126
+	}
+}

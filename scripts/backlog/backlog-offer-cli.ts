@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { josh_command } from '#scripts/josh/josh-run'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { json_value } from '#scripts/lib/json-value'
@@ -21,7 +19,6 @@ import { backlog_offer, type OfferAnswer } from './backlog-offer'
 // and in the `--json` object; every explanation `backlog:next` and `backlog:budget` print is streamed
 // straight through to stderr.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'offer'
@@ -36,7 +33,6 @@ const EXHAUSTED_ANSWER = 'exhausted'
 const NO_RUNNING = 0
 const DRAIN_TEXT = 'backlog drained'
 const should_forward_stderr = true
-const COUNT_PATTERN = /^\d+$/u
 
 const USAGE =
 	'Usage: josh backlog:offer --started <ISO-8601> [--active <ISO-8601>] [--merged <n>] [--running <n>] [--max <n>] [--idle <minutes>] [--retries <n>] [--exclude <n>[,<n>...]]... [--repo <owner/repo>] [--json]'
@@ -65,18 +61,10 @@ function read_values(argv: ReadonlyArray<string>): ParsedValues | undefined {
 	return cli_flags.values_of(argv, OPTIONS)
 }
 
-function to_count(raw: string | undefined): number | undefined {
-	if (raw === undefined || !COUNT_PATTERN.test(raw)) return undefined
-
-	const parsed = Number(raw)
-
-	return Number.isSafeInteger(parsed) ? parsed : undefined
-}
-
 // A count flag that was given but unreadable makes the invocation unreadable rather than defaulted —
 // the contract `backlog:budget` follows for its own counts.
 function count_of(raw: string | undefined): number | undefined {
-	return raw === undefined ? DEFAULT_COUNT : to_count(raw)
+	return raw === undefined ? DEFAULT_COUNT : cli_flags.to_count(raw)
 }
 
 interface OfferCounts {
@@ -159,6 +147,7 @@ function emit(decision: BudgetRead, offer: OfferAnswer, is_json: boolean): numbe
 			verdict,
 			issues,
 			answer: offer.answer,
+			cause: offer.cause,
 			retries: offer.retries,
 			reason,
 			is_finish,
@@ -200,7 +189,7 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {
 	const next = await josh_command.josh_run(next_argv(values), should_forward_stderr)
 	const offer = backlog_offer.answer_of(
-		{ code: next.code, tokens: to_tokens(next.out) },
+		{ code: next.code, tokens: to_tokens(next.out), err: next.err },
 		counts.running,
 		counts.retries,
 	)
@@ -239,10 +228,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await decide(values, counts)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const backlog_offer_cli = {
 	JSON_KEY,
 	budget_argv,
@@ -251,8 +236,6 @@ const backlog_offer_cli = {
 	read_values,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_offer_cli }
 export type { ParsedValues }

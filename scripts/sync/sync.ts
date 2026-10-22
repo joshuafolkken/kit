@@ -1,13 +1,12 @@
-#!/usr/bin/env tsx
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dependabot_cooldown } from '#scripts/dependabot/dependabot-cooldown'
 import { project_checks } from '#scripts/gate/project-checks'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
-import { basic_path_migration } from '#scripts/init/basic-path-migration'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { project_profile } from '#scripts/init/project-profile'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { project_config } from '#scripts/safe-chain/project-config'
@@ -19,9 +18,7 @@ import { file_content } from './file-content'
 import { sync_ai_files } from './sync-ai-files'
 import { sync_configs } from './sync-configs'
 
-const PACKAGE_JSON = 'package.json'
-const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
-const BASIC_PRETTIER_CONFIG = 'prettier.config.mjs'
+const PACKAGE_JSON_UNCHANGED_MSG = `  ✔ unchanged ${PACKAGE_JSON}`
 
 function did_migrate_prettierrc(destination_path: string): boolean {
 	const legacy_path = path.join(path.dirname(destination_path), '.prettierrc')
@@ -29,7 +26,7 @@ function did_migrate_prettierrc(destination_path: string): boolean {
 
 	const existing = readFileSync(legacy_path, 'utf8')
 
-	writeFileSync(
+	file_content.write_contained(
 		destination_path,
 		init_logic.merge_prettier_config(existing, path.dirname(destination_path)),
 	)
@@ -48,7 +45,7 @@ function write_merged_prettier_config(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, merged)
+	file_content.write_contained(destination_path, merged)
 	console.info('  ✔ synced    prettier.config.js')
 }
 
@@ -64,20 +61,6 @@ function sync_prettier_config(destination_path: string): void {
 	write_merged_prettier_config(destination_path)
 }
 
-// A basic project's prettier config written under the static profile name still imports the static
-// preset path; it is moved onto the basic one with the rule `josh init` applies.
-function sync_basic_prettier_config(destination_path: string): void {
-	if (!existsSync(destination_path)) return
-
-	const existing = readFileSync(destination_path, 'utf8')
-	const did_change = file_content.write_text_if_changed(
-		destination_path,
-		basic_path_migration.migrate_basic_paths(existing),
-	)
-
-	console.info(`  ✔ ${did_change ? 'synced   ' : 'unchanged'} ${BASIC_PRETTIER_CONFIG}`)
-}
-
 function sync_playwright_config(destination_path: string): void {
 	if (!existsSync(destination_path)) return
 
@@ -90,7 +73,7 @@ function sync_playwright_config(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, template)
+	file_content.write_contained(destination_path, template)
 	console.info('  ✔ synced    playwright.config.ts')
 }
 
@@ -106,7 +89,7 @@ function sync_deploy_vps(destination_path: string): void {
 		return
 	}
 
-	writeFileSync(destination_path, patched)
+	file_content.write_contained(destination_path, patched)
 	console.info('  ✔ synced    deploy-vps.yml')
 }
 
@@ -156,7 +139,7 @@ function sync_package_json_with(
 		return
 	}
 
-	writeFileSync(destination_path, transformed)
+	file_content.write_contained(destination_path, transformed)
 	console.info(synced_message)
 }
 
@@ -255,6 +238,13 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 	repository_labels.ensure_labels(name_with_owner)
 }
 
+// Every file that restates the workspace's `minimumReleaseAge`: Safe Chain's `.aikido` and
+// Dependabot's `cooldown`.
+function sync_release_window_mirrors(root: string): void {
+	project_config.sync_project_config(root)
+	dependabot_cooldown.sync_dependabot_cooldown(root)
+}
+
 function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_files.sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
@@ -267,20 +257,19 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
-	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window `.aikido`'s age is
-	// derived from.
-	project_config.sync_project_config(PROJECT_ROOT)
+	// After `sync_ai_copy_all`, which may add the `pnpm-workspace.yaml` window both mirrors are derived
+	// from, and which rewrites `.github/dependabot.yml` itself.
+	sync_release_window_mirrors(PROJECT_ROOT)
 	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
 }
 
-// A basic project gets what `josh init` gives that profile and nothing more: its AI file set and the
-// move of its prettier preset path. The full toolchain's configs, Sonar, package.json migrations and
-// repository settings are never written into it.
+// A basic project gets what `josh init` gives that profile and nothing more: its AI file set. The full
+// toolchain's configs, Sonar, package.json migrations and repository settings are never written into
+// it.
 function sync_basic_artifacts(is_force: boolean): void {
 	console.info('profile: basic (package.json josh.profile)\n')
 	sync_ai_files.sync_ai_copy_all(is_force, project_profile.inspect_project(PROJECT_ROOT, 'basic'))
-	sync_basic_prettier_config(path.join(PROJECT_ROOT, BASIC_PRETTIER_CONFIG))
 }
 
 // Checked before anything is written, never per file: the damage is the whole run, and a partial
@@ -289,18 +278,16 @@ function sync_basic_artifacts(is_force: boolean): void {
 //
 // Only a recorded basic profile switches the file set; an unrecorded one stays full, as every
 // project initialized before the profile was recorded was set up.
-function main(): void {
+function main(args: ReadonlyArray<string> = []): void {
 	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
 
-	const is_force = process.argv.includes('--force')
+	const is_force = args.includes('--force')
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	if (project_checks.is_basic(PROJECT_ROOT)) sync_basic_artifacts(is_force)
 	else sync_project_artifacts(is_force)
 	console.info('\n✅ Done.\n')
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const sync = {
 	should_skip_hook_file: sync_ai_files.should_skip_hook_file,
@@ -318,6 +305,7 @@ const sync = {
 	sync_prepare_lefthook_warning,
 	sync_safe_chain_preinstall,
 	sync_package_json_migrations,
+	sync_release_window_mirrors,
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 

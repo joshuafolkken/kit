@@ -1,3 +1,4 @@
+import { figure_format } from '#scripts/lib/figure-format'
 import { time_agent_bundles } from './time-agent-bundles'
 import { time_format } from './time-format'
 import { time_round_trips } from './time-round-trips'
@@ -111,7 +112,7 @@ const NO_BUNDLES: BundleTotals = {
 // `scripts/time-x` inside `scripts/time-xyz`.
 //
 // **The tail position is what makes an absolute path comparable with a relative one.** A `Read` call
-// names `/Users/…/kit/scripts/time/x.ts` while the `grep` before it named `scripts/time`, and nothing
+// names `/Users/…/kit/tools/time/x.ts` while the `grep` before it named `tools/time`, and nothing
 // here knows the working directory the second was relative to — so the search-then-read pair, which is
 // the whole reason the target test exists, would escape it on the two shapes it occurs in most.
 function contains_segments(whole: string, part: string): boolean {
@@ -124,7 +125,7 @@ function contains_segments(whole: string, part: string): boolean {
 }
 
 // Equal, or one inside the other. The containing form is what catches the search-then-read pair:
-// `grep -rn foo scripts` names `scripts`, and the `cat scripts/time/x.ts` that follows it names a path
+// `grep -rn foo scripts` names `scripts`, and the `cat tools/time/x.ts` that follows it names a path
 // beneath — which is exactly how the second call learned the first one's answer.
 function is_related(left: string, right: string): boolean {
 	if (left === right) return true
@@ -422,7 +423,7 @@ interface TripPrice {
 }
 
 function recoverable_suffix(totals: BundleTotals, round_trip_count: number): string {
-	const share = time_format.format_share(totals.recoverable_round_trips, round_trip_count)
+	const share = figure_format.format_share(totals.recoverable_round_trips, round_trip_count)
 
 	return `${share} of ${String(round_trip_count)} round trip(s)`
 }

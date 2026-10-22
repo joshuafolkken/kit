@@ -2,7 +2,11 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_limit_cli } from '#scripts/lane/lane-limit-cli'
 import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_spent } from '#scripts/lane/lane-spent'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -37,6 +41,19 @@ async function not_parent(): Promise<boolean> {
 async function read_repo(): Promise<string | undefined> {
 	return REPO
 }
+
+// Every lane's state record reads running: never a real one from a test.
+function running_records(issues: ReadonlyArray<string>): Map<string, LaneStateRecord> {
+	const changed_at = '2026-10-20T01:28:00.000Z'
+
+	return new Map(
+		issues.map((issue) => [issue, { issue, state: 'running', changed_at, changed_by: 'lane:run' }]),
+	)
+}
+
+beforeEach(() => {
+	vi.spyOn(lane_state, 'read_states').mockImplementation(async (issues) => running_records(issues))
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -85,6 +102,10 @@ describe('backlog_ready.drive_free_lane_count', () => {
 	})
 })
 
+function record(invocation: string): RunCarry {
+	return { invocation, started_at: EARLY, merged: 0, filed: 0, cuts: 0, failures: 0, outages: 0 }
+}
+
 function lane_of(issue: string): LaneInfo {
 	return {
 		issue,
@@ -107,6 +128,7 @@ describe('backlog_ready.free_lanes_beside', () => {
 	beforeEach(() => {
 		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
 	})
 
 	it('answers the free count `lane:limit` prints', async () => {
@@ -123,6 +145,56 @@ describe('backlog_ready.free_lanes_beside', () => {
 		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
 
 		await expect(backlog_ready.free_lanes_beside(OPEN)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4107: a drain run's lane with no child in it filled the limit, and `run:board`
+// drew `no free lane 4/4` beside three running children.
+describe('backlog_ready.lane_use', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+	})
+
+	it('counts only the lanes whose child still works, while every open lane keeps its seat', async () => {
+		// Each lane's child is probed with `pgrep`: never a real process from a test.
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue(['3867', '3868'])
+
+		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
+			occupied: OPEN.length - ['3867', '3868'].length,
+			seated: OPEN.length,
+			unknown: [],
+		})
+	})
+
+	it('counts every open lane while every child works', async () => {
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
+
+		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
+			occupied: OPEN.length,
+			seated: OPEN.length,
+			unknown: [],
+		})
+	})
+})
+
+// joshuafolkken/kit#4107: idle kept lanes filling every port seat must not shut out their resumes.
+describe('backlog_ready.drive_limit_room', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_limit_override, 'read_override').mockResolvedValue(undefined)
+		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(OPEN)
+	})
+
+	it('reads the limit less the working lanes, the seats the idle ones hold aside', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', String(OPEN.length))
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue(['3867', '3868'])
+
+		await expect(backlog_ready.drive_limit_room()).resolves.toBe(['3867', '3868'].length)
+	})
+
+	it('throws on an unreadable lane limit', async () => {
+		vi.stubEnv('JOSH_LANE_LIMIT', 'abc')
+
+		await expect(backlog_ready.drive_limit_room()).rejects.toThrow('JOSH_LANE_LIMIT')
 	})
 })
 
@@ -157,10 +229,6 @@ describe('backlog_ready.print_ready_line', () => {
 })
 
 // joshuafolkken/kit#2472: a `--only` run's work is its named list, so the pool is never its pick-up.
-function record(invocation: string): RunCarry {
-	return { invocation, started_at: EARLY, merged: 0, filed: 0, cuts: 0, failures: 0, outages: 0 }
-}
-
 describe('backlog_ready.drains_pool', () => {
 	it('drains the pool without a record, or under a run that is not --only', () => {
 		expect(backlog_ready.drains_pool(undefined)).toBe(true)
@@ -208,5 +276,23 @@ describe('backlog_ready.read_backlog_next', () => {
 
 		await expect(backlog_ready.ready_issues()).resolves.toEqual(['2445'])
 		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], true, undefined)
+	})
+
+	// joshuafolkken/kit#4349: the stream is the repository's log, so an earlier run's merge is no exclusion.
+	it("excludes only this invocation's merged children", async () => {
+		const merge = run_event_stream.EVENT_KIND.MERGE
+		const events: ReadonlyArray<RunEvent> = [
+			{ pos: 1, at: '2026-09-22T12:00:00.000Z', kind: merge, text: '#2400 merged' },
+			{ pos: 2, at: '2026-09-23T13:00:00.000Z', kind: merge, text: '#2445 merged' },
+		]
+
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(record('backlogrun'))
+		vi.spyOn(run_event_stream_emit, 'stream_target').mockResolvedValue('events.jsonl')
+		vi.spyOn(run_event_stream, 'read_events').mockReturnValue(events)
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(ANSWER)
+
+		await backlog_ready.read_backlog_next(TIMEOUT_MS)
+
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT, '--exclude', '2445'], false, TIMEOUT_MS)
 	})
 })

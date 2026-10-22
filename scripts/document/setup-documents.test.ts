@@ -23,7 +23,7 @@ const OVERVIEW = 'docs/overview.md'
 const AUTHENTICATION = 'docs/authentication.md'
 const INIT_GUIDE = 'docs/init.md'
 const COMMAND_CATALOG = 'docs/josh-command-catalog.md'
-const README_POSITIONING = "kit gives Claude Code or Codex your project's rules and checks."
+const README_POSITIONING = 'hand-off kit for Claude Code and Codex'
 // joshuafolkken/kit#3829: the README points in one line to the how-to guide, which sums up what
 // adopting kit into an existing project touches, one line each, linking each to its detail.
 const ADOPTION_HEADING = '### Adding kit to an existing project'

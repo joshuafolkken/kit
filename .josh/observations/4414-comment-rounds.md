@@ -1,0 +1,4 @@
+- rf:tests | low | scripts/backlog/backlog-plan-read.ts:79 | 2026-10-21 | #4414
+- rf:comments | low | scripts/issue/issue-labels.ts:257 | 2026-10-21 | #4414
+- rf:project-conventions | low | scripts/issue/session-cite-scan.test.ts:110 | 2026-10-21 | #4414
+- rf:comments | low | scripts/backlog/backlog-drive-idle.ts:77 | 2026-10-21 | #4414

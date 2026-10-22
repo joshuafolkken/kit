@@ -245,7 +245,7 @@ Neither the parent's log nor the lane child's held a `requires approval` line
 
 ## The log
 
-`<log-dir>/<scenario>-<n>.log`, by default under `.claude/tmp/fresh-machine`, which kit's distributed
+`<log-dir>/<scenario>-<n>.log`, by default under `.josh/tmp/fresh-machine`, which kit's distributed
 `.gitignore` already ignores. One file holds the image build, the pack and the container's session.
 Every command is printed as `$ <command>` before it runs and `[exit <status>]` after, and the probes
 follow the line `# probes — recorded, never failing the run`.

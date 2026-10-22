@@ -2,8 +2,10 @@ import { investigation_reads } from '#scripts/delegation/investigation-reads'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { direct_filing } from './direct-filing'
+import { direct_issue_comment } from './direct-issue-comment'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
@@ -13,6 +15,7 @@ import { issue_comments } from './issue-comments'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
 import { lane_carry_conflict } from './lane-carry-conflict'
+import { lane_direct_tool } from './lane-direct-tool'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
 import { lane_split_park } from './lane-split-park'
@@ -28,6 +31,7 @@ import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
+import { timed_rerun } from './timed-rerun'
 import { worktree_guard } from './worktree-guard'
 
 // The rules delivered by a `PreToolUse` refusal at the moment they bind, rather than carried resident
@@ -46,12 +50,32 @@ type CallTest = (
 	run: ReadonlyArray<GuardedCall>,
 ) => boolean
 
+// The tail is read lazily: most calls no rewrite applies to never need it.
+type CallRewrite = (call: GuardedCall, tail: () => string) => Record<string, unknown> | undefined
+
+// The human-readable side `pnpm josh rule:list` renders, carried on the row so a rule is one entry.
+interface RuleAbout {
+	title: string
+	// The single source of the rule's procedure.
+	topic: string
+	fires: string
+	// The silent turn — it matches the state in which the rule is already kept.
+	quiet: string
+	// The hook command that delivers it; absent reads as `PRETOOL_GUARD`.
+	entry?: string
+}
+
+// Every row here — batching and investigation included — is delivered by the one `PreToolUse`
+// process (`scripts/hooks/pretool-guard.ts`).
+const PRETOOL_GUARD = 'pnpm josh pretool:guard'
+
 // `id` keys the rule's own refusal record, so one rule firing never spends another's budget.
 interface DeliveredRule {
 	id: string
 	is_trigger: (call: GuardedCall) => boolean
 	// The only text that reaches the model: the instruction and the pointer.
 	reason: string
+	about: RuleAbout
 	// A stand-down when an earlier act on the tail already satisfied the rule; checked first, so a
 	// satisfied call spends no record.
 	already_satisfied?: (tail: string, call: GuardedCall) => boolean
@@ -63,6 +87,9 @@ interface DeliveredRule {
 	// The occasion the rule governs, for a row whose trigger is the violation itself (else `is_trigger`
 	// would only count runs that broke it).
 	reaches?: CallTest
+	// The call made right, for a row `guard-remedy.ts` classes as a rewrite: `rule-rewrite.ts` runs it
+	// in place of the refusal. `undefined` where this call has no mechanical fix, so it is refused.
+	rewrite?: CallRewrite
 	// The note a hook attaches where it rewrites a violating call instead of refusing it, so
 	// `rule-value.ts` counts the rewrite as this row's delivery.
 	rewrite_note?: string
@@ -71,7 +98,7 @@ interface DeliveredRule {
 	former_reasons?: ReadonlyArray<string>
 }
 
-// Scored but possibly delivered by its own binary (batching, investigation) — joining `DELIVERED_RULES`
+// Scored but possibly delivered by its own guard inside `pretool-guard.ts` (batching, investigation) — joining `DELIVERED_RULES`
 // would refuse one violation twice — so `is_trigger` is optional here.
 type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 	is_trigger?: DeliveredRule['is_trigger']
@@ -91,6 +118,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
 	// question are `issue:file`'s own steps, so no row gates them.
 	direct_filing.ROW,
+	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
+	// points at takes the body by path, so the body rows have nothing left to say.
+	direct_issue_comment.ROW,
 	filing_cap.ROW,
 	issue_comments.ROW,
 	{
@@ -99,6 +129,13 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: SHELL_BODY_REASON,
 		keeps: on_bash_command(keeps_body_safe),
 		reaches: on_bash_command(carries_a_body),
+		about: {
+			title: 'No body on the shell',
+			topic: '`shell-body.md`',
+			fires:
+				'a double-quoted body value (`-f body="…"` / `-f "body=…"` / `--body "…"` / `--notify-message "…"`) carrying a backtick or `$`',
+			quiet: 'the shell does not evaluate the body',
+		},
 	},
 	raw_field_body.ROW,
 	{
@@ -107,8 +144,16 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: piped_verification.PIPED_VERIFICATION_REASON,
 		keeps: on_bash_command(piped_verification.keeps_verdict_intact),
 		reaches: on_bash_command(piped_verification.runs_verification),
-		// A `| tail` / `| grep` masking is rewritten under `pipefail` by `pretool-guard.ts`, never refused.
+		// A masking whose filter reads to the end is rewritten under `pipefail`, never refused.
+		rewrite: piped_verification.pipefail_input,
 		rewrite_note: piped_verification.PIPEFAIL_NOTE,
+		about: {
+			title: 'Piped verification',
+			topic: '`output-bounds.md`',
+			fires:
+				'a pass/fail josh check (`gate` / `check` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise',
+			quiet: 'the exit code reaches the caller — a failure reads as a failure',
+		},
 	},
 	{
 		id: 'early-heartbeat',
@@ -117,6 +162,14 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		decide: early_heartbeat.decide,
 		keeps: on_bash_command(early_heartbeat.is_progress_watch),
 		reaches: on_bash_command(early_heartbeat.waits_for_progress),
+		about: {
+			title: 'Early progress report',
+			topic:
+				'`.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet"',
+			fires:
+				'a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence',
+			quiet: 'no hand-made wait timer — `run:progress` holds the one clock',
+		},
 	},
 	// Before `run-tail`: whether to commit at all is decided before how to push.
 	test_declared_commit.ROW,
@@ -130,6 +183,13 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		decide: run_tail_rule.decide,
 		keeps: run_tail_rule.is_backgrounded_push_step,
 		reaches: run_tail_rule.is_push_step_call,
+		about: {
+			title: 'Idle run tail',
+			topic: '`.claude/skills/workflow-commands/background-commands.md`',
+			fires:
+				'`pnpm josh git -y` (`josh g`, `--yes` alike) issued in the **foreground**. Every occurrence',
+			quiet: 'issued in the background — its completion resumes the run',
+		},
 	},
 	// Reads the lane name and the cut record. Once per run, not `decide`: taking the cut ends the
 	// process, and the verdicts that leave a run at the gate all need the reissue through. `reaches`
@@ -141,13 +201,25 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
 		reaches: pre_gate_cut.reaches_the_pre_gate_boundary,
+		about: {
+			title: 'The cut before the gate',
+			topic: '`.claude/skills/workflow-commands/pre-gate-cut.md`',
+			fires:
+				'`pnpm josh gate` (`josh ga`) in a lane work tree whose `JOSH_LANE_CHILD` names the Issue and has no cut record',
+			quiet: 'outside a lane, no marker (a person in the lane), or already cut',
+		},
 	},
 	// A split child's park is refused before `lane-park` sees it.
 	lane_split_park.ROW,
 	lane_park.ROW,
 	lane_interactive_ask.ROW,
+	agent_model.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
+	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
+	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
+	timed_rerun.ROW,
+	lane_direct_tool.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.
 	josh_git_bare.ROW,
 	// The Bash-string gaps the deny glob cannot express, read by argv; `delivered-rules-bash.test.ts`
@@ -177,6 +249,13 @@ const BATCHING_RULE: MeasuredRule = {
 	reason: time_batch_guard.REASON,
 	keeps: batches_the_turn,
 	reaches: time_batch_guard.is_guarded_call,
+	about: {
+		title: 'Turn batching',
+		topic: '`turn-batching.md`',
+		fires:
+			'the `Bash` / `Edit` / `Read` after three single-call turns in a row; fires **again** every three more such turns',
+		quiet: 'calls per round trip above the floor',
+	},
 }
 
 // No `is_trigger`, as for batching. No `keeps`: any dispatch would read as compliance, so it is left
@@ -185,6 +264,13 @@ const INVESTIGATION_RULE: MeasuredRule = {
 	id: 'investigation',
 	reason: investigation_reads.REASON,
 	reaches: investigation_reads.is_refusable_call,
+	about: {
+		title: 'Investigation delegation threshold',
+		topic: '`delegation.md`',
+		fires:
+			'the `Read` / `Bash` that makes the third read of a file the run will not edit; fires **again** once reads pile up to the threshold again',
+		quiet: 'reads under the threshold — nothing to delegate yet',
+	},
 }
 
 const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
@@ -291,6 +377,7 @@ const delivered_rules = {
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	POLL_LOOP_REASON: poll_loop.POLL_LOOP_REASON,
 	PRE_GATE_CUT_REASON: pre_gate_cut.PRE_GATE_CUT_REASON,
+	PRETOOL_GUARD,
 	RAW_FIELD_BODY_REASON: raw_field_body.RAW_FIELD_BODY_REASON,
 	RUN_TAIL_REASON: run_tail_rule.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
@@ -304,5 +391,5 @@ const delivered_rules = {
 	is_issue_filing,
 }
 
-export type { DeliveredRule, MeasuredRule }
+export type { CallRewrite, DeliveredRule, MeasuredRule, RuleAbout }
 export { delivered_rules }

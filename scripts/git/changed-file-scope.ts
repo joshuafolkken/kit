@@ -11,9 +11,10 @@ import { git_command } from './git-command'
 // nothing, and listing what was narrowed by — is identical, so it lives here once rather than in
 // each command.
 //
-// **A narrowed run is added in front of the whole check, never in place of it.** Both fallbacks
-// therefore end at the whole check, and each says which of the two it was: the one thing this must
-// never do is answer "nothing to run" quietly.
+// The narrowed unit run replaces the whole suite in the gate (joshuafolkken/kit#4065), and the
+// narrowed lint the whole-tree lint (joshuafolkken/kit#4085), each with CI's whole run behind it.
+// Either way both fallbacks end at the whole check, and each says which of the two it was: the
+// one thing this must never do is answer "nothing to run" quietly.
 
 type ScopeMode = 'all' | 'related'
 
@@ -176,7 +177,7 @@ async function resolve_command_scope(request: ScopeRequest): Promise<ChangedFile
 // describing a set the caller never handed over.
 function report_unusable_arguments(
 	command_arguments: ReadonlyArray<string>,
-	scope: ChangedFileScope,
+	scope: Pick<ChangedFileScope, 'files'>,
 	label: string,
 ): void {
 	const narrowed = new Set(scope.files)
@@ -195,6 +196,7 @@ const changed_file_scope = {
 	UNREADABLE_REASON,
 	describe_scope,
 	flags_of,
+	format_file_list,
 	is_flag,
 	read_changed_files,
 	report_unusable_arguments,

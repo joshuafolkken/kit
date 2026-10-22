@@ -66,6 +66,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_bare_josh_git),
 	reason: JOSH_GIT_BARE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Bare `pnpm josh git`',
+		topic: '`CLAUDE.md` → Git Rules',
+		fires:
+			'`pnpm josh git` without `-y`, whose staging prompt cancels with no TTY. Every occurrence',
+		quiet: '`pnpm josh git -y`',
+	},
 }
 
 const josh_git_bare = {

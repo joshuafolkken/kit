@@ -44,7 +44,7 @@ pnpm josh init --dry-run
 
 kit itself does not count as a dependency, and an `index.html` file does not decide the profile. `josh init` records the first decision in `package.json` as `josh.profile` and keeps it on every re-run; pass `--profile` to change it.
 
-The former names `static` and `node` still work as `basic` and `full`, recorded or passed to `--profile`. Re-running `josh init` records the new name and moves the `prettier/static` and `dist/CLAUDE.static.md` imports onto `prettier/basic` and `dist/CLAUDE.basic.md`. Why: `docs/maintainers/init-rationale.md` → "Renamed profiles".
+The former names `static` and `node` still work as `basic` and `full`, recorded or passed to `--profile`. Re-running `josh init` records the new name. Why: `docs/maintainers/init-rationale.md` → "Renamed profiles".
 
 Web files and Git are separate conditions: HTML, CSS, or JavaScript files (including `.mjs` and `.cjs`) enable Web formatting unless the project already has a formatter of its own (a `biome.json`, `biome.jsonc` or `dprint.json` — `.dprint.json` and the `.jsonc` forms too); TypeScript files enable a TypeScript config; a Git repository enables Git settings; a GitHub origin enables GitHub files.
 
@@ -267,8 +267,8 @@ The `basic` profile copies short AI pointers and a `pnpm-workspace.yaml` that ap
 CLAUDE.md           AGENTS.md           GEMINI.md
 CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
-.mcp.json           .ncurc.json         .prettierignore
-SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
+.mcp.json           .prettierignore     SECURITY.md
+pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/dependabot-auto-merge.yml

@@ -1,0 +1,8 @@
+{
+	"reason": "#4158 adds two commands (epic:bundle --apply, epic --decide) that replace hand-run epic writes; the growth is the new modules, their usage lines and the review-round fixes",
+	"date": "2026-10-19",
+	"growth": {
+		"scripts.code_lines": 268,
+		"ai_cost.on_demand_bytes": 58
+	}
+}

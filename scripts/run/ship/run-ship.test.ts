@@ -25,6 +25,33 @@ describe('run_ship.format_report — each step under its own header', () => {
 	})
 })
 
+// joshuafolkken/kit#4166: a stopped preflight's unmet preconditions reach the stop record.
+describe('run_ship.section_of — a stage result under its header', () => {
+	it('carries the preconditions and the conflicts a stage handed back', () => {
+		const result = { code: FAILED, out: 'red', conflicts: ['a.ts'], preconditions: ['lock'] }
+
+		expect(run_ship.section_of('h', result)).toStrictEqual({
+			header: 'h',
+			body: 'red',
+			code: FAILED,
+			conflicts: ['a.ts'],
+			preconditions: ['lock'],
+		})
+	})
+
+	// joshuafolkken/kit#4431: a review round's tagged cause reaches the stop record.
+	it('carries the cause a review round tagged its stop with', () => {
+		expect(run_ship.section_of('h', { code: FAILED, out: 'red', cause: 'attest' })).toStrictEqual({
+			...section('h', 'red', FAILED),
+			cause: 'attest',
+		})
+	})
+
+	it('adds neither key to a result that has none', () => {
+		expect(run_ship.section_of('h', { code: OK, out: 'ok' })).toStrictEqual(section('h', 'ok'))
+	})
+})
+
 describe('run_ship.failed_section — the step that stopped the ship', () => {
 	it('returns the first failed section', () => {
 		const failed = run_ship.failed_section([section('a', '', OK), section('b', '', FAILED)])

@@ -3,7 +3,9 @@ import type { dlopen } from 'node:ffi'
 // A process's CPU time with the children it has reaped folded in, so a vitest worker or a gate's
 // eslint born and gone between two `run:board` samples still reaches its lane through its parent.
 // macOS's `ps -S` does not fold them; the kernel keeps them in `proc_pid_rusage`'s
-// `ri_child_user_time` / `ri_child_system_time`, reached here through `node:ffi`.
+// `ri_child_user_time` / `ri_child_system_time`, reached here through `node:ffi`. The same call's
+// `ri_phys_footprint` is the process's memory as `top`'s MEM and Activity Monitor's "Memory" count it —
+// compressed pages included, which a resident set leaves out (joshuafolkken/kit#4171).
 //
 // **`node:ffi` is experimental** — added in Node 26 (kit's `engines` is `^22.19.0 || ^24.0.0 ||
 // >=26.0.0`) and liable to change. Where it is missing, or the platform is not macOS, or a call
@@ -23,8 +25,14 @@ interface Timebase {
 	denom: number
 }
 
-// The CPU milliseconds of one process, `undefined` where it cannot be read (gone, or another user's).
-type RusageReader = (pid: number) => number | undefined
+// One process's CPU milliseconds and its physical footprint in bytes.
+interface RusageReading {
+	cpu_ms: number
+	footprint_bytes: number
+}
+
+// One process's reading, `undefined` where it cannot be read (gone, or another user's).
+type RusageReader = (pid: number) => RusageReading | undefined
 
 const PROC_LIBRARY = '/usr/lib/libproc.dylib'
 const SYSTEM_LIBRARY = '/usr/lib/libSystem.B.dylib'
@@ -35,6 +43,8 @@ const USER_TIME_OFFSET = 16
 const SYSTEM_TIME_OFFSET = 24
 const CHILD_USER_TIME_OFFSET = 96
 const CHILD_SYSTEM_TIME_OFFSET = 104
+// `rusage_info_v2`'s `ri_phys_footprint`.
+const PHYS_FOOTPRINT_OFFSET = 72
 const TIME_OFFSETS = [
 	USER_TIME_OFFSET,
 	SYSTEM_TIME_OFFSET,
@@ -93,10 +103,12 @@ function reader_of(ffi: Ffi): RusageReader {
 	const { proc_pid_rusage } = ffi.dlopen(PROC_LIBRARY, PROC_PID_RUSAGE).functions
 	const buffer = Buffer.alloc(RUSAGE_INFO_V2_BYTES)
 
-	return function read(pid: number): number | undefined {
-		const status = proc_pid_rusage(pid, RUSAGE_INFO_V2, buffer)
+	return function read(pid: number): RusageReading | undefined {
+		if (proc_pid_rusage(pid, RUSAGE_INFO_V2, buffer) !== 0) return undefined
 
-		return status === 0 ? cpu_ms_of(buffer, timebase) : undefined
+		const footprint_bytes = Number(buffer.readBigUInt64LE(PHYS_FOOTPRINT_OFFSET))
+
+		return { cpu_ms: cpu_ms_of(buffer, timebase), footprint_bytes }
 	}
 }
 
@@ -121,4 +133,4 @@ function rusage_reader(platform: NodeJS.Platform, load: ModuleLoad): RusageReade
 const run_board_usage_rusage = { cpu_ms_of, load_builtin, quiet_ffi, rusage_reader }
 
 export { run_board_usage_rusage }
-export type { RusageReader, Timebase }
+export type { RusageReader, RusageReading, Timebase }

@@ -21,14 +21,20 @@ beforeEach(() => {
 // labels as they stand when it runs (joshuafolkken/kit#2712), one name per line, and a read that
 // fails stops the check loudly rather than judging an empty label set.
 describe('pr_classification.fetch_current_labels', () => {
-	it('asks the issue labels endpoint for the label names', () => {
+	it('asks every page of the issue labels endpoint for the label names', () => {
 		gh_outcomes.mockReturnValue({ exitCode: 0, stdout: '' })
 
 		pr_classification.fetch_current_labels(REPOSITORY, PULL_NUMBER)
 
 		expect(gh_outcomes).toHaveBeenCalledWith(
 			'gh',
-			['api', `repos/${REPOSITORY}/issues/${String(PULL_NUMBER)}/labels`, '--jq', '.[].name'],
+			[
+				'api',
+				`repos/${REPOSITORY}/issues/${String(PULL_NUMBER)}/labels`,
+				'--paginate',
+				'--jq',
+				'.[].name',
+			],
 			expect.anything(),
 		)
 	})

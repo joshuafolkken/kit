@@ -5,7 +5,11 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_park } from '#scripts/issue/issue-park'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
@@ -23,6 +27,7 @@ import {
 } from '#scripts/run/carry/run-carry'
 import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
+import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge } from './run-merge'
 import { run_merge_ship } from './run-merge-ship'
@@ -52,10 +57,6 @@ const MERGE_CLOSER = 'pnpm josh run:merge'
 const SINGLE_READ = { attempts: 1, interval_ms: 0 }
 const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
-// What the driver judged when it parks a child, stated on the issue.
-const FAILED_CAUSE = 'the child’s session ended with its issue still open and unfinished.'
-const CUT_RELAUNCH_CAUSE =
-	'its lane held a declared cut, but no successor could be relaunched from it (or it already was once).'
 
 // One returned child's context, gathered from the command line by the CLI.
 interface MergeContext {
@@ -73,6 +74,8 @@ interface MergeContext {
 	// The merged pull request that closes the child, when GitHub left the child OPEN after the merge —
 	// the one `merged` child whose issue this command still has to close.
 	merged_pr?: string | undefined
+	// The outage is a ship stop no relaunch answered: re-dispatched, but not added to the streak.
+	is_unanswered?: boolean | undefined
 }
 
 interface FailedResult {
@@ -81,12 +84,16 @@ interface FailedResult {
 	// Set when the carry record refused the count because this session is not its owner. The caller
 	// surfaces this as a hard failure rather than continuing.
 	is_refused: boolean
-	// The open `blocked-by` blockers the child was released to wait on, cited — empty for a child that
-	// was parked (or refused) instead.
-	blockers: ReadonlyArray<string>
+	// What the child was released to wait on — its open `blocked-by` blockers, cited, and a start date
+	// still ahead — empty for a child that was parked (or refused) instead.
+	waits: ReadonlyArray<string>
+	// The short name of why a parked child was parked, which its park event carries.
+	cause?: string | undefined
 }
 
-const NO_BLOCKERS: ReadonlyArray<string> = []
+const NO_WAITS: ReadonlyArray<string> = []
+// The wait a `not-before` label alone records: the label carries no date, only that one is ahead.
+const NOT_BEFORE_WAIT = 'a start date still ahead (`not-before`)'
 
 // A captured `pnpm josh` subprocess: its output is read back rather than inherited, and a non-zero
 // exit is a value to branch on rather than a throw. The step's stderr stays piped here — `run:merge`
@@ -165,8 +172,17 @@ async function sync_main(): Promise<void> {
 	if (!is_synced) throw new Error(`main:sync failed: ${error_output}`)
 }
 
+// `lane:close` says on stderr what it terminated — the child and whatever else ran from the checkout
+// (joshuafolkken/kit#4304) — so that stderr is passed on rather than dropped with the capture. An
+// `incomplete` close — a process that outlived even a SIGKILL — is logged and the run carries on: the
+// merge cannot be undone, and the supervisor closes the lane again each pass until it ends
+// (joshuafolkken/kit#4300).
 async function close_lane(child: string): Promise<void> {
-	await josh(['lane:close', child])
+	const result = await josh(['lane:close', child])
+	const said = result.err?.trimEnd() ?? ''
+
+	if (said !== '') console.error(said)
+	if (result.code !== 0) console.error(`${session_cite.issue(child)}: lane:close is incomplete`)
 }
 
 async function stash_work(child: string, directory: string): Promise<void> {
@@ -202,22 +218,30 @@ function kept_lane_comment(directory: string): string {
 	return `The split left this issue's lane open: it still holds a commit, an uncommitted change or a live process — ${directory}`
 }
 
-// A child promoted to an epic by a split leaves its lane holding a seat: the epic root is never
-// dispatched again, so nothing else would ever close it. The lane is closed only when it holds
-// nothing — no commit, no change, no live process (`lane_vacant`); any other lane is kept, and why is
-// stated on the issue.
-async function close_split_lane(child: string): Promise<void> {
+// A child that ended without a merge closes its lane only when the lane holds nothing — no commit, no
+// change, no live process (`lane_vacant`); any other lane is kept for whoever resumes the issue.
+// Returns the kept lane, `undefined` where there was none or it was closed. joshuafolkken/kit#4028:
+// three children that ended doing nothing left lanes that filled the limit.
+async function close_vacant_lane(child: string): Promise<LaneInfo | undefined> {
 	const lane = await lane_registry.find_open_lane(child)
 
-	if (lane === undefined) return
+	if (lane === undefined) return undefined
 
-	if (await lane_vacant.is_vacant(lane)) {
-		await close_lane(child)
+	if (!(await lane_vacant.is_vacant(lane))) return lane
 
-		return
+	await close_lane(child)
+
+	return undefined
+}
+
+// A child promoted to an epic by a split leaves its lane holding a seat: the epic root is never
+// dispatched again, so nothing else would ever close it. A lane it keeps is stated on the issue.
+async function close_split_lane(child: string): Promise<void> {
+	const kept = await close_vacant_lane(child)
+
+	if (kept !== undefined) {
+		await git_gh_issue_write.issue_try_comment(child, kept_lane_comment(kept.directory))
 	}
-
-	await git_gh_issue_write.issue_try_comment(child, kept_lane_comment(lane.directory))
 }
 
 // The progress comment is a human-readable mirror of the carry record, so it is best-effort and only
@@ -270,8 +294,17 @@ async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
 	return undefined
 }
 
+// A child that ended without a merge: end whatever of its process still runs, drop its stale
+// `in-progress`, and close its lane if the child left nothing in it. The reap comes first, so the lane
+// reads with no live process.
+async function release_child(child: string): Promise<void> {
+	lane_reap.reap_child(await lane_registry.lane_location(child))
+	await run_label.unmark(child)
+	await close_vacant_lane(child)
+}
+
 function refused_result(carry: RunCarry): FailedResult {
-	return { carry, is_parked: false, is_refused: true, blockers: NO_BLOCKERS }
+	return { carry, is_parked: false, is_refused: true, waits: NO_WAITS }
 }
 
 // The child's open `blocked-by` blockers, cited. A read that fails answers none, so the child is
@@ -284,66 +317,89 @@ async function open_blockers(child: string): Promise<ReadonlyArray<string>> {
 			.filter((blocker) => blocker.state === OPEN_STATE)
 			.map((blocker) => issue_cite.plain(blocker.number, blocker.repo))
 	} catch {
-		return NO_BLOCKERS
+		return NO_WAITS
 	}
 }
 
-// A child that ended unfinished while an open blocker it records still has to land first is waiting,
-// not failed: nothing is counted and `needs-decision` is not applied — the
-// order is already recorded, so there is nothing for a person to decide — and its stale `in-progress`
-// is dropped so the offer hands it back on its own once the blockers merge. The ownership guard is
-// still asked, so a session that does not own the run cannot release a child it never dispatched.
-async function do_waiting(
-	ctx: MergeContext,
-	blockers: ReadonlyArray<string>,
-): Promise<FailedResult> {
+// Whether the child carries `not-before` — the body's start date copied to a label. Read only where the
+// body could not be: the body is the source, so a label it no longer backs is never a wait.
+async function has_not_before_label(ctx: MergeContext): Promise<boolean> {
+	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
+
+	return read.kind === 'state' && has_label_name(read.state.labels, NOT_BEFORE_LABEL)
+}
+
+// The child's declared start date while it is still ahead (joshuafolkken/kit#4076), or its `not-before`
+// label when the body could not be read (joshuafolkken/kit#4102), or the samples it still waits on. A
+// due date or none answers none, so the child is parked as before.
+async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>> {
+	const body = await git_gh_command.issue_get_body(ctx.child, ctx.repo)
+
+	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : NO_WAITS
+
+	await issue_sample_gate.prime([body])
+	const reason = issue_not_before.waiting_reason(body)
+
+	return reason === undefined ? NO_WAITS : [reason]
+}
+
+// A child that ended unfinished while an open blocker it records still has to land first, or while
+// its declared start date is still ahead, is waiting, not failed: nothing is counted and
+// `needs-decision` is not applied — when it runs is already recorded, so there is nothing for a person
+// to decide — and its stale `in-progress` is dropped so the offer hands it back on its own once the
+// blockers merge and the date arrives. The ownership guard is still asked, so a session that does not
+// own the run cannot release a child it never dispatched.
+async function do_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Promise<FailedResult> {
 	const refused = await refused_carry(ctx)
 
 	if (refused !== undefined) return refused_result(refused)
 
-	lane_reap.reap_child(ctx.child)
-	await run_label.unmark(ctx.child)
-	await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.waiting_comment(blockers))
+	await release_child(ctx.child)
+	await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.waiting_comment(waits))
 
-	return { carry: undefined, is_parked: false, is_refused: false, blockers }
+	return { carry: undefined, is_parked: false, is_refused: false, waits }
 }
 
 // A failed child: count the failure, end whatever of its process is still running (a child judged
 // abandoned that hung on a wait loop would otherwise answer the pgrep liveness check `alive` for its
-// issue number forever), drop the stale `in-progress`, and park it with `needs-decision` so the next
-// offer does not hand the same child straight back. Returns the record so the caller can read the
-// streak against the guard. Returns `is_refused: true` without touching labels when the carry record
+// issue number forever), drop the stale `in-progress`, and park it with `run:stalled` so the next
+// offer does not hand the same child straight back. Not `needs-decision`: the failure is mechanical,
+// and nothing is asked of a person but to fix its cause (joshuafolkken/kit#4102). Returns the record
+// so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the carry record
 // rejected the count. A park is always explained on the issue — `cause` says what was judged, and the
 // comment what was read and what a person does next.
-async function park_failed(ctx: MergeContext, cause: string): Promise<FailedResult> {
+async function park_failed(ctx: MergeContext, cause: StallCause): Promise<FailedResult> {
 	const result = await apply_carry(ctx, run_merge.change_of('failed'))
 
 	if (result.kind === 'refused') return refused_result(result.carry)
 
 	const carry = result.kind === 'applied' ? result.carry : undefined
 
-	lane_reap.reap_child(ctx.child)
-	await run_label.unmark(ctx.child)
-	const is_parked = await git_gh_issue_write.issue_add_label(ctx.child, NEEDS_DECISION_LABEL)
+	await release_child(ctx.child)
+	const reason = { child: ctx.child, cause: cause.why, carry, output: ctx.output }
+	const park = await issue_park.apply(ctx.child, RUN_STALLED_LABEL, run_merge.park_comment(reason))
 
-	if (is_parked) {
-		const reason = { child: ctx.child, cause, carry, output: ctx.output }
-
-		await git_gh_issue_write.issue_try_comment(ctx.child, run_merge.park_comment(reason))
+	return {
+		carry,
+		is_parked: park.is_labelled,
+		is_refused: false,
+		waits: NO_WAITS,
+		cause: cause.short,
 	}
-
-	return { carry, is_parked, is_refused: false, blockers: NO_BLOCKERS }
 }
 
-// A child that ended unfinished: waiting when it records an open blocker (`do_waiting`), parked
-// otherwise (`park_failed`) — an order already recorded is never a decision for a person. Without a
-// cause of the caller's, a child whose detached ship ended is parked for the ship's stop.
-async function do_failed(ctx: MergeContext, cause?: string): Promise<FailedResult> {
-	const blockers = await open_blockers(ctx.child)
+// A child that ended unfinished: waiting when it records an open blocker or a start date still ahead
+// (`do_waiting`), parked otherwise (`park_failed`) — a recorded order or date is never a decision for a
+// person. Without a cause of the caller's, a child whose detached ship ended is parked for the ship's
+// stop.
+async function do_failed(ctx: MergeContext, cause?: StallCause): Promise<FailedResult> {
+	const waits = [...(await open_blockers(ctx.child)), ...(await start_date_wait(ctx))]
 
-	if (blockers.length > 0) return await do_waiting(ctx, blockers)
+	if (waits.length > 0) return await do_waiting(ctx, waits)
 
-	return await park_failed(ctx, cause ?? run_merge_ship.cause(ctx.child) ?? FAILED_CAUSE)
+	const judged = cause ?? run_merge_ship.cause(ctx.child) ?? run_stalled.SESSION_UNFINISHED
+
+	return await park_failed(ctx, judged)
 }
 
 // The outcome of counting an outage: the record to read the streak against, and whether the count was
@@ -359,13 +415,20 @@ interface OutageResult {
 // the child, so it is re-dispatchable in the same run. Returns the record so the caller can read the
 // outage streak against its guard. Returns `is_refused: true` without touching labels when the carry
 // record rejected the count.
+async function count_outage(ctx: MergeContext): Promise<ApplyCarryResult> {
+	if (ctx.is_unanswered !== true) return await apply_carry(ctx, run_merge.change_of('outage'))
+
+	const refused = await refused_carry(ctx)
+
+	return refused === undefined ? { kind: 'none' } : { kind: 'refused', carry: refused }
+}
+
 async function do_outage(ctx: MergeContext): Promise<OutageResult> {
-	const result = await apply_carry(ctx, run_merge.change_of('outage'))
+	const result = await count_outage(ctx)
 
 	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
 
-	lane_reap.reap_child(ctx.child)
-	await run_label.unmark(ctx.child)
+	await release_child(ctx.child)
 
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
 }
@@ -442,9 +505,9 @@ async function ask_next(ctx: MergeContext): Promise<string> {
 }
 
 const run_merge_steps = {
-	CUT_RELAUNCH_CAUSE,
 	ask_next,
 	close_split_lane,
+	release_child,
 	do_failed,
 	do_merged,
 	do_outage,

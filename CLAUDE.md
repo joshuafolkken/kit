@@ -1,9 +1,5 @@
 # Claude Code Instructions
 
-## Project
-
-Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS · Drizzle · better-auth · Paraglide · MCP
-
 ## Communication
 
 - **Answer opinion-seeking questions from a neutral standpoint.** A leading question is not a cue to agree — recommend the option you genuinely judge best.
@@ -32,7 +28,7 @@ Log auto-decisions: an Issue comment in an Issue workflow, else a one-line "Auto
 
 ## Critical Conventions (non-standard — always apply)
 
-Naming, exports, file names and content rules are enforced by `eslint/rules/`; their single source is `prompts/coding-standards.md` → "Conventions". `function` syntax, not arrows (named SvelteKit route handlers may use typed-const arrows); lint does not check it.
+Naming, exports, file names and content rules are enforced by `eslint/rules/`; their single source is `prompts/coding-standards.md` → "Conventions". `function` syntax, not arrows (named SvelteKit route handlers may use typed-const arrows), `func-style`.
 
 ### Quality limits
 
@@ -63,7 +59,7 @@ Before every `git commit`, a subagent runs `/code-review` per `prompts/review.md
 
 - **No commits** unless explicitly requested. **No merges, branch deletions, force pushes or other shared-state mutations** unless requested in the current turn — except invoking `fullrun` or `backlogrun` authorizes the merge via `pnpm josh followup`; `prrun` does not. `.claude/settings.json` denies these, but the deny is narrower than the rule — never read "the tool let me" as permission.
 - **Never stage or mutate the git index on your own** — only on explicit instruction or via `pnpm josh git`. `prompts/collaboration-workflow/operating-rules.md` → "no-self-staging".
-- **Use `pnpm josh git`; open a PR with `pnpm josh pr`** — `pnpm josh rule:guard` refuses a direct `gh pr create`. GitHub operations are `gh api` (REST) — `prompts/collaboration-workflow/gh-rest.md`.
+- **Use `pnpm josh git`; open a PR with `pnpm josh pr`** — the `direct-pr-create` row of `pnpm josh rule:list` refuses a direct `gh pr create`. GitHub operations are `gh api` (REST) — `prompts/collaboration-workflow/gh-rest.md`.
 - **Run `git status` (and `git stash list`) live** before acting on any tree assumption.
 
 ## Collaboration Workflow
@@ -80,7 +76,7 @@ Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflo
 
 #### Mid-workflow stop notification (`confirmation`)
 
-Before pausing **any** run for the user — a command's stop, an upstream-Issue interrupt, a Tier C confirmation — send once per stop (skip when the user asked for the stop this turn):
+The `Stop` hook sends it when your held run awaits a decision — lead with the reason, end with `Recommended: <choice>`. Send it yourself only when the hook refuses the stop:
 
 ```bash
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"

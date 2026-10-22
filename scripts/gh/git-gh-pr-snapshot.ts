@@ -1,4 +1,5 @@
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { git_gh_branch_rules } from './git-gh-branch-rules'
 import { git_gh_exec } from './git-gh-exec'
 import { read_pull, require_pr_number } from './git-gh-pr-read'
 import type { RestPull } from './git-gh-pr-rest'
@@ -69,10 +70,24 @@ async function pr_get_review_decision(pr_number: number): Promise<string> {
 // `git-pr-checks-eval.ts` compares strictly against: `MERGE_STATE_CLEAN` never matches a lower-case
 // `clean`, which would also take every pull request out of the CodeRabbit non-blocking exemption
 // keyed on `UNSTABLE`. The rule is shared with `to_pr_info` rather than written twice.
+//
+// **`headRefOid` is the commit the rollup was read from**, in `gh`'s spelling, so a merge can be bound
+// to the head whose checks passed rather than to whatever the branch points at by then (#4036).
+//
+// **`requiredContexts` is the base branch's required checks** (`git-gh-branch-rules.ts`), which the
+// merge gate reads to accept an `UNSTABLE` pull request held only by an optional check.
 async function build_checks_fields(pull: RestPull): Promise<Record<string, unknown>> {
+	const head_sha = read_head_sha(pull)
+	const [rollup, required_contexts] = await Promise.all([
+		read_status_check_rollup(head_sha),
+		git_gh_branch_rules.read_required_contexts(pull.base?.ref),
+	])
+
 	return {
-		statusCheckRollup: await read_status_check_rollup(read_head_sha(pull)),
+		statusCheckRollup: rollup,
 		mergeStateStatus: to_gh_state(pull.mergeable_state),
+		headRefOid: head_sha,
+		requiredContexts: required_contexts,
 	}
 }
 

@@ -7,12 +7,7 @@ import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
-import {
-	ALREADY_DONE_LABEL,
-	EPIC_LABEL,
-	has_any_label,
-	NEEDS_DECISION_LABEL,
-} from '#scripts/issue/issue-labels'
+import { EPIC_LABEL, has_any_label, PARKED_LABELS } from '#scripts/issue/issue-labels'
 
 // The candidate pool `josh backlog:next` answers from.
 //
@@ -25,11 +20,12 @@ import {
 
 const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
 // The labels that put a withheld row in the "needs a person" bucket rather than the "waiting on
-// time" one. `already-done` belongs with `needs-decision` because no amount of waiting moves it: the
-// work is merged and the close is Tier C, so a person is the only thing that resolves it.
+// time" one are the park labels (`PARKED_LABELS`). `already-done` and `run:stalled` belong with
+// `needs-decision` because no amount of waiting moves them: the work is merged and the close is Tier C,
+// or a mechanical cause has to be fixed, so a person is the only thing that resolves it.
 // Read as `time`, it would be reported as something that resolves itself
-// and nobody would ever be told to close it.
-const DECISION_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])
+// and nobody would ever be told to act on it.
+const DECISION_LABELS: ReadonlySet<string> = PARKED_LABELS
 
 // What decides whether a standalone row is offered: the children an opted-in epic is going to offer
 // instead, the ones the caller has named as done, and the repository the rows belong to.
@@ -140,6 +136,9 @@ function settle_standalone(
 // `epic_issue.blocker_references_of` is the epic side's own resolution —
 // `repository_url` when the node names one, this repository only as the fallback an unqualified
 // relation has always meant — and it is reused rather than repeated.
+//
+// The body rides along as an epic child's does, so a declared start time (`issue-not-before.ts`)
+// reaches the classification and the board's waiting row for a standalone row too (#4014).
 function to_child(issue: OpenIssueData, repo: string): EpicChild {
 	return {
 		number: issue.number,
@@ -147,6 +146,7 @@ function to_child(issue: OpenIssueData, repo: string): EpicChild {
 		state: 'OPEN',
 		labels: (issue.labels ?? []).map((label) => label.name),
 		blocked_by: epic_issue.blocker_references_of(issue, repo),
+		body: issue.body,
 	}
 }
 

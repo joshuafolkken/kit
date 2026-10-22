@@ -1,17 +1,19 @@
-#!/usr/bin/env tsx
 import { existsSync, globSync } from 'node:fs'
+import { availableParallelism } from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
+import { core_budget } from '#scripts/gate/core-budget'
+import { free_cores } from '#scripts/gate/free-cores'
 import { project_checks } from '#scripts/gate/project-checks'
+import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
+import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
 import { unit_worker_share } from './unit-worker-share'
 
 const PNPM = 'pnpm'
 const FAIL_EXIT_CODE = 1
-const ARGV_START = 2
 const VITEST_PACKAGE = path.join('node_modules', 'vitest')
 const UNIT_GLOB = '**/*.{test,spec}.{ts,js}'
 const NODE_MODULES = 'node_modules'
@@ -175,20 +177,56 @@ function isolated_unit_environment(
 // Reading the share first and claiming afterwards leaves a window in which two hooks firing together
 // both count "alone" and both run uncapped. Inside the marker the number is identical — this run's own
 // record is now on disk and `is_nested_run` therefore contributes nothing — and the window is gone.
+//
+// **The share is bounded by the claim the run was admitted on** (`unit_worker_share.cap_to_claim`), so
+// a share read after admission never opens more workers than the ledger holds for it
+// (joshuafolkken/kit#4235).
+//
+// **The machine is read only when no count was typed.** The reading waits out a sample window, and a
+// caller's `--maxWorkers` — the gate's cap among them, already bounded by the same reading — wins
+// whatever it says.
+async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
+	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
+
+	const available_cores = availableParallelism()
+	const free = await free_cores.read({ available_cores })
+	const share = unit_worker_share.current_share(
+		available_cores,
+		unit_worker_share.live_run_count(),
+		free,
+	)
+
+	return unit_worker_share.cap_to_claim(share, core_budget.held_unit_claim())
+}
+
+async function execute_vitest(
+	vitest_arguments: ReadonlyArray<string>,
+	recording: RecordingEnvironment,
+): Promise<number> {
+	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
+		env: { ...isolated_unit_environment(), ...recording },
+		extendEnv: false,
+		stdio: 'inherit',
+		reject: false,
+	})
+
+	return result.exitCode ?? FAIL_EXIT_CODE
+}
+
+// A whole-suite run also records the test-read map `josh test:related` narrows by.
 async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<number> {
 	return await unit_worker_share.with_run_marker(async () => {
-		const sized = unit_worker_share.worker_arguments(
-			vitest_arguments,
-			unit_worker_share.current_share(),
-		)
-		const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments, ...sized], {
-			env: isolated_unit_environment(),
-			extendEnv: false,
-			stdio: 'inherit',
-			reject: false,
-		})
+		const sized = [
+			...vitest_arguments,
+			...unit_worker_share.worker_arguments(vitest_arguments, await vitest_share(vitest_arguments)),
+		]
+		const root = await changed_file_scope.repository_root_or_cwd()
 
-		return result.exitCode ?? FAIL_EXIT_CODE
+		return await test_read_recording.with_read_recording(
+			root,
+			sized,
+			async (recording) => await execute_vitest(sized, recording),
+		)
 	})
 }
 
@@ -247,13 +285,6 @@ async function run_guarded_unit(
 	return await run_guarded_vitest(project_directory, ['run', ...extra_arguments])
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const extra_arguments = process.argv.slice(ARGV_START)
-	const exit_code = await run_guarded_unit(process.cwd(), extra_arguments)
-
-	process.exit(exit_code)
-}
-
 const test_unit_guard = {
 	SKIP_MARKER,
 	guard_action,
@@ -265,6 +296,7 @@ const test_unit_guard = {
 	isolated_unit_environment,
 	run_guarded_unit,
 	run_guarded_vitest,
+	vitest_share,
 }
 
 export type { GuardAction }

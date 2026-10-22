@@ -17,7 +17,8 @@ const INTEGRATION_HINT =
 const LOCAL_INTEGRATION_CHECK_SOURCE = `if(!process.env.CI&&!process.env.GLOBAL_AGENT_HTTP_PROXY)console.warn('${INTEGRATION_HINT}')`
 const SAFE_CHAIN_CMD = `node -e "${LOCAL_INTEGRATION_CHECK_SOURCE}"`
 // Every `preinstall` an earlier kit wrote: `setup-ci` alone, pinned or not, or followed by the
-// `node -e` check of any earlier wording.
+// `node -e` check of any earlier wording. Removable from kit 2.0.0; consumers still carried `setup-ci`
+// at joshuafolkken/kit#4187.
 const LEGACY_PREINSTALL_RE =
 	/^pnpm dlx @aikidosec\/safe-chain(?:@\S+)? setup-ci(?: && node -e "[^"]*")?$/u
 

@@ -51,13 +51,12 @@ describe(`${RATIONALE_FILE} — the measurement behind the rule`, () => {
 describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
-	it.each([
-		TOPIC_HEADING,
-		`${RATIONALE_FILE}\` → "Why the rules are guards, not prose"`,
-		'pnpm josh rule:guard',
-	])('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
+	it.each([TOPIC_HEADING, '`implementation-cut` row of `pnpm josh rule:list`'])(
+		'states %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
 
 	// **The re-arm contract is the whole of joshuafolkken/kit#2310**: the resume clears the record so
 	// both guards re-arm, and a record left in place would silence them for the rest of the run. The two

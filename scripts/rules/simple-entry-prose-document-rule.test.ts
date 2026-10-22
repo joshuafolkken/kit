@@ -1,5 +1,5 @@
 import { read_repo_file, routing_documents } from '#scripts/document/ai-document-fixture'
-import { single_source, type SingleSourceRule } from '#scripts/document/single-source'
+import { single_source, type SingleSourceRule } from '#tools/document/single-source'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#2189. The simple workflow entries (`kickoff` / `fullrun` / `halfrun` and the
@@ -29,7 +29,7 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/issue-comments.md`,
 	},
 	{
-		marker: 'The work in progress almost always includes a',
+		marker: 'every entry sets `<M>` aside with',
 		canonical: `${SKILL_DIR}/prerequisite.md`,
 	},
 	{

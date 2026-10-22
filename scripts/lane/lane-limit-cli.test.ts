@@ -1,3 +1,4 @@
+import { session_cite } from '#scripts/issue/session-cite'
 import { describe, expect, it, vi } from 'vitest'
 import type { LimitChoice } from './lane-capacity'
 import { lane_limit_cli, type LimitPorts } from './lane-limit-cli'
@@ -17,6 +18,7 @@ interface FakeRun {
 	is_live: boolean
 	override: number | undefined
 	environment: LimitChoice
+	unknown?: ReadonlyArray<string>
 }
 
 interface RunOutput {
@@ -36,7 +38,7 @@ function ports_of(run: FakeRun): LimitPorts {
 			return run.is_live
 		}),
 		emit_raise: vi.fn(async () => undefined),
-		live_lane_count: vi.fn(async () => IN_USE),
+		lane_use: vi.fn(async () => ({ occupied: IN_USE, seated: IN_USE, unknown: run.unknown ?? [] })),
 	}
 }
 
@@ -155,6 +157,17 @@ describe('lane_limit_cli.run — the bare form', () => {
 
 		expect(result.output).toBe(
 			'lane limit 9 (12 capped at the seats) (lane:limit override) · in use 3 · free 6',
+		)
+	})
+
+	it('names the lanes with no state record and the command that writes one', async () => {
+		const ports = ports_of({ ...live_run(), unknown: ['4211', '4212'] })
+		const result = await run_capturing('info', [], ports)
+
+		const issues = `${session_cite.issue('4211')} ${session_cite.issue('4212')}`
+
+		expect(result.output).toBe(
+			`lane limit 6 (JOSH_LANE_LIMIT) · in use 3 · free 3 · ${issues}: no lane state — counted in use`,
 		)
 	})
 })

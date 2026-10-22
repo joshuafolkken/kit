@@ -29,6 +29,7 @@ vi.mock('#scripts/git/git-command', () => ({
 		fast_forward_local: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
+		head_commit: vi.fn(),
 		push: vi.fn(),
 		status: vi.fn(),
 	},
@@ -49,13 +50,15 @@ vi.mock('#scripts/gh/git-pr-checks', () => ({
 	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
-// The migration moves real files; unmocked from the repository root it would move this checkout's own
-// ledger (joshuafolkken/kit#2724).
-vi.mock('./observation-ledger-migrate', () => ({
-	observation_ledger_migrate: { migrate: vi.fn() },
+// The ledger preparation migrates and reads real files; unmocked from the repository root it would move
+// this checkout's own ledger (joshuafolkken/kit#2724) and make these tests depend on its lines
+// (joshuafolkken/kit#4069).
+vi.mock('./observation-ledger-prepare', () => ({
+	observation_ledger_prepare: { prepare: vi.fn(async () => []) },
 }))
 
 const NO_COMMITS = 0
+const PUSHED_SHA = 'c0ffee1'
 const SUCCESS_EXIT_CODE = 0
 const WAIT_INTERRUPTED = 'the wait was interrupted'
 const GRAPHQL_FORBIDDEN = 'gh: Resource not accessible by integration (HTTP 403)'
@@ -70,13 +73,18 @@ const STUCK_PULL: OpenPull = {
 	has_auto_merge: false,
 }
 
-function on_default_branch(): void {
+function stub_git_on_default_branch(): void {
 	vi.mocked(git_command.status).mockResolvedValue(MODIFIED_LEDGER)
 	vi.mocked(git_command.branch).mockResolvedValue(DEFAULT_BRANCH)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
 	vi.mocked(git_command.commit_count_beyond).mockResolvedValue(NO_COMMITS)
 	vi.mocked(git_command.checkout_b).mockResolvedValue('')
+	vi.mocked(git_command.head_commit).mockResolvedValue(PUSHED_SHA)
+}
+
+function on_default_branch(): void {
+	stub_git_on_default_branch()
 	vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([])
 	vi.mocked(git_pr_checks.wait_for_pr_merged).mockResolvedValue('merged')
 	vi.mocked(git_pr_checks.read_merge_progress).mockResolvedValue('waiting')
@@ -101,10 +109,11 @@ describe('observations_flush — auto-merge', () => {
 		on_default_branch()
 	})
 
-	it('requests auto-merge on the flush branch before it starts waiting', async () => {
+	// #4036: bound to the commit this flush pushed, so a later push to the branch is not what lands.
+	it('requests auto-merge on the flush branch, bound to the pushed head, before it starts waiting', async () => {
 		await flush_message()
 
-		expect(git_gh_command.pr_enable_auto_merge).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_gh_command.pr_enable_auto_merge).toHaveBeenCalledWith(FLUSH_BRANCH, PUSHED_SHA)
 		expect(first_call_order(git_gh_command.pr_enable_auto_merge)).toBeLessThan(
 			first_call_order(git_pr_checks.wait_for_pr_merged),
 		)
@@ -115,7 +124,7 @@ describe('observations_flush — auto-merge', () => {
 
 		const message = await flush_message()
 
-		expect(git_gh_command.pr_enable_auto_merge).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_gh_command.pr_enable_auto_merge).toHaveBeenCalledWith(FLUSH_BRANCH, PUSHED_SHA)
 		expect(message).toContain(WAIT_INTERRUPTED)
 		expect(message).toContain(FLUSH_BRANCH)
 	})
@@ -149,10 +158,17 @@ describe('observations_flush — an auto-merge that does not land', () => {
 		vi.mocked(git_gh_command.pr_enable_auto_merge).mockRejectedValue(new Error(GRAPHQL_FORBIDDEN))
 		vi.spyOn(console, 'warn').mockReturnValue(undefined)
 
+		vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
+			rollup: [],
+			merge_state_status: 'CLEAN',
+			review_decision: undefined,
+			head_sha: PUSHED_SHA,
+		})
+
 		const message = await flush_message()
 
 		expect(git_pr_checks.wait_for_pr_success).toHaveBeenCalledWith(FLUSH_BRANCH)
-		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(FLUSH_BRANCH)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(FLUSH_BRANCH, PUSHED_SHA)
 		expect(git_pr_checks.wait_for_pr_merged).not.toHaveBeenCalled()
 		expect(message).toBe(observations_flush.merged_message(FLUSH_BRANCH))
 	})

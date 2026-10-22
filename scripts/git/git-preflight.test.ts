@@ -116,8 +116,22 @@ describe('git_preflight.problems_of — the refusal as a list', () => {
 		})
 
 		expect(problems).toHaveLength(2)
-		expect(problems[0]).toMatch(/Branch mismatch/u)
-		expect(problems[1]).toMatch(/Choose one release classification/u)
+		expect(problems[0]?.problem).toMatch(/Branch mismatch/u)
+		expect(problems[1]?.problem).toMatch(/Choose one release classification/u)
+	})
+
+	// joshuafolkken/kit#4166: a stopped ship records which precondition it stopped on.
+	it('names the kind of each unmet precondition', async () => {
+		arrange(UNNUMBERED_BRANCH, UNCLASSIFIED_ISSUE)
+
+		const titled = await git_preflight.problems_of({
+			cli_input: NUMBERED_TITLE,
+			will_open_pr: true,
+		})
+		const untitled = await git_preflight.problems_of({ cli_input: 'fix login', will_open_pr: true })
+
+		expect(titled.map(({ kind }) => kind)).toStrictEqual(['branch', 'classification'])
+		expect(untitled.map(({ kind }) => kind)).toStrictEqual(['issue'])
 	})
 
 	it('is empty when every precondition holds', async () => {

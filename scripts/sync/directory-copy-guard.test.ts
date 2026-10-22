@@ -6,16 +6,16 @@ const cp_sync_mock = vi.hoisted(() => vi.fn())
 // answer the walk too — an empty listing is the neutral answer for the suites that only test guards.
 const readdir_sync_mock = vi.hoisted(() => vi.fn<() => Array<string>>(() => []))
 const read_file_sync_mock = vi.hoisted(() => vi.fn<() => string>(() => ''))
-const write_file_sync_mock = vi.hoisted(() => vi.fn())
+const write_contained_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('node:fs', () => ({
 	cpSync: cp_sync_mock,
 	lstatSync: lstat_sync_mock,
 	readdirSync: readdir_sync_mock,
 	readFileSync: read_file_sync_mock,
-	writeFileSync: write_file_sync_mock,
 }))
 
+const { file_content } = await import('./file-content')
 const { classify_path, copy_directory_failure, directory_copy_blocker, transform_copied_tree } =
 	await import('./directory-copy-guard')
 
@@ -30,7 +30,8 @@ beforeEach(() => {
 	lstat_sync_mock.mockReset()
 	readdir_sync_mock.mockReset().mockReturnValue([])
 	read_file_sync_mock.mockReset().mockReturnValue('')
-	write_file_sync_mock.mockReset()
+	write_contained_mock.mockReset()
+	vi.spyOn(file_content, 'write_contained').mockImplementation(write_contained_mock)
 })
 
 function throwing(code: string): () => never {
@@ -116,7 +117,7 @@ describe('copy_directory_failure', () => {
 		read_file_sync_mock.mockReturnValue('see `prompts/refactoring.md`')
 
 		expect(copy_directory_failure(SOURCE, DESTINATION)).toBeUndefined()
-		expect(write_file_sync_mock).toHaveBeenCalledWith(
+		expect(write_contained_mock).toHaveBeenCalledWith(
 			`${DESTINATION}/SKILL.md`,
 			'see `node_modules/@joshuafolkken/kit/prompts/refactoring.md`',
 		)
@@ -154,7 +155,7 @@ describe('transform_copied_tree', () => {
 
 		transform_copied_tree(SOURCE, DESTINATION)
 
-		expect(write_file_sync_mock).not.toHaveBeenCalled()
+		expect(write_contained_mock).not.toHaveBeenCalled()
 	})
 
 	it('reaches markdown nested below the directory root', () => {
@@ -164,7 +165,7 @@ describe('transform_copied_tree', () => {
 
 		transform_copied_tree(SOURCE, DESTINATION)
 
-		expect(write_file_sync_mock).toHaveBeenCalledWith(
+		expect(write_contained_mock).toHaveBeenCalledWith(
 			`${DESTINATION}/reference/deep.md`,
 			'`node_modules/@joshuafolkken/kit/prompts/review.md`',
 		)
@@ -199,6 +200,6 @@ describe('transform_copied_tree — what it leaves alone', () => {
 
 		transform_copied_tree(SOURCE, DESTINATION)
 
-		expect(write_file_sync_mock).not.toHaveBeenCalled()
+		expect(write_contained_mock).not.toHaveBeenCalled()
 	})
 })

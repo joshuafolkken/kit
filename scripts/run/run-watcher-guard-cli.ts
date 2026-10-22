@@ -9,7 +9,7 @@ import { run_watcher_guard } from './run-watcher-guard'
 // through `run-watcher-hook.ts` so every tool call is checked.
 //
 // **Exits 0 (ok) or 1 (stale).** A non-zero exit is what the hook mechanism treats as a refusal —
-// the same contract `batch:guard` and `rule:guard` hold.
+// the same contract `pretool:guard` holds.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1

@@ -7,12 +7,13 @@ const { PROJECT_ROOT: REPO_ROOT } = await import('#scripts/init/init-paths')
 // `scripts/notify/telegram-notify.ts` is the only Telegram egress there is, so "this command cannot
 // notify" is a question about imports rather than a promise in prose.
 //
-// **What this asserts is the direct import of every module the command reaches**, its own three plus
-// the four readers they pull in — not a full transitive closure, which would drag in most of
+// **What this asserts is the direct import of every module the command reaches**, its entry and own three
+// plus the four readers they pull in — not a full transitive closure, which would drag in most of
 // `scripts/` and stop telling anyone anything. That set is where such an import would realistically
 // appear, and it is the set a regression here would have to go through.
 describe('run:progress cannot reach Telegram', () => {
 	it.each([
+		'scripts/run/progress/run-progress-main.ts',
 		'scripts/run/progress/run-progress-cli.ts',
 		'scripts/run/progress/run-progress-read.ts',
 		'scripts/run/progress/run-progress.ts',

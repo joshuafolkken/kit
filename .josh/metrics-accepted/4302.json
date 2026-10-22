@@ -1,0 +1,8 @@
+{
+	"reason": "Split measurement now reads untracked files itself (git diff never lists them), including a guard that counts an unreadable untracked entry as a zero-line file so one dangling symlink cannot reject the measurement",
+	"date": "2026-10-20",
+	"growth": {
+		"scripts.code_lines": 64,
+		"ai_cost.on_demand_bytes": 646
+	}
+}

@@ -1,63 +1,53 @@
 # `fullrun` — the step lists and the branches
 
-**The detailed procedure behind `fullrun.md`'s manifest**, read on demand — `pnpm josh run:next <N>`
-names which step the run is at, and the sections below carry that step in full. History:
-`docs/maintainers/fullrun-steps-rationale.md` → "Where each rule came from".
+`pnpm josh run:next <N>` names which step the run is at, and the sections below carry that step in
+full.
 
 ## The `fullrun #N` step list
 
 File Issues with `pnpm josh issue:file` (it applies the classification labels); see `prompts/collaboration-workflow/issue-template.md`.
 
-**`in-progress` is already on the Issue** — `run:entry` applied it once the tree was held and the
-budget allowed the run, and `run:release <N>` takes it back off → Read Issue #N and its comments
-(`issue-comments.md`) → **normalize the title** (if not in English or can be phrased more clearly,
-derive a better English title and `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"`)
-→ post the agreed plan only if the Issue body is blank (`gh api -X PATCH
-repos/{owner}/{repo}/issues/<N> -f body="<plan>"`); if the body already has content, skip the
-plan-posting step → implement (the `plan` event `run:board` draws 📝 from is written by code — by
-`run:entry` for a `run:planned` issue, else at the first implementation edit — never by hand; no cut
-follows the plan — a lane child's context is bounded by the
-threshold-gated implementation cut alone) → run the **verification gate** (the full procedure is `chain-rule.md`;
-in outline: refactor → `pnpm josh main:merge` → **a dispatched lane child hands the rest to
-`pnpm josh ship --detach --review "<title> #<N>"` and ends its turn** (`chain-rule.md` step 0) → otherwise `pnpm josh run:cut <N>` (the pre-gate cut, before the gate; a no-op
-outside a lane) → start `pnpm josh gate` and a subagent `/code-review`
-with the brief `pnpm josh review:brief` prints on `git diff main`, join the gate before the commit,
-iterate to no high/medium findings, within the round cap (`prompts/review.md`) → **the clean path folds the ship region into
-one call**, `pnpm josh ship "<title> #<N>"` (gate → commit/push/PR → the CI-wait `followup` → the
-`run:tail` report bookkeeping, stopping at the first failed step), with any
-branch-2 filing (`pnpm josh issue:file`, which runs `epic:bundle` itself) run before it → **when a second round is due `ship` does not
-fit**: open the PR between the rounds with `pnpm josh git -y "<title> #<N>"`, run round 2 beside CI, then
-`pnpm josh followup` and `pnpm josh run:tail <N>`). Issue plan comments are written in the session language (`JOSH_SESSION_LANG`,
-default `ja`). Before implementing, run `pnpm josh ms`, then `pnpm josh latest:scope`
-and update dependencies only on `required` — `latest-gate.md` is its single source, and on `required`
-load the `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it
-refuses in a lane, and `pnpm josh main:merge` brings the latest default in during the gate
-(`docs/maintainers/fullrun-steps-rationale.md` → "Why a lane child skips `josh ms`"). The parent runs
-`pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
-`backlogrun-child.md` are the single sources. When running `pnpm josh followup`, pass an
-implementation summary via `--notify-message` in the session language, leading with the three
-plain-language lines: `"Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n-
-<change1>\n- <change2>"`. **`pnpm josh followup` waits for CI, verifies AI review findings, sends the
-completion notification, then merges; if blockers are found it exits non-zero — fix and re-run.**
-**Run `pnpm josh ms` after the merge.** A Codex lane skips it — the parent's `run:merge` syncs the
-primary checkout; a Claude run keeps it.
+1. **`in-progress` is already on the Issue** — `run:entry` applied it once the tree was held and the
+   budget allowed the run, and `run:release <N>` takes it back off.
+2. Read the Issue and its comments off `run:entry`'s `run:prep` report (`issue-comments.md`).
+3. **Record the agreed plan** with `pnpm josh issue:plan <N> --body-file <path>`, adding
+   `--title "<title>"` when the title is not in English or can be phrased more clearly (a blank body
+   takes the plan, otherwise it becomes a comment; its `### 影響を受ける既存の利用者` section is drafted
+   with `pnpm josh plan:consumers` — `kickoff.md` step 4).
+4. Run `pnpm josh ms`, then update dependencies only where the `run:prep` report answers
+   `latest: required` — `latest-gate.md` is its single source, and on `required` load the
+   `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it refuses
+   in a lane, and `pnpm josh main:merge` brings the latest default in during the gate. The parent runs
+   `pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
+   `backlogrun-child.md` are the single sources.
+5. Implement. The `plan` event `run:board` draws 📝 from is written by code — by `run:entry` for a
+   `run:planned` issue, else at the first implementation edit — never by hand; no cut follows the
+   plan — a lane child's context is bounded by the threshold-gated implementation cut alone.
+6. Run the **verification gate** through the merge: `chain-rule.md` → "Run the review-to-merge
+   chain". Branch-2 filing (`pnpm josh issue:file`, which runs `epic:bundle` itself) runs before
+   `pnpm josh ship`.
+7. When running `pnpm josh followup`, pass an implementation summary via `--notify-message` in the
+   session language, leading with the three plain-language lines: `"Implemented <title>\nCause:
+   ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"`. **`pnpm josh followup` waits
+   for CI, verifies AI review findings, sends the completion notification, then merges; if blockers
+   are found it exits non-zero — fix and re-run.**
+8. `run:tail` returns the checkout to the default branch (`main:sync`) after the merge; a lane child's
+   `run:tail` skips that step and the parent syncs the primary checkout.
 
 ## The `fullrun new` step list
 
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
-(2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file> --depth <n>`,
+(2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file>`,
 with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
-`<N>`. (3) Add `in-progress` (the bare hold named no issue):
-`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=in-progress'`. (4) Post the agreed plan
-in the session language: fill the body if blank,
-otherwise add a comment. (5) If the working tree already has staged or modified files,
-`git stash push -m "fullrun new: pre-existing changes" -- ':!.josh/observations'` first. (6) `pnpm josh ms`. (7)
-`pnpm josh latest:scope`; on `required` run `josh latest` and load the `dependency-update` skill; on
-`skip` neither runs (`latest-gate.md` is the single source). If you stashed in (5),
-`pnpm josh stash:pop "fullrun new: pre-existing changes"` — by message, never a positional `git stash
-pop`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round
+`<N>`. (3) `pnpm josh run:hold --adopt <N>` — re-keys the bare hold to `<N>` and applies `in-progress`;
+every later stop releases with `run:release <N>`. (4) Record the agreed plan
+in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers section as in
+`kickoff.md` step 4). (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
+`pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
+skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
+`pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round
 runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether a second round is due**, once
 round 1's fixes are in and before the commit. (10) Where the tree was edited after the first gate
 started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y "<title> #<N>"` — the pull request
@@ -69,9 +59,8 @@ round was due** (9a `skip`), fold steps (10)–(13) and the release bookkeeping 
 ship "<title> #<N>" --notify-message "..."` (gate → commit/push/PR → the CI-wait `followup` → `run:tail`,
 stopping at the first failed step); **where a second round ran**, the PR opened
 at (11) and the region stays separate — `pnpm josh followup "<title> #<N>" --notify-message "..."` then
-`pnpm josh run:tail <N>`. (14) **After the merge, run `pnpm josh ms`.** (15) **Ask `pnpm josh
-release:scope` and close the completion summary with what it answered** (`followup.md` →
-"When `pnpm josh release` runs").
+`pnpm josh run:tail <N>`. (14) **Close the completion summary with `run:tail`'s `release:scope`
+answer** (`followup.md` → "When `pnpm josh release` runs").
 
 ## The release ask — the last step of either form
 

@@ -5,7 +5,7 @@ const probes = vi.hoisted(() => ({
 	commit_count_beyond: vi.fn(),
 	default_branch_reference: vi.fn(),
 	is_tree_dirty: vi.fn(),
-	is_process_running_default: vi.fn(),
+	process_trace_default: vi.fn(),
 }))
 
 vi.mock('#scripts/git/git-command', () => ({
@@ -16,7 +16,7 @@ vi.mock('#scripts/git/git-command', () => ({
 }))
 vi.mock('#scripts/run/hold/run-hold', () => ({ run_hold: { is_tree_dirty: probes.is_tree_dirty } }))
 vi.mock('./lane-await', () => ({
-	lane_await: { is_process_running_default: probes.is_process_running_default },
+	lane_await: { process_trace_default: probes.process_trace_default },
 }))
 
 const { lane_vacant } = await import('./lane-vacant')
@@ -37,7 +37,7 @@ beforeEach(() => {
 	probes.default_branch_reference.mockResolvedValue(BASE)
 	probes.commit_count_beyond.mockResolvedValue(0)
 	probes.is_tree_dirty.mockResolvedValue(false)
-	probes.is_process_running_default.mockReturnValue(false)
+	probes.process_trace_default.mockReturnValue('none')
 })
 
 // joshuafolkken/kit#3289: only a lane holding nothing at all may be closed and opened afresh.
@@ -61,7 +61,14 @@ describe('lane_vacant.is_vacant', () => {
 	})
 
 	it('keeps a lane whose child is still alive', async () => {
-		probes.is_process_running_default.mockReturnValue(true)
+		probes.process_trace_default.mockReturnValue('alive')
+
+		expect(await lane_vacant.is_vacant(LANE)).toBe(false)
+	})
+
+	// joshuafolkken/kit#4028: a pgrep that failed or timed out never looked, so it clears no lane.
+	it('keeps a lane whose process probe could not look', async () => {
+		probes.process_trace_default.mockReturnValue('unknown')
 
 		expect(await lane_vacant.is_vacant(LANE)).toBe(false)
 	})
@@ -75,5 +82,18 @@ describe('lane_vacant.is_vacant', () => {
 		probes.commit_count_beyond.mockRejectedValue(new Error('rev-list failed'))
 
 		expect(await lane_vacant.is_vacant(LANE)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4028: the lane limit counts no vacant lane, read for every open lane at once.
+describe('lane_vacant.vacant_issues', () => {
+	it('names the vacant lanes and leaves out one that holds a commit', async () => {
+		const kept = { ...LANE, issue: '18', branch: '18-lane' }
+
+		probes.commit_count_beyond.mockImplementation(async (_base: string, branch: string) =>
+			branch === kept.branch ? 1 : 0,
+		)
+
+		await expect(lane_vacant.vacant_issues([LANE, kept])).resolves.toStrictEqual([LANE.issue])
 	})
 })

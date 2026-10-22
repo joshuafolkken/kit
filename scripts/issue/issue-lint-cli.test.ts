@@ -21,7 +21,7 @@ afterEach(async () => {
 
 describe('issue:lint label output', () => {
 	it.each([
-		{ body: `${VALID_BODY}- 種別: 不具合\n`, expected: 'labels: bug' },
+		{ body: `${VALID_BODY}- 種別: 不具合\n- 原因: #4201\n`, expected: 'labels: bug' },
 		{ body: `${VALID_BODY}- 種別: 非不具合\n- 目的: 機能追加\n`, expected: ENHANCEMENT_OUTPUT },
 		{ body: `${VALID_BODY}- 種別: 非不具合\n- 目的: 機能改善\n`, expected: ENHANCEMENT_OUTPUT },
 		{
@@ -87,7 +87,7 @@ describe('issue:lint classification failures', () => {
 
 		await writeFile(
 			body_path,
-			`${VALID_BODY}- 種別: 不具合\n- 目的: 機能改善\n${REQUIRED_SECTIONS}`,
+			`${VALID_BODY}- 種別: 不具合\n- 原因: #4201\n- 目的: 機能改善\n${REQUIRED_SECTIONS}`,
 		)
 		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 

@@ -1,49 +1,77 @@
 #!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
+import { stop_actions } from '#scripts/hooks/stop-actions'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
+import { pre_gate_cut } from '#scripts/rules/pre-gate-cut'
+import { stop_decision } from '#scripts/rules/stop-decision'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
+import { tail_commands } from '#scripts/rules/tail-commands'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
-import { run_hold } from '#scripts/run/hold/run-hold'
+import { run_cut_report } from '#scripts/run/cut/run-cut-report'
+import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
+import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 
-// The `Stop` hook entry: one process that delivers the three stop-time rules.
+// The `Stop` hook entry: one process that delivers the stop-time rules, running the fixed ones itself
+// (`stop-actions.ts`).
 // It is the stop-time counterpart of `pretool-guard.ts` — a second entry on the same `hook_decision`
 // foundation, not a second copy of it.
 //
 // **Every failure allows the stop.** A missing transcript, an unreadable hold record, a git status
 // that will not read — each ends as "no block", for the same reason the PreToolUse guard fails open:
-// a hook that failed closed would wedge a run over its own plumbing. The block rules are self-
-// resolving (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
+// a hook that failed closed would wedge a run over its own plumbing. The hook runs the fixed
+// operations itself (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
 
-// The hold record for this working tree is still in place, and whether it is a `prrun` stop's.
-// `unreadable` reads as absent: the safe direction for a stop guard is not to
-// block, and an unreadable record is not proof a run is holding.
-async function hold_facts(): Promise<Pick<StopContext, 'hold_present' | 'prrun_stopped'>> {
+// The hold record for this working tree. `unreadable` reads as absent: the safe direction for a stop
+// guard is not to act, and an unreadable record is not proof a run is holding.
+async function held_record(): Promise<RunHold | undefined> {
 	const directory = await run_hold.worktree_directory()
-	const hold =
-		directory === undefined
-			? undefined
-			: run_halfrun_resume.hold_of(run_hold.read_hold(run_hold.hold_path(directory)))
+	if (directory === undefined) return undefined
 
-	return { hold_present: hold !== undefined, prrun_stopped: hold?.prrun_stop_head !== undefined }
+	return run_halfrun_resume.hold_of(run_hold.read_hold(run_hold.hold_path(directory)))
+}
+
+// The pause was announced: by a `josh notify` on the tail, or by this hook's own send, recorded on the
+// hold since the pause began (joshuafolkken/kit#3961).
+function was_notified(hold: RunHold | undefined, tail: string): boolean {
+	if (lane_park.mentions_confirmation_notify(tail)) return true
+
+	return (
+		hold !== undefined && run_hold_session.is_notified_since(hold, last_prompt.pause_start(tail))
+	)
+}
+
+// The Issue the hold names, whether it is a `prrun` stop's and this session's own, and whether its
+// pause was already announced.
+async function hold_facts(
+	tail: string,
+): Promise<Pick<StopContext, 'hold_issue' | 'hold_owned' | 'notified' | 'prrun_stopped'>> {
+	const hold = await held_record()
+
+	return {
+		hold_issue: hold?.issue,
+		hold_owned: hold === undefined || run_hold_session.is_session_hold(hold),
+		notified: was_notified(hold, tail),
+		prrun_stopped: hold?.prrun_stop_head !== undefined,
+	}
 }
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
@@ -60,7 +88,20 @@ function was_filed(tail: string): boolean {
 	return filing_cap.turn_filing_count(tail) > 0
 }
 
-// The session language the refusal is written for — `write_stop_decision` has already loaded the `.env`.
+// This turn ended at a cut — a record still `carried`, or this turn's `run:cut` relaunching a successor.
+// The second covers the successor's resume clearing the record before this stop (joshuafolkken/kit#3936);
+// the held cut outside a lane prints no marker, so its person is still notified.
+function is_cut_stop(tail: string): boolean {
+	if (run_cut.carried_cut_sync() !== undefined) return true
+
+	return tail_commands.answered(
+		filing_cap.current_turn(tail),
+		pre_gate_cut.takes_the_cut,
+		run_cut_report.RELAUNCHED_CUT_MARKER,
+	)
+}
+
+// The session language the refusal is written for — `respond_from_stdin` has already loaded the `.env`.
 function session_lang(): string {
 	return session_language.resolve_session_lang().lang
 }
@@ -85,13 +126,13 @@ async function build_context(
 	const tail = transcript_tail(transcript_path)
 
 	return {
-		...(await hold_facts()),
+		...(await hold_facts(tail)),
 		tree_clean: !(await run_hold.is_tree_dirty()),
-		notified: lane_park.mentions_confirmation_notify(tail),
 		message: payload_tail.message,
 		prompt: last_prompt.prompt_text(tail),
+		answers_question: stop_decision.is_question(last_prompt.turn_prompt(tail)),
 		stop_hook_active: payload_tail.stop_hook_active,
-		cut_pending: run_cut.carried_cut_sync() !== undefined,
+		cut_pending: is_cut_stop(tail),
 		filed: was_filed(tail),
 		session_owner: repo_party.current_owner(),
 		...(await session_role_facts()),
@@ -167,24 +208,28 @@ async function run_report_checks(): Promise<void> {
 	await run_stranded_detect.run_stranded_check()
 }
 
-// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop
-// is being held — all three rules block, so a bare `#N` is reported the same way.
-async function write_stop_decision(raw_payload: string): Promise<void> {
-	hook_decision.load_environment_file()
+async function decided_envelope(raw_payload: string): Promise<string | undefined> {
 	await run_report_checks()
 
-	const { reason } = await outcome_of(raw_payload)
+	return await stop_actions.envelope_of(await outcome_of(raw_payload), session_lang())
+}
 
-	if (reason === undefined) return
+// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop is
+// held or the hook acted on it (`stop-actions.ts`). The report checks print too — a strand's skipped
+// notify line — and text ahead of the envelope makes the harness drop the refusal, as the #4091 child's
+// lane-background block was (joshuafolkken/kit#4101), so everything before the write goes to stderr.
+async function write_stop_decision(raw_payload: string): Promise<void> {
+	const envelope = await stdout_on_stderr.run(async () => await decided_envelope(raw_payload))
 
-	process.stdout.write(`${stop_rules.block_envelope(reason, session_lang())}\n`)
+	if (envelope === undefined) return
+
+	process.stdout.write(`${envelope}\n`)
 }
 
 const stop_guard = { outcome_of, stop_outcome_for_payload }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('stop:guard')
-	else await write_stop_decision(await text(process.stdin))
+	await hook_decision.respond_from_stdin('stop:guard', write_stop_decision)
 }
 
 export { stop_guard, write_stop_decision }

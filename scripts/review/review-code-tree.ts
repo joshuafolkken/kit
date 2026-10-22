@@ -4,6 +4,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { comment_ranges, type TypeScriptApi } from './comment-ranges'
 import { review_stamps } from './review-stamps'
 
@@ -26,7 +27,6 @@ const SCRIPT_EXTENSIONS: ReadonlyArray<string> = ['.ts', '.js']
 const SVELTE_EXTENSION = '.svelte'
 const EXCLUDED_PREFIX = '.claude/'
 const TYPESCRIPT_MODULE = 'typescript'
-const PACKAGE_JSON = 'package.json'
 
 function is_svelte(relative: string): boolean {
 	return relative.endsWith(SVELTE_EXTENSION)
@@ -100,20 +100,24 @@ async function record(
 }
 
 // The paths whose code round 1's fixes left as it was — whose difference, if any, is in comments.
-// Nothing qualifies against a record taken on another base, for the reason the round-1 snapshot is
-// refused on one.
+// Against a record taken on another base only `unmoved` qualifies — the paths the move left alone
+// (`review_round_one_blobs.unmoved`), where the carried file is round 1's own and equal code digests
+// still mean a comment-only fix (joshuafolkken/kit#4165).
 function comment_only(
 	snapshot: FileMapStamp | undefined,
 	tree: Record<string, string>,
 	base: string | undefined,
+	unmoved: ReadonlyArray<string> = [],
 ): ReadonlyArray<string> {
-	if (snapshot === undefined || base === undefined || snapshot.base !== base) return []
+	if (snapshot === undefined || base === undefined) return []
+	const is_same_base = snapshot.base === base
 
 	return Object.keys(snapshot.files).filter(
-		(relative) => snapshot.files[relative] === tree[relative],
+		(relative) =>
+			snapshot.files[relative] === tree[relative] && (is_same_base || unmoved.includes(relative)),
 	)
 }
 
-const review_code_tree = { comment_only, read, record, tree_of }
+const review_code_tree = { comment_only, load_typescript, read, record, tree_of }
 
 export { review_code_tree }

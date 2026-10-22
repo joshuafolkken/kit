@@ -66,6 +66,22 @@ describe('json_value.parse_with — JSON read against a schema', () => {
 	})
 })
 
+describe('json_value.parse_array — a listing that may not be one', () => {
+	it('reads an array as its elements, an empty one included', () => {
+		expect(json_value.parse_array('[1,"a"]')).toEqual([1, 'a'])
+		expect(json_value.parse_array('[]')).toEqual([])
+	})
+
+	it.each([
+		['text that is not JSON', 'not json'],
+		['an object', '{"a":1}'],
+		['JSON null', 'null'],
+		['a number', '3'],
+	])('reads %s as undefined rather than an empty listing', (_label, text) => {
+		expect(json_value.parse_array(text)).toBeUndefined()
+	})
+})
+
 describe('json_value.is_record', () => {
 	it.each([
 		['a plain object', { a: 1 }, true],

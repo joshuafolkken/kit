@@ -1,0 +1,4 @@
+- rf:project-conventions | low | scripts/ci/pr-classification.ts:22 | 2026-10-21 | #4180
+- rf:project-conventions | low | scripts/hooks/format-edited-cli.ts:10 | 2026-10-21 | #4180
+- rf:comments | low | scripts/build/build-hooks.test.ts:167 | 2026-10-21 | #4180
+- rf:tests | low | scripts/josh/hook-decision-stdin.test.ts | 2026-10-21 | #4180

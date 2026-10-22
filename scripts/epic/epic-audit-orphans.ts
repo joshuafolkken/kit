@@ -14,7 +14,6 @@ import { epic_parse } from './epic-parse'
 // the children the epic already names, while this one searches for issues the epic does *not* name.
 
 const SEARCH_LIMIT = 50
-const PARENT_MARKERS: ReadonlyArray<string> = ['親:', 'Parent:', '親：']
 // Named apart from `epic_audit_checks.ORPHAN_CHILD`: that check reports an orphan it found, this one
 // reports that the search for orphans was incomplete, and a reader has to be able to tell them apart.
 const ORPHAN_SEARCH = 'orphan search'
@@ -25,18 +24,15 @@ const CAPPED_BY_MATCHES = `The open-issue scan filled its ${String(SEARCH_LIMIT)
 
 const searched_issue_schema = z.object({ number: z.number(), body: z.string().nullable() })
 
-function has_parent_marker(line: string): boolean {
-	return PARENT_MARKERS.some((marker) => line.includes(marker))
-}
-
 // Whether an issue's body names this epic as its parent, in the shape the issue template uses.
 //
 // Both halves must be on the *same line*. An issue parented to a different epic routinely backlinks
 // this one elsewhere in its body, and matching the marker and the number independently reported
 // every such issue as an orphan.
 //
-// The number is read through the same reference parse the checks use, so a parent line (a PARENT_MARKERS
-// prefix) such as `owner/other#858` names that repository's epic and not this one's.
+// The number is read through the same reference parse the checks use, so a parent line (one
+// `epic_audit_logic.has_parent_marker` accepts) such as `owner/other#858` names that repository's
+// epic and not this one's.
 // The known set is this repository alone — a parent line names this epic or it names nothing here —
 // and it is passed rather than omitted so a repository whose own name contains a dot still recognizes
 // `joshuafolkken/site.com#858`.
@@ -49,7 +45,8 @@ function names_this_epic(line: string, epic_number: number, repo: string): boole
 function claims_parent(body: string | null, epic_number: number, repo: string): boolean {
 	return (body ?? '')
 		.split('\n')
-		.some((line) => has_parent_marker(line) && names_this_epic(line, epic_number, repo))
+		.filter((line) => epic_audit_logic.has_parent_marker(line))
+		.some((line) => names_this_epic(line, epic_number, repo))
 }
 
 // Why the scan stopped before the end of the open backlog, or that it did not. Both cutoffs hide the

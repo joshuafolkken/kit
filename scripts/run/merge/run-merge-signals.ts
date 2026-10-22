@@ -1,3 +1,4 @@
+import { api_auth } from '#scripts/agent/api-auth'
 import { api_outage } from '#scripts/agent/api-outage'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_merged } from '#scripts/issue/issue-merged'
@@ -25,6 +26,15 @@ function read_is_outage(output: string | undefined): boolean {
 	return api_outage.is_outage(run_ending.read_exit(output)) || run_ending.ended_mid_turn(output)
 }
 
+// Whether the child's session ended because it could not authenticate — off without `--output`, as the
+// outage read is. The lane's log is appended across launches, so it is read as the reviewer's is
+// (`api_auth.is_auth_failed_transcript`).
+function read_is_auth_failure(output: string | undefined): boolean {
+	if (output === undefined) return false
+
+	return api_auth.is_auth_failed_transcript(run_ending.read_transcript(output))
+}
+
 async function child_outages(child: string): Promise<number> {
 	const events = await run_event_stream_emit.current_events()
 
@@ -36,14 +46,21 @@ async function child_outages(child: string): Promise<number> {
 }
 
 // An outage child is re-dispatched only so many times: one that ends the same way on every dispatch is
-// parked, since merges in other lanes reset the run-wide outage streak and would never stop it.
-async function read_is_retryable(child: string, output: string | undefined): Promise<boolean> {
-	const is_interrupted =
-		read_is_outage(output) || (await run_merge_ship.is_unanswered(child, output))
+// parked, since merges in other lanes reset the run-wide outage streak and would never stop it. **An
+// unanswered ship stop is told apart from an API outage**: the child reached the API, so it is
+// re-dispatched without adding to the run-wide streak (joshuafolkken/kit#3974).
+async function read_retryable(
+	child: string,
+	output: string | undefined,
+): Promise<{ is_outage: boolean; is_unanswered: boolean }> {
+	const is_api_outage = read_is_outage(output)
+	const is_unanswered = !is_api_outage && (await run_merge_ship.is_unanswered(child, output))
 
-	if (!is_interrupted) return false
+	if (!is_api_outage && !is_unanswered) return { is_outage: false, is_unanswered: false }
 
-	return (await child_outages(child)) < run_merge.CONSECUTIVE_OUTAGE_LIMIT
+	const is_outage = (await child_outages(child)) < run_merge.CONSECUTIVE_OUTAGE_LIMIT
+
+	return { is_outage, is_unanswered: is_outage && is_unanswered }
 }
 
 // The timeline is read only for an OPEN, unparked child — the one classification a merged closing pull
@@ -69,14 +86,16 @@ async function read_is_withdrawn(child: string, read: IssueRead): Promise<boolea
 }
 
 async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
-	const [is_cut, merged_pr, is_outage, is_withdrawn] = await Promise.all([
+	const [is_cut, merged_pr, retryable, is_withdrawn] = await Promise.all([
 		run_merge_steps.has_resumable_cut(ctx.child),
 		read_merged_pr(ctx.child, read),
-		read_is_retryable(ctx.child, ctx.output),
+		read_retryable(ctx.child, ctx.output),
 		read_is_withdrawn(ctx.child, read),
 	])
 
-	return { is_outage, is_cut, merged_pr, is_withdrawn }
+	const is_auth_failure = read_is_auth_failure(ctx.output)
+
+	return { ...retryable, is_cut, merged_pr, is_withdrawn, is_auth_failure }
 }
 
 // An unread state is `unresolved` unless a withdrawal already settled the child, which is read locally;

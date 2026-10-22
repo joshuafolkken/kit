@@ -19,43 +19,22 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
-import { run_merge_token, type MergeToken } from '#scripts/run/merge/run-merge-token'
+import { run_merge_token } from '#scripts/run/merge/run-merge-token'
+import { backlog_drive_adopt } from './backlog-drive-adopt'
+import { backlog_drive_hold } from './backlog-drive-hold'
+import { backlog_drive_idle } from './backlog-drive-idle'
+import { backlog_drive_judge } from './backlog-drive-judge'
+import { backlog_drive_memory } from './backlog-drive-memory'
+import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_seats } from './backlog-drive-seats'
+import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 
 const { MERGE_TOKEN } = run_merge_token
+const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
 const RUN_VERDICT = 'run'
 const STOP_VERDICT = 'stop'
-// How the loop reads each `run:merge` token — keyed by the producer's own type, so a token added there
-// is a type error here until it is classified. `hand-back` ends the loop at once: a hand-off, a person's
-// stop, the environment down, a foreign owner, an unreadable state. `stop` — the failure guard, or a
-// failed child left unparked — collects the child, starts nothing more, and collects the children still
-// in flight before the loop ends. `await` is a cut resumed in place: the same lane is awaited again.
-//
-// **The offer `run:merge` passes through is never read here** (joshuafolkken/kit#3781): its `stop` —
-// only person-waiting issues left — is spelled like the control one, and acting on it ended the run
-// without the idle watch. The loop asks `backlog:offer` on the next pass instead, so whether a parked
-// backlog waits or ends is `backlog:budget`'s alone, after a merge as after any other pass.
-type TokenHandling = 'hand-back' | 'stop' | 'await'
-const TOKEN_HANDLING: Readonly<Record<MergeToken, TokenHandling>> = {
-	[MERGE_TOKEN.OVER]: 'hand-back',
-	[MERGE_TOKEN.HUMAN_REVIEW]: 'hand-back',
-	[MERGE_TOKEN.ENVIRONMENT]: 'hand-back',
-	[MERGE_TOKEN.BUSY]: 'hand-back',
-	[MERGE_TOKEN.RETRY]: 'hand-back',
-	[MERGE_TOKEN.STOP]: 'stop',
-	[MERGE_TOKEN.RESUMED]: 'await',
-}
-
-function tokens_handled(...handlings: ReadonlyArray<TokenHandling>): ReadonlySet<string> {
-	const entries = Object.entries(TOKEN_HANDLING)
-
-	return new Set(entries.filter(([, handling]) => handlings.includes(handling)).map(([key]) => key))
-}
-
-const IMMEDIATE_TOKENS = tokens_handled('hand-back')
-// Every token `run:merge` prints first even on a non-zero exit.
-const HANDOFF_TOKENS = tokens_handled('hand-back', 'stop')
-const MERGED_OUTCOME = 'merged'
+// The outcomes that keep a child out of the rest of this run's offers.
+const EXCLUDED_OUTCOMES: ReadonlySet<string> = new Set(['merged', 'withdrawn'])
 const WATCH_VERDICT = 'watch'
 // The verdicts the loop acts on without the parent. Any other is handed back as it was printed.
 const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
@@ -76,6 +55,8 @@ interface OfferRead {
 	issues: ReadonlyArray<string>
 	retries: number
 	answer?: string | undefined
+	// Why a `blocked` answer started nothing, where the offer said — `solo` for the `run:solo` gate.
+	cause?: string | undefined
 	reason?: string | undefined
 	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent
 	// reads as not owed, so a drain with the switch off keeps the idle watch.
@@ -98,6 +79,8 @@ interface DriveState {
 	stop_is_finish?: boolean | undefined
 	// The child whose merge answered `stop`, carried on the resume line: no offer re-derives that stop.
 	stopped_by?: string | undefined
+	// The last offer answered `run` on a machine with no memory to spare (`backlog-drive-memory.ts`).
+	is_memory_held?: boolean | undefined
 }
 
 interface DriveEnd {
@@ -118,6 +101,9 @@ interface DrivePorts {
 	is_finished: (issue: string) => boolean
 	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
 	merge: (issue: string) => Promise<Collected>
+	// The lanes on a child this run launched and never settled that the loop does not hold — one the
+	// parent dispatched itself with `lane:launch` (`backlog_drive_adopt.adoptable` in production).
+	adoptable: (in_flight: ReadonlyArray<string>) => Promise<ReadonlyArray<string>>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
 	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
@@ -125,12 +111,26 @@ interface DrivePorts {
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
 	free_lanes: () => Promise<number>
-	// Whether the issue already holds a kept lane (one a child was dispatched into) — it is reused, so it
-	// takes no free seat.
+	// The places left under the limit, port seats aside — `backlog_ready.drive_limit_room` in production.
+	limit_room: () => Promise<number>
+	// Whether the issue already holds a kept lane (one a child was dispatched into) — it is reused, and
+	// seated ahead of a fresh launch inside the limit room (`backlog-drive-seats.ts`).
 	has_lane: (issue: string) => Promise<boolean>
 	// How many open issues lacking `auto-ok` still owe a judgement — `auto_ok_judge_read.owed` in
 	// production, `0` when the read failed.
 	judgement_owed: () => Promise<number>
+	// Whether the machine has no memory for one more lane — `backlog_drive_memory.gauge()` in production,
+	// which carries its hysteresis between calls.
+	memory_held: () => Promise<boolean>
+	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
+	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
+	hold: (reason: string | undefined) => Promise<void>
+	// A watch with nothing in flight — the one idle notification (`backlog-drive-idle.ts`), deduplicated
+	// per episode by the port itself.
+	idle: (state: DriveState) => Promise<void>
+	// A holding offer with nothing in flight — the paused-lane notice (`backlog-drive-paused.ts`), which
+	// reads the lane records itself and is deduplicated per pause episode by the port.
+	paused: () => Promise<void>
 	now: () => Date
 }
 
@@ -154,20 +154,12 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 	}
 }
 
-// Only an empty backlog drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a
-// parked or unreadable backlog has no retrospective for `run:step` to fire and stays the driver's.
-function is_drain(read: OfferRead, state: DriveState): boolean {
+// A drain owing the retrospective, read under a `watch` or a `stop` verdict. Only an empty backlog
+// drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a parked or unreadable
+// backlog has no retrospective for `run:step` to fire and stays the driver's.
+function is_drain_owed(read: OfferRead, state: DriveState, verdict: string): boolean {
 	return (
-		read.verdict === WATCH_VERDICT &&
-		read.answer === EXHAUSTED_ANSWER &&
-		state.in_flight.length === 0 &&
-		read.is_retrospective_owed === true
-	)
-}
-
-function needs_retrospective(read: OfferRead, state: DriveState): boolean {
-	return (
-		read.verdict === STOP_VERDICT &&
+		read.verdict === verdict &&
 		read.answer === EXHAUSTED_ANSWER &&
 		state.in_flight.length === 0 &&
 		read.is_retrospective_owed === true
@@ -196,10 +188,12 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	}
 }
 
-// Only a merged child is excluded: `backlog:next` may still read it OPEN. Any other is classified by
-// its labels, so excluding it would hide a child a person released for the rest of the process.
+// A merged child is excluded because `backlog:next` may still read it OPEN, and a withdrawn one because
+// `lane:withdraw` leaves it OPEN for the next run, not this one (joshuafolkken/kit#4365). Any other is
+// classified by its labels, so excluding it would hide a child a person released for the rest of the
+// process.
 function excluded(issue: string, outcome: Collected['outcome'], state: DriveState): Array<string> {
-	if (outcome !== MERGED_OUTCOME || state.exclude.includes(issue)) return state.exclude
+	if (!EXCLUDED_OUTCOMES.has(outcome) || state.exclude.includes(issue)) return state.exclude
 
 	return [...state.exclude, issue]
 }
@@ -271,8 +265,8 @@ async function refused(
 
 // **No more new lanes than free lanes**. `backlog:offer` lists every ready issue without reading the
 // lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran out of seats. An issue
-// that already holds a kept lane reuses it and takes no seat (`backlog-drive-seats.ts`); the rest launch
-// up to the free count, read once before the first launch.
+// that already holds a kept lane reuses its port seat but takes a place under the limit, ahead of a
+// fresh launch; the rest launch up to the free count (`backlog-drive-seats.ts`), read before the first.
 //
 // **Only a launch is activity**: a pass that started nothing — every lane taken
 // — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.
@@ -310,7 +304,10 @@ async function launch_all(
 // parent's. With children still running the watch is only waiting on them.
 function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	if (!KNOWN_VERDICTS.has(read.verdict)) return ended(read.verdict, state, read.verdict)
-	if (needs_retrospective(read, state)) return ended('retrospective', state, 'retrospective')
+
+	if (is_drain_owed(read, state, STOP_VERDICT)) {
+		return ended('retrospective', state, 'retrospective')
+	}
 
 	if (read.verdict === STOP_VERDICT) {
 		return {
@@ -324,34 +321,37 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 		}
 	}
 
-	if (is_drain(read, state)) return ended(WATCH_VERDICT, state, WATCH_VERDICT)
+	if (is_drain_owed(read, state, WATCH_VERDICT)) return ended(WATCH_VERDICT, state, WATCH_VERDICT)
 
 	return { kind: 'continue', state }
 }
 
-// **A free lane with nothing opted in is the open backlog's turn to be judged**
-// (joshuafolkken/kit#3854): a watch over an exhausted pool hands back `judge` while an open issue
-// lacking `auto-ok` still owes a judgement, ahead of the drain it would otherwise be. Once every one
-// carries its judgement comment the count is zero and the watch is the driver's again.
-async function is_judgement_owed(read: OfferRead, ports: DrivePorts): Promise<boolean> {
-	const is_exhausted = read.verdict === WATCH_VERDICT && read.answer === EXHAUSTED_ANSWER
+// An offer answered `run`: launched while the machine has memory to spare, held until it does otherwise.
+async function run_offered(
+	issues: ReadonlyArray<string>,
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	if (await ports.memory_held()) return await backlog_drive_memory.held(state, ports)
 
-	if (!is_exhausted || (await ports.free_lanes()) <= NO_FREE_LANES) return false
-
-	return (await ports.judgement_owed()) > 0
+	return await launch_all(issues, state, ports)
 }
 
+// Every offer answers the memory hold afresh: one that is not `run` leaves nothing held for memory.
 async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const read = await ports.offer(state)
 
 	if (read === undefined) return ended('offer', state)
 
-	const next = { ...state, retries: read.retries }
+	const next = { ...state, retries: read.retries, is_memory_held: false }
 
-	if (read.verdict === RUN_VERDICT) return await launch_all(read.issues, next, ports)
-	if (await is_judgement_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
+	if (read.verdict === RUN_VERDICT) return await run_offered(read.issues, next, ports)
+	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	return on_verdict(read, next)
+	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const result = await backlog_drive_paused.noticed(idle, read, ports)
+
+	return await backlog_drive_hold.held(result, read, ports)
 }
 
 // One pass: collect every child that ended, then — unless a `stop` has been read — ask what to start.
@@ -377,10 +377,11 @@ async function run_pass(
 	should_offer: boolean,
 	ports: DrivePorts,
 ): Promise<PassResult> {
-	const collected = await collect_finished(state, ports)
+	const held = await backlog_drive_adopt.held(state, should_offer, ports)
+	const collected = await collect_finished(held, ports)
 
 	if (collected.kind === 'end') return collected
-	if (!is_offering(state, collected.state, should_offer)) return settle(collected)
+	if (!is_offering(held, collected.state, should_offer)) return settle(collected)
 
 	return settle(await ask_offer(collected.state, ports))
 }
@@ -419,10 +420,13 @@ function is_window_spent(run: LoopRun, config: LoopConfig, now_ms: number): bool
 type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
 
 // One pass of the loop: the offer is due on the first pass and then no oftener than `offer_ms`, bar the
-// passes that collected a child. A `next` carries the run to sleep on and pass again.
+// passes that collected a child and the one that finds a memory hold cleared. A `next` carries the run
+// to sleep on and pass again.
 async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
 	const now_ms = ports.now().getTime()
-	const is_due = now_ms - run.offered_ms >= config.offer_ms
+	const is_due =
+		now_ms - run.offered_ms >= config.offer_ms ||
+		(await backlog_drive_memory.is_cleared(run.state, ports))
 	const result = await run_pass(run.state, is_due, ports)
 
 	ports.on_state(result.state)

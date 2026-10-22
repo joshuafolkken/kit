@@ -14,7 +14,7 @@ import { run_step, type PreVerdict } from './run-step'
 const ALREADY_DONE_STEP =
 	'Issue is CLOSED — nothing to run. Verify it against merged code before starting.'
 const KEEP_WORK_STEP =
-	'Issue is CLOSED but this lane holds uncommitted work — stash it with `git stash push -u -m "<N>: uncommitted work at already-done"` before ending.'
+	'Issue is CLOSED but this lane holds uncommitted work — stash it with `pnpm josh stash:push "<N>: uncommitted work at already-done"` before ending.'
 const LATEST_STEP =
 	'Update dependencies first (latest: required), load the dependency-update skill, then implement.'
 const HUMAN_REVIEW_STEP =

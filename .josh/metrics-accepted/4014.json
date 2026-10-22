@@ -1,0 +1,7 @@
+{
+	"reason": "#4014: the board reads the not-before reason (one import) and a standalone row carries its body into EpicChild (one field) — the feature itself, no removable duplication",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}

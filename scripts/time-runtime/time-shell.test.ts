@@ -42,6 +42,27 @@ describe('josh_arguments', () => {
 	})
 })
 
+describe('josh_signatures_of', () => {
+	it('keeps the operands that tell two reads apart', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh lane:output 1 a.log')).toEqual([
+			'josh lane:output 1 a.log',
+		])
+	})
+
+	it('keeps flags and drops redirections', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh run:carry --cut 2>&1')).toEqual([
+			'josh run:carry --cut',
+		])
+	})
+
+	it('reads every segment of a chain', () => {
+		expect(time_shell.josh_signatures_of('pnpm josh lint:related a.ts && pnpm josh gate')).toEqual([
+			'josh lint:related a.ts',
+			'josh gate',
+		])
+	})
+})
+
 // What a pipeline throws away (joshuafolkken/kit#1556). A shell reports a pipeline with its last
 // command's status, so the cases below are about which segments lose theirs — and, just as much,
 // about which ones do not, because a caller that read `||` or the final segment as discarded would
@@ -87,6 +108,13 @@ describe('discarded_commands', () => {
 	it('reads only the sub-command the pipe actually swallows', () => {
 		expect(time_shell.discarded_commands('pnpm josh gate; echo done | tail')).toEqual([
 			' echo done ',
+		])
+	})
+
+	// A newline ends a command as `;` does, so the line before the pipe is not part of what it swallows.
+	it('reads only the line the pipe sits on', () => {
+		expect(time_shell.discarded_commands('echo hi\npnpm josh lint | tail')).toEqual([
+			'pnpm josh lint ',
 		])
 	})
 })

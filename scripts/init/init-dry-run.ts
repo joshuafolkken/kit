@@ -41,7 +41,7 @@ interface DryRunSplit {
 }
 
 const DRY_RUN_FLAG = '--dry-run'
-const INIT_SCRIPT = 'scripts/init/init.ts'
+const INIT_SCRIPT = 'scripts/init/init-main.ts'
 const SCRATCH_PREFIX = 'josh-init-dry-run-'
 const DEFAULT_BRANCH = 'main'
 const TITLE = 'josh init --dry-run — nothing was written. The setup would:'

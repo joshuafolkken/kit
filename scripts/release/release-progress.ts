@@ -1,12 +1,10 @@
-import path from 'node:path'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { json_value } from '#scripts/lib/json-value'
+import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { poll } from '#scripts/lib/poll'
-import { file_reader } from '#scripts/lib/read-file'
 import { npm_registry } from '#scripts/version/npm-registry'
-import { version_targets } from '#scripts/version/version-targets'
 import { z } from 'zod'
+import { release_publish_run } from './release-publish-run'
 import { release_tag } from './release-tag'
 
 // The stage lines `pnpm josh release` prints, and the two stages it waits for after the tag.
@@ -15,9 +13,9 @@ import { release_tag } from './release-tag'
 // `publish-npm` puts the version on npm and `create-release` opens the GitHub Release once the
 // publishing jobs pass. Stopping at the tag would call the release published ahead of both, so the
 // command waits for each, prints one line per stage reached, and prints the completion line only
-// when every stage has — a stage that times out is named with ❌ and the run exits non-zero.
+// when every stage has — a stage that times out, or whose Publish run fails first, is named with ❌
+// and the run exits non-zero.
 
-const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NPM_TIMEOUT_ENV = 'JOSH_RELEASE_NPM_TIMEOUT_SECONDS'
@@ -35,16 +33,10 @@ const manifest_schema = z.looseObject({
 })
 
 type ReleaseManifest = { is_private: true } | { is_private: false; name: string }
-
-function parse_manifest(cwd: string): z.infer<typeof manifest_schema> {
-	const raw = file_reader.read_optional(path.join(cwd, PACKAGE_JSON)) ?? ''
-	const parsed = manifest_schema.safeParse(json_value.parse_or_undefined(raw))
-
-	return parsed.success ? parsed.data : {}
-}
+type NpmState = { kind: 'published' } | { kind: 'failed'; run_id: number } | { kind: 'pending' }
 
 function read_manifest(cwd: string): ReleaseManifest {
-	const manifest = parse_manifest(cwd)
+	const manifest = package_manifest.read_manifest_if_valid(cwd, manifest_schema) ?? {}
 
 	if (manifest.private === true) return { is_private: true }
 	if (manifest.name === undefined) throw new Error(`${PACKAGE_JSON} in ${cwd} has no package name.`)
@@ -85,6 +77,18 @@ function missed_npm_line(package_name: string, version: string): string {
 	].join('\n')
 }
 
+// The run's own failure is known, so the line names the run rather than a stage that never came. It
+// claims no more than the last registry read: a job beside `publish-npm` can fail the run after npm
+// took the version.
+function failed_publish_line(version: string, run_id: number): string {
+	const tag = release_tag.tag_name(version)
+
+	return [
+		`❌ Publish ${tag} failed (run ${String(run_id)}) before npm listed ${tag}.`,
+		`  Inspect it with: gh run view ${String(run_id)} --log-failed`,
+	].join('\n')
+}
+
 function missed_release_line(version: string): string {
 	return [
 		`❌ No GitHub Release: ${release_tag.tag_name(version)} never got one.`,
@@ -109,18 +113,34 @@ async function read_release_url(version: string): Promise<string | undefined> {
 	}
 }
 
+function npm_outcome_line(package_name: string, version: string, state: NpmState): string {
+	if (state.kind === 'published') return npm_line(package_name, version)
+	if (state.kind === 'failed') return failed_publish_line(version, state.run_id)
+
+	return missed_npm_line(package_name, version)
+}
+
+async function npm_state(package_name: string, version: string): Promise<NpmState> {
+	if (npm_registry.has_public_version(package_name, version)) return { kind: 'published' }
+	const run_id = await release_publish_run.failed_run_id(version)
+
+	return run_id === undefined ? { kind: 'pending' } : { kind: 'failed', run_id }
+}
+
 async function wait_for_npm(manifest: ReleaseManifest, version: string): Promise<boolean> {
 	if (manifest.is_private) return true
-	const is_published = await poll.poll_until(
-		async () => npm_registry.has_public_version(manifest.name, version),
-		release_tag.poll_options_for(NPM_TIMEOUT_ENV),
-	)
+	// `poll_until` answers only whether it stopped, so the state the last read found is kept here.
+	const seen: { state: NpmState } = { state: { kind: 'pending' } }
 
-	console.info(
-		is_published ? npm_line(manifest.name, version) : missed_npm_line(manifest.name, version),
-	)
+	await poll.poll_until(async () => {
+		seen.state = await npm_state(manifest.name, version)
 
-	return is_published
+		return seen.state.kind !== 'pending'
+	}, release_tag.poll_options_for(NPM_TIMEOUT_ENV))
+
+	console.info(npm_outcome_line(manifest.name, version, seen.state))
+
+	return seen.state.kind === 'published'
 }
 
 async function wait_for_github_release(version: string): Promise<boolean> {

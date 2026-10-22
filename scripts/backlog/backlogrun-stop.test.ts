@@ -43,6 +43,8 @@ function harness(stage: Stage = {}): { ports: StopPorts; calls: Array<string> } 
 	const calls: Array<string> = []
 	const read = stage.read ?? NONE
 	const ports: StopPorts = {
+		running_supervisor: vi.fn(() => stage.supervisor),
+		running_parent: vi.fn(() => stage.parent),
 		stop_supervisor: vi.fn(() => {
 			calls.push('supervisor')
 
@@ -198,6 +200,56 @@ describe('backlogrun_stop.stop — nothing running, and lanes', () => {
 	})
 })
 
+// joshuafolkken/kit#4154: `--restart` stops the same processes in the same order and leaves the record.
+describe('backlogrun_stop.stop_keeping_record', () => {
+	it('stops the supervisor, the parent and the headless session and keeps the record', async () => {
+		const read = carried_headless(WOKEN_PID)
+		const { ports, calls } = harness({ ...WOKEN, parent: PARENT_PID, read, live: [WOKEN_PID] })
+		const report = await backlogrun_stop.stop_keeping_record(GIT_DIRECTORY, ports)
+
+		expect(report).toMatchObject({ session: WOKEN_PID, record: { kind: 'kept' } })
+		expect(calls).toStrictEqual(['supervisor', 'parent', 'session'])
+		expect(ports.end_record).not.toHaveBeenCalled()
+		expect(backlogrun_stop.is_stopped(report)).toBe(true)
+	})
+
+	it('keeps a record whose owner is gone', async () => {
+		const { ports } = harness({ read: carried(SESSION_PID) })
+		const report = await backlogrun_stop.stop_keeping_record(GIT_DIRECTORY, ports)
+
+		expect(report.record).toStrictEqual({ kind: 'kept' })
+		expect(ports.end_record).not.toHaveBeenCalled()
+	})
+
+	it('keeps nothing where there is no record', async () => {
+		const report = await backlogrun_stop.stop_keeping_record(GIT_DIRECTORY, harness().ports)
+
+		expect(report.record).toStrictEqual({ kind: 'none' })
+	})
+})
+
+describe('backlogrun_stop.stop_keeping_record — a live owner', () => {
+	it('names a live owner it did not start and stops nothing, so the run keeps its supervisor', async () => {
+		const read = carried(SESSION_PID)
+		const { ports, calls } = harness({ ...WOKEN, parent: PARENT_PID, read, live: [SESSION_PID] })
+		const report = await backlogrun_stop.stop_keeping_record(GIT_DIRECTORY, ports)
+
+		expect(report).toMatchObject({ supervisor: undefined, parent: undefined, session: undefined })
+		expect(report.record).toStrictEqual({ kind: 'held', owner: SESSION_PID })
+		expect(calls).toStrictEqual([])
+		expect(backlogrun_stop.is_stopped(report)).toBe(false)
+	})
+
+	it('stops a record owned by the parent it launched', async () => {
+		const read = carried(PARENT_PID)
+		const { ports, calls } = harness({ ...WOKEN, parent: PARENT_PID, read, live: [PARENT_PID] })
+		const report = await backlogrun_stop.stop_keeping_record(GIT_DIRECTORY, ports)
+
+		expect(report.record).toStrictEqual({ kind: 'kept' })
+		expect(calls).toStrictEqual(['supervisor', 'parent'])
+	})
+})
+
 const NOTHING: StopReport = {
 	supervisor: undefined,
 	parent: undefined,
@@ -240,7 +292,15 @@ describe('backlogrun_stop.lines_of', () => {
 		const report = { ...NOTHING, record: { kind: 'ended' as const }, lanes: ['3701', '3702'] }
 
 		expect(backlogrun_stop.lines_of(report).at(-1)).toBe(
-			'backlogrun: 2 lane(s) still running, not stopped: #3701 #3702',
+			'backlogrun: 2 lane(s) still running, not stopped: #3701 #3702 — suspend them in place with `josh lane:pause --all`',
 		)
+	})
+})
+
+describe('backlogrun_stop.lines_of — a restart', () => {
+	it('says the record was kept', () => {
+		const report = { ...NOTHING, record: { kind: 'kept' as const } }
+
+		expect(backlogrun_stop.lines_of(report)).toStrictEqual(["backlogrun: kept the run's record"])
 	})
 })

@@ -2,14 +2,31 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
+import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { test_read_recording } from './test-read-recording'
 import { test_unit_guard } from './test-unit-guard'
+import { unit_share_fixture } from './unit-share-fixture'
 import { unit_worker_share } from './unit-worker-share'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/git/changed-file-scope', () => ({
+	changed_file_scope: { repository_root_or_cwd: vi.fn() },
+}))
+// **Mocked because the real one writes this checkout's test-read map** on a green whole-suite run.
+// What it records and when is `test-read-recording.test.ts`; here it hands the run its variables.
+vi.mock('./test-read-recording', () => ({ test_read_recording: { with_read_recording: vi.fn() } }))
 
 const mocked_execa = vi.mocked(execa)
+const mocked_recording = vi.mocked(test_read_recording.with_read_recording)
+const ROOT = path.resolve('/repo')
+const RECORDING = { JOSH_TEST_READS_ROOT: ROOT }
+
+beforeEach(() => {
+	vi.mocked(changed_file_scope.repository_root_or_cwd).mockResolvedValue(ROOT)
+	mocked_recording.mockImplementation(async (_root, _arguments, run) => await run(RECORDING))
+})
 
 type ExecaResult = Awaited<ReturnType<typeof execa>>
 
@@ -20,6 +37,8 @@ const UNIT_FILE = path.join('src', UNIT_TEST_BASENAME)
 const OUTER_SEED = '7'
 const OUTER_SEAT = '3'
 const SPAWN_OPTIONS_POSITION = 2
+const FREE_CORES = 3
+const CALLER_WORKERS = '--maxWorkers=4'
 
 function fake_result(exit_code: number | undefined): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
@@ -56,18 +75,13 @@ function expect_isolated_environment(options: Record<string, unknown>): void {
 
 const ctx = { project_directory: '' }
 
-// **Pinned rather than left real, because the real answer is what else is running on the machine**
-// (joshuafolkken/kit#1515). `run_vitest` asks for this run's share of the workers and appends
-// `--maxWorkers` when there is one, so a suite asserting the exact argument list would pass alone and
-// fail beside a second lane — the class of flake this whole issue is about. Only the share is stubbed;
-// the marker lifecycle around the spawn stays real, so the wrapper is still exercised.
-function stub_share(share: number | undefined): void {
-	vi.spyOn(unit_worker_share, 'current_share').mockReturnValue(share)
-}
+const { stub_claim, stub_free, stub_share } = unit_share_fixture
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	stub_share(undefined)
+	stub_free(undefined)
+	stub_claim(undefined)
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-'))
 })
 
@@ -307,6 +321,44 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 	})
 })
 
+describe('test_unit_guard.run_guarded_unit — the free cores', () => {
+	beforeEach(() => {
+		add_vitest_package()
+		add_unit_file(UNIT_FILE)
+	})
+
+	// joshuafolkken/kit#3945: the share is bounded by the cores free of load outside the ledger.
+	it('hands the free cores to the share', async () => {
+		stub_free(FREE_CORES)
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
+
+		expect(unit_worker_share.current_share).toHaveBeenCalledWith(
+			expect.any(Number),
+			expect.any(Number),
+			FREE_CORES,
+		)
+	})
+
+	// A typed count wins whatever the machine says, so the sample window is not waited out for it.
+	it('neither reads the machine nor overrides a caller-supplied --maxWorkers', async () => {
+		const read = stub_free(FREE_CORES)
+
+		stub_share(FREE_CORES)
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [CALLER_WORKERS])
+
+		expect(read).not.toHaveBeenCalled()
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'pnpm',
+			['exec', 'vitest', 'run', CALLER_WORKERS],
+			expect.objectContaining({ reject: false }),
+		)
+	})
+})
+
 describe('test_unit_guard.isolated_unit_environment', () => {
 	it('removes the checkout port allocation and keeps unrelated values', () => {
 		vi.stubEnv(PORT_SEED_KEY, OUTER_SEED)
@@ -332,5 +384,15 @@ describe('test_unit_guard.run_guarded_unit — spawn environment', () => {
 
 		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 		expect_isolated_environment(last_spawn_options())
+	})
+
+	// joshuafolkken/kit#4065: the recorder decides from the arguments vitest is actually given.
+	it('hands the recorder the full vitest arguments and Vitest the recording variables', async () => {
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [CALLER_WORKERS])
+
+		expect(mocked_recording.mock.calls.at(-1)?.slice(0, 2)).toEqual([ROOT, ['run', CALLER_WORKERS]])
+		expect(last_spawn_options()['env']).toMatchObject(RECORDING)
 	})
 })

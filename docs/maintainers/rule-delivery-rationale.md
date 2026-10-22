@@ -1,10 +1,7 @@
 # Triggered delivery — rationale
 
-This is maintainer-only rationale behind
-[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md):
-the measurements and arguments that justify the procedure's boundaries and mechanism, and the list
-of what each marker test pins. No run reads it — every trigger, action, verdict and boundary an
-agent follows stays in the procedure, and a change to this file changes no rule.
+Rationale behind
+[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md).
 
 ## Why delivery is needed
 
@@ -43,7 +40,7 @@ was delivered.
   `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
   `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
   entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
-  `Bash|Edit|Read|Write|AskUserQuestion`. A
+  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task`. A
   batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
   still honors its own environment switch.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /
@@ -70,15 +67,25 @@ read come from `hook-decision.ts`; whether a message is a stop notice comes from
 `lane-park.ts`; whether a hold is in place comes from the `run:hold` record — **no second verdict
 mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
 repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
-payload carries no tool call, and all four rows answer with `{"decision":"block","reason":…}`. That
-is the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
+payload carries no tool call. A row that needs the model answers with `{"decision":"block","reason":…}`,
+the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
+
+**A row whose answer is fixed acts instead of refusing** (joshuafolkken/kit#3919). The stop
+notification, the hold release and the citation lines are each one operation whose arguments the hook
+already holds, so `stop-actions.ts` runs them in process — the same `send_values`, `run_hold_cli.run`
+and `issue_cite_cli.cite` the commands call, since three `pnpm` launches would spend most of the
+20-second budget — and reports them as a `systemMessage`. A refusal there cost a whole model turn to
+run a command the hook already knew. Only an action that fails falls back to its old refusal, and
+never past `stop_hook_active`. The actions run only on a stop that goes through, so a refused stop
+never notifies a pause its continuation cancels; the stdout of the reused calls is sent to stderr,
+since the hook's stdout is the decision envelope.
 
 **Two entry points, one foundation.** "One route, never a new one" forbids a second copy of the
 shared part, not an entry point per event. The four `stop:guard` rows are triggered by **the run
 stopping**, not by a shell call, so they live in `stop-rules.ts` rather than in `DELIVERED_RULES` in
-`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): each
-of the four blocking rows resolves itself (send the notice, release the hold, file the Issue, fix the
-citation and reissue the reply), and `stop_hook_active` stops an endless loop.
+`delivered-rules.ts`, which is `PreToolUse`-only. Every error lets the stop through (fail-open): the
+hook runs the fixed rows itself, each blocking row resolves itself (file the Issue, rewrite the reply),
+and `stop_hook_active` stops an endless loop.
 
 `backlogrun`'s ordinary parent loop and the fetch of the next Issue are handled by the supervisor
 process, so the Stop verdict that made a run fetch the next Issue was removed. On the route that hands
@@ -147,7 +154,7 @@ runs; this row avoids it
 because a body-only read **does not pass**. A `PreToolUse` refusal carries a single string, though,
 so **the hook does not inject the comment text** — the run fetches it itself, one round trip later.
 
-**This is the only row whose trigger overlaps `batch:guard`'s.** `time_batch_guard.is_guarded_call`
+**This is the only row whose trigger overlaps the `batching` row's.** `time_batch_guard.is_guarded_call`
 treats `gh issue view` as a candidate (`gh issue create` it does not). But this row refuses every time
 until its prerequisite is met, so it skips the `is_first_delivery` yield branch and refuses even on a
 turn that also draws a batching refusal. `delivered-rules.test.ts` pins this.
@@ -160,7 +167,7 @@ appears far more often inside `--jq`). Without that, a write quoting `gh issue v
 would vanish.
 
 **A write is not a read.** `gh api` becomes a POST as soon as `-f` / `-F` / `--field` / `--raw-field`
-/ `--input` appears, and `kickoff` PATCHes `…/issues/<N>` to normalize the title and fill an empty
+/ `--input` appears, and a run PATCHes `…/issues/<N>` to normalize the title and fill an empty
 body. A call whose method is not explicitly `GET`, or that carries a field flag, is out of scope.
 
 **`-c` does not count as "with comments".** `gh issue view <N> -c` is a correct read, but `-c` belongs
@@ -187,7 +194,7 @@ joshuafolkken/kit#1570: the parent set a fresh waiting timer every time it woke,
 once, and progress reports landed every few minutes instead of once per interval. So **a row that
 owns its own `decide` is outside once-per-run and refuses every time its condition holds**.
 
-**For such a row, the yield branch shared with `batch:guard` protects something else.** A
+**For such a row, the yield branch shared with the `batching` row protects something else.** A
 once-per-run row protected its **record** — losing the race would waste the run's only delivery. A
 call that sets a waiting timer is by definition a single `Bash`, a shape the batching guard also
 treats as a candidate, so **yielding the refusal as well would let a reissue inside the 10-second
@@ -202,7 +209,7 @@ once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped t
 the run that skimmed the procedure would be the one that walked past the guard. The rows are
 `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
 stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
-record to use up either, so it does not yield to `batch:guard` (yielding would let a reissue inside
+record to use up either, so it does not yield to the `batching` row (yielding would let a reissue inside
 the 10-second window through without the prerequisite).
 
 **When the evidence of the prerequisite cannot be read, the default is to refuse.** A deliberate
@@ -282,11 +289,11 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
 
 `lane-guard-policy.ts` gives each mode a one-sentence `because`; the measurements behind it:
 
-- `investigation` → `notice`. A refusal ends a child turn (joshuafolkken/kit#2138), so it was `off`
-  until joshuafolkken/kit#2382 re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372
-  #2374 #2375):
-  every one read 4–17 files it never edited, over the threshold of 3. The notice names the concrete
-  files (the #2276 precedent), since a generic "delegate" did not move the number (#2164 → #2178).
+- `investigation` → `refuse`. It was `off` (joshuafolkken/kit#2138) until joshuafolkken/kit#2382
+  re-measured the six lane children after #2347 (#2366 #2370 #2371 #2372 #2374 #2375): every one read
+  4–17 files it never edited, over the threshold of 3, so it became a notice naming those files.
+  joshuafolkken/kit#3927 measured the notice not moving the reading (52% of lane cost in main-line
+  exploration), so it refuses at the same threshold, once per accumulation.
 - `batching` → `off`. A notice (joshuafolkken/kit#2164), taken off (joshuafolkken/kit#2178), restored
   (joshuafolkken/kit#2276) and re-measured (joshuafolkken/kit#2405) at 1.13 calls per round trip
   against a 1.40 target, as every advisory attempt before it (joshuafolkken/kit#1304, #1329, #1337,
@@ -311,7 +318,7 @@ test file pins:
 - `scripts/rules/delivered-rules.test.ts` — each entry **actually fires** on its trigger and is silent
   otherwise. Prose that did not work is where this mechanism started, so **a move that does not fire
   is not a move**
-- `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` is wired under `PreToolUse` naming
+- `scripts/claude/claude-settings-hooks.test.ts` — `pretool:guard` is wired under `PreToolUse` naming
   `Bash` alone, declares a timeout and points at a josh subcommand that exists
 - `scripts/backlog/backlog-manufacturing-rule.test.ts` — the WIP cap exists in `wip-cap.md` as its
   single source, and the hold `issue:file` prints carries the refusal, the two exemptions and the
@@ -373,6 +380,15 @@ test file pins:
   switching to a branch other than its own lane branch, and is silent for its own branch, a create or
   detach, outside a lane, and in the main checkout), that it fires every time, and that only one row
   claims a command
+- `scripts/rules/lane-direct-tool.test.ts` — pins that a lane child's direct `eslint` / `vitest` /
+  `cspell` / `tsc` (bare, `pnpm exec`, `npx`, behind a `/usr/bin/time -p` prefix —
+  joshuafolkken/kit#4356) is refused, since the core budget counts only what a `josh` command
+  reserves (joshuafolkken/kit#4357), and that it is silent outside a lane, for a `pnpm josh` run
+  (`reserved-run` included) and for a tool name inside a quoted argument
+- `scripts/rules/timed-rerun.test.ts` — pins that a command timed with `time` / `/usr/bin/time` /
+  `hyperfine` is pointed at the recorded durations (the Actions jobs, `pnpm josh lane:stats`) once
+  per run, that a record read or a quoted mention is silent, and that the row precedes
+  `lane-direct-tool`, its one overlap (joshuafolkken/kit#4356)
 - `scripts/rules/git-argv.test.ts` / `scripts/rules/git-force.test.ts` /
   `scripts/rules/worktree-guard.test.ts` / `scripts/rules/file-body.test.ts` — pin the predicates and
   message wording of the three groups of Bash-string rows (joshuafolkken/kit#2120). `scripts/rules/delivered-rules-bash.test.ts`
@@ -384,6 +400,10 @@ test file pins:
 - `scripts/rules/direct-pr-create.test.ts` — pins the predicate that stops a direct PR creation which
   never generates `closes #N` (`gh pr create`, a `gh api` write to pulls, joshuafolkken/kit#3183). It is delivered as the
   fourth row of `permission-guards.ts`
+- `scripts/rules/pr-merge.test.ts` — pins the predicate that stops a PR merge by the agent's own
+  `Bash` call in the spellings the `gh pr merge*` glob misses (`curl … /pulls/<N>/merge`, a GraphQL
+  merge mutation or a file-sourced GraphQL body, joshuafolkken/kit#4038). It is delivered as the
+  fifth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
   for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
   a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),
@@ -394,8 +414,8 @@ test file pins:
   notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
   and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
   `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
-  silence (hold × no notice blocks; clean × hold blocks; dirty or notified is silent;
-  `stop_hook_active` is silent; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
-  repository or an unknown owner is silent; a bare `#N` blocks, while one in link form, a code fence,
+  silence (hold × no notice sends the notify; clean × hold releases it; dirty or notified is silent;
+  `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
+  repository or an unknown owner is silent; a bare `#N` prints the citation lines, while one in link form, a code fence,
   inline code, a quoted line or a PR reference is silent), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

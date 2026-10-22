@@ -1,4 +1,5 @@
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { run_progress_config } from '#scripts/run/progress/run-progress-config'
@@ -105,7 +106,7 @@ function wait_duration_ms(command: string): number {
 		NO_SECONDS,
 	)
 
-	return seconds * run_progress.MS_PER_SECOND
+	return seconds * MS_PER_SECOND
 }
 
 function is_armed(target: string, now_ms: number): boolean {

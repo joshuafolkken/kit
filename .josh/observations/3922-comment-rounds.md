@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/git/main-merge-regenerate.ts:59 | 2026-10-16 | #3922
+- rf:assumptions | low | scripts/git/main-merge-regenerate.ts:58 | 2026-10-16 | #3922

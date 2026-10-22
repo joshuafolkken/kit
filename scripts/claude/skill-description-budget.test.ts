@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { skill_meta } from '#scripts/claude/skill-meta'
+import { skill_meta } from '#tools/claude/skill-meta'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#3394: every session loads each skill's description, so the four run-facing ones

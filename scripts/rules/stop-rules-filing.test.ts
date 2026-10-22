@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { stop_decision } from './stop-decision'
 import { stop_rules, type StopContext } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
@@ -63,9 +64,9 @@ describe('stop_rules.stop_outcome — filing offer in an interactive session', (
 	})
 
 	it('leaves the other reply rules in place', () => {
-		const { reason } = stop_rules.stop_outcome(attended({ message: `${OFFER_MESSAGE} #7` }))
+		const { actions } = stop_rules.stop_outcome(attended({ message: `${OFFER_MESSAGE} #7` }))
 
-		expect(reason).toContain('pnpm josh issue:cite 7')
+		expect(actions).toEqual([{ kind: 'cite', references: ['#7'] }])
 	})
 })
 
@@ -78,13 +79,14 @@ describe('stop_rules.stop_outcome — filing offer stands down and ordering', ()
 		expect(outcome.reason).toBeUndefined()
 	})
 
-	it('goes ahead of the citation rule and behind the hold rules', () => {
-		const offer_with_bare = `${OFFER_MESSAGE} #7`
-		const held = unattended({ hold_present: true, message: offer_with_bare })
+	// joshuafolkken/kit#3919: a refused stop runs no action, so the held run is not notified either;
+	// joshuafolkken/kit#3961: the held reply names no decision, so that refusal rides on the same one.
+	it('refuses ahead of the citation and hold actions, running none of them', () => {
+		const held = unattended({ hold_issue: '7', message: `${OFFER_MESSAGE} #7` })
 
-		expect(stop_rules.stop_outcome(unattended({ message: offer_with_bare })).reason).toBe(
-			stop_rules.FILING_OFFER_REASON,
-		)
-		expect(stop_rules.stop_outcome(held).reason).toBe(stop_rules.STOP_NOTIFY_REASON)
+		expect(stop_rules.stop_outcome(held)).toEqual({
+			...stop_rules.NO_OUTCOME,
+			reason: `${stop_rules.FILING_OFFER_REASON}\n\n${stop_decision.DECISION_REASON}`,
+		})
 	})
 })

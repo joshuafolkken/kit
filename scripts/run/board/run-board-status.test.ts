@@ -1,8 +1,13 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_lane_state } from './run-board-lane-state'
 import type { Phase } from './run-board-phase'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
@@ -20,6 +25,8 @@ const PARK_3409 = '#3409 parked'
 const PLAN_3415 = 'planned #3415'
 const DECISION_PARK = '#3433 parked (needs-decision)'
 const NONE: ReadonlySet<number> = new Set()
+const { NO_LANES } = run_board_lane_state
+const LIVE: ItemStatus = { state: 'running' }
 
 const { STAGE } = run_ship_stage
 const IMPLEMENT_3409: Step = [KIND.LANE_PHASE, '#3409 implement']
@@ -42,7 +49,7 @@ function track_after(...later: ReadonlyArray<Step>): ReadonlyArray<string> {
 	const steps: Array<Step> = [[KIND.CHILD_LAUNCH, LAUNCH_3409], ...later]
 	const events = steps.map(([kind, text], index) => event_at(index + 1, T0, kind, text))
 
-	return run_board_status.statuses_of(events, [], NONE).get(3409)?.track ?? []
+	return run_board_status.statuses_of(events, NO_LANES).get(3409)?.track ?? []
 }
 
 // The phase #3409 is on after its launch and the given steps.
@@ -59,11 +66,12 @@ describe('run_board_status.statuses_of', () => {
 			event_at(4, T2, KIND.MERGE, MERGE_3409),
 			event_at(5, T3, KIND.PARK, DECISION_PARK),
 		]
-		const statuses = run_board_status.statuses_of(events, [], NONE)
+		const statuses = run_board_status.statuses_of(events, NO_LANES)
 
 		expect(statuses.get(3409)).toStrictEqual({
 			state: 'merged',
 			started_ms: Date.parse(T0),
+			spans: [{ from_ms: Date.parse(T0), end_ms: Date.parse(T2) }],
 			ended_ms: Date.parse(T2),
 			track: ['investigate'],
 		})
@@ -71,16 +79,17 @@ describe('run_board_status.statuses_of', () => {
 		expect(statuses.get(3433)?.state).toBe('parked')
 	})
 
-	it('reads an in-scope lane the stream never saw launched as running, with its lane', () => {
-		const statuses = run_board_status.statuses_of([], ['3420'], new Set([3420]))
+	// joshuafolkken/kit#4269: a lane is not made running from a scope or a lane listing alone.
+	it('draws no row for an open lane that only the run scope names', () => {
+		const statuses = run_board_status.statuses_of([], NO_LANES)
 
-		expect(statuses.get(3420)).toStrictEqual({ state: 'running', lane: 'lane 3420' })
+		expect(statuses.has(3420)).toBe(false)
 	})
 
-	it('leaves a settled child settled even while its lane is still open', () => {
+	it('leaves a settled child settled', () => {
 		const events = [event_at(1, T0, KIND.MERGE, MERGE_3409)]
 
-		expect(run_board_status.statuses_of(events, ['3409'], NONE).get(3409)?.state).toBe('merged')
+		expect(run_board_status.statuses_of(events, NO_LANES).get(3409)?.state).toBe('merged')
 	})
 })
 
@@ -92,30 +101,48 @@ describe('run_board_status.statuses_of withdrawn', () => {
 			event_at(2, T1, KIND.WITHDRAW, '#3409 withdrawn by a person: superseded'),
 		]
 
-		expect(run_board_status.statuses_of(events, [], NONE).get(3409)).toMatchObject({
+		expect(run_board_status.statuses_of(events, NO_LANES).get(3409)).toMatchObject({
 			state: 'withdrawn',
 			ended_ms: Date.parse(T1),
+			reason: 'superseded',
 		})
+	})
+
+	// joshuafolkken/kit#4045: the park that ended a child keeps its reason; a bare one keeps none.
+	it('keeps the reason of the park that ended a child, and none for a bare park', () => {
+		const events = [
+			event_at(1, T0, KIND.PARK, DECISION_PARK),
+			event_at(2, T1, KIND.PARK, PARK_3409),
+		]
+		const statuses = run_board_status.statuses_of(events, NO_LANES)
+
+		expect(statuses.get(3433)?.reason).toBe('needs-decision')
+		expect(statuses.get(3409)).not.toHaveProperty('reason')
 	})
 })
 
 describe('run_board_status.statuses_of lanes', () => {
-	it('leaves out a lane whose issue is neither on the stream nor in the run', () => {
-		const statuses = run_board_status.statuses_of([], ['3347'], new Set([3441]))
+	// joshuafolkken/kit#4269: what the span says of an earlier run's lane, or of a lane with no record, is
+	// not this run's — both are drawn apart.
+	it('leaves out an earlier run’s lane and a lane with no record, whatever the span says', () => {
+		const events = [
+			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
+			event_at(2, T1, KIND.CHILD_LAUNCH, '#3410 launched'),
+		]
+		const lanes = { ...NO_LANES, earlier: new Map([[3409, LIVE]]), unknown: ['3410'] }
+		const statuses = run_board_status.statuses_of(events, lanes)
 
-		expect(statuses.has(3347)).toBe(false)
+		expect([statuses.has(3409), statuses.has(3410)]).toStrictEqual([false, false])
 	})
 
-	it('keeps a launched child running with its lane even when the plan does not name it', () => {
+	it('draws this run’s lane as its record says, over what the stream last said', () => {
 		const events = [event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409)]
-		const statuses = run_board_status.statuses_of(events, ['3409'], NONE)
+		const paused: ItemStatus = { state: 'paused', started_ms: Date.parse(T0), lane: 'lane 3409' }
+		const lanes = { ...NO_LANES, own: new Map([[3409, paused]]) }
 
-		expect(statuses.get(3409)).toStrictEqual({
-			state: 'running',
-			started_ms: Date.parse(T0),
-			track: ['investigate'],
-			phase_ms: Date.parse(T0),
-			lane: 'lane 3409',
+		expect(run_board_status.statuses_of(events, lanes).get(3409)).toStrictEqual({
+			...paused,
+			spans: [{ from_ms: Date.parse(T0), end_ms: undefined }],
 		})
 	})
 })
@@ -154,13 +181,13 @@ describe('run_board_status.statuses_of phases', () => {
 			event_at(3, T2, ...ship_3409(STAGE.REPORT)),
 		]
 
-		expect(run_board_status.statuses_of(events, [], NONE).get(3409)?.state).toBe('merged')
+		expect(run_board_status.statuses_of(events, NO_LANES).get(3409)?.state).toBe('merged')
 	})
 
 	it('ignores a plan event for an issue no lane has launched', () => {
 		const events = [event_at(1, T0, KIND.PLAN, 'planned #3999')]
 
-		expect(run_board_status.statuses_of(events, [], NONE).has(3999)).toBe(false)
+		expect(run_board_status.statuses_of(events, NO_LANES).has(3999)).toBe(false)
 	})
 })
 
@@ -254,6 +281,7 @@ function read_labelled(
 describe('run_board_status.settle_closed with the listing’s labels', () => {
 	it.each<[string, ReadonlyArray<string>, string]>([
 		['needs-decision as waiting on a person', [NEEDS_DECISION_LABEL, IN_PROGRESS_LABEL], 'human'],
+		['run:stalled as stopped, never a person', [RUN_STALLED_LABEL, IN_PROGRESS_LABEL], 'stopped'],
 		['no in-progress as stopped', ['bug'], 'stopped'],
 		['in-progress as still running', ['bug', IN_PROGRESS_LABEL], 'running'],
 	])('draws a running child labelled %s', (_label, labels, state) => {
@@ -273,36 +301,6 @@ describe('run_board_status.settle_closed with the listing’s labels', () => {
 		['the listing was read before the launch', read_labelled(['bug'], Date.parse(T0) - 1)],
 	])('keeps the labelled child running when %s', (_label, read) => {
 		expect(run_board_status.settle_closed(RUNNING, read).get(3409)?.state).toBe('running')
-	})
-})
-
-// joshuafolkken/kit#3451: a child read closed from GitHub ends when it closed, merged or not.
-describe('run_board_status.settle_closed with a closed read', () => {
-	it.each<[string, boolean, string]>([
-		['merged', true, 'merged'],
-		['done', false, 'done'],
-	])('draws a child read closed as %s, timed to its close', (_label, is_merged, state) => {
-		const read = read_closed({ title: 'Fix', labels: [], closed_ms: Date.parse(T2), is_merged })
-
-		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
-			state,
-			started_ms: Date.parse(T0),
-			ended_ms: Date.parse(T2),
-		})
-	})
-
-	it('ignores a close dated before the launch', () => {
-		const read = read_closed({
-			title: 'Fix',
-			labels: [],
-			closed_ms: Date.parse(T0) - 1,
-			is_merged: true,
-		})
-
-		expect(run_board_status.settle_closed(RUNNING, read).get(3409)).toStrictEqual({
-			state: 'done',
-			started_ms: Date.parse(T0),
-		})
 	})
 })
 
@@ -326,7 +324,13 @@ describe('run_board_status settled tracks', () => {
 	it.each<[string, OpenRead]>([
 		[
 			'read closed',
-			read_closed({ title: 'Fix', labels: [], closed_ms: Date.parse(T2), is_merged: true }),
+			read_closed({
+				title: 'Fix',
+				labels: [],
+				closed_ms: Date.parse(T2),
+				is_merged: true,
+				is_not_planned: false,
+			}),
 		],
 		['gone from the listing', GONE],
 		['labelled stopped', read_labelled(['bug'])],

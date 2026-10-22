@@ -93,7 +93,7 @@ function is_destructive_segment(segment: string): boolean {
 }
 
 function is_destructive_command(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_destructive_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_destructive_segment(segment))
 }
 
 const DESTRUCTIVE_COMMAND_REASON =
@@ -109,6 +109,13 @@ const ROW = {
 	decide: (): boolean => true,
 	// The opening the reason carried before it was cut to the action and the next command.
 	former_reasons: ['⛔ destructive command: a recursive forced `rm` (`rm -rf`'],
+	about: {
+		title: 'Destructive command',
+		topic: '`operating-rules.md`',
+		fires:
+			'`rm -rf` (any spelling), `gh repo delete` / `archive`, `gh pr close`, `gh api -X DELETE`. Every occurrence',
+		quiet: "`gh issue close` or removing an Issue label — the workflow's own steps",
+	},
 }
 
 const destructive_command = { DESTRUCTIVE_COMMAND_REASON, ROW, is_destructive_command }

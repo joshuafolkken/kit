@@ -4,11 +4,10 @@ import path from 'node:path'
 import { read_repo_file, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_body_guard } from './rule-body-guard'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2272: the residency questions have to be delivered at the edit that writes a rule
@@ -84,7 +83,7 @@ function placement_tail(): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
 })
@@ -173,9 +172,9 @@ describe('writes_rule_prose — Write reads the existing file for its old text',
 	})
 })
 
-describe('rule_delivery — end to end through the enumeration', () => {
+describe('delivered_rules.delivery — end to end through the enumeration', () => {
 	it('delivers the rule on an edit that writes a rule into prose', () => {
-		expect(rule_delivery(edit_payload('append', '', RULE_SENTENCE), NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(edit_payload('append', '', RULE_SENTENCE), NOW_MS)).toBe(REASON)
 	})
 
 	// Once per run: the second edit of the same run is not refused again.
@@ -183,18 +182,20 @@ describe('rule_delivery — end to end through the enumeration', () => {
 	it('keeps refusing the reissued edit until both placement commands ran', () => {
 		const payload = edit_payload('append-repeat', '', RULE_SENTENCE)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
 	})
 
 	it('says nothing about a typo fix in a rule document', () => {
-		expect(rule_delivery(edit_payload('typo', TYPO_OLD, TYPO_NEW), NOW_MS)).toBeUndefined()
+		expect(
+			delivered_rules.delivery(edit_payload('typo', TYPO_OLD, TYPO_NEW), NOW_MS),
+		).toBeUndefined()
 	})
 
 	it('says nothing when the switch is off', () => {
-		process.env[SWITCH_ENV_KEY] = 'off'
+		process.env[delivered_rules.SWITCH_ENV_KEY] = 'off'
 
-		expect(rule_delivery(edit_payload('off', '', RULE_SENTENCE), NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(edit_payload('off', '', RULE_SENTENCE), NOW_MS)).toBeUndefined()
 	})
 
 	// Exactly one enumeration row claims the edit, so no delivery is silently dropped.
@@ -206,19 +207,19 @@ describe('rule_delivery — end to end through the enumeration', () => {
 	})
 })
 
-describe('rule_delivery — the placement-verdict stand-down (joshuafolkken/kit#2324)', () => {
+describe('delivered_rules.delivery — the placement-verdict stand-down (joshuafolkken/kit#2324)', () => {
 	// Both placement oracles answered earlier in the run: the edit passes on the record, not the reminder.
 	it('stands down once oracle:list and run:step are both on the tail', () => {
 		const payload = edit_payload('answered', '', RULE_SENTENCE, placement_tail())
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 
 	// Only one answered: the record is incomplete, so the edit is still refused.
 	it('still refuses when only oracle:list is on the tail', () => {
 		const payload = edit_payload('half-answered', '', RULE_SENTENCE, ORACLE_LIST_CALL)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(REASON)
 	})
 })
 

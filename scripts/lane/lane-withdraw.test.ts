@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
@@ -11,10 +12,12 @@ import { lane_close, type CloseOutcome } from './lane-close'
 import { lane_preserve } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_state } from './lane-state'
 import { lane_withdraw } from './lane-withdraw'
 
-// joshuafolkken/kit#3908: a person withdraws a running lane child's issue for good. Every side effect is
-// spied on — what is pinned is the order, and that a refusal writes nothing.
+// joshuafolkken/kit#3908: a person withdraws a running lane child's issue from the run. Every side effect
+// is spied on — what is pinned is the order, and that a refusal writes nothing. joshuafolkken/kit#4365:
+// the Issue stays open.
 
 const ISSUE = '3769'
 const REASON = 'superseded by #3780'
@@ -34,7 +37,13 @@ const LANE: LaneInfo = {
 	is_stranded: false,
 }
 
-const CLOSED_LANE: CloseOutcome = { issue: ISSUE, kind: 'closed', left_behind: [], reaped: [] }
+const CLOSED_LANE: CloseOutcome = {
+	issue: ISSUE,
+	kind: 'closed',
+	left_behind: [],
+	reaped: [],
+	residents: [],
+}
 
 function state_read(state: string): StateRead {
 	return { kind: 'state', state: { state, labels: [], is_human_review: false } }
@@ -46,10 +55,13 @@ const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const reap_child = vi.spyOn(lane_reap, 'reap_child')
 const changes_probe = vi.spyOn(git_stash, 'has_changes')
 const push = vi.spyOn(git_stash, 'push')
-const close_not_planned = vi.spyOn(git_gh_issue_write, 'issue_close_not_planned')
+const try_comment = vi.spyOn(git_gh_issue_write, 'issue_try_comment')
+// The REST transport every issue write goes through, so a close of any reason is caught.
+const gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const announce = vi.spyOn(lane_preserve, 'announce')
 const unmark = vi.spyOn(run_label, 'unmark')
 const close_lane = vi.spyOn(lane_close, 'close_lane')
+const record_change = vi.spyOn(lane_state, 'record_change')
 
 function first_call(spy: { mock: { invocationCallOrder: Array<number> } }): number {
 	return spy.mock.invocationCallOrder[0] ?? 0
@@ -58,8 +70,9 @@ function first_call(spy: { mock: { invocationCallOrder: Array<number> } }): numb
 function expect_nothing_written(): void {
 	expect(emit).not.toHaveBeenCalled()
 	expect(reap_child).not.toHaveBeenCalled()
-	expect(close_not_planned).not.toHaveBeenCalled()
+	expect(try_comment).not.toHaveBeenCalled()
 	expect(close_lane).not.toHaveBeenCalled()
+	expect(record_change).not.toHaveBeenCalled()
 }
 
 function arrange_open_lane(): void {
@@ -70,25 +83,27 @@ function arrange_open_lane(): void {
 	changes_probe.mockResolvedValue(false)
 }
 
-function arrange_close(): void {
+function arrange_writes(): void {
 	push.mockResolvedValue()
-	close_not_planned.mockResolvedValue(true)
+	try_comment.mockResolvedValue(true)
+	gh_api.mockResolvedValue('')
 	announce.mockResolvedValue()
 	unmark.mockResolvedValue(true)
 	close_lane.mockResolvedValue(CLOSED_LANE)
+	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })
 }
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	arrange_open_lane()
-	arrange_close()
+	arrange_writes()
 })
 
 describe('lane_withdraw.withdraw — the order of the steps', () => {
-	it('records the event, stops the child, keeps the work, closes the issue, then the lane', async () => {
+	it('records the event, stops the child, keeps the work, comments, then closes the lane', async () => {
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
-		const order = [emit, reap_child, changes_probe, close_not_planned, unmark, close_lane].map(
-			(spy) => first_call(spy),
+		const order = [emit, reap_child, changes_probe, try_comment, unmark, close_lane].map((spy) =>
+			first_call(spy),
 		)
 
 		expect(order).toStrictEqual(order.toSorted((left, right) => left - right))
@@ -96,23 +111,39 @@ describe('lane_withdraw.withdraw — the order of the steps', () => {
 			kind: 'withdrawn',
 			reaped: 1,
 			stash: undefined,
-			is_closed: true,
-			had_closed: false,
+			is_noted: true,
 			lane: 'closed',
+			residents: [],
 		})
 	})
 
-	it('names the issue and the reason on the event stream and in the close comment', async () => {
+	it('names the issue and the reason on the event stream and in the issue comment', async () => {
 		await lane_withdraw.withdraw(ISSUE, REASON)
 
 		expect(emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.WITHDRAW,
 			`#${ISSUE} withdrawn by a person: ${REASON}`,
 		)
-		expect(close_not_planned).toHaveBeenCalledWith(
-			ISSUE,
-			expect.stringContaining(`- Why: ${REASON}`),
-		)
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining(`- Why: ${REASON}`))
+	})
+})
+
+// joshuafolkken/kit#4365: the withdrawal ends this run's attempt, not the work.
+describe('lane_withdraw.withdraw — the issue stays open', () => {
+	it('never closes the issue and reads its state only once', async () => {
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(outcome).toMatchObject({ kind: 'withdrawn' })
+		expect(gh_api).not.toHaveBeenCalled()
+		expect(read_issue).toHaveBeenCalledOnce()
+	})
+
+	it('says on the issue and in the report that the next run offers it again', async () => {
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining('stays open'))
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining('next run'))
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('The Issue stays open')
 	})
 })
 
@@ -130,19 +161,52 @@ describe('lane_withdraw.withdraw — the work and the child', () => {
 		reap_child.mockReturnValue([])
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(outcome).toMatchObject({ kind: 'withdrawn', reaped: 0, is_closed: true })
+		expect(outcome).toMatchObject({ kind: 'withdrawn', reaped: 0, is_noted: true })
 		expect(close_lane).toHaveBeenCalledWith(ISSUE)
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('already ended')
 	})
+})
 
-	it('leaves the close of an issue that merged before its child was stopped', async () => {
-		read_issue.mockResolvedValueOnce(state_read('OPEN')).mockResolvedValueOnce(state_read('CLOSED'))
+// joshuafolkken/kit#4304: a withdrawal closes the lane, so it says what the close ended from the checkout.
+describe('lane_withdraw.withdraw — processes still running from the checkout', () => {
+	it('names the processes the close ended', async () => {
+		close_lane.mockResolvedValue({ ...CLOSED_LANE, residents: [PID] })
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(outcome).toMatchObject({ kind: 'withdrawn', is_closed: true, had_closed: true })
-		expect(close_not_planned).not.toHaveBeenCalled()
-		expect(close_lane).toHaveBeenCalledWith(ISSUE)
-		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('already closed')
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain(
+			`Terminated 1 process(es) still running from the lane`,
+		)
+	})
+
+	it('says a reading that failed rather than reading it as none', async () => {
+		close_lane.mockResolvedValue({ ...CLOSED_LANE, residents: undefined })
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('lsof or ps failed')
+	})
+})
+
+// joshuafolkken/kit#4268: the state record names the withdrawal, not the close it ran.
+describe('lane_withdraw.withdraw — the lane state record', () => {
+	it('records the lane as ended by lane:withdraw after the close', async () => {
+		await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(record_change).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'ended',
+			command: 'lane:withdraw',
+		})
+		expect(first_call(record_change)).toBeGreaterThan(first_call(close_lane))
+	})
+
+	// joshuafolkken/kit#4300: a close a process outlived leaves the lane for the supervisor to close again.
+	it('records no end when the close was incomplete', async () => {
+		close_lane.mockResolvedValue({ ...CLOSED_LANE, kind: 'incomplete' })
+
+		await expect(lane_withdraw.withdraw(ISSUE, REASON)).resolves.toMatchObject({
+			lane: 'incomplete',
+		})
+		expect(record_change).not.toHaveBeenCalled()
 	})
 })
 
@@ -173,35 +237,24 @@ describe('lane_withdraw.withdraw — refusals write nothing', () => {
 })
 
 describe('lane_withdraw.withdraw — what is left when a step fails', () => {
-	it('leaves the issue open and the lane in place when the work cannot be stashed', async () => {
+	it('leaves the lane in place and writes nothing on the issue when the work cannot be stashed', async () => {
 		changes_probe.mockResolvedValue(true)
 		push.mockRejectedValue(new Error(LOCK_ERROR))
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
 		expect(outcome).toStrictEqual({ kind: 'unsaved', directory: DIRECTORY, reason: LOCK_ERROR })
 		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.WITHDRAW, expect.any(String))
-		expect(reap_child).toHaveBeenCalledWith(ISSUE)
-		expect(close_not_planned).not.toHaveBeenCalled()
+		expect(reap_child).toHaveBeenCalledWith(LANE)
+		expect(try_comment).not.toHaveBeenCalled()
 		expect(close_lane).not.toHaveBeenCalled()
 	})
 
-	it('closes the lane and says to close the issue by hand when the close fails', async () => {
-		close_not_planned.mockResolvedValue(false)
+	it('still closes the lane and says so when the comment cannot be posted', async () => {
+		try_comment.mockResolvedValue(false)
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(outcome).toMatchObject({ kind: 'withdrawn', is_closed: false })
+		expect(outcome).toMatchObject({ kind: 'withdrawn', is_noted: false })
 		expect(close_lane).toHaveBeenCalledWith(ISSUE)
-		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('by hand')
-	})
-
-	it('leaves the issue open when it cannot be read again after the child is stopped', async () => {
-		read_issue
-			.mockResolvedValueOnce(state_read('OPEN'))
-			.mockResolvedValueOnce({ kind: 'unreadable' })
-		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
-
-		expect(outcome).toMatchObject({ kind: 'withdrawn', is_closed: false, had_closed: false })
-		expect(close_not_planned).not.toHaveBeenCalled()
-		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('by hand')
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('could not be posted')
 	})
 })

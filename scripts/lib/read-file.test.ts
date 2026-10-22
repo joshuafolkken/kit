@@ -26,6 +26,18 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
+describe('file_reader.is_absent', () => {
+	it.each([
+		['an ENOENT error', Object.assign(new Error(ABSENT), { code: ABSENT }), true],
+		['a permission error', Object.assign(new Error(DENIED), { code: DENIED }), false],
+		['ENOTDIR', Object.assign(new Error('ENOTDIR'), { code: 'ENOTDIR' }), false],
+		['an error with no code', new Error(ABSENT), false],
+		['a value that is not an error', { code: ABSENT }, false],
+	])('answers %s', (_label, error, expected) => {
+		expect(file_reader.is_absent(error)).toBe(expected)
+	})
+})
+
 describe('file_reader.read_file_or_empty', () => {
 	it(RETURNS_CONTENT, () => {
 		read_mock.mockReturnValue(CONTENT)

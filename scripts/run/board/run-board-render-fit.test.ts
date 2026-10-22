@@ -7,8 +7,9 @@ import type { ItemState } from './run-board-status'
 
 // joshuafolkken/kit#3505: a short pane takes the footer and the legend first, then the finished rows,
 // and keeps the running rows longest; a frame with no pane is drawn whole, footer and all.
+// joshuafolkken/kit#4042: the finished rows fold from the oldest into their own section's count.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, note } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, note, rule } = run_board_render_fixture
 const FOOTER = ['', 'footer']
 const WIDE = 500
 
@@ -20,17 +21,19 @@ function row(number: number, state: ItemState, started_minute: number): BoardRow
 	return { number, title: `Issue ${String(number)}`, kind: undefined, state, status, waits: [] }
 }
 
-// Running and merged rows mixed as they started, and three notes. One cut row or note only trades its
-// line for a `more N` line, so each stage has two to show a cut that saves a row.
+// Running and finished rows mixed as they started, and three notes. One cut row or note only trades its
+// line for a `more N` line, so each stage has two to show a cut that saves a row — the finished rows
+// three, the oldest of them withdrawn.
 const VIEW: BoardView = {
 	header: header({
 		layout: {
 			...EMPTY_LAYOUT,
 			active: [
 				row(1, 'running', 0),
-				row(2, 'merged', 10),
+				row(2, 'withdrawn', 10),
 				row(3, 'running', 20),
 				row(4, 'merged', 30),
+				row(5, 'merged', 40),
 			],
 		},
 	}),
@@ -66,13 +69,24 @@ describe('run_board_render.render in a short pane', () => {
 		expect(frame(whole.length - 1)).toStrictEqual(whole.slice(0, -2))
 	})
 
-	it('cuts the finished rows while the running rows and the notes stay', () => {
+	it('folds the oldest finished rows into the done count while the newest one stays', () => {
 		const lines = first_without('Issue 2')
-		const kept = ['Issue 1', 'Issue 3', 'newest', 'oldest']
+		const kept = ['Issue 1', 'Issue 3', 'Issue 5', 'newest', 'oldest']
+		const newest = lines.findIndex((line) => line.includes('Issue 5'))
 
 		expect(has(lines, 'Issue 4')).toBe(false)
-		expect(kept.map((text) => has(lines, text))).toStrictEqual([true, true, true, true])
-		expect(lines).toContain('  more 2')
+		expect(kept.map((text) => has(lines, text))).toStrictEqual([true, true, true, true, true])
+		expect(lines[newest - 1]).toBe(rule('✅ done'))
+		expect(lines[newest + 1]).toBe('    ✅ 2 more  🚫 1')
+		expect(has(lines, '  more')).toBe(false)
+	})
+
+	it('drops the done section once its last row is cut, counting the rows on the plan’s more', () => {
+		const lines = first_without('Issue 5')
+
+		expect(has(lines, '✅ done')).toBe(false)
+		expect([has(lines, 'Issue 1'), has(lines, 'Issue 3')]).toStrictEqual([true, true])
+		expect(lines).toContain('  more 3')
 	})
 
 	it('cuts the oldest note before the newer, and the earlier running row before the later', () => {

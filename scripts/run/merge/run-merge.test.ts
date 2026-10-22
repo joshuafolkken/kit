@@ -10,6 +10,7 @@ import { run_merge } from './run-merge'
 
 const CLOSED = 'CLOSED'
 const NEEDS_DECISION = 'needs-decision'
+const RUN_STALLED = 'run:stalled'
 const ALREADY_DONE = 'already-done'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
 const IN_PROGRESS = 'in-progress'
@@ -45,13 +46,12 @@ describe('classify_child', () => {
 		expect(run_merge.classify_child(open)).toBe(HUMAN_REVIEW)
 	})
 
-	it('reads an OPEN needs-decision child as parked', () => {
-		expect(run_merge.classify_child(issue_state_of({ labels: [NEEDS_DECISION] }))).toBe(PARKED)
-	})
-
-	it('reads an OPEN already-done child as parked', () => {
-		expect(run_merge.classify_child(issue_state_of({ labels: [ALREADY_DONE] }))).toBe(PARKED)
-	})
+	it.each([NEEDS_DECISION, RUN_STALLED, ALREADY_DONE])(
+		'reads an OPEN %s child as parked',
+		(label) => {
+			expect(run_merge.classify_child(issue_state_of({ labels: [label] }))).toBe(PARKED)
+		},
+	)
 
 	it('reads an OPEN child with neither label as failed', () => {
 		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }))).toBe('failed')
@@ -97,6 +97,22 @@ describe('classify_child — is_outage is ignored outside the failed case', () =
 		{ over: { labels: [ALREADY_DONE] }, expected: 'parked' },
 	])('classifies $expected regardless of an outage exit record', ({ over, expected }) => {
 		expect(run_merge.classify_child(issue_state_of(over), OUTAGE)).toBe(expected)
+	})
+})
+
+// joshuafolkken/kit#4216: an authentication failure is read before the outage and the failure, and
+// counts nothing.
+describe('classify_child — a child that could not authenticate', () => {
+	it('reads an OPEN unparked child that could not authenticate as unauthenticated', () => {
+		const signals = { ...OUTAGE, is_auth_failure: true }
+
+		expect(run_merge.classify_child(issue_state_of({ labels: [IN_PROGRESS] }), signals)).toBe(
+			'unauthenticated',
+		)
+	})
+
+	it('counts nothing for an unauthenticated child', () => {
+		expect(run_merge.change_of('unauthenticated')).toBeUndefined()
 	})
 })
 
@@ -168,6 +184,18 @@ describe('classify_child — withdrawn by a person', () => {
 	})
 })
 
+// joshuafolkken/kit#4076: a release to wait names what the child waits on, a start date included.
+describe('waiting_comment', () => {
+	it('names every wait and says the child is neither parked nor counted', () => {
+		const comment = run_merge.waiting_comment(['#3501', 'not before 2026-10-24T23:29Z'])
+
+		expect(comment).toContain('not parked, and not counted as a failure')
+		expect(comment).toContain('waits on: #3501, not before 2026-10-24T23:29Z.')
+		expect(comment).toContain('its sample condition is met')
+		expect(comment).not.toContain(NEEDS_DECISION)
+	})
+})
+
 // joshuafolkken/kit#2769: a park the driver makes is explained on the issue — why, what was read, and
 // what a person does next.
 describe('park_comment', () => {
@@ -189,7 +217,8 @@ describe('park_comment', () => {
 			output: 'lane.jsonl',
 		})
 
-		expect(comment).toContain(NEEDS_DECISION)
+		expect(comment).toContain(RUN_STALLED)
+		expect(comment).not.toContain(NEEDS_DECISION)
 		expect(comment).toContain('- Why: the session ended unfinished.')
 		expect(comment).toContain('no merged pull request')
 		expect(comment).toContain('Consecutive failures: 2 of 3')

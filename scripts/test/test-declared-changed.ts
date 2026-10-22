@@ -75,8 +75,8 @@ function restore_injection(previous: ReadonlyArray<string> | undefined): void {
 	injected.paths = previous
 }
 
-// The seam the `rule_delivery` call path needs. `is_untested_commit` reads the
-// tree at trigger time rather than from an argument, so a unit test driving `rule_delivery` cannot reach
+// The seam the `delivered_rules.delivery` call path needs. `is_untested_commit` reads the
+// tree at trigger time rather than from an argument, so a unit test driving `delivered_rules.delivery` cannot reach
 // `current_verdict`'s `paths` port from the outside. Running `body` inside `with_paths` fixes the read
 // to `paths` for its duration and restores it afterwards — the `PreToolUse` production path, which never
 // calls this, still reads the live tree.

@@ -1,4 +1,5 @@
 import { git_followup_stages, type FollowupStage } from '#scripts/followup/git-followup-stages'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 
 // Reading `followup`'s own stage rows back out of what it printed.
 //
@@ -35,9 +36,6 @@ const LINE_SEPARATOR = '\n'
 // so the tail is the one part of the row whose shape the alignment cannot move.
 const SECONDS_SUFFIX = ' s'
 const DIGIT_OR_POINT = /[\d.]/u
-// Written here rather than imported: `time-format.ts` keeps its own copy private, and reaching for
-// `run-progress.ts` would pull a command module into the parse for one number.
-const MS_PER_SECOND = 1000
 const NO_STAGES: ReadonlyArray<FollowupStage> = []
 
 // Leading whitespace is trimmed for the same reason `time-reported-failure.ts` trims it: the printer

@@ -7,6 +7,11 @@ import { describe, expect, it } from 'vitest'
 // pair below pins the corrected wording present and the wrong wording absent.
 
 const PLAN_COMMENT = 'prompts/collaboration-workflow/plan-comment.md'
+// joshuafolkken/kit#4188: plan-comment.md stops at Step 3 and points at fullrun-steps.md, so the
+// corrections below its Step 3 are pinned in the single sources it used to restate.
+const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
+const DEPENDENCY_UPDATE = '.claude/skills/dependency-update/SKILL.md'
+const ENTRY_SEQUENCE = '.claude/skills/workflow-commands/entry-sequence.md'
 const UPSTREAM = 'prompts/collaboration-workflow/upstream-interrupt.md'
 const CLAUDE = 'CLAUDE.md'
 const CLAUDE_HEADING = 'Cross-package problems → file the upstream Issue, then stop'
@@ -19,17 +24,21 @@ interface Correction {
 
 const CORRECTIONS: ReadonlyArray<Correction> = [
 	{
-		document_path: PLAN_COMMENT,
+		document_path: CHAIN_RULE,
 		present: 'The review runs in a subagent, never a main-line skill load',
 		absent: '実装者と同一コンテキスト',
 	},
 	{
-		document_path: PLAN_COMMENT,
-		present: '`pnpm-workspace.yaml` の `overrides`',
+		document_path: DEPENDENCY_UPDATE,
+		present: 'read effective overrides only from `pnpm-workspace.yaml`',
 		absent: 'package.json の overrides に',
 	},
-	{ document_path: PLAN_COMMENT, present: 'pnpm josh latest:scope', absent: 'pnpm latest' },
-	{ document_path: PLAN_COMMENT, present: '--field body=@<path>', absent: '-f body="' },
+	{ document_path: ENTRY_SEQUENCE, present: 'pnpm josh latest:if-required', absent: 'pnpm latest' },
+	{
+		document_path: PLAN_COMMENT,
+		present: 'pnpm josh issue:plan <N> --body-file <path>',
+		absent: '-f body="',
+	},
 	{ document_path: UPSTREAM, present: 'pnpm josh repo:party', absent: 'kit / app-kit / game-kit' },
 	{ document_path: UPSTREAM, present: CLAUDE_HEADING, absent: 'then always stop' },
 ]

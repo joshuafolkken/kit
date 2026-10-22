@@ -1,6 +1,5 @@
 import type { IssueState } from '#scripts/issue/issue-state'
 import { session_cite } from '#scripts/issue/session-cite'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_prep } from './run-prep'
 
@@ -35,7 +34,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 const has_changes_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/git/stash/git-stash', () => ({
-	git_stash: { has_changes: has_changes_mock },
+	git_stash: { has_stashable_changes: has_changes_mock },
 }))
 
 const ahead_mock = vi.hoisted(() => vi.fn<(issue_number: string) => Promise<Array<string>>>())
@@ -279,11 +278,5 @@ describe('run_prep_cli.run ship preconditions', () => {
 
 		expect(printed()).toContain(run_prep.SHIP_HEADER)
 		expect(printed()).not.toContain(run_prep.SHIP_UNMET)
-	})
-})
-
-describe('josh run:prep registration', () => {
-	it('is registered as a josh command', () => {
-		expect(COMMAND_MAP['run:prep']?.script).toBe('scripts/run/run-prep-cli.ts')
 	})
 })

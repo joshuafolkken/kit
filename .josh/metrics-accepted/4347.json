@@ -1,0 +1,7 @@
+{
+	"reason": "Stop hook must read a SendMessage-resumed subagent as pending, in transcript order, so it stops releasing a live lane's hold and in-progress (#4347)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

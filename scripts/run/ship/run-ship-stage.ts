@@ -44,6 +44,9 @@ interface ShipState {
 	is_committed: boolean
 	is_pushed: boolean
 	is_merged: boolean
+	// The issue changed after the recorded review's brief (`issue-watch-gate.ts`), so the review re-runs
+	// even on a committed tree (joshuafolkken/kit#4221).
+	is_review_stale?: boolean
 }
 
 const RECORD_PREFIX = 'josh-ship-stages-'
@@ -129,8 +132,9 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
 	// The `--review` round precedes the commit, so a commit is its output as it
 	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
-	// the recorded round, and only a commit pins the tree that round read.
-	[STAGE.REVIEW]: (_done, state) => state.is_merged || state.is_committed,
+	// the recorded round, and only a commit pins the tree that round read — unless the issue changed since.
+	[STAGE.REVIEW]: (_done, state) =>
+		state.is_merged || (state.is_committed && state.is_review_stale !== true),
 	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
 	// The merge of the default branch before the commit: once committed, a
 	// conflicting pull request is the followup's to merge again.
@@ -173,9 +177,11 @@ function commit_flags(state: ShipState): ReadonlyArray<string> {
 // **The newest line carries the attempt's history**: a fourth word lists every
 // stage the attempt has started, so the one line per issue a stream full of positions keeps still
 // draws the whole track. A line with no started stage keeps the three-word form.
+// The stage is a word rather than a `Stage`: the pre-detach checks, which are not one, are written in
+// the same form (`run-ship-pre-detach-timed.ts`).
 function event_text(
 	issue: string,
-	stage: Stage,
+	stage: string,
 	phase: Phase,
 	started: ReadonlyArray<string> = [],
 ): string {

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
@@ -10,6 +8,8 @@ import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-c
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
@@ -20,7 +20,6 @@ import { session_cite } from '#scripts/issue/session-cite'
 // nothing checks it. The contract is `epic:next`'s: one token on standard output, every explanation
 // on standard error, so `answer=$(pnpm josh auto-ok:next)` reads it.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const EXCLUDE_FLAG = '--exclude'
@@ -210,7 +209,11 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 		LISTING_LIMIT,
 	)
 
-	return json === undefined ? await classify_failed_read() : parse_listing(json, is_capped)
+	const read = json === undefined ? await classify_failed_read() : parse_listing(json, is_capped)
+
+	if (read.kind === 'read') await issue_sample_gate.prime(read.issues.map((issue) => issue.body))
+
+	return read
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native
@@ -331,10 +334,15 @@ function is_runnable(
 	issue: OpenIssueData,
 	tracked: ReadonlyMap<number, number>,
 	exclude: ReadonlyArray<number>,
+	now: number = Date.now(),
 ): boolean {
 	if (tracked.has(issue.number)) return false
 
-	return is_unblocked(issue) && !exclude.includes(issue.number)
+	return (
+		is_unblocked(issue) &&
+		!exclude.includes(issue.number) &&
+		issue_not_before.is_due(issue.body, now)
+	)
 }
 
 function pick_next(
@@ -351,7 +359,7 @@ function pick_next(
 function none_reason(count: number): string {
 	if (count === 0) return NONE_OPTED_IN_MESSAGE
 
-	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, blocked by an open issue, or the one just merged.`
+	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, blocked by an open issue, not due until its start time, or the one just merged.`
 }
 
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run
@@ -457,14 +465,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await answer(read, options.exclude)
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
-// macOS a write to a pipe is asynchronous — `process.exit()` can tear the process down before it has
-// drained, and this command's whole contract is `answer=$(pnpm josh auto-ok:next)`. The same shape
-// is already in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const auto_ok_cli = {
 	USAGE,
 	NONE_TOKEN,
@@ -485,8 +485,6 @@ const auto_ok_cli = {
 	truncation_note,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { auto_ok_cli }
 export type { NextOptions, OptedInRead, PickupContext, TrackingRead }

@@ -1,7 +1,4 @@
-#!/usr/bin/env tsx
 import { statSync } from 'node:fs'
-import { text } from 'node:stream/consumers'
-import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_guard_policy, type LaneGuardMode } from '#scripts/lane/lane-guard-policy'
 import { json_value } from '#scripts/lib/json-value'
@@ -176,8 +173,8 @@ function is_candidate(call: GuardedCall): boolean {
 }
 
 // A refusable call is refused only where the mode is `refuse`. A lane child is `notice`, so it reaches
-// here and is withheld the refusal — the notice branch carries the guidance instead, because a refusal
-// ends a headless child's turn.
+// here and is withheld the refusal — the notice branch carries the guidance instead, for the reason its
+// `because` in `lane-guard-policy.ts` records.
 function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
 	if (duplicate_mode() !== 'refuse') return false
 
@@ -215,11 +212,6 @@ const { deny_envelope, DISABLED_VALUES } = hook_decision
 const duplicate_reads = {
 	REASON,
 	NOTICE,
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('duplicate-read:guard')
-	else hook_decision.write_outcome(await text(process.stdin), duplicate_read_outcome)
 }
 
 export {

@@ -1,0 +1,7 @@
+{
+	"reason": "#4043 adds the board row's activity column alignment and phase-event suppression, a new behavior",
+	"date": "2026-10-17",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}

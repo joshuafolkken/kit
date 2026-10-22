@@ -1,15 +1,15 @@
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { DefectRate } from './defect-rate'
 import { defect_rate_cli } from './defect-rate-cli'
 
 const REPO = 'owner/repo'
 const NOW_MS = Date.parse('2026-09-23T14:00:00Z')
+const DAYS = 7
 const DEFECT_BODY = '- 種別: 不具合'
 const INTERRUPT_LABELS = [{ name: 'route:interrupt' }]
 const DEFECT_ITEM = { body: DEFECT_BODY, labels: [] }
 const ENHANCEMENT_ITEM = { body: '', labels: [{ name: 'enhancement' }] }
-const LOWER_BOUNDS = 'lower bounds'
 const TWO_SEARCHES = 2
 const THREE_PAGES_TOTAL = 201
 const OVER_CEILING = 5000
@@ -37,8 +37,6 @@ function stub_search(
 	filed: object | ReadonlyArray<object>,
 	completed: object | ReadonlyArray<object>,
 ): MockInstance {
-	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
-
 	return vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(async (request: GhApiRequest) => {
 		const search = request.path.includes('created') ? filed : completed
 		const pages = Array.isArray(search) ? search : [search]
@@ -55,38 +53,12 @@ function requested_pages(api: MockInstance, kind: string): Array<number> {
 		.toSorted((left, right) => left - right)
 }
 
-function capture(): MockInstance {
-	return vi.spyOn(console, 'info').mockImplementation(() => undefined)
-}
-
-function printed(spy: MockInstance): string {
-	return spy.mock.calls.map((call) => String(call[0])).join('\n')
+async function measure(days: number = DAYS): Promise<DefectRate | undefined> {
+	return await defect_rate_cli.measure_window(REPO, days, NOW_MS)
 }
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-describe('defect_rate_cli.read_days', () => {
-	it('defaults to 14 days', () => {
-		expect(defect_rate_cli.read_days([])).toBe(14)
-	})
-
-	it('reads a positive whole number of days', () => {
-		expect(defect_rate_cli.read_days(['--days', '30'])).toBe(30)
-	})
-
-	it('accepts a window of ten years', () => {
-		expect(defect_rate_cli.read_days(['--days', '3650'])).toBe(3650)
-	})
-
-	it.each([['0'], [''], ['1.5'], ['-3'], ['3651'], ['999999999']])('refuses --days %j', (raw) => {
-		expect(defect_rate_cli.read_days(['--days', raw])).toBeUndefined()
-	})
-
-	it('refuses an unknown flag', () => {
-		expect(defect_rate_cli.read_days(['--day', '3'])).toBeUndefined()
-	})
 })
 
 describe('defect_rate_cli.search_path', () => {
@@ -103,37 +75,31 @@ describe('defect_rate_cli.search_path', () => {
 	})
 })
 
-describe('defect_rate_cli.run', () => {
-	it('prints the rate from both searches over the requested window', async () => {
+describe('defect_rate_cli.measure_window', () => {
+	it('measures both searches over the requested window', async () => {
 		const filed = page([DEFECT_ITEM, { labels: INTERRUPT_LABELS }])
 		const api = stub_search(filed, page([ENHANCEMENT_ITEM, ENHANCEMENT_ITEM]))
-		const output = capture()
 
-		expect(await defect_rate_cli.run(['--days', '7'], NOW_MS)).toBe(0)
-		expect(printed(output)).toContain('last 7 days (since 2026-09-16): 1.00 (2 / 2)')
+		expect(await measure()).toEqual({
+			days: DAYS,
+			since: '2026-09-16',
+			defects: 2,
+			enhancements: 2,
+			is_capped: false,
+		})
 		expect(api).toHaveBeenCalledTimes(TWO_SEARCHES)
 	})
 
-	it('fails rather than printing a rate when a search cannot be read', async () => {
-		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
+	it('answers nothing rather than a rate when a search cannot be read', async () => {
 		vi.spyOn(git_gh_exec, 'exec_gh_api').mockRejectedValue(new Error('rate limited'))
-		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
-		expect(await defect_rate_cli.run([], NOW_MS)).toBe(1)
-		expect(errors).toHaveBeenCalled()
-	})
-
-	it('fails with the usage on an unreadable window', async () => {
-		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-
-		expect(await defect_rate_cli.run(['--days', 'x'], NOW_MS)).toBe(1)
-		expect(errors).toHaveBeenCalledWith(defect_rate_cli.USAGE)
+		expect(await measure()).toBeUndefined()
 	})
 })
 
 // joshuafolkken/kit#3103: the pages are fetched together rather than walked one `next` link at a
 // time, so the rate must still count every item on every page, and only the pages that exist.
-describe('defect_rate_cli.run — the search pages', () => {
+describe('defect_rate_cli.measure_window — the search pages', () => {
 	it('reads every page the first page counts and measures them all', async () => {
 		const filed = [
 			page([DEFECT_ITEM], THREE_PAGES_TOTAL),
@@ -141,30 +107,25 @@ describe('defect_rate_cli.run — the search pages', () => {
 			page([{ labels: INTERRUPT_LABELS }]),
 		]
 		const api = stub_search(filed, page([ENHANCEMENT_ITEM, ENHANCEMENT_ITEM, ENHANCEMENT_ITEM]))
-		const output = capture()
 
-		expect(await defect_rate_cli.run(['--days', '7'], NOW_MS)).toBe(0)
+		expect(await measure()).toMatchObject({ defects: 3, enhancements: 3 })
 		expect(requested_pages(api, 'created')).toEqual([1, 2, 3])
-		expect(printed(output)).toContain('1.00 (3 / 3)')
 	})
 
-	it('reads no page past the search ceiling and warns that the window is capped', async () => {
+	it('reads no page past the search ceiling and marks the window capped', async () => {
 		const filed = Array.from({ length: CEILING_PAGES }, () => page([DEFECT_ITEM], OVER_CEILING))
 		const api = stub_search(filed, page([ENHANCEMENT_ITEM]))
-		const output = capture()
 
-		expect(await defect_rate_cli.run([], NOW_MS)).toBe(0)
+		expect(await measure()).toMatchObject({ is_capped: true })
 		expect(requested_pages(api, 'created')).toHaveLength(CEILING_PAGES)
-		expect(printed(output)).toContain(LOWER_BOUNDS)
 	})
 
-	it('fails rather than measuring part of a search when a later page cannot be read', async () => {
+	it('answers nothing rather than measuring part of a search when a later page cannot be read', async () => {
 		stub_search(
 			[page([DEFECT_ITEM], THREE_PAGES_TOTAL), page([DEFECT_ITEM])],
 			page([ENHANCEMENT_ITEM]),
 		)
-		vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
-		expect(await defect_rate_cli.run([], NOW_MS)).toBe(1)
+		expect(await measure()).toBeUndefined()
 	})
 })

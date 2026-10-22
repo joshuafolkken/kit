@@ -1,0 +1,149 @@
+import { core_budget } from '#scripts/gate/core-budget'
+import {
+	CSPELL_CACHE_FLAGS,
+	CSPELL_COMMIT_CACHE_FLAGS,
+	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
+	ESLINT_COMMIT_CACHE_FLAGS,
+	PRETTIER_CACHE_FLAGS,
+} from '#scripts/josh/josh-command-types'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('#scripts/lint/eslint-cache-dependencies', () => ({
+	eslint_cache_dependencies: {
+		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
+}))
+
+const execa_module = await import('execa')
+const mocked_execa = vi.mocked(execa_module.execa)
+const { eslint_daemon } = await import('#scripts/lint/eslint-daemon')
+const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
+const { eslint_cache_dependencies } = await import('#scripts/lint/eslint-cache-dependencies')
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
+const { pre_commit_lint } = await import('./pre-commit-lint')
+
+type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
+
+const STAGED = ['src/a.ts', 'docs/b.md']
+
+function built(tool: string): ReadonlyArray<string> {
+	return pre_commit_lint.build_arguments(tool, STAGED) ?? []
+}
+
+function joined(tool: string): string {
+	return built(tool).join(' ')
+}
+
+beforeEach(() => {
+	vi.clearAllMocks()
+})
+
+// joshuafolkken/kit#3948: the pre-commit hook's cache locations come from the same constants the
+// ignore rules are asserted against, joined so a flag stays paired with its value. The gate's location
+// is excluded by comparing the argument itself: `.cspellcache.commit` has `.cspellcache` as a prefix,
+// so a substring check of the joined line could never pass.
+describe('pre_commit_lint.build_arguments', () => {
+	it('spell-checks the staged files through the hook cache, not the gate cache it would prune', () => {
+		expect(joined('cspell')).toContain(CSPELL_COMMIT_CACHE_FLAGS.join(' '))
+		expect(built('cspell')).not.toContain(CSPELL_CACHE_FLAGS.at(-1))
+	})
+
+	it('checks formatting through the prettier cache the gate warms', () => {
+		expect(joined('prettier')).toContain(`--ignore-unknown ${PRETTIER_CACHE_FLAGS.join(' ')}`)
+	})
+
+	it('lints quietly through the hook cache, so warning-less reports never reach the gate', () => {
+		expect(joined('eslint')).toContain(`--quiet ${ESLINT_COMMIT_CACHE_FLAGS.join(' ')}`)
+		expect(built('eslint')).not.toContain(ESLINT_CACHE_FLAGS.at(-1))
+	})
+
+	it('passes the staged files last', () => {
+		expect(pre_commit_lint.build_arguments('eslint', STAGED)?.slice(-STAGED.length)).toEqual(STAGED)
+	})
+
+	it('answers nothing for a tool it does not know', () => {
+		expect(pre_commit_lint.build_arguments('stylelint', STAGED)).toBeUndefined()
+	})
+})
+
+describe('pre_commit_lint.run', () => {
+	it('returns the tool exit code', async () => {
+		mocked_execa.mockResolvedValueOnce({ exitCode: 1 } as unknown as ExecaResult)
+
+		expect(await pre_commit_lint.run(['prettier', ...STAGED])).toBe(1)
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'pnpm',
+			pre_commit_lint.build_arguments('prettier', STAGED),
+			expect.objectContaining({ stdio: 'inherit' }),
+		)
+	})
+
+	// joshuafolkken/kit#3944: lefthook starts the three tools in parallel, each off the ledger until now.
+	it.each([
+		['cspell', 'spell_check'],
+		['prettier', 'format'],
+		['eslint', 'eslint_scan'],
+	] as const)('claims the core budget %s is declared under', async (tool, budget) => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation').mockResolvedValue(0)
+
+		expect(await pre_commit_lint.run([tool, ...STAGED])).toBe(0)
+		expect(reservation).toHaveBeenCalledWith(
+			core_budget.CORE_WEIGHTS[budget],
+			expect.any(Function),
+			expect.objectContaining({ memory_mb: core_budget.MEMORY_MB[budget] }),
+		)
+		reservation.mockRestore()
+	})
+
+	it('refuses an unknown tool with a usage error and runs nothing', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await pre_commit_lint.run(['stylelint'])).toBe(pre_commit_lint.USAGE_ERROR_EXIT_CODE)
+		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
+const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }
+
+// joshuafolkken/kit#4358: eslint runs warm or cold through `eslint_daemon.run_or_cold`, inside the
+// eslint reservation.
+describe('pre_commit_lint.run — eslint', () => {
+	it('lints the staged files through the daemon route inside the eslint reservation', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		reservation.mockImplementation(async (_weight, work) => await work())
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'))
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(reservation).toHaveBeenCalledOnce()
+		reservation.mockRestore()
+	})
+
+	it('fails a run that ended without an exit code', async () => {
+		mocked_run_or_cold.mockResolvedValueOnce({ ...STALE_RED, exit_code: undefined })
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4415: a merge can change only what a staged file imports, and the hook's content
+// cache keeps the staged file's verdict. Its entry is dropped from the hook's cache file before the
+// run reads it, and the run's own report is the one printed.
+describe('pre_commit_lint.run — the dependency guard', () => {
+	it('runs eslint inside the guard of the hook cache file and prints its report', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+		expect(mocked_guard).toHaveBeenCalledWith(ESLINT_COMMIT_CACHE_FILE, expect.any(Function))
+		expect(write).toHaveBeenCalledWith(STALE_RED.output)
+	})
+})

@@ -1,12 +1,14 @@
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage and per stopped `josh ship`, read back by `josh lane:stats`.
+// `josh ship` stage, per stopped `josh ship`, per round-2 decision and per core-budget wait, read back
+// by `josh lane:stats`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -23,6 +25,9 @@ const LEDGER_SUFFIX = '.jsonl'
 const LINE_SEPARATOR = '\n'
 // `followup`'s wait for CI — a stage of a lane's run that no `josh ship` stage is the whole of.
 const CI_WAIT_STAGE = 'ci-wait'
+// A detached `josh ship`'s fast checks in the agent's own turn — not a resumable ship stage, since the
+// supervised gate runs them again (joshuafolkken/kit#4382).
+const PRE_DETACH_STAGE = 'pre-detach'
 const LEDGER_FILE_MODE = 0o600
 // The flags `detached-launch.ts` appends its log with, for the same deterministic shared-temp path.
 const { O_APPEND, O_CREAT, O_NOFOLLOW, O_WRONLY } = constants
@@ -37,6 +42,12 @@ const KIND = {
 	STAGE: 'stage',
 	STOP: 'stop',
 	OVERLAP: 'overlap',
+	HELD: 'held',
+	RELEASED: 'released',
+	ROUND_TWO: 'round-two',
+	OFFERABLE: 'offerable',
+	CORE_WAIT: 'core-wait',
+	UNIT_FILES: 'unit-files',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -45,6 +56,18 @@ const check_schema = z.object({
 	elapsed_ms: z.number(),
 	is_passed: z.boolean(),
 	is_reused: z.boolean().optional(),
+	// The CPU milliseconds the check's process tree spent, so a core weight can be re-measured from
+	// the ledger (joshuafolkken/kit#4362). Absent where the gate could not read it (off macOS).
+	cpu_ms: z.number().optional(),
+	// Why the unit leg ran the whole suite instead of the related tests — a stable kind, never the
+	// file it names (joshuafolkken/kit#4397). Absent when it narrowed, and on every other check.
+	fallback: z.string().optional(),
+	// The unit leg's since-green no-op: nothing moved, so it ran no test (joshuafolkken/kit#4457).
+	is_unmoved: z.boolean().optional(),
+	// The width the check asked the core budget for, the width it ran at and how long it waited, so a
+	// unit claim's wait for room is read per run (joshuafolkken/kit#4451). Absent on a check that
+	// claimed none — a reused one, or one inside another gate's claim.
+	claim: z.object({ requested: z.number(), granted: z.number(), waited_ms: z.number() }).optional(),
 })
 const gate_schema = z.object({
 	kind: z.literal(KIND.GATE),
@@ -60,6 +83,9 @@ const gate_schema = z.object({
 	// Each check's own duration and verdict, so `josh lane:stats` can name the check a slow gate waited
 	// on. A reused check started no process: its row says so, and its zero is no timing.
 	checks: z.array(check_schema).optional(),
+	// A gate that reused a green record for this tree and base and started no check: counted, never
+	// timed (joshuafolkken/kit#4397).
+	is_reused: z.boolean().optional(),
 })
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
@@ -100,13 +126,21 @@ const stage_schema = z.object({
 	issue: z.number().optional(),
 })
 // A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
-// retrospective's stop reason. How long it stayed stopped is derived from the next ship stage, not
-// recorded, so a resumed ship never has to know the stop it ends.
+// retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded
+// before it had one. `preconditions` names the kinds a preflight stop found unmet (`run-ship-preflight.ts`),
+// absent on any other stop and on one recorded before it had them. `findings` names the
+// `<category>:<severity>` of each finding that decided a review or round-2 stop — the blocking ones, else
+// the fixed ones (joshuafolkken/kit#4426),
+// absent where none decided the stop. How long it stayed stopped is derived from the next ship stage, not recorded, so a
+// resumed ship never has to know the stop it ends.
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),
 	at: z.string(),
 	issue: z.number(),
 	reason: z.string(),
+	cause: z.string().optional(),
+	preconditions: z.array(z.string()).optional(),
+	findings: z.array(z.string()).optional(),
 })
 // A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
 // before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the
@@ -120,6 +154,49 @@ const overlap_schema = z.object({
 	waited_ms: z.number(),
 	is_cleared: z.boolean(),
 })
+// A `backlog:drive` pass that left a free lane empty: `reason` is why — the offer verdict that started
+// nothing, or the hand-back that stopped the driver. How long the lane stayed empty is derived from the
+// next `held`, `released` or `dispatch` entry, the way a stop's wait is (joshuafolkken/kit#3995).
+const held_schema = z.object({ kind: z.literal(KIND.HELD), at: z.string(), reason: z.string() })
+// The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
+// the run finished, so no free lane is owed a child any more.
+const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
+// One `review:round2` decision a `josh ship` acted on for `issue`: `verdict` and the stable reason
+// `code` it fell under, so the period's skips and runs are counted by why (joshuafolkken/kit#4064).
+const round_two_schema = z.object({
+	kind: z.literal(KIND.ROUND_TWO),
+	at: z.string(),
+	issue: z.number(),
+	verdict: z.string(),
+	code: z.string(),
+})
+// A stall detector observation, written only when it changes: whether offerable backlog work and a free
+// lane coexisted, so a stall is aged from when both first held rather than from the last launch
+// (joshuafolkken/kit#4349).
+const offerable_schema = z.object({
+	kind: z.literal(KIND.OFFERABLE),
+	at: z.string(),
+	is_offerable: z.boolean(),
+})
+// One claim that waited `waited_ms` for the core budget before `command` could start — written by the
+// command itself, so a wait inside a gate, a scoped check or a ship lands in one record. `issue` is the
+// lane the claim ran in, absent outside a lane (joshuafolkken/kit#4382).
+const core_wait_schema = z.object({
+	kind: z.literal(KIND.CORE_WAIT),
+	at: z.string(),
+	command: z.string(),
+	waited_ms: z.number(),
+	issue: z.number().optional(),
+})
+// One vitest run's slowest test files, each with its wall time from environment setup to its last
+// test, so a unit run whose wall time far outran its CPU names the file it stalled on
+// (joshuafolkken/kit#4451). Written by the run itself (`tools/test/unit-file-reporter.ts`).
+const unit_file_schema = z.object({ file: z.string(), elapsed_ms: z.number() })
+const unit_files_schema = z.object({
+	kind: z.literal(KIND.UNIT_FILES),
+	at: z.string(),
+	files: z.array(unit_file_schema),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -128,6 +205,12 @@ const entry_schema = z.discriminatedUnion('kind', [
 	stage_schema,
 	stop_schema,
 	overlap_schema,
+	held_schema,
+	released_schema,
+	round_two_schema,
+	offerable_schema,
+	core_wait_schema,
+	unit_files_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -138,6 +221,14 @@ type DispatchEntry = z.infer<typeof dispatch_schema>
 type StageEntry = z.infer<typeof stage_schema>
 type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
+type HeldEntry = z.infer<typeof held_schema>
+type RoundTwoEntry = z.infer<typeof round_two_schema>
+type OfferableEntry = z.infer<typeof offerable_schema>
+type CoreWaitEntry = z.infer<typeof core_wait_schema>
+type CoreWaitRecord = Omit<CoreWaitEntry, 'kind' | 'at'>
+type UnitFilesEntry = z.infer<typeof unit_files_schema>
+type UnitFileRecord = z.infer<typeof unit_file_schema>
+type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
 type GateCheckRecord = z.infer<typeof check_schema>
@@ -224,6 +315,33 @@ async function record_overlap(overlap: OverlapRecord, path?: string): Promise<vo
 	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
 }
 
+async function record_held(reason: string, path?: string): Promise<void> {
+	await record({ kind: KIND.HELD, at: now_iso(), reason }, path)
+}
+
+async function record_released(path?: string): Promise<void> {
+	await record({ kind: KIND.RELEASED, at: now_iso() }, path)
+}
+
+async function record_offerable(is_offerable: boolean, path?: string): Promise<void> {
+	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
+}
+
+async function record_round_two(round_two: RoundTwoRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.ROUND_TWO, at: now_iso(), ...round_two }, path)
+}
+
+async function record_core_wait(wait: CoreWaitRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.CORE_WAIT, at: now_iso(), ...wait }, path)
+}
+
+async function record_unit_files(
+	files: ReadonlyArray<UnitFileRecord>,
+	path?: string,
+): Promise<void> {
+	await record({ kind: KIND.UNIT_FILES, at: now_iso(), files: [...files] }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -232,9 +350,7 @@ function is_present(entry: LedgerEntry | undefined): entry is LedgerEntry {
 	return entry !== undefined
 }
 
-// Every entry, oldest first. A malformed line — a write cut short — is skipped rather than making the
-// whole ledger unreadable, and an absent or unowned file is an empty ledger.
-function read_entries(path: string): ReadonlyArray<LedgerEntry> {
+function parse_entries(path: string): ReadonlyArray<LedgerEntry> {
 	const raw = stamp_file.read_stamp_text(path)
 
 	if (raw === undefined) return []
@@ -245,32 +361,56 @@ function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 		.filter(is_present)
 }
 
+// Each ledger's entries, parsed again only once the file itself has changed (joshuafolkken/kit#4263).
+const parsed_ledgers = stamped_memo.create<ReadonlyArray<LedgerEntry>>()
+
+// Every entry, oldest first. A malformed line — a write cut short — is skipped rather than making the
+// whole ledger unreadable, and an absent or unowned file is an empty ledger.
+function read_entries(path: string): ReadonlyArray<LedgerEntry> {
+	return parsed_ledgers.of(path, stamped_memo.file_stamp(path), () => parse_entries(path))
+}
+
 const lane_ledger = {
 	CI_WAIT_STAGE,
 	KIND,
+	PRE_DETACH_STAGE,
 	append,
 	read_entries,
 	record,
+	record_core_wait,
 	record_dispatch,
 	record_gate,
+	record_held,
+	record_released,
 	record_merge,
 	record_overlap,
+	record_offerable,
+	record_round_two,
 	record_stage,
 	record_stop,
+	record_unit_files,
 	target,
 	target_of,
 }
 
 export type {
+	CoreWaitEntry,
+	CoreWaitRecord,
 	DispatchEntry,
 	GateCheckRecord,
 	GateEntry,
+	HeldEntry,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,
+	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	RoundTwoEntry,
 	StageEntry,
 	StopEntry,
+	StopRecord,
+	UnitFileRecord,
+	UnitFilesEntry,
 }
 export { lane_ledger }

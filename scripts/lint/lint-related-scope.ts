@@ -8,16 +8,14 @@ import {
 import {
 	ESLINT_RELATED_CACHE_FILE,
 	ESLINT_RELATED_CACHE_FLAGS,
+	PRETTIER_RELATED_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import type { CrossFileRecheckOptions } from './cross-file-recheck'
 
 // `josh lint` reads the whole repository on every call, and an implementation loop calls it after
 // every few edits — re-reading files the change never touched.
 //
-// **This narrowing is added in front of the whole check, never in place of it.** `josh gate` still
-// runs `josh lint` over everything before the commit: a formatting rule can be broken by a file the
-// change did not name (a shared config, a generated snapshot), and only the whole-tree run sees
-// that. What the narrowing replaces is the repeat calls in between.
+// The gate narrows its own lint the same way, with its own caches and a whole-tree fallback for a
+// changed toolchain or lint configuration (`lint-gate-scope.ts`), and CI lints the whole tree.
 //
 // The decision this file makes is which extensions the two linters read, and how each of them is
 // asked about a file list instead of a directory. Everything it shares with `josh test:related` —
@@ -94,39 +92,49 @@ function describe_scope(scope: ChangedFileScope, root: string): string {
 	return changed_file_scope.describe_scope(scope, root, VOCABULARY)
 }
 
-function prettier_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
-	return [...PRETTIER_ARGS, ...files]
+// Where a narrowed run keeps its caches. `josh lint:related` keeps its own and the gate its own, for
+// the reason `eslint_arguments` gives below; a narrowed gate run on the gate's caches loses none of
+// the whole-tree entries, since a file it does not visit is not pruned (`josh-command-types.ts`).
+interface LintCaches {
+	eslint_file: string
+	eslint_flags: ReadonlyArray<string>
+	prettier_flags: ReadonlyArray<string>
+}
+
+const RELATED_CACHES: LintCaches = {
+	eslint_file: ESLINT_RELATED_CACHE_FILE,
+	eslint_flags: ESLINT_RELATED_CACHE_FLAGS,
+	prettier_flags: PRETTIER_RELATED_CACHE_FLAGS,
+}
+
+// The scoped run's own cache file, for the reason eslint's below gives: prettier too rewrites its
+// cache file whole, so a narrowed run sharing the gate's would discard entries a concurrent gate wrote.
+function prettier_arguments(
+	files: ReadonlyArray<string>,
+	caches: LintCaches = RELATED_CACHES,
+): ReadonlyArray<string> {
+	return [...PRETTIER_ARGS, ...files, ...caches.prettier_flags]
 }
 
 // The cache file is this command's own rather than the gate's, because the two run at the same time.
-// `josh gate` lints the whole tree beside the review while an
+// `josh gate` lints beside the review while an
 // implementation loop calls this command between edits, and each eslint run rewrites its cache file
 // whole from the copy it loaded at start-up — so on one file the run that finished last would
 // discard the other's entries, and a narrowed run finishing during a whole-tree run would roll the
 // cache back to its pre-gate state. Sharing would let a narrowed run warm the gate's cache only for
 // pruning, which says nothing about two writers. It is the same judgement the edit hook's own cache
 // file makes.
-//
-// **What is narrowed is still only the target list, never the gate.** `josh gate` runs `josh lint`
-// over the whole tree before any commit; this file decides which files a repeat call reads.
-function eslint_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
-	return [...ESLINT_ARGS, ...files, ...ESLINT_RELATED_CACHE_FLAGS, ...ESLINT_SCOPED_FLAGS]
-}
-
-// What re-reading a cached cross-file report (`cross-file-recheck.ts`) needs to ask the narrowed run's question
-// again: the same targets, the same cache file, and the Node API's spelling of `--no-warn-ignored`.
-function cross_file_recheck_options(files: ReadonlyArray<string>): CrossFileRecheckOptions {
-	return {
-		cache_file: ESLINT_RELATED_CACHE_FILE,
-		patterns: files,
-		eslint_options: { warnIgnored: false },
-	}
+function eslint_arguments(
+	files: ReadonlyArray<string>,
+	caches: LintCaches = RELATED_CACHES,
+): ReadonlyArray<string> {
+	return [...ESLINT_ARGS, ...files, ...caches.eslint_flags, ...ESLINT_SCOPED_FLAGS]
 }
 
 const lint_related_scope = {
 	COMMAND_LABEL,
-	cross_file_recheck_options,
 	NOTHING_LINTABLE_REASON,
+	RELATED_CACHES,
 	describe_scope,
 	eslint_arguments,
 	is_lintable,
@@ -134,4 +142,5 @@ const lint_related_scope = {
 	scope_inputs,
 }
 
+export type { LintCaches }
 export { lint_related_scope }

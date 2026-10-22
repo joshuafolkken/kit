@@ -1,0 +1,7 @@
+{
+	"reason": "The test-read map records each dirty file's digest so the unit leg's reuse compares content rather than names (#4425)",
+	"date": "2026-10-21",
+	"growth": {
+		"scripts.code_lines": 35
+	}
+}

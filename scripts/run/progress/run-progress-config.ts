@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
-import { json_value } from '#scripts/lib/json-value'
+import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { z } from 'zod'
 import { run_progress } from './run-progress'
 
@@ -25,8 +24,6 @@ import { run_progress } from './run-progress'
 // Reading the working directory alone would let the guard enforce the repository's interval while the
 // watcher it guards kept the default, which is the one state this module exists to prevent.
 
-const PACKAGE_FILE = 'package.json'
-
 // Unknown keys are stripped rather than rejected: this reads a whole `package.json`, and every other
 // field in it is none of this module's business. A present-but-unusable interval fails the parse and
 // falls through, which is the same answer an unusable environment variable already gets.
@@ -35,13 +32,8 @@ const package_schema = z.object({
 })
 
 function read_declared_minutes(directory: string): number | undefined {
-	try {
-		const raw = readFileSync(path.join(directory, PACKAGE_FILE), 'utf8')
-
-		return json_value.parse_with(raw, package_schema)?.josh?.progress_interval_minutes
-	} catch {
-		return undefined
-	}
+	return package_manifest.read_manifest_if_valid(directory, package_schema)?.josh
+		?.progress_interval_minutes
 }
 
 function read_package_minutes(start: string): number | undefined {
@@ -55,7 +47,7 @@ function read_package_minutes(start: string): number | undefined {
 }
 
 function to_ms(minutes: number | undefined): number | undefined {
-	return minutes === undefined ? undefined : minutes * run_progress.MS_PER_MINUTE
+	return minutes === undefined ? undefined : minutes * MS_PER_MINUTE
 }
 
 /**
@@ -88,7 +80,7 @@ function configured_interval_ms(directory: string = process.cwd()): number {
 }
 
 const run_progress_config = {
-	PACKAGE_FILE,
+	PACKAGE_FILE: PACKAGE_JSON,
 	configured_interval_ms,
 	read_package_minutes,
 	resolve_interval_ms,

@@ -1,16 +1,15 @@
-#!/usr/bin/env tsx
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { doctor_io } from '#scripts/doctor/doctor-io'
 import { error_text } from '#scripts/lib/error-message'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { package_version_schema, with_package_manager_schema } from '#scripts/lib/schemas'
 import { auto_merge_setting } from '#scripts/repo/auto-merge-setting'
 import { pack_hook } from '#scripts/safe-chain/pack-hook'
-import { project_config } from '#scripts/safe-chain/project-config'
 import { security_updates } from '#scripts/security/security-updates'
 import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
+import { file_content } from '#scripts/sync/file-content'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
@@ -28,10 +27,8 @@ import { package_manager_pin } from './package-manager-pin'
 import { project_profile, type ProjectProfile, type ProjectShape } from './project-profile'
 import { working_tree } from './working-tree'
 
-const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const LEFTHOOK_BIN = 'lefthook'
-const ARGUMENT_START_INDEX = 2
 const INSTALL_HINT = '→ run `pnpm install` to install what package.json lists'
 const INIT_USAGE = 'josh init [--profile basic|full] [--no-install] [--dry-run]'
 
@@ -152,7 +149,7 @@ function merge_project_package_json(shape: ProjectShape): void {
 		return
 	}
 
-	writeFileSync(package_json_path, merged)
+	file_content.write_contained(package_json_path, merged)
 	console.info(`  ✔ ${is_existing ? 'updated' : 'created'}   package.json`)
 }
 
@@ -230,7 +227,7 @@ function initialize_project(shape: ProjectShape): void {
 
 	run_ai_file_actions(shape)
 	pack_hook.sync_pack_hook(PROJECT_ROOT, PACKAGE_DIR)
-	if (shape.profile === 'full') project_config.sync_project_config(PROJECT_ROOT)
+	if (shape.profile === 'full') sync.sync_release_window_mirrors(PROJECT_ROOT)
 }
 
 // A tool `init` just listed is absent until the user installs it — and `josh lint` then fails on it
@@ -335,10 +332,6 @@ function run_cli(args: ReadonlyArray<string>): void {
 		console.error(`\n✖ ${error_text.message_of(error)}\n`)
 		process.exitCode = 1
 	}
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	run_cli(process.argv.slice(ARGUMENT_START_INDEX))
 }
 
 const init = {

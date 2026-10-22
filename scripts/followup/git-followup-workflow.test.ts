@@ -85,6 +85,7 @@ vi.mock('#scripts/issue/issue-watch-gate', () => ({
 // import time, so the real check would read the observation ledger of whatever run is executing this
 // suite. Its default is `not-required`, so importing the module does not throw before a case runs.
 const OK = vi.hoisted(() => 'ok')
+const FEATURE_BRANCH = 'feature-branch'
 const ALLOWS_MERGE_TITLE = 'allows the merge when the verdict is %s'
 const NO_MERGE_TITLE = 'leaves a --no-merge run alone'
 const RECORD_REFUSAL_SENTINEL = vi.hoisted(() => 'record-refusal-sentinel')
@@ -107,6 +108,24 @@ vi.mock('#scripts/review/live-evidence', () => ({
 		check: evidence_check_mock,
 		refusal_message: () => EVIDENCE_REFUSAL_SENTINEL,
 	},
+}))
+
+// **Mocked for the same reason** (joshuafolkken/kit#3954): the real check re-reads the issue and the
+// pull request body. Its default is no refusal, so the import-time `main` passes.
+const MAP_REFUSAL = vi.hoisted(() => 'acceptance-map-refusal-sentinel')
+const map_refusal_mock = vi.hoisted(() => vi.fn(async (): Promise<string | undefined> => undefined))
+
+vi.mock('#scripts/review/acceptance-map-check', () => ({
+	acceptance_map_check: { refusal: map_refusal_mock },
+}))
+
+// **Mocked for the same reason** (joshuafolkken/kit#4287): the real check reads the branch diff and
+// the pull request body. Its default is no refusal, so the import-time `main` passes.
+const REMOVED_REFUSAL = vi.hoisted(() => 'removed-tests-refusal-sentinel')
+const removed_mock = vi.hoisted(() => vi.fn(async (): Promise<string | undefined> => undefined))
+
+vi.mock('#scripts/review/removed-tests-check', () => ({
+	removed_tests_check: { refusal: removed_mock },
 }))
 
 // **Mocked because `git_pr_followup` reaches `telegram-notify` and `main` runs at import time** — so
@@ -312,7 +331,7 @@ describe('a merge is refused unless the review round was recorded', () => {
 
 // joshuafolkken/kit#2446. A runtime change merges only with live-execution evidence in its body.
 describe('a merge is refused unless a runtime change carries live-execution evidence', () => {
-	const BRANCH = 'feature-branch'
+	const BRANCH = FEATURE_BRANCH
 
 	it('throws when the verdict is required', async () => {
 		evidence_check_mock.mockResolvedValueOnce('required')
@@ -340,6 +359,51 @@ describe('a merge is refused unless a runtime change carries live-execution evid
 		await git_followup_workflow.assert_live_evidence(false, BRANCH)
 
 		expect(evidence_check_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('a merge is refused until every acceptance criterion maps to a row', () => {
+	const BRANCH = FEATURE_BRANCH
+	const ISSUE = '3954'
+
+	it('throws the refusal the check names', async () => {
+		map_refusal_mock.mockResolvedValueOnce(MAP_REFUSAL)
+
+		await expect(
+			git_followup_workflow.assert_acceptance_mapped(true, ISSUE, BRANCH),
+		).rejects.toThrow(MAP_REFUSAL)
+	})
+
+	it('allows the merge when the check refuses nothing, asking about this issue and branch', async () => {
+		map_refusal_mock.mockClear()
+
+		await expect(
+			git_followup_workflow.assert_acceptance_mapped(true, ISSUE, BRANCH),
+		).resolves.toBeUndefined()
+		expect(map_refusal_mock).toHaveBeenCalledWith(ISSUE, BRANCH)
+	})
+
+	it.each([
+		[false, ISSUE],
+		[true, undefined],
+	])('asks nothing when merging is %s and the issue is %s', async (should_merge, issue) => {
+		map_refusal_mock.mockClear()
+		await git_followup_workflow.assert_acceptance_mapped(should_merge, issue, BRANCH)
+
+		expect(map_refusal_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('a merge is refused until every removed test is disposed of', () => {
+	it('throws the refusal the check names for this branch, and asks nothing without a merge', async () => {
+		removed_mock.mockClear().mockResolvedValueOnce(REMOVED_REFUSAL)
+
+		await expect(
+			git_followup_workflow.assert_removed_tests_disposed(true, FEATURE_BRANCH),
+		).rejects.toThrow(REMOVED_REFUSAL)
+		await git_followup_workflow.assert_removed_tests_disposed(false, FEATURE_BRANCH)
+
+		expect(removed_mock).toHaveBeenCalledExactlyOnceWith(FEATURE_BRANCH)
 	})
 })
 

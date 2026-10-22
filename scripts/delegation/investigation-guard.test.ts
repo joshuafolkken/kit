@@ -1,20 +1,20 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delegation_policy } from './delegation-policy'
 import {
 	deny_envelope,
 	DISABLED_VALUES,
-	investigation_notice_path,
 	investigation_outcome,
 	investigation_refusal,
 	is_enabled,
-	NOTICE,
 	refusal_path,
 	SWITCH_ENV_KEY,
 } from './investigation-guard'
@@ -134,7 +134,6 @@ afterAll(() => {
 
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(refusal_path(transcript), { force: true })
-		rmSync(investigation_notice_path(transcript), { force: true })
 	}
 
 	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
@@ -284,12 +283,10 @@ describe('investigation_refusal — a file the run has edited is not re-counted'
 	})
 })
 
-describe('investigation — a dispatched lane child gets a notice, not a refusal', () => {
-	// joshuafolkken/kit#2382: the guard was `off` in a lane child from kit#2138, on the reason that a
-	// child cannot dispatch a sub-unit to read its own edit targets. #2382 measured six lane children
-	// reading 4–17 unedited files each, so the reading was there to send out — the guard now delivers the
-	// same guidance as a notice, which a headless child survives (a refusal would end its turn). The mark
-	// and the checkout are set up here exactly as `lane-park.test.ts` sets up its own lane case.
+describe('investigation — a dispatched lane child is refused like the main line', () => {
+	// joshuafolkken/kit#3927: the guard was a notice in a lane child from kit#2382, and the notice was
+	// measured not to move the reading, so the child is refused at the same threshold. The mark and the
+	// checkout are set up here exactly as `lane-park.test.ts` sets up its own lane case.
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -300,41 +297,44 @@ describe('investigation — a dispatched lane child gets a notice, not a refusal
 		process.chdir(ENTRY_DIRECTORY)
 	})
 
-	// **The acceptance condition: a notice is raised and no refusal is** — asserted together with the
-	// enumeration so the guard and the policy cannot drift apart. A `permissionDecision` would end the
-	// headless child's turn (kit#2138), so `investigation_refusal` must stay `undefined` here.
-	it('raises a notice with no refusal at the threshold while marked as a lane child', () => {
+	// **The acceptance condition: the refusal, not a notice** — asserted together with the enumeration
+	// so the guard and the policy cannot drift apart.
+	it('refuses at the threshold while marked as a lane child, with no notice', () => {
 		const transcript = write_transcript('lane-child', at_threshold_lines())
 		const outcome = investigation_outcome(payload_of(transcript), NOW_MS)
 
-		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('notice')
-		// `reason` undefined is the refusal being withheld — a `permissionDecision` would end the child's
-		// headless turn (kit#2138) — while `notice` carries the guidance instead.
-		expect(outcome.reason).toBeUndefined()
-		expect(outcome.notice).toBeDefined()
+		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('refuse')
+		expect(outcome.reason).toBe(investigation_reads.REASON)
+		expect(outcome.notice).toBeUndefined()
 	})
 
-	// **The notice names the concrete unedited files** (kit#2276, kit#2382), so the child is shown which
-	// reads to send out rather than only told to delegate — the form kit#2164 → #2178 measured not to move
-	// the number.
-	it('names the unedited files this run read in the notice', () => {
-		const transcript = write_transcript('lane-child-names', at_threshold_lines())
-		const outcome = investigation_outcome(payload_of(transcript), NOW_MS)
+	// The threshold is unchanged in a lane child: below it nothing is said.
+	it('says nothing below the threshold while marked as a lane child', () => {
+		const transcript = write_transcript('lane-child-below', target_turn_lines(0, [LONE_FILE]))
 
-		expect(outcome.notice).toContain('scripts/read-0.ts')
-		expect(outcome.notice).toContain('scripts/read-1.ts')
-		// The wording is the base notice with the reads appended, so it opens with the base text.
-		expect(outcome.notice).toContain(NOTICE)
+		expect(investigation_outcome(payload_of(transcript), NOW_MS).reason).toBeUndefined()
 	})
 
-	// A person working in a lane carries no mark, so the guard refuses exactly as it always did — the
-	// "fires as before when not a lane child" half of the acceptance criterion.
-	it('refuses again once the lane-child mark is gone', () => {
+	// A person working in a lane carries no mark, so the guard refuses exactly as it always did.
+	it('refuses once the lane-child mark is gone', () => {
 		const transcript = write_transcript('lane-unmarked', at_threshold_lines())
 
 		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 
 		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBe(investigation_reads.REASON)
+	})
+
+	// The lane's headless reviewer carries the same mark, and reading the diff's files is its task.
+	it('stands down for the reviewer session of the lane', () => {
+		const transcript = write_transcript('lane-reviewer', at_threshold_lines())
+
+		process.env[agent_session_role.KEY] = agent_role_profile.REVIEWER
+
+		try {
+			expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+		} finally {
+			Reflect.deleteProperty(process.env, agent_session_role.KEY)
+		}
 	})
 })
 

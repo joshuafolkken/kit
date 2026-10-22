@@ -2,6 +2,7 @@ import {
 	BUG_LABEL,
 	has_label_name,
 	INTERRUPT_ROUTE_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_SOLO_LABEL,
 } from './issue-labels'
@@ -9,7 +10,7 @@ import {
 // The keys that decide which open issue is offered first, defined once for
 // every ranking that asks: the `🗒 Next issues` display, the `auto-ok` pickup and `backlog:next`.
 //
-// In order: `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
+// In order: `priority:critical`, then `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
 // `route:interrupt`), then how many other open issues wait on it. Below those, the caller's own order
 // stands — the sort is stable, so recency and the defect-rate adjustment survive as the last key.
 //
@@ -35,6 +36,10 @@ function flag(is_set: boolean): number {
 	return is_set ? 1 : 0
 }
 
+function is_critical(labels: ReadonlyArray<string>): boolean {
+	return has_label_name(labels, PRIORITY_CRITICAL_LABEL)
+}
+
 function is_priority(labels: ReadonlyArray<string>): boolean {
 	return has_label_name(labels, PRIORITY_HIGH_LABEL)
 }
@@ -48,6 +53,7 @@ function is_verification_defect(labels: ReadonlyArray<string>): boolean {
 // Negated so that the larger value sorts first under an ascending comparison.
 function keys_of(row: RankRow): ReadonlyArray<number> {
 	return [
+		-flag(is_critical(row.labels)),
 		-flag(is_priority(row.labels)),
 		-flag(is_verification_defect(row.labels)),
 		-row.dependents,

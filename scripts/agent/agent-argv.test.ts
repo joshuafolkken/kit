@@ -36,6 +36,20 @@ describe('a stored lane profile across a cut', () => {
 	})
 })
 
+// joshuafolkken/kit#3926: a verification round builds under its own reviewer profile.
+describe('a review round', () => {
+	it('builds a later round under the verification profile', () => {
+		check.mockReturnValue({ kind: 'ready' })
+		const sonnet = 'claude-sonnet-5-5'
+		const built = agent_argv.review_in(INVOCATION, 2, LANE, {
+			JOSH_REVIEWER_VERIFICATION_MODEL: sonnet,
+		})
+
+		expect(built).toMatchObject({ kind: 'argv', profile: { model: sonnet } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(sonnet)
+	})
+})
+
 describe('an unsupported CLI', () => {
 	it('refuses with the diagnostic note and checks no other model', () => {
 		check.mockReturnValue({ kind: 'rejected', note: OUTDATED })

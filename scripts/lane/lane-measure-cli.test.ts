@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,6 +14,7 @@ vi.mock('./lane-load', () => ({ lane_load: { sample: sample_mock } }))
 const { lane_ledger } = await import('./lane-ledger')
 const { lane_measure_cli } = await import('./lane-measure-cli')
 const { lane_stats } = await import('./lane-stats')
+const { run_event_stream } = await import('#scripts/run/event/run-event-stream')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-test-'))
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
@@ -24,8 +25,20 @@ afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
 })
 
-function fresh_context(): { ledger_path: string; now_ms: number } {
-	return { ledger_path: path.join(scratch, `${randomUUID()}.jsonl`), now_ms: NOW }
+interface TestContext {
+	ledger_path: string
+	events_path: string
+	transcript_directories: Array<string>
+	now_ms: number
+}
+
+function fresh_context(): TestContext {
+	return {
+		ledger_path: path.join(scratch, `${randomUUID()}.jsonl`),
+		events_path: path.join(scratch, `${randomUUID()}-events.jsonl`),
+		transcript_directories: [],
+		now_ms: NOW,
+	}
 }
 
 beforeEach(() => {
@@ -113,7 +126,123 @@ describe('lane_measure_cli.run — stats', () => {
 
 		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
 
-		expect(printed).toContain('| stop | median (min) | max (min) | runs | not resumed |')
-		expect(printed).toContain('| gate | not measured | not measured | 0 | 1 |')
+		expect(printed).toContain('| stop | wait median (min) | wait max (min) | wait total (min) |')
+		expect(printed).toContain('| gate | not measured | not measured | not measured | 0 | 1 |')
+	})
+})
+
+// joshuafolkken/kit#3997: a park on the run's event stream ends a stop's wait.
+describe('lane_measure_cli.run — stats reads the event stream', () => {
+	it('reads the parks off the event stream the context names', async () => {
+		const context = fresh_context()
+		const parked_at = new Date(Date.parse(AT) + 60_000).toISOString()
+
+		lane_ledger.append(context.ledger_path, { kind: 'stop', at: AT, issue: 1, reason: 'gate' })
+		run_event_stream.append(context.events_path, 'park', '#1 parked', parked_at)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| gate | 1.0 | 1.0 | 1.0 | 1 | 0 |')
+	})
+
+	// joshuafolkken/kit#4395: the same stream times the slot's cut, park and merge hand-offs.
+	it('prints the hand-off gaps off the event stream the context names', async () => {
+		const context = fresh_context()
+		const resumed_at = new Date(Date.parse(AT) + 16_000).toISOString()
+
+		run_event_stream.append(context.events_path, 'cut', '#1 cut (implementation)', AT)
+		run_event_stream.append(context.events_path, 'resume', '#1 resumed', resumed_at)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| gap | count | median (s) | max (s) | not ended |')
+		expect(printed).toContain('| cut → resume | 1 | 16 | 16 | 0 |')
+	})
+})
+
+// joshuafolkken/kit#3995: and how long a free lane stayed empty, by why.
+describe('lane_measure_cli.run — stats holds', () => {
+	it('prints the per-hold-reason table', async () => {
+		const context = fresh_context()
+
+		lane_ledger.append(context.ledger_path, { kind: 'held', at: AT, reason: 'offer:wait' })
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| held by | total (min) | median (min) | max (min) | holds |')
+		expect(printed).toContain('| offer:wait | not measured | not measured | not measured | 1 | 1 |')
+	})
+})
+
+// joshuafolkken/kit#4382: and how long each lane waited for the core budget.
+describe('lane_measure_cli.run — stats core waits', () => {
+	it('prints the per-lane core-wait table', async () => {
+		const context = fresh_context()
+		const wait = {
+			kind: 'core-wait',
+			at: AT,
+			command: 'lint',
+			waited_ms: 60_000,
+			issue: 7,
+		} as const
+
+		lane_ledger.append(context.ledger_path, wait)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| lane | total (min) | median (min) | waits |')
+		expect(printed).toContain('| 7 | 1.0 | 1.0 | 1 |')
+	})
+})
+
+// joshuafolkken/kit#4064: and why round 2 ran or was skipped.
+describe('lane_measure_cli.run — stats round 2', () => {
+	it('prints the per-verdict-and-code table', async () => {
+		const context = fresh_context()
+		const decision = {
+			kind: 'round-two',
+			at: AT,
+			issue: 1,
+			verdict: 'skip',
+			code: 'inert',
+		} as const
+
+		lane_ledger.append(context.ledger_path, decision)
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| round 2 | code | decisions |')
+		expect(printed).toContain('| skip | inert | 1 |')
+	})
+})
+
+// joshuafolkken/kit#4418: and the lane sessions' transcript-side metrics, last.
+describe('lane_measure_cli.run — stats transcripts', () => {
+	it('prints the transcript table over the directories the context names', async () => {
+		const context = fresh_context()
+		const directory = mkdtempSync(path.join(scratch, 'transcripts-'))
+		const block = { type: 'tool_use', id: 't', input: { command: 'pnpm josh gate' } }
+		const line = { type: 'assistant', timestamp: AT, message: { content: [block] } }
+
+		writeFileSync(path.join(directory, 'session.jsonl'), JSON.stringify(line))
+		await lane_measure_cli.run(['stats', '--period', '2'], {
+			...context,
+			transcript_directories: [directory],
+		})
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| transcript metric | value |')
+		expect(printed).toContain('| verification calls, solo | 1 |')
 	})
 })

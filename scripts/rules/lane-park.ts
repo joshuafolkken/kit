@@ -1,6 +1,7 @@
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { run_park } from '#scripts/run/park/run-park'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 
@@ -19,15 +20,12 @@ import { shell_segments } from './shell-segments'
 // confirmation` is the call every lane-child stop passes through. The agent that obeys this is always
 // a `claude -p` child, so the rule leaves residency entirely (`prompts/collaboration-workflow/rule-delivery.md`).
 //
-// **Why once per run and not a synchronous compliance check.** The pre-gate cut can stay silent on a
-// compliant run because the cut record is a local file it reads synchronously; the park is a label on
-// GitHub, which a `PreToolUse` guard cannot read (it answers synchronously, network calls are out).
-// Scanning the transcript tail for the label instead is unsafe in the one direction that matters: a
-// child that merely *read* `backlogrun-park.md`, whose prose carries the very `labels[]=needs-decision`
-// command, would look compliant and the guard would fall silent on a real violation — the whole bug,
-// reappearing inside its own check. So the row carries no `already_satisfied`: it fires once per run on
-// the stop, the reason is a checklist rather than an accusation, and a child that already parked simply
-// reissues. One wasted round trip on the compliant path is the safe direction; a missed park is not.
+// **A parked child is silent, read off the local park record.** The park is a label on GitHub, which a
+// `PreToolUse` guard cannot read (it answers synchronously, network calls are out), and scanning the
+// transcript tail for the label is unsafe: a child that merely *read* `backlogrun-park.md` would look
+// compliant. So `pnpm josh run:park` writes a local record once the comment and the label are both on
+// the issue, and the guard reads it synchronously, the way the pre-gate cut guard reads the cut record
+// (joshuafolkken/kit#4132). A child with no record still gets the once-per-run checklist.
 
 // `josh notify`, named canonically — `shell_segments.is_josh_command` expands an alias before the match.
 const NOTIFY_COMMANDS: ReadonlySet<string> = new Set(['notify'])
@@ -85,22 +83,42 @@ function is_parking_child(directory: string = process.cwd()): boolean {
 	return lane_child_marker.is_child_of(directory) && !lane_handoff.is_handed_off(directory)
 }
 
-function is_unparked_stop(command: string, is_child: () => boolean = is_parking_child): boolean {
+// A parking child that has not parked yet: `run:park` left no record for its issue in this repository.
+// Kept apart from `is_parking_child`, which `run:entry` reads to leave a lane child's stop to this row
+// whether or not it has parked.
+function is_unparked_child(directory: string = process.cwd()): boolean {
+	if (!is_parking_child(directory)) return false
+
+	const issue = lane_child_marker.marked_issue()
+
+	return issue === undefined || !run_park.is_parked_sync(issue, directory)
+}
+
+function is_unparked_stop(command: string, is_child: () => boolean = is_unparked_child): boolean {
 	if (!is_confirmation_notify(command)) return false
 
 	return is_child()
 }
 
 // **Keeping this rule is applying `needs-decision`**, the one act the park asks for before the stop.
-// It reads an actual `Bash` command — a label application by REST or by `gh issue edit` — never the
-// transcript tail, so a doc read that quotes the command is not mistaken for the run making it.
+// It reads an actual `Bash` command — `josh run:park`, or a label application by REST or by
+// `gh issue edit` — never the transcript tail, so a doc read that quotes the command is not mistaken
+// for the run making it. `run:park --clear` takes the park off, so it is not one.
 const APPLIES_NEEDS_DECISION = new RegExp(
 	String.raw`(?:labels\[\]=|--add-label[= ]'?)${NEEDS_DECISION_LABEL}\b`,
 	'u',
 )
+const PARK_COMMANDS: ReadonlySet<string> = new Set(['run:park'])
+const CLEAR_FLAG = /(?:^|\s)--clear\b/u
+
+function is_park_command(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, PARK_COMMANDS) && !CLEAR_FLAG.test(segment)
+}
 
 function records_the_park(command: string): boolean {
-	return APPLIES_NEEDS_DECISION.test(command)
+	if (APPLIES_NEEDS_DECISION.test(command)) return true
+
+	return shell_segments.segments_of(command).some((segment) => is_park_command(segment))
 }
 
 // The instruction in the shape a refusal can carry: what the stop must leave behind, how to record it,
@@ -109,24 +127,27 @@ function records_the_park(command: string): boolean {
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
 	'⛔ lane child park: this session is a dispatched lane child, so a stop for a person parks first: ' +
-	"`gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'`; " +
-	'`pnpm josh issue:comment <N> --body-file <path>` (question, options, stash); a ' +
+	'`pnpm josh run:park <N> --body-file <path>` (question, options, stash — it applies ' +
+	'`needs-decision`); a ' +
 	'`needs-human-review` / `already-done` stop already is. Reissue this notify, once per run ' +
 	'(`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
-// The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`, and
-// no `already_satisfied`.** The stop ends the turn, so it is not the recurring act `decide` is for. It carries no `already_satisfied` because the park it asks for is a GitHub label a
-// synchronous guard cannot read, and the transcript-tail alternative would read a child that merely
-// *read* `backlogrun-park.md` — whose prose carries the `labels[]=needs-decision` command — as
-// compliant and fall silent on a real violation (the header above). `keeps` reads an actual
-// label-application `Bash` command, never the tail, so it is not fooled the same way; `reaches` stays
-// `is_trigger`, since a compliant run issues the same confirmation notify and belongs in the
-// denominator.
+// The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`.** The
+// stop ends the turn, so it is not the recurring act `decide` is for. A parked child is excluded in the
+// trigger itself (`is_unparked_child`), so the park record is the satisfaction and no
+// `already_satisfied` reads the tail. `keeps` reads an actual park `Bash` command, never the tail, so a
+// doc read that quotes one is not mistaken for it.
 const ROW = {
 	id: 'lane-park',
 	is_trigger: bash_triggers.on_bash_command(is_unparked_stop),
 	reason: LANE_PARK_REASON,
 	keeps: bash_triggers.on_bash_command(records_the_park),
+	about: {
+		title: 'Lane child park',
+		topic: '`.claude/skills/workflow-commands/pre-gate-cut.md`',
+		fires: 'a dispatched lane child issuing `pnpm josh notify --task-type confirmation`',
+		quiet: 'not a lane child, or not a stop notification',
+	},
 }
 
 const lane_park = {
@@ -135,6 +156,7 @@ const lane_park = {
 	ROW,
 	is_confirmation_notify,
 	is_parking_child,
+	is_unparked_child,
 	is_unparked_stop,
 	mentions_confirmation_notify,
 	records_the_park,

@@ -1,10 +1,7 @@
 # `backlogrun` lanes — rationale
 
-This is the maintainer-only rationale behind `.claude/skills/workflow-commands/backlogrun-lanes.md`:
-the reasons, the history and the arguments that justify its rules. It is never read during a run —
-the procedure document carries every trigger, command, bound and prohibition, and points here only for
-why they are what they are. The procedure became a point-of-use document, never an entry read, in
-joshuafolkken/kit#2010.
+Rationale behind `.claude/skills/workflow-commands/backlogrun-lanes.md`, a point-of-use document
+since joshuafolkken/kit#2010.
 
 ## Why the lane ceiling is shaped the way it is
 

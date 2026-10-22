@@ -111,8 +111,9 @@ function rest_pull_page(rows: ReadonlyArray<Record<string, unknown>>): string {
 // thing under test. The thunk form exists for `pr_merge`, whose tests have to arrange "the merge
 // request failed and the pull request reads back merged" — two different outcomes on two paths,
 // which a body-only mapping cannot express. Written as a widening of this one router rather than as
-// a second one beside it.
-type GhApiAnswer = string | (() => Promise<string>)
+// a second one beside it. The thunk receives the request, so a write and a read on one path (the
+// labels endpoint) can answer differently.
+type GhApiAnswer = string | ((request: GhApiRequest) => Promise<string>)
 
 // A request routed by path rather than by call order: one read now asks for the repository name, the
 // branch lookup and the pull request, and a path with no route fails loudly instead of answering the
@@ -125,7 +126,7 @@ function gh_api_routes(
 
 		if (answer === undefined) throw new Error(`unexpected gh api path: ${request.path}`)
 
-		return typeof answer === 'string' ? answer : await answer()
+		return typeof answer === 'string' ? answer : await answer(request)
 	}
 }
 

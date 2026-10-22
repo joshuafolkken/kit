@@ -71,6 +71,7 @@ function merge(world_state: World, issue: string): void {
 function ports(world_state: World): LoopPorts {
 	return {
 		is_finished: () => true,
+		adoptable: async () => [],
 		merge: async (issue) => {
 			merge(world_state, issue)
 
@@ -87,8 +88,13 @@ function ports(world_state: World): LoopPorts {
 			return 'launched'
 		},
 		free_lanes: async () => FREE_LANES,
+		limit_room: async () => FREE_LANES,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
+		memory_held: async () => false,
+		hold: async () => undefined,
+		idle: async () => undefined,
+		paused: async () => undefined,
 		now: () => new Date(world_state.clock),
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds
