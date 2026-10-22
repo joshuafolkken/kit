@@ -118,6 +118,20 @@ async function explicit_change(
 	return { changed: [...named, ...since_map], map, since_map }
 }
 
+// **A non-code file a main sync brought in is not this branch's change** (joshuafolkken/kit#4572), so it
+// joins `since_map`: it still reaches the tests reading it, but never sends the run to the whole suite —
+// main's CI verified it. A synced module stays a moved file, so `vitest related` still walks to the
+// tests importing it, a branch-only one among them. A branch change git cannot read marks nothing.
+async function synced_data(synced: ReadonlyArray<string>): Promise<ReadonlyArray<string>> {
+	const data = synced.filter((file) => !related_scope.is_relatable(file))
+
+	if (data.length === 0) return []
+
+	const branch = (await branch_change()) ?? data
+
+	return data.filter((file) => !branch.includes(file))
+}
+
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
 // are. A moved file — code or not — reaches the tests reading it as data through the map, whose
 // entries hold no module that started reading it after the map's tree; the change since that tree
@@ -145,7 +159,9 @@ async function since_green_change(
 
 	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
 
-	return { ...change, synced: parts.synced }
+	const since_map = [...(change.since_map ?? []), ...(await synced_data(parts.synced))]
+
+	return { ...change, since_map, synced: parts.synced }
 }
 
 async function whole_change(root: string, map: ReadMap | undefined): Promise<ChangeReading> {

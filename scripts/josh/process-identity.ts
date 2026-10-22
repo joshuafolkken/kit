@@ -30,7 +30,7 @@ import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 // `Tue Sep  8 09:15:33 2026` in one shell and `Tue Sep  8 02:15:33 2026` in another that exported
 // `TZ=UTC` — and a writer and reader disagreeing about `TZ` would read a live process as a stranger.
 // That failure is worse than the one this module fixes, because it fires on a gate that really is
-// running: `unit-worker-share` would sweep the marker of a live run and put every suite back on the
+// running: `unit-run-marker` would sweep the marker of a live run and put every suite back on the
 // whole machine, and `bench-guard` would clear the caches out from under a running gate. The probe
 // therefore pins `TZ` and `LC_ALL` rather than inheriting them.
 

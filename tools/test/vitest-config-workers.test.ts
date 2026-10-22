@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
+import { unit_run_marker } from '#scripts/test/unit-run-marker'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { vitest_config_workers } from './vitest-config-workers'
@@ -75,7 +76,7 @@ describe('vitest_config_workers.config_workers', () => {
 	})
 
 	it("falls back to vitest's default when the share cannot be read", () => {
-		vi.spyOn(unit_worker_share, 'live_run_count').mockImplementation(() => {
+		vi.spyOn(unit_run_marker, 'live_run_count').mockImplementation(() => {
 			throw new Error('unreadable')
 		})
 

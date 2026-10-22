@@ -71,6 +71,14 @@ describe('test_related_record.record_of', () => {
 
 		expect(record).not.toHaveProperty('test_files')
 	})
+
+	// joshuafolkken/kit#4572: a synced non-code file joins `since_map` as well.
+	it('counts a synced file that is also in the since-map part once, as synced', () => {
+		const input = { ...related_input(), since_map: [SINCE_MAP_CHANGE, SYNCED_CHANGE] }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record).toMatchObject({ changed: 1, synced: 1, since_map: 1 })
+	})
 })
 
 describe('test_related_record.record_of — a full-suite run', () => {
