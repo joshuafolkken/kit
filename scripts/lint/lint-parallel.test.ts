@@ -26,7 +26,7 @@ const { eslint_cache_dependencies } = await import('./eslint-cache-dependencies'
 const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
 const { eslint_daemon } = await import('./eslint-daemon')
 const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
-const { lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
+const { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -105,6 +105,40 @@ describe('run_lint_parallel_checks', () => {
 		const code = await run_lint_parallel_checks()
 
 		expect(code).toBe(1)
+	})
+})
+
+const RUNNER_CORES = 4
+const CI_ENVIRONMENT = { CI: 'true' }
+const CONCURRENCY_FLAG = '--concurrency'
+
+// joshuafolkken/kit#4579: CI's whole-tree eslint takes one worker per runner core; local runs share
+// the machine with other lanes and stay single-threaded.
+describe('whole_tree_eslint_args', () => {
+	it('lints on one worker per core in CI', () => {
+		const args = lint_parallel.whole_tree_eslint_args(CI_ENVIRONMENT, RUNNER_CORES)
+
+		expect(args).toEqual([...ESLINT_ARGS, CONCURRENCY_FLAG, String(RUNNER_CORES)])
+	})
+
+	it('keeps the local whole-tree lint single-threaded', () => {
+		expect(lint_parallel.whole_tree_eslint_args({}, RUNNER_CORES)).toEqual(ESLINT_ARGS)
+	})
+
+	it('checks the same files and caches in CI as locally', () => {
+		const args = lint_parallel.whole_tree_eslint_args(CI_ENVIRONMENT, RUNNER_CORES)
+
+		expect(args.slice(0, ESLINT_ARGS.length)).toEqual(ESLINT_ARGS)
+	})
+
+	it('is what the whole-tree lint hands eslint in CI', async () => {
+		vi.stubEnv('CI', 'true')
+		mock_exit_codes(0, 0)
+
+		await run_lint_parallel_checks()
+		vi.unstubAllEnvs()
+
+		expect(mocked_execa.mock.calls[1]?.[1]).toContain(CONCURRENCY_FLAG)
 	})
 })
 
