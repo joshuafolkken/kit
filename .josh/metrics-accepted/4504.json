@@ -1,0 +1,9 @@
+{
+	"reason": "#4504: issue:already-done refuses a follow-up measurement before writing (admit hook + refusal, +21 lines); measurement.md gains the issue:measured pointer the lane never reached (+2 rules lines, +179 on-demand bytes)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 21,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 179
+	}
+}
