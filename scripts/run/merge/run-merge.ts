@@ -41,8 +41,9 @@ const ONE = 1
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (needs-human-review.md).
 // - `parked`      — OPEN and carrying a park label (`PARKED_LABELS`); a person still owns it.
 // - `split`       — OPEN and carrying `epic`; its work was divided into new children.
-// - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API; not
-//                   the child's failure, so it is re-dispatchable and uncounted against the failure guard.
+// - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API, a
+//                   host restart killed it, or its ship stop went unanswered; not the child's failure, so
+//                   it is re-dispatchable and uncounted against the failure guard.
 // - `cut`         — OPEN and carrying neither, but its lane holds a declared cut no successor adopted;
 //                   the child ended its session on purpose, so it is resumed rather than parked and
 //                   counts nothing.
@@ -65,8 +66,9 @@ interface EndingSignals {
 	merged_pr?: string | undefined
 	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`).
 	is_withdrawn?: boolean | undefined
-	// The outage is a ship stop no relaunch answered, not an API the child could not reach.
-	is_unanswered?: boolean | undefined
+	// The outage is not an API the child could not reach — a ship stop no relaunch answered, or a host
+	// restart that killed it — so it is left out of the run-wide streak.
+	is_streak_exempt?: boolean | undefined
 	// The exit record shows the session could not authenticate (`api-auth.ts`).
 	is_auth_failure?: boolean | undefined
 }

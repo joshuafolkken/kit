@@ -452,7 +452,7 @@ Confirms the child from GitHub and does its post-merge steps: a **merged**
 child (CLOSED) is counted into the carry record (resetting the failure streak), then `main:sync`,
 `lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
-reach the API) has it dropped, unparked and uncounted: re-dispatchable;
+reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.

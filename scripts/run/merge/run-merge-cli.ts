@@ -404,9 +404,9 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	const signals = await run_merge_signals.read_signals(ctx, read)
 	const outcome = run_merge_signals.outcome_of(read, signals)
 
-	const { merged_pr, is_unanswered } = signals
+	const { merged_pr, is_streak_exempt } = signals
 
-	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr, is_unanswered })) }
+	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr, is_streak_exempt })) }
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

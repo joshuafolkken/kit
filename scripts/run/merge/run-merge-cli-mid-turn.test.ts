@@ -2,6 +2,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { run_merge_driver } from './run-merge-driver'
+import { run_merge_restart } from './run-merge-restart'
 import { run_merge_ship } from './run-merge-ship'
 
 // A child interrupted by its environment — its session killed inside a turn, or its ship stopped with
@@ -29,6 +30,8 @@ vi.mock('#scripts/run/run-ending', () => ({
 }))
 
 vi.mock('./run-merge-ship', () => ({ run_merge_ship: { is_unanswered: vi.fn() } }))
+
+vi.mock('./run-merge-restart', () => ({ run_merge_restart: { is_host_restart: vi.fn() } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: vi.fn(), current_events: vi.fn() },
@@ -64,6 +67,7 @@ async function merge_child(): Promise<void> {
 beforeEach(() => {
 	vi.mocked(run_ending.ended_mid_turn).mockReturnValue(false)
 	vi.mocked(run_merge_ship.is_unanswered).mockResolvedValue(false)
+	vi.mocked(run_merge_restart.is_host_restart).mockResolvedValue(false)
 	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([])
 	do_outage_mock.mockReset().mockResolvedValue({ carry: { outages: 1 }, is_refused: false })
 	do_failed_mock.mockReset().mockResolvedValue(FAILED)
@@ -82,7 +86,17 @@ it('re-dispatches a child whose ship stopped with no relaunch to fix it', async 
 	await merge_child()
 
 	expect(do_outage_mock).toHaveBeenCalledOnce()
-	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_unanswered: true }))
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_streak_exempt: true }))
+})
+
+// joshuafolkken/kit#4540: a restart cleared the transcript, so only the lane's dispatch time tells.
+it('re-dispatches a child the host restart killed without adding to the streak', async () => {
+	vi.mocked(run_merge_restart.is_host_restart).mockResolvedValue(true)
+	vi.mocked(run_ending.ended_mid_turn).mockReturnValue(true)
+	await merge_child()
+
+	expect(do_failed_mock).not.toHaveBeenCalled()
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_streak_exempt: true }))
 })
 
 // joshuafolkken/kit#3974: a child that reached the API is not booked as the environment being down.
@@ -91,7 +105,7 @@ it('books a child killed inside a turn as an outage the streak counts', async ()
 	vi.mocked(run_merge_ship.is_unanswered).mockResolvedValue(true)
 	await merge_child()
 
-	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_unanswered: false }))
+	expect(do_outage_mock).toHaveBeenCalledWith(expect.objectContaining({ is_streak_exempt: false }))
 })
 
 it('parks a child once it has been re-dispatched as an outage three times', async () => {
