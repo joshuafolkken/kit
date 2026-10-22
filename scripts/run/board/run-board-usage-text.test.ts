@@ -4,8 +4,8 @@ import type { UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
 // joshuafolkken/kit#4171: a lane row's and a processes row's CPU, MEM and CMPRS cells — a figure and
-// a gauge each, the gauge's full width the whole machine, shaded at the header's thresholds unless a
-// lane row passes its share.
+// a gauge each, full at the whole machine and shaded at the header's thresholds unless a
+// lane row passes its share, which also fills its gauge.
 
 const { GAUGE_SHADES, bar_of } = run_board_labels
 const { cell_widths, cells_of, lane_limits, lane_thresholds, plain_of } = run_board_usage_text
@@ -93,8 +93,8 @@ describe('run_board_usage_text.lane_thresholds', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const [cpu, memory] = cells_of(figure(5.95, 6), SCALE, GAUGE, lane_limits(2))
 
-		expect(cpu).toBe(`59.5 ${bar_of(5.95, 10, GAUGE, GAUGE_SHADES.red)}`)
-		expect(memory).toBe(` 6.0 ${bar_of(6, 20, GAUGE, GAUGE_SHADES.yellow)}`)
+		expect(cpu).toBe(`59.5 ${bar_of(5.95, 3.5, GAUGE, GAUGE_SHADES.red)}`)
+		expect(memory).toBe(` 6.0 ${bar_of(6, 7, GAUGE, GAUGE_SHADES.yellow)}`)
 	})
 
 	it('keeps the machine’s thresholds where no limits are passed', () => {
@@ -103,6 +103,53 @@ describe('run_board_usage_text.lane_thresholds', () => {
 		expect(cells_of(figure(5.95), SCALE, GAUGE)[0]).toBe(
 			`59.5 ${bar_of(5.95, 10, GAUGE, GAUGE_SHADES.normal)}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#4546: a lane row's gauge is full at its share, so its length agrees with its color.
+const MACHINE: UsageScale = { cores: 11, total_bytes: 18 * GB }
+const SIX = lane_limits(6)
+
+function cpu_figure(percent: number): UsageFigure {
+	return figure((MACHINE.cores * percent) / 100, 1.7, 1.2)
+}
+
+describe('run_board_usage_text.lane_limits', () => {
+	it('draws a yellow lane four cells long at 10.1% CPU and 1.7 GB with six lanes running', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(cells_of(cpu_figure(10.1), MACHINE, GAUGE, SIX)).toStrictEqual([
+			'10.1 ■■■■─',
+			' 1.7 ■■■■─',
+			' 1.2 ■■■──',
+		])
+	})
+
+	it('shades the share’s gauges at the share’s thresholds, unchanged', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const [cpu, memory] = cells_of(cpu_figure(10.1), MACHINE, GAUGE, SIX)
+
+		expect(cpu).toBe(`10.1 ${bar_of(4, 5, GAUGE, GAUGE_SHADES.yellow)}`)
+		expect(memory).toBe(` 1.7 ${bar_of(4, 5, GAUGE, GAUGE_SHADES.yellow)}`)
+	})
+
+	it('stops a value past the share at a full red gauge, and draws a small one empty', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const [over] = cells_of(cpu_figure(21.2), MACHINE, GAUGE, SIX)
+		const [under] = cells_of(cpu_figure(0.5), MACHINE, GAUGE, SIX)
+
+		expect(over).toBe(`21.2 ${bar_of(1, 1, GAUGE, GAUGE_SHADES.red)}`)
+		expect(under).toBe(` 0.5 ${bar_of(0, 1, GAUGE, GAUGE_SHADES.normal)}`)
+	})
+
+	it('keeps a processes row’s gauge full at the whole machine', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(cells_of(cpu_figure(10.1), MACHINE, GAUGE)).toStrictEqual([
+			'10.1 ■────',
+			' 1.7 ─────',
+			' 1.2 ─────',
+		])
 	})
 })
 

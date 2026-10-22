@@ -86,9 +86,9 @@ describe('run_board_render_lanes.number_text lane share colors', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const lane = row_of(LANE, 'running')
 
-		expect(shade_of_busy([lane])).toContain(bar_of(5.95, 10, SCREEN_GAUGE, GAUGE_SHADES.yellow))
+		expect(shade_of_busy([lane])).toContain(bar_of(5.95, 7, SCREEN_GAUGE, GAUGE_SHADES.yellow))
 		expect(shade_of_busy([lane, row_of(7, 'running')])).toContain(
-			bar_of(5.95, 10, SCREEN_GAUGE, GAUGE_SHADES.red),
+			bar_of(5.95, 3.5, SCREEN_GAUGE, GAUGE_SHADES.red),
 		)
 	})
 })
