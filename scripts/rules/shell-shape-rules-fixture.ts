@@ -30,7 +30,7 @@ const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'piped-verification': ['pipe'],
 	'early-heartbeat': [],
-	'test-declared': [],
+	'test-declared': [HEREDOC],
 	'run-tail': [HEREDOC],
 	'timed-rerun': ['hyperfine-quoted', 'time-flag-value', HEREDOC],
 	'josh-git-bare': ['and-chain', HEREDOC],
