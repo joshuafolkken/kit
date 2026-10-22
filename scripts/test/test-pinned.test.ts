@@ -1,0 +1,147 @@
+import { symlink, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { test_pinned } from './test-pinned'
+import { test_pinned_logic } from './test-pinned-logic'
+
+// Drives `josh test:pinned` against a real git repository, modelled on joshuafolkken/kit#4102's round 1:
+// `run()` gained a driver-flag output beside `result.token`, and the tests only covered the default
+// path, so reverting that hunk to `result.token` left every test green. The first hunk is pinned —
+// reverting it turns its test red — and must not be listed; it comes first so that a revert left in
+// place would turn the second hunk's run red too and hide it. A committed new module is not reverted.
+
+const RUN_TIMEOUT = 120_000
+const DRIVER_FILE = 'driver.js'
+const TEST_FILE = 'driver.test.ts'
+const NODE_MODULES = 'node_modules'
+const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
+const PORCELAIN = '--porcelain'
+
+const ADDED_FILE = 'added.js'
+const BASE_DRIVER = `export function label(code) {
+	return code === 0 ? 'ok' : 'busy'
+}
+
+export function token_of(result) {
+	return result.token
+}
+`
+const CHANGED_DRIVER = `export function label(code) {
+	return code === 0 ? 'merged' : 'busy'
+}
+
+export function token_of(result, argv) {
+	return argv.includes('--driver') ? String(result.code) : result.token
+}
+`
+const DEFAULT_PATH_TEST = `import { expect, it } from 'vitest'
+import { label, token_of } from './driver.js'
+
+it('labels a merge', () => {
+	expect(label(0)).toBe('merged')
+})
+
+it('reads the token on the default path', () => {
+	expect(token_of({ token: 't', code: 0 }, [])).toBe('t')
+})
+`
+
+const fixture: { current?: FixtureWorkspace } = {}
+
+async function git(arguments_: ReadonlyArray<string>): Promise<string> {
+	return await git_fixture_workspace.git(process.cwd(), arguments_)
+}
+
+async function write(name: string, content: string): Promise<void> {
+	await writeFile(path.join(process.cwd(), name), content)
+}
+
+// main carries the base driver; the `change` branch commits a new module no test reaches, and leaves
+// the changed driver and its test uncommitted, so the run has to copy the working tree in.
+async function build_base(): Promise<void> {
+	await git(['init', git_fixture_workspace.MAIN_BRANCH])
+	await write('package.json', '{ "type": "module" }\n')
+	await write('.gitignore', `${NODE_MODULES}\n`)
+	await write(DRIVER_FILE, BASE_DRIVER)
+	await git(['add', '.'])
+	await git(['commit', '-m', 'base'])
+}
+
+async function build_change_branch(): Promise<void> {
+	await build_base()
+	await git(['switch', '-c', 'change'])
+	await write(ADDED_FILE, 'export const ADDED = 1\n')
+	await git(['add', ADDED_FILE])
+	await git(['commit', '-m', 'add'])
+	await write(DRIVER_FILE, CHANGED_DRIVER)
+	await write(TEST_FILE, DEFAULT_PATH_TEST)
+	await symlink(PROJECT_NODE_MODULES, path.join(process.cwd(), NODE_MODULES), 'dir')
+}
+
+async function snapshot(): Promise<string> {
+	const status = await git(['status', PORCELAIN])
+	const trees = await git(['worktree', 'list', PORCELAIN])
+
+	return `${status}\n${trees}`
+}
+
+beforeEach(() => {
+	const workspace = git_fixture_workspace.open_workspace('test-pinned-')
+
+	fixture.current = workspace
+	process.chdir(workspace.workspace)
+})
+
+afterEach(async () => {
+	if (fixture.current !== undefined) await git_fixture_workspace.close_workspace(fixture.current)
+})
+
+describe('test_pinned.run', () => {
+	it(
+		'lists the #4102-shaped hunk no test pins and not the pinned one, leaving the checkout untouched',
+		async () => {
+			await build_change_branch()
+			const before = await snapshot()
+
+			const report = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+			expect(report.unpinned).toEqual([
+				expect.objectContaining({ file: DRIVER_FILE, new_start: 5 }),
+			])
+			expect(report.unpinned[0]?.is_green).toBe(true)
+			expect(report.unchecked).toEqual([])
+			expect(await snapshot()).toBe(before)
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'reports the hunks past the cap as unchecked without running them',
+		async () => {
+			await build_change_branch()
+
+			const report = await test_pinned.run(1)
+
+			expect(report.unpinned).toEqual([])
+			expect(report.unchecked.map((hunk) => test_pinned_logic.location(hunk))).toEqual([
+				`${DRIVER_FILE}:5`,
+			])
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+describe('test_pinned.run under a user diff config', () => {
+	it('reads the hunks when diff.mnemonicPrefix renames the diff prefixes', async () => {
+		await build_change_branch()
+		await git(['config', 'diff.mnemonicPrefix', 'true'])
+
+		const report = await test_pinned.run(0)
+
+		expect(report.unchecked.map((hunk) => test_pinned_logic.location(hunk))).toEqual([
+			`${DRIVER_FILE}:2`,
+			`${DRIVER_FILE}:5`,
+		])
+	})
+})

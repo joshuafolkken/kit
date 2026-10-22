@@ -1,6 +1,6 @@
 import path from 'node:path'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { changed_paths } from '#scripts/git/changed-paths'
-import { review_tree } from '#scripts/review/review-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
@@ -89,7 +89,7 @@ function map_dirty_with(digest: string): void {
 
 describe('test_related.reaches_tests — code dirty when the map was recorded', () => {
 	it('answers false while that code holds the content the map was recorded on', async () => {
-		map_dirty_with(review_tree.tree_of(ROOT, [SOURCE])[SOURCE] ?? '')
+		map_dirty_with(input_fingerprint.of_file(path.join(ROOT, SOURCE)))
 
 		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(false)
 	})
@@ -101,7 +101,7 @@ describe('test_related.reaches_tests — code dirty when the map was recorded', 
 	})
 
 	it('answers true for a moved file a recorded test reads, whatever the dirty code', async () => {
-		map_dirty_with(review_tree.tree_of(ROOT, [SOURCE])[SOURCE] ?? '')
+		map_dirty_with(input_fingerprint.of_file(path.join(ROOT, SOURCE)))
 
 		await expect(test_related.reaches_tests(ROOT, [READ_DOCUMENT])).resolves.toBe(true)
 	})

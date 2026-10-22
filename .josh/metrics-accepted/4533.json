@@ -1,0 +1,7 @@
+{
+	"reason": "run:pause re-reconciles on a rerun past a failed reconcile, and refusal_after throws on an unreadable epic (review fixes for #4533)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 69
+	}
+}

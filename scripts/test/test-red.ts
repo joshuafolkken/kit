@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { copyFile, mkdir, readFile } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { change_base } from '#scripts/git/change-base'
@@ -31,22 +31,6 @@ function changed_tests(paths: ReadonlyArray<string>): Array<string> {
 	return test_red_logic.unit_test_files(paths).filter((file) => existsSync(file))
 }
 
-async function copy_one(tree: string, file: string): Promise<void> {
-	const target = path.join(tree, file)
-
-	await mkdir(path.dirname(target), { recursive: true })
-	await copyFile(file, target)
-}
-
-// Each file has its own target, and a recursive `mkdir` tolerates a sibling creating the same parent.
-async function copy_in(tree: string, files: ReadonlyArray<string>): Promise<void> {
-	await Promise.all(
-		files.map(async (file) => {
-			await copy_one(tree, file)
-		}),
-	)
-}
-
 function reporter_arguments(report: string): Array<string> {
 	// The plain `--outputFile`, not `--outputFile.json`: a config that sets `test.outputFile` as a string
 	// wins over the keyed form, which would send the report into the tree and read every run `no-test`.
@@ -57,16 +41,20 @@ async function read_report(report: string): Promise<string> {
 	return existsSync(report) ? await readFile(report, 'utf8') : ''
 }
 
-// The verdict of one run. `--passWithNoTests` keeps "the filter matched nothing" from reading as a
+// The verdict of one run over `selection` — `run <files>`, or `related <file> --run` for
+// `josh test:pinned`. `--passWithNoTests` keeps "the filter matched nothing" from reading as a
 // failure, and the JSON report — written beside the tree, never into it — says whether anything ran at
 // all, so a file the old config excludes is `no-test` rather than a `green` that refuses a correct fix.
-// A test that ran and broke, or a file that could not load against the old code, makes it `red`.
+// A test that ran and broke, or a file that could not load against the old code, makes it `red`. The
+// report is removed first, so a run that writes none never reads the one before it.
 async function verdict_in(
 	{ parent, tree }: BaseTree,
-	files: ReadonlyArray<string>,
+	selection: ReadonlyArray<string>,
 ): Promise<RedVerdict> {
 	const report = path.join(parent, REPORT_NAME)
-	const vitest_args = ['run', '--passWithNoTests', ...reporter_arguments(report), ...files]
+	const vitest_args = [...selection, '--passWithNoTests', ...reporter_arguments(report)]
+
+	await rm(report, { force: true })
 	const result = await execa(path.join(tree, VITEST_BIN), vitest_args, {
 		cwd: tree,
 		env: git_location_environment.location_free_environment(),
@@ -80,9 +68,9 @@ async function verdict_in(
 
 async function verdict_on(base: string, files: ReadonlyArray<string>): Promise<RedVerdict> {
 	return await base_tree.with_tree(TREE_PREFIX, base, async (pre_fix) => {
-		await copy_in(pre_fix.tree, files)
+		await base_tree.copy_in(pre_fix.tree, files)
 
-		return await verdict_in(pre_fix, files)
+		return await verdict_in(pre_fix, ['run', ...files])
 	})
 }
 
@@ -115,7 +103,7 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 	return 0
 }
 
-const test_red = { main, run }
+const test_red = { main, run, verdict_in }
 
 export type { RedRun }
 export { test_red }

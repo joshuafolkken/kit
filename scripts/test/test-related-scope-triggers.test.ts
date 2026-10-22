@@ -7,19 +7,21 @@ import { related_scope, type ScopeRequest } from './test-related-scope'
 // lane ledger can count the fallbacks by the file rather than only by the kind.
 
 const ROOT = path.resolve('/repo')
-const SOURCE_FILE = path.join('scripts', 'thing.ts')
+const SCRIPTS_DIRECTORY = 'scripts'
+const SOURCE_FILE = path.join(SCRIPTS_DIRECTORY, 'thing.ts')
 const PACKAGE_FILE = 'package.json'
 const LOCK_FILE = 'pnpm-lock.yaml'
 const NEW_DRAFT = path.join('drafts', 'added.md')
 const OTHER_NEW_DRAFT = path.join('drafts', 'other.md')
 const DOCUMENT_FILE = path.join('docs', 'thing.md')
+const DOCUMENT_READER = path.join(SCRIPTS_DIRECTORY, 'docs-reader.ts')
 
 const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
 	dirty: {},
-	directories: ['docs', 'scripts'],
-	readers: { [DOCUMENT_FILE]: [path.join('scripts', 'docs-reader.ts')] },
+	directories: ['docs', SCRIPTS_DIRECTORY],
+	readers: { [DOCUMENT_FILE]: [DOCUMENT_READER] },
 }
 
 function at(file: string): string {
@@ -28,6 +30,7 @@ function at(file: string): string {
 
 function scope_of(
 	changed: ScopeRequest['changed'],
+	since_map: ReadonlyArray<string> = [],
 ): ReturnType<typeof related_scope.resolve_scope> {
 	return related_scope.resolve_scope({
 		root: ROOT,
@@ -35,6 +38,7 @@ function scope_of(
 		map: MAP,
 		recorded: new Set(),
 		is_present: () => true,
+		since_map,
 	})
 }
 
@@ -52,6 +56,26 @@ describe('related_scope.resolve_scope — the files that sent it to the whole su
 
 		expect(scope.mode).toBe('all')
 		expect(scope.files).toStrictEqual([at(NEW_DRAFT), at(OTHER_NEW_DRAFT)])
+	})
+
+	it('leaves a file that joined only from the map’s tree out of the whole-suite triggers', () => {
+		const scope = scope_of([SOURCE_FILE, PACKAGE_FILE, NEW_DRAFT], [PACKAGE_FILE, NEW_DRAFT])
+
+		expect(scope.mode).toBe('related')
+		expect(scope.files).toStrictEqual([at(SOURCE_FILE)])
+	})
+
+	it('still sends the run to the whole suite on a trigger this change moved', () => {
+		const scope = scope_of([PACKAGE_FILE, LOCK_FILE, NEW_DRAFT], [LOCK_FILE, NEW_DRAFT])
+
+		expect(scope.mode).toBe('all')
+		expect(scope.files).toStrictEqual([at(PACKAGE_FILE)])
+	})
+
+	it('still runs the tests reading a file that joined only from the map’s tree', () => {
+		const scope = scope_of([SOURCE_FILE, DOCUMENT_FILE], [DOCUMENT_FILE])
+
+		expect(scope.files).toStrictEqual([at(SOURCE_FILE), at(DOCUMENT_READER)])
 	})
 
 	it('holds no file where no file sent it there', () => {

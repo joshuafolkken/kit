@@ -56,6 +56,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "te": "test:e2e",
     "tm": "time",
     "tmd": "time:density",
+    "tpn": "test:pinned",
     "tr": "test:related",
     "trd": "test:red",
     "tu": "test:unit",
@@ -1314,6 +1315,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "[filters...]",
       "developer",
       [
+        "processes",
+      ],
+    ],
+    "test:pinned": [
+      "[--max <n>]",
+      "developer",
+      [
+        "git",
         "processes",
       ],
     ],

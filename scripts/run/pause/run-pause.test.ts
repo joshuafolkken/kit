@@ -64,6 +64,14 @@ const add_children = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/epic/epic-add', () => ({ epic_add: { add_children } }))
 
+const reconcile_epic = vi.hoisted(() => vi.fn())
+
+const refusal_after = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/epic/epic-reconcile', () => ({
+	epic_reconcile: { reconcile_epic, refusal_after },
+}))
+
 vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 	run_hold_cli: {
 		run: async () => {
@@ -77,6 +85,8 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 const REQUEST = { issue: '10', prerequisite: '11' }
 const MESSAGE = 'run:pause: #10 waits on #11'
 const BLOCKED_BY = 'blocked-by'
+const RECORDED_IN_EPIC = 'recorded in epic'
+const BOTH_TRACKED = '- [ ] #10\n- [ ] #11'
 
 beforeEach(() => {
 	Object.assign(state, {
@@ -101,6 +111,12 @@ beforeEach(() => {
 
 		return 0
 	})
+	reconcile_epic.mockReset().mockImplementation(async () => {
+		state.calls.push('reconcile')
+
+		return 0
+	})
+	refusal_after.mockReset().mockResolvedValue(undefined)
 })
 
 describe('run_pause.pause — the four steps in order', () => {
@@ -114,6 +130,17 @@ describe('run_pause.pause — the four steps in order', () => {
 		expect(state.blockers).toStrictEqual([11])
 	})
 
+	it('says nothing was stashed on a clean tree', async () => {
+		state.has_work = false
+
+		await run_pause.pause(REQUEST)
+
+		expect(state.comments[0]).toContain('nothing was stashed')
+		expect(state.comments[0]).not.toContain('stash:pop')
+	})
+})
+
+describe('run_pause.pause — the blocked-by step inside an epic', () => {
 	it('records the relation through `epic --add --before` when an epic tracks the issue', async () => {
 		state.epics = [{ number: 7, body: '- [ ] #10' }]
 
@@ -125,27 +152,61 @@ describe('run_pause.pause — the four steps in order', () => {
 			children: [11],
 			position: { kind: 'before', target: 10 },
 		})
-		expect(result.done.find(({ step }) => step === BLOCKED_BY)?.detail).toContain(
-			'recorded in epic',
-		)
+		expect(result.done.find(({ step }) => step === BLOCKED_BY)?.detail).toContain(RECORDED_IN_EPIC)
 	})
 
-	it('writes the relation directly when the epic insertion recorded none', async () => {
-		state.epics = [{ number: 7, body: '- [ ] #10\n- [ ] #11' }]
-		add_children.mockImplementation(async () => 0)
+	// joshuafolkken/kit#4533: `epic --add` reads a tracked prerequisite as a move and drops its other
+	// orders, so the relation is recorded beside them and reconciled into the declaration instead.
+	it('keeps a tracked prerequisite in place, recording the relation and reconciling the epic', async () => {
+		state.epics = [{ number: 7, body: '- [ ] #10\n- [ ] #11\n- [ ] #12' }]
+
+		const result = await run_pause.pause(REQUEST)
+
+		expect(state.calls).toStrictEqual(['stash', 'comment', 'relation', 'reconcile', 'release'])
+		expect(add_children).not.toHaveBeenCalled()
+		expect(reconcile_epic).toHaveBeenCalledWith(7)
+		expect(state.blockers).toStrictEqual([11])
+		expect(result.done.find(({ step }) => step === BLOCKED_BY)?.detail).toContain(RECORDED_IN_EPIC)
+	})
+})
+
+describe('run_pause.pause — the blocked-by step past the first answer it reads', () => {
+	it('keeps a prerequisite in place when a second epic also lists it', async () => {
+		state.epics = [
+			{ number: 7, body: BOTH_TRACKED },
+			{ number: 8, body: '- [ ] #11' },
+		]
 
 		await run_pause.pause(REQUEST)
 
+		expect(add_children).not.toHaveBeenCalled()
+		expect(reconcile_epic).toHaveBeenCalledWith(7)
+	})
+
+	it('writes the relation directly when `epic --add` exits 0 without posting it', async () => {
+		state.epics = [{ number: 7, body: '- [ ] #10' }]
+		add_children.mockImplementation(async () => {
+			state.calls.push('epic')
+
+			return 0
+		})
+
+		await run_pause.pause(REQUEST)
+
+		expect(state.calls).toStrictEqual(['stash', 'comment', 'epic', 'relation', 'release'])
 		expect(state.blockers).toStrictEqual([11])
 	})
 
-	it('says nothing was stashed on a clean tree', async () => {
-		state.has_work = false
+	it('inserts through `epic --add` when only another epic tracks the prerequisite', async () => {
+		state.epics = [
+			{ number: 7, body: '- [ ] #10' },
+			{ number: 8, body: '- [ ] #11' },
+		]
 
 		await run_pause.pause(REQUEST)
 
-		expect(state.comments[0]).toContain('nothing was stashed')
-		expect(state.comments[0]).not.toContain('stash:pop')
+		expect(add_children).toHaveBeenCalledOnce()
+		expect(reconcile_epic).not.toHaveBeenCalled()
 	})
 })
 
@@ -187,6 +248,23 @@ describe('run_pause.pause — a failure stops, and a rerun continues', () => {
 	})
 })
 
+// joshuafolkken/kit#4533: the relation lands before the reconcile declares it, so a rerun that reads
+// the relation as recorded still owes the declaration.
+describe('run_pause.pause — a rerun past a failed reconcile', () => {
+	it('reconciles again once the relation is already recorded', async () => {
+		state.epics = [{ number: 7, body: BOTH_TRACKED }]
+		reconcile_epic.mockResolvedValueOnce(1)
+		await run_pause.pause(REQUEST)
+		state.calls = []
+
+		const result = await run_pause.pause(REQUEST)
+
+		expect(result.kind).toBe('paused')
+		expect(state.calls).toStrictEqual(['reconcile', 'release'])
+		expect(state.blockers).toStrictEqual([11])
+	})
+})
+
 describe('run_pause.pause — a read that fails is never a negative answer', () => {
 	it('fails the comment step on unreadable comments rather than posting a second one', async () => {
 		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValueOnce(undefined)
@@ -223,5 +301,34 @@ describe('run_pause.pause — a read that fails is never a negative answer', () 
 
 		expect(result).toMatchObject({ kind: 'failed', step: BLOCKED_BY })
 		expect(state.calls).not.toContain('release')
+	})
+
+	it('fails the blocked-by step, naming the reconcile, when `epic --reconcile` refuses', async () => {
+		state.epics = [{ number: 7, body: BOTH_TRACKED }]
+		reconcile_epic.mockImplementation(async () => 1)
+
+		const result = await run_pause.pause(REQUEST)
+
+		expect(result).toMatchObject({ kind: 'failed', step: BLOCKED_BY })
+		expect('reason' in result && result.reason).toContain('epic --reconcile 7')
+		expect(state.calls).not.toContain('release')
+	})
+})
+
+// joshuafolkken/kit#4533: a relation recorded and then refused by the reconcile stays undeclared, and
+// a rerun reads it as already recorded, so the refusal is planned before the write.
+describe('run_pause.pause — a reconcile that would refuse writes nothing', () => {
+	it('records no relation when the reconcile would refuse it', async () => {
+		const cycle = 'Circular dependency'
+
+		state.epics = [{ number: 7, body: BOTH_TRACKED }]
+		refusal_after.mockResolvedValue(cycle)
+
+		const result = await run_pause.pause(REQUEST)
+
+		expect(refusal_after).toHaveBeenCalledWith(7, { blocker: 11, blocked: 10 })
+		expect('reason' in result && result.reason).toContain(cycle)
+		expect(state.calls).not.toContain('relation')
+		expect(reconcile_epic).not.toHaveBeenCalled()
 	})
 })

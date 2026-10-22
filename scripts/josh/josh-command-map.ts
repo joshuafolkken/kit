@@ -47,6 +47,7 @@ const ALIASES: Record<string, string> = {
 	tr: 'test:related',
 	td: 'test:declared',
 	trd: 'test:red',
+	tpn: 'test:pinned',
 	te: 'test:e2e',
 	c: 'check',
 	pt: 'port',

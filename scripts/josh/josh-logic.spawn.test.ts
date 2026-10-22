@@ -132,6 +132,8 @@ const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
 	'cspell:dot',
 	'test:unit',
 	'test:related',
+	// joshuafolkken/kit#4516
+	'test:pinned',
 	// joshuafolkken/kit#3944
 	'retrospective',
 ]

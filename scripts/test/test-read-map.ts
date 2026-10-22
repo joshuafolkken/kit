@@ -21,7 +21,7 @@ interface ReadMap {
 	version: number
 	commit: string
 	// The files that differed from `commit` when the map was recorded, each with the digest of its
-	// content then, so one whose content has not moved since does not count as changed
+	// content then (`input_fingerprint.of_files`), so one whose content has not moved since does not count as changed
 	// (joshuafolkken/kit#4425).
 	dirty: Record<string, string>
 	// The directories `commit` holds, so a directory new since then is told apart from one no test
@@ -30,9 +30,10 @@ interface ReadMap {
 	readers: ReadRecords
 }
 
-// Bumped whenever the shape or what a reader means changes, so a map an older kit wrote reads as no
-// map at all.
-const MAP_VERSION = 5
+// Bumped whenever the shape, what a reader means or how `dirty` is digested changes, so a map an older
+// kit wrote reads as no map at all and the next full run writes it afresh. 6: `dirty` is
+// `input-fingerprint.ts`'s digest of every changed file (joshuafolkken/kit#4497).
+const MAP_VERSION = 6
 
 const MAP_DIRECTORY = 'josh'
 const MAP_FILE_STEM = 'test-read-map'

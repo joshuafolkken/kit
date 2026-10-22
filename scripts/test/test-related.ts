@@ -2,13 +2,13 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
@@ -38,12 +38,11 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 
 // The change a narrowing reads, and the map it reads it against. `is_unmoved` is the since-green
 // reading's positive fact that nothing moved since this command was last green on this checkout.
-// `synced` is the part of the change a main sync brought in, and `since_map` the part the change since
-// the map's tree joined to the named files, both kept for the run's ledger record.
-type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'> & {
+// `synced` is the part of the change a main sync brought in, kept for the run's ledger record, and
+// `since_map` the part the change since the map's tree joined to what this change moved.
+type ChangeReading = Pick<ScopeRequest, 'changed' | 'map' | 'since_map'> & {
 	is_unmoved?: true
 	synced?: ReadonlyArray<string>
-	since_map?: ReadonlyArray<string>
 }
 
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
@@ -79,16 +78,24 @@ async function change_since(
 	return test_read_map.changed_since_tree(
 		map,
 		since,
-		review_tree.tree_of(root, Object.keys(map.dirty)),
+		input_fingerprint.of_files(root, Object.keys(map.dirty)),
 	)
 }
 
+// **The map's tree is whichever lane last ran the whole suite green**, so the change since it holds that
+// lane's own branch change too (joshuafolkken/kit#4527). What this branch did not change is marked
+// `since_map`: it still reaches its readers, but only this branch's change can send the run to the
+// whole suite. A branch change git cannot read marks nothing.
 async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 	const changed = await change_since(root, map)
 
 	if (changed === undefined) return { changed: await branch_change(), map: undefined }
 
-	return { changed, map }
+	const branch = await branch_change()
+
+	if (branch === undefined) return { changed, map }
+
+	return { changed, map, since_map: changed.filter((file) => !branch.includes(file)) }
 }
 
 // Explicit file arguments win over the git reading, which is what makes the narrowing testable by

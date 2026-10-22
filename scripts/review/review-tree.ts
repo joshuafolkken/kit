@@ -1,8 +1,6 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
-import { stamp_file } from '#scripts/josh/stamp-file'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 
 // The tree `josh review:brief` records: every path the change touches, and the digest of its content.
@@ -18,15 +16,7 @@ import { observation_ledger } from '#scripts/observations/observation-ledger'
 // A path the change lists but the working tree does not hold — deleted, or renamed away. Recorded
 // rather than dropped: a delete applied by a fix is part of the fix delta, and a dropped entry would
 // read as "unchanged" on the comparison.
-const ABSENT_DIGEST = 'absent'
-
-function digest_of(root: string, relative: string): string {
-	try {
-		return stamp_file.digest(readFileSync(path.join(root, relative)))
-	} catch {
-		return ABSENT_DIGEST
-	}
-}
+const ABSENT_DIGEST = input_fingerprint.ABSENT
 
 // Sorted so two readings of one tree produce the same record byte for byte, which is what lets a
 // stored stamp be compared against a fresh reading without a normalization step in between.
@@ -39,11 +29,10 @@ function digest_of(root: string, relative: string): string {
 // undo then moved the tree under both. Filtered here, every reader of the map
 // — the gate's record, both hooks, the brief and the round-2 fix delta — agrees on it.
 function tree_of(root: string, paths: ReadonlyArray<string>): Record<string, string> {
-	const sorted = paths
-		.filter((relative) => !observation_ledger.is_ledger_path(relative))
-		.toSorted((left, right) => left.localeCompare(right))
-
-	return Object.fromEntries(sorted.map((relative) => [relative, digest_of(root, relative)]))
+	return input_fingerprint.of_files(
+		root,
+		paths.filter((relative) => !observation_ledger.is_ledger_path(relative)),
+	)
 }
 
 // **The root is asked of git, never taken from `process.cwd()` — nor from `PROJECT_ROOT`, which is

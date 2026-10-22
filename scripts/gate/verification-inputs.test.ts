@@ -63,9 +63,9 @@ describe('verification_inputs.declaration_of', () => {
 		expect(verification_inputs.is_declared(BEHAVIOR_LABEL)).toBe(false)
 	})
 
-	it('follows imports for the unit step alone', () => {
-		expect(verification_inputs.declaration_of(gate_plan.UNIT_LABEL)?.follows_imports).toBe(true)
-		expect(verification_inputs.declaration_of(gate_plan.LINT_LABEL)?.follows_imports).toBe(false)
+	it('declares the run-time read record as the unit step’s inputs alone', () => {
+		expect(verification_inputs.declaration_of(gate_plan.UNIT_LABEL)?.reads).toBe('recorded')
+		expect(verification_inputs.declaration_of(gate_plan.LINT_LABEL)?.reads).toBe('matched')
 	})
 })
 

@@ -30,6 +30,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh test` · `josh t` | — | developer | processes | Run unit and E2E tests |
 | `josh test:declared` · `josh td` | `[--match]` | developer | processes | Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin |
 | `josh test:e2e` · `josh te` | `[filters...]` | developer | processes | Run E2E tests with Playwright (skips when absent or no e2e files) |
+| `josh test:pinned` · `josh tpn` | `[--max <n>]` | developer | git, processes | Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on |
 | `josh test:red` · `josh trd` | — | developer | git, processes | Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only |
 | `josh test:related` · `josh tr` | `[files...]` | developer | processes | Run only the unit tests related to the changed files (full suite on fallback) |
 | `josh test:unit` · `josh tu` | `[filters...]` | developer | processes | Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests) |

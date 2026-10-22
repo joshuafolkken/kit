@@ -258,7 +258,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 `josh gate` runs it as its unit leg.
 
-- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on; a narrowed run matching nothing prints `No test files found` and exits 0.
+- Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.
 - A bare run after a green one reads only what moved since, main syncs included, plus the branch's own test files; nothing moved runs no test. The whole change when no record compares (none, or other tools, `NODE_ENV` or `TZ`), a non-code file moved (the map cannot see its read), or a toolchain, TypeScript or test-runner config moved (`scripts/gate/verification-inputs.ts`).
@@ -298,6 +298,23 @@ pnpm josh test:red   # red, green, no-test or test-only
 On an Issue declaring `- 種別: 不具合`, `pnpm josh git -y` refuses `green`.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in detail".
+
+### `josh test:pinned`
+
+<!-- usage: test:pinned -->
+
+Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on.
+
+```bash
+pnpm josh test:pinned           # unpinned / unchecked <file>:<line> lines
+pnpm josh test:pinned --max 5   # check at most 5 hunks; the rest print as unchecked
+```
+
+<!-- /usage -->
+
+Exits non-zero when any checked hunk is unpinned; an unchecked hunk alone does not fail the run.
+
+Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:pinned` in detail".
 
 ### `josh test:e2e`
 

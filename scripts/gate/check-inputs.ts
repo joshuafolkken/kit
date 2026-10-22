@@ -40,7 +40,7 @@ async function reads_any(
 	is_ignored: PrettierIgnored,
 	root: string,
 ): Promise<boolean> {
-	if (declaration.follows_imports) return await test_related.reaches_tests(root, paths)
+	if (declaration.reads === 'recorded') return await test_related.reaches_tests(root, paths)
 
 	const { is_input } = declaration
 
