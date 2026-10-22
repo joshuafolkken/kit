@@ -30,6 +30,16 @@ interface HoldRecorder {
 	end: (end: DriveEnd) => Promise<void>
 }
 
+// The issues an offer that started nothing waited on, when it named them (joshuafolkken/kit#4513).
+interface HeldWaiting {
+	waiting?: ReadonlyArray<number> | undefined
+}
+
+// A hold's reason, `undefined` for the finished run, and the issues its offer waited on.
+interface HeldDraft extends HeldWaiting {
+	reason: string | undefined
+}
+
 // Whether a hold may still be open — at a driver's start, one an earlier driver's hand-back left.
 interface HoldLedger {
 	is_open: boolean
@@ -37,7 +47,8 @@ interface HoldLedger {
 
 // The reason an offer that started nothing holds a free lane, or `undefined` for the run's stop. The
 // offer's cause stands in for its answer, so a `run:solo` wait is `offer:watch:solo` rather than one
-// more `offer:watch:blocked` (joshuafolkken/kit#4396).
+// more `offer:watch:blocked` (joshuafolkken/kit#4396), and a dependency-chain or start-condition wait is
+// `offer:watch:chain`, `offer:watch:gate` or `offer:watch:chain+gate` (joshuafolkken/kit#4513).
 function offer_reason(read: OfferRead): string | undefined {
 	if (read.verdict === STOP_VERDICT) return undefined
 
@@ -53,7 +64,7 @@ async function held(
 	read: OfferRead,
 	ports: Pick<DrivePorts, 'hold'>,
 ): Promise<PassResult> {
-	if (result.kind === 'continue') await ports.hold(offer_reason(read))
+	if (result.kind === 'continue') await ports.hold(offer_reason(read), read.waiting)
 
 	return result
 }
@@ -90,19 +101,19 @@ async function release(ledger: HoldLedger): Promise<void> {
 // A ledger line only while a lane is free; a full pool or the finished run releases the open hold.
 async function record(
 	ledger: HoldLedger,
-	reason: string | undefined,
+	draft: HeldDraft,
 	count: number | undefined,
 ): Promise<void> {
 	if (count === undefined) return
 
-	if (reason === undefined || count === NO_FREE_LANES) {
+	if (count === NO_FREE_LANES || draft.reason === undefined) {
 		await release(ledger)
 
 		return
 	}
 
 	ledger.is_open = true
-	await lane_ledger.record_held(reason)
+	await lane_ledger.record_held({ reason: draft.reason, waiting: draft.waiting })
 }
 
 // The production `hold` port and the driver's end, sharing whether a hold is open. Best-effort like
@@ -112,8 +123,8 @@ function recorder(
 ): HoldRecorder {
 	const ledger: HoldLedger = { is_open: true }
 
-	async function write(reason: string | undefined): Promise<void> {
-		await record(ledger, reason, await free_count(free_lanes, reason))
+	async function write(reason: string | undefined, waiting?: ReadonlyArray<number>): Promise<void> {
+		await record(ledger, { reason, waiting }, await free_count(free_lanes, reason))
 	}
 
 	return {
@@ -127,4 +138,4 @@ function recorder(
 const backlog_drive_hold = { hand_back_reason, held, recorder }
 
 export { backlog_drive_hold }
-export type { HoldRecorder }
+export type { HeldWaiting, HoldRecorder }
