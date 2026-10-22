@@ -157,13 +157,16 @@ async function scoped_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan
 }
 
 // `undefined` is a failed read, which the board answers by keeping the plan it already has.
+// An empty listing is one too: the board is read while its own run's issues are open, and an empty one
+// drew every live child finished and the pool empty (joshuafolkken/kit#4537). The guard is the board's
+// alone — `backlog:plan` in a repository with no open issue reads an empty listing correctly.
 async function read_plan(
 	named: NamedPlan,
 	ports: PlanPorts = LIVE_PORTS,
 ): Promise<BoardPlan | undefined> {
 	const listing = await ports.fetch_open()
 
-	if (listing === undefined) return undefined
+	if (listing === undefined || listing.rows.length === 0) return undefined
 
 	const read = { listing, ports }
 

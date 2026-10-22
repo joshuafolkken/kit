@@ -150,7 +150,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 	)
 }
 
-// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
+// The statuses scoped to the run's plan, a running child GitHub read closed settled.
 // Before the plan is read, the run's own children alone, named and settled as the snapshot left them.
 function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	if (state.plan !== undefined) return planned_layout(state, state.plan, local)

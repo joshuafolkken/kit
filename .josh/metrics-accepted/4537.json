@@ -1,0 +1,7 @@
+{
+	"reason": "A running child is asked closed while the plan read fails or its kept closed read predates its relaunch, since listing absence no longer settles it (#4537)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

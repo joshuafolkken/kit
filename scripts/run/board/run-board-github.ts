@@ -26,6 +26,7 @@ const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * MS_PER_SECOND
 const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state
 const STOPPED_STATE: ItemState = 'stopped'
+const RUNNING_STATE: ItemState = 'running'
 
 // What a step of the GitHub reads works against.
 interface Gather {
@@ -98,14 +99,26 @@ function open_read_of(state: BoardState, plan: BoardPlan | undefined): OpenRead 
 	}
 }
 
-// A child still drawn stopped holds no closed read of this launch — any it holds closed before it
-// relaunched — so it is asked again.
-function is_closed_candidate(issue: number, status: ItemStatus, read: OpenRead): boolean {
-	if (status.state === STOPPED_STATE) return true
-
+function is_unlisted(issue: number, read: OpenRead): boolean {
 	const open = read.open_numbers
 
-	return open !== undefined && !open.has(issue) && !read.closed.has(issue)
+	return open !== undefined && !open.has(issue)
+}
+
+// A child still drawn stopped or running holds no closed read of this launch — any it holds closed
+// before it relaunched — so it is asked again. A running child is asked too while the plan read fails:
+// the kept plan still lists it, and an empty listing — failed, or a repository whose last open issue
+// was this child — would otherwise leave it running forever (joshuafolkken/kit#4537).
+function is_closed_candidate(
+	issue: number,
+	status: ItemStatus,
+	read: OpenRead,
+	is_plan_failed: boolean,
+): boolean {
+	if (status.state === STOPPED_STATE) return true
+	if (status.state === RUNNING_STATE) return is_plan_failed || is_unlisted(issue, read)
+
+	return is_unlisted(issue, read) && !read.closed.has(issue)
 }
 
 // The children the board has not read closed yet that the open listing no longer holds, or that it
@@ -114,9 +127,10 @@ function is_closed_candidate(issue: number, status: ItemStatus, read: OpenRead):
 function unread_closed(state: BoardState, local: LocalRead): Array<number> {
 	const read = open_read_of(state, state.plan)
 	const drawn = run_board_status.settle_closed(statuses_for(state, local), read)
+	const is_plan_failed = state.failed_ms !== undefined
 
 	return [...drawn]
-		.filter(([issue, status]) => is_closed_candidate(issue, status, read))
+		.filter(([issue, status]) => is_closed_candidate(issue, status, read, is_plan_failed))
 		.map(([issue]) => issue)
 }
 

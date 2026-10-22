@@ -215,12 +215,13 @@ describe('run_board_tick.tick — the run’s own scope', () => {
 		expect(frames.at(-1)).not.toContain(STALE_LANE)
 	})
 
-	it('settles a launched child the open listing no longer holds', async () => {
+	// joshuafolkken/kit#4537: a listing that came back short is no proof the child closed.
+	it('keeps a launched child the open listing no longer holds uncounted until it is read closed', async () => {
 		const { ports, frames } = harness(LAUNCHED, [single_plan([])])
 
 		await tick(FRESH_STATE, ports)
 
-		expect(frames.at(-1)).toContain(' 1/1 ')
+		expect(frames.at(-1)).toContain(' 0/1 ')
 	})
 })
 
