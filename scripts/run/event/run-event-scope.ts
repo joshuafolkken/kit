@@ -114,7 +114,7 @@ function is_own_ship_event(event: RunEvent, issue: string): boolean {
 }
 
 // The issue an event's text names, the way every reader here — and `run:board` — keys an event to a child.
-function issue_named(event: RunEvent): string | undefined {
+function issue_named(event: Pick<RunEvent, 'text'>): string | undefined {
 	return ISSUE_REFERENCE.exec(event.text)?.[1]
 }
 

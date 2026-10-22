@@ -198,6 +198,9 @@ const event_schema = z.object({
 	at: z.string(),
 	kind: z.string(),
 	text: z.string(),
+	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
+	// reader never has to find its launch again. An event written before it has none.
+	elapsed_ms: z.number().optional(),
 })
 
 type RunEvent = z.infer<typeof event_schema>
@@ -363,12 +366,12 @@ function append_held(target: string, event: Omit<RunEvent, 'pos'>): number {
  * unlocked read-then-rewrite would lose one writer's event to another's. A lock still
  * held after the wait is reported on stderr and thrown, which the best-effort emit side swallows.
  */
-function append(target: string, kind: string, text: string, at: string): AppendResult {
-	if (!is_event_kind(kind)) return { appended: false, position: FIRST_POSITION }
+function append_event(target: string, event: Omit<RunEvent, 'pos'>): AppendResult {
+	if (!is_event_kind(event.kind)) return { appended: false, position: FIRST_POSITION }
 
 	const lock = `${target}${LOCK_SUFFIX}`
 	const position = repository_lock.with_lock_sync(
-		() => append_held(target, { at, kind, text }),
+		() => append_held(target, event),
 		lock,
 		LOCK_WAIT_MS,
 	)
@@ -381,6 +384,11 @@ function append(target: string, kind: string, text: string, at: string): AppendR
 	}
 
 	return { appended: true, position }
+}
+
+// `append_event` for an event that records nothing beyond its kind, text and instant.
+function append(target: string, kind: string, text: string, at: string): AppendResult {
+	return append_event(target, { at, kind, text })
 }
 
 /**
@@ -432,6 +440,7 @@ const run_event_stream = {
 	EVENT_KINDS,
 	TRACE_KINDS,
 	append,
+	append_event,
 	format_event,
 	has_since,
 	is_stage_start,

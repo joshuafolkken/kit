@@ -10,8 +10,15 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const stream_target_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./run-event-stream-emit', () => ({
-	run_event_stream_emit: { stream_target: stream_target_mock },
+// The real `append_at` writes the event; the lane record its ending reads is none (joshuafolkken/kit#4481).
+vi.mock(import('./run-event-stream-emit'), async (import_original) => {
+	const { run_event_stream_emit } = await import_original()
+
+	return { run_event_stream_emit: { ...run_event_stream_emit, stream_target: stream_target_mock } }
+})
+
+vi.mock('#scripts/lane/lane-state', () => ({
+	lane_state: { read_state: vi.fn().mockResolvedValue(undefined) },
 }))
 
 const { run_event_cli } = await import('./run-event-cli')

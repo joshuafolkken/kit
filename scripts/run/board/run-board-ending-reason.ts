@@ -45,6 +45,23 @@ function reason_of(event: RunEvent): string | undefined {
 	return event.kind === KIND.WITHDRAW ? withdraw_reason(event) || undefined : undefined
 }
 
-const run_board_ending_reason = { park_reason, reason_of }
+interface EndingRecord {
+	reason?: string
+	elapsed_ms?: number
+}
+
+// What an ending event records for its row: the reason it gives and the lane time its writer recorded
+// (joshuafolkken/kit#4481), each only where the event carries it.
+function recorded_of(event: RunEvent): EndingRecord {
+	const reason = reason_of(event)
+	const { elapsed_ms } = event
+
+	return {
+		...(reason !== undefined && { reason }),
+		...(elapsed_ms !== undefined && { elapsed_ms }),
+	}
+}
+
+const run_board_ending_reason = { park_reason, reason_of, recorded_of }
 
 export { run_board_ending_reason }

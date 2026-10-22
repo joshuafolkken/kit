@@ -47,6 +47,8 @@ interface ItemStatus {
 	// GitHub read is weighed against.
 	launched_ms?: number | undefined
 	ended_ms?: number | undefined
+	// The lane time the event that ended the child recorded (joshuafolkken/kit#4481), where it carries one.
+	elapsed_ms?: number | undefined
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
 	// it; the board does not draw it.
 	lane?: string | undefined
@@ -157,12 +159,10 @@ function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemSta
 }
 
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
-	const reason = run_board_ending_reason.reason_of(event)
-
 	return {
 		...settled_as(previous, state),
 		ended_ms: moment(event),
-		...(reason !== undefined && { reason }),
+		...run_board_ending_reason.recorded_of(event),
 	}
 }
 

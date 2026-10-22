@@ -1,7 +1,9 @@
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { error_text } from '#scripts/lib/error-message'
+import { run_board_lane_time } from '#scripts/run/board/run-board-lane-time'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from './run-event-scope'
-import { run_event_stream, type RunEvent } from './run-event-stream'
+import { run_event_stream, type AppendResult, type RunEvent } from './run-event-stream'
 
 // The write side of the run's event stream. It resolves the run's identity and
 // appends, and it is where the "reporting must not break the work it reports on" contract is kept: every
@@ -27,6 +29,54 @@ async function stream_target(): Promise<string | undefined> {
 	return repository === undefined ? undefined : run_event_stream.target_of(repository)
 }
 
+// The child's lane record; an unreadable one reads as none, so the ending is still written.
+async function lane_record(issue: string): Promise<LaneStateRecord | undefined> {
+	try {
+		return await lane_state.read_state(issue)
+	} catch (error) {
+		error_text.trace_swallowed('run_event_stream_emit.lane_record', error)
+
+		return undefined
+	}
+}
+
+async function ending_fields(
+	target: string,
+	event: Omit<RunEvent, 'pos'>,
+): Promise<Pick<RunEvent, 'elapsed_ms'>> {
+	const issue = run_event_scope.issue_named(event)
+
+	if (issue === undefined || !run_board_lane_time.OFF_LANE_KINDS.has(event.kind)) return {}
+
+	const elapsed_ms = run_board_lane_time.ending_elapsed({
+		events: run_event_stream.read_events(target),
+		issue: Number(issue),
+		record: await lane_record(issue),
+		ended_ms: Date.parse(event.at),
+	})
+
+	return elapsed_ms === undefined ? {} : { elapsed_ms }
+}
+
+/**
+ * Append one event at `at`, an ending with its child's lane time (joshuafolkken/kit#4481). Every writer
+ * of an ending — `emit` and `run:event --append` — appends through here, so the time is computed once,
+ * as the ending is written, with the board's own count.
+ */
+async function append_at(
+	target: string,
+	kind: string,
+	text: string,
+	at: Date,
+): Promise<AppendResult> {
+	const event = { kind, text, at: at.toISOString() }
+
+	return run_event_stream.append_event(target, {
+		...event,
+		...(await ending_fields(target, event)),
+	})
+}
+
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
@@ -38,7 +88,7 @@ async function emit(kind: string, text: string, at: Date = new Date()): Promise<
 
 		if (target === undefined) return
 
-		run_event_stream.append(target, kind, text, at.toISOString())
+		await append_at(target, kind, text, at)
 	} catch {
 		// Reporting is best-effort: a failed append is dropped rather than raised into the caller's work.
 	}
@@ -176,6 +226,7 @@ async function all_events(): Promise<ReadonlyArray<RunEvent>> {
 
 const run_event_stream_emit = {
 	all_events,
+	append_at,
 	current_events,
 	emit,
 	emit_heartbeat,

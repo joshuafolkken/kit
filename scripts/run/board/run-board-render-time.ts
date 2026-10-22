@@ -15,24 +15,23 @@ function end_of(row: BoardRow, now_ms: number): number | undefined {
 	return run_board_earlier.is_live(row) ? now_ms : row.status?.ended_ms
 }
 
-// How long a row has run on a lane, up to `ended_ms`. A row whose launch rolled off the stream has no
-// span, so it runs from its lane record's launch.
-function in_lane_ms(status: ItemStatus, started_ms: number, ended_ms: number): number {
-	const spans = status.spans ?? []
+// The time the event that settled the row recorded (joshuafolkken/kit#4481): a settled row draws it
+// rather than counting again, so it keeps its time when its launch lies outside the run's span.
+function recorded_ms(row: BoardRow): number | undefined {
+	return run_board_earlier.is_live(row) ? undefined : row.status?.elapsed_ms
+}
 
-	return spans.length === 0
-		? ended_ms - started_ms
-		: run_board_lane_time.in_lane_ms(spans, ended_ms)
+// How long a row has run on a lane, up to its end. A row whose launch rolled off the stream has no
+// span, so it runs from its lane record's launch.
+function counted_ms(status: ItemStatus | undefined, ended: number | undefined): number | undefined {
+	if (ended === undefined || status?.started_ms === undefined) return undefined
+
+	return run_board_lane_time.elapsed_of(status.spans ?? [], status.started_ms, ended)
 }
 
 // How long a row has run: a running one until now, a settled one until its end.
 function elapsed_ms(row: BoardRow, now_ms: number): number | undefined {
-	const { status } = row
-	const ended = end_of(row, now_ms)
-
-	if (ended === undefined || status?.started_ms === undefined) return undefined
-
-	return in_lane_ms(status, status.started_ms, ended)
+	return recorded_ms(row) ?? counted_ms(row.status, end_of(row, now_ms))
 }
 
 function time_of(row: BoardRow, now_ms: number): string | undefined {
