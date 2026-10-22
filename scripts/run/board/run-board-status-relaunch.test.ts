@@ -56,6 +56,10 @@ describe('run_board_status.statuses_of relaunch', () => {
 			state: 'running',
 			started_ms: Date.parse(T0),
 			launched_ms: Date.parse(T3),
+			spans: [
+				{ from_ms: Date.parse(T0), end_ms: undefined },
+				{ from_ms: Date.parse(T3), end_ms: undefined },
+			],
 			track: ['investigate'],
 			phase_ms: Date.parse(T3),
 		})

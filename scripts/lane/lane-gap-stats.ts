@@ -2,6 +2,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_ledger, type LedgerEntry, type MergeEntry } from './lane-ledger'
+import { lane_spans, type Span } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stop_stats } from './lane-stop-stats'
@@ -36,56 +37,14 @@ const OFFER_ANSWERS: ReadonlySet<string> = new Set([
 	lane_ledger.KIND.RELEASED,
 ])
 
-interface Span {
-	from_ms: number
-	end_ms: number | undefined
-}
-
-interface IssueAt {
-	issue: number | undefined
-	at_ms: number
-}
-
-interface IssuePair {
-	starts: ReadonlyArray<IssueAt>
-	bounds: ReadonlyArray<IssueAt>
-	ends: ReadonlyArray<IssueAt>
-}
-
 // Only an implementation cut appends a `resume` when it is adopted; a pre-gate resume appends nothing,
 // so its cut would read as never ended (`run-cut-cli.ts` → `emit_resume_event`).
 function implementation_cuts(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
 	return events.filter((event) => event.text.endsWith(IMPLEMENTATION_CUT))
 }
 
-// The issue's next start of any kind closes the window: an end after it belongs to that later start,
-// so a start never ended stays not ended rather than borrowing a later run's end.
-function next_start_ms(
-	starts: ReadonlyArray<IssueAt>,
-	issue: number | undefined,
-	from_ms: number,
-): number {
-	const later = starts.filter((other) => other.issue === issue && other.at_ms > from_ms)
-
-	return Math.min(...later.map((other) => other.at_ms))
-}
-
-// Each start until the first end of its own issue, before that issue's next start in `bounds`.
-function issue_spans(pair: IssuePair): Array<Span> {
-	return pair.starts.map((start) => {
-		const until_ms = next_start_ms(pair.bounds, start.issue, start.at_ms)
-
-		return {
-			from_ms: start.at_ms,
-			end_ms: pair.ends.find(
-				(end) => end.issue === start.issue && end.at_ms >= start.at_ms && end.at_ms < until_ms,
-			)?.at_ms,
-		}
-	})
-}
-
 function relaunch_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
-	return issue_spans({
+	return lane_spans.issue_spans({
 		starts: lane_stop_stats.events_of(implementation_cuts(events), EVENT_KIND.CUT),
 		bounds: lane_stop_stats.events_of(events, EVENT_KIND.CUT),
 		ends: lane_stop_stats.events_of(events, EVENT_KIND.RESUME),
@@ -97,7 +56,7 @@ function relaunch_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
 function outage_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
 	const outages = lane_stop_stats.events_of(events, EVENT_KIND.OUTAGE)
 
-	return issue_spans({
+	return lane_spans.issue_spans({
 		starts: outages,
 		bounds: outages,
 		ends: lane_stop_stats.events_of(events, EVENT_KIND.CHILD_LAUNCH),

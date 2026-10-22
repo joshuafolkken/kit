@@ -39,6 +39,7 @@ describe('run_board_status.statuses_of a lane no child is working in', () => {
 		expect(statuses.get(ISSUE)).toStrictEqual({
 			state: 'stopped',
 			started_ms: Date.parse(T0),
+			spans: [{ from_ms: Date.parse(T0), end_ms: undefined }],
 			track: ['investigate'],
 			lane: 'lane 3409',
 		})
