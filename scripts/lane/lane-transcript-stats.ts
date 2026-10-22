@@ -183,6 +183,6 @@ function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Ar
 		.flatMap((file) => lane_transcript_calls.parse(file.session_id, cost_transcript.read_raw(file)))
 }
 
-const lane_transcript_stats = { read_calls, table }
+const lane_transcript_stats = { read_calls, table, verification_commands }
 
 export { lane_transcript_stats }
