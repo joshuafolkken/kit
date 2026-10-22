@@ -263,8 +263,9 @@ describe('lane_session_broker — a failed action names its reason', () => {
 // request unread, and the ship waited out the 30-minute limit on a server that was still alive.
 describe('lane_session_broker — a request the broker cannot read', () => {
 	const NEWER = { ...RELAUNCH, stop: { ...RELAUNCH.stop, is_from_newer_main: true } }
+	// joshuafolkken/kit#4489: the reason names the refused field rather than guessing at the supervisor.
 	const UNREADABLE =
-		"the broker answered a failure: the broker could not read the request — the supervisor runs older code than the lane's ship"
+		'the broker answered a failure: the broker could not read the request — unrecognized key: action.stop.is_from_newer_main'
 
 	it('answers the unreadable request at once, naming why, and starts nothing', async () => {
 		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
@@ -275,6 +276,15 @@ describe('lane_session_broker — a request the broker cannot read', () => {
 		})
 		expect(relaunch).not.toHaveBeenCalled()
 		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('names the path of a field whose value the schema refused', async () => {
+		const stop = { ...RELAUNCH.stop, cause: 'weather' }
+		const unknown_cause = { ...RELAUNCH, stop } as unknown as BrokerAction
+
+		expect(reason_of(await request_review(CLAUDE_LANE, unknown_cause))).toContain(
+			'could not read the request — action.stop.cause: ',
+		)
 	})
 
 	it("puts the failure on the run's stream under the lane's issue", async () => {

@@ -44,9 +44,10 @@ const request_schema = z
 // **A request this broker cannot read is still answered**: the supervisor keeps the code it started
 // with while a lane's ship runs a newer main, so a field the ship added made the request unreadable and
 // the ship waited out the whole limit on a server that had dropped it (joshuafolkken/kit#4230).
+// **The reason names the fields the schema refused**: a guess at the supervisor's age hid a field the
+// broker's schema had never learned even on one main (joshuafolkken/kit#4489).
 const envelope_schema = z.looseObject({ session: z.uuid(), nonce: z.uuid() })
-const UNREADABLE_REASON =
-	"the broker could not read the request — the supervisor runs older code than the lane's ship"
+const UNREADABLE_REASON = 'the broker could not read the request'
 const response_schema = z
 	.object({
 		session: z.uuid(),
@@ -90,12 +91,26 @@ function write_record(target: string, body: BrokerResponse | z.infer<typeof reas
 	atomic_write.replace_file(target, JSON.stringify(body))
 }
 
+function refused_field(issue: z.core.$ZodIssue): ReadonlyArray<string> {
+	const at = issue.path.map(String)
+
+	if (issue.code !== 'unrecognized_keys') return [`${at.join('.')}: ${issue.message}`]
+
+	return issue.keys.map((key) => `unrecognized key: ${[...at, key].join('.')}`)
+}
+
+function unreadable(error: z.ZodError): BrokerAnswer {
+	const fields = error.issues.flatMap((issue) => refused_field(issue))
+
+	return failure(`${UNREADABLE_REASON} — ${fields.join('; ')}`)
+}
+
 async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
 	const parsed = request_schema.safeParse(received)
 
 	return parsed.success
 		? await lane_session_action.answer(lane, parsed.data.action)
-		: failure(UNREADABLE_REASON)
+		: unreadable(parsed.error)
 }
 
 async function process_request(
