@@ -30,7 +30,7 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 }))
 // No green record, so every case reads the whole branch change; the since-green narrowing is
 // `test-related.since-green.test.ts`.
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved: vi.fn() } }))
+vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { GateTree } from '#scripts/gate/gate-tree'
+import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
@@ -8,6 +9,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from './test-read-map'
+import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 
@@ -35,7 +37,13 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 
 // The change a narrowing reads, and the map it reads it against. `is_unmoved` is the since-green
 // reading's positive fact that nothing moved since this command was last green on this checkout.
-type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'> & { is_unmoved?: true }
+// `synced` is the part of the change a main sync brought in, and `since_map` the part the change since
+// the map's tree joined to the named files, both kept for the run's ledger record.
+type ChangeReading = Pick<ScopeRequest, 'changed' | 'map'> & {
+	is_unmoved?: true
+	synced?: ReadonlyArray<string>
+	since_map?: ReadonlyArray<string>
+}
 
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
 // `resolve_scope`, and only one of them means "could not tell".
@@ -95,7 +103,10 @@ async function explicit_change(
 
 	if (since === undefined) return { changed: explicit, map: undefined }
 
-	return { changed: [...new Set([...explicit, ...since])], map }
+	const named = new Set(explicit)
+	const since_map = since.filter((file) => !named.has(file))
+
+	return { changed: [...named, ...since_map], map, since_map }
 }
 
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
@@ -107,9 +118,12 @@ async function since_green_change(
 	root: string,
 	map: ReadMap | undefined,
 ): Promise<ChangeReading | undefined> {
-	const moved = await since_green.read_moved(review_stamps.test_related_stamp)
+	const parts = await since_green.read_moved_parts(review_stamps.test_related_stamp)
 
-	if (moved === undefined) return undefined
+	if (parts === undefined) return undefined
+
+	const moved = moved_paths.union_of(parts)
+
 	if (moved.length === 0) return { changed: [], map, is_unmoved: true }
 
 	const change = await explicit_change(root, moved, map)
@@ -118,7 +132,7 @@ async function since_green_change(
 
 	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
 
-	return change
+	return { ...change, synced: parts.synced }
 }
 
 async function whole_change(root: string, map: ReadMap | undefined): Promise<ChangeReading> {
@@ -200,12 +214,7 @@ async function run_scope(
 	)
 }
 
-async function read_scope(
-	root: string,
-	command_arguments: ReadonlyArray<string>,
-): Promise<RelatedScope> {
-	const change = await read_change(root, command_arguments)
-
+async function resolve_change(root: string, change: ChangeReading): Promise<RelatedScope> {
 	const { UNMOVED_REASON } = related_scope
 
 	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
@@ -215,20 +224,50 @@ async function read_scope(
 	return related_scope.resolve_scope({ root, ...change, recorded, is_present: existsSync })
 }
 
+async function read_run_input(
+	root: string,
+	command_arguments: ReadonlyArray<string>,
+): Promise<RunInput> {
+	const change = await read_change(root, command_arguments)
+	const scope = await resolve_change(root, change)
+
+	const { changed, synced = [], since_map = [] } = change
+
+	return { scope, root, changed, synced, since_map }
+}
+
+// Every run is timed and counted into the lane ledger (joshuafolkken/kit#4465).
+async function run_and_record(
+	input: RunInput,
+	command_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	const started = performance.now()
+	const { exit_code, test_files } = await test_related_record.with_test_count(
+		async () => await run_scope(input.scope, input.root, command_arguments),
+	)
+
+	await test_related_record.record_run(input, {
+		elapsed_ms: performance.now() - started,
+		test_files,
+	})
+
+	return exit_code
+}
+
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const scope = await read_scope(root, command_arguments)
+	const input = await read_run_input(root, command_arguments)
 
 	// A non-code argument is resolved through the map rather than handed to vitest, so only the
 	// code arguments can be ones vitest was not given.
 	changed_file_scope.report_unusable_arguments(
 		command_arguments.filter((argument) => related_scope.is_relatable(argument)),
-		scope,
+		input.scope,
 		related_scope.COMMAND_LABEL,
 	)
 
 	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await run_scope(scope, root, command_arguments)
+	const exit_code = await run_and_record(input, command_arguments)
 
 	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
 		before: conclusive_tree(before),

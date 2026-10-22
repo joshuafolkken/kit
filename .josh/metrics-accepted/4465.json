@@ -1,0 +1,7 @@
+{
+	"reason": "test:related now records each run (change/synced/since-map/readers, scope, test files, elapsed) to the lane ledger and lane:stats shows it, as #4465 AC1 requires; the since-map count keeps main merges after the test-read map out of the change itself; the count-file protocol and whole-suite file list are new single-source modules",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 304
+	}
+}
