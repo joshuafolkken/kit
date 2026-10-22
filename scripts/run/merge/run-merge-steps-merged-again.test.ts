@@ -23,6 +23,7 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 vi.mock('#scripts/lane/lane-reap', () => ({
 	lane_reap: { reap_child: vi.fn().mockReturnValue([]) },
 }))
+vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics: vi.fn() } }))
 
 const { run_merge_steps } = await import('./run-merge-steps')
 

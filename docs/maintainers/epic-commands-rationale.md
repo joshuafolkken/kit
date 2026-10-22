@@ -107,8 +107,10 @@ steps with the body template (joshuafolkken/kit#3178).
 
 **Why every split gets an epic.** Kept as a comment on the first child, the split rationale ends up
 inside the issue a batch merges and closes first, burying the plan for the rest. An earlier caveat
-("with few children, the epic costs more than it organizes") lost its ground once `followup` began
-auto-closing an epic whose children are all closed (`scripts/epic/epic-close.ts`): with no abandoned
+("with few children, the epic costs more than it organizes") lost its ground once josh began
+auto-closing an epic whose children are all closed (`scripts/epic/epic-close.ts`, run by `followup`
+after its merge, `issue:measured` after its close and `run:merge` for every merged child; a person
+who closes an `already-done` child closes its epic too): with no abandoned
 epic left to manage, the only risk is misjudging the branch. A `closes #<epic>` in the last PR was
 rejected because it also fires when a batch fails midway.
 
@@ -134,7 +136,7 @@ backlogrun #<E> --only
 ```
 
 - `Progress` is a task list because GitHub ticks only that notation when the child closes; it never
-  closes the epic itself, which is `followup`'s job (and why the `epic` label and the task list are both
+  closes the epic itself, which is josh's job on every child close (and why the `epic` label and the task list are both
   required — either missing leaves the epic open).
 - `Dependencies` is an arrow chain (`->` or `→`) because `followup`'s missing-relation warning fires
   only on that notation. Order-free batches write `None — the children are independent; any execution

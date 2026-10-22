@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { epic_close } from '#scripts/epic/epic-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_evidence_exit } from '#scripts/issue/issue-evidence-exit'
 import { MEASURED_LABEL } from '#scripts/issue/issue-labels'
@@ -25,10 +26,13 @@ async function apply_label(issue_number: string): Promise<boolean> {
 	return write.is_applied
 }
 
+// A closed measurement may be its epic's last child, and no `followup` runs for it — so the epic
+// auto-close is run here, through the one entry every child close takes (`epic-close.ts`).
 async function close_issue(issue_number: string): Promise<boolean> {
 	const is_closed = await git_gh_command.issue_close(issue_number, undefined)
 
-	if (!is_closed) console.error(`Issue ${session_cite.issue(issue_number)} not closed`)
+	if (is_closed) await epic_close.close_completed_epics({ issue_number, is_merged: true })
+	else console.error(`Issue ${session_cite.issue(issue_number)} not closed`)
 
 	return is_closed
 }

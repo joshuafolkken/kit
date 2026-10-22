@@ -308,7 +308,7 @@ pnpm josh issue:measured 4452 --evidence-file .josh/tmp/measured.md   # comment,
 
 <!-- /usage -->
 
-See `issue-comments.md` → "A measurement-only Issue". Steps stop at the first failure. No pull request closes such an Issue, so the run does; `run:merge` reads it CLOSED as merged, never `run:stalled`.
+See `issue-comments.md` → "A measurement-only Issue". Steps stop at the first failure. No pull request closes such an Issue, so the run does, then closes any epic it completed; `run:merge` reads it CLOSED as merged, never `run:stalled`.
 
 The `measured` label tells this close from a person's, so `run:carry --end` and `run:tidy` still count it as merged. A criterion that needs a code change is not a measurement — that Issue takes the pull request.
 

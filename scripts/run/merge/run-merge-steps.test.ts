@@ -31,6 +31,7 @@ const reap_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/lane/lane-reap', () => ({
 	lane_reap: { reap_child: reap_mock },
 }))
+vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics: vi.fn() } }))
 
 const { run_merge_steps } = await import('./run-merge-steps')
 

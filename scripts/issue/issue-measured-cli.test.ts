@@ -27,6 +27,10 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 
 vi.mock('#scripts/run/hold/run-hold-cli', () => ({ run_hold_cli: { run: release } }))
 
+const close_completed_epics = vi.hoisted(() => vi.fn<() => Promise<void>>())
+
+vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics } }))
+
 const ISSUE = '4452'
 const FLAG = '--evidence-file'
 const EVIDENCE = '- criterion 1: CI run 123 — 4m12s\n'
@@ -51,6 +55,9 @@ beforeEach(() => {
 
 		return true
 	})
+	close_completed_epics.mockReset().mockImplementation(async () => {
+		calls.push('epics')
+	})
 	release.mockReset().mockImplementation(async () => {
 		calls.push('release')
 
@@ -74,11 +81,12 @@ afterAll(() => {
 })
 
 describe('issue_measured_cli.run — the completion in order', () => {
-	it('posts the result, labels it measured, closes it, then releases the hold', async () => {
+	it('posts the result, labels it measured, closes it and its epics, then releases the hold', async () => {
 		const code = await issue_measured_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
 
 		expect(code).toBe(0)
-		expect(calls).toStrictEqual(['comment', 'label', 'close', 'release'])
+		expect(calls).toStrictEqual(['comment', 'label', 'close', 'epics', 'release'])
+		expect(close_completed_epics).toHaveBeenCalledWith({ issue_number: ISSUE, is_merged: true })
 		expect(issue_comment).toHaveBeenCalledWith(ISSUE, EVIDENCE.trim())
 		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, MEASURED_LABEL)
 		expect(issue_close).toHaveBeenCalledWith(ISSUE, undefined)
@@ -108,6 +116,7 @@ describe('issue_measured_cli.run — a failure stops at its step', () => {
 
 		expect(await issue_measured_cli.run([ISSUE, FLAG, EVIDENCE_FILE])).toBe(1)
 		expect(calls).toStrictEqual(['comment', 'label'])
+		expect(close_completed_epics).not.toHaveBeenCalled()
 	})
 })
 

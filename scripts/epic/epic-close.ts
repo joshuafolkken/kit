@@ -98,30 +98,32 @@ function to_sibling_state(raw_json: string | undefined): SiblingState {
 	}
 }
 
-async function inspect_sibling(sibling: number, repo?: string): Promise<SiblingState> {
-	return to_sibling_state(await git_gh_command.issue_get_state_and_relations(String(sibling), repo))
-}
+type ChildRead = SiblingState & { is_readable: boolean }
 
-// A cross-repository child, read by naming its repository in the read's REST path. `is_readable`
-// is what decides whether the epic may close at all: closing while a child's state is unknown is
-// exactly what the old refusal prevented, and reading them is the only thing that changed.
-async function inspect_external(
-	child: ExternalChild,
-): Promise<SiblingState & { is_readable: boolean }> {
+// A same-repository child carries no `repo`; a cross-repository one names it.
+type ChildReference = Omit<ExternalChild, 'repo'> & { repo?: string | undefined }
+
+// A child read by number, naming its repository in the REST path when it lives in another one.
+// `is_readable` is what decides whether the epic may close at all: closing while a child's state is
+// unknown is exactly what the refusal prevents. A failed read is told apart from an open child
+// rather than read as one, which left a finished epic open with nothing in the output (#4560). A
+// read whose answer carries no state is a failed read too.
+async function inspect_child(child: ChildReference): Promise<ChildRead> {
 	const raw = await git_gh_command.issue_get_state_and_relations(String(child.number), child.repo)
 
-	return { ...to_sibling_state(raw), is_readable: raw !== undefined }
+	return { ...to_sibling_state(raw), is_readable: parse_child(raw)?.state !== undefined }
 }
 
 // The merged Issue is excluded rather than queried: GitHub applies `closes #N` asynchronously, so
 // reading its state immediately after the merge races with that propagation.
-async function inspect_siblings(
-	epic: EpicIssue,
-	merged_number: number,
-): Promise<Array<SiblingState>> {
-	const siblings = epic.children.filter((child) => child !== merged_number)
+async function inspect_children(epic: EpicIssue, merged_number: number): Promise<Array<ChildRead>> {
+	const siblings: Array<ChildReference> = epic.children
+		.filter((child) => child !== merged_number)
+		.map((number) => ({ number }))
 
-	return await Promise.all(siblings.map(async (sibling) => await inspect_sibling(sibling)))
+	return await Promise.all(
+		[...siblings, ...epic.external_children].map(async (child) => await inspect_child(child)),
+	)
 }
 
 // `pnpm josh epic --ordered` and `--add` record the declared chain themselves, through the REST
@@ -209,37 +211,25 @@ async function close_epic(epic: EpicIssue): Promise<boolean> {
 	return await close_epic_with(epic_number, comment)
 }
 
-// The cross-repository children's states, and whether every one of them could be read. An epic with
-// a child whose state is unknown keeps the old handling — left open for manual closing.
-async function inspect_external_children(
-	epic: EpicIssue,
-): Promise<{ states: Array<SiblingState>; is_complete: boolean }> {
-	if (epic.external_children.length === 0) return { states: [], is_complete: true }
-	const results = await Promise.all(
-		epic.external_children.map(async (child) => await inspect_external(child)),
-	)
+// The manual-close request is made only when every child that was read is closed: while one is still
+// open the batch is unfinished anyway, and asking for a manual close would invite closing it early.
+function warn_when_unread_blocks_close(epic: EpicIssue, states: ReadonlyArray<ChildRead>): void {
+	if (states.some((state) => state.is_readable && !state.is_closed)) return
 
-	return {
-		states: results.map((result) => ({
-			is_closed: result.is_closed,
-			has_blocked_by: result.has_blocked_by,
-		})),
-		is_complete: results.every((result) => result.is_readable),
-	}
+	console.info(
+		`⚠️  Epic ${session_cite.issue(epic.number)} has a child whose state could not be read; ${CLOSE_MANUALLY}`,
+	)
 }
 
+// An epic with a child whose state is unknown is left open for manual closing, and says so.
 async function close_epic_when_complete(epic: EpicIssue, merged_number: number): Promise<boolean> {
-	const external = await inspect_external_children(epic)
+	const states = await inspect_children(epic, merged_number)
 
-	if (!external.is_complete) {
-		console.info(
-			`ℹ️  Epic ${session_cite.issue(epic.number)} has a child in another repository whose state could not be read; ${CLOSE_MANUALLY}`,
-		)
+	if (states.some((state) => !state.is_readable)) {
+		warn_when_unread_blocks_close(epic, states)
 
 		return false
 	}
-
-	const states = [...(await inspect_siblings(epic, merged_number)), ...external.states]
 
 	warn_when_order_unrecorded(epic, states)
 
@@ -363,9 +353,14 @@ async function resolve_and_close_safely(merged_number: number): Promise<void> {
 /**
  * Close every open epic whose task list is fully complete once `issue_number` closed.
  *
- * Requires `is_merged`: the linked Issue is treated as closed without being queried, which only
- * holds once the PR actually merged. On a `--no-merge` run that Issue is still open, so skipping
- * this guard would close an epic whose batch is not finished.
+ * **The one entry every child close goes through** (#4560): `followup` after its merge,
+ * `josh issue:measured` after its own close, and `run:merge` for every child it counts as merged —
+ * which also catches a merge GitHub left OPEN. Running it
+ * twice for one child is harmless: a closed epic is no longer in the open listing.
+ *
+ * Requires `is_merged` — the child is known closed: the linked Issue is treated as closed without
+ * being queried. On a `--no-merge` run that Issue is still open, so skipping this guard would close
+ * an epic whose batch is not finished.
  */
 async function close_completed_epics(input: {
 	issue_number: string | undefined
