@@ -198,7 +198,7 @@ async function lane_room_of(
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
 		occupied_count: occupied.length,
-		earlier_occupied: occupied.filter((issue) => sorted.earlier.has(Number(issue))),
+		earlier_occupied: run_board_lane_state.earlier_occupied(occupied, sorted),
 		idle_lanes: room.idle,
 	}
 }

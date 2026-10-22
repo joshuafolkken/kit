@@ -98,7 +98,12 @@ function lanes_of(read: LaneRead): BoardLanes {
 	return sorted
 }
 
-const run_board_lane_state = { NO_LANES, lanes_of }
+// An earlier run's lane is drawn only while it holds a place under the limit.
+function earlier_occupied(occupied: ReadonlyArray<string>, sorted: BoardLanes): Array<string> {
+	return occupied.filter((issue) => sorted.earlier.has(Number(issue)))
+}
+
+const run_board_lane_state = { NO_LANES, earlier_occupied, lanes_of }
 
 export { run_board_lane_state }
 export type { BoardLanes, LaneRead }

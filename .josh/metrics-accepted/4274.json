@@ -1,0 +1,7 @@
+{
+	"reason": "test:related on this branch now runs the fast-check property tests for lane and run lifecycle combinations (#4274); the median of the last 5 solo gates' related runs moved 952ms to 1048ms",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 376
+	}
+}
