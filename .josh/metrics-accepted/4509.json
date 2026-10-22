@@ -1,7 +1,7 @@
 {
-	"reason": "The supervisor reloads on new code between dispatches (#4509): the closure watch, the hand-over to a successor and its take-over check, a bounded driver window that brings the pass boundary between dispatches, and stopping an unclaimed successor",
+	"reason": "Round-2 fix: a stop decision now wins over a code reload, with a regression test pinning it",
 	"date": "2026-10-22",
 	"growth": {
-		"scripts.code_lines": 257
+		"scripts.code_lines": 258
 	}
 }

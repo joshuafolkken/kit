@@ -9,7 +9,7 @@ import { run_wake_loop_fixture } from './run-wake-loop-fixture'
 // joshuafolkken/kit#4509: the supervisor reloads its code at a pass boundary, before it drives or
 // launches anything for that pass.
 
-const { HANDED_OFF, IN_FLIGHT, INVOCATION, NOW, recorder } = run_wake_loop_fixture
+const { ENDED, HANDED_OFF, IN_FLIGHT, INVOCATION, NOW, recorder } = run_wake_loop_fixture
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
@@ -46,6 +46,21 @@ describe('run_wake_loop.run_loop — reloading on new code', () => {
 
 		expect(stop.reason).toBe(run_wake_loop.RELOAD_REASON)
 		expect(is_code_stale).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('run_wake_loop.run_loop — a stop wins over a reload', () => {
+	it('ends the run rather than reloading when the carry record ended', async () => {
+		const is_code_stale = vi.fn(async () => true)
+
+		const stop = await run_wake_loop.run_loop(
+			scratch.target,
+			{ ...recorder([ENDED]).ports, is_code_stale },
+			0,
+		)
+
+		expect(stop.reason).toBe('ended')
+		expect(is_code_stale).not.toHaveBeenCalled()
 	})
 
 	it('stops without checking the code when the wake record is gone', async () => {

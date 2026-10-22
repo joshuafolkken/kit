@@ -175,17 +175,21 @@ async function retry_closes(ports: LoopPorts): Promise<void> {
 //
 // **A pass boundary is where the supervisor reloads its code** (joshuafolkken/kit#4509): no driver
 // is running and no session is being launched, so a successor on the new code takes over without
-// stopping any lane. A record already removed ends the loop before this pass is reached.
+// stopping any lane. A record already removed ends the loop before this pass is reached, and a carry
+// record that ended or became unreadable stops the run before the code is checked, so a reload never
+// hands a finished run to a successor.
 async function run_pass(
 	target: string,
 	wake: RunWake,
 	ports: LoopPorts,
 ): Promise<LoopStop | undefined> {
-	if (await ports.is_code_stale()) return CODE_CHANGED
+	const decision = await decide_pass(wake, ports)
+
+	if (decision.kind !== 'stop' && (await ports.is_code_stale())) return CODE_CHANGED
 
 	await retry_closes(ports)
 
-	const outcome = await step(wake, await decide_pass(wake, ports), ports)
+	const outcome = await step(wake, decision, ports)
 
 	if (outcome.kind === 'stop') return outcome.stop
 
