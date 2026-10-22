@@ -68,10 +68,12 @@ async function occupancy_of(
 	const issues = open.map((lane) => lane.issue)
 	const trace = { process_trace: await lane_snapshot_trace.traces_of(issues, rows) }
 	const records = await lane_state.read_states(issues)
+	const is_merge_waiting = await lane_snapshot_trace.merge_waits_of(issues, rows)
 	const occupied = backlog_occupied.occupied_lanes(
 		open,
 		(live) => lane_spent.idle_lanes(live, trace),
 		records,
+		is_merge_waiting,
 	)
 	const unknown = backlog_occupied.unknown_lanes(open, records)
 

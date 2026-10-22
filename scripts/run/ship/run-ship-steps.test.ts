@@ -167,7 +167,7 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 
 		expect(await step_for(STAGE.SYNC).run(ARGS, FRESH)).toBe(OK)
 		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(OK)
-		expect(followup_spy).toHaveBeenCalledWith(TITLE, ARGS.notify)
+		expect(followup_spy).toHaveBeenCalledWith(TITLE, ARGS.notify, expect.any(Function))
 	})
 })
 

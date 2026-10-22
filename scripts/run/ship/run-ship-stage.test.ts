@@ -214,6 +214,39 @@ describe('run_ship_stage record — the attempt’s started stages (joshuafolkke
 	})
 })
 
+describe('run_ship_stage record — the merge wait (joshuafolkken/kit#4466)', () => {
+	it('keeps the merge wait beside the started stages until it is taken down', () => {
+		const target = fresh_target()
+
+		run_ship_stage.mark_started(target, STAGE.FOLLOWUP)
+		run_ship_stage.mark_merge_waiting(target, true)
+
+		expect(run_ship_stage.read_merge_waiting(target)).toBe(true)
+		expect(run_ship_stage.read_started(target)).toStrictEqual([STAGE.FOLLOWUP])
+
+		run_ship_stage.mark_merge_waiting(target, false)
+
+		expect(run_ship_stage.read_merge_waiting(target)).toBe(false)
+	})
+
+	it('takes the merge wait down when a stop ends the attempt', () => {
+		const target = fresh_target()
+
+		run_ship_stage.mark_merge_waiting(target, true)
+		run_ship_stage.end_attempt(target)
+
+		expect(run_ship_stage.read_merge_waiting(target)).toBe(false)
+	})
+
+	it('reads a record written before the field as not waiting', () => {
+		const target = fresh_target()
+
+		writeFileSync(target, JSON.stringify({ done: [], started: [STAGE.FOLLOWUP] }))
+
+		expect(run_ship_stage.read_merge_waiting(target)).toBe(false)
+	})
+})
+
 describe('run_ship_stage.started_of — the attempt a line carries (joshuafolkken/kit#3552)', () => {
 	const { PHASE } = run_ship_stage
 

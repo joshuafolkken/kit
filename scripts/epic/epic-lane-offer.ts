@@ -1,4 +1,5 @@
 import { lane_capacity } from '#scripts/lane/lane-capacity'
+import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { epic_busy, type BusyRead } from './epic-busy'
 import {
 	epic_candidate_confirm,
@@ -62,8 +63,22 @@ function is_held(read: BusyRead): boolean {
 	return read.kind === 'unreadable' || read.kind === 'truncated'
 }
 
-function free_lanes(read: BusyRead, limit: number): number {
-	return is_held(read) ? NO_LANES : lane_capacity.free_lanes(limit, epic_busy.occupied_lanes(read))
+function free_lanes(read: BusyRead, limit: number, merge_waiting: number): number {
+	if (is_held(read)) return NO_LANES
+
+	return lane_capacity.free_lanes(limit, epic_busy.occupied_lanes(read) - merge_waiting)
+}
+
+// **A holder whose detached ship waits on its merge holds no lane** — the count `backlog:drive` makes
+// for the pool (`backlog-occupied.ts`), so a named epic's lanes are offered the place too
+// (joshuafolkken/kit#4466). It keeps `in-progress` until the merge. The ship records read are this
+// checkout's, which is the repository `backlog-drive-epic.ts` asks about.
+async function merge_waiting_holders(read: BusyRead): Promise<number> {
+	if (read.kind !== 'busy') return NO_LANES
+
+	return await lane_snapshot_trace.count_merge_waiting(
+		read.issues.map((issue) => String(issue.number)),
+	)
 }
 
 function wanted_of(request: LaneRequest, free: number): number {
@@ -247,7 +262,7 @@ async function offer_for_repo(
 
 	if (notice !== undefined) console.error(notice)
 
-	const free = free_lanes(read, request.limit)
+	const free = free_lanes(read, request.limit, await merge_waiting_holders(read))
 	const ages = await holder_ages(read, request.repo)
 
 	if (free === NO_LANES) {

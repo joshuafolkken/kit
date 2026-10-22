@@ -66,6 +66,8 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 - **The brief names the invocation it descends from** — e.g. `backlogrun #<E> --only`, the child
   number, and that it runs as `fullrun #<N>` under that authorization; the unit refuses a brief without
   it.
+- A child whose ship waits on its merge frees its lane — the next child launches beside it, and a
+  stop at `followup` relaunches the child once a place is free: `scripts/backlog/backlog-occupied.ts`.
 
 ### What the summary carries, and how long it may be
 

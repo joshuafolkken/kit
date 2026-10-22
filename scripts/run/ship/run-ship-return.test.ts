@@ -10,6 +10,13 @@ const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
+const limit_mock = vi.hoisted(() => vi.fn())
+const lane_use_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-capacity', () => ({
+	lane_capacity: { lane_limit: limit_mock, seated_limit: (limit: number): number => limit },
+}))
+vi.mock('#scripts/backlog/backlog-ready', () => ({ backlog_ready: { lane_use: lane_use_mock } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -60,6 +67,8 @@ const ARGS = {
 const SERVER = 'server-1'
 const NEW_SERVER = 'server-2'
 const STOPPED = { is_success: false, reason: 'the broker stopped serving before it answered' }
+const LIMIT = 4
+const USE = { occupied: 1, seated: 1, unknown: [] }
 
 beforeEach(() => {
 	emit_mock.mockReset()
@@ -72,6 +81,11 @@ beforeEach(() => {
 	park_mock.mockReset().mockResolvedValue(true)
 	stale_mock.mockReset().mockResolvedValue(false)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+})
+
+beforeEach(() => {
+	limit_mock.mockReset().mockResolvedValue({ kind: 'limit', limit: LIMIT })
+	lane_use_mock.mockReset().mockResolvedValue(USE)
 })
 
 describe('run_ship_return.return_control', () => {
@@ -115,6 +129,65 @@ describe('run_ship_return.return_control', () => {
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME, OUTPUT)).toBe('recorded')
 		expect(emit_mock).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#4466: a ship waiting on its merge holds no lane place, so a red CI or a CodeRabbit
+// finding that needs judgement must still bring a child back to fix it.
+describe('run_ship_return.return_control on a merge wait that needs judgement', () => {
+	it.each([
+		['a red CI check', 'X e2e  fail  https://github.com/o/r/actions/runs/1'],
+		['a CodeRabbit finding', 'CodeRabbit left 1 unresolved actionable comment'],
+	])('relaunches the lane child with %s in its prompt', async (_case, output) => {
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, output)).toBe(
+			'relaunched',
+		)
+
+		const invocation = String(relaunch_mock.mock.calls[0]?.[1])
+
+		expect(invocation).toContain(output)
+		expect(invocation.endsWith(`fullrun #${ISSUE}`)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
+// place before it relaunches, keeping its stop prompt rather than handing the issue to the driver.
+describe('run_ship_return.return_control on a merge wait past the lane limit', () => {
+	it('waits for a place, then relaunches the followup stop with its output', async () => {
+		lane_use_mock
+			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 1 })
+			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 1 })
+			.mockResolvedValue({ ...USE, occupied: LIMIT })
+
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
+			'relaunched',
+		)
+		expect(lane_use_mock).toHaveBeenCalledTimes(3)
+		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(OUTPUT)
+	})
+
+	it('relaunches once the wait runs out with the lanes still full', async () => {
+		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
+
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
+			'relaunched',
+		)
+	})
+
+	it('relaunches a stop before the followup however many lanes are working', async () => {
+		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
+
+		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('relaunched')
+		expect(lane_use_mock).not.toHaveBeenCalled()
+	})
+
+	it('relaunches a followup stop when the lane limit cannot be read', async () => {
+		limit_mock.mockResolvedValue({ kind: 'invalid', problem: 'JOSH_LANE_LIMIT is not a number' })
+		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
+
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
+			'relaunched',
+		)
 	})
 })
 

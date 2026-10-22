@@ -1,0 +1,8 @@
+{
+	"reason": "Lane slots free while a detached ship waits on its merge: the merge-wait mark, its readers, the named-epic discount and the supervisor's wait for a place before a followup relaunch (#4466)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 126,
+		"ai_cost.on_demand_bytes": 346
+	}
+}

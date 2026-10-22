@@ -59,15 +59,17 @@ const STARTED_INDEX = 3
 const WORD_COUNT = STARTED_INDEX + 1
 
 // `started` lists the stages the current attempt started, kept across a supervisor that ended without a
-// stop so its successor's lines still carry them.
+// stop so its successor's lines still carry them. `is_merge_waiting` is set only while `josh followup`
+// itself runs (joshuafolkken/kit#4466).
 const record_schema = z.object({
 	done: z.array(z.string()),
 	started: z.array(z.string()).default([]),
+	is_merge_waiting: z.boolean().default(false),
 })
 
 type ShipRecord = z.infer<typeof record_schema>
 
-const EMPTY_RECORD: ShipRecord = { done: [], started: [] }
+const EMPTY_RECORD: ShipRecord = { done: [], started: [], is_merge_waiting: false }
 
 // Keyed on the repository and the issue: every lane of one repository shares the common git directory,
 // and two issues shipping from two lanes keep two records.
@@ -112,7 +114,18 @@ function mark_started(target: string, stage: Stage): void {
 // A `ship-stop` ends the attempt on the board (`run-board-phase.ts`), so the next attempt lists afresh
 // while the completed stages stay recorded.
 function end_attempt(target: string): void {
-	stamp_file.replace_stamp(target, { ...read_record(target), started: [] })
+	stamp_file.replace_stamp(target, { ...read_record(target), started: [], is_merge_waiting: false })
+}
+
+// Whether the ship waits on CI, CodeRabbit and the merge alone: its lane then holds no place under the
+// lane limit (`backlog-occupied.ts`). Cleared before any gate the followup stage runs, at a stop, and
+// when a successor supervisor opens the record, so a dead supervisor's flag frees nothing.
+function read_merge_waiting(target: string): boolean {
+	return read_record(target).is_merge_waiting
+}
+
+function mark_merge_waiting(target: string, is_merge_waiting: boolean): void {
+	stamp_file.replace_stamp(target, { ...read_record(target), is_merge_waiting })
 }
 
 // Removed once the report stage completes, so a later ship of the same issue starts from the preflight.
@@ -216,8 +229,10 @@ const run_ship_stage = {
 	event_text,
 	is_done,
 	mark_done,
+	mark_merge_waiting,
 	mark_started,
 	read_done,
+	read_merge_waiting,
 	read_started,
 	record_path,
 	started_of,

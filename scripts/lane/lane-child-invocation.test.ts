@@ -33,6 +33,20 @@ describe('the lane child invocation prompts', () => {
 	})
 })
 
+// joshuafolkken/kit#4466: the merge-wait read asks the ship record only where a supervisor is listed.
+describe('the ship pattern read as the extended regex pgrep applies', () => {
+	const ship = new RegExp(lane_child_invocation.ship_pattern(ISSUE), 'u')
+
+	it.each([
+		[`node /usr/local/bin/pnpm josh ship --review Hand the region over #${ISSUE}`, true],
+		[`node tsx scripts/run/ship/run-ship-cli.ts Hand the region over #${ISSUE}`, true],
+		[`claude -p Resuming the lane child ... fullrun #${ISSUE}`, false],
+		[`node /usr/local/bin/pnpm josh ship Other work #${ISSUE}0`, false],
+	])('finds the ship supervisor alone: %s', (line, is_ship) => {
+		expect(ship.test(line)).toBe(is_ship)
+	})
+})
+
 // joshuafolkken/kit#2428: the agent ends once it hands the region to a detached ship supervisor, so the
 // pattern the parent polls must find that supervisor too, or a shipping lane is booked finished.
 describe('the process pattern read as the extended regex pgrep applies', () => {

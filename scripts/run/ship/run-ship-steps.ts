@@ -2,10 +2,11 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_preflight } from './run-ship-preflight'
+import { run_ship_probe } from './run-ship-probe'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stage, type ShipState, type Stage } from './run-ship-stage'
-import { run_ship_sync, type StepResult } from './run-ship-sync'
+import { run_ship_sync, type StepResult, type WaitMark } from './run-ship-sync'
 
 // The stages `josh ship` runs, in the order a change ships, kept apart from the chaining
 // CLI so the order is read in one place.
@@ -85,9 +86,24 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	},
 ]
 
+// The followup's merge wait on the stage record, written best-effort as the stages are
+// (`run-ship-cli.ts`): a lost mark only keeps the lane counted (joshuafolkken/kit#4466).
+function wait_mark(target: string | undefined): WaitMark {
+	return function mark(is_merge_waiting: boolean): void {
+		if (target === undefined) return
+
+		try {
+			run_ship_stage.mark_merge_waiting(target, is_merge_waiting)
+		} catch {
+			// Best-effort: an unmarked wait holds the lane's place, the safe direction.
+		}
+	}
+}
+
 // The merge, then the ship body draft goes with it (`run-ship-body-draft.ts`).
 async function followup_stage(args: ShipArguments): Promise<StepResult> {
-	const result = await run_ship_sync.followup_stage(args.title, args.notify)
+	const mark = wait_mark(await run_ship_probe.record_target(args.number))
+	const result = await run_ship_sync.followup_stage(args.title, args.notify, mark)
 
 	if (result.code === SUCCESS_EXIT_CODE) await run_ship_body_draft.remove(args.number)
 

@@ -2,6 +2,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_limit_cli } from '#scripts/lane/lane-limit-cli'
 import { lane_limit_override } from '#scripts/lane/lane-limit-override'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { lane_spent } from '#scripts/lane/lane-spent'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -171,6 +172,18 @@ describe('backlog_ready.lane_use', () => {
 
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length,
+			seated: OPEN.length,
+			unknown: [],
+		})
+	})
+
+	// joshuafolkken/kit#4466: the merge wait read from the snapshot must reach the count.
+	it('frees the place of a lane whose ship waits on its merge, while it keeps its seat', async () => {
+		vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
+		vi.spyOn(lane_snapshot_trace, 'merge_waits_of').mockResolvedValue((issue) => issue === '3865')
+
+		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
+			occupied: OPEN.length - 1,
 			seated: OPEN.length,
 			unknown: [],
 		})

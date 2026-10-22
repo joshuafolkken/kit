@@ -27,6 +27,12 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
 }))
 
+const merge_waiting_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-snapshot-trace', () => ({
+	lane_snapshot_trace: { count_merge_waiting: merge_waiting_mock },
+}))
+
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 
@@ -78,6 +84,7 @@ beforeEach(() => {
 	// Every holder these cases list is running; a stale one is `epic-solo-stale.test.ts`'s case.
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
+	merge_waiting_mock.mockResolvedValue(0)
 })
 
 describe('epic_lane_offer.offer_for_repo — how many children fit', () => {
@@ -99,6 +106,19 @@ describe('epic_lane_offer.offer_for_repo — how many children fit', () => {
 		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(TWO_LANES))
 
 		expect(numbers_of(offer.children)).toEqual([FIRST])
+	})
+
+	// joshuafolkken/kit#4466: a holder whose detached ship waits on its merge keeps `in-progress` but holds
+	// no lane, as `backlog:drive` counts the pool.
+	it('offers the lane of a holder whose ship waits on its merge', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(holders([HOLDER, OTHER_HOLDER])))
+		merge_waiting_mock.mockResolvedValueOnce(ONE_LANE)
+
+		const children = [child(FIRST), child(SECOND)]
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(TWO_LANES))
+
+		expect(numbers_of(offer.children)).toEqual([FIRST])
+		expect(merge_waiting_mock).toHaveBeenCalledWith([String(HOLDER), String(OTHER_HOLDER)])
 	})
 
 	it('offers a single child when the caller did not ask for every lane', async () => {

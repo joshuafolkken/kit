@@ -1,6 +1,7 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 
 type StartRead = (pid: number) => string | undefined
@@ -57,6 +58,22 @@ async function ship_reader(read: StartRead): Promise<(issue: string) => boolean>
 		run_ship_detach.read_result(repository, issue, read)?.result === 'running'
 }
 
+// The live ship for `issue` is inside `josh followup`: it waits on CI, CodeRabbit and the merge alone
+// (joshuafolkken/kit#4466). The mark is down while the followup stage merges and gates again, after a
+// stop, and once a successor supervisor opens the record (`run_ship_stage.read_merge_waiting`).
+function is_merge_waiting(repository: string, issue: string, read: StartRead): boolean {
+	if (run_ship_detach.read_result(repository, issue, read)?.result !== 'running') return false
+
+	return run_ship_stage.read_merge_waiting(run_ship_stage.record_path(repository, issue))
+}
+
+// `is_merge_waiting` for this checkout, read the way `ship_reader` reads.
+async function merge_wait_reader(read: StartRead): Promise<(issue: string) => boolean> {
+	const repository = await read_repository()
+
+	return (issue) => repository !== undefined && is_merge_waiting(repository, issue, read)
+}
+
 // When the detached ship for `issue` that is still live was launched, or `undefined` where none is.
 function ship_running_since(issue: string, directory: string): number | undefined {
 	const repository = git_common_directory.repository(directory)
@@ -77,6 +94,7 @@ const lane_handoff = {
 	is_handed_off,
 	is_ship_running,
 	is_ship_succeeded,
+	merge_wait_reader,
 	ship_reader,
 	ship_running_since,
 }

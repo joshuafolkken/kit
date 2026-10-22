@@ -72,6 +72,9 @@ to 32 minutes; give the call the largest timeout it accepts (`timeout: 600000` i
 harness detaches the call, wait for its report; where it kills it, set `JOSH_CI_TIMEOUT_SECONDS` and
 re-run once CI has settled. Re-run after every follow-up commit.
 
+In a lane, the detached ship supervisor runs it, not the child — its merge wait holds no lane
+place: `scripts/backlog/backlog-occupied.ts`.
+
 **The count of unreleased merges is surfaced at completion — not a version.** It prints `🚚 unreleased
 merges on main: <n>`. **Do not report a shipped version** — a child no longer bumps. See "When `pnpm
 josh release` runs" below.

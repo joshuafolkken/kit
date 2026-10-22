@@ -89,6 +89,32 @@ describe('backlog_occupied.occupied_lanes — a paused lane', () => {
 	})
 })
 
+// joshuafolkken/kit#4466: a child that handed its region to a detached ship has ended, and the ship's
+// followup only polls CI and the merge, yet its lane held a place for the whole wait.
+const MERGING = '4466'
+
+function is_merge_waiting(issue: string): boolean {
+	return issue === MERGING
+}
+
+describe('backlog_occupied.occupied_lanes — a lane waiting on its merge', () => {
+	const ALL = [lane(WORKING), lane(MERGING)]
+
+	it('drops a lane whose detached ship waits on its merge', () => {
+		const records = records_of([WORKING, MERGING])
+
+		expect(
+			backlog_occupied
+				.occupied_lanes(ALL, () => [], records, is_merge_waiting)
+				.map((one) => one.issue),
+		).toStrictEqual([WORKING])
+	})
+
+	it('counts every lane where no merge wait is read', () => {
+		expect(occupied(ALL, () => [])).toStrictEqual([WORKING, MERGING])
+	})
+})
+
 describe('backlog_occupied.unknown_lanes', () => {
 	it('names the live lanes with no record, never a stranded one', () => {
 		const lanes = [lane(WORKING), lane(BLOCKED), lane('4105', true)]

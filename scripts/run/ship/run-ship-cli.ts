@@ -286,6 +286,11 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 	const done = target === undefined ? new Set<string>() : run_ship_stage.read_done(target)
 	const started = target === undefined ? [] : [...run_ship_stage.read_started(target)]
 
+	// A supervisor that died mid-followup left its wait marked; this one waits on nothing yet.
+	record(target, (path) => {
+		run_ship_stage.mark_merge_waiting(path, false)
+	})
+
 	return { target, done, state, started }
 }
 
