@@ -25,7 +25,7 @@ import type { CarryOwner, RunCarry } from './run-carry'
 // How long after its last write a conversation whose process has gone still counts as continuing. It
 // bridges a restart and a resume — measured at eighteen seconds — with room for a person reopening a
 // window, and it is the order of the wake grace window, so a genuine crash is recovered no later than
-// a lost wake would be retried.
+// a lost wake would be retried. A headless owner is not given it (`run-carry.ts` → `is_owner_live`).
 const CONVERSATION_QUIET_MS = 600_000
 
 type Environment = Readonly<Record<string, string | undefined>>
