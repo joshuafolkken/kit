@@ -4,11 +4,12 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
 const review_in_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
+const read_stamp_text = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
 	stamp_file: {
-		read_stamp_text: vi.fn(() => ''),
+		read_stamp_text,
 		remove_stamp: vi.fn(),
 		stamp_path: vi.fn((prefix: string) => `stamps/${prefix}x`),
 		write_text_stamp: vi.fn(),
@@ -47,6 +48,7 @@ const OPEN = 'run:review'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
 const ROUND_ONE = { kind: 'review', round: '1' }
 const UNSERVED = 'no broker serves this lane'
+const LOW = 'tests:low:a.ts'
 const ANTHROPIC_REVIEWER_PROFILE = {
 	provider: 'anthropic',
 	role: 'reviewer',
@@ -82,6 +84,7 @@ beforeEach(() => {
 	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
 	reviewer_on(ANTHROPIC_REVIEWER_PROFILE)
 	is_child_mock.mockReset().mockReturnValue(true)
+	read_stamp_text.mockReset().mockReturnValue('')
 	broker_request.mockReset().mockResolvedValue({ is_success: false, reason: UNSERVED })
 	broker_serving.mockReset().mockReturnValue(false)
 })
@@ -99,6 +102,7 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 	// joshuafolkken/kit#4431: a reviewer the broker could not start is the infrastructure, no finding.
 	it('stops before attestation when the isolated reviewer is unavailable', async () => {
 		reviewer_on(OPENAI_REVIEWER_PROFILE)
+		read_stamp_text.mockReturnValue(undefined)
 
 		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject({
 			code: FAILED,
@@ -111,9 +115,34 @@ describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
 	// joshuafolkken/kit#3974: the broker's reason reaches the ship log instead of a bare failure.
 	it("names the broker's reason when the isolated reviewer fails", async () => {
 		reviewer_on(OPENAI_REVIEWER_PROFILE)
+		read_stamp_text.mockReturnValue(undefined)
 		const result = await run_ship_review_steps.review_stage(ISSUE)
 
 		expect(result.out).toContain(`isolated reviewer failed: ${UNSERVED}`)
+	})
+})
+
+// joshuafolkken/kit#4562: a reviewer that failed keeps the review it wrote, and only that one.
+describe('run_ship_review_steps.review_stage — a reviewer that failed', () => {
+	it('stops when the reviewer exits non-zero, before the join', async () => {
+		launch.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: FAILED })
+		read_stamp_text.mockReturnValue(undefined)
+
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toHaveProperty('cause', 'infra')
+		expect(commands()).toStrictEqual([OPEN])
+	})
+
+	it('attests and records a review written before the broker failed', async () => {
+		reviewer_on(OPENAI_REVIEWER_PROFILE)
+		read_stamp_text.mockReturnValue(LOW)
+
+		expect(await stage_code()).toBe(OK)
+		expect(commands()).toStrictEqual([
+			OPEN,
+			'run:review --join',
+			'review:attest --check',
+			`review:record --issue ${ISSUE} ${LOW}`,
+		])
 	})
 })
 

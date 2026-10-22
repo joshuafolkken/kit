@@ -194,13 +194,6 @@ describe('run_ship_review_steps.review_stage — a finding or a refusal stops it
 })
 
 describe('run_ship_review_steps.review_stage — a reviewer error stops it', () => {
-	it('stops when the reviewer exits non-zero, before the join', async () => {
-		launch.mockResolvedValue({ ...COMPLETED, exit_code: FAILED })
-
-		expect(await stage()).toHaveProperty('cause', 'infra')
-		expect(commands()).toStrictEqual([OPEN])
-	})
-
 	it('stops when the reviewer could not start', async () => {
 		launch.mockResolvedValue({ kind: 'failed', note: SPAWN_NOTE })
 

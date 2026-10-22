@@ -96,9 +96,37 @@ describe('run_ship_reviewer.reviewed', () => {
 
 	it('books a reviewer that exited non-zero as infrastructure, not a finding', async () => {
 		launch.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: FAILED })
+		read_stamp_text.mockReturnValue(undefined)
 		const [, review] = run_ship_reviewer.reviewed([], prompt_of, ISSUE, run_ship_reviewer.ROUND_TWO)
 
 		expect(await review?.()).toHaveProperty('cause', CAUSE.INFRA)
+	})
+})
+
+// joshuafolkken/kit#4562: a session that failed after writing its findings keeps that review.
+describe('run_ship_reviewer.reviewed — a session that failed after writing its findings', () => {
+	it('books a non-zero exit with an unreadable findings file as infrastructure', async () => {
+		launch.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: FAILED })
+		read_stamp_text.mockReturnValue('half a line')
+		const [, review] = run_ship_reviewer.reviewed([], prompt_of, ISSUE, run_ship_reviewer.ROUND_ONE)
+
+		expect(await review?.()).toHaveProperty('cause', CAUSE.INFRA)
+	})
+
+	it('keeps the review of a reviewer that wrote its findings before it failed', async () => {
+		launch.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: FAILED })
+		read_stamp_text.mockReturnValue('tests:medium:src/a.test.ts:3 — misses the empty case')
+		const [, review] = run_ship_reviewer.reviewed([], prompt_of, ISSUE, run_ship_reviewer.ROUND_ONE)
+
+		expect(await review?.()).toEqual({ code: OK, out: '' })
+	})
+
+	it('keeps the clean review of a reviewer that wrote an empty findings file before it failed', async () => {
+		launch.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: FAILED })
+		read_stamp_text.mockReturnValue('')
+		const [, review] = run_ship_reviewer.reviewed([], prompt_of, ISSUE, run_ship_reviewer.ROUND_ONE)
+
+		expect(await review?.()).toEqual({ code: OK, out: '' })
 	})
 })
 
