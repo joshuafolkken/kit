@@ -1,5 +1,6 @@
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_transcript_calls, type ToolCall } from './lane-transcript-calls'
@@ -30,15 +31,15 @@ const CALL_CLASSES: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [
 const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set(
 	CALL_CLASSES.flatMap(([, names]) => [...names]),
 )
-// A command is `josh <name>` at the start of a shell command — after a separator, past env
-// assignments, shell keywords and a `pnpm` / `npx` runner — so `josh lint:related; josh test:related`
-// and `out=$(pnpm josh gate)` name their commands. A heredoc body or a quoted string only mentions a
-// command, so both are cut before matching; a `<<<` here-string opens no body.
+// A command is `josh <name>` at the start of a shell command — after a separator and the shell
+// keywords, then past what `time_shell` skips (env assignments, wrappers with their flags and operands,
+// a `pnpm` / `npx` runner) — so `josh lint:related; josh test:related`, `out=$(pnpm josh gate)` and
+// `CI=1 timeout 600 pnpm josh gate` name their commands. A heredoc body or a quoted string only
+// mentions a command, so `time_shell.unquoted` cuts both, keeping a `"$(…)"` that runs
+// (joshuafolkken/kit#4525).
 const SEPARATOR_PATTERN = /[;&|()\n]/u
 const WORD_PATTERN = /\s+/u
-const PREFIX_WORDS: ReadonlySet<string> = new Set([
-	'pnpm',
-	'npx',
+const KEYWORDS: ReadonlySet<string> = new Set([
 	'if',
 	'elif',
 	'else',
@@ -46,47 +47,26 @@ const PREFIX_WORDS: ReadonlySet<string> = new Set([
 	'while',
 	'until',
 	'do',
-	'time',
 	'!',
 	'{',
 ])
-const HEREDOC_TAG_PATTERN = /(?<!<)<<(?!<)-?\s*['"]?(?<tag>\w+)/u
-const QUOTED_PATTERN = /'[^']*'|"(?:[^"\\]|\\.)*"/gu
 // `scripts/gate/core-wait.ts` writes this into every wait line it prints.
 const CORE_WAIT_PHRASE = 'waits for the core budget'
 const PERCENT = 100
 const COLUMNS = ['transcript metric', 'value'] as const
 const { NOT_MEASURED } = lane_stage_stats
 
-// The heredoc tag still open after `line`, or the one `line` opens.
-function next_heredoc_tag(line: string, tag: string | undefined): string | undefined {
-	if (tag !== undefined) return line.trim() === tag ? undefined : tag
-
-	return HEREDOC_TAG_PATTERN.exec(line)?.groups?.['tag']
-}
-
-function without_heredocs(text: string): string {
-	const kept: Array<string> = []
-	const open: { tag: string | undefined } = { tag: undefined }
-
-	for (const line of text.split('\n')) {
-		if (open.tag === undefined) kept.push(line)
-		open.tag = next_heredoc_tag(line, open.tag)
-	}
-
-	return kept.join('\n')
-}
-
 // The josh command `segment` runs, or `''` when it runs none.
 function segment_command(segment: string): string {
 	const words = segment.trim().split(WORD_PATTERN)
-	const start = words.findIndex((word) => !word.includes('=') && !PREFIX_WORDS.has(word))
+	const start = words.findIndex((word) => !KEYWORDS.has(word))
+	const named = time_shell.josh_command_of_segment(words.slice(start).join(' '))
 
-	return words[start] === 'josh' ? (words[start + 1] ?? '') : ''
+	return named.slice(time_shell.JOSH_PREFIX.length)
 }
 
 function verification_commands(command = ''): Array<string> {
-	const spoken = without_heredocs(command).replaceAll(QUOTED_PATTERN, '')
+	const spoken = time_shell.unquoted(command)
 	const named = spoken.split(SEPARATOR_PATTERN).map((segment) => segment_command(segment))
 
 	return named.filter((name) => VERIFICATION_COMMANDS.has(name))

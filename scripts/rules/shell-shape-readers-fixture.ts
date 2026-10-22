@@ -11,7 +11,10 @@ const VERIFICATION_COMMANDS: ShapeExpectations<ReadonlyArray<string>> = {
 	'hyperfine-quoted': [],
 	'time-flag-value': [],
 	'env-timeout-wrapper': [],
+	'time-flag-gate': ['gate'],
+	'env-timeout-gate': ['gate'],
 	'command-substitution': [],
+	'gate-substitution': ['gate'],
 	'semicolon-chain': [],
 	'and-chain': [],
 	pipe: ['gate'],
@@ -20,15 +23,24 @@ const VERIFICATION_COMMANDS: ShapeExpectations<ReadonlyArray<string>> = {
 	'name-prefix': [],
 }
 
+// The first `ps` column word, kept as it is: an assignment is not in `ps`'s arguments, so `run:board`
+// never meets one there (#4525).
+const ENV_PREFIX = 'CI=1'
+const TIME_BINARY = '/usr/bin/time'
+const ASSIGNED_SUBSTITUTION = 'out="$(pnpm'
+
 const EXECUTABLES: ShapeExpectations<string> = {
 	plain: 'pnpm',
 	'multiline-quoted-field': 'gh',
 	'curl-data-file': 'curl',
 	'quoted-mention': 'echo',
 	'hyperfine-quoted': 'hyperfine',
-	'time-flag-value': '/usr/bin/time',
-	'env-timeout-wrapper': 'CI=1',
-	'command-substitution': 'out="$(pnpm',
+	'time-flag-value': TIME_BINARY,
+	'env-timeout-wrapper': ENV_PREFIX,
+	'time-flag-gate': TIME_BINARY,
+	'env-timeout-gate': ENV_PREFIX,
+	'command-substitution': ASSIGNED_SUBSTITUTION,
+	'gate-substitution': ASSIGNED_SUBSTITUTION,
 	'semicolon-chain': 'git',
 	'and-chain': 'git',
 	pipe: 'pnpm',

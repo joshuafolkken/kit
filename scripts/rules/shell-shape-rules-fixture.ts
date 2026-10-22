@@ -11,11 +11,12 @@ const HEREDOC: ShellShapeId = 'heredoc-mention'
 const QUOTED: ShellShapeId = 'quoted-mention'
 const SUBSHELL: ShellShapeId = 'subshell'
 const SEMICOLON: ShellShapeId = 'semicolon-chain'
+const TIME_FLAG_GATE: ShellShapeId = 'time-flag-gate'
 
 // Filings, comments, bodies and oracle consultations.
 const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'third-party-write': [HEREDOC],
-	'direct-filing': [QUOTED, HEREDOC],
+	'direct-filing': [HEREDOC],
 	'direct-issue-comment': [HEREDOC],
 	'filing-cap': [HEREDOC],
 	'issue-comments': [],
@@ -32,7 +33,7 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'early-heartbeat': [],
 	'test-declared': [HEREDOC],
 	'run-tail': [HEREDOC],
-	'timed-rerun': ['hyperfine-quoted', 'time-flag-value', HEREDOC],
+	'timed-rerun': ['hyperfine-quoted', 'time-flag-value', TIME_FLAG_GATE, HEREDOC],
 	'josh-git-bare': ['and-chain', HEREDOC],
 	'git-force': ['multiline-quoted-field', HEREDOC],
 	'worktree-mutation': [SUBSHELL, HEREDOC],
@@ -48,7 +49,14 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 // command test.
 const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'lane-background': [HEREDOC],
-	'pre-gate-cut': ['plain', 'pipe', HEREDOC],
+	'pre-gate-cut': [
+		'plain',
+		TIME_FLAG_GATE,
+		'env-timeout-gate',
+		'gate-substitution',
+		'pipe',
+		HEREDOC,
+	],
 	'lane-split-park': [],
 	'lane-park': ['command-substitution', HEREDOC],
 	'lane-interactive-ask': [],

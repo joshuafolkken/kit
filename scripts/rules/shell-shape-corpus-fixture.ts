@@ -51,8 +51,13 @@ const SHELL_SHAPES = {
 	'time-flag-value': '/usr/bin/time -f %e pnpm josh git -y',
 	// An environment prefix and `timeout` with its duration.
 	'env-timeout-wrapper': 'CI=1 timeout 600 git push --force origin HEAD',
+	// The same two wrappers around the gate itself (#4525).
+	'time-flag-gate': '/usr/bin/time -f %e pnpm josh gate',
+	'env-timeout-gate': 'CI=1 timeout 600 pnpm josh gate',
 	// `$(…)` around the command (#4418).
 	'command-substitution': 'out="$(pnpm josh notify --task-type confirmation)"; echo "$out"',
+	// `$(…)` around the gate (#4525).
+	'gate-substitution': 'out="$(pnpm josh gate)"',
 	// `;` between commands (#4418).
 	'semicolon-chain': 'git status; gh pr create --title "x" --body-file body.md; gh pr merge 5',
 	// `&&` between commands.
