@@ -6,7 +6,7 @@ import {
 } from '#scripts/run/run-liveness'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_handoff } from './lane-handoff'
-import { lane_process_table, type ProcessTable } from './lane-process-table'
+import { lane_process_table, type ProcessTable, type TableRead } from './lane-process-table'
 import type { TreeProbes } from './lane-reap'
 
 // `lane_await.process_trace_default` answered for many lanes from one process snapshot
@@ -43,7 +43,42 @@ async function traces_of(
 	return (issue) => (idle.has(issue) ? PROCESS_NONE : PROCESS_ALIVE)
 }
 
-const lane_snapshot_trace = { traces_of }
+function never_merge_waiting(): boolean {
+	return false
+}
+
+/**
+ * Whether each of `issues` has a detached ship waiting on its merge (`lane_handoff.merge_wait_reader`),
+ * read from `rows`. The record is read only where the snapshot shows that lane's ship supervisor, so a
+ * count with no ship running starts no process (joshuafolkken/kit#4466).
+ */
+async function merge_waits_of(
+	issues: ReadonlyArray<string>,
+	rows: ProcessTable | undefined,
+): Promise<(issue: string) => boolean> {
+	if (rows === undefined) return never_merge_waiting
+
+	const probes = lane_process_table.probes_of(rows)
+	const shipping = issues.filter(
+		(issue) => probes.matching(lane_child_invocation.ship_pattern(issue)).length > 0,
+	)
+
+	if (shipping.length === 0) return never_merge_waiting
+
+	return await lane_handoff.merge_wait_reader(lane_process_table.start_reader(rows))
+}
+
+/** How many of `issues` have a detached ship in this checkout waiting on its merge, from a fresh snapshot. */
+async function count_merge_waiting(
+	issues: ReadonlyArray<string>,
+	table: TableRead = lane_process_table.read_table,
+): Promise<number> {
+	const is_waiting = await merge_waits_of(issues, await table())
+
+	return issues.filter((issue) => is_waiting(issue)).length
+}
+
+const lane_snapshot_trace = { count_merge_waiting, merge_waits_of, traces_of }
 
 export { lane_snapshot_trace }
 export type { TraceRead }

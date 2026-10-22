@@ -45,6 +45,7 @@ const GATE_RED = { code: FAILED, out: 'gate red' }
 const PUSH_REJECTED = { code: FAILED, out: 'push rejected' }
 const PUSH = ['git', '-y', '--skip-commit', '--skip-pr', TITLE]
 const FOLLOWUP = ['followup', TITLE, ...NOTIFY]
+const SPAWN_FAILED = 'spawn failed'
 
 function commands(): ReadonlyArray<ReadonlyArray<string>> {
 	return josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)
@@ -198,5 +199,49 @@ describe('run_ship_sync.followup_stage — failures that are not merged again', 
 
 		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual(FOLLOWUP_FAILED)
 		expect(merge_mock).toHaveBeenCalledTimes(run_ship_sync.MAX_MERGE_RETRIES)
+	})
+})
+
+// joshuafolkken/kit#4466: the lane holds no place only while `josh followup` waits, never while the
+// followup stage merges and gates again.
+describe('run_ship_sync.followup_stage — the merge wait mark', () => {
+	it('marks the wait around each followup and takes it down before the gate', async () => {
+		const marks: Array<string> = []
+
+		josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+			marks.push(argv[0] ?? '')
+
+			return marks.length === 2 ? FOLLOWUP_FAILED : { code: OK, out: '' }
+		})
+		scoped_mock.mockImplementation(async () => {
+			marks.push('gate')
+
+			return SCOPED_GREEN
+		})
+		merge_mock.mockResolvedValue(MERGED)
+
+		await run_ship_sync.followup_stage(TITLE, NOTIFY, (is_waiting) => {
+			marks.push(is_waiting ? 'wait' : 'clear')
+		})
+
+		expect(marks).toStrictEqual([
+			'wait',
+			'followup',
+			'clear',
+			'gate',
+			'git',
+			'wait',
+			'followup',
+			'clear',
+		])
+	})
+
+	it('takes the wait down when the followup throws', async () => {
+		const mark = vi.fn()
+
+		josh_run_mock.mockRejectedValue(new Error(SPAWN_FAILED))
+
+		await expect(run_ship_sync.followup_stage(TITLE, NOTIFY, mark)).rejects.toThrow(SPAWN_FAILED)
+		expect(mark.mock.calls).toStrictEqual([[true], [false]])
 	})
 })

@@ -122,21 +122,53 @@ async function merge_again(title: string, failed: JoshResult): Promise<StepResul
 	return await push_merged(title)
 }
 
-async function followup_stage(
+// Whether the ship waits on the merge alone, for its stage record (`run_ship_stage.mark_merge_waiting`).
+type WaitMark = (is_merge_waiting: boolean) => void
+
+function ignore_wait(): void {
+	// A ship with no stage record has no lane place to free.
+}
+
+// The wait is marked only while `josh followup` runs: the merge again and its gate run unmarked, so a
+// lane gating here still holds its place (joshuafolkken/kit#4466).
+async function marked_followup(
 	title: string,
 	notify: ReadonlyArray<string>,
-	retries = 0,
+	mark: WaitMark,
+): Promise<JoshResult> {
+	mark(true)
+
+	try {
+		return await josh(['followup', title, ...notify])
+	} finally {
+		mark(false)
+	}
+}
+
+async function followup_attempt(
+	title: string,
+	notify: ReadonlyArray<string>,
+	mark: WaitMark,
+	retries: number,
 ): Promise<StepResult> {
-	const result = await josh(['followup', title, ...notify])
+	const result = await marked_followup(title, notify, mark)
 
 	if (result.code === SUCCESS_EXIT_CODE || retries >= MAX_MERGE_RETRIES) return result
 
 	const stop = await merge_again(title, result)
 
-	return stop ?? (await followup_stage(title, notify, retries + 1))
+	return stop ?? (await followup_attempt(title, notify, mark, retries + 1))
+}
+
+async function followup_stage(
+	title: string,
+	notify: ReadonlyArray<string>,
+	mark: WaitMark = ignore_wait,
+): Promise<StepResult> {
+	return await followup_attempt(title, notify, mark, 0)
 }
 
 const run_ship_sync = { CONFLICT_NOTE, MAX_MERGE_RETRIES, followup_stage, sync_stage }
 
-export type { StepResult }
+export type { StepResult, WaitMark }
 export { run_ship_sync }

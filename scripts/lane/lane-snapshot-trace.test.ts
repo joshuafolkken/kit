@@ -2,7 +2,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { PROCESS_ALIVE, PROCESS_NONE, PROCESS_UNKNOWN } from '#scripts/run/run-liveness'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_handoff } from './lane-handoff'
-import { lane_process_table } from './lane-process-table'
+import { lane_process_table, type ProcessTable } from './lane-process-table'
 import { lane_snapshot_trace } from './lane-snapshot-trace'
 
 // joshuafolkken/kit#4245: a lane's process trace is answered from one process snapshot, with the same
@@ -67,6 +67,62 @@ describe('lane_snapshot_trace.traces_of', () => {
 
 		expect([trace(WORKING), trace(IDLE)]).toEqual([PROCESS_UNKNOWN, PROCESS_UNKNOWN])
 		expect(reader).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4466: a lane whose detached ship waits on its merge holds no place, read only where
+// the snapshot lists that ship's supervisor.
+const SHIP_ROWS = lane_process_table.parse(
+	`503 1 0:00.01 4 S ${START} node /usr/local/bin/pnpm josh ship Finish #${SHIPPING}`,
+)
+
+async function ship_table(): Promise<ProcessTable | undefined> {
+	return SHIP_ROWS
+}
+
+async function unread_table(): Promise<undefined> {
+	await Promise.resolve(undefined)
+}
+
+describe('lane_snapshot_trace.merge_waits_of', () => {
+	it('reads the merge wait of a lane whose ship supervisor is listed', async () => {
+		const reader = vi
+			.spyOn(lane_handoff, 'merge_wait_reader')
+			.mockResolvedValue((issue) => issue === SHIPPING)
+
+		const is_waiting = await lane_snapshot_trace.merge_waits_of([WORKING, SHIPPING], SHIP_ROWS)
+
+		expect([is_waiting(WORKING), is_waiting(SHIPPING)]).toEqual([false, true])
+		expect(reader).toHaveBeenCalledWith(expect.any(Function))
+	})
+
+	it.each([
+		['no ship supervisor is listed', ROWS],
+		['the snapshot could not be read', undefined],
+	])('reads no ship record when %s', async (_case, rows) => {
+		const reader = vi.spyOn(lane_handoff, 'merge_wait_reader')
+
+		const is_waiting = await lane_snapshot_trace.merge_waits_of([WORKING, SHIPPING], rows)
+
+		expect(is_waiting(SHIPPING)).toBe(false)
+		expect(reader).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4466: the named-epic offer discounts the `in-progress` holders waiting on a merge.
+describe('lane_snapshot_trace.count_merge_waiting', () => {
+	it('counts the issues whose ship waits on its merge, from the snapshot it reads', async () => {
+		vi.spyOn(lane_handoff, 'merge_wait_reader').mockResolvedValue((issue) => issue === SHIPPING)
+
+		const count = await lane_snapshot_trace.count_merge_waiting([WORKING, SHIPPING], ship_table)
+
+		expect(count).toBe(1)
+	})
+
+	it('counts none when the snapshot could not be read', async () => {
+		const count = await lane_snapshot_trace.count_merge_waiting([SHIPPING], unread_table)
+
+		expect(count).toBe(0)
 	})
 })
 

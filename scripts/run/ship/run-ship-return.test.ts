@@ -10,6 +10,9 @@ const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
+const place_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: place_mock } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -74,6 +77,10 @@ beforeEach(() => {
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
+beforeEach(() => {
+	place_mock.mockReset().mockResolvedValue(undefined)
+})
+
 describe('run_ship_return.return_control', () => {
 	it('records the stopped stage as a ship-stop position naming the issue', async () => {
 		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
@@ -115,6 +122,46 @@ describe('run_ship_return.return_control', () => {
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME, OUTPUT)).toBe('recorded')
 		expect(emit_mock).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#4466: a ship waiting on its merge holds no lane place, so a red CI or a CodeRabbit
+// finding that needs judgement must still bring a child back to fix it.
+describe('run_ship_return.return_control on a merge wait that needs judgement', () => {
+	it.each([
+		['a red CI check', 'X e2e  fail  https://github.com/o/r/actions/runs/1'],
+		['a CodeRabbit finding', 'CodeRabbit left 1 unresolved actionable comment'],
+	])('relaunches the lane child with %s in its prompt', async (_case, output) => {
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, output)).toBe(
+			'relaunched',
+		)
+
+		const invocation = String(relaunch_mock.mock.calls[0]?.[1])
+
+		expect(invocation).toContain(output)
+		expect(invocation.endsWith(`fullrun #${ISSUE}`)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
+// place before it relaunches, keeping its stop prompt rather than handing the issue to the driver.
+describe('run_ship_return.return_control on a merge wait past the lane limit', () => {
+	it('waits for a place for its lane before it relaunches the stop with its output', async () => {
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
+			'relaunched',
+		)
+		expect(place_mock).toHaveBeenCalledWith(LANE, 'followup')
+		expect(place_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			relaunch_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(OUTPUT)
+	})
+
+	it('waits for no place past the ship-stop cap', async () => {
+		is_over_mock.mockResolvedValue(true)
+		await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)
+
+		expect(place_mock).not.toHaveBeenCalled()
 	})
 })
 

@@ -153,6 +153,41 @@ describe('josh ship — a restart after a stale review', () => {
 	})
 })
 
+// joshuafolkken/kit#4466: a supervisor killed inside `josh followup` leaves its wait marked; the
+// successor takes it down before it re-runs anything, so its lane counts while it does.
+describe('josh ship — a restart after a supervisor died waiting on its merge', () => {
+	it('takes the merge wait down before the first stage runs', async () => {
+		const seen: Array<boolean> = []
+
+		run_ship_stage.mark_started(current.target, 'followup')
+		run_ship_stage.mark_merge_waiting(current.target, true)
+		josh_run_mock.mockImplementation(async () => {
+			seen.push(run_ship_stage.read_merge_waiting(current.target))
+
+			return { code: OK, out: '' }
+		})
+
+		await run_ship_cli.run([TITLE])
+
+		expect(seen[0]).toBe(false)
+	})
+
+	it('marks the wait while its own followup runs', async () => {
+		const seen: Array<string> = []
+
+		josh_run_mock.mockImplementation(async (argv) => {
+			seen.push(`${argv[0] ?? ''} ${String(run_ship_stage.read_merge_waiting(current.target))}`)
+
+			return { code: OK, out: '' }
+		})
+
+		await run_ship_cli.run([TITLE])
+
+		expect(seen).toContain('followup true')
+		expect(seen).toContain('gate false')
+	})
+})
+
 describe('josh ship — a restart with a record', () => {
 	it('resumes after a failed followup without re-running the gate or the commit', async () => {
 		josh_run_mock

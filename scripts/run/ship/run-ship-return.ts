@@ -9,6 +9,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { ShipSection } from './run-ship'
 import { run_ship_next, type ShipResume } from './run-ship-next'
+import { run_ship_place } from './run-ship-place'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_relaunch_cap } from './run-ship-relaunch-cap'
 import { run_ship_stage, type Stage } from './run-ship-stage'
@@ -150,6 +151,9 @@ async function return_control(
 	if (lane === undefined) return 'recorded'
 
 	if (await run_ship_relaunch_cap.is_over(issue)) return await parked(issue, stage, resume)
+	// A followup stop waits for a lane place, keeping the ship-stop prompt and the relaunch cap a driver
+	// re-dispatch would lose (`run-ship-place.ts`).
+	await run_ship_place.await_place(lane, stage)
 
 	const stop = { stage, ...resume, context: await run_ship_stop_context.build(issue, output) }
 	// **A broker that stopped serving before the stop is waited for**: one that died during the review left

@@ -22,20 +22,37 @@ import type { LaneRecords } from '#scripts/lane/lane-state'
 // `lane_spent.idle_lanes`) clears a lane, and a probe that did not answer keeps it. A stranded lane has
 // no tree to work in and holds no place either. The reads stay local — no issue label is read —
 // because the count gates the network read behind it (`backlog-ready.ts`).
+//
+// **A lane whose detached ship waits on its merge holds no place either** (joshuafolkken/kit#4466). The
+// child ended at the hand-off, and while `josh followup` runs the supervisor only polls CI, CodeRabbit
+// and the merge, so the slot is free for the next launch while every merge check still runs. The wait is
+// unmarked while the followup stage merges and gates again (`run-ship-sync.ts`); a stop there counts
+// the lane again, and past the limit the supervisor waits for a place before it relaunches the child
+// (`run-ship-return.ts`). A named epic's offer discounts the same lanes (`epic-lane-offer.ts`).
 
 // The issues whose lane has no child working in it (`lane_spent.idle_lanes`).
 type IdleRead = (lanes: ReadonlyArray<LaneInfo>) => ReadonlyArray<string>
+// Whether the lane of an issue has a detached ship waiting on its merge (`lane_handoff.merge_wait_reader`).
+type MergeWaitRead = (issue: string) => boolean
+
+function is_never_merge_waiting(): boolean {
+	return false
+}
 
 function occupied_lanes(
 	lanes: ReadonlyArray<LaneInfo>,
 	idle: IdleRead,
 	records: LaneRecords,
+	is_merge_waiting: MergeWaitRead = is_never_merge_waiting,
 ): Array<LaneInfo> {
 	const live = lanes.filter((lane) => !lane.is_stranded)
 	const idle_issues = new Set(idle(live))
 
 	return live.filter(
-		(lane) => !idle_issues.has(lane.issue) && records.get(lane.issue)?.state !== 'paused',
+		(lane) =>
+			!idle_issues.has(lane.issue) &&
+			records.get(lane.issue)?.state !== 'paused' &&
+			!is_merge_waiting(lane.issue),
 	)
 }
 
@@ -49,4 +66,4 @@ function unknown_lanes(lanes: ReadonlyArray<LaneInfo>, records: LaneRecords): Ar
 const backlog_occupied = { occupied_lanes, unknown_lanes }
 
 export { backlog_occupied }
-export type { IdleRead }
+export type { IdleRead, MergeWaitRead }

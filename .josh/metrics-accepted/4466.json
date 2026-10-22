@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 fix: followup stops waiting for a lane place queue in issue order through a place-wait mark on the ship stage record (run-ship-place.ts), so waiters past the limit no longer each count themselves and wait out the hour together; the ship command-line parsing moved to run-ship-args.ts so run-ship-cli.ts stays under max-lines after merging main, its imports and export adding six lines",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 209,
+		"ai_cost.on_demand_bytes": 346
+	}
+}

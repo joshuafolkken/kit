@@ -347,11 +347,13 @@ async function report_epics(
 	const choice = await lane_capacity.lane_limit()
 	if (choice.kind === 'problem') return refuse(choice.problem)
 
-	return await report(
-		views,
-		{ repo: options.repo, limit: choice.limit, is_all_lanes: options.is_all_lanes ?? false },
+	const request = epic_lane_offer.lane_request(
+		{ repo: options.repo, is_all_lanes: options.is_all_lanes ?? false },
+		choice.limit,
 		current_repo,
 	)
+
+	return await report(views, request, current_repo)
 }
 
 // One view per named epic, classified against one shared registry read. `running` is every named
