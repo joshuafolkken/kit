@@ -131,7 +131,15 @@ describe('cases.cases_for', () => {
 })
 
 describe('cases.VOCABULARY', () => {
-	it('is exactly the four boundaries plus none', () => {
-		expect(cases.VOCABULARY).toEqual(['network', 'process', 'fs', 'time', cases.NONE])
+	it('is exactly the four boundaries, the two interactions, plus none', () => {
+		expect(cases.VOCABULARY).toEqual([
+			'network',
+			'process',
+			'fs',
+			'time',
+			'state',
+			'env',
+			cases.NONE,
+		])
 	})
 })

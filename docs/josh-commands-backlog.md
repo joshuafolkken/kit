@@ -1042,7 +1042,7 @@ Output: `clean`, or `clones: <N>` then each clone `[same-file|cross-file|cross-r
 
 <!-- usage: cases -->
 
-Read changed paths and print the I/O boundaries crossed and their mandatory abnormal cases: network | process | fs | none.
+Read changed paths and print the boundaries crossed and their mandatory abnormal cases: network | process | fs | time | state | env | none.
 
 ```bash
 pnpm josh cases scripts/a.ts scripts/b.ts   # the boundaries these paths cross
