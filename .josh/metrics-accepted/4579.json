@@ -1,0 +1,7 @@
+{
+	"reason": "CI-only eslint --concurrency selector and its comment (#4579)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 12
+	}
+}

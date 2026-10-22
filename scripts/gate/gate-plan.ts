@@ -245,6 +245,8 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 // already single-threaded, `tsc` is one process, and cspell's CLI exposes no thread count at all.
 // Nothing in those three takes a number, so how many of them run beside each other is the only
 // quantity the gate controls, and dividing the machine before admitting them is how it controls it.
+// CI alone hands eslint a thread count (joshuafolkken/kit#4579, `lint-parallel.ts`): a runner is one
+// gate on a machine of its own, so there is no other lane for the threads to crowd.
 //
 // **Narrowing is not skipping.** Every one of the four checks still runs, over the same files, and
 // the gate still reports every failure in one pass — `bounded_pool` queues what it does not start,
