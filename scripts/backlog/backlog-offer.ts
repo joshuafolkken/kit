@@ -2,6 +2,7 @@ import { epic_solo } from '#scripts/epic/epic-solo'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { BacklogAnswer } from './backlog-budget'
 import { backlog_next } from './backlog-next'
+import { backlog_wait_cause } from './backlog-wait-cause'
 
 // The mechanical half of `josh backlog:offer`: turn what `backlog:next`
 // answered — its stdout tokens and its exit code — into the one word `backlog:budget` is then asked
@@ -38,9 +39,12 @@ interface OfferAnswer {
 	issues: ReadonlyArray<string>
 	// The consecutive-retry count after this ask — reset to zero by any answer that is not `retry`.
 	retries: number
-	// Why a `blocked` answer started nothing, where `backlog:next` said: `solo` for the `run:solo` gate,
-	// so `lane:stats` rows that wait apart from every other one (joshuafolkken/kit#4396).
-	cause?: typeof SOLO_CAUSE
+	// Why a `wait` answer started nothing, where `backlog:next` said: `solo` for the `run:solo` gate,
+	// so `lane:stats` rows that wait apart from every other one (joshuafolkken/kit#4396); `chain`,
+	// `gate` or `chain+gate` for the waits `backlog-wait-cause.ts` names (joshuafolkken/kit#4513).
+	cause?: string
+	// The issues a `chain` / `gate` cause waited on, recorded with the hold.
+	waiting?: ReadonlyArray<number> | undefined
 }
 
 // The verdict words that map to one answer regardless of context. `wait` and `retry` are the two that
@@ -82,11 +86,22 @@ function is_numbers(tokens: ReadonlyArray<string>): boolean {
 	return tokens.length > 0 && tokens.every((token) => issue_number_shape.is_issue_number(token))
 }
 
-// A `blocked` answer whose stderr carries the `run:solo` gate's notice, marked `solo`.
-function with_cause(offer: OfferAnswer, error: string): OfferAnswer {
-	const is_solo = offer.answer === BLOCKED_ANSWER && epic_solo.is_solo_wait(error)
+// What `backlog:next`'s stderr says a blocked wait was for: the `run:solo` gate's notice first, then
+// the waiting issues' causes, or nothing when it names neither.
+function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting'> {
+	if (epic_solo.is_solo_wait(error)) return { cause: SOLO_CAUSE }
 
-	return is_solo ? { ...offer, cause: SOLO_CAUSE } : offer
+	const causes = backlog_wait_cause.parse(error)
+	const tag = backlog_wait_cause.tag_of(causes)
+
+	return tag === undefined ? {} : { cause: tag, waiting: backlog_wait_cause.numbers_of(causes) }
+}
+
+// A `wait` answer marked with its cause. An `exhausted` wait is marked too: the idle watch it opens
+// holds a free lane as long as a `blocked` one, and a hold with nothing in flight here (a start date,
+// or a blocker another session runs) is still that wait, not an empty backlog.
+function with_cause(offer: OfferAnswer, token: string, error: string): OfferAnswer {
+	return token === TOKENS.wait ? { ...offer, ...blocked_cause(error) } : offer
 }
 
 // **Read the exit code before the tokens.** Exit 1 is "the listing could not be read", which is never
@@ -101,7 +116,9 @@ function answer_of(read: NextRead, running: number, retries: number): OfferAnswe
 		return { answer: 'candidates', issues: read.tokens, retries: NO_RETRIES }
 	}
 
-	return with_cause(from_verdict(read.tokens[0] ?? '', running, retries), read.err ?? '')
+	const token = read.tokens[0] ?? ''
+
+	return with_cause(from_verdict(token, running, retries), token, read.err ?? '')
 }
 
 const backlog_offer = { RETRY_LIMIT, answer_of, verdict_answer, wait_answer }

@@ -217,9 +217,22 @@ describe('lane_ledger.record_held', () => {
 		const target = ledger('held')
 		const reason = 'offer:wait:blocked'
 
-		await lane_ledger.record_held(reason, target)
+		await lane_ledger.record_held({ reason }, target)
 
-		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'held', reason }])
+		const entries = lane_ledger.read_entries(target)
+
+		expect(entries).toMatchObject([{ kind: 'held', reason }])
+		expect(entries[0]).not.toHaveProperty('waiting')
+	})
+
+	// joshuafolkken/kit#4513: the issues a blocked wait waited on read back with the hold.
+	it('records the issues a hold waited on, read back as its waiting list', async () => {
+		const target = ledger('held-waiting')
+		const held = { reason: 'offer:watch:chain', waiting: [4496, 4497] }
+
+		await lane_ledger.record_held(held, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'held', ...held }])
 	})
 
 	it('records the release that ends a hold without a dispatch', async () => {

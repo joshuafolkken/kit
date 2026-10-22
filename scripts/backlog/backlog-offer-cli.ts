@@ -148,6 +148,7 @@ function emit(decision: BudgetRead, offer: OfferAnswer, is_json: boolean): numbe
 			issues,
 			answer: offer.answer,
 			cause: offer.cause,
+			waiting: offer.waiting,
 			retries: offer.retries,
 			reason,
 			is_finish,

@@ -1,0 +1,7 @@
+{
+	"reason": "Review round 1: an exhausted wait now carries its chain/gate/solo cause too, plus the tests pinning it and the retry case",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 91
+	}
+}

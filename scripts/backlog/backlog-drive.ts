@@ -21,7 +21,7 @@ import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_adopt } from './backlog-drive-adopt'
-import { backlog_drive_hold } from './backlog-drive-hold'
+import { backlog_drive_hold, type HeldWaiting } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_judge } from './backlog-drive-judge'
 import { backlog_drive_memory } from './backlog-drive-memory'
@@ -50,12 +50,12 @@ const JUDGE_REASON = 'judge'
 const LAUNCHED = 'launched'
 const UNOPENED = 'unopened'
 
-interface OfferRead {
+interface OfferRead extends HeldWaiting {
 	verdict: string
 	issues: ReadonlyArray<string>
 	retries: number
 	answer?: string | undefined
-	// Why a `blocked` answer started nothing, where the offer said — `solo` for the `run:solo` gate.
+	// Why a `blocked` answer started nothing — `solo`, or `backlog-wait-cause.ts`'s with its `waiting`.
 	cause?: string | undefined
 	reason?: string | undefined
 	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent
@@ -124,7 +124,7 @@ interface DrivePorts {
 	memory_held: () => Promise<boolean>
 	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
 	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
-	hold: (reason: string | undefined) => Promise<void>
+	hold: (reason: string | undefined, waiting?: ReadonlyArray<number>) => Promise<void>
 	// A watch with nothing in flight — the one idle notification (`backlog-drive-idle.ts`), deduplicated
 	// per episode by the port itself.
 	idle: (state: DriveState) => Promise<void>

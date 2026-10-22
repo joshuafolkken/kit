@@ -78,6 +78,15 @@ describe('backlog:next with a declared start time', () => {
 		expect(stderr()).toContain(`not before ${FUTURE}`)
 	})
 
+	// joshuafolkken/kit#4513: the wait names its cause in the line `backlog:offer` reads back.
+	it('names the row as waiting on a start condition', async () => {
+		backlog_fixture.stub_backlog({ opted_in: [dated(FUTURE)] })
+
+		await backlog_next.run([])
+
+		expect(stderr()).toContain(`Waiting on a start condition: [#${String(OLD_ISSUE_NUMBER)}]`)
+	})
+
 	// joshuafolkken/kit#4383: priority:critical ranks the runnable rows, never a row held on time.
 	it('still waits on a priority:critical issue before its time', async () => {
 		const critical = { ...dated(FUTURE), labels: [{ name: PRIORITY_CRITICAL_LABEL }] }
