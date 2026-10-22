@@ -223,8 +223,9 @@ const HEADER_ICONS = {
 	heartbeat: '💓',
 	// A failed plan read: ❗ rather than ⚠, a text symbol drawn two columns wide over the blank after it.
 	warning: '❗',
-	// The estimated finish: a done row's own mark, as the run's end is what it estimates.
-	estimate: STATE_ICONS.done,
+	// The estimated finish: 🎯 rather than 🏁, a done row's state icon, so the legend names each once
+	// (joshuafolkken/kit#4538).
+	estimate: '🎯',
 } as const
 
 // The kind of what the header's third line says, under the `💪` (joshuafolkken/kit#3767): a call a

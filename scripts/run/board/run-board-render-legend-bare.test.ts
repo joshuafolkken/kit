@@ -14,8 +14,9 @@ const LEGEND = [
 	'🚦 gate',
 	'🔧 operation',
 	'⏰ elapsed',
-	'🏁 estimated finish',
+	'🎯 estimated finish',
 	'💤 parked',
+	'🏁 done',
 	'✨ feature',
 	'🐛 fix',
 	'🔗 waits on',
@@ -48,13 +49,15 @@ function running(number: number, phase: Phase): BoardRow {
 	return row(number, { state: 'running', status })
 }
 
-// Two children shipping and gating, one parked feature, and a fix queued behind it.
+// Two children shipping and gating, one parked feature, one closed unmerged, and a fix queued behind
+// the parked one.
 const LAYOUT: BoardLayout = {
 	...EMPTY_LAYOUT,
 	active: [
 		running(1, 'ship'),
 		running(2, 'gate'),
 		row(3, { state: 'parked', kind: 'enhancement' }),
+		row(5, { state: 'done' }),
 	],
 	queued: [
 		{
@@ -93,5 +96,12 @@ describe('run_board_render.render legend icons drawn bare', () => {
 			expect(board).toContain(icon)
 			expect(board).not.toContain(entry)
 		}
+	})
+
+	// joshuafolkken/kit#4538: the estimated finish once shared 🏁 with a done row.
+	it('gives each icon it names one meaning', () => {
+		const icons = (lines.at(-1) ?? '').split(GAP).map((entry) => entry.split(' ', 1)[0])
+
+		expect(new Set(icons).size).toBe(icons.length)
 	})
 })
