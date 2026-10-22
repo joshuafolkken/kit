@@ -154,8 +154,10 @@ async function import_module(module_path: string): Promise<unknown> {
 describe('vitest configs — the unit file reporter is named, not imported', () => {
 	it('names the unit file reporter by its path in the main config', async () => {
 		const config = REPORTED_CONFIG.parse(await import_module(MAIN_CONFIG))
+		const named = ['default', unit_projects.UNIT_FILE_REPORTER]
 
-		expect(config.default.test.reporters).toEqual(['default', unit_projects.UNIT_FILE_REPORTER])
+		// The leading entries only: a `JOSH_UNIT_DURATIONS=record` run appends the duration reporter.
+		expect(config.default.test.reporters.slice(0, named.length)).toEqual(named)
 	})
 
 	it('loads a reporter vitest can construct from the named path', async () => {
