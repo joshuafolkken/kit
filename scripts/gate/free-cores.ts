@@ -8,7 +8,7 @@ import { machine_capacity, type MachineReading } from './machine-capacity'
 
 // The cores a unit suite may open workers on: the core count less the load from outside the core
 // budget's ledger, the figure the ledger admits against (`machine_capacity.machine_budget`). The run
-// count in `unit-worker-share.ts` divides the machine between unit runs; this is what bounds that
+// count in `unit-run-marker.ts` divides the machine between unit runs; this is what bounds that
 // division when something else holds the cores.
 //
 // Its own module because the reading needs the ledger, and `core-budget.ts` already imports
@@ -45,7 +45,7 @@ function free_of(reading: MachineReading, options: FreeCoresOptions): number | u
 
 // **The workers the free memory holds** (joshuafolkken/kit#4528): the free memory over one worker's
 // peak (`core_weights.MEMORY_MB.unit_worker`, where its measurement is recorded). Divided here, not in
-// `unit-worker-share.ts`, which the vitest config imports — `core-weights.ts` there would widen every
+// `unit-run-marker.ts`, which the vitest config imports — `core-weights.ts` there would widen every
 // related run on it to the whole suite. The memory is the reading's own available figure, not the
 // budget's: the ledger's held memory is added back there for admission's walk, and it is not free for
 // this run's workers. `undefined` — a platform `machine-capacity.ts` reads no memory on — leaves the

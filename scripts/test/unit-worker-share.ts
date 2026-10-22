@@ -1,11 +1,6 @@
-import { readdirSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
-import path from 'node:path'
-import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
-import { process_identity } from '#scripts/josh/process-identity'
-import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { json_value } from '#scripts/lib/json-value'
+import { unit_run_marker } from './unit-run-marker'
 
 // How wide one vitest run may fan out when it is not the only one on the machine.
 //
@@ -26,135 +21,21 @@ import { json_value } from '#scripts/lib/json-value'
 // **The division activates only under concurrency.** One run in flight — every solo run, CI included
 // — gets exactly the number the gate and the hook produced before this module existed, so a quiet
 // machine behaves bit for bit as it did and only the condition that was measured broken changes.
+//
+// **The run markers and their division of the machine are `unit-run-marker.ts`**, the part the vitest
+// config imports (joshuafolkken/kit#4572); the capacity and claim bounds and the flag handling are here.
+const { MIN_WORKERS, NESTED_KEY, NESTED_VALUE, SOLO_RUNS } = unit_run_marker
+const { is_nested_run, live_run_count, mark_run_started, marker_path, resolve_unit_workers } =
+	unit_run_marker
 
-// A record that means something only while it exists, in the shape `stamp-file.ts` already keeps for
-// the in-flight gate marker. Keyed by pid rather than by checkout: `josh gate`'s unit step and a
-// `josh test:related` can be in flight in one checkout at once, and both of them are load.
-const RUN_PREFIX = 'josh-unit-running-'
 // Vitest's own flag, in both spellings its CLI accepts — it normalizes `--max-workers` to the same
 // option, so a run that recognized only one of them would replace a number the caller typed with the
 // share and contradict the promise below. The camel-case one is what gets written.
 const WORKER_FLAG = '--maxWorkers'
 const WORKER_FLAGS: ReadonlyArray<string> = [WORKER_FLAG, '--max-workers']
-// Never below one: a share of zero would run no test at all and report the suite green.
-const MIN_WORKERS = 1
 // The core vitest's own process — the pool, the reporter and Vite's transforms — keeps busy beside its
 // workers (joshuafolkken/kit#4362). A direct run's claim holds it above its worker count.
 const MAIN_PROCESS_CORES = 1
-// One run in flight is this run alone, which is the case that changes nothing.
-const SOLO_RUNS = 1
-
-// A marker is the writing process's identity and nothing else; a pid-only marker has an answer of its
-// own below (`is_running`) rather than being rejected here.
-type RunMarker = ProcessOwner
-
-function marker_path(pid: number = process.pid): string {
-	return stamp_file.stamp_path(RUN_PREFIX, String(pid))
-}
-
-// **A marker is evidence, and the process behind it is the test.** A run killed outright leaves its
-// file behind, and a count that trusted the file alone would hold every later run down to one worker
-// for good — the failure mode `run-hold.ts` answers with an expiry, which cannot be sized here because
-// a unit suite under six-way load already takes minutes. The process that writes this marker is the
-// long-lived one, so unlike a `run:hold` record its identity is a liveness test rather than a note for
-// the reader.
-//
-// **The pid alone was not that identity**. The section below already named
-// what goes wrong — a reissued pid turns a leaked marker into a permanent phantom — and answered it by
-// sweeping, which only ever collected the markers whose pid had *not* yet been reissued. Since the
-// record now carries the writing process's start time beside its pid, a reissued pid is recognized as
-// a different process and swept like any other dead one. A pid that is not positive is caught by the
-// same check, inside `process_identity`: `process.kill(0, …)` addresses the caller's own process group
-// rather than a process, so a truncated or hand-edited marker would otherwise answer "alive" forever.
-//
-// **"Cannot tell" counts as live here, which is the opposite of what the in-flight gate marker's
-// readers do with it, and deliberately so.** A marker with no recorded start time — written before the
-// field existed, or on a platform where it cannot be read — resolves toward *more* sharing: being
-// wrong that way costs this run a narrower share of the machine, while being wrong the other way puts
-// six unit suites on eleven cores, an oversubscription measured at a load
-// average of 209.
-function is_running(marker: RunMarker): boolean {
-	return process_identity.is_same_process(marker.pid, marker.process_start) !== false
-}
-
-function read_marker(source: string): RunMarker | undefined {
-	const raw = stamp_file.read_stamp_text(source)
-
-	if (raw === undefined) return undefined
-
-	const parsed = process_owner_schema.safeParse(json_value.parse_or_undefined(raw))
-
-	return parsed.success ? parsed.data : undefined
-}
-
-// An unreadable temp directory answers "no other run", which is the direction that leaves behavior
-// as it was rather than throttling a run on a guess. Unlike the network guard, being wrong here costs
-// wall time and never a false result.
-function marker_files(directory: string = PLATFORM_TEMP_ROOT): Array<string> {
-	try {
-		return readdirSync(directory).filter((name) => name.startsWith(RUN_PREFIX))
-	} catch {
-		return []
-	}
-}
-
-// **A marker whose process is gone is removed, not merely skipped.** Skipping it is correct only until
-// the operating system reissues that pid to something else, which on a machine left running for days
-// it will — and from then on the phantom is counted as a live run for good, with every solo run held
-// at one worker and `josh gate` announcing lanes that do not exist. `finally` in `with_run_marker`
-// cannot prevent the leak, because the interrupt that produces it (Ctrl-C reaching the whole foreground
-// group) does not unwind. Sweeping on read is what bounds it: the first later run collects it.
-function sweep_marker(source: string): void {
-	try {
-		stamp_file.remove_stamp(source)
-	} catch {
-		/* not ours to remove; counting it out is the whole requirement */
-	}
-}
-
-// **Only a marker that parsed to a dead pid is swept, and the unlink still cannot throw.** A marker
-// this account may not read — another user's file on a sticky `/tmp` — is `undefined` here, and
-// deleting on that answer would raise `EPERM` from a path with no `catch` between it and
-// `announce_gate_plan`: an unreadable file belonging to somebody else would abort the gate outright,
-// which is worse than the leak this sweep exists for. Unreadable therefore counts as not-live and is
-// left alone, exactly as it was before the sweep existed.
-function is_marker_live(source: string): boolean {
-	const marker = read_marker(source)
-
-	if (marker === undefined) return false
-	if (is_running(marker)) return true
-
-	sweep_marker(source)
-
-	return false
-}
-
-// Every marker in the temp directory whose process is still alive. This run's own is deliberately not
-// among them: both callers count *before* writing theirs, so the `+ 1` at the call site adds it.
-function live_run_count(directory: string = PLATFORM_TEMP_ROOT): number {
-	return marker_files(directory).filter((name) => is_marker_live(path.join(directory, name))).length
-}
-
-// **The gate claims its place before its unit step exists, and the child must not claim a second
-// one.** `josh gate` counts the runs in flight and then spawns `josh test:unit`, so without this the
-// marker appears a second or so after the count that needed it — and two lanes launched together, the
-// shape `epicrun` produces, both read "nothing else is running" and both take the whole machine. The
-// gate therefore marks itself around the whole run and passes this down through the environment; the
-// guard inside the child sees it and marks nothing, because the two processes are one run.
-const NESTED_KEY = 'JOSH_UNIT_RUN_MARKED'
-const NESTED_VALUE = '1'
-
-function is_nested_run(): boolean {
-	return process.env[NESTED_KEY] === NESTED_VALUE
-}
-
-// **`undefined` at one run means "leave the choice where it was".** The gate then applies its own
-// core reservation and the hook passes no flag at all, which is what both did before this existed.
-function resolve_unit_workers(available_cores: number, runs: number): number | undefined {
-	if (runs <= SOLO_RUNS) return undefined
-
-	return Math.max(MIN_WORKERS, Math.floor(available_cores / runs))
-}
 
 // **The run count divides the machine; the free cores bound what that division hands out.** The
 // share counts only unit runs, so load from outside the core budget's ledger — Claude sessions, other
@@ -260,17 +141,6 @@ function worker_arguments(
 	return [`${WORKER_FLAG}=${String(share)}`]
 }
 
-// **The write failing is not a reason to fail the run.** A marker that could not be written costs the
-// next run a wider share than it should have — the behavior that was there before — while a thrown
-// error here would fail a unit suite over bookkeeping.
-function mark_run_started(target: string): void {
-	try {
-		stamp_file.write_stamp(target, process_identity.own_fields())
-	} catch {
-		/* a missing marker costs a wide share, never a wrong result */
-	}
-}
-
 // `finally`, so a suite that threw still clears its marker — and so does the nested branch, which
 // restores nothing because it wrote nothing.
 async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
@@ -292,23 +162,13 @@ async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
 }
 
 const unit_worker_share = {
+	...unit_run_marker,
 	MAIN_PROCESS_CORES,
-	MIN_WORKERS,
-	NESTED_KEY,
-	NESTED_VALUE,
-	RUN_PREFIX,
-	SOLO_RUNS,
 	cap_to_capacity,
 	cap_to_claim,
 	cap_to_free,
 	current_share,
 	has_worker_flag,
-	is_nested_run,
-	live_run_count,
-	mark_run_started,
-	marker_path,
-	read_marker,
-	resolve_unit_workers,
 	with_run_marker,
 	worker_arguments,
 }

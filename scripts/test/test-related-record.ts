@@ -21,7 +21,8 @@ interface RunInput {
 	// The part of `changed` a main sync brought in, empty outside a since-green reading.
 	synced: ReadonlyArray<string>
 	// The part of `changed` the change since the test-read map's tree joined to the named or moved
-	// files — main merges that landed after the map among them — never the run's own change.
+	// files — main merges that landed after the map among them — never the run's own change. It holds
+	// the synced non-code files as well, which the record counts as `synced` alone.
 	since_map: ReadonlyArray<string>
 }
 
@@ -89,7 +90,11 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const changed = new Set(input.changed)
 	const synced = part_of(input.synced, changed)
-	const since_map = part_of(input.since_map, changed)
+	// A synced non-code file is in `since_map` too (`synced_data` in `test-related.ts`), counted once.
+	const since_map = part_of(
+		input.since_map.filter((file) => !input.synced.includes(file)),
+		changed,
+	)
 	const record = {
 		scope: related_scope.scope_kind(input.scope),
 		changed: changed.size - synced - since_map,

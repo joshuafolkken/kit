@@ -2,7 +2,7 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { unit_run_marker } from '#scripts/test/unit-run-marker'
 
 // The worker count `vitest.config.ts` hands vitest, so a run that does not go through `josh` — a
 // lane child's `pnpm vitest run`, `npx vitest` — takes the same share of the machine as `josh test:*`
@@ -35,14 +35,14 @@ function clear_on_exit(target: string): void {
 }
 
 function marked_share(available_cores: number, directory: string): number | undefined {
-	const target = path.join(directory, path.basename(unit_worker_share.marker_path()))
+	const target = path.join(directory, path.basename(unit_run_marker.marker_path()))
 
-	unit_worker_share.mark_run_started(target)
+	unit_run_marker.mark_run_started(target)
 	clear_on_exit(target)
 
-	return unit_worker_share.resolve_unit_workers(
+	return unit_run_marker.resolve_unit_workers(
 		available_cores,
-		unit_worker_share.live_run_count(directory),
+		unit_run_marker.live_run_count(directory),
 	)
 }
 
@@ -50,7 +50,7 @@ function config_workers(
 	available_cores: number = availableParallelism(),
 	directory: string = PLATFORM_TEMP_ROOT,
 ): number | undefined {
-	if (unit_worker_share.is_nested_run()) return undefined
+	if (unit_run_marker.is_nested_run()) return undefined
 
 	try {
 		return marked_share(available_cores, directory)

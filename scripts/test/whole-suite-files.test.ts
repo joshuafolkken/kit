@@ -51,6 +51,14 @@ describe('whole_suite_files — every file vitest widens the whole suite on', ()
 		expect(graph).not.toContain(path.normalize('scripts/lane/lane-ledger.ts'))
 	})
 
+	// joshuafolkken/kit#4572: the config reads the run markers alone, so the often-changed bounds of the
+	// worker share stay out of every test's dependencies.
+	it('keeps the worker share out of the config imports', async () => {
+		const graph = await import_graph([MAIN_CONFIG])
+
+		expect(graph).not.toContain(path.normalize('scripts/test/unit-worker-share.ts'))
+	})
+
 	it('names the network guard itself', () => {
 		expect(whole_suite_files.WHOLE_SUITE_FILES).toContain(
 			path.normalize(String(unit_setup_files.NETWORK_GUARD[0])),
