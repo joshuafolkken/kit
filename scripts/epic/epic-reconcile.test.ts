@@ -52,6 +52,23 @@ describe('a relation recorded but never declared is written into the declaration
 	})
 })
 
+// joshuafolkken/kit#4533: `run:pause` records a second order for a child that already has one and
+// relies on the reconcile to declare it beside the first, never in its place.
+describe('a recorded order added beside a declared one keeps the declared one', () => {
+	it('declares the new order and still carries the existing chain', () => {
+		const plan = epic_reconcile.build_reconcile_plan({
+			body: body_with(CHAIN).replace('- [ ] #2', '- [ ] #2\n- [ ] #3'),
+			recorded: [child(1, []), child(2, [1]), child(3, [1])],
+			repo: REPO,
+		})
+
+		if (plan.kind !== 'reconciled') throw new Error(EXPECTED_RECONCILIATION)
+		expect(plan.reconciliation.declare).toEqual([{ blocker: 1, blocked: 3 }])
+		expect(plan.reconciliation.body).toContain(CHAIN)
+		expect(plan.reconciliation.body).toContain('#1 -> #3')
+	})
+})
+
 describe('an order declared but never recorded is aligned by recording the relation', () => {
 	const plan = plan_for(CHAIN, [child(1, []), child(2, [])])
 
@@ -77,6 +94,29 @@ describe('a circular union of declared and recorded orders is refused', () => {
 		expect(plan.kind).toBe('cycle')
 		if (plan.kind !== 'cycle') return
 		expect(plan.message).toContain('Circular dependency')
+	})
+})
+
+// joshuafolkken/kit#4533: `run:pause` plans the reconcile with the relation it is about to record,
+// so an order the reconcile would refuse is refused before the relation is written.
+describe('the plan after a relation not yet recorded', () => {
+	it('refuses a relation that closes a cycle with a stale declaration', () => {
+		const input = {
+			body: body_with('#2 -> #1'),
+			recorded: [child(1, [2]), child(2, [])],
+			repo: REPO,
+		}
+		const plan = epic_reconcile.build_plan_after(input, { blocker: 1, blocked: 2 })
+
+		expect(plan.kind).toBe('cycle')
+	})
+
+	it('declares the relation as though it were already recorded', () => {
+		const input = { body: body_with(UNORDERED), recorded: [child(1, []), child(2, [])], repo: REPO }
+		const plan = epic_reconcile.build_plan_after(input, { blocker: 1, blocked: 2 })
+
+		if (plan.kind !== 'reconciled') throw new Error(EXPECTED_RECONCILIATION)
+		expect(plan.reconciliation.declare).toEqual([{ blocker: 1, blocked: 2 }])
 	})
 })
 

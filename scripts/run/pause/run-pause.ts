@@ -1,6 +1,7 @@
 import { epic_add } from '#scripts/epic/epic-add'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_index } from '#scripts/epic/epic-index'
+import { epic_reconcile } from '#scripts/epic/epic-reconcile'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
@@ -98,18 +99,37 @@ async function is_blocked(request: PauseRequest): Promise<boolean> {
 	return blockers.includes(Number(request.prerequisite))
 }
 
+interface Tracking {
+	epic: number
+	// Whether the same epic already tracks the prerequisite as a row of its own.
+	is_prerequisite_child: boolean
+}
+
+// Every epic listing the child, not the one `build_epic_index` keeps: a child a second epic also
+// lists is still a row of this one.
+function is_listed_by(
+	epics: ReadonlyArray<{ number: number; body: string }>,
+	child: string,
+	epic: number,
+): boolean {
+	return epic_index.build_tracking_index(epics).get(Number(child))?.includes(epic) === true
+}
+
 // A listing cut short is no answer about absence: an epic past the cut tracks `#M` invisibly, and a
 // direct relation written then leaves that epic recording an order its body never declares.
-async function tracking_epic(request: PauseRequest): Promise<number | undefined> {
+async function tracking_epic(request: PauseRequest): Promise<Tracking | undefined> {
 	const fetched = await epic_index.fetch_epics(EPIC_LIMIT)
 	if (fetched === undefined) throw new Error('the open epics could not be read')
-	const epic = epic_index.build_epic_index(fetched.epics).get(Number(request.issue))
+	const index = epic_index.build_epic_index(fetched.epics)
+	const epic = index.get(Number(request.issue))
 
 	if (epic === undefined && !epic_bundle_gaps.is_membership_established(fetched.cutoff)) {
 		throw new Error('the open epics were not read in full, so an epic tracking it may be unseen')
 	}
 
-	return epic
+	if (epic === undefined) return undefined
+
+	return { epic, is_prerequisite_child: is_listed_by(fetched.epics, request.prerequisite, epic) }
 }
 
 async function add_to_epic(epic: number, request: PauseRequest): Promise<void> {
@@ -130,21 +150,57 @@ async function record_relation(request: PauseRequest): Promise<void> {
 	throw new Error('the blocked-by relation was not recorded')
 }
 
-// With an epic, `epic --add --before` writes the row, the declaration and the relation together.
-// An insertion that adds nothing — the prerequisite already a row there — records no relation, so
-// the relation is read back and written directly when it is still missing.
-async function record_in_epic(epic: number, request: PauseRequest): Promise<string> {
-	await add_to_epic(epic, request)
-	if (!(await is_blocked(request))) await record_relation(request)
+async function refuse_unreconcilable(epic: number, request: PauseRequest): Promise<void> {
+	const link = { blocker: Number(request.prerequisite), blocked: Number(request.issue) }
+	const refusal = await epic_reconcile.refusal_after(epic, link)
+	if (refusal === undefined) return
 
-	return `recorded in epic ${session_cite.issue(epic)}`
+	throw new Error(
+		`\`pnpm josh epic --reconcile ${String(epic)}\` would refuse the relation, so none was recorded: ${refusal}`,
+	)
+}
+
+async function reconcile_epic(epic: number): Promise<void> {
+	if ((await epic_reconcile.reconcile_epic(epic)) === SUCCESS_EXIT_CODE) return
+
+	throw new Error(
+		`the relation was recorded, but \`pnpm josh epic --reconcile ${String(epic)}\` failed to declare it`,
+	)
+}
+
+// A prerequisite outside the epic gains its row, declaration and relation from `epic --add --before`.
+// One the epic already tracks does not: `epic --add` reads it as a move and drops every order it
+// already had, where a pause only adds one — so the relation is recorded directly and
+// `epic --reconcile` copies it into the declaration beside the others, once a dry plan shows the
+// reconcile accepts it: a refusal after the write would leave the relation undeclared. `epic --add`
+// exits 0 on a relation it failed to post, so the relation is read back after the insertion.
+async function record_in_epic(tracking: Tracking, request: PauseRequest): Promise<string> {
+	if (tracking.is_prerequisite_child) {
+		await refuse_unreconcilable(tracking.epic, request)
+		await record_relation(request)
+		await reconcile_epic(tracking.epic)
+	} else {
+		await add_to_epic(tracking.epic, request)
+		if (!(await is_blocked(request))) await record_relation(request)
+	}
+
+	return `recorded in epic ${session_cite.issue(tracking.epic)}`
+}
+
+// A relation recorded inside an epic tracking both issues is only done once it is declared, so a
+// rerun past a failed reconcile reconciles again — a no-op on an epic that already declares it.
+async function settle_recorded(request: PauseRequest): Promise<string> {
+	const tracking = await tracking_epic(request)
+	if (tracking?.is_prerequisite_child === true) await reconcile_epic(tracking.epic)
+
+	return ALREADY
 }
 
 async function blocked_by_step(request: PauseRequest): Promise<string> {
-	if (await is_blocked(request)) return ALREADY
+	if (await is_blocked(request)) return await settle_recorded(request)
 
-	const epic = await tracking_epic(request)
-	if (epic !== undefined) return await record_in_epic(epic, request)
+	const tracking = await tracking_epic(request)
+	if (tracking !== undefined) return await record_in_epic(tracking, request)
 	await record_relation(request)
 
 	return 'recorded'

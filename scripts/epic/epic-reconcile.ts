@@ -235,11 +235,50 @@ async function reconcile_epic(epic_number: number): Promise<number> {
 	return await apply_plan(epic_number, plan)
 }
 
+function with_recorded(
+	recorded: ReadonlyArray<EpicChild>,
+	link: DependencyLink,
+	repo: string,
+): Array<EpicChild> {
+	return recorded.map((child) =>
+		child.number === link.blocked && child.repo === repo
+			? { ...child, blocked_by: [...child.blocked_by, to_blocker(link, repo)] }
+			: child,
+	)
+}
+
+// The plan the epic would reconcile to once `link` is recorded, so a caller about to record it can
+// refuse first — a relation recorded and then refused leaves an order the declaration never carries.
+function build_plan_after(input: ReconcilePlanInput, link: DependencyLink): ReconcilePlan {
+	return build_reconcile_plan({
+		...input,
+		recorded: with_recorded(input.recorded, link, input.repo),
+	})
+}
+
+// Why reconciling after recording `link` would refuse, read before anything is written. An epic that
+// cannot be read throws: a failed read is no answer about whether the reconcile would refuse.
+async function refusal_after(
+	epic_number: number,
+	link: DependencyLink,
+): Promise<string | undefined> {
+	const epic = await epic_read.read_epic(epic_number)
+	if ('error' in epic) throw new Error(epic.error)
+
+	const input = { body: epic.subject.body, recorded: epic.recorded, repo: epic.repo }
+	const plan = build_plan_after(input, link)
+	if (plan.kind === 'cycle') return plan.message
+
+	return plan.kind === 'error' ? plan.error : undefined
+}
+
 const epic_reconcile = {
 	NOTHING_TO_RECONCILE,
 	RECONCILED,
+	build_plan_after,
 	build_reconcile_plan,
 	reconcile_epic,
+	refusal_after,
 }
 
 export { epic_reconcile }
