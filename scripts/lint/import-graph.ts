@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
 import path from 'node:path'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { file_reader } from '#scripts/lib/read-file'
 import type ts from 'typescript'
 
@@ -13,8 +13,6 @@ import type ts from 'typescript'
 // than the one whose types the rule read. A package's file is named by its resolved path rather than
 // read: that path carries the installed version, and a package's files change with nothing else.
 const TSCONFIG = 'tsconfig.json'
-const HASH_ALGORITHM = 'sha256'
-const MISSING = 'missing'
 const NODE_MODULES = 'node_modules'
 const MODULE_STATEMENT = /^(?:import|export)\b/mu
 const GLOBAL_DECLARATION = /^declare (?:global|module|namespace)\b/mu
@@ -47,10 +45,6 @@ interface ProjectConfig {
 
 interface ImportGraph {
 	closure_hash: (file: string) => string
-}
-
-function hash_of(content: string): string {
-	return createHash(HASH_ALGORITHM).update(content).digest('hex')
 }
 
 // `typescript` is an optional peer: a project without it has no type-aware rule to go stale.
@@ -201,8 +195,7 @@ function ambient_of(resolver: Resolver, root: string, config: ProjectConfig): Ar
 function content_hash(context: GraphContext, file: string): string {
 	const known = context.content_hashes.get(file)
 	if (known !== undefined) return known
-	const content = file_reader.read_if_readable(file)
-	const computed = content === undefined ? MISSING : hash_of(content)
+	const computed = input_fingerprint.of_file(file)
 
 	context.content_hashes.set(file, computed)
 
@@ -257,7 +250,7 @@ function closure_hash(context: GraphContext, file: string): string {
 		token_of(context, dependency),
 	)
 
-	return hash_of(tokens.toSorted((left, right) => left.localeCompare(right)).join('\n'))
+	return input_fingerprint.of_entries(tokens)
 }
 
 // Undefined where nothing type-aware can run: no `typescript`, or no `tsconfig.json` at the root.

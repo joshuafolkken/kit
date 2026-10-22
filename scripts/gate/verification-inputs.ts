@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { stamp_file } from '#scripts/josh/stamp-file'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { gate_plan } from './gate-plan'
+import { input_fingerprint } from './input-fingerprint'
 import { toolchain_inputs } from './toolchain-inputs'
 
 // **What each verification depends on, declared once** (joshuafolkken/kit#4495). Every reuse of a
@@ -13,9 +13,11 @@ import { toolchain_inputs } from './toolchain-inputs'
 // new reuse picks a declaration rather than writing its own invalidation.
 //
 // A declaration names:
-// - `is_input` — whether a path is a content input; `undefined` leaves it to `follows_imports`.
-// - `follows_imports` — the inputs are the transitive closure the test-read map records
-//   (joshuafolkken/kit#4314), so a path is an input only when some recorded test reads it.
+// - `is_input` — whether a path is a content input; `undefined` leaves it to `reads`.
+// - `reads` — `matched`: the inputs are the paths `is_input` accepts. `recorded`: the inputs are the
+//   files a run read, as the run recorded them — the test-read map (joshuafolkken/kit#4314), whose
+//   file digests are `input-fingerprint.ts`'s — so a path is an input only when some recorded test
+//   reads it.
 // - `is_config` — the files that configure the check: one that moves invalidates the verdict whatever
 //   else moved, and stops the since-green narrowing.
 // - `tools` — the packages whose installed version runs the check.
@@ -86,9 +88,11 @@ type PrettierIgnored = (relative: string) => Promise<boolean>
 
 type FileTest = (relative: string, is_ignored: PrettierIgnored) => Promise<boolean>
 
+type InputReads = 'matched' | 'recorded'
+
 interface InputDeclaration {
 	readonly is_input: FileTest | undefined
-	readonly follows_imports: boolean
+	readonly reads: InputReads
 	readonly is_config: (relative: string) => boolean
 	readonly tools: ReadonlyArray<string>
 	readonly env: ReadonlyArray<string>
@@ -141,7 +145,7 @@ function configures_lint(relative: string): boolean {
 
 const LINT: InputDeclaration = {
 	is_input: is_lint_input,
-	follows_imports: false,
+	reads: 'matched',
 	is_config: configures_lint,
 	tools: ['prettier', 'eslint', 'typescript'],
 	env: COMMON_ENV,
@@ -149,7 +153,7 @@ const LINT: InputDeclaration = {
 
 const UNIT: InputDeclaration = {
 	is_input: undefined,
-	follows_imports: true,
+	reads: 'recorded',
 	is_config: configures_tests,
 	tools: ['vitest', 'typescript'],
 	env: [...COMMON_ENV, 'TZ'],
@@ -158,7 +162,7 @@ const UNIT: InputDeclaration = {
 function compiled(is_input: FileTest): InputDeclaration {
 	return {
 		is_input,
-		follows_imports: false,
+		reads: 'matched',
 		is_config: configures_compiler,
 		tools: ['typescript'],
 		env: COMMON_ENV,
@@ -228,9 +232,7 @@ function fingerprint(
 		declarations.flatMap((declaration) => entries_of(declaration, root, environment)),
 	)
 
-	return stamp_file.digest(
-		[...entries].toSorted((left, right) => left.localeCompare(right)).join('\n'),
-	)
+	return input_fingerprint.of_entries(entries)
 }
 
 const DECLARED_LABELS: ReadonlyArray<string> = [...DECLARATIONS.keys()]
@@ -244,5 +246,5 @@ const verification_inputs = {
 	PRETTIER_IGNORE_FILES,
 }
 
-export type { InputDeclaration, PrettierIgnored }
+export type { InputDeclaration, InputReads, PrettierIgnored }
 export { verification_inputs }

@@ -1,0 +1,7 @@
+{
+	"reason": "#4497 adds the shared input-fingerprint module that the ESLint import graph, the test-read map, the review tree and the verification-input fingerprint now share; the per-site hashing it replaces was removed",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

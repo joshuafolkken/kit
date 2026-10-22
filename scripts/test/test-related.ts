@@ -2,13 +2,13 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
@@ -78,7 +78,7 @@ async function change_since(
 	return test_read_map.changed_since_tree(
 		map,
 		since,
-		review_tree.tree_of(root, Object.keys(map.dirty)),
+		input_fingerprint.of_files(root, Object.keys(map.dirty)),
 	)
 }
 

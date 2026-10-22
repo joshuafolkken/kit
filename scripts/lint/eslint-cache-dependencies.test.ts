@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -133,6 +141,31 @@ describe('eslint_cache_dependencies.guard — only the imported file changed', (
 		const guarded = await run_guarded()
 
 		expect(guarded.exit_code).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#4497: a cache file of another layout, or a corrupt one, is removed before the run
+// rather than left to eslint, so the run rebuilds it with every entry hashed.
+describe('eslint_cache_dependencies.guard — a cache file it cannot read', () => {
+	it('removes the file before the run', async () => {
+		writeFileSync(cache_file, '{"not": "a cache"')
+
+		const is_present = await eslint_cache_dependencies.guard(
+			ESLINT_CACHE_FILE,
+			async () => existsSync(cache_file),
+			project,
+		)
+
+		expect(is_present).toBe(false)
+	})
+
+	it('rebuilds a cache whose entries carry the hash', async () => {
+		writeFileSync(cache_file, 'not flatted')
+
+		const guarded = await run_guarded()
+
+		expect(guarded.exit_code).toBe(0)
+		expect(readFileSync(cache_file, 'utf8')).toContain('"dependencies"')
 	})
 })
 

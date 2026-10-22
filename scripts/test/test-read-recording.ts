@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
-import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 
@@ -43,7 +43,7 @@ type TreeSnapshot = Pick<ReadMap, 'commit' | 'dirty' | 'directories'>
 // an edit made while the tests ran as content they read.
 async function tree_snapshot(root: string): Promise<TreeSnapshot> {
 	const commit = await git_command.head_commit()
-	const dirty = review_tree.tree_of(root, await changed_paths.read_changed_since(commit))
+	const dirty = input_fingerprint.of_files(root, await changed_paths.read_changed_since(commit))
 
 	return { commit, dirty, directories: await commit_directories(commit) }
 }
