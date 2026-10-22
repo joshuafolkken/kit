@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -118,7 +119,10 @@ async function since_green_change(
 	root: string,
 	map: ReadMap | undefined,
 ): Promise<ChangeReading | undefined> {
-	const parts = await since_green.read_moved_parts(review_stamps.test_related_stamp)
+	const parts = await since_green.read_moved_parts(
+		review_stamps.test_related_stamp,
+		gate_plan.UNIT_LABEL,
+	)
 
 	if (parts === undefined) return undefined
 

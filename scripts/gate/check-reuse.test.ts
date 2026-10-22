@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_tree } from '#scripts/review/review-tree'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_reuse, type CheckRecords } from './check-reuse'
 import { gate_plan } from './gate-plan'
 import type { GateStepResult } from './gate-report'
@@ -136,5 +136,28 @@ describe('check_reuse.record_green_checks', () => {
 		await check_reuse.record_green_checks(all_passed(), RECORDED, records)
 
 		await expect(reused(records, RECORDED)).resolves.toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4495: each record carries the fingerprint of its own check's tools and environment.
+describe('check_reuse — the inputs fingerprint', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('reuses nothing when a declared environment variable changed since the records', async () => {
+		const records = await recorded()
+
+		vi.stubEnv('NODE_ENV', 'production')
+
+		await expect(reused(records, RECORDED)).resolves.toStrictEqual([])
+	})
+
+	it('keeps reusing a check whose declaration leaves the changed variable out', async () => {
+		const records = await recorded()
+
+		vi.stubEnv('TZ', 'Etc/GMT+12')
+
+		await expect(reused(records, RECORDED)).resolves.toStrictEqual([LINT_LABEL, TYPE_CHECK_LABEL])
 	})
 })

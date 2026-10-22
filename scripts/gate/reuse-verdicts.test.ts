@@ -5,11 +5,13 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from '#scripts/test/test-read-map'
 import fc from 'fast-check'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { check_reuse } from './check-reuse'
 import { gate_plan } from './gate-plan'
+import type { GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
 import { gate_tree } from './gate-tree'
 import { RECORD, reuse_operations } from './reuse-operations-fixture'
@@ -25,7 +27,14 @@ import { since_green } from './since-green'
 const MAX_STEPS = 30
 const NUM_RUNS = 60
 const scratch = mkdtempSync(path.join(tmpdir(), 'reuse-verdicts-'))
-const green_record = path.join(scratch, 'green.json')
+const gate_record = path.join(scratch, 'gate.json')
+const lint_record = path.join(scratch, 'lint-related.json')
+const unit_record = path.join(scratch, 'test-related.json')
+
+function check_record(label: string): string {
+	return path.join(scratch, `check-${label}.json`)
+}
+
 const SCOPED_LABELS: ReadonlyArray<string> = [
 	gate_plan.LINT_LABEL,
 	gate_plan.TYPE_CHECK_LABEL,
@@ -34,8 +43,10 @@ const SCOPED_LABELS: ReadonlyArray<string> = [
 	gate_plan.UNIT_LABEL,
 ]
 // The kinds of path each scoped check reads, written from what the check does rather than from
-// `check-inputs.ts`: a module, a declaration and a config file are inputs of every check. The unit
-// step reads beyond those only what a recorded test reads — here a test that reads every doc.
+// `verification-inputs.ts`: a module, a declaration and a config file are inputs of every check. The
+// unit step reads beyond those only what a recorded test reads — here a test that reads every doc. A
+// config file stops a check's since-green narrowing only when it configures that check: the lint
+// configuration is a source of the unit step, not its configuration (joshuafolkken/kit#4495).
 const SHARED_INPUTS: ReadonlyArray<Kind> = ['module', 'declaration', 'globals', 'config']
 const INPUTS: ReadonlyMap<string, ReadonlySet<Kind>> = new Map([
 	[gate_plan.LINT_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc', 'style'])],
@@ -43,6 +54,9 @@ const INPUTS: ReadonlyMap<string, ReadonlySet<Kind>> = new Map([
 	[gate_plan.EXPORTS_LABEL, new Set<Kind>(SHARED_INPUTS)],
 	[gate_plan.METRICS_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc'])],
 	[gate_plan.UNIT_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc'])],
+])
+const CONFIGURES_OTHERS: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
+	[gate_plan.UNIT_LABEL, ['eslint.config.js']],
 ])
 const DOC_READER = 'src/guide.test.ts'
 const documents = [...reuse_world.create_world().contents.keys()].filter(
@@ -61,7 +75,8 @@ const walked: { world: World } = { world: reuse_world.create_world() }
 interface Verdicts {
 	gate_reused: boolean
 	checks_reused: ReadonlyArray<string>
-	narrowed_to: ReadonlyArray<string> | undefined
+	lint_narrowed_to: ReadonlyArray<string> | undefined
+	unit_narrowed_to: ReadonlyArray<string> | undefined
 }
 
 function synced_between(arguments_: ReadonlyArray<string>): string {
@@ -86,45 +101,73 @@ vi.spyOn(gate_tree, 'read_gate_tree').mockImplementation(async () => current_tre
 vi.spyOn(test_read_map, 'read_map').mockReturnValue(READ_MAP)
 vi.spyOn(changed_paths, 'read_changed_since').mockResolvedValue([])
 vi.spyOn(changed_paths, 'read_held_at').mockImplementation(async (_commit, files) => [...files])
+const read_changed_tree = vi.spyOn(review_tree, 'read_changed_tree')
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
 })
 
-function record_green(world: World): void {
+function passed(label: string): GateStepResult {
+	return { label, command: `josh ${label}`, exit_code: 0, output: '', elapsed_ms: 1 }
+}
+
+// Each record is written by the stamp that reads it, so it carries that verification's inputs.
+async function record_green(world: World): Promise<void> {
 	const tree = current_tree(world)
 
-	review_stamps.gate_stamp.write(tree.files, green_record, tree.base)
+	review_stamps.gate_stamp.write(tree.files, gate_record, tree.base)
+	review_stamps.lint_related_stamp.write(tree.files, lint_record, tree.base)
+	review_stamps.test_related_stamp.write(tree.files, unit_record, tree.base)
+	read_changed_tree.mockResolvedValue(tree.files)
+	const results = SCOPED_LABELS.map((label) => passed(label))
+
+	await check_reuse.record_green_checks(results, tree, check_record)
 }
 
 async function actual_verdicts(world: World): Promise<Verdicts> {
 	const tree = current_tree(world)
-	const gate = gate_skip.gate_reuse(tree.files, tree.base, green_record)
-	const checks = await check_reuse.reusable_checks(SCOPED_LABELS, tree, () => green_record)
-	const narrowed = await since_green.read_moved(review_stamps.gate_stamp, green_record)
+	const gate = gate_skip.gate_reuse(tree.files, tree.base, gate_record)
+	const checks = await check_reuse.reusable_checks(SCOPED_LABELS, tree, check_record)
+	const { lint_related_stamp, test_related_stamp } = review_stamps
+	const lint = await since_green.read_moved(lint_related_stamp, gate_plan.LINT_LABEL, lint_record)
+	const unit = await since_green.read_moved(test_related_stamp, gate_plan.UNIT_LABEL, unit_record)
 
 	return {
 		gate_reused: 'stamp' in gate,
 		checks_reused: [...checks.keys()].toSorted(reuse_world.by_name),
-		narrowed_to: narrowed?.toSorted(reuse_world.by_name),
+		lint_narrowed_to: lint?.toSorted(reuse_world.by_name),
+		unit_narrowed_to: unit?.toSorted(reuse_world.by_name),
 	}
 }
 
-function reads_none_of(label: string, moved_kinds: ReadonlyArray<Kind>): boolean {
+function reads(label: string, relative: string): boolean {
 	const inputs = INPUTS.get(label) ?? new Set()
 
-	return moved_kinds.every((kind) => !inputs.has(kind))
+	return inputs.has(reuse_world.kind_of(relative))
+}
+
+function configures(label: string, relative: string): boolean {
+	const is_config = reuse_world.kind_of(relative) === 'config'
+
+	return is_config && !(CONFIGURES_OTHERS.get(label) ?? []).includes(relative)
+}
+
+function narrowed_to(
+	label: string,
+	moved: ReadonlyArray<string>,
+): ReadonlyArray<string> | undefined {
+	return moved.some((relative) => configures(label, relative)) ? undefined : moved
 }
 
 function expected_verdicts(world: World): Verdicts {
 	const moved = reuse_world.moved(world)
-	const kinds = moved.map((relative) => reuse_world.kind_of(relative))
-	const labels = SCOPED_LABELS.filter((label) => reads_none_of(label, kinds))
+	const labels = SCOPED_LABELS.filter((label) => moved.every((relative) => !reads(label, relative)))
 
 	return {
 		gate_reused: moved.length === 0,
 		checks_reused: labels.toSorted(reuse_world.by_name),
-		narrowed_to: kinds.includes('config') ? undefined : moved,
+		lint_narrowed_to: narrowed_to(gate_plan.LINT_LABEL, moved),
+		unit_narrowed_to: narrowed_to(gate_plan.UNIT_LABEL, moved),
 	}
 }
 
@@ -137,7 +180,7 @@ async function take(
 
 	trace.push(step.name)
 	step.apply()
-	if (step.name === RECORD) record_green(world)
+	if (step.name === RECORD) await record_green(world)
 
 	expect(await actual_verdicts(world), `after ${trace.join(' → ')}`).toStrictEqual(
 		expected_verdicts(world),
@@ -149,7 +192,7 @@ async function walk(choices: ReadonlyArray<readonly [number, number]>): Promise<
 	const trace: Array<string> = []
 
 	walked.world = world
-	record_green(world)
+	await record_green(world)
 
 	for (const choice of choices) {
 		// eslint-disable-next-line no-await-in-loop -- each step is chosen from the world the one before it left

@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { environment_flags } from '@joshuafolkken/kit/env'
-import { toolchain_config } from '#scripts/gate/toolchain-config'
+import { gate_plan } from '#scripts/gate/gate-plan'
+import { verification_inputs } from '#scripts/gate/verification-inputs'
 import {
 	changed_file_scope,
 	type ChangedFileScope,
@@ -23,9 +24,9 @@ import { lint_related_scope, type LintCaches } from './lint-related-scope'
 // import broke is caught by the whole-tree run alone. The other files that run actually lints are
 // the changed ones, and those are exactly the ones this run names.
 //
-// What a cache entry does not see falls back to the whole tree: a toolchain or ignore file
-// (`toolchain-config.ts`), the eslint configuration and kit's own rules, the TypeScript configuration
-// the type-aware rules read, and a change that cannot be read. CI lints the whole tree on every run,
+// What a cache entry does not see falls back to the whole tree: a configuration the lint check declares
+// (`verification-inputs.ts`) — a toolchain or ignore file, the eslint configuration and kit's own rules,
+// the TypeScript configuration the type-aware rules read — and a change that cannot be read. CI lints the whole tree on every run,
 // so the narrowed gate always has the full check behind it.
 
 interface NarrowedLint {
@@ -51,38 +52,17 @@ const VOCABULARY: ScopeVocabulary = {
 	narrowed_suffix: 'checking only them',
 }
 
-// A file name starting with one of these, or a path under one of the directories, configures prettier,
-// eslint or the TypeScript program its type-aware rules read. Prettier keys its cache on the options
-// too, so a changed `prettier.config.*` re-checks every file the whole-tree run reads.
-const LINT_CONFIG_PREFIXES: ReadonlyArray<string> = [
-	'eslint.config.',
-	'prettier.config.',
-	'svelte.config.',
-	'tsconfig',
-]
-const LINT_CONFIG_DIRECTORIES: ReadonlySet<string> = new Set(['eslint', 'prettier', 'tsconfig'])
-
 function all_scope(reason: string): ChangedFileScope {
 	return { mode: 'all', files: [], reason }
 }
 
-function is_lint_config(relative: string): boolean {
-	const name = path.basename(relative)
-	const [top = ''] = relative.split(path.sep)
-
-	return (
-		LINT_CONFIG_DIRECTORIES.has(top) ||
-		LINT_CONFIG_PREFIXES.some((prefix) => name.startsWith(prefix))
-	)
-}
-
-// Repository-root-relative paths, as the since-green narrowing (`since-green.ts`) reads them too.
-function configures_toolchain(relatives: ReadonlyArray<string>): boolean {
-	return toolchain_config.has_config(relatives) || relatives.some((file) => is_lint_config(file))
-}
-
+// The lint check's declared configurations (`verification-inputs.ts`), as the since-green narrowing
+// reads them too.
 function configures_lint(files: ReadonlyArray<string>, root: string): boolean {
-	return configures_toolchain(files.map((file) => path.relative(root, file)))
+	return verification_inputs.configures(
+		gate_plan.LINT_LABEL,
+		files.map((file) => path.relative(root, file).split(path.sep).join('/')),
+	)
 }
 
 // `files` are absolute, as `changed_file_scope.read_changed_files` answers them; `undefined` is a
@@ -114,7 +94,6 @@ const lint_gate_scope = {
 	CHANGED_FLAG: '--changed',
 	CI_REASON,
 	CONFIG_REASON,
-	configures_toolchain,
 	describe_scope,
 	narrowed_run,
 	resolve_gate_scope,

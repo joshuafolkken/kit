@@ -1,7 +1,7 @@
 import type { FileMapStampAccess } from '#scripts/josh/file-map-stamp'
-import { lint_gate_scope } from '#scripts/lint/lint-gate-scope'
 import { gate_tree } from './gate-tree'
 import { moved_paths, type MovedParts } from './moved-paths'
+import { verification_inputs } from './verification-inputs'
 
 // **A scoped check re-run reads only what moved since its last green run on this checkout**
 // (joshuafolkken/kit#4393). A lane's ship retry — after a review fix or a preflight stop — re-ran
@@ -14,8 +14,9 @@ import { moved_paths, type MovedParts } from './moved-paths'
 // vouches for the same thing, by the same argument one run earlier.
 //
 // **Whatever cannot be narrowed answers `undefined`**, and the caller reads the whole branch change as
-// before: no record, one that cannot be compared, or a moved file that configures the toolchain or the
-// linters — a file green under the old configuration says nothing under the new one. An empty list is
+// before: no record, one that cannot be compared, one written under other tools or environment, or a
+// moved file the check's declaration names a configuration — a file green under the old configuration
+// says nothing under the new one. An empty list is
 // the positive fact that nothing moved: the gate's unit step on the tree the preflight just passed.
 
 // The narrowing line each command prints before it runs, so a since-green run is never read as one
@@ -24,31 +25,34 @@ function describe(label: string, moved: ReadonlyArray<string>): string {
 	return `${label}: reading only the ${String(moved.length)} file(s) changed since its last green run on this checkout.`
 }
 
-function is_narrowable(parts: MovedParts | undefined): parts is MovedParts {
-	return parts !== undefined && !lint_gate_scope.configures_toolchain(moved_paths.union_of(parts))
+function is_narrowable(label: string, parts: MovedParts | undefined): parts is MovedParts {
+	return parts !== undefined && !verification_inputs.configures(label, moved_paths.union_of(parts))
 }
 
 // What moved with a main sync's part kept apart, for a caller that records how much of its input the
-// sync brought in (`josh test:related`, joshuafolkken/kit#4465).
+// sync brought in (`josh test:related`, joshuafolkken/kit#4465). `label` names the gate check whose
+// declaration (`verification-inputs.ts`) the record vouches for.
 async function read_moved_parts(
 	stamp: FileMapStampAccess,
+	label: string,
 	source?: string,
 ): Promise<MovedParts | undefined> {
 	const record = stamp.read(source)
 
-	if (record === undefined) return undefined
+	if (record === undefined || !stamp.describes_inputs(record)) return undefined
 
 	const parts = await moved_paths.moved_parts(record, await gate_tree.read_gate_tree())
 
-	return is_narrowable(parts) ? parts : undefined
+	return is_narrowable(label, parts) ? parts : undefined
 }
 
 // Repository-root-relative paths, or `undefined` when the caller has to read the whole branch change.
 async function read_moved(
 	stamp: FileMapStampAccess,
+	label: string,
 	source?: string,
 ): Promise<ReadonlyArray<string> | undefined> {
-	const parts = await read_moved_parts(stamp, source)
+	const parts = await read_moved_parts(stamp, label, source)
 
 	return parts === undefined ? undefined : moved_paths.union_of(parts)
 }

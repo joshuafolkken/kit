@@ -64,8 +64,17 @@ const FORCE_FLAG = '--force'
 // rewritten by the hook's own install each cost minutes before anyone could tell them apart.
 type GateReuse = { stamp: FileMapStamp } | { miss: string }
 
+// The fingerprint of every declared check's tools and environment (`verification-inputs.ts`).
+const INPUTS_MOVED = 'a checked tool or environment variable changed since the green gate'
+
 function base_moved(recorded: string | undefined, base: string): string {
 	return `the merge base moved since the green gate (${recorded ?? 'none'} → ${base})`
+}
+
+function stamp_miss(stamp: FileMapStamp, base: string): string | undefined {
+	if (stamp.base !== base) return base_moved(stamp.base, base)
+
+	return review_stamps.gate_stamp.describes_inputs(stamp) ? undefined : INPUTS_MOVED
 }
 
 function gate_reuse(
@@ -79,9 +88,10 @@ function gate_reuse(
 	const stamp = review_brief.matching_stamp(review_stamps.gate_stamp.read(source), tree)
 
 	if (stamp === undefined) return { miss: 'no green gate record matches the changed files' }
-	if (stamp.base !== base) return { miss: base_moved(stamp.base, base) }
 
-	return { stamp }
+	const miss = stamp_miss(stamp, base)
+
+	return miss === undefined ? { stamp } : { miss }
 }
 
 function stamp_of(reuse: GateReuse): FileMapStamp | undefined {

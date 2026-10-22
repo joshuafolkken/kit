@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { document_byte_check } from '#scripts/document/document-byte-check'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -247,7 +248,10 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 
 		await lint_related.run_related_lint([])
 
-		expect(since_green.read_moved).toHaveBeenCalledWith(review_stamps.lint_related_stamp)
+		expect(since_green.read_moved).toHaveBeenCalledWith(
+			review_stamps.lint_related_stamp,
+			gate_plan.LINT_LABEL,
+		)
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
 		expect(eslint_arguments()).not.toContain(other_source)
 	})

@@ -53,8 +53,7 @@ describe('check_inputs.touches_inputs', () => {
 		).resolves.toBe(true)
 	})
 
-	it('answers true for an unscoped check whatever moved', async () => {
-		expect(check_inputs.is_scoped('cspell')).toBe(false)
+	it('answers true for an undeclared check whatever moved', async () => {
 		await expect(check_inputs.touches_inputs('cspell', [], never_ignored)).resolves.toBe(true)
 	})
 })
@@ -89,24 +88,26 @@ describe('check_inputs.touches_inputs for the unit step', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('is scoped, and asks test:related whether the moved set reaches a test', async () => {
+	it('asks test:related whether the moved set reaches a test', async () => {
 		const reaches = vi.spyOn(test_related, 'reaches_tests').mockResolvedValue(false)
 
-		expect(check_inputs.is_scoped(UNIT_LABEL)).toBe(true)
 		await expect(
 			check_inputs.touches_inputs(UNIT_LABEL, ['README.md'], never_ignored, PROJECT_ROOT),
 		).resolves.toBe(false)
 		expect(reaches).toHaveBeenCalledWith(PROJECT_ROOT, ['README.md'])
 	})
 
-	it('reads a lock file as an input without asking', async () => {
-		const reaches = vi.spyOn(test_related, 'reaches_tests').mockResolvedValue(false)
+	it.each([LOCK_FILE, 'vitest.config.ts'])(
+		'reads %j as an input without asking',
+		async (relative) => {
+			const reaches = vi.spyOn(test_related, 'reaches_tests').mockResolvedValue(false)
 
-		await expect(check_inputs.touches_inputs(UNIT_LABEL, [LOCK_FILE], never_ignored)).resolves.toBe(
-			true,
-		)
-		expect(reaches).not.toHaveBeenCalled()
-	})
+			await expect(
+				check_inputs.touches_inputs(UNIT_LABEL, [relative], never_ignored),
+			).resolves.toBe(true)
+			expect(reaches).not.toHaveBeenCalled()
+		},
+	)
 })
 
 describe('check_inputs.prettier_ignored', () => {
