@@ -100,3 +100,33 @@ describe('review_finding_ledger — has_issue_record', () => {
 		expect(review_finding_ledger.has_issue_record('- k:x | d1 | obs | w | h', 1)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#4276: the interaction review's round is its own `- ri:` line, in the same grammar.
+describe('review_finding_ledger — the interaction kind', () => {
+	const INTERACTION = 'interaction'
+	const finding = { category: 'bug-risks', severity: 'high', file: FILE } as const
+
+	it('writes a finding and a zero-finding round as `- ri:` lines', () => {
+		expect(review_finding_ledger.finding_line(finding, DATE, ISSUE, INTERACTION)).toBe(
+			'- ri:bug-risks | high | src/foo.ts:42 | 2026-09-22 | #2325',
+		)
+		expect(review_finding_ledger.zero_round_line(DATE, ISSUE, INTERACTION)).toBe(
+			'- ri:none | none | - | 2026-09-22 | #2325',
+		)
+	})
+
+	it('keeps the two kinds apart in has_issue_record', () => {
+		const code_only = review_finding_ledger.zero_round_line(DATE, ISSUE)
+		const interaction_only = review_finding_ledger.zero_round_line(DATE, ISSUE, INTERACTION)
+
+		expect(review_finding_ledger.has_issue_record(code_only, ISSUE, INTERACTION)).toBe(false)
+		expect(review_finding_ledger.has_issue_record(interaction_only, ISSUE)).toBe(false)
+		expect(review_finding_ledger.has_issue_record(interaction_only, ISSUE, INTERACTION)).toBe(true)
+	})
+
+	it('counts no `- ri:` line in the code-review aggregation', () => {
+		const line = review_finding_ledger.finding_line(finding, DATE, ISSUE, INTERACTION)
+
+		expect(review_finding_ledger.category_counts(line)).toEqual([])
+	})
+})

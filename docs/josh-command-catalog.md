@@ -67,7 +67,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
 | `josh review:findings` · `josh rvf` | — | developer | files | Count review findings by category from the observation ledger |
-| `josh review:record` | `--issue <N> [--comment] [<category>:<severity>:<file> ...] \| --check --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
+| `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file> ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
 
 ## Versioning
 
@@ -178,7 +178,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh report:template` | `summary\|done [<path>...]` | automation | files | Print the work summary or completion report skeleton in the session language: summary \| done |
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
-| `josh review:brief` | `[--round <1\|2>] \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
+| `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
 | `josh review:round2` | `[--round-1-closed] [--json]` | automation | none | Say whether the second /code-review round is due, or may be skipped entirely |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |

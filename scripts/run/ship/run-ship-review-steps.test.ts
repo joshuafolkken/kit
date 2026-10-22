@@ -28,6 +28,11 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
+// Never `missing`, so these cases run no interaction review — its own are in
+// `run-ship-review-interaction.test.ts` (joshuafolkken/kit#4276).
+vi.mock('#scripts/review/review-interaction', () => ({
+	review_interaction: { status: async () => undefined },
+}))
 vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_round_two: record_round_two_mock },
 }))

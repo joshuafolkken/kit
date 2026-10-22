@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/lane/lane-lifecycle.test.ts:76 | 2026-10-22 | #4274
+- rf:tests | low | scripts/lane/lane-lifecycle.test.ts:76 | 2026-10-22 | #4274
