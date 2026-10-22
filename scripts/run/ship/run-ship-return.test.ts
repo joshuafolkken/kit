@@ -353,3 +353,18 @@ describe('run_ship_return — the stop context in the relaunched prompt', () => 
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain('pnpm josh ship --detach --review')
 	})
 })
+
+// joshuafolkken/kit#4589: a failed section's body carries its stderr, where a poll warns of a rate
+// limit it recovered from — the stop is classified on the standard output alone.
+describe('run_ship_return.hand_back on a section that kept its standard output apart', () => {
+	it('classifies a followup stop on the standard output, not its stderr', async () => {
+		const failed = { body: `${OUTPUT}\nAPI rate limit exceeded`, out: OUTPUT }
+
+		await run_ship_return.hand_back(ARGS, 'followup', failed)
+
+		expect(emit_mock).toHaveBeenCalledWith(
+			'ship-stop',
+			`#${ISSUE} followup failed (check) — pnpm josh ship --log ${ISSUE}`,
+		)
+	})
+})

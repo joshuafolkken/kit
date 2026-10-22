@@ -34,6 +34,7 @@ describe('run_ship.section_of — a stage result under its header', () => {
 			header: 'h',
 			body: 'red',
 			code: FAILED,
+			out: 'red',
 			conflicts: ['a.ts'],
 			preconditions: ['lock'],
 		})
@@ -43,12 +44,27 @@ describe('run_ship.section_of — a stage result under its header', () => {
 	it('carries the cause a review round tagged its stop with', () => {
 		expect(run_ship.section_of('h', { code: FAILED, out: 'red', cause: 'attest' })).toStrictEqual({
 			...section('h', 'red', FAILED),
+			out: 'red',
 			cause: 'attest',
 		})
 	})
 
-	it('adds neither key to a result that has none', () => {
-		expect(run_ship.section_of('h', { code: OK, out: 'ok' })).toStrictEqual(section('h', 'ok'))
+	// joshuafolkken/kit#4589: the poll's unreadable-read warnings go to stderr, and a stop log without
+	// them hid why the merge gate never concluded.
+	it('keeps the stderr of a failed stage in its body', () => {
+		const result = { code: FAILED, out: 'red', err: 'Could not read the PR state' }
+
+		expect(run_ship.section_of('h', result)).toMatchObject({
+			body: 'red\nCould not read the PR state',
+			out: 'red',
+		})
+	})
+
+	it('adds no stop key to a result that has none', () => {
+		expect(run_ship.section_of('h', { code: OK, out: 'ok' })).toStrictEqual({
+			...section('h', 'ok'),
+			out: 'ok',
+		})
 	})
 })
 

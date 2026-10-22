@@ -12,6 +12,7 @@ import {
 	gh_api_routes,
 	gh_failure,
 	PR_BRANCH,
+	pr_detail_path,
 	PR_HEAD_SHA,
 	pr_lookup_path,
 	pr_reviews_path,
@@ -47,8 +48,7 @@ vi.mock('./git-gh-conditional', () => ({
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
-// The per-poll reads, answered by the same router (joshuafolkken/kit#4550).
-vi.mocked(git_gh_conditional.read_conditional).mockImplementation(conditional_read_over(mocked_api))
+const mocked_conditional = vi.mocked(git_gh_conditional.read_conditional)
 
 const SONAR_QUBE = 'SonarQube'
 const CODE_RABBIT = 'CodeRabbit'
@@ -81,6 +81,8 @@ async function read_snapshot(
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	// The per-poll reads, answered by the same router (joshuafolkken/kit#4550).
+	mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 	forget_pr_numbers()
 	forget_branch_rules()
 	git_gh_poll_read.forget_poll_reads()
@@ -110,6 +112,24 @@ describe('pr_get_state_snapshot — the three fields', () => {
 		const snapshot = await read_snapshot()
 
 		expect(snapshot.review_decision).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4589: GitHub computes `mergeable_state` lazily and answers 304 for a pull request
+// whose state moved, so a detail read through the poll cache kept the gate on a stale `blocked`.
+describe('pr_get_state_snapshot — a lazily computed mergeable_state', () => {
+	it('reads the state that moved under an unchanged ETag', async () => {
+		await read_snapshot({ pull: { mergeable_state: 'blocked' } })
+		const fresh = conditional_read_over(mocked_api)
+
+		mocked_conditional.mockImplementation(async (path, etag) =>
+			etag !== undefined && path === pr_detail_path()
+				? { kind: 'unchanged' }
+				: await fresh(path, etag),
+		)
+		const snapshot = await read_snapshot({ pull: { mergeable_state: 'clean' } })
+
+		expect(snapshot.merge_state_status).toBe('CLEAN')
 	})
 })
 

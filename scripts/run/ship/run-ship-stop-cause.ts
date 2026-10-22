@@ -69,12 +69,20 @@ function review_cause(output: string, tagged: Cause = CAUSE.FINDING): Cause {
 // of the preconditions a stopped preflight found unmet, and the cause a review round tagged its stop with.
 interface StoppedOutput {
 	body: string
+	// The standard output alone, read for the infrastructure in place of the body when present.
+	out?: string
 	conflicts?: ReadonlyArray<string>
 	preconditions?: ReadonlyArray<string>
 	cause?: Cause
 }
 
 const NO_OUTPUT: StoppedOutput = { body: '' }
+
+// A failed stage's body also carries its stderr, where a poll warns of a transient rate limit it then
+// recovered from — so the infrastructure is read on the standard output alone wherever the stage kept it.
+function infra_text({ body, out = body }: StoppedOutput): string {
+	return out
+}
 
 function cause_of(stage: Stage, failed: StoppedOutput): Cause {
 	const { body, conflicts, cause } = failed
@@ -83,7 +91,7 @@ function cause_of(stage: Stage, failed: StoppedOutput): Cause {
 	if (reason === run_ship_stage.CONFLICT) return CAUSE.CONFLICT
 	if (is_review(stage)) return review_cause(body, cause)
 
-	return INFRA_STAGES.has(stage) && is_infra(body) ? CAUSE.INFRA : CAUSE.CHECK
+	return INFRA_STAGES.has(stage) && is_infra(infra_text(failed)) ? CAUSE.INFRA : CAUSE.CHECK
 }
 
 // Whether a finding decided the stop — false on any other stop, and on a review stop no finding decided
