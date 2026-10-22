@@ -38,19 +38,37 @@ interface Gather {
 
 // A title the board once knew stays known, so an issue that left the open listing keeps its name —
 // one the last board's snapshot named among them.
+function titles_of(state: BoardState): ReadonlyMap<number, string> {
+	return state.plan?.context.titles ?? state.known.titles
+}
+
 function with_titles(plan: BoardPlan, state: BoardState): BoardPlan {
-	const previous = state.plan?.context.titles ?? state.known.titles
-	const titles = new Map([...previous, ...plan.context.titles])
+	const titles = new Map([...titles_of(state), ...plan.context.titles])
 
 	return { ...plan, context: { ...plan.context, titles } }
 }
 
+// A lane this run started after the last plan read was asked, on an issue the plan has no title for
+// (joshuafolkken/kit#4577). The read it launches is asked after the lane started, so a title still
+// missing after it — past the listing's cap, or a failed read — waits the usual interval.
+function has_untitled_lane(state: BoardState, gather: Gather): boolean {
+	const asked_ms = state.attempted_ms ?? Infinity
+	const titles = titles_of(state)
+
+	return [...gather.local.lane_states.own].some(
+		([issue, status]) => !titles.has(issue) && (status.started_ms ?? -Infinity) > asked_ms,
+	)
+}
+
 // An ended run's plan is read until it lands once, then held; a read in flight is not launched again.
+// A lane with no title is read for at once rather than after the interval.
 function is_plan_due(state: BoardState, gather: Gather): boolean {
 	if (state.plan_fetch !== undefined) return false
 	if (gather.local.ended_ms !== undefined && state.fetched_ms !== undefined) return false
 
-	return is_due(state.attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	return (
+		is_due(state.attempted_ms, PLAN_RETRY_MS, gather.now_ms) || has_untitled_lane(state, gather)
+	)
 }
 
 function launch_plan(state: BoardState, gather: Gather): BoardState {

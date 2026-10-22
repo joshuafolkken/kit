@@ -1,0 +1,4 @@
+- rf:performance | low | scripts/epic/epic-close.ts:354 | 2026-10-22 | #4564
+- rf:bug-risks | low | scripts/epic/epic-close.ts:234 | 2026-10-22 | #4564
+- rf:comments | low | scripts/epic/epic-close.ts:343 | 2026-10-22 | #4564
+- rf:tests | low | scripts/epic/epic-close.test.ts:170 | 2026-10-22 | #4564
