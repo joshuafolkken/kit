@@ -579,7 +579,7 @@ pnpm josh run:event --last                   # the newest event alone
 
 <!-- /usage -->
 
-Keyed to the common git directory `run:carry` uses, so parent and lane children append to one stream that survives a session cut. `--watch` is for debugging; the ambient pane is `run:board`, which `.vscode/tasks.json` opens on folder open.
+Keyed to the common git directory `run:carry` uses, so parent and lane children append to one stream that survives a session cut. `--watch` is for debugging; the ambient pane is `run:board`.
 
 `--follow` is `--from` that waits, returning at an event or else at the interval. Events go to stdout and the next position to stderr — the same before
 and after a cut. `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
@@ -640,7 +640,7 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 <!-- /usage -->
 
-`.vscode/tasks.json`, distributed by `josh sync`, opens it in a pane when the workspace opens.
+`.vscode/tasks.json`, which `josh init` creates and `josh sync` refreshes, ships it as the `josh: run board` task, started by hand from "Tasks: Run Task".
 
 The header is three lines — the first two in three columns, the third a spinner and time under the second column, then the kind's icon and words under the third:
 
