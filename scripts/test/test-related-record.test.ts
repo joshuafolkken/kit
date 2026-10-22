@@ -91,6 +91,21 @@ describe('test_related_record.record_of — a full-suite run', () => {
 			since_map: 0,
 			readers: 0,
 		})
+		expect(record).not.toHaveProperty('trigger_files')
+	})
+
+	it('records the files that sent the run to the whole suite, relative to the root', () => {
+		const files = ['package.json', 'pnpm-lock.yaml']
+		const input: RunInput = {
+			scope: { mode: 'all', files: files.map((file) => path.join(ROOT, file)), reason: '' },
+			root: ROOT,
+			changed: files,
+			synced: [],
+			since_map: [],
+		}
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record.trigger_files).toStrictEqual(files)
 	})
 })
 

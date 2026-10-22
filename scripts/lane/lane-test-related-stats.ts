@@ -11,16 +11,19 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // run on its own.
 
 const DECIMALS = 1
+const RUNS_COLUMN = 'runs'
+const SECONDS_COLUMN = 'median (s)'
 const COLUMNS = [
 	'test:related scope',
-	'runs',
+	RUNS_COLUMN,
 	'changed',
 	'synced',
 	'since map',
 	'readers',
 	'test files',
-	'median (s)',
+	SECONDS_COLUMN,
 ] as const
+const TRIGGER_COLUMNS = ['test:related whole-suite trigger', RUNS_COLUMN, SECONDS_COLUMN] as const
 
 type CountField = 'changed' | 'synced' | 'since_map' | 'readers'
 
@@ -62,18 +65,63 @@ function scope_row(scope: string, entries: ReadonlyArray<TestRelatedEntry>): str
 	])
 }
 
-// The period's table: `entries` is the whole ledger, filtered here to `window`.
-function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
-	const runs = lane_stats.in_window(entries, window).filter(is_test_related)
-	const scopes = [...new Set(runs.map((run) => run.scope))]
-
-	return [
-		lane_stats.to_row(COLUMNS),
-		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...scopes.map((scope) => scope_row(scope, runs)),
-	].join('\n')
+function rows_under(columns: ReadonlyArray<string>, rows: ReadonlyArray<string>): string {
+	return [lane_stats.to_row(columns), lane_stats.to_row(columns.map(() => '---')), ...rows].join(
+		'\n',
+	)
 }
 
-const lane_test_related_stats = { table }
+function runs_in(
+	entries: ReadonlyArray<LedgerEntry>,
+	window: StatsWindow,
+): Array<TestRelatedEntry> {
+	return lane_stats.in_window(entries, window).filter(is_test_related)
+}
+
+// The period's table: `entries` is the whole ledger, filtered here to `window`.
+function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+	const runs = runs_in(entries, window)
+	const scopes = [...new Set(runs.map((run) => run.scope))]
+
+	return rows_under(
+		COLUMNS,
+		scopes.map((scope) => scope_row(scope, runs)),
+	)
+}
+
+interface TriggerRuns {
+	file: string
+	runs: ReadonlyArray<TestRelatedEntry>
+}
+
+function runs_sent_by(file: string, runs: ReadonlyArray<TestRelatedEntry>): TriggerRuns {
+	return { file, runs: runs.filter((run) => run.trigger_files?.includes(file) === true) }
+}
+
+function trigger_row({ file, runs }: TriggerRuns): string {
+	return lane_stats.to_row([
+		file,
+		String(runs.length),
+		seconds_cell(runs.map((run) => run.elapsed_ms)),
+	])
+}
+
+// Which changed file sent a run to the whole suite, most runs first (joshuafolkken/kit#4510): the
+// table `WHOLE_SUITE_FILES` and the test-read map are trimmed from. A row written before the files
+// were recorded names none, and so counts under no file.
+function trigger_table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+	const runs = runs_in(entries, window)
+	const files = [...new Set(runs.flatMap((run) => run.trigger_files ?? []))]
+	const triggers = files
+		.map((file) => runs_sent_by(file, runs))
+		.toSorted((left, right) => right.runs.length - left.runs.length)
+
+	return rows_under(
+		TRIGGER_COLUMNS,
+		triggers.map((trigger) => trigger_row(trigger)),
+	)
+}
+
+const lane_test_related_stats = { table, trigger_table }
 
 export { lane_test_related_stats }

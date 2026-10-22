@@ -104,15 +104,18 @@ interface Selection {
 	unread: ReadonlyArray<string>
 }
 
-// Either the selection the changed non-code files resolve to, or why they cannot be resolved.
-type MapResolution = Selection | { reason: string }
+// Either the selection the changed non-code files resolve to, or why they cannot be resolved — with
+// the repository-root-relative files that sent the run to the whole suite, where a file did.
+type MapResolution = Selection | { reason: string; triggers?: ReadonlyArray<string> }
 
 function is_relatable(file_path: string): boolean {
 	return RELATABLE_EXTENSIONS.has(path.extname(file_path))
 }
 
-function all_scope(reason: string): RelatedScope {
-	return { mode: 'all', files: [], reason }
+// A full-suite scope's `files` are the changed files that sent it there (joshuafolkken/kit#4510), as a
+// `none` scope's are the ones that settled it; the printed line still names only the first.
+function all_scope(reason: string, triggers: ReadonlyArray<string> = [], root = ''): RelatedScope {
+	return { mode: 'all', files: triggers.map((file) => path.join(root, file)), reason }
 }
 
 // A file no recorded test read narrows only when the recorded tree held it, or held its directory and
@@ -125,11 +128,13 @@ function resolve_through_map(others: ReadonlyArray<string>, request: ScopeReques
 	if (map === undefined) return { reason: `${NO_MAP_REASON} ${String(others[0])}` }
 
 	const unread = others.filter((file) => test_read_map.readers_of(map, file).length === 0)
-	const unknown = unread.find(
+	const unknown = unread.filter(
 		(file) => !recorded.has(file) && !test_read_map.in_unread_directory(map, file),
 	)
 
-	if (unknown !== undefined) return { reason: `${unknown} ${UNRECORDED_SUFFIX}` }
+	if (unknown.length > 0) {
+		return { reason: `${String(unknown[0])} ${UNRECORDED_SUFFIX}`, triggers: unknown }
+	}
 
 	return { files: others.flatMap((file) => test_read_map.readers_of(map, file)), unread }
 }
@@ -168,13 +173,13 @@ function narrowed_scope(selection: Selection, request: ScopeRequest): RelatedSco
 // `undefined` and `[]` are deliberately different inputs. The first says the change could not be
 // read; the second says it was read and held nothing to relate.
 function resolve_scope(request: ScopeRequest): RelatedScope {
-	const { changed } = request
+	const { changed, root } = request
 
 	if (changed === undefined) return all_scope(UNREADABLE_REASON)
 
-	const whole = changed.find((file) => WHOLE_SUITE_FILES.has(file))
+	const whole = changed.filter((file) => WHOLE_SUITE_FILES.has(file))
 
-	if (whole !== undefined) return all_scope(`${whole} ${WHOLE_SUITE_SUFFIX}`)
+	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
 
 	const code = changed.filter((file) => is_relatable(file))
 	const resolution = resolve_through_map(
@@ -182,7 +187,7 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 		request,
 	)
 
-	if ('reason' in resolution) return all_scope(resolution.reason)
+	if ('reason' in resolution) return all_scope(resolution.reason, resolution.triggers, root)
 
 	const files = [...code, ...code_readers(code, request.map), ...resolution.files]
 
