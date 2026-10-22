@@ -4,6 +4,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { gate_plan } from './gate-plan'
+import { toolchain_inputs } from './toolchain-inputs'
 
 // **What each verification depends on, declared once** (joshuafolkken/kit#4495). Every reuse of a
 // verdict — the whole gate (`gate-skip.ts`), one check (`check-reuse.ts`), a scoped record
@@ -32,19 +33,13 @@ const GIT_IGNORE = '.gitignore'
 const PRETTIER_IGNORE = '.prettierignore'
 const PRETTIER_IGNORE_FILES = [GIT_IGNORE, PRETTIER_IGNORE] as const
 
-// A manifest or lock file moves the installed tools, and an ignore or editor file moves what prettier
-// formats — a configuration of every declared check.
+// A manifest or lock file moves the installed tools (`toolchain-inputs.ts`, the list every kept result
+// shares), and an ignore or editor file moves what prettier formats — a configuration of every
+// declared check.
 const MANIFEST = 'package.json'
 
 const TOOLCHAIN_FILES: ReadonlySet<string> = new Set([
-	MANIFEST,
-	'pnpm-lock.yaml',
-	'pnpm-workspace.yaml',
-	'package-lock.json',
-	'yarn.lock',
-	'bun.lock',
-	'bun.lockb',
-	'.npmrc',
+	...toolchain_inputs.PACKAGE_FILES.map((relative) => path.basename(relative)),
 	'.editorconfig',
 	...PRETTIER_IGNORE_FILES,
 ])

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { build, type OnLoadArgs, type OutputFile, type Plugin, type PluginBuild } from 'esbuild'
 
@@ -141,11 +142,19 @@ function place_build(out_directory: string, files: ReadonlyArray<OutputFile>, st
 // the bundles as fresh once every one of them is in place.
 //
 // This script is an input too: it rewrites what it loads, so an edit to it changes the bundles while
-// every bundled source stays byte-identical.
-async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
-	const sources = new Map<string, Uint8Array>([
+// every bundled source stays byte-identical. So is the toolchain (`toolchain-inputs.ts`): the manifest
+// maps the `#scripts/*` imports esbuild resolves, and the lockfile pins esbuild itself.
+function build_inputs(): Map<string, Uint8Array> {
+	const toolchain = toolchain_inputs.paths(PACKAGE_DIR)
+
+	return new Map<string, Uint8Array>([
 		[path.relative(PACKAGE_DIR, BUILD_SCRIPT), readFileSync(BUILD_SCRIPT)],
+		...toolchain.map((input) => [input, readFileSync(path.join(PACKAGE_DIR, input))] as const),
 	])
+}
+
+async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
+	const sources = build_inputs()
 	const entry_points = HOOK_BUNDLES.map((bundle) => entry_point(bundle))
 	const entries = new Set(entry_points.map((entry) => entry.in))
 	const { outputFiles: files } = await build({

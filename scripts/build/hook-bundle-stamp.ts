@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
 
@@ -192,12 +193,31 @@ function is_digest_current(
 	return true
 }
 
-// Fresh only when the record exists, every output it lists is still there, and the listed inputs hash
-// to the recorded digest — a missing or deleted input counts as stale. The hash is skipped when the
-// inputs still carry the signatures of an earlier launch that verified this digest.
+// The build records the toolchain inputs among its sources (`build-hooks.ts`), so an edited one
+// changes the digest; one created since — a new `tsconfig.*.json` or rule module — is in no record.
+function lists_toolchain(stamp: HookBundleStamp, package_directory: string): boolean {
+	const recorded = new Set(stamp.inputs.map((input) => input.split(path.sep).join('/')))
+
+	return toolchain_inputs.paths(package_directory).every((input) => recorded.has(input))
+}
+
+function is_complete(
+	stamp: HookBundleStamp,
+	out_directory: string,
+	package_directory: string,
+): boolean {
+	if (stamp.outputs.some((output) => !existsSync(path.join(out_directory, output)))) return false
+
+	return lists_toolchain(stamp, package_directory)
+}
+
+// Fresh only when the record exists, every output it lists is still there, it lists every toolchain
+// input, and the listed inputs hash to the recorded digest — a missing or deleted input counts as
+// stale. The hash is skipped when the inputs still carry the signatures of an earlier launch that
+// verified this digest.
 function is_fresh(out_directory: string, package_directory: string): boolean {
 	const stamp = read_stamp(out_directory)
-	if (!stamp?.outputs.every((output) => existsSync(path.join(out_directory, output)))) return false
+	if (stamp === undefined || !is_complete(stamp, out_directory, package_directory)) return false
 	const snapshot = read_snapshot(package_directory, stamp.inputs)
 	if (snapshot === undefined) return false
 	if (is_remembered(out_directory, stamp.digest, snapshot.signatures)) return true

@@ -1,9 +1,11 @@
-import { existsSync, lstatSync, readdirSync, statSync } from 'node:fs'
+import { lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_package_bin } from '#scripts/build/local-bin'
+import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
 
@@ -20,29 +22,14 @@ const DAEMON_STOP = 'stop'
 const PNPM_EXEC = 'exec'
 const ESLINT_BIN = 'eslint'
 const PNPM_ESLINT_PREFIX_LENGTH = 2
-// The two shapes a flat config is built from here and in every consumer of this kit: the root
-// `eslint.config.*` entry, and the rule modules under `eslint/` that it imports. The type program the
-// typed rules run on reads the root `tsconfig*.json` and what it extends under `tsconfig/`, and
-// typescript-eslint's project service never watches them (joshuafolkken/kit#4494).
-const CONFIG_DIRECTORIES: ReadonlySet<string> = new Set(['eslint', 'tsconfig'])
-const CONFIG_ENTRIES: ReadonlyArray<RegExp> = [
-	/^eslint\.config\.[cm]?[jt]s$/u,
-	/^tsconfig(?:\.[\w-]+)?\.json$/u,
-]
-// A consumer's config imports its rules from installed packages (`@joshuafolkken/app-kit/eslint…`),
-// so an install is a config input too: pnpm rewrites `node_modules/.modules.yaml` on every install,
-// and the lockfile on every dependency change a checkout or merge brings in.
 const NODE_MODULES = 'node_modules'
-const DEPENDENCY_INPUTS = ['pnpm-lock.yaml', path.join(NODE_MODULES, '.modules.yaml')]
-// The daemon's type program keeps every source it read but did not lint, so a merge that changes
-// those types leaves typed rules failing on the old ones (joshuafolkken/kit#4443). Git appends to this
-// work tree's HEAD reflog on every merge, checkout, reset, pull and commit — the commands that move
-// sources under the daemon without an edit the hook sees.
-const HEAD_REFLOG = path.join('logs', 'HEAD')
-// `eslint_d` writes `<token> <port> <pid> <hash>` here once, when the daemon has started — so the
-// file's mtime is when the daemon loaded its config.
+// `eslint_d` writes `<token> <port> <pid> <hash>` here once, when the daemon has started, and removes
+// it when the daemon stops — so its text names one daemon.
 const DAEMON_RECORD = '.eslint_d'
-const NOTHING_NEWER = 0
+// What that daemon loaded: its record's text and the fingerprint it started under, written beside it.
+const FINGERPRINT_RECORD = '.eslint_d-toolchain'
+const RECORD_SEPARATOR = '\n'
+const NO_HEAD = 'no-head'
 
 // Where this file sits inside the kit package. `eslint_d` is kit's dependency rather than the
 // consumer's, and pnpm writes a `node_modules/.bin` shim only for a project's *direct* dependencies,
@@ -55,6 +42,13 @@ interface DaemonOutcome {
 	stdout: string
 	// stdout and stderr interleaved, which is what a caller prints.
 	output: string
+}
+
+interface DaemonRecord {
+	// The running daemon's own record, or nothing when none runs.
+	daemon: string | undefined
+	// What `remember` wrote for the daemon it last saw start.
+	recorded: string | undefined
 }
 
 interface DaemonRunOptions {
@@ -82,14 +76,10 @@ function resolve_daemon_cli(project_root: string): string | undefined {
 	)
 }
 
-function is_config_entry(name: string): boolean {
-	return CONFIG_ENTRIES.some((entry) => entry.test(name))
-}
-
+// The flat config, the type program's options and the installed packages a consumer's config imports
+// its rules from — typescript-eslint's project service watches none of them (joshuafolkken/kit#4494).
 function is_config_input(relative_path: string): boolean {
-	return (
-		CONFIG_DIRECTORIES.has(relative_path.split(path.sep)[0] ?? '') || is_config_entry(relative_path)
-	)
+	return toolchain_inputs.is_input(relative_path)
 }
 
 // The eslint arguments of a `pnpm exec eslint …` list, or nothing when the list runs another tool.
@@ -101,67 +91,88 @@ function eslint_arguments_of(
 	return pnpm_arguments.slice(PNPM_ESLINT_PREFIX_LENGTH)
 }
 
-// A linked worktree's reflog lives under its own git directory, which `--git-path` resolves; outside
-// a repository there is none.
-function head_reflog_paths(project_root: string): ReadonlyArray<string> {
-	const reflog = git_spawn_sync.read(['rev-parse', '--git-path', HEAD_REFLOG], {
-		cwd: project_root,
-	})
+// **What a daemon is current for: the toolchain's content and the commit checked out.** The daemon's
+// type program keeps every source it read but did not lint, so a merge that changes those types leaves
+// typed rules failing on the old ones (joshuafolkken/kit#4443); every merge, checkout, reset, pull and
+// commit moves HEAD, the commands that move sources under the daemon without an edit the hook sees.
+// A content digest rather than a time: a copy or a checkout rewrites every mtime and leaves the
+// content alone, and an edit can keep its old mtime. Outside a repository there is no HEAD.
+function fingerprint(project_root: string): string {
+	const head = git_spawn_sync.read(['rev-parse', 'HEAD'], { cwd: project_root }) ?? NO_HEAD
 
-	return reflog === undefined ? [] : [path.resolve(project_root, reflog)]
+	return `${toolchain_inputs.digest(project_root)}:${head}`
 }
 
-// Files only: a directory's mtime moves on every entry created in it, an editor's temp file too.
-function files_under(directory: string): ReadonlyArray<string> {
-	if (!existsSync(directory)) return []
-
-	return readdirSync(directory, { recursive: true, withFileTypes: true })
-		.filter((entry) => entry.isFile())
-		.map((entry) => path.join(entry.parentPath, entry.name))
-}
-
-function config_input_paths(project_root: string): ReadonlyArray<string> {
-	const entries = readdirSync(project_root).filter((name) => is_config_entry(name))
-	const modules = [...CONFIG_DIRECTORIES].flatMap((name) =>
-		files_under(path.join(project_root, name)),
-	)
-
-	return [
-		...[...entries, ...DEPENDENCY_INPUTS].map((name) => path.join(project_root, name)),
-		...modules,
-		...head_reflog_paths(project_root),
-	]
-}
-
-// A dependency input a project does not have (no install yet, another package manager), a file listed and then gone before its stat (an editor's atomic save, a checkout mid-run) or a
-// dangling symlink counts as nothing newer rather than failing the lint it only decides a restart for.
-function newest_config_mtime(project_root: string): number {
-	return Math.max(
-		NOTHING_NEWER,
-		...config_input_paths(project_root).map(
-			(file) => statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? NOTHING_NEWER,
-		),
-	)
-}
-
-function daemon_started_ms(project_root: string): number | undefined {
+// Where the eslint the daemon resolves keeps its record, or nothing without an installed eslint.
+function eslint_directory(project_root: string): string | undefined {
 	try {
-		const eslint_manifest = createRequire(path.join(project_root, 'package.json')).resolve(
-			'eslint/package.json',
+		return path.dirname(
+			createRequire(path.join(project_root, 'package.json')).resolve('eslint/package.json'),
 		)
-
-		return statSync(path.join(path.dirname(eslint_manifest), DAEMON_RECORD)).mtimeMs
 	} catch {
 		return undefined
 	}
 }
 
+function read_text(file: string): string | undefined {
+	try {
+		return readFileSync(file, 'utf8')
+	} catch {
+		return undefined
+	}
+}
+
+function read_record(project_root: string): DaemonRecord {
+	const directory = eslint_directory(project_root)
+	if (directory === undefined) return { daemon: undefined, recorded: undefined }
+
+	return {
+		daemon: read_text(path.join(directory, DAEMON_RECORD)),
+		recorded: read_text(path.join(directory, FINGERPRINT_RECORD)),
+	}
+}
+
+function record_text(daemon: string, current: string): string {
+	return `${daemon}${RECORD_SEPARATOR}${current}`
+}
+
 // A daemon keeps the rule modules it imported first — eslint cache-busts only the config entry file —
-// so a config input written after it started (an edit, a `git merge`, a checkout) leaves it linting
-// against the old rules, and a HEAD move after it started leaves it typing against the old sources.
-// The edit hook restarts it on its own config edits; this catches the rest.
-function is_stale(started_ms: number | undefined, newest_input_ms: number): boolean {
-	return started_ms !== undefined && started_ms < newest_input_ms
+// so a toolchain input that moved since it started leaves it linting against the old rules, and a
+// HEAD move leaves it typing against the old sources. A daemon this module did not record — another
+// tool started it, or the record is from an older one — is stale too: nothing says what it loaded.
+// The edit hook records the daemons it starts and restarts (`remember_started`); this catches the rest.
+function is_stale(record: DaemonRecord, current: string): boolean {
+	if (record.daemon === undefined) return false
+
+	return record.recorded !== record_text(record.daemon, current)
+}
+
+// Best-effort, like the daemon's own record: one that could not be written restarts the daemon once
+// more on the next run.
+function remember(project_root: string, current: string): void {
+	const directory = eslint_directory(project_root)
+	if (directory === undefined) return
+	const daemon = read_text(path.join(directory, DAEMON_RECORD))
+	if (daemon === undefined) return
+
+	try {
+		atomic_write.replace_file(
+			path.join(directory, FINGERPRINT_RECORD),
+			record_text(daemon, current),
+		)
+	} catch {
+		// A lost record costs one restart.
+	}
+}
+
+// The edit hook starts the daemon on its first eslint fix and restarts it after a config edit, each
+// under the inputs as they are now, and a daemon's record changes with every start — so a record that
+// changed across the hook's commands names a daemon they started. Recording it keeps the next lint run
+// from stopping and cold-starting a daemon that is already current.
+function remember_started(project_root: string, before: DaemonRecord): void {
+	if (read_record(project_root).daemon === before.daemon) return
+
+	remember(project_root, fingerprint(project_root))
 }
 
 // `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
@@ -189,25 +200,36 @@ function is_start_failure(outcome: DaemonOutcome): boolean {
 	return outcome.exit_code !== 0 && outcome.stdout.length === 0
 }
 
+// The fingerprint is taken before the run, so an input that moves while the daemon starts is caught by
+// the next one.
+async function run_current(
+	cli: string,
+	eslint_arguments: ReadonlyArray<string>,
+	options: DaemonRunOptions,
+): Promise<DaemonOutcome | undefined> {
+	const { project_root } = options
+	const current = fingerprint(project_root)
+	if (is_stale(read_record(project_root), current)) await spawn_daemon(cli, [DAEMON_STOP], options)
+
+	const outcome = await spawn_daemon(cli, eslint_arguments, options)
+	if (is_start_failure(outcome)) return undefined
+	remember(project_root, current)
+
+	return outcome
+}
+
 // The run through the warm daemon, or nothing when there is no daemon to reach or it failed to
 // start — the caller then runs its own cold route, so a project without the daemon lints as before.
 async function run(
 	pnpm_arguments: ReadonlyArray<string>,
 	options: DaemonRunOptions,
 ): Promise<DaemonOutcome | undefined> {
-	const { project_root } = options
 	const eslint_arguments = eslint_arguments_of(pnpm_arguments)
 	if (eslint_arguments === undefined) return undefined
-	const cli = resolve_daemon_cli(project_root)
+	const cli = resolve_daemon_cli(options.project_root)
 	if (cli === undefined) return undefined
 
-	if (is_stale(daemon_started_ms(project_root), newest_config_mtime(project_root))) {
-		await spawn_daemon(cli, [DAEMON_STOP], options)
-	}
-
-	const outcome = await spawn_daemon(cli, eslint_arguments, options)
-
-	return is_start_failure(outcome) ? undefined : outcome
+	return await run_current(cli, eslint_arguments, options)
 }
 
 // The warm run from the current directory, read as a buffered child's result, or the cold
@@ -227,14 +249,17 @@ async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<Buffe
 
 const eslint_daemon = {
 	eslint_arguments_of,
+	fingerprint,
 	is_config_input,
 	is_stale,
-	newest_config_mtime,
+	read_record,
+	record_text,
+	remember_started,
 	resolve_daemon_cli,
 	run,
 	run_or_cold,
 	ESLINT_DAEMON,
 }
 
-export type { DaemonOutcome }
+export type { DaemonOutcome, DaemonRecord }
 export { eslint_daemon }

@@ -15,6 +15,9 @@ const HELPER = path.join('tools', 'metrics', 'helper.ts')
 const UNRELATED = path.join('scripts', 'unrelated.ts')
 const CONFIG = 'eslint.config.js'
 const CONFIG_MODULE = path.join('eslint', 'rules', 'code-quality.js')
+const TSCONFIG = 'tsconfig.json'
+const LOCKFILE = 'pnpm-lock.yaml'
+const INSTALL_RECORD = path.join('node_modules', '.modules.yaml')
 const READING: CachedReading = { stdout: '{"guards":1}', approvals: [['7.json', 'approved']] }
 const written: Array<string> = []
 
@@ -65,15 +68,19 @@ describe('metrics_base_cache.ruler_files', () => {
 	})
 })
 
-describe('metrics_base_cache.read — the eslint configuration lines are counted under', () => {
-	it.each([CONFIG, CONFIG_MODULE])('has nothing once %s changed', (changed) => {
-		const root = ruler()
-		const name = stored(commit(), root)
+// joshuafolkken/kit#4496: every toolchain input, created or edited.
+describe('metrics_base_cache.read — the toolchain the lines are counted under', () => {
+	it.each([CONFIG, CONFIG_MODULE, TSCONFIG, LOCKFILE, INSTALL_RECORD])(
+		'has nothing once %s changed',
+		(changed) => {
+			const root = ruler()
+			const name = stored(commit(), root)
 
-		file(root, changed, 'export default [{ rules: { "max-lines": "off" } }]\n')
+			file(root, changed, 'export default [{ rules: { "max-lines": "off" } }]\n')
 
-		expect(metrics_base_cache.read(name, root)).toBeUndefined()
-	})
+			expect(metrics_base_cache.read(name, root)).toBeUndefined()
+		},
+	)
 })
 
 describe('metrics_base_cache.read', () => {

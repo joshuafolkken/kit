@@ -287,6 +287,10 @@ jobs:
           # images carry different Node.js patch releases for `'24'`. Restored across two of them,
           # every entry was stale and lint ran cold (~340s against ~60s), so the resolved version
           # leads every key and restore-key: each release keeps its own lineage.
+          # joshuafolkken/kit#4496: the key is not built from `scripts/gate/toolchain-inputs.ts`, the
+          # list every local reuse reads — the cache is restored before the install, with no tsx to run
+          # it. The lockfile and eslint config hashes move it with the two inputs ESLint's own
+          # per-entry check does not cover.
           key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
