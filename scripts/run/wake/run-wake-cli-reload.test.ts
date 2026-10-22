@@ -80,7 +80,7 @@ describe('run_wake_cli.reload', () => {
 describe('run_wake_cli.reload — the successor takes the run over', () => {
 	it.each([
 		['died', 'it exited before it claimed the run'],
-		['unclaimed', 'it did not claim the run in time'],
+		['unclaimed', 'it did not claim the run in time, so it was stopped'],
 	] as const)('fails the stop when the launched successor %s', async (takeover, note) => {
 		vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: SUCCESSOR_PID })
 		vi.spyOn(run_wake_takeover, 'await_takeover').mockResolvedValue(takeover)

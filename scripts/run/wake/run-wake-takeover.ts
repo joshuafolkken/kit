@@ -2,6 +2,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_wake } from './run-wake'
+import { run_wake_stop } from './run-wake-stop'
 
 // Whether the successor a reload launched took the run over (joshuafolkken/kit#4509).
 //
@@ -20,6 +21,7 @@ type TakeoverResult = 'taken' | 'died' | 'unclaimed'
 interface TakeoverPorts {
 	holder_pid: () => number | undefined
 	is_alive: (pid: number) => boolean
+	stop: (pid: number) => void
 	sleeper?: (duration_ms: number) => Promise<void>
 }
 
@@ -27,6 +29,7 @@ function ports_of(wake_target: string): TakeoverPorts {
 	return {
 		holder_pid: () => run_wake.read_wake(wake_target)?.pid,
 		is_alive: process_identity.is_live_pid,
+		stop: run_wake_stop.signal,
 	}
 }
 
@@ -36,6 +39,9 @@ function result_of(pid: number, ports: TakeoverPorts): TakeoverResult {
 	return ports.is_alive(pid) ? 'unclaimed' : 'died'
 }
 
+// **A successor still unclaimed at the bound is stopped**, so the failed reload's warning says what is
+// true: left running, it would claim the run later and supervise one the warning and the board call
+// stranded.
 async function await_takeover(
 	pid: number,
 	ports: TakeoverPorts,
@@ -47,7 +53,11 @@ async function await_takeover(
 		...(ports.sleeper && { sleeper: ports.sleeper }),
 	})
 
-	return result_of(pid, ports)
+	const result = result_of(pid, ports)
+
+	if (result === 'unclaimed') ports.stop(pid)
+
+	return result
 }
 
 const run_wake_takeover = { await_takeover, ports_of }

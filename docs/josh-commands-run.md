@@ -186,9 +186,11 @@ record: the driver keeps the `run:merge` event stream and the `run:report` finis
 
 The supervisor reloads itself when its own import closure changes on disk: at a pass boundary it
 hands the run to a successor on the new code, notes it on the run's stream and answers `reload`.
+The driver runs with `--window 5`, so a pass boundary comes at least every five minutes while lanes
+are active.
 
 The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
-start is a `failed` stop.
+start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
 
 **Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
 

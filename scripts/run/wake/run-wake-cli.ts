@@ -82,7 +82,7 @@ const RELOAD_FAILED_NOTE =
 	"The supervisor's code changed, but the supervisor to replace it did not start"
 const TAKEOVER_NOTES: Record<Exclude<TakeoverResult, 'taken'>, string> = {
 	died: 'it exited before it claimed the run',
-	unclaimed: 'it did not claim the run in time',
+	unclaimed: 'it did not claim the run in time, so it was stopped',
 }
 const SUPERSEDED_RESULT: WakeTidyResult = 'superseded'
 const REMOVED_RESULT: WakeTidyResult = 'removed'

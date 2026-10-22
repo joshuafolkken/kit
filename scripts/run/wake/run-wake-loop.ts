@@ -56,8 +56,9 @@ interface LoopPorts {
 	is_code_stale: () => Promise<boolean>
 }
 
-// `released`: the carry record ended while the driver paused, so there is nothing to hand on and the
-// next pass decides from the record how the run ends.
+// `released`: the carry record ended while the driver paused, or the driver's window was spent, so
+// there is nothing to hand on and the next pass decides from the record whether the run ends, reloads
+// or drives on.
 type DriveResult =
 	| { kind: 'finished' }
 	| { kind: 'released' }
