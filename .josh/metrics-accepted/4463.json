@@ -1,0 +1,7 @@
+{
+	"reason": "run:board times rows by summed in-lane spans: new run-board-lane-time module and the shared lane-spans module (#4463)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 69
+	}
+}

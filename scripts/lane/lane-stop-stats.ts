@@ -1,6 +1,7 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_ledger, type LedgerEntry, type StopEntry } from './lane-ledger'
+import type { IssueAt } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
@@ -50,12 +51,6 @@ interface StopWait {
 	reason: string
 	causes: ReadonlyArray<string>
 	wait_ms: number | undefined
-}
-
-// One instant an issue's wait can end at. `issue` is absent on a stage whose writer held none.
-interface IssueAt {
-	issue: number | undefined
-	at_ms: number
 }
 
 function is_stop(entry: LedgerEntry): entry is StopEntry {
