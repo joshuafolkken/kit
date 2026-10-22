@@ -88,6 +88,36 @@ describe('removed_tests.undisposed — the #4171 deletion at the merge', () => {
 	})
 })
 
+// joshuafolkken/kit#4563: the ship body draft carries a pending row for each removed test before the
+// ship, and the row stays refused until the run fills it in.
+describe('removed_tests.with_pending_rows — the rows a draft gets before the ship', () => {
+	const HINT = `<!-- when the change removes or renames a test, ${removed_tests.ROW_FORMAT} -->`
+	const PENDING_SHARE = `- \`${SHARE}\` — 未記入`
+
+	it('adds the heading and a titled pending row to a body with no section, never at the hint', () => {
+		const body = removed_tests.with_pending_rows(`${SUMMARY}\n\n${HINT}\n`, [THRESHOLDS])
+
+		expect(body).toBe(
+			`${SUMMARY}\n\n${HINT}\n\n${removed_tests.DISPOSITION_HEADING}\n\n${PENDING_THRESHOLDS}\n`,
+		)
+		expect(removed_tests.undisposed([THRESHOLDS], body)).toStrictEqual([THRESHOLDS])
+	})
+
+	it('puts a missing row under the heading the body already has, keeping its rows', () => {
+		const filled = `- \`${CPU}\` — 廃止: #4171 the CPU figure is a bar now`
+		const body = removed_tests.with_pending_rows(body_of([filled]), [SHARE])
+
+		expect(removed_tests.undisposed([SHARE, CPU], body)).toStrictEqual([SHARE])
+		expect(body).toContain(`${removed_tests.DISPOSITION_HEADING}\n\n${PENDING_SHARE}\n\n${filled}`)
+	})
+
+	it('leaves a body alone once each title has a row, pending or filled', () => {
+		const body = body_of([PENDING_THRESHOLDS, `- \`${LANES}\` — 置き換え: run_board_bar > shades`])
+
+		expect(removed_tests.with_pending_rows(body, [THRESHOLDS, LANES])).toBe(body)
+	})
+})
+
 describe('removed_tests — what the brief and the refusal print', () => {
 	it('adds no brief section when no test was removed', () => {
 		expect(removed_tests.brief_block([])).toStrictEqual([])

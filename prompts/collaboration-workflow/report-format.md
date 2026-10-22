@@ -67,7 +67,7 @@
 
 ### PR 本文の消えたテストの処置
 
-`## 消えたテストの処置` 節の行の形（`pnpm josh review:brief` が `Removed tests` として一覧化し、`pnpm josh ship` と `pnpm josh followup` が照合する — `scripts/review/removed-tests.ts`）:
+`## 消えたテストの処置` 節の行の形（`pnpm josh review:brief` が `Removed tests` として一覧化し、`pnpm josh ship` と `pnpm josh followup` が照合する — `scripts/review/removed-tests.ts`。緑の `pnpm josh test:related` が、テスト名入りの `未記入` 行を ship 本文の下書きに足す — `scripts/run/ship/run-ship-removed-rows.ts`）:
 
 ```md
 - `<describe> > <テスト名>` — 置き換え: <いまその振る舞いを守るテスト名>
