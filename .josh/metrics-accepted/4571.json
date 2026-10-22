@@ -1,0 +1,7 @@
+{
+	"reason": "The stop release is written every time while a full pool keeps its once-per-hold release, so parks collected after a full-pool release still get their offer answer",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}

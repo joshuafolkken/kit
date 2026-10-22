@@ -52,6 +52,34 @@ describe('backlog_drive.run_pass — a merge that answers stop', () => {
 	})
 })
 
+// The guard's stop of 2026-10-22: no offer followed it, so the hold stayed open until the next
+// driver's dispatch 22 minutes later (joshuafolkken/kit#4571).
+describe('backlog_drive.run_pass — the hold a merge stop releases', () => {
+	it('releases the hold once when the collection turns the run to stopping', async () => {
+		const { ports, holds } = harness({
+			finished: [FIRST_CHILD],
+			merges: new Map([[FIRST_CHILD, STOP]]),
+		})
+		const stopping = await backlog_drive.run_pass(state([FIRST_CHILD, SECOND_CHILD]), true, ports)
+
+		await backlog_drive.run_pass(stopping.state, true, ports)
+
+		expect(holds).toStrictEqual([undefined])
+	})
+
+	it('releases nothing when the run was already stopping', async () => {
+		const { ports, holds } = harness({
+			finished: [FIRST_CHILD],
+			merges: new Map([[FIRST_CHILD, STOP]]),
+		})
+		const stopping = { ...state([FIRST_CHILD, SECOND_CHILD]), is_stopping: true }
+
+		await backlog_drive.run_pass(stopping, true, ports)
+
+		expect(holds).toStrictEqual([])
+	})
+})
+
 describe('backlog_drive.run_loop — a merge that answers stop', () => {
 	it('waits for the child still in flight, starts nothing new, then finishes', async () => {
 		const { ports, calls, states } = harness({
