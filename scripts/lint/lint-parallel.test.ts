@@ -108,37 +108,17 @@ describe('run_lint_parallel_checks', () => {
 	})
 })
 
-const RUNNER_CORES = 4
-const CI_ENVIRONMENT = { CI: 'true' }
-const CONCURRENCY_FLAG = '--concurrency'
-
-// joshuafolkken/kit#4579: CI's whole-tree eslint takes one worker per runner core; local runs share
-// the machine with other lanes and stay single-threaded.
-describe('whole_tree_eslint_args', () => {
-	it('lints on one worker per core in CI', () => {
-		const args = lint_parallel.whole_tree_eslint_args(CI_ENVIRONMENT, RUNNER_CORES)
-
-		expect(args).toEqual([...ESLINT_ARGS, CONCURRENCY_FLAG, String(RUNNER_CORES)])
-	})
-
-	it('keeps the local whole-tree lint single-threaded', () => {
-		expect(lint_parallel.whole_tree_eslint_args({}, RUNNER_CORES)).toEqual(ESLINT_ARGS)
-	})
-
-	it('checks the same files and caches in CI as locally', () => {
-		const args = lint_parallel.whole_tree_eslint_args(CI_ENVIRONMENT, RUNNER_CORES)
-
-		expect(args.slice(0, ESLINT_ARGS.length)).toEqual(ESLINT_ARGS)
-	})
-
-	it('is what the whole-tree lint hands eslint in CI', async () => {
+// joshuafolkken/kit#4581: a worker per runner core (#4579) did not shorten CI's lint over five runs,
+// so the whole-tree eslint stays single-threaded in CI as it is locally.
+describe('whole-tree eslint in CI', () => {
+	it('hands eslint the same arguments as a local run', async () => {
 		vi.stubEnv('CI', 'true')
 		mock_exit_codes(0, 0)
 
 		await run_lint_parallel_checks()
 		vi.unstubAllEnvs()
 
-		expect(mocked_execa.mock.calls[1]?.[1]).toContain(CONCURRENCY_FLAG)
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(ESLINT_ARGS)
 	})
 })
 

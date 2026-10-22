@@ -1,5 +1,3 @@
-import { availableParallelism } from 'node:os'
-import { environment_flags } from '@joshuafolkken/kit/env'
 import { project_checks } from '#scripts/gate/project-checks'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import {
@@ -28,24 +26,6 @@ const ESLINT_ARGS = ['exec', 'eslint', WHOLE_TREE, ...ESLINT_CACHE_FLAGS] as con
 // Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
 // its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CACHE_FLAGS] as const
-
-const CONCURRENCY_FLAG = '--concurrency'
-
-type Environment = Readonly<Record<string, string | undefined>>
-
-// joshuafolkken/kit#4579: in CI the whole-tree eslint sets the Static Checks job's length, and the
-// runner has nothing else to share its cores with once the shorter checks beside it finish — so
-// eslint lints on one worker per core there. Locally it stays single-threaded: lanes share the
-// machine, and the gate divides it by admitting checks, not by threads (`gate-plan.ts`). The flag
-// changes how files are scheduled, never which files or rules are checked.
-function whole_tree_eslint_args(
-	environment: Environment = process.env,
-	cores: number = availableParallelism(),
-): ReadonlyArray<string> {
-	if (!environment_flags.is_ci_enabled(environment['CI'])) return ESLINT_ARGS
-
-	return [...ESLINT_ARGS, CONCURRENCY_FLAG, String(cores)]
-}
 
 // What one eslint run is made of: the child's arguments and the cache file they name.
 interface EslintRun {
@@ -157,7 +137,7 @@ async function run_lint_checks(
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, whole_tree_eslint_args(), ESLINT_CACHE_FILE)
+	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE)
 }
 
 // `josh lint --changed`, the gate's lint: the branch's changed files on the gate's own caches, or the
@@ -189,7 +169,6 @@ const lint_parallel = {
 	run_lint_checks,
 	run_lint_command,
 	run_lint_parallel_checks,
-	whole_tree_eslint_args,
 }
 
 export { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS }
