@@ -184,6 +184,14 @@ driver advances (`prompts/collaboration-workflow/upstream-interrupt.md` →
 repository, named by `--list` and by every warning. Progress is relayed from the existing report
 record: the driver keeps the `run:merge` event stream and the `run:report` finish path.
 
+The supervisor reloads itself when its own import closure changes on disk: at a pass boundary it
+hands the run to a successor on the new code, notes it on the run's stream and answers `reload`.
+The driver runs with `--window 5`, so a pass boundary comes at least every five minutes while lanes
+are active.
+
+The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
+start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
+
 **Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
 
 | Provider  | scheduler                    | worker                       | reviewer                   |
@@ -201,7 +209,7 @@ outdated or unauthenticated CLI refuses without fallback, promotion or worker re
 `run:wake --list`, `lane:list`, the review brief and each launch log expose the resolved provider,
 role, model and effort; the worker's launch is `josh lane:dispatch`.
 
-**Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `unreadable` and `failed` each warn.
+**Output / exit codes:** stdout is one token; stderr explains. `started`, `running`, `supervising`, `stale`, `stopped`, `ended`, `reload`, `unreadable` exit 0; `none` exits 0 for `--list` / `--stop` and 1 for `--start`; `failed`, `unknown` exit 1. `unreadable` and `failed` each warn.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:wake` in detail".
 

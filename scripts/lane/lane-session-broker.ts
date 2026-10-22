@@ -41,8 +41,9 @@ const REQUEST_LIMIT_MINUTES: Readonly<Record<BrokerAction['kind'], number>> = {
 const request_schema = z
 	.object({ session: z.uuid(), nonce: z.uuid(), action: lane_session_action.action_schema })
 	.strict()
-// **A request this broker cannot read is still answered**: the supervisor keeps the code it started
-// with while a lane's ship runs a newer main, so a field the ship added made the request unreadable and
+// **A request this broker cannot read is still answered**: the supervisor reloads on new code only at
+// its next pass boundary (`run-wake-code.ts`), so until then a lane's ship can run a newer main than
+// the broker's, and a field the ship added made the request unreadable and
 // the ship waited out the whole limit on a server that had dropped it (joshuafolkken/kit#4230).
 // **The reason names the fields the schema refused**: a guess at the supervisor's age hid a field the
 // broker's schema had never learned even on one main (joshuafolkken/kit#4489).
@@ -113,13 +114,31 @@ async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise
 		: unreadable(parsed.error)
 }
 
+// The requests this process's servers are answering now — what the supervisor's reload waits out
+// (`run-wake-cli.ts`), since closing a server mid-review fails that review.
+const answering = { count: 0 }
+
+function is_answering(): boolean {
+	return answering.count > 0
+}
+
+async function answer_counted(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
+	answering.count += 1
+
+	try {
+		return await answer_request(lane, received)
+	} finally {
+		answering.count -= 1
+	}
+}
+
 async function process_request(
 	lane: LaneInfo,
 	response: string,
 	received: BrokerEnvelope,
 	state: { current: BrokerResponse },
 ): Promise<void> {
-	const answer = await answer_request(lane, received)
+	const answer = await answer_counted(lane, received)
 	const { session, nonce } = received
 
 	if (!answer.is_success) write_record(reason_path(response), { nonce, reason: answer.reason })
@@ -353,6 +372,7 @@ async function request(
 }
 
 const lane_session_broker = {
+	is_answering,
 	is_serving,
 	request,
 	request_path,

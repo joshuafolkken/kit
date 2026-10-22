@@ -77,6 +77,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 		},
 		now: () => new Date(clock.now),
 		retry_closes: async () => undefined,
+		is_code_stale: async () => false,
 	}
 
 	return { ports, wakes, wake_times, sleeps, work_asks }

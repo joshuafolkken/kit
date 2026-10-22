@@ -98,6 +98,7 @@ function wake_ports(world: World): LoopPorts {
 		sleep: async () => undefined,
 		now: () => NOW,
 		retry_closes: async () => undefined,
+		is_code_stale: async () => false,
 	}
 }
 

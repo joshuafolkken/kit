@@ -893,7 +893,7 @@ The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent
   - Lanes still running are **not** stopped; their count and Issue numbers are printed, and each child finishes or is closed with `pnpm josh lane:close <N>`. To halt them without discarding anything, `pnpm josh lane:pause --all`.
   - A run typed into a session of your own is owned by it, and `--stop` does not signal it: the owner's pid is printed, the record is kept and the exit code is 1. End it from that session.
   - No Telegram is sent.
-- `--restart` stops what `--stop` stops but keeps the record, so a new supervisor continues the run.
+- `--restart` stops what `--stop` stops but keeps the record, so a new supervisor continues the run. New supervisor code on main reloads between passes ([`run:wake`](./josh-commands-run.md#josh-runwake)).
 
 **Output / exit codes:** prints the started pid, session and log path, then the board's exit code; bad arguments or an agent that cannot start exit 1. `--stop` prints what it stopped and exits 0; a `--restart` it cannot make exits 1.
 

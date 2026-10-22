@@ -6,8 +6,8 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_wake_cli } from './run-wake-cli'
 import type { WakeContext } from './run-wake-describe'
+import { run_wake_ports } from './run-wake-ports'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#3738: the supervisor says on the run's stream that the judgment session it woke is
@@ -37,7 +37,7 @@ function context(): WakeContext {
 function wake(invocation: string, result: LaunchResult): LaunchResult {
 	vi.spyOn(run_wake_session, 'launch').mockReturnValue(result)
 
-	return run_wake_cli.ports_for(context(), PROFILE).wake(invocation, SID, MATERIAL)
+	return run_wake_ports.ports_for(context(), PROFILE).wake(invocation, SID, MATERIAL)
 }
 
 function stages(): Array<string> {
@@ -51,7 +51,7 @@ function stages(): Array<string> {
 // here rather than spawned.
 beforeEach(() => {
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-cli-stage-'))
+	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-ports-'))
 })
 
 afterEach(() => {
@@ -80,5 +80,18 @@ describe('the supervisor waking a judgment session', () => {
 		expect(result.kind).toBe('failed')
 		expect(run_wake_session.launch).not.toHaveBeenCalled()
 		expect(stages()).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4509: only the supervisor's own `--loop` watches its code.
+describe('run_wake_ports.ports_for — code staleness', () => {
+	it('never reads the code as stale when no watch is given', async () => {
+		expect(await run_wake_ports.ports_for(context(), PROFILE).is_code_stale()).toBe(false)
+	})
+
+	it('answers with the watch it is given', async () => {
+		const ports = run_wake_ports.ports_for(context(), PROFILE, async () => true)
+
+		expect(await ports.is_code_stale()).toBe(true)
 	})
 })
