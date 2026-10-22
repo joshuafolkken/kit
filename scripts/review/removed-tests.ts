@@ -122,6 +122,7 @@ const removed_tests = {
 	DISPOSITION_HEADING,
 	refusal_message,
 	removed,
+	ROW_FORMAT,
 	undisposed,
 }
 

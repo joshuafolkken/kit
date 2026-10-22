@@ -197,6 +197,7 @@ const acceptance_map = {
 	criterion_id,
 	has_map,
 	refusal_message,
+	ROW_FORMAT,
 	rows_of,
 	skeleton,
 }

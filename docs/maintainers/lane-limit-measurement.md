@@ -189,6 +189,8 @@ once under each when it found two:
 - `issue`, `branch`, `classification`, `live-evidence`, `acceptance-map`, `lock`
 - `scoped` — the scoped pair went red
 - `unreadable` — a precondition could not be read
+- `pre-detach` — not a precondition: a lane child's fast checks went red beside the refusal
+  (`run-ship-cli.ts`), so a preflight stop's causes can outnumber its unmet preconditions
 
 A preflight stop recorded before the preconditions were kept reads under its cause.
 

@@ -96,6 +96,8 @@ const REPOSITORY = '/repo/.git'
 const STOPPED_REPORT = '=== gate ===\nred'
 const DRAFT = '/repo/.git/worktrees/2428/josh-ship-body-2428.md'
 const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
+const LIVE_EVIDENCE = 'live-evidence'
+const TYPE_ERROR = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
 
 const info_lines: Array<string> = []
 
@@ -218,14 +220,12 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 // joshuafolkken/kit#4305: a lane shipped seven times to see one failure at a time.
 describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
 	it('reports the preflight refusal and the pre-detach failures together', async () => {
-		const type_error = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
-
 		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
-		pre_detach_mock.mockResolvedValue({ code: FAILED, out: type_error })
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: TYPE_ERROR })
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
 		expect(info_lines.join('\n')).toContain(PREFLIGHT_REFUSAL)
-		expect(info_lines.join('\n')).toContain(type_error)
+		expect(info_lines.join('\n')).toContain(TYPE_ERROR)
 	})
 
 	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
@@ -239,6 +239,35 @@ describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
 		expect(record.mock.calls).toStrictEqual([
 			[{ issue: Number(NUMBER), reason: 'preflight', cause: 'check' }],
 		])
+	})
+})
+
+// joshuafolkken/kit#4478: a lane read the report through `tail`, saw only the type error, and shipped
+// into the same refusal again.
+describe('run_ship_cli.run — the preflight refusal beside red pre-detach checks', () => {
+	beforeEach(() => {
+		preflight_mock.mockResolvedValue({
+			code: FAILED,
+			out: PREFLIGHT_REFUSAL,
+			preconditions: [LIVE_EVIDENCE],
+		})
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: TYPE_ERROR })
+	})
+
+	it('prints the refusal after the pre-detach failures', async () => {
+		await run_ship_cli.run([TITLE, '--detach'])
+		const report = info_lines.join('\n')
+
+		expect(report.indexOf(PREFLIGHT_REFUSAL)).toBeGreaterThan(report.indexOf(TYPE_ERROR))
+		expect(report.endsWith('stopped at: === preflight ===')).toBe(true)
+	})
+
+	it('records the red pre-detach checks beside the unmet preconditions', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+
+		await run_ship_cli.run([TITLE, '--detach'])
+
+		expect(record.mock.calls[0]?.[0].preconditions).toStrictEqual([LIVE_EVIDENCE, 'pre-detach'])
 	})
 })
 

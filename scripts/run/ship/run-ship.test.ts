@@ -59,6 +59,12 @@ describe('run_ship.failed_section — the step that stopped the ship', () => {
 		expect(failed?.header).toBe('b')
 	})
 
+	it('returns the last of two failed sections, the one printed last', () => {
+		const failed = run_ship.failed_section([section('a', '', FAILED), section('b', '', FAILED)])
+
+		expect(failed?.header).toBe('b')
+	})
+
 	it('returns undefined when every executed step was green', () => {
 		expect(run_ship.failed_section([section('a', '', OK)])).toBeUndefined()
 	})

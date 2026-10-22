@@ -382,6 +382,13 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
+// The preflight stop's unmet kinds, with `pre-detach` added when those checks went red beside it.
+function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
+	if (checks.code === SUCCESS_EXIT_CODE) return stop
+
+	return { ...stop, preconditions: [...(stop.preconditions ?? []), lane_ledger.PRE_DETACH_STAGE] }
+}
+
 // The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
 // hand-off — a stop it finds is fixed by the same session instead of relaunching one from the
 // supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The fast
@@ -389,16 +396,21 @@ function should_detach(args: ShipArguments): boolean {
 // supervisor's gate runs them again rather than passing over them. They run even when the preflight
 // refused, so one ship reports every failure there is to fix (joshuafolkken/kit#4305); the preflight's
 // refusal still comes before its own scoped pair, the one heavy check here.
+//
+// **The refusal is printed last**: a lane child reading the report through `tail` saw only the red
+// metrics or type check after it, fixed those, and shipped into the same refusal again — every repeated
+// preflight stop of joshuafolkken/kit#4478. The stop records the pre-detach checks' red beside the
+// unmet kinds, so the ledger shows which refusals came with one.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
+	const result = await run_ship_pre_detach_timed.checks(args.number)
+	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
 	if (preflight.code !== SUCCESS_EXIT_CODE) {
-		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, preflight)
+		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, with_checks(preflight, checks))
 	}
 
-	const result = await run_ship_pre_detach_timed.checks(args.number)
-
-	return [preflight, { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }]
+	return [checks, preflight]
 }
 
 async function detach_after_preflight(args: ShipArguments): Promise<number> {
