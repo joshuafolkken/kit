@@ -73,6 +73,11 @@ function condition_of(body = ''): Condition | undefined {
 	return { pr: Number(groups['pr']), count: Number(groups['count']) }
 }
 
+// The number the declared condition cites, or `undefined` when there is none or it does not parse.
+function cited_number(body: string): number | undefined {
+	return condition_of(body)?.pr
+}
+
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
 
@@ -173,7 +178,15 @@ function reset(): void {
 	ledger.path = undefined
 }
 
-const issue_sample_gate = { DECLARATION, prime, problems, reason_of, reset, wait_of }
+const issue_sample_gate = {
+	DECLARATION,
+	cited_number,
+	prime,
+	problems,
+	reason_of,
+	reset,
+	wait_of,
+}
 
 export type { PrimePorts, SampleWait }
 export { issue_sample_gate }
