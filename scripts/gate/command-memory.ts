@@ -16,7 +16,8 @@ import { core_weights } from './core-weights'
 // **Every spelling is read down to the program.** `git_argv.program_of` skips the wrapper words, a
 // quoted script handed to a shell is read as its own line (`bash_triggers.shell_script_of`), and the
 // command after `pnpm josh reserved-run <weight> --` is read as the call it wraps, marked reserved. A
-// heredoc body is text, not commands, so it is dropped before the line is cut.
+// heredoc body is text, so it is dropped before the line is cut — unless a shell reads it
+// (`bash <<'EOF'`), when it is read as a line of its own, the `sh -c` escape spelled another way.
 //
 // **The estimate is the largest tool's, not the sum**: the commands of one line run one after another,
 // so only one of them is resident at a time. A line with no known tool is `undefined`, the 0 MB it
@@ -39,6 +40,10 @@ const COMMAND_SEPARATOR = '--'
 const ESLINT = 'eslint'
 const VITEST = 'vitest'
 const AUTO_WORKERS = 'auto'
+const LINE_BREAK = '\n'
+// A heredoc fed to a shell — `bash <<'EOF'`, `sh -s <<EOF` — whose body the shell runs.
+const SHELL_HEREDOC = /\b(?:ba|z|da|k)?sh(?:\s+-\w+)*\s*<<-?\s*(['"]?)(\w+)\1/u
+const HEREDOC_DELIMITER_GROUP = 2
 // ESLint 10's `auto` caps its workers at half the available cores (`eslint/lib/eslint/eslint.js`).
 const AUTO_CORE_SHARE = 2
 const SINGLE_WORKER = 1
@@ -72,6 +77,25 @@ function reading_of(segment: string, is_reserved: boolean): ToolCall | PendingLi
 	return call === undefined ? undefined : { ...call, is_reserved }
 }
 
+// The lines up to the delimiter alone on its line, or to the end when it never closes.
+function body_until(lines: ReadonlyArray<string>, delimiter: string): string {
+	const end = lines.findIndex((body_line) => body_line.trim() === delimiter)
+
+	return (end === -1 ? lines : lines.slice(0, end)).join(LINE_BREAK)
+}
+
+// The body of every heredoc the line feeds to a shell, each as a line of its own: `bash <<'EOF'` runs
+// its body, where `cat <<EOF` only prints it.
+function shell_heredoc_bodies(line: string): Array<string> {
+	const lines = line.split(LINE_BREAK)
+
+	return lines.flatMap((opening, index) => {
+		const delimiter = SHELL_HEREDOC.exec(opening)?.[HEREDOC_DELIMITER_GROUP]
+
+		return delimiter === undefined ? [] : body_until(lines.slice(index + 1), delimiter)
+	})
+}
+
 function is_tool_call(reading: ToolCall | PendingLine): reading is ToolCall {
 	return 'name' in reading
 }
@@ -92,8 +116,10 @@ function tool_calls_of(line: string): Array<ToolCall> {
 			.quote_aware_commands_of(time_shell.without_heredoc_bodies(next.line))
 			.flatMap((segment) => reading_of(segment, is_reserved) ?? [])
 
+		const bodies = shell_heredoc_bodies(next.line).map((body) => ({ line: body, is_reserved }))
+
 		calls.push(...readings.filter((reading) => is_tool_call(reading)))
-		pending.push(...readings.filter((reading) => is_pending_line(reading)))
+		pending.push(...readings.filter((reading) => is_pending_line(reading)), ...bodies)
 	}
 
 	return calls

@@ -85,6 +85,16 @@ describe('reserved_run.reservation_options', () => {
 		expect(options_of(argv).memory_mb).toBe(EXPLICIT_MB)
 	})
 
+	// The argv is re-read as a shell line, so a separator inside one argument must not cut it.
+	it('keeps a separator inside one argument from reading as a command', () => {
+		const argv = ['1', '--', 'git', 'commit', '-m', 'a; eslint .']
+
+		expect(options_of(argv)).toEqual({
+			command: "git commit -m 'a; eslint .'",
+			memory_mb: undefined,
+		})
+	})
+
 	// A `josh` command reserves its own place; reading it here would count it twice.
 	it('leaves a command the table does not know at no memory', () => {
 		expect(options_of([String(AUDIT_WEIGHT), '--', 'pnpm', 'josh', 'audit'])).toEqual({

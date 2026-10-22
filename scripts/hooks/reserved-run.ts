@@ -41,6 +41,10 @@ const MEMORY_FLAG = '--memory'
 const MEMORY_OPTION_LENGTH = 2
 // An explicit `--memory` claims at least one MB; zero is the absence the estimate already stands for.
 const MIN_MEMORY_MB = 1
+// An argument that is one shell word with no quoting.
+const PLAIN_WORD = /^[\w./=:@%+,-]+$/u
+// A single quote inside a single-quoted word: close, escaped quote, reopen.
+const ESCAPED_QUOTE = String.raw`'\''`
 
 interface ReservedCommand {
 	weight: number
@@ -81,6 +85,15 @@ function parse_arguments(argv: ReadonlyArray<string>): ReservedCommand | undefin
 	return memory !== undefined && command.length > 0 ? { weight, ...memory, command } : undefined
 }
 
+// An argument as one shell word: a plain one as written, anything else single-quoted. **The estimate
+// re-reads the command as a shell line**, so `git commit -m "a; eslint ."` joined bare would be cut at
+// the `;` and reserved as an eslint run.
+function shell_word(argument: string): string {
+	if (PLAIN_WORD.test(argument)) return argument
+
+	return `'${argument.split("'").join(ESCAPED_QUOTE)}'`
+}
+
 // What the claim carries to the ledger: the command named on the waiting line, and the memory it
 // holds — the explicit `--memory`, else the estimate read off the command (`command-memory.ts`), else
 // none, the 0 MB a command the table does not know counted before.
@@ -88,7 +101,7 @@ function reservation_options(parsed: ReservedCommand): {
 	command: string
 	memory_mb: number | undefined
 } {
-	const command = parsed.command.join(' ')
+	const command = parsed.command.map((argument) => shell_word(argument)).join(' ')
 
 	return { command, memory_mb: parsed.memory_mb ?? command_memory.estimated_memory_mb(command) }
 }

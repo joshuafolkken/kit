@@ -1,8 +1,8 @@
 {
-	"reason": "Round-2 review fix: shell_script_of anchored to the segment's program and heredoc bodies dropped before the cut (+7 lines)",
+	"reason": "Round-2 review fixes: read a heredoc fed to a shell as commands, and shell-quote reserved-run argv before re-reading it",
 	"date": "2026-10-22",
 	"growth": {
-		"scripts.code_lines": 145,
+		"scripts.code_lines": 166,
 		"ai_cost.on_demand_bytes": 115
 	}
 }

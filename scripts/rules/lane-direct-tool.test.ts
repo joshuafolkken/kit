@@ -121,6 +121,11 @@ describe('is_lane_direct_tool — multi-worker eslint and shell scripts', () => 
 		['a multi-worker eslint in `sh -c`', `sh -c 'cd x && ${ESLINT_FOUR}'`],
 		['a direct tool in `sh -c`', `sh -c '${PNPM_EXEC_ESLINT}'`],
 		['a direct tool in `bash -c`', 'bash -c "npx vitest run"'],
+		['a multi-worker eslint in a `bash` heredoc', `bash <<'EOF'\n${ESLINT_FOUR}\nEOF`],
+		[
+			'a reserved multi-worker eslint in an `sh` heredoc',
+			`pnpm josh reserved-run 4 -- sh <<EOF\n${ESLINT_FOUR}\nEOF`,
+		],
 	])('fires on %s in a lane child', (_name, command) => {
 		expect(lane_direct_tool.is_lane_direct_tool(command, true)).toBe(true)
 	})
@@ -131,6 +136,8 @@ describe('is_lane_direct_tool — multi-worker eslint and shell scripts', () => 
 		['no `--concurrency`', RESERVED_ESLINT],
 		['a reserved single-worker eslint in `sh -c`', `pnpm josh reserved-run 2 -- sh -c 'eslint .'`],
 		['the related lint', LINT_RELATED],
+		// A heredoc no shell reads is text: `cat` prints it.
+		['a heavy tool in a `cat` heredoc', `cat <<'EOF' > notes.md\n${ESLINT_FOUR}\nEOF`],
 	])('says nothing about %s in a lane child', (_name, command) => {
 		expect(lane_direct_tool.is_lane_direct_tool(command, true)).toBe(false)
 	})

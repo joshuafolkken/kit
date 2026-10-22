@@ -63,6 +63,7 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'agent-model': [],
 	'lane-carry-conflict': [HEREDOC],
 	'lane-switch-main': [SUBSHELL, HEREDOC],
+	// The corpus heredoc is `cat`'s, which runs nothing; a shell's heredoc is pinned in its own test.
 	'lane-direct-tool': [],
 	'implementation-cut': [],
 }
