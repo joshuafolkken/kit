@@ -2,8 +2,11 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_next_shared } from './backlog-next-shared'
+import { backlog_offer_cli } from './backlog-offer-cli'
+import { backlog_ready } from './backlog-ready'
 
 // joshuafolkken/kit#4550: the drive's assignment and the arrival probe each asked `backlog:next` every
 // minute, and each read the whole pool from GitHub for the same answer.
@@ -82,9 +85,11 @@ describe('backlog_next_shared.read on an answer it does not keep', () => {
 describe('backlog_next_shared.read across a backlogrun', () => {
 	// joshuafolkken/kit#4483: with a free slot the usual state, the drive's offer and the arrival probe
 	// both asked within the same minute.
+	// Each side builds its own argv, so the test fails if the two ever stop agreeing on the key.
 	it('runs backlog:next once for the drive and the arrival probe in one minute', async () => {
-		const drive = await backlog_next_shared.read(ARGV, true)
-		const probe = await backlog_next_shared.read(ARGV, false, MINUTE_MS)
+		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(undefined)
+		const drive = await backlog_next_shared.read(backlog_offer_cli.next_argv({}), true)
+		const probe = await backlog_ready.read_backlog_next(MINUTE_MS)
 
 		expect(probe).toEqual(drive)
 		expect(josh_command.josh_run).toHaveBeenCalledOnce()

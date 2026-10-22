@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { shared_cache, type CacheSlot } from './shared-cache'
 import { shared_cache_fixture } from './shared-cache-fixture'
+import { stamp_file } from './stamp-file'
 
 const SLOT: CacheSlot = { prefix: 'josh-shared-cache-test-', ttl_ms: 60_000 }
 const NOW_MS = Date.parse('2026-10-22T12:00:00Z')
@@ -60,10 +62,13 @@ describe('shared_cache.remember', () => {
 		expect(shared_cache.read(SLOT, KEY, value_schema, NOW_MS)).toBeUndefined()
 	})
 
+	// The record sits at the repository's common root, never the work tree's own `PROJECT_ROOT`.
 	it('shares the record between two work trees of one repository', async () => {
-		vi.mocked(git_common_directory.repository).mockReturnValue('/shared-cache-test/common')
+		const common = `/shared-cache-test/${randomUUID()}`
+
+		vi.mocked(git_common_directory.repository).mockReturnValue(common)
 		await remember_count(NOW_MS)
 
-		expect(shared_cache.read(SLOT, KEY, value_schema, NOW_MS)).toEqual(VALUE)
+		expect(stamp_file.read_stamp_text(stamp_file.stamp_path(SLOT.prefix, common))).toContain(KEY)
 	})
 })
