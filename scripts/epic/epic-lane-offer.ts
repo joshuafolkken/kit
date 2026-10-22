@@ -40,11 +40,13 @@ interface RepoPool {
 
 // What is being asked of one repository. `is_all_lanes` is the caller's appetite rather than the
 // repository's capacity: `epic:next --repo` prints a single token unless `--lanes` was passed, so a
-// caller written against the one-child contract keeps getting exactly one child.
+// caller written against the one-child contract keeps getting exactly one child. `is_this_checkout`
+// says whether `repo` is the repository this command runs in, whose ship records are the ones read.
 interface LaneRequest {
 	repo: string
 	limit: number
 	is_all_lanes: boolean
+	is_this_checkout: boolean
 }
 
 // The answer for one repository: the children to start, the verdict standing in their place when
@@ -72,9 +74,10 @@ function free_lanes(read: BusyRead, limit: number, merge_waiting: number): numbe
 // **A holder whose detached ship waits on its merge holds no lane** — the count `backlog:drive` makes
 // for the pool (`backlog-occupied.ts`), so a named epic's lanes are offered the place too
 // (joshuafolkken/kit#4466). It keeps `in-progress` until the merge. The ship records read are this
-// checkout's, which is the repository `backlog-drive-epic.ts` asks about.
-async function merge_waiting_holders(read: BusyRead): Promise<number> {
-	if (read.kind !== 'busy') return NO_LANES
+// checkout's, so a `--repo` naming another repository is discounted nothing: its holder numbers
+// would be matched against this repository's unrelated ships.
+async function merge_waiting_holders(read: BusyRead, request: LaneRequest): Promise<number> {
+	if (read.kind !== 'busy' || !request.is_this_checkout) return NO_LANES
 
 	return await lane_snapshot_trace.count_merge_waiting(
 		read.issues.map((issue) => String(issue.number)),
@@ -262,7 +265,7 @@ async function offer_for_repo(
 
 	if (notice !== undefined) console.error(notice)
 
-	const free = free_lanes(read, request.limit, await merge_waiting_holders(read))
+	const free = free_lanes(read, request.limit, await merge_waiting_holders(read, request))
 	const ages = await holder_ages(read, request.repo)
 
 	if (free === NO_LANES) {
@@ -278,9 +281,22 @@ async function offer_for_repo(
 	return solo_offer(await collect(for_repo, wanted_of(request, free)), read, request, ages)
 }
 
+// A `--repo` compared against the repository this command runs in, case-insensitively as GitHub
+// names it.
+function lane_request(
+	asked: Pick<LaneRequest, 'repo' | 'is_all_lanes'>,
+	limit: number,
+	current_repo: string,
+): LaneRequest {
+	const is_this_checkout = asked.repo.toLowerCase() === current_repo.toLowerCase()
+
+	return { ...asked, limit, is_this_checkout }
+}
+
 const epic_lane_offer = {
 	combine_verdicts,
 	dedupe_pools,
+	lane_request,
 	offer_for_repo,
 }
 

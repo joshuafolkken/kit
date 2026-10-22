@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild } from './epic-graph'
 import { epic_label_age } from './epic-label-age'
+import { epic_lane_offer } from './epic-lane-offer'
 import { epic_next } from './epic-next'
 import type { EpicView } from './epic-next-views'
 import { epic_view_fixture } from './epic-view-fixture'
@@ -105,7 +106,9 @@ async function answer_for(
 	limit: number = ONE_LANE,
 	is_all_lanes = false,
 ): Promise<number> {
-	return await epic_next.report(views_of(children), { repo: REPO, limit, is_all_lanes }, REPO)
+	const request = epic_lane_offer.lane_request({ repo: REPO, is_all_lanes }, limit, REPO)
+
+	return await epic_next.report(views_of(children), request, REPO)
 }
 
 function listing(numbers: ReadonlyArray<number>): string {

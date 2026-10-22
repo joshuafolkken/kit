@@ -4,6 +4,7 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
+import { epic_lane_offer } from './epic-lane-offer'
 import { epic_next } from './epic-next'
 import { epic_view_fixture } from './epic-view-fixture'
 
@@ -78,7 +79,9 @@ function stdout(): string {
 async function answer_for(children: ReadonlyArray<EpicChild>): Promise<number> {
 	const views = epic_view_fixture.single_view(snapshot(children), EPIC_NUMBER)
 
-	return await epic_next.report(views, { repo: REPO, limit: ONE_LANE, is_all_lanes: false }, REPO)
+	const request = epic_lane_offer.lane_request({ repo: REPO, is_all_lanes: false }, ONE_LANE, REPO)
+
+	return await epic_next.report(views, request, REPO)
 }
 
 beforeEach(() => {

@@ -39,7 +39,7 @@ function pool(children: ReadonlyArray<EpicChild>): RepoPool {
 }
 
 function request(is_all_lanes = true): LaneRequest {
-	return { repo: REPO, limit: TWO_LANES, is_all_lanes }
+	return { repo: REPO, limit: TWO_LANES, is_all_lanes, is_this_checkout: true }
 }
 
 beforeEach(() => {

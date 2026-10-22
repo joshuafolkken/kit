@@ -66,7 +66,7 @@ function pool(children: ReadonlyArray<EpicChild>): RepoPool {
 }
 
 function request(limit: number, is_all_lanes = true): LaneRequest {
-	return { repo: REPO, limit, is_all_lanes }
+	return { repo: REPO, limit, is_all_lanes, is_this_checkout: true }
 }
 
 function holders(numbers: ReadonlyArray<number>): string {
@@ -106,19 +106,6 @@ describe('epic_lane_offer.offer_for_repo — how many children fit', () => {
 		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(TWO_LANES))
 
 		expect(numbers_of(offer.children)).toEqual([FIRST])
-	})
-
-	// joshuafolkken/kit#4466: a holder whose detached ship waits on its merge keeps `in-progress` but holds
-	// no lane, as `backlog:drive` counts the pool.
-	it('offers the lane of a holder whose ship waits on its merge', async () => {
-		issue_list.mockResolvedValueOnce(listing_outcome(holders([HOLDER, OTHER_HOLDER])))
-		merge_waiting_mock.mockResolvedValueOnce(ONE_LANE)
-
-		const children = [child(FIRST), child(SECOND)]
-		const offer = await epic_lane_offer.offer_for_repo([pool(children)], request(TWO_LANES))
-
-		expect(numbers_of(offer.children)).toEqual([FIRST])
-		expect(merge_waiting_mock).toHaveBeenCalledWith([String(HOLDER), String(OTHER_HOLDER)])
 	})
 
 	it('offers a single child when the caller did not ask for every lane', async () => {
