@@ -20,6 +20,8 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const should_forward_stderr = true
 const ATTEST_CHECK = ['review:attest', '--check']
+const KEPT_REVIEW_NOTE =
+	'the reviewer wrote its findings before it failed — its review is kept; attest and record judge it.'
 type Round = '1' | '2'
 
 const ROUND_ONE: Round = '1'
@@ -64,6 +66,24 @@ function exited_note(log_path: string): string {
 	return `${api_auth.AUTH_FAILURE_NOTE}: ${exited}`
 }
 
+function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
+	return run_ship_review.read_verdict(stamp_file.read_stamp_text(paths().findings))
+}
+
+// **A session that ran and then failed keeps the review it wrote** (joshuafolkken/kit#4562). The
+// findings file is removed before the launch and written as the reviewer's last step, so a readable one
+// is this session's finished review — a late auth failure or a lost broker reply then costs nothing,
+// where a relaunch would review the whole change again. The attest and record phases still judge it.
+function ended_session(failed_note: string): JoshResult {
+	if (current_verdict().kind === run_ship_review.VERDICT.INVALID) {
+		return failure(failed_note, CAUSE.INFRA)
+	}
+
+	note(`${failed_note}\n${KEPT_REVIEW_NOTE}`)
+
+	return { code: SUCCESS_EXIT_CODE, out: '' }
+}
+
 // Under the round's reviewer profile — the same model and effort (`JOSH_REVIEWER_*` included) the
 // chain's subagent is given — and waited on, so the join below runs only once the review has finished.
 // Each call is its own process, so round 2 is a fresh session by construction.
@@ -82,7 +102,7 @@ async function run_direct_session(
 		return failure(`reviewer could not start: ${result.note}`, CAUSE.INFRA)
 	}
 
-	if (result.exit_code !== SUCCESS_EXIT_CODE) return failure(exited_note(log_path), CAUSE.INFRA)
+	if (result.exit_code !== SUCCESS_EXIT_CODE) return ended_session(exited_note(log_path))
 
 	return { code: SUCCESS_EXIT_CODE, out: '' }
 }
@@ -117,7 +137,7 @@ async function run_session(
 
 	return answer.is_success
 		? { code: SUCCESS_EXIT_CODE, out: '' }
-		: failure(`isolated reviewer failed: ${answer.reason}`, CAUSE.INFRA)
+		: ended_session(`isolated reviewer failed: ${answer.reason}`)
 }
 
 // The brief goes to a file and the previous round's findings are removed, so a reviewer that writes
@@ -139,10 +159,6 @@ async function launch_reviewer(
 		issue,
 		round,
 	)
-}
-
-function current_verdict(): ReturnType<typeof run_ship_review.read_verdict> {
-	return run_ship_review.read_verdict(stamp_file.read_stamp_text(paths().findings))
 }
 
 // A refused attestation — the issue changed after the brief, an update left unread, no attestation —

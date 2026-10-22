@@ -1,0 +1,7 @@
+{
+	"reason": "ended_session keeps a review the reviewer wrote before its session failed, so an infra stop no longer discards a finished review (#4562)",
+	"date": "2026-10-22",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}
