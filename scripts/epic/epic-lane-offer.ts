@@ -68,7 +68,11 @@ function is_held(read: BusyRead): boolean {
 function free_lanes(read: BusyRead, limit: number, merge_waiting: number): number {
 	if (is_held(read)) return NO_LANES
 
-	return lane_capacity.free_lanes(limit, epic_busy.occupied_lanes(read) - merge_waiting)
+	const holders = epic_busy.occupied_lanes(read)
+
+	// A merge-waiting holder frees its place under the limit but keeps its port seat
+	// (`lane_capacity.free_lanes`).
+	return lane_capacity.free_lanes(limit, holders - merge_waiting, holders)
 }
 
 // **A holder whose detached ship waits on its merge holds no lane** — the count `backlog:drive` makes

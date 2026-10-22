@@ -1,8 +1,8 @@
 {
-	"reason": "Round-2 fix: LaneRequest carries is_this_checkout, built by lane_request, so a --repo naming another repository is discounted no merge-waiting holder",
+	"reason": "Round-3 fix: free_lanes passes the holder count as the seated count, so a merge-waiting holder frees its limit place but keeps its port seat and lane:open is not offered past the last seat",
 	"date": "2026-10-22",
 	"growth": {
-		"scripts.code_lines": 137,
+		"scripts.code_lines": 138,
 		"ai_cost.on_demand_bytes": 346
 	}
 }

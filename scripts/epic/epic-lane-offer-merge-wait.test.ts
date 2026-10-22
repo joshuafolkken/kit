@@ -2,6 +2,7 @@ import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixtu
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { IN_PROGRESS_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
+import { lane_seed_policy } from '#scripts/lane/lane-seed'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_classify } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -92,6 +93,27 @@ describe('epic_lane_offer.offer_for_repo — a holder waiting on its merge', () 
 
 		expect(numbers_of(offer.children)).toEqual([FIRST])
 		expect(merge_waiting_mock).not.toHaveBeenCalled()
+	})
+
+	// A merge-waiting holder keeps its lane open, so its port seat is not offered: `lane:open` would
+	// refuse the launch past the last seat.
+	it('offers no lane when the merge-waiting holder keeps the last port seat', async () => {
+		const seated = Array.from(
+			{ length: lane_seed_policy.LAST_LANE_SEAT },
+			(_, index) => HOLDER + index,
+		)
+
+		issue_list.mockResolvedValueOnce(listing_outcome(holders(seated)))
+
+		const children = [child(FIRST, REPO)]
+		const all_seats = epic_lane_offer.lane_request(
+			{ repo: REPO, is_all_lanes: true },
+			lane_seed_policy.LAST_LANE_SEAT,
+			REPO,
+		)
+		const offer = await epic_lane_offer.offer_for_repo([pool(children)], all_seats)
+
+		expect(offer.children).toEqual([])
 	})
 })
 

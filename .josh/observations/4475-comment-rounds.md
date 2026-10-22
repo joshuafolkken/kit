@@ -1,0 +1,4 @@
+- rf:comments | low | scripts/run/merge/run-merge-collect.ts:25 | 2026-10-22 | #4475
+- rf:comments | low | docs/maintainers/josh-commands-run-rationale.md:93 | 2026-10-22 | #4475
+- rf:tests | low | scripts/run/merge/run-merge.test.ts:13 | 2026-10-22 | #4475
+- rf:assumptions | low | .claude/skills/workflow-commands/issue-comments.md:69 | 2026-10-22 | #4475
