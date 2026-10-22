@@ -1,3 +1,5 @@
+import { duration_sequencer } from '#tools/test/duration-sequencer'
+import { unit_duration_record } from '#tools/test/unit-duration-record'
 import { unit_file_reporter } from '#tools/test/unit-file-reporter'
 import { vitest_config_workers } from '#tools/test/vitest-config-workers'
 import { defineConfig } from 'vitest/config'
@@ -20,8 +22,11 @@ export default defineConfig({
 		// `undefined` — alone, or driven by `josh`, whose guard sizes the run itself — leaves the choice
 		// to the command line or vitest's default (joshuafolkken/kit#4262).
 		maxWorkers: vitest_config_workers.config_workers(),
-		// The default output, plus the run's slowest files in the lane ledger (joshuafolkken/kit#4451).
-		reporters: ['default', unit_file_reporter.create()],
+		// The default output, plus the run's slowest files in the lane ledger (joshuafolkken/kit#4451),
+		// plus the per-file duration record when asked for (joshuafolkken/kit#4467).
+		reporters: ['default', unit_file_reporter.create(), ...unit_duration_record.reporters()],
+		// `--shard` splits by that record's durations rather than by file count (joshuafolkken/kit#4467).
+		sequence: { sequencer: duration_sequencer.DurationSequencer },
 		// Root-level so both projects keep sharing this config's Vite server (joshuafolkken/kit#4301).
 		deps: unit_projects.DEPENDENCY_OPTIMIZER,
 		coverage: {
