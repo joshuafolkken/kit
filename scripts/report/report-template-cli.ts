@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { cases_interaction_scan } from '#scripts/cases/cases-interaction-scan'
 import { cases } from '#scripts/cases/cases-logic'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { session_language } from '#scripts/josh/session-language'
@@ -16,14 +17,21 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE = `Usage: josh report:template ${report_template.KINDS.join('|')} [<path>...]`
 
-// The owed cases follow the session language, so an English skeleton carries English conditions.
-function change_for(path: string): ChangeInput {
+// The owed cases follow the session language, so an English skeleton carries English conditions. The
+// shared-state and environment cases lead: they name the other components a change can break with,
+// which the I/O cases after them do not.
+async function change_for(path: string): Promise<ChangeInput> {
 	const { lang } = session_language.resolve_session_lang()
+	const findings = await cases_interaction_scan.scan([path])
+	const io_cases = cases.cases_for(cases.boundaries_in([path]), lang)
 
-	return { path, abnormal_cases: cases.cases_for(cases.boundaries_in([path]), lang) }
+	return {
+		path,
+		abnormal_cases: [...cases_interaction_scan.lines_for(findings, lang), ...io_cases],
+	}
 }
 
-function run(argv: ReadonlyArray<string>): number {
+async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [kind = '', ...paths] = argv
 
 	if (!report_template.is_kind(kind)) {
@@ -32,20 +40,20 @@ function run(argv: ReadonlyArray<string>): number {
 		return FAILURE_EXIT_CODE
 	}
 
-	const changes = paths.map((path) => change_for(path))
+	const changes = await Promise.all(paths.map(async (path) => await change_for(path)))
 
 	console.info(report_template.build(kind, changes, report_labels.session_labels()))
 
 	return SUCCESS_EXIT_CODE
 }
 
-function main(argv: ReadonlyArray<string>): void {
+async function main(argv: ReadonlyArray<string>): Promise<void> {
 	josh_environment_file.load_environment_file()
-	process.exitCode = run(argv)
+	process.exitCode = await run(argv)
 }
 
 const report_template_cli = { run }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { report_template_cli }

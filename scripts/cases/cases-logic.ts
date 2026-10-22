@@ -1,5 +1,6 @@
 import { session_language } from '#scripts/josh/session-language'
 import { file_reader } from '#scripts/lib/read-file'
+import { cases_interaction } from './cases-interaction'
 
 // `josh cases <path...>`: read the changed paths and answer which I/O
 // boundaries the code crosses — network, process start, filesystem — then name the abnormal cases
@@ -113,10 +114,12 @@ function cases_for(
 	)
 }
 
-// The fixed verdict vocabulary the command can print — the three boundary tokens and `none`. The
-// decision-oracle test asserts its registered vocabulary equals this.
+// The fixed verdict vocabulary the command can print — the four boundary tokens, the two interaction
+// tokens (`cases-interaction.ts`) and `none`. The decision-oracle test asserts its registered
+// vocabulary equals this.
 const VOCABULARY: ReadonlyArray<string> = [
 	...BOUNDARIES.map((definition) => definition.boundary),
+	...cases_interaction.INTERACTIONS,
 	NONE,
 ]
 

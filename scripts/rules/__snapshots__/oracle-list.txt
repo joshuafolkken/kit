@@ -84,9 +84,9 @@ decision oracles:
     no firing `pnpm josh issue:file` runs it as one of its filing steps, and a direct filing is refused by the `direct-filing` delivered rule; there is no separate call left to gate
     source    prompts/collaboration-workflow/issue-template.md
   cases
-    decision  Each boundary a change crosses (network, process, fs, time) and the abnormal cases it owes
+    decision  Each boundary a change crosses (network, process, fs, time, shared state, environment) and the abnormal cases it owes
     command   pnpm josh cases <path...>
-    answers   network | process | fs | time | none
+    answers   network | process | fs | time | state | env | none
     no firing it answers a status question and governs no action of its own to gate before
     source    prompts/collaboration-workflow/report-format.md → 変更とテスト
   issue:state

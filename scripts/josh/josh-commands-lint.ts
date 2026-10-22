@@ -33,7 +33,7 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 	cases: {
 		script: 'scripts/cases/cases-cli.ts',
 		description:
-			'Read changed paths and print the I/O boundaries crossed and their mandatory abnormal cases: network | process | fs | none',
+			'Read changed paths and print the boundaries crossed and their mandatory abnormal cases: network | process | fs | time | state | env | none',
 		category: 'AI tools',
 		reference: ['<path...>', 'automation', ['files']],
 		usage: {
