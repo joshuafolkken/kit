@@ -138,3 +138,31 @@ describe('vitest configs — every config arms the same guards', () => {
 		},
 	)
 })
+
+// joshuafolkken/kit#4465: by path, so the reporter and the ledger it writes stay out of the config's
+// dependencies, whose change runs every test under `vitest related`.
+const REPORTED_TEST = z.object({ reporters: z.array(z.unknown()) })
+const REPORTED_CONFIG = z.object({ default: z.object({ test: REPORTED_TEST }) })
+const REPORTER_ENTRY = z.object({ default: z.function() })
+
+async function import_module(module_path: string): Promise<unknown> {
+	const loaded: unknown = await import(pathToFileURL(path.resolve(module_path)).href)
+
+	return loaded
+}
+
+describe('vitest configs — the unit file reporter is named, not imported', () => {
+	it('names the unit file reporter by its path in the main config', async () => {
+		const config = REPORTED_CONFIG.parse(await import_module(MAIN_CONFIG))
+		const named = ['default', unit_projects.UNIT_FILE_REPORTER]
+
+		// The leading entries only: a `JOSH_UNIT_DURATIONS=record` run appends the duration reporter.
+		expect(config.default.test.reporters.slice(0, named.length)).toEqual(named)
+	})
+
+	it('loads a reporter vitest can construct from the named path', async () => {
+		const entry = REPORTER_ENTRY.parse(await import_module(unit_projects.UNIT_FILE_REPORTER))
+
+		expect(Reflect.construct(entry.default, [])).toHaveProperty('onTestRunEnd')
+	})
+})

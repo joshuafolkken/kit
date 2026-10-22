@@ -51,3 +51,20 @@ describe('moved_paths.moved_since', () => {
 		).resolves.toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#4465: the two halves apart, so a caller can count what a main sync brought in.
+describe('moved_paths.moved_parts', () => {
+	it('keeps the base diff apart from the branch edits, a path both name in each', async () => {
+		read_git.mockResolvedValue(`${SOURCE}\0${FROM_MAIN}\0`)
+
+		const parts = await moved_paths.moved_parts(RECORD, { files: { [SOURCE]: 'd2' }, base: BASE_B })
+
+		expect(parts).toStrictEqual({ changed: [SOURCE], synced: [SOURCE, FROM_MAIN] })
+	})
+
+	it('answers an empty sync when the base did not move', async () => {
+		const parts = await moved_paths.moved_parts(RECORD, { files: { [SOURCE]: 'd2' }, base: BASE_A })
+
+		expect(parts).toStrictEqual({ changed: [SOURCE], synced: [] })
+	})
+})

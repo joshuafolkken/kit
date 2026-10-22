@@ -27,23 +27,41 @@ async function base_diff(from: string, to: string): Promise<ReadonlyArray<string
 	}
 }
 
+// The two diffs apart: `synced` is what a main sync brought in, `changed` the paths whose digest moved.
+// A path can be in both.
+interface MovedParts {
+	changed: ReadonlyArray<string>
+	synced: ReadonlyArray<string>
+}
+
 // `undefined` when the record cannot be compared: no base on either side, or a tree map that came back
 // empty — also what `gate-tree.ts` answers when git could not be read, so it describes no tree.
-async function moved_since(
-	stamp: FileMapStamp,
-	tree: GateTree,
-): Promise<ReadonlyArray<string> | undefined> {
+async function moved_parts(stamp: FileMapStamp, tree: GateTree): Promise<MovedParts | undefined> {
 	const is_unread = Object.keys(tree.files).length === 0
 
 	if (is_unread || stamp.base === undefined || tree.base === undefined) return undefined
 
-	const moved_base = await base_diff(stamp.base, tree.base)
+	const synced = await base_diff(stamp.base, tree.base)
 
-	if (moved_base === undefined) return undefined
+	if (synced === undefined) return undefined
 
-	return [...new Set([...file_map_stamp.changed_since(stamp, tree.files), ...moved_base])]
+	return { changed: file_map_stamp.changed_since(stamp, tree.files), synced }
 }
 
-const moved_paths = { moved_since }
+function union_of(parts: MovedParts): ReadonlyArray<string> {
+	return [...new Set([...parts.changed, ...parts.synced])]
+}
 
+async function moved_since(
+	stamp: FileMapStamp,
+	tree: GateTree,
+): Promise<ReadonlyArray<string> | undefined> {
+	const parts = await moved_parts(stamp, tree)
+
+	return parts === undefined ? undefined : union_of(parts)
+}
+
+const moved_paths = { moved_parts, moved_since, union_of }
+
+export type { MovedParts }
 export { moved_paths }

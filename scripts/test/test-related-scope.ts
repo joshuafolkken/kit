@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { test_read_map, type ReadMap } from './test-read-map'
-import { unit_setup_files } from './unit-setup-files'
+import { whole_suite_files } from './whole-suite-files'
 
 // The whole unit suite is expensive — the largest share of what the gate checks spend, and an
 // implementation loop paid it again on every re-check — while one changed file narrows it to a small
@@ -48,32 +48,7 @@ const RELATABLE_EXTENSIONS: ReadonlySet<string> = new Set([
 	'.svelte',
 ])
 
-// The files every test depends on without importing or reading them: the package and its lock,
-// the vitest configuration, and the setup files every worker runs before every test.
-const SETUP_FILES: ReadonlyArray<string> = [
-	...unit_setup_files.NETWORK_GUARD,
-	...unit_setup_files.STATE_GUARD,
-	...unit_setup_files.WORKER_GUARDS,
-	...unit_setup_files.READ_RECORDER,
-].map((file) => path.normalize(file))
-
-const WHOLE_SUITE_FILES: ReadonlySet<string> = new Set([
-	'package.json',
-	'pnpm-lock.yaml',
-	'pnpm-workspace.yaml',
-	'tsconfig.json',
-	'vitest.config.ts',
-	'vitest.harness.config.ts',
-	path.join('tools', 'test', 'unit-projects.ts'),
-	path.join('scripts', 'test', 'unit-setup-files.ts'),
-	path.join('tools', 'test', 'pure-files.ts'),
-	path.join('tools', 'test', 'vitest-include-globs.ts'),
-	// What the read recorder runs in every worker, which no test imports through the setup file.
-	path.join('tools', 'test', 'test-read-capture.ts'),
-	path.join('scripts', 'test', 'test-read-trace.ts'),
-	...SETUP_FILES,
-])
-
+const { WHOLE_SUITE_FILES } = whole_suite_files
 const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import or read'
 const NO_MAP_REASON = 'no test-read map covers the changed non-code file'
@@ -222,6 +197,10 @@ function describe_scope(scope: RelatedScope, root: string): string {
 	return `${COMMAND_LABEL}: ${scope.reason} — ${NONE_SUFFIX}.\n${listing}`
 }
 
+function reason_kind(reason: string): string {
+	return FALLBACK_KINDS.find((entry) => reason.includes(entry.reason))?.kind ?? OTHER_FALLBACK
+}
+
 // The kind of full-suite fallback a run's output names, read off the line `describe_scope` printed, or
 // `undefined` when the run narrowed or ran nothing.
 function fallback_kind(output: string): string | undefined {
@@ -234,9 +213,13 @@ function fallback_kind(output: string): string | undefined {
 
 	if (line === undefined) return undefined
 
-	const reason = line.slice(prefix.length, -suffix.length)
+	return reason_kind(line.slice(prefix.length, -suffix.length))
+}
 
-	return FALLBACK_KINDS.find((entry) => reason.includes(entry.reason))?.kind ?? OTHER_FALLBACK
+// The stable name a scope is recorded under: its mode when it narrowed or ran nothing, else the kind of
+// full-suite fallback its reason falls under (joshuafolkken/kit#4465).
+function scope_kind(scope: RelatedScope): string {
+	return scope.mode === 'all' ? reason_kind(scope.reason) : scope.mode
 }
 
 // Whether a run's output is the since-green no-op — nothing moved, so no test ran — read off the line
@@ -271,6 +254,7 @@ const related_scope = {
 	is_relatable,
 	is_unmoved,
 	resolve_scope,
+	scope_kind,
 	vitest_arguments,
 }
 

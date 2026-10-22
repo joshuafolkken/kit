@@ -1,4 +1,5 @@
 import path from 'node:path'
+import type { MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
@@ -6,6 +7,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
+import { test_related_record } from './test-related-record'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4393: a ship retry re-ran every test the whole branch diff reaches. A bare run now
@@ -27,10 +29,10 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
 vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(), read_moved: vi.fn() },
+	since_green: { describe: vi.fn(), read_moved_parts: vi.fn() },
 }))
 
-const mocked_moved = vi.mocked(since_green.read_moved)
+const mocked_moved = vi.mocked(since_green.read_moved_parts)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 
@@ -53,6 +55,11 @@ function map_with(
 		directories: [],
 		readers,
 	}
+}
+
+// What moved with nothing brought in by a main sync.
+function changed_only(...changed: Array<string>): MovedParts {
+	return { changed, synced: [] }
 }
 
 function vitest_arguments(): ReadonlyArray<string> {
@@ -86,7 +93,7 @@ beforeEach(() => {
 
 describe('test_related.run_related_tests — since the last green run', () => {
 	it('reads the moved files from its own green record', async () => {
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
 
@@ -94,7 +101,7 @@ describe('test_related.run_related_tests — since the last green run', () => {
 	})
 
 	it('narrows to the moved files and the change since the map, leaving an untouched source out', async () => {
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
 
@@ -107,7 +114,7 @@ describe('test_related.run_related_tests — since the last green run', () => {
 	})
 
 	it('runs no tests when nothing moved since the green run', async () => {
-		mocked_moved.mockResolvedValue([])
+		mocked_moved.mockResolvedValue(changed_only())
 
 		await expect(test_related.run_related_tests([])).resolves.toBe(0)
 
@@ -118,7 +125,7 @@ describe('test_related.run_related_tests — since the last green run', () => {
 	})
 
 	it('says it narrowed since the green run before vitest starts', async () => {
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
 
@@ -138,7 +145,7 @@ describe('test_related.run_related_tests — reading the whole branch instead', 
 
 	it('reads the whole branch change when no test-read map covers the moved files', async () => {
 		vi.mocked(test_read_map.read_map).mockReturnValue(undefined)
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
 
@@ -147,7 +154,7 @@ describe('test_related.run_related_tests — reading the whole branch instead', 
 
 	it("reads the whole branch change when the map's tree can no longer be diffed", async () => {
 		vi.mocked(changed_paths.read_changed_since).mockRejectedValue(PRUNED_TREE)
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
 
@@ -156,7 +163,7 @@ describe('test_related.run_related_tests — reading the whole branch instead', 
 
 	it('runs the whole suite when neither change can be read', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockRejectedValue(PRUNED_TREE)
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 		mocked_changed.mockRejectedValue(new Error('not a git repository'))
 
 		await test_related.run_related_tests([])
@@ -180,7 +187,7 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 	it('runs the map readers of a moved non-code file and the source changed since the map', async () => {
 		vi.mocked(test_read_map.read_map).mockReturnValue(map_with({ [document]: [document_reader] }))
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, document])
-		mocked_moved.mockResolvedValue([document])
+		mocked_moved.mockResolvedValue(changed_only(document))
 
 		await test_related.run_related_tests([])
 
@@ -191,7 +198,7 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 
 	it('runs the source changed since the map for a moved code file read as data', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE])
-		mocked_moved.mockResolvedValue([FIXED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
 
@@ -201,5 +208,32 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 			absolute(UNTOUCHED_SOURCE),
 			'--run',
 		])
+	})
+})
+
+// joshuafolkken/kit#4465: the run's ledger record tells the main sync's part of its input apart.
+describe('test_related.run_related_tests — the ledger record', () => {
+	it('records the moved files a main sync brought in apart from the change itself', async () => {
+		const record_run = vi.spyOn(test_related_record, 'record_run').mockResolvedValue()
+
+		mocked_moved.mockResolvedValue({ changed: [FIXED_SOURCE], synced: [UNTOUCHED_SOURCE] })
+
+		await test_related.run_related_tests([])
+
+		expect(record_run.mock.calls[0]?.[0].synced).toEqual([UNTOUCHED_SOURCE])
+	})
+
+	it('records the change since the map that nothing moved apart from the change itself', async () => {
+		const record_run = vi.spyOn(test_related_record, 'record_run').mockResolvedValue()
+
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([FIXED_SOURCE, UNTOUCHED_SOURCE])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
+
+		await test_related.run_related_tests([])
+
+		expect(record_run.mock.calls[0]?.[0]).toMatchObject({
+			changed: [FIXED_SOURCE, UNTOUCHED_SOURCE],
+			since_map: [UNTOUCHED_SOURCE],
+		})
 	})
 })

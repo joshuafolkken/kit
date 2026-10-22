@@ -164,3 +164,4 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_GIT_BINARY`           | the unit suite's network guard | The `git` every spawn runs in place of the platform's own binary.                                                                       |
 | `JOSH_TEST_READS_DIRECTORY` | a whole-suite `josh test:unit` | Where each worker's read recorder writes the repository paths its test files read, merged into the test-read map after a green run.     |
 | `JOSH_TEST_READS_ROOT`      | a whole-suite `josh test:unit` | The repository root the read recorder resolves read paths against; a path outside it is not recorded.                                   |
+| `JOSH_UNIT_COUNT_FILE`      | `josh test:related`            | Where the unit suite's reporter writes how many test files the run ran, recorded with the run's scope in the lane ledger.               |
