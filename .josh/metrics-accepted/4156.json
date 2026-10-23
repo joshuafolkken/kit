@@ -1,9 +1,0 @@
-{
-	"reason": "#4156 adds run:hold --adopt / --human-review-stop and the tree-keyed test:e2e stamp (new modules + tests) and documents the new flags in the run skill docs",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 164,
-		"ai_cost.on_demand_bytes": 339,
-		"prose.long_paragraphs": 1
-	}
-}

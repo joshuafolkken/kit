@@ -1,7 +1,0 @@
-{
-	"reason": "Thread the stage's standard output through the ship stop hand-back so a followup stop is classified on stdout, not stderr (review finding, #4589)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

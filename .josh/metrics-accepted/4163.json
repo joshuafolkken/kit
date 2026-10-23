@@ -1,7 +1,0 @@
-{
-	"reason": "New josh latest:if-required command (#4163) replaces a four-times-documented stash/latest/pop procedure with one command",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

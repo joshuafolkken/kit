@@ -1,8 +1,0 @@
-{
-	"reason": "Delete the ship body draft once the pull request merges, so a reopened issue never ships the old body (review round 1 of #4168)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 83,
-		"ai_cost.on_demand_bytes": 373
-	}
-}

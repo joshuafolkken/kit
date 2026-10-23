@@ -1,7 +1,0 @@
-{
-	"reason": "The test:related record and stats, the shipped count-file protocol, the whole-suite file list (now also naming the #4467 sequencer modules) and the reporter's timing split into test-module-elapsed.ts so the duration record no longer pulls the reporter into the vitest config graph",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 305
-	}
-}

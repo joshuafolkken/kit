@@ -1,8 +1,0 @@
-{
-	"reason": "#3734: the cut guards and pre-gate-cut.md now state that a cut relaunching its successor owes no Telegram (+260 on-demand bytes), and the run:cut fixture exposes the command's stderr so the held run's instruction is pinned (+4 code lines)",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 4,
-		"ai_cost.on_demand_bytes": 260
-	}
-}

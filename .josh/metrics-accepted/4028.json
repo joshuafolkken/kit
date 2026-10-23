@@ -1,7 +1,0 @@
-{
-	"reason": "Vacant-lane read in the occupancy count, release_child closing a vacant lane on every non-merged end, the per-state no-free-lane reason with used/limit, and a process probe that could not look keeping a lane occupied (#4028)",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 74
-	}
-}

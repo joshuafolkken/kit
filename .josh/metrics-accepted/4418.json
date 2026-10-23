@@ -1,7 +1,0 @@
-{
-	"reason": "#4418 adds the transcript-side lane metrics table to lane:stats: a transcript tool-call parser and the table module, plus a shell-aware command matcher that skips heredoc bodies, quoted strings and here-strings and sees past subshell parentheses, substitutions and shell keywords (review rounds 1-2), all new code the Issue asks for",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 236
-	}
-}

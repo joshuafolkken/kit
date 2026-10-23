@@ -1,7 +1,0 @@
-{
-	"reason": "The #tools/ alias resolution and the scripts/-vs-tools/ boundary checks that replace the 45 per-file files exclusions (#4149)",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

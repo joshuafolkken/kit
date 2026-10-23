@@ -1,7 +1,0 @@
-{
-	"reason": "New lane-direct-tool rule row: lane agents' direct eslint/vitest/cspell/tsc runs bypassed the core budget (#4357)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

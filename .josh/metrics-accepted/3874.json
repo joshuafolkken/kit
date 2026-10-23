@@ -1,8 +1,0 @@
-{
-	"reason": "Round-2 review fix: the ps locale pin and the VS Code extension-path and Claude package patterns in lane-process-load add four code lines",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 164,
-		"prose.long_paragraphs": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "run:board reads each lane's child liveness through lane_spent.idle_lanes and draws a lane with no child stopped only after lane_await's re-confirm window, carried across reads in run-board-idle.ts (#3893 review round 1: one bare probe drew a cut's handoff stopped); the free-lane read moved to backlog_ready, net of the removed board copy",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 59
-	}
-}

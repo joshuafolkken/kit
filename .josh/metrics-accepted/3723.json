@@ -1,7 +1,0 @@
-{
-	"reason": "#3723 adds a feature: the basic profile's unit check runs the project's own scripts.test when vitest is absent (new project-test-script module, three new guard actions and their skip notices)",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 88
-	}
-}

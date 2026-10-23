@@ -1,7 +1,0 @@
-{
-	"reason": "TaskStop results are a second end-of-task shape the lane stop guard must read (#4472): one pattern, one reader and the line-level fallback",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

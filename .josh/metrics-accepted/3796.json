@@ -1,8 +1,0 @@
-{
-	"reason": "#3796: basic projects josh start set up record josh.workflow and receive .claude/settings.json, and launched Claude sessions pass --permission-mode bypassPermissions, and such a project seeds JOSH_SESSION_LANG for the session:lang hook it now receives; the lane doc states the new flag",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 50,
-		"ai_cost.on_demand_bytes": 52
-	}
-}

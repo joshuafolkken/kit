@@ -1,7 +1,0 @@
-{
-	"reason": "The SvelteKit init pattern records the sv version and builds and checks the app around josh init, which #3719 asks the run to verify",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

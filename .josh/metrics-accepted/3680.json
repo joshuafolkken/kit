@@ -1,7 +1,0 @@
-{
-	"reason": "#3680 adds a new check (published peer floors vs every installed toolkit's) to josh ranges: one logic module, its CLI wiring with the toolkit enumeration the review asked for, and a shared test fixture covering the kit and app-kit tiers",
-	"date": "2026-10-11",
-	"growth": {
-		"scripts.code_lines": 140
-	}
-}

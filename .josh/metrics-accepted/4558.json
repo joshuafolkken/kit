@@ -1,7 +1,0 @@
-{
-	"reason": "run:board shares its plan read through shared_cache; the BoardPlan's maps and sets need a JSON codec (#4558)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 84
-	}
-}

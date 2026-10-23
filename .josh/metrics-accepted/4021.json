@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 review asked for a test of read_order_comments, exported for that test",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 50
-	}
-}

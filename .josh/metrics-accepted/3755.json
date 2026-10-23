@@ -1,7 +1,0 @@
-{
-	"reason": "josh start fetches osv-scanner before its first step and stops with guidance when it cannot (#3755): a new preflight, its stop message and the notice printed before the fetch so a slow download does not read as a hang, reusing audit:provision rather than copying it",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 21
-	}
-}

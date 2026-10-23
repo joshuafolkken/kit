@@ -1,8 +1,0 @@
-{
-	"reason": "Review round 1 of #4176 required two scope qualifiers on the first-party write section: unasked observation filing stays with observation-filing.md, and an unknown party licenses no unconfirmed write",
-	"date": "2026-10-19",
-	"growth": {
-		"rules.lines": 10,
-		"ai_cost.on_demand_bytes": 1019
-	}
-}

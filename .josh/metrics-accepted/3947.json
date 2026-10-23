@@ -1,7 +1,0 @@
-{
-	"reason": "New lane launch priority module (#3947): 19 lines for setPriority on every launched session",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

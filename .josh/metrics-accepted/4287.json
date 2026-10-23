@@ -1,9 +1,0 @@
-{
-	"reason": "#4287 adds the removed-test gate: title extraction (callee-chain classification so Playwright test.describe/test.step read right), comparison, brief section, ship/followup refusal, and the disposition format in report-format.md",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 244,
-		"rules.lines": 12,
-		"ai_cost.on_demand_bytes": 696
-	}
-}

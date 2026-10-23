@@ -1,8 +1,0 @@
-{
-	"reason": "#4200 draws an earlier run's lanes that hold a place on run:board: the read, the layout's earlier rows and their rationale paragraph",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 60,
-		"prose.long_paragraphs": 1
-	}
-}

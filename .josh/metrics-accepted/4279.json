@@ -1,7 +1,0 @@
-{
-	"reason": "#4279 changes only board/backlog text helpers (+41 code lines, one small test file); gate/unit slowdown is host load from concurrent backlogrun lanes (load average ~24 on 11 cores), not this diff",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 41
-	}
-}

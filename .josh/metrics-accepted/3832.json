@@ -1,7 +1,0 @@
-{
-	"reason": "New own-formatter detection module and its skip reason, so a basic project with Biome or dprint gets no Prettier (#3832)",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4457 adds the unit-leg no-op flag: is_unmoved reader, unit_facts in the gate ledger, and the no-op column in lane:stats",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

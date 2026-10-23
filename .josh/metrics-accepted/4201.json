@@ -1,7 +1,0 @@
-{
-	"reason": "New lane-paused probe (pgrep + one ps stat read) so the lane limit can leave a SIGSTOP-ed lane uncounted; the board's stat predicate moved into it rather than duplicated",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 36
-	}
-}

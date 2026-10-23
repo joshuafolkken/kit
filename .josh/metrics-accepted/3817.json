@@ -1,7 +1,0 @@
-{
-	"reason": "#3817 adds the Claude lane broker run for the run:wake supervisor's whole life and a relaunch action on the shared lane session broker, so a lane child's detached ship reaches a token-holding process for its reviewer and relaunch; the review fixes moved the broker from one backlog:drive to the supervisor (run-wake-supervise.ts), kept the heartbeat through an in-flight request and held a re-listed lane until its old server finished",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 191
-	}
-}

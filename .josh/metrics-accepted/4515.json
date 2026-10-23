@@ -1,9 +1,0 @@
-{
-	"reason": "Round-1 review fix: the reader list counts the edited names past its cap instead of dropping them silently, with a real-git test for the count",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 243,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 93
-	}
-}

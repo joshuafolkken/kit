@@ -1,7 +1,0 @@
-{
-	"reason": "The gate's unit step passes its own --maxWorkers, so it needs its own post-admission free-memory bound (admitted_step) beside the guard's",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

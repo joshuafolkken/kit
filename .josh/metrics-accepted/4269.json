@@ -1,8 +1,0 @@
-{
-	"reason": "#4269: the lane state record replaces the span/ps inference for a net +2 code lines; review round 1 adds +6 so the launch event and the record share one instant (emit takes the caller's instant) and a backfilled record with no run is placed by its launch time",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 8,
-		"prose.long_paragraphs": 1
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "The interaction review (#4276): a new ledger round kind, its brief and record paths, the followup merge gate and the ship stage, scoped to the kit repository",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 222,
-		"rules.lines": 10,
-		"ai_cost.on_demand_bytes": 639
-	}
-}

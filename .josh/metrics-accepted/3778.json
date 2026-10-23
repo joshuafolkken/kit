@@ -1,7 +1,0 @@
-{
-	"reason": "#3778 adds josh auth:setup (keychain token save, redacted live output) and passes a Claude Code token into requires_claude fresh-machine scenarios",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 215
-	}
-}

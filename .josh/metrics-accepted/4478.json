@@ -1,7 +1,0 @@
-{
-	"reason": "Print the preflight refusal last and put the row formats into the ship body draft (#4478)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Two new basic-profile source entries for AGENTS.md and GEMINI.md, plus the two filename constants the naming rule requires for their computed keys (#3726)",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Review round 2 of #4235: the claim now bounds a solo unit share, and the overflow ledger counts the narrowed unit weight (with_grant), each with its regression test",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 86
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "round-2 review fix: lane:withdraw leaves an issue unread after the reap open, and run:merge asks again when a withdrawn child's timeline cannot be read",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 243,
-		"ai_cost.on_demand_bytes": 215,
-		"prose.excess_bold": 1
-	}
-}

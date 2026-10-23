@@ -1,7 +1,0 @@
-{
-	"reason": "#4518 adds a render stress fixture and its tests; no runtime code changed",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 102
-	}
-}

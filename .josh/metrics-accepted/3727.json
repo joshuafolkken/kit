@@ -1,7 +1,0 @@
-{
-	"reason": "New josh uninstall command (#3727): four modules under scripts/uninstall/ that plan, report and apply the removal; it reuses init/sync builders rather than a second file list. Review fixes added 8 lines: the hand review ordered before pnpm install, the lefthook config check that it names kit, and .gitignore never removed, each with its test",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 363
-	}
-}

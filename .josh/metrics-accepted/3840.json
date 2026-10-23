@@ -1,7 +1,0 @@
-{
-	"reason": "A server-identity record beside the broker response replaces the stall-prone heartbeat as the liveness signal while keeping the response shape that ships branched before it parse (#3840)",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 60
-	}
-}

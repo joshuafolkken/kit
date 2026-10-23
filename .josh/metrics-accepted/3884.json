@@ -1,7 +1,0 @@
-{
-	"reason": "Recovering lanes interrupted across a backlogrun hand-off needs a dead-unit classifier, a carried-lane collector and kept-lane seating (#3884)",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 138
-	}
-}

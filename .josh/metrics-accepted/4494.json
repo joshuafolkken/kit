@@ -1,7 +1,0 @@
-{
-	"reason": "Property tests for reuse verdicts (#4494) add test code; the eslint daemon also watches the type program's tsconfig, which the reference model showed a warm daemon kept stale",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 305
-	}
-}

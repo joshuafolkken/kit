@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats splits verification calls into three classes (scoped / gate-metrics by hand / ship) per #4442 AC3",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

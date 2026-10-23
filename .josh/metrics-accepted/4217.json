@@ -1,7 +1,0 @@
-{
-	"reason": "#4217: is_tailed single-sources the running-row tail condition so cell_text skips the finish-time cell without duplicating tail_of's check",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

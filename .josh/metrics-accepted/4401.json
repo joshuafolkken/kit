@@ -1,7 +1,0 @@
-{
-	"reason": "#4401: run:board reads a child drawn stopped closed at once (candidate filter, new-child due check, shared open_read_of)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 27
-	}
-}

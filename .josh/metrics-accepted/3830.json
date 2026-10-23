@@ -1,7 +1,0 @@
-{
-	"reason": "josh init --dry-run: new scratch-copy simulation and report modules, plus the round-2 fix that skips directory symlinks when mirroring the project (#3830)",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 351
-	}
-}

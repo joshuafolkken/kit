@@ -1,7 +1,0 @@
-{
-	"reason": "lane:close and lane:restart also end processes carrying the lane's JOSH_LANE_CHILD mark wherever they run (new process-lane-marks reading ps -E) #4315",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

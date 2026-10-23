@@ -1,7 +1,0 @@
-{
-	"reason": "#4000 adds the before/after role comparison to josh time (new cost-run-split module and --split-at flag)",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 110
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Per-check gate reuse (check-inputs.ts, check-reuse.ts), its unread-tree guard, and per-check ledger timings with the lane:stats table (lane-check-stats.ts) are new behavior #3903",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 317
-	}
-}

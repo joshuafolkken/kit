@@ -1,7 +1,0 @@
-{
-	"reason": "#4510 adds the whole-suite trigger table to lane:stats and the trigger_files ledger field it reads",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 47
-	}
-}

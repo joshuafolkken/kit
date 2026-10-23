@@ -1,7 +1,0 @@
-{
-	"reason": "josh release reads the tag's Publish run during the npm wait so a failed run ends the wait at once (#4089)",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

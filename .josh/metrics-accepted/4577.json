@@ -1,7 +1,0 @@
-{
-	"reason": "#4577 adds the untitled-lane early plan re-read to run:board (has_untitled_lane, titles_of)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

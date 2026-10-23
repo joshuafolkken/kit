@@ -1,9 +1,0 @@
-{
-	"reason": "run:merge --driver child-process path (run-merge-driver/outcome) and the run:stalled label replace an in-process import and an overloaded needs-decision; backlog:plan rows name their park label; docs gain the run:stalled park rows and the --driver flag",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 83,
-		"ai_cost.on_demand_bytes": 197,
-		"prose.long_paragraphs": 1
-	}
-}

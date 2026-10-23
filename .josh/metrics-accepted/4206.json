@@ -1,7 +1,0 @@
-{
-	"reason": "run:board names the named-order wait on queued rows (#4206): held_after in the driver, the carry passed through to the board reason",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 38
-	}
-}

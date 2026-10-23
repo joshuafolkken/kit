@@ -1,7 +1,0 @@
-{
-	"reason": "New ledger fields, the reused-gate record, the fallback-kind reader and the lane:stats whole-gate row and fallback table that #4397 asks for",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 68
-	}
-}

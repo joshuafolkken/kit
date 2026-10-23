@@ -1,7 +1,0 @@
-{
-	"reason": "#3781: run:merge verdicts carry is_offer and one is_control_stop reading, so the driver stops only on the control stop; the fixture scripts the offer source",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "lane:close ends processes still running from the lane checkout, and run:merge, run:tidy and lane:withdraw report what it ended (new lane-residents and the shared lsof cwd reading) #4304",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 126
-	}
-}

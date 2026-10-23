@@ -1,7 +1,0 @@
-{
-	"reason": "Seed the resumed drive's exclusion with the children the stream reads withdrawn, which no invocation collects across a hand-back (#4365 review)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

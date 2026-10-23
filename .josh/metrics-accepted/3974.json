@@ -1,7 +1,0 @@
-{
-	"reason": "Broker answers now carry a failure reason end to end (client and server reasons, a reason sidecar that keeps the response shape older ships parse) and an unanswered ship stop is re-dispatched without counting toward the outage streak (#3974)",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 57
-	}
-}

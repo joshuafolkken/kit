@@ -1,8 +1,0 @@
-{
-	"reason": "concise-prose rule plus the bold-limit scope the round-1 review required (list lead labels and cited bold exempt)",
-	"date": "2026-10-15",
-	"growth": {
-		"rules.lines": 13,
-		"ai_cost.on_demand_bytes": 717
-	}
-}

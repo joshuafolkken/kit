@@ -1,7 +1,0 @@
-{
-	"reason": "lane_snapshot_trace answers idle lanes from the one process snapshot (lstart column, async ship reader) instead of a synchronous pgrep and ps per lane",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 89
-	}
-}

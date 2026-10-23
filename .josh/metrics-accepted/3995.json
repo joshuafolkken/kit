@@ -1,7 +1,0 @@
-{
-	"reason": "Free-lane hold records (#3995): ledger held/released entries, a per-run hold recorder that ends a hold on a full pool or a finished run, and the lane:stats held table",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 200
-	}
-}

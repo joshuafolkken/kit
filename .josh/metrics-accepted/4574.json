@@ -1,8 +1,0 @@
-{
-	"reason": "#4574 adds the CodeRabbit wait timer for followup (followup-coderabbit-wait.ts) and its tests, plus a doc paragraph defining the new coderabbit-wait / coderabbit-rate-limit stages — a new measurement with no existing code or prose to replace",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 70,
-		"prose.long_paragraphs": 1
-	}
-}

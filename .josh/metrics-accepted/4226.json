@@ -1,7 +1,0 @@
-{
-	"reason": "run-board-render.ts outgrew max-lines with the lane rows' shared title cut (#4226); its foot parts moved to run-board-render-foot.ts, whose imports and module object add the rest",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 54
-	}
-}

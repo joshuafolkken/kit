@@ -1,8 +1,0 @@
-{
-	"reason": "Paused-lane notice now fires only when a long-paused lane declares a path an open candidate overlaps (review of #4270), so a drained or parked backlog stays quiet",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 221,
-		"ai_cost.on_demand_bytes": 111
-	}
-}

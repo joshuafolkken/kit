@@ -1,8 +1,0 @@
-{
-	"reason": "#4491 adds the shared-state and environment boundaries to josh cases (two new modules) and names them in report-format.md's test-declaration rule",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 259,
-		"ai_cost.on_demand_bytes": 216
-	}
-}

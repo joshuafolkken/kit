@@ -1,7 +1,0 @@
-{
-	"reason": "A preflight stop now records the kinds of its unmet preconditions, and lane:stats counts them (#4166): each preflight source tags its problems with a kind, which is threaded through StepResult and ShipSection to the stop record",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 74
-	}
-}

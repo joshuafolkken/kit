@@ -1,7 +1,0 @@
-{
-	"reason": "#4384 adds the pane-width cut of findings lines (fitted_line) the Issue asks for; no existing logic duplicated",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

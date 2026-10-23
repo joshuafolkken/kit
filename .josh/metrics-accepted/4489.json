@@ -1,7 +1,0 @@
-{
-	"reason": "The broker names the zod-refused fields in an unreadable request's reason (#4489)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

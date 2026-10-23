@@ -1,7 +1,0 @@
-{
-	"reason": "Shell-shape corpus fixtures declare every delivered rule's answer on every shape, and the corpus payload now carries each command-text rule's own trigger (review round 1 finding)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 644
-	}
-}

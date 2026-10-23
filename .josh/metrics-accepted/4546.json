@@ -1,7 +1,0 @@
-{
-	"reason": "#4546: lane-row gauges need where the gauge is full (is_full_at_red, CellScale) beside the color total",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4015 adds the backlog:drive idle notification (backlog-drive-idle.ts and emit_once_since_with); the removed stalled Telegram path offsets part of it",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 112
-	}
-}
