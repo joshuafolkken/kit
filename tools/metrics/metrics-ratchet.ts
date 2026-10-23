@@ -166,6 +166,43 @@ function accept(
 	}
 }
 
+// This branch's own approval, the file `name` names: `undefined` where it is absent, the merge-base
+// already holds it, it does not parse, or it records no reason — a growth with no reason has nothing
+// to be re-recorded under.
+function own_approval(
+	name: string,
+	current: ReadonlyMap<string, string>,
+	base: ReadonlyMap<string, string>,
+): Approval | undefined {
+	const text = current.get(name)
+
+	if (text === undefined || base.get(name) === text) return undefined
+
+	const approval = parse_approval(text)
+
+	return approval !== undefined && approval.reason.trim().length > 0 ? approval : undefined
+}
+
+// The approval re-recorded at the growth measured now, or `undefined` while it still covers every total
+// it names. **Only a named total is re-recorded**: the reason was written for those, so a total it
+// does not name still stops (joshuafolkken/kit#4716).
+function refresh(
+	approval: Approval,
+	base: Metrics,
+	current: Metrics,
+	date: string,
+): Approval | undefined {
+	const past = changes(base, current, [approval]).filter(
+		(change) => Object.hasOwn(approval.growth, change.name) && change.growth > change.approved,
+	)
+
+	if (past.length === 0) return undefined
+
+	const regrown = Object.fromEntries(past.map((change) => [change.name, change.growth]))
+
+	return { ...approval, date, growth: { ...approval.growth, ...regrown } }
+}
+
 function render_regression(change: Change): string {
 	const values = `merge-base ${String(change.base)} → current ${String(change.current)}`
 
@@ -185,8 +222,10 @@ const metrics_ratchet = {
 	approval_text,
 	compare,
 	fresh_approvals,
+	own_approval,
 	parse_approval,
 	parse_metrics,
+	refresh,
 	render_regressions,
 }
 

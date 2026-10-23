@@ -94,7 +94,6 @@ async function command_lists(directory: string): Promise<Array<PreDetachCheck>> 
 		{ list: type_check, label: gate_plan.TYPE_CHECK_LABEL },
 		...STATIC_CHECKS,
 		...guard_tests(directory),
-		...kit_only(directory),
 	]
 }
 
@@ -135,17 +134,23 @@ function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 }
 
 // All run at once, buffered, and every failure is reported, so one ship shows all there is to fix.
-// The tree is read before they start, so a record is written only for the tree they read.
+// The tree is read before they start, so a record is written only for the tree they read. **The
+// metrics totals run first, alone**: they may re-record the branch's approval file
+// (`metrics-command.ts`), and a file written under the others would move the tree and leave the gate
+// nothing to reuse (joshuafolkken/kit#4716).
 async function checks(
 	directory: string = process.cwd(),
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
 ): Promise<JoshResult> {
+	const metrics = await Promise.all(
+		kit_only(directory).map(async (check) => await run_in(directory, check)),
+	)
 	const [lists, tree] = await Promise.all([command_lists(directory), gate_tree.read_gate_tree()])
 	const runs = await Promise.all(lists.map(async (check) => await run_in(directory, check)))
 
 	await check_reuse.record_green_checks(gate_results(runs), tree, records)
 
-	return verdict(runs)
+	return verdict([...runs, ...metrics])
 }
 
 const run_ship_pre_detach = {

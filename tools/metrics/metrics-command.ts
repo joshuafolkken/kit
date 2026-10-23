@@ -28,7 +28,8 @@ import { prose_density, type ProseTotals } from './prose-density'
 //
 // `--totals-only` is the form a detached `josh ship` runs before the hand-off, and `josh lint:related`
 // reports in the loop (`scripts/gate/metrics-totals.ts`): the totals alone, so a grown total stops the
-// session that knows why it grew. The durations stay with
+// session that knows why it grew; once that session recorded a reason, the form re-records the
+// growth it names at what it measures now (`check_totals_only`). The durations stay with
 // the supervised gate — before the detach the gate ledger they read is stale.
 //
 // `--json` is the form this command runs on the merge-base's tree: the totals alone, as JSON, held
@@ -208,25 +209,59 @@ function settle(commit: string, verdict: Verdict): number {
 	return say(SETTLED_LINE[verdict.kind])
 }
 
+// Re-records the issue's own approval at the growth measured now, once a reason is recorded, and
+// returns the reading with the file it wrote (`metrics_ratchet.refresh`).
+function rerecord(root: string, issue: number, base: Reading, current: Reading): Reading {
+	const name = metrics_base.approval_name(issue)
+	const own = metrics_ratchet.own_approval(name, current.approvals, base.approvals)
+	const fresh =
+		own === undefined
+			? undefined
+			: metrics_ratchet.refresh(own, base.metrics, current.metrics, today())
+
+	if (fresh === undefined) return current
+
+	const file = metrics_base.write_approval(root, issue, fresh)
+
+	say(`josh metrics: the growth re-recorded in ${file} — ${fresh.reason}`)
+
+	return { ...current, approvals: metrics_base.approval_texts(root) }
+}
+
+async function rerecorded(root: string, base: Reading, current: Reading): Promise<Reading> {
+	const issue = git_branch.issue_from_branch(await git_command.branch())
+
+	return issue === undefined ? current : rerecord(root, issue, base, current)
+}
+
 // No commit to measure from — not a repository, no default branch — holds the totals to nothing,
 // the way every guard that asks for the merge-base fails open there. CI names its commit, and a name
 // that does not resolve throws (`metrics-base.ts`).
-async function check_totals(root: string, metrics: Metrics): Promise<number> {
+async function check_totals(
+	root: string,
+	metrics: Metrics,
+	is_rerecorded = false,
+): Promise<number> {
 	const commit = await metrics_base.resolve_commit()
 
 	if (commit === undefined) return say('josh metrics: no merge-base, so no total is held to one')
 
-	const current: Reading = { metrics, approvals: metrics_base.approval_texts(root) }
-	const base = await metrics_base.read(commit, current)
+	const measured: Reading = { metrics, approvals: metrics_base.approval_texts(root) }
+	const base = await metrics_base.read(commit, measured)
+	const current = is_rerecorded ? await rerecorded(root, base, measured) : measured
 	const approvals = metrics_ratchet.fresh_approvals(current.approvals, base.approvals)
 
 	return settle(commit, metrics_ratchet.compare(base.metrics, metrics, approvals))
 }
 
+// The form that runs before the gate — `josh lint:related` and ship's pre-detach — is the one that
+// re-records: an approval re-accepted after every small edit cost a lane six accepts and a pre-detach
+// stop (joshuafolkken/kit#4716). The gate's own form only compares, so the tree its record names does
+// not move under it.
 async function check_totals_only(root: string, metrics: Metrics): Promise<number> {
 	process.stdout.write(`${metrics_logic.render(metrics)}\n`)
 
-	return await check_totals(root, metrics)
+	return await check_totals(root, metrics, true)
 }
 
 // Both halves always run, so one failing gate names every total and every duration that grew.

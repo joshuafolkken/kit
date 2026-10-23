@@ -188,6 +188,48 @@ describe('josh metrics --accept', () => {
 	)
 })
 
+// An edit after the accept grew a total again, and a reason is already recorded (joshuafolkken/kit#4716).
+describe('josh metrics --totals-only after the growth rose past the accept', () => {
+	it(
+		're-records the growth the approval names at what it measures now, and passes',
+		async () => {
+			await git(['switch', '-c', ISSUE_BRANCH])
+			grow_rules()
+			await accept()
+			grow_rules()
+
+			const result = await check()
+			const [text = ''] = metrics_base.approval_texts(kit().root).values()
+
+			expect(result.stdout).toContain('the growth re-recorded in')
+			expect(result.exit_code).toBe(0)
+			expect(metrics_ratchet.parse_approval(text)?.reason).toBe(REASON)
+			expect(await check()).toMatchObject({ exit_code: 0 })
+		},
+		SCENARIO_TIMEOUT_MS,
+	)
+
+	it(
+		'still fails a total the recorded approval does not name',
+		async () => {
+			await git(['switch', '-c', ISSUE_BRANCH])
+			grow_rules()
+			await accept()
+
+			const file = path.join(kit().root, LONG_PARAGRAPH_FILE)
+
+			mkdirSync(path.dirname(file), { recursive: true })
+			writeFileSync(file, LONG_PARAGRAPH)
+
+			const result = await check()
+
+			expect(result.stderr).toContain(LONG_PARAGRAPHS)
+			expect(result.exit_code).toBe(1)
+		},
+		SCENARIO_TIMEOUT_MS,
+	)
+})
+
 describe('josh metrics --accept on a branch that names no issue', () => {
 	// The durations are accepted by the same form, on any branch: only a growth needs an issue.
 	it(
