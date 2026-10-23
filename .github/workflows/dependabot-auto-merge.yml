@@ -83,13 +83,16 @@ jobs:
       #
       # `--disable-auto` is an error on a pull request with nothing armed, so the state is read first;
       # a read that fails falls through to the withdrawal rather than past it, and a withdrawal that
-      # fails leaves the run red. GraphQL names the token's identity `github-actions`; the REST
-      # spelling is accepted too.
+      # still fails after its retries leaves the run red. GraphQL names the token's identity
+      # `github-actions`; the REST spelling is accepted too.
       - name: Withdraw this workflow's auto-merge after a push by anyone but Dependabot
         id: withdraw
         if: github.actor != 'dependabot[bot]'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
+          # A variable so the unit test that runs this script can set the delay to zero.
+          RETRY_ATTEMPTS: '3'
+          RETRY_BACKOFF_SECONDS: '5'
           GH_TOKEN: ${{ github.token }}
         run: |
           enabler="$(gh pr view "$PR_URL" --json autoMergeRequest \
@@ -107,4 +110,13 @@ jobs:
               ;;
           esac
 
-          gh pr merge --disable-auto "$PR_URL"
+          attempt=1
+
+          until gh pr merge --disable-auto "$PR_URL"; do
+            if [ "$attempt" -ge "$RETRY_ATTEMPTS" ]; then
+              exit 1
+            fi
+
+            sleep "$((attempt * RETRY_BACKOFF_SECONDS))"
+            attempt=$((attempt + 1))
+          done

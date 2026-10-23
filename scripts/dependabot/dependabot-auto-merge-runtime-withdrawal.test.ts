@@ -1,3 +1,4 @@
+import type { WorkflowStep } from '#scripts/ci/ci-yml-fixture'
 import { workflow_expression_fixture } from '#scripts/ci/workflow-expression-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { reconcile_script_fixture, type Case } from './dependabot-reconcile-script-fixture'
@@ -8,11 +9,11 @@ import { dependabot_workflow_fixture, type WorkflowRun } from './dependabot-work
 // (joshuafolkken/kit#4691). These guards hold when the withdrawal runs and what its script does.
 const { DEPENDABOT_LOGIN, MAINTAINER_LOGIN, NO_OUTPUT, NOT_MANAGED, ACTIONS_ECOSYSTEM } =
 	dependabot_workflow_fixture
-const { PATCH_UPDATE, runtime_job, find_step, step_run, step_condition, build_run_context } =
+const { PATCH_UPDATE, runtime_job, find_step, step_condition, build_run_context } =
 	dependabot_workflow_fixture
 const { ARMED_QUERY, FALSE, LASTING_OUTAGE, NOTHING, WITHDRAWN_MARKER, WITHDRAW_CALL } =
 	reconcile_script_fixture
-const { call_count, remove_workspace, run_step } = reconcile_script_fixture
+const { call_count, remove_workspace, run_step, withdraw_attempts } = reconcile_script_fixture
 
 const WITHDRAW_STEP_ID = 'withdraw'
 const WITHDRAW_LABEL = 'withdrawal'
@@ -36,13 +37,15 @@ function withdraw_step_reached(run: WorkflowRun): boolean {
 	return workflow_expression_fixture.evaluate_condition(condition, build_run_context(run))
 }
 
+function withdraw_step(): WorkflowStep | undefined {
+	return find_step(runtime_job(), WITHDRAW_STEP_ID)
+}
+
 function run_withdrawal(scenario: Partial<Case>): string {
-	const script = step_run(find_step(runtime_job(), WITHDRAW_STEP_ID))
-
 	const armed_by_kit = { is_armed: true, state_answer: WORKFLOW_ARMER }
+	const base = { should_be_armed: FALSE, may_arm: FALSE, ...armed_by_kit }
 
-	return run_step(script, { should_be_armed: FALSE, may_arm: FALSE, ...armed_by_kit, ...scenario })
-		.direction
+	return run_step(withdraw_step(), { ...base, ...scenario }).direction
 }
 
 describe('kit’s own dependabot-auto-merge.yml — when the withdrawal runs', () => {
@@ -94,11 +97,19 @@ describe.skipIf(process.platform === 'win32')(
 			expect(run_withdrawal({ fail_reads: LASTING_OUTAGE })).toBe(WITHDRAWN_MARKER)
 		})
 
+		// One transient API error must not leave the auto-merge armed on an unreviewed diff.
+		it('withdraws on the last retry after transient failures', () => {
+			const attempts = withdraw_attempts(withdraw_step())
+
+			expect(run_withdrawal({ fail_merges: attempts - 1 })).toBe(WITHDRAWN_MARKER)
+			expect(call_count(WITHDRAW_CALL)).toBe(attempts)
+		})
+
 		// This workflow is not a required check, but a red run is what makes a lasting failure visible.
-		it('fails the run when the withdrawal itself fails', () => {
+		it('fails the run when every withdrawal attempt fails', () => {
 			run_withdrawal({ fail_merges: LASTING_OUTAGE, expect_failure: true })
 
-			expect(call_count(WITHDRAW_CALL)).toBe(1)
+			expect(call_count(WITHDRAW_CALL)).toBe(withdraw_attempts(withdraw_step()))
 		})
 	},
 )

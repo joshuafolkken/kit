@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { WorkflowStep } from '#scripts/ci/ci-yml-fixture'
 import { expect } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 
@@ -69,14 +70,16 @@ function remove_workspace(): void {
 	rmSync(workspace, { recursive: true, force: true })
 }
 
-// The reconciling step's own `env`, minus the entries GitHub would have expanded. Taking the retry
-// count from the workflow rather than restating it here keeps the cases honest about what a runner
-// actually does.
-function literal_step_environment(): Record<string, string> {
+// A step's own `env` — the reconciling step's unless another is named — minus the entries GitHub
+// would have expanded. Taking the retry count from the workflow rather than restating it here keeps
+// the cases honest about what a runner actually does.
+function literal_step_environment(
+	step: WorkflowStep | undefined = find_step(template_job(), RECONCILE_STEP_ID),
+): Record<string, string> {
 	// Typed as unknown on purpose: an unquoted `RETRY_ATTEMPTS: 3` parses as a number, and calling a
 	// string method on it would take the whole suite down with a `TypeError` rather than report that
 	// the workflow declared something these guards cannot read.
-	const declared: Record<string, unknown> = find_step(template_job(), RECONCILE_STEP_ID)?.env ?? {}
+	const declared: Record<string, unknown> = step?.env ?? {}
 
 	return Object.fromEntries(
 		Object.entries(declared)
@@ -87,8 +90,8 @@ function literal_step_environment(): Record<string, string> {
 
 // Refused rather than coerced: `Number(undefined)` is `NaN`, which the stub would interpolate as the
 // string `NaN` and then never fail a call, so every retry case would pass without retrying anything.
-function withdraw_attempts(): number {
-	const declared = Number(literal_step_environment()['RETRY_ATTEMPTS'])
+function withdraw_attempts(step?: WorkflowStep): number {
+	const declared = Number(literal_step_environment(step)['RETRY_ATTEMPTS'])
 
 	if (!Number.isSafeInteger(declared)) {
 		throw new TypeError('the reconciling step declares no RETRY_ATTEMPTS')
@@ -249,7 +252,9 @@ function write_gh_stub(scenario: Case): string {
 // Runs any step's script against the stub, so kit's own withdrawal step is exercised by the same
 // `gh` the reconciling step is. A renamed step yields the empty script, which bash runs happily and
 // which would make every "does nothing" case pass without testing anything — hence the check.
-function run_step(script: string, scenario: Case): Outcome {
+function run_step(step: WorkflowStep | undefined, scenario: Case): Outcome {
+	const script = step_run(step)
+
 	expect(script).toContain(WITHDRAW_COMMAND)
 
 	const bin = write_gh_stub(scenario)
@@ -257,7 +262,7 @@ function run_step(script: string, scenario: Case): Outcome {
 		encoding: 'utf8',
 		env: {
 			...process.env,
-			...literal_step_environment(),
+			...literal_step_environment(step),
 			PATH: `${bin}:${process.env['PATH'] ?? ''}`,
 			[DECISION_VARIABLE]: scenario.should_be_armed,
 			[ENTITLEMENT_VARIABLE]: scenario.may_arm,
@@ -276,11 +281,11 @@ function run_step(script: string, scenario: Case): Outcome {
 }
 
 function run_reconcile(scenario: Case): Outcome {
-	const script = step_run(find_step(template_job(), RECONCILE_STEP_ID))
+	const step = find_step(template_job(), RECONCILE_STEP_ID)
 
-	expect(script).toContain(MERGE_COMMAND)
+	expect(step_run(step)).toContain(MERGE_COMMAND)
 
-	return run_step(script, scenario)
+	return run_step(step, scenario)
 }
 
 const reconcile_script_fixture = {
