@@ -8,7 +8,8 @@ const run_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/lib/buffered-process', () => ({
 	buffered_process: {
 		run_buffered_process: run_mock,
-		is_process_failed: (result: { exit_code: number }): boolean => result.exit_code !== 0,
+		is_process_failed: (result: { exit_code: number | undefined }): boolean =>
+			result.exit_code !== 0,
 	},
 }))
 vi.mock('#scripts/gate/type-check-step', () => ({
@@ -48,11 +49,15 @@ const ACCEPT_HINT = 'pnpm josh metrics --accept --reason "<why>"'
 const GUARD_FAILURE = 'FAIL scripts/document/document-byte-budget.test.ts > stays under budget'
 
 interface Answer {
-	exit_code: number
+	exit_code: number | undefined
 	output: string
 }
 
 const tree = { directory: '' }
+
+function heading(command: string, exit_code = FAILED): string {
+	return `✗ ${command} — exit code ${String(exit_code)}`
+}
 
 function commands(): ReadonlyArray<string> {
 	return run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -130,7 +135,7 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: TYPE_ERROR,
+			out: `${heading(TYPE_CHECK)}\n${TYPE_ERROR}`,
 		})
 	})
 
@@ -140,7 +145,7 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: GUARD_FAILURE,
+			out: `${heading(GUARD_TESTS)}\n${GUARD_FAILURE}`,
 		})
 	})
 
@@ -155,7 +160,33 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: `${TYPE_ERROR}\n\n${GUARD_FAILURE}`,
+			out: [
+				`${heading(TYPE_CHECK)}\n${TYPE_ERROR}`,
+				`${heading(GUARD_TESTS)}\n${GUARD_FAILURE}`,
+			].join('\n\n'),
+		})
+	})
+})
+
+// joshuafolkken/kit#4594: a failure that printed nothing still names its check and how it ended.
+describe('run_ship_pre_detach.checks — the failed check is named', () => {
+	const NO_OUTPUT_EXIT = 2
+
+	it('names the check and its exit code when it failed with no output', async () => {
+		answer(new Map([[EXPORTS, { exit_code: NO_OUTPUT_EXIT, output: '' }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
+			code: FAILED,
+			out: heading(EXPORTS, NO_OUTPUT_EXIT),
+		})
+	})
+
+	it('names the check as ended without an exit code when it timed out', async () => {
+		answer(new Map([[TYPE_CHECK, { exit_code: undefined, output: '' }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
+			code: FAILED,
+			out: `✗ ${TYPE_CHECK} — no exit code (timed out or ended by a signal)`,
 		})
 	})
 })
@@ -175,7 +206,7 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: unread,
+			out: `${heading(EXPORTS)}\n${unread}`,
 		})
 	})
 
@@ -217,7 +248,7 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: grown,
+			out: `${heading(metrics)}\n${grown}`,
 		})
 	})
 })

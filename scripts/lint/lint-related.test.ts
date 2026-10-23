@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { document_byte_check } from '#scripts/document/document-byte-check'
 import { gate_plan } from '#scripts/gate/gate-plan'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -33,6 +34,10 @@ vi.mock('#scripts/gate/since-green', () => ({
 vi.mock('#scripts/document/document-byte-check', () => ({
 	document_byte_check: { check_all: vi.fn(), check_files: vi.fn() },
 }))
+// Mocked so no case runs this checkout's real `josh metrics`; what it asks is `metrics-totals.test.ts`.
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { growth_notice: vi.fn() },
+}))
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
@@ -42,6 +47,7 @@ const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_byte_all = vi.mocked(document_byte_check.check_all)
 const mocked_byte_files = vi.mocked(document_byte_check.check_files)
+const mocked_notice = vi.mocked(metrics_totals.growth_notice)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
 // tree rather than checking nothing, so both branches are asserted by which runner they called.
@@ -79,6 +85,46 @@ beforeEach(() => {
 	mocked_before.mockResolvedValue(BEFORE_TREE)
 	mocked_byte_all.mockReturnValue(0)
 	mocked_byte_files.mockReturnValue(0)
+	mocked_notice.mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4594: a grown metrics total is reported in the loop rather than first at the
+// detached ship's pre-detach stop.
+describe('lint_related.run_related_lint — the metrics growth notice', () => {
+	const notice = 'josh metrics: 1 total(s) grew past the merge-base'
+
+	it('prints the growth notice beside the lint', async () => {
+		mocked_notice.mockResolvedValue(notice)
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_notice).toHaveBeenCalledWith(REPOSITORY_ROOT)
+		expect(written_output()).toContain(notice)
+	})
+
+	it('skips the whole-repository totals pass on a red lint', async () => {
+		mocked_scoped.mockResolvedValue(FAILED)
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_notice).not.toHaveBeenCalled()
+	})
+
+	it('skips the whole-repository totals pass on a run narrowed by file arguments', async () => {
+		await lint_related.run_related_lint([CHANGED_SOURCE])
+
+		expect(mocked_notice).not.toHaveBeenCalled()
+	})
+
+	it('keeps the lint exit code and its green record when a total grew', async () => {
+		mocked_notice.mockResolvedValue(notice)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
+		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
+			before: BEFORE_TREE,
+			exit_code: 0,
+		})
+	})
 })
 
 describe('lint_related.run_related_lint — the green record', () => {
