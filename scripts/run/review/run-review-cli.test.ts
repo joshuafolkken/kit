@@ -23,6 +23,13 @@ describe('join_exit_code', () => {
 	})
 })
 
+// joshuafolkken/kit#4715: a `general-purpose` review agent loaded the skill, which forked a second one.
+describe('JOIN_HINT', () => {
+	it('names the reviewer agent type, which opens no nested review agent', () => {
+		expect(run_review_cli.JOIN_HINT).toContain('as the `reviewer` agent type')
+	})
+})
+
 describe('run argument grammar', () => {
 	it('refuses an unknown flag with the usage line', async () => {
 		expect(await run_review_cli.run(['--nope'])).toBe(FAILURE_EXIT_CODE)
