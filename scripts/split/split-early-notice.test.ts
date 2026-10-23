@@ -10,10 +10,14 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		branch: vi.fn(),
-		diff_main_numstat: vi.fn(),
+		diff_numstat_since: vi.fn(),
 		git_directories: vi.fn(),
 		untracked_names: vi.fn(),
 	},
+}))
+
+vi.mock('#scripts/git/change-base', () => ({
+	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
@@ -48,7 +52,7 @@ beforeEach(() => {
 	vi.mocked(git_command.branch).mockResolvedValue(ISSUE_BRANCH)
 	vi.mocked(git_command.git_directories).mockResolvedValue([GIT_DIRECTORY])
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
-	vi.mocked(git_command.diff_main_numstat).mockResolvedValue(OVER_GUIDE_NUMSTAT)
+	vi.mocked(git_command.diff_numstat_since).mockResolvedValue(OVER_GUIDE_NUMSTAT)
 })
 
 afterEach(async () => {
@@ -77,20 +81,20 @@ describe('split_early_notice.surface over the guide', () => {
 
 describe('split_early_notice.surface under the guide', () => {
 	it('prints nothing and leaves no marker, so a later crossing still shows', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(AT_GUIDE_NUMSTAT)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(AT_GUIDE_NUMSTAT)
 		await split_early_notice.surface()
 
 		expect(console.warn).not.toHaveBeenCalled()
 		expect(existsSync(marker())).toBe(false)
 
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(OVER_GUIDE_NUMSTAT)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(OVER_GUIDE_NUMSTAT)
 		await split_early_notice.surface()
 
 		expect(console.warn).toHaveBeenCalledOnce()
 	})
 
 	it('prints nothing for a small diff', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
 		await split_early_notice.surface()
 
 		expect(console.warn).not.toHaveBeenCalled()
@@ -106,7 +110,7 @@ describe('split_early_notice.surface off an issue', () => {
 	})
 
 	it('prints nothing when the diff cannot be read', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockRejectedValue(new Error('no base'))
+		vi.mocked(git_command.diff_numstat_since).mockRejectedValue(new Error('no base'))
 
 		await expect(split_early_notice.surface()).resolves.toBeUndefined()
 		expect(console.warn).not.toHaveBeenCalled()
