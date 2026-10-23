@@ -375,7 +375,7 @@ async function supervised(
 	profile: AgentProfile,
 ): Promise<LoopStop> {
 	const source = run_wake_code.source_of(context.worktree, SCRIPT_PATH)
-	const is_stale = code_check(await run_wake_code.watch(source))
+	const is_stale = code_check(await run_wake_code.watch(source, lane_session_broker.take_refusal))
 	const ports = run_wake_ports.ports_for(context, profile, is_stale)
 	const stop = await run_wake_supervise.supervise({
 		context,
