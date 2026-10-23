@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -37,6 +45,9 @@ const LATER_OUTPUT = path.join(scratch, 'agent-8.jsonl')
 const OUTSIDE_ROOTS = '/opt/kit-lanes/agent-7.jsonl'
 const HEAD_LINE = 'HEAD 0000000000000000000000000000000000000000'
 const SINGLE_RECORD = 1
+// The permission bits are the mode below the file-type bits, `0o777` at most.
+const PERMISSION_RANGE = 0o1000
+const BROAD_MODE = 0o644
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -105,6 +116,14 @@ describe('recording where a lane’s unit writes', () => {
 		const [lane] = await lane_registry.list_lanes()
 
 		expect(lane?.seat).toBe(SEAT)
+	})
+
+	// joshuafolkken/kit#4634: rewriting the `.env` keeps it readable by its owner alone.
+	it('leaves the .env readable by its owner only', async () => {
+		writeFileSync(ENV_FILE, SEAT_LINE, { mode: BROAD_MODE })
+		await lane_output.record_output(ISSUE, UNIT_OUTPUT)
+
+		expect(statSync(ENV_FILE).mode % PERMISSION_RANGE).toBe(lane_registry.OWNER_ONLY_MODE)
 	})
 
 	it('answers none for a lane whose child has not been handed over yet', async () => {

@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import {
+	chmodSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	statSync,
+	utimesSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,6 +23,12 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 // every test here would look for lanes under the wrong root.
 vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { worktree_list: vi.fn() } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
+// Real, but a spy, so a test can switch the narrowing off and see the mode the write creates with.
+vi.mock('node:fs', async (import_original) => {
+	const actual = await import_original<{ chmodSync: (file: string, mode: number) => void }>()
+
+	return { ...actual, chmodSync: vi.fn(actual.chmodSync) }
+})
 
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { git_command } = await import('#scripts/git/git-command')
@@ -268,5 +282,37 @@ describe('every registered work tree', () => {
 			path.join(LANE_ROOT, '1490'),
 			path.join(LANE_ROOT, '1600'),
 		])
+	})
+})
+
+// joshuafolkken/kit#4634: the lane's `.env` carries the root's Telegram token, so it is written
+// readable by its owner alone — a file the write creates and one it overwrites alike.
+describe('writing a lane .env', () => {
+	// The permission bits are the mode below the file-type bits, `0o777` at most.
+	const PERMISSION_RANGE = 0o1000
+	const BROAD_MODE = 0o644
+	const SEAT_CONTENT = 'JOSH_LANE_SEAT=1\n'
+	const directory = path.join(LANE_ROOT, '4634')
+
+	function mode_of(): number {
+		return statSync(path.join(directory, '.env')).mode % PERMISSION_RANGE
+	}
+
+	// The narrowing is switched off so the create-time mode alone is checked: the file must never be
+	// readable by others, not even between the write and the narrowing.
+	it('creates it readable by its owner only', () => {
+		vi.mocked(chmodSync).mockImplementationOnce(() => undefined)
+		mkdirSync(directory, { recursive: true })
+		lane_registry.write_environment(directory, SEAT_CONTENT)
+
+		expect(mode_of()).toBe(lane_registry.OWNER_ONLY_MODE)
+	})
+
+	it('narrows an existing one it overwrites', () => {
+		mkdirSync(directory, { recursive: true })
+		writeFileSync(path.join(directory, '.env'), '', { mode: BROAD_MODE })
+		lane_registry.write_environment(directory, SEAT_CONTENT)
+
+		expect(mode_of()).toBe(lane_registry.OWNER_ONLY_MODE)
 	})
 })

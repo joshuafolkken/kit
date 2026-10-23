@@ -6,6 +6,7 @@ import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_interaction } from './review-interaction'
 import { review_record, type RecordVerdict } from './review-record'
+import { review_reviewed_tree } from './review-reviewed-tree'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
 // `/code-review` round's findings. It appends a `- rf:` line per finding to
@@ -246,16 +247,38 @@ async function carry_comment_rounds(root: string): Promise<void> {
 
 // The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
-async function append_round(
-	issue: number,
-	lines: ReadonlyArray<string>,
-	root: string,
-): Promise<number> {
+interface AppendedRound {
+	issue: number
+	lines: ReadonlyArray<string>
+	root: string
+	kind: LineKind
+	findings: ReadonlyArray<Finding>
+}
+
+const HIGH_SEVERITY = 'high'
+
+// The files whose finding the round could not have fixed in place — a High never is.
+function unsettled_files(findings: ReadonlyArray<Finding>): ReadonlyArray<string> {
+	return findings
+		.filter((finding) => finding.severity === HIGH_SEVERITY)
+		.map((finding) => finding.file)
+}
+
+// A code round also records the tree its verdict stands for, which `josh ship` reuses while the tree
+// holds still (`review-reviewed-tree.ts`); the interaction review decides nothing the ship reuses.
+async function append_round({
+	issue,
+	lines,
+	root,
+	kind,
+	findings,
+}: AppendedRound): Promise<number> {
 	const ledger_path = observation_ledger_home.issue_path(issue, root)
 
 	await observation_ledger_home.append(ledger_path, lines)
 	console.info(confirmation(lines.length, ledger_path))
 	await carry_comment_rounds(root)
+	if (kind === 'code') await review_reviewed_tree.record(unsettled_files(findings))
 
 	return 0
 }
@@ -269,11 +292,18 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = build_lines(request, observation_ledger_home.ledger_date(now), kind_of(parsed))
+	const kind = kind_of(parsed)
+	const lines = build_lines(request, observation_ledger_home.ledger_date(now), kind)
 
 	if (parsed.comment) return await post_comment(request.issue, lines)
 
-	return await append_round(request.issue, lines, root)
+	return await append_round({
+		issue: request.issue,
+		lines,
+		root,
+		kind,
+		findings: request.findings,
+	})
 }
 
 // **The default is the work tree the command runs in, a lane's inside a lane**.

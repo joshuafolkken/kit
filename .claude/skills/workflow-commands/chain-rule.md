@@ -6,17 +6,20 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), the scoped pair, the ship body draft filled in
-   (`report-format.md` → "PR 本文の受け入れ条件の対応表"), `pnpm josh ship --detach --review
-   "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
+   the implementer's self-check"), the scoped pair, `pnpm josh run:review` and its `/code-review`
+   subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
+   本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
+   round's fixes with the scoped pair, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
+   (`--cite <N>`), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
    `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
    and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
    `metrics` leaves no record it reuses. A stop relaunches a child
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing) and (Anthropic lane) the re-detach to run after
    the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
-   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`); the
-   supervisor skips a recorded round 1 unless it went stale.
+   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`). Ship
+   reuses the recorded round 1 on a tree unmoved since the record, else reviews only the
+   delta.
    `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
    rather than refused.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and

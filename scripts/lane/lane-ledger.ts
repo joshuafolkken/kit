@@ -10,6 +10,7 @@ import {
 	type HeldRecord,
 	type LedgerEntry,
 	type OverlapRecord,
+	type RoundOneRecord,
 	type RoundTwoRecord,
 	type StageRecord,
 	type StopRecord,
@@ -147,6 +148,10 @@ async function record_offerable(is_offerable: boolean, path?: string): Promise<v
 	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
 }
 
+async function record_round_one(round_one: RoundOneRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.ROUND_ONE, at: now_iso(), ...round_one }, path)
+}
+
 async function record_round_two(round_two: RoundTwoRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.ROUND_TWO, at: now_iso(), ...round_two }, path)
 }
@@ -211,6 +216,7 @@ const lane_ledger = {
 	record_merge,
 	record_overlap,
 	record_offerable,
+	record_round_one,
 	record_round_two,
 	record_stage,
 	record_stop,
@@ -233,6 +239,7 @@ export type {
 	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	RoundOneEntry,
 	RoundTwoEntry,
 	StageEntry,
 	StopEntry,
