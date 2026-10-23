@@ -1,0 +1,7 @@
+{
+	"reason": "Two file_content imports route the .aikido and dependabot.yml writes through write_contained (#4666)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}
