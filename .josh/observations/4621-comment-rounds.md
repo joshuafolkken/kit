@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/backlog/backlog-measure-close.ts:70 | 2026-10-23 | #4621

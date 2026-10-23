@@ -12,6 +12,7 @@ const KIND = {
 	OVERLAP: 'overlap',
 	HELD: 'held',
 	RELEASED: 'released',
+	ROUND_ONE: 'round-one',
 	ROUND_TWO: 'round-two',
 	OFFERABLE: 'offerable',
 	CORE_WAIT: 'core-wait',
@@ -137,6 +138,15 @@ const held_schema = z.object({
 // The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
 // the run finished, so no free lane is owed a child any more.
 const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
+// The round 1 a `josh ship` acted on for `issue`: `verdict` is the reviewer's — `clean`, `fixed`,
+// `blocking` — or `reused` where a round recorded before the ship still described the tree, so the
+// period's ship-time rounds that passed with no fix are counted (joshuafolkken/kit#4620).
+const round_one_schema = z.object({
+	kind: z.literal(KIND.ROUND_ONE),
+	at: z.string(),
+	issue: z.number(),
+	verdict: z.string(),
+})
 // One `review:round2` decision a `josh ship` acted on for `issue`: `verdict` and the stable reason
 // `code` it fell under, so the period's skips and runs are counted by why (joshuafolkken/kit#4064).
 const round_two_schema = z.object({
@@ -200,6 +210,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	overlap_schema,
 	held_schema,
 	released_schema,
+	round_one_schema,
 	round_two_schema,
 	offerable_schema,
 	core_wait_schema,
@@ -216,6 +227,7 @@ type StageEntry = z.infer<typeof stage_schema>
 type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
 type HeldEntry = z.infer<typeof held_schema>
+type RoundOneEntry = z.infer<typeof round_one_schema>
 type RoundTwoEntry = z.infer<typeof round_two_schema>
 type OfferableEntry = z.infer<typeof offerable_schema>
 type CoreWaitEntry = z.infer<typeof core_wait_schema>
@@ -224,6 +236,7 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
@@ -252,6 +265,8 @@ export type {
 	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	RoundOneEntry,
+	RoundOneRecord,
 	RoundTwoEntry,
 	RoundTwoRecord,
 	StageEntry,

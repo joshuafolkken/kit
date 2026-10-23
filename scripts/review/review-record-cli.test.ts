@@ -28,6 +28,13 @@ vi.mock('./review-comment-round', async (original) => {
 	return { review_comment_round: { ...actual.review_comment_round, carry: carry_mock } }
 })
 
+const reviewed_record_mock = vi.hoisted(() => vi.fn())
+
+// The real record would retake this checkout's reviewed-tree stamp, which a running lane reads.
+vi.mock('./review-reviewed-tree', () => ({
+	review_reviewed_tree: { record: reviewed_record_mock },
+}))
+
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
 const COMMENT_URL = 'https://example.test/comment\n'
@@ -289,6 +296,20 @@ describe('review_record_cli.run — carrying the comment rounds', () => {
 		expect(carry_mock).toHaveBeenCalledExactlyOnceWith(root)
 	})
 
+	// joshuafolkken/kit#4620: the ship reuses a code round while the tree it recorded holds still.
+	it('records the reviewed tree for a ledger round, and not for a comment round', async () => {
+		const root = root_of('reviewed-tree')
+
+		reviewed_record_mock.mockClear()
+		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
+		await quietly(async () => await review_record_cli.run(['--issue', '4620'], NOW, root))
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '4620', '--comment'], NOW, root),
+		)
+
+		expect(reviewed_record_mock).toHaveBeenCalledOnce()
+	})
+
 	it('records the round and exits 0 when the carry fails', async () => {
 		const root = root_of('carry-failed')
 
@@ -299,5 +320,24 @@ describe('review_record_cli.run — carrying the comment rounds', () => {
 
 		expect(code).toBe(0)
 		expect(existsSync(issue_file(root, 3811))).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4620: a High is never fixed in place, so the reviewed tree never vouches for its file.
+describe('review_record_cli.run — the reviewed tree', () => {
+	it('leaves the files a High cites out of the reviewed tree', async () => {
+		const root = root_of('reviewed-tree-high')
+
+		reviewed_record_mock.mockClear()
+		await quietly(
+			async () =>
+				await review_record_cli.run(
+					['--issue', '4620', 'bug-risks:high:a.ts:12', 'bug-risks:medium:b.ts'],
+					NOW,
+					root,
+				),
+		)
+
+		expect(reviewed_record_mock).toHaveBeenCalledExactlyOnceWith(['a.ts:12'])
 	})
 })
