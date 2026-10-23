@@ -129,8 +129,7 @@ function read_targets(args: ReadonlyArray<string>): ReadonlyArray<CiteTarget> | 
 	return parse_targets(parsed.positionals, parsed.values.repo)
 }
 
-// The lines `issue:cite` prints for `args`, without printing them — the `Stop` hook shows them itself
-// (`stop-actions.ts`). `undefined` for a line nobody can read.
+// The lines `issue:cite` prints for `args`, or `undefined` for a line nobody can read.
 async function cite(args: ReadonlyArray<string>): Promise<CiteReport | undefined> {
 	const targets = read_targets(args)
 	if (targets === undefined) return undefined
@@ -159,7 +158,6 @@ async function run(args: ReadonlyArray<string>): Promise<number> {
 
 const issue_cite_cli = {
 	USAGE,
-	cite,
 	parse_targets,
 	run,
 }

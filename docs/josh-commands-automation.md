@@ -202,7 +202,7 @@ It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh script
 
 <!-- usage: stop:guard -->
 
-Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin).
+Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin).
 
 ```bash
 pnpm josh stop:guard   # run by the Stop hook, the stop payload as JSON on stdin

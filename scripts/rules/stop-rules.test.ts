@@ -7,7 +7,6 @@ const { DECISION, DECISION_MESSAGE, action_kinds, context } = stop_rules_fixture
 // joshuafolkken/kit#2329: every stop reason ends on this, so a correction never reprints the reply.
 const NO_REPRINT = 'do not repeat your previous reply'
 const BARE_MESSAGE = 'done in #7'
-const QUOTING_PROMPT = 'explain this log: closed #7'
 
 describe('stop_rules.stop_outcome — stop notification', () => {
 	// joshuafolkken/kit#3919: the hook sends it itself rather than refusing the stop.
@@ -129,57 +128,19 @@ describe('stop_rules.stop_outcome — pre-gate cut', () => {
 	})
 })
 
-describe('stop_rules.stop_outcome — issue citation', () => {
-	it('prints the citation lines for a bare #N instead of refusing', () => {
-		const outcome = stop_rules.stop_outcome(context({ message: 'done in #123 and #456' }))
+// joshuafolkken/kit#4626: the reply's Issue references are the reply's own; the hook adds nothing.
+describe('stop_rules.stop_outcome — a bare #N in the reply', () => {
+	it.each([BARE_MESSAGE, 'done in #123 and #456', 'see joshuafolkken/kit#45'])(
+		'neither refuses nor acts on %j',
+		(message) => {
+			expect(stop_rules.stop_outcome(context({ message }))).toEqual(stop_rules.NO_OUTCOME)
+		},
+	)
 
-		expect(outcome.reason).toBeUndefined()
-		expect(outcome.actions).toEqual([{ kind: 'cite', references: ['#123', '#456'] }])
-	})
-
-	it('carries an owner/repo#N reference through to the cite action', () => {
-		const { actions } = stop_rules.stop_outcome(context({ message: 'see joshuafolkken/kit#45' }))
-
-		expect(actions).toEqual([{ kind: 'cite', references: ['joshuafolkken/kit#45'] }])
-	})
-
-	it('is silent on a link-form citation', () => {
-		const message = 'done in [#123](https://github.com/o/r/issues/123)'
-
-		expect(stop_rules.stop_outcome(context({ message })).reason).toBeUndefined()
-	})
-
-	it('does not block a bare #N once stop_hook_active is set', () => {
-		const outcome = stop_rules.stop_outcome(
-			context({ message: BARE_MESSAGE, stop_hook_active: true }),
-		)
-
-		expect(outcome.reason).toBeUndefined()
-	})
-
-	it('cites after the hold actions', () => {
+	it('runs only the hold actions for a held stop whose reply carries a bare #N', () => {
 		const held = { hold_issue: '7', message: `${DECISION_MESSAGE} #7` }
 
-		expect(action_kinds(held)).toEqual(['notify', 'cite'])
-	})
-})
-
-// joshuafolkken/kit#2819: a pasted log from another repository carries its own numbers.
-describe('stop_rules.stop_outcome — issue citation quoted from the prompt', () => {
-	it('is silent on a bare #N the prompt already carried', () => {
-		const outcome = stop_rules.stop_outcome(
-			context({ message: BARE_MESSAGE, prompt: QUOTING_PROMPT }),
-		)
-
-		expect(outcome.reason).toBeUndefined()
-	})
-
-	it('still cites a bare #N the prompt did not carry', () => {
-		const { actions } = stop_rules.stop_outcome(
-			context({ message: 'done in #7 and #8', prompt: QUOTING_PROMPT }),
-		)
-
-		expect(actions).toEqual([{ kind: 'cite', references: ['#8'] }])
+		expect(action_kinds(held)).toEqual(['notify'])
 	})
 })
 

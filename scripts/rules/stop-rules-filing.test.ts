@@ -63,10 +63,15 @@ describe('stop_rules.stop_outcome — filing offer in an interactive session', (
 		expect(stop_rules.stop_outcome(attended({ message: OFFER_MESSAGE })).reason).toBeUndefined()
 	})
 
-	it('leaves the other reply rules in place', () => {
-		const { actions } = stop_rules.stop_outcome(attended({ message: `${OFFER_MESSAGE} #7` }))
+	it('leaves the hold actions in place', () => {
+		const held = attended({
+			hold_issue: '7',
+			tree_clean: true,
+			notified: true,
+			message: OFFER_MESSAGE,
+		})
 
-		expect(actions).toEqual([{ kind: 'cite', references: ['#7'] }])
+		expect(stop_rules.stop_outcome(held).actions).toEqual([{ kind: 'release', issue: '7' }])
 	})
 })
 
@@ -81,7 +86,7 @@ describe('stop_rules.stop_outcome — filing offer stands down and ordering', ()
 
 	// joshuafolkken/kit#3919: a refused stop runs no action, so the held run is not notified either;
 	// joshuafolkken/kit#3961: the held reply names no decision, so that refusal rides on the same one.
-	it('refuses ahead of the citation and hold actions, running none of them', () => {
+	it('refuses ahead of the hold actions, running none of them', () => {
 		const held = unattended({ hold_issue: '7', message: `${OFFER_MESSAGE} #7` })
 
 		expect(stop_rules.stop_outcome(held)).toEqual({

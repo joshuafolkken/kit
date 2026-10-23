@@ -71,9 +71,9 @@ payload carries no tool call. A row that needs the model answers with `{"decisio
 the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
 
 **A row whose answer is fixed acts instead of refusing** (joshuafolkken/kit#3919). The stop
-notification, the hold release and the citation lines are each one operation whose arguments the hook
-already holds, so `stop-actions.ts` runs them in process — the same `send_values`, `run_hold_cli.run`
-and `issue_cite_cli.cite` the commands call, since three `pnpm` launches would spend most of the
+notification and the hold release are each one operation whose arguments the hook already holds, so
+`stop-actions.ts` runs them in process — the same `send_values` and `run_hold_cli.run` the commands
+call, since two `pnpm` launches would spend most of the
 20-second budget — and reports them as a `systemMessage`. A refusal there cost a whole model turn to
 run a command the hook already knew. Only an action that fails falls back to its old refusal, and
 never past `stop_hook_active`. The actions run only on a stop that goes through, so a refused stop
@@ -116,7 +116,7 @@ The implementation reuse and verdict details taken out of the procedure's list.
 - **No file body on the shell** — the existence check is one `stat`
 - **The stop notice / releasing the hold** — the hold is read off the `run:hold` record, and a clean
   tree as an empty `git status --porcelain`
-- **The Issue-citation format / the offer to file** — reads `last_assistant_message`; whether
+- **The offer to file** — reads `last_assistant_message`; whether
   anything was filed uses `filing_cap`'s count, a third party is judged by `repo_party.classify`, and
   the row stays silent while `stop_hook_active` is set
 - **Appending to a rule body** — the stand-down came with joshuafolkken/kit#2324: it stands down once the transcript tail records both `oracle:list` and
@@ -410,12 +410,11 @@ test file pins:
   and, on the real delivery route, "refused every time until both commands have run". The same suite
   checks that the message carries question 0 (`oracle:list`) and the ordering question (`run:step`),
   and that the single source is `residency.md`
-- `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the four stop rules (the stop
-  notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
-  and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
-  `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
+- `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the three stop rules (the stop
+  notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`)
+  and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts` and
+  `scripts/rules/filing-offer.test.ts` pin firing and
   silence (hold × no notice sends the notify; clean × hold releases it; dirty or notified is silent;
   `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
-  repository or an unknown owner is silent; a bare `#N` prints the citation lines, while one in link form, a code fence,
-  inline code, a quoted line or a PR reference is silent), and
+  repository or an unknown owner is silent; a bare `#N` in the reply neither acts nor blocks), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring
