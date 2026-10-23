@@ -7,6 +7,7 @@ import { execaSync } from 'execa'
 
 const SECRETLINT_BIN = 'secretlint'
 const NO_GLOB_FLAG = '--no-glob'
+const END_OF_OPTIONS = '--'
 const ARGV_OFFSET = 2
 
 // The scan is defense in depth ahead of GitHub push protection, not the only gate, so a
@@ -31,9 +32,10 @@ function resolve_secretlint_binary(project_root: string): string | undefined {
 
 // lefthook substitutes literal paths, so `--no-glob` is mandatory: a SvelteKit route directory
 // such as `(app)` or `[id]` would otherwise reach secretlint's glob engine as a pattern.
-// Masking and the .gitignore cascade are both on by default in v13 — no flag adds them.
+// Masking and the .gitignore cascade are both on by default in v13 — no flag adds them. `--` ends
+// the options, so a staged file named like `--secretlintrc=evil.json` stays a path, not a flag.
 function build_scan_arguments(staged_files: ReadonlyArray<string>): Array<string> {
-	return [NO_GLOB_FLAG, ...staged_files]
+	return [NO_GLOB_FLAG, END_OF_OPTIONS, ...staged_files]
 }
 
 function plan_scan(staged_files: ReadonlyArray<string>, project_root: string): ScanDecision {

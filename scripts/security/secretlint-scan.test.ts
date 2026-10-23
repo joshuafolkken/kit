@@ -47,7 +47,19 @@ describe('secretlint_scan.build_scan_arguments', () => {
 	it('passes --no-glob ahead of the staged files', () => {
 		expect(secretlint_scan.build_scan_arguments(STAGED_FILES)).toStrictEqual([
 			'--no-glob',
+			'--',
 			...STAGED_FILES,
+		])
+	})
+
+	// A staged file can be named like a flag; behind `--` secretlint reads it as a path.
+	it('places a file name starting with - after the end of the options', () => {
+		const flag_like = '--secretlintrc=evil.json'
+
+		expect(secretlint_scan.build_scan_arguments([flag_like])).toStrictEqual([
+			'--no-glob',
+			'--',
+			flag_like,
 		])
 	})
 

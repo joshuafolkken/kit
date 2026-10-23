@@ -1,0 +1,7 @@
+{
+	"reason": "Encode ref names in gh api paths; add branch_protection_checks_api_path so ruleset-check builds its paths from one source #4670",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

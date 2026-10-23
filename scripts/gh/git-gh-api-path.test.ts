@@ -100,6 +100,41 @@ describe('commit_status_api_path', () => {
 	})
 })
 
+// A ref name is one path segment: unencoded, `?` and `#` end the path and `/` adds segments.
+describe('ref name encoding', () => {
+	it.each([
+		['feature/x', 'feature%2Fx'],
+		['fix?x', 'fix%3Fx'],
+		['fix#1', 'fix%231'],
+	])('encodes the branch %s in the rules path', (branch, encoded) => {
+		expect(git_gh_api_path.branch_rules_api_path(branch)).toBe(
+			`${CURRENT_REPO_PATH}/rules/branches/${encoded}`,
+		)
+	})
+
+	it('encodes the branch in the protection checks path', () => {
+		expect(git_gh_api_path.branch_protection_checks_api_path('a/b?c#d', REPO)).toBe(
+			`repos/${REPO}/branches/a%2Fb%3Fc%23d/protection/required_status_checks`,
+		)
+	})
+
+	it('encodes the tag in the tag reference and release paths', () => {
+		expect(git_gh_api_path.tag_ref_api_path('v1/rc?#')).toBe(
+			`${CURRENT_REPO_PATH}/git/ref/tags/v1%2Frc%3F%23`,
+		)
+		expect(git_gh_api_path.release_by_tag_api_path('v1/rc?#')).toBe(
+			`${CURRENT_REPO_PATH}/releases/tags/v1%2Frc%3F%23`,
+		)
+	})
+
+	// The repository keeps its `/`: it is two segments, owner and name.
+	it('leaves the repository unencoded', () => {
+		expect(git_gh_api_path.branch_rules_api_path('main', REPO)).toBe(
+			`repos/${REPO}/rules/branches/main`,
+		)
+	})
+})
+
 describe('pull_merge_api_path', () => {
 	it('builds the merge endpoint under the current repository', () => {
 		expect(git_gh_api_path.pull_merge_api_path('7')).toBe(`${CURRENT_REPO_PATH}/pulls/7/merge`)
