@@ -77,7 +77,7 @@ const PRETOOL_GUARD_TOOLS = ['Bash', 'Edit', 'Read', 'Write', 'AskUserQuestion',
 // any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
 // rather than a push that dies after the unit suite has already run. It goes through the shared
 // launcher like every other hook (joshuafolkken/kit#3256), so a bundle runs it instead of `pnpm josh`.
-const PROVISION_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision')
+const PROVISION_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision --session-start')
 // Derived from the download's own bound for the reason the formatter's is: a harness kill lands
 // mid-write, and the staging file this script renames from is the only thing that makes that
 // survivable. Raising the download budget has to raise the declared timeout with it.

@@ -1,5 +1,6 @@
 import { repo_discovery } from './repo-discovery'
 import { repo_origin } from './repo-origin'
+import { session_owner_pin } from './session-owner-pin'
 
 // **First-party vs third-party, computed rather than judged**. `CLAUDE.md`
 // and `upstream-interrupt.md` both declared the test mechanical — owner equality between the target
@@ -36,15 +37,25 @@ function target_owner(owner_repo: string): string | undefined {
 	return repo_origin.parse_origin_url(`https://${repo_origin.GITHUB_HOST}/${owner_repo}`)?.owner
 }
 
-// The owner of the repository the session runs in, read locally from its `origin` — no network call
-// and no authenticated CLI, so the guard that consults it stays synchronous.
+// The owner of the repository the session runs in: the one pinned at session start, else read
+// locally from its `origin` — no network call and no authenticated CLI, so the guard that consults it
+// stays synchronous. The pin is what keeps a mid-session remote rewrite from changing the answer
+// (`session-owner-pin.ts`).
 function current_owner(repository_path: string = process.cwd()): string | undefined {
-	return repo_discovery.resolve_current_owner(repository_path)
+	return (
+		session_owner_pin.pinned(repository_path) ??
+		repo_discovery.resolve_current_owner(repository_path)
+	)
 }
 
-// The owner `GH_REPO` names, read from its last two segments so an optional host prefix is skipped.
+// The owner a `[HOST/]OWNER/REPO` selector names — `GH_REPO`, or `gh`'s `-R` / `--repo` value — read
+// from its last two segments so an optional host prefix is skipped.
+function selector_owner(selector: string): string | undefined {
+	return target_owner(selector.split('/').slice(-GH_REPO_PATH_SEGMENTS).join('/'))
+}
+
 function gh_repo_owners(gh_repo: string): Array<string | undefined> {
-	return [target_owner(gh_repo.split('/').slice(-GH_REPO_PATH_SEGMENTS).join('/'))]
+	return [selector_owner(gh_repo)]
 }
 
 // The owner of every remote the work tree declares. A remote whose owner cannot be read stays in the
@@ -80,6 +91,7 @@ const repo_party = {
 	classify,
 	current_owner,
 	placeholder_owners,
+	selector_owner,
 	target_owner,
 }
 

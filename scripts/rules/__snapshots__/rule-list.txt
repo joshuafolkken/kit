@@ -1,8 +1,8 @@
 # Trigger-delivered rules — rendered by `pnpm josh rule:list` from `scripts/rules/delivered-rules.ts`
 
 - **Third-party write** (`third-party-write`, `upstream-interrupt.md`)
-  - fires: `pnpm josh pretool:guard` — a `gh api` write (field flag or a write method) to a repository whose owner is not this session. Every occurrence
-  - silent: a read, or a first-party owner (`pnpm josh repo:party`)
+  - fires: `pnpm josh pretool:guard` — a `gh api` write (field flag or a write method) or a `gh <group> <action>` write selected by `-R` / `GH_REPO` to a repository whose owner is not this session, or a `gh api graphql` call whose line names `mutation` or whose query the shell expands, outside the merge and administration rows. Every occurrence
+  - silent: a read, a GraphQL query, or a first-party owner (pinned at session start, `pnpm josh repo:party`)
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Credential in a body** (`credential-body`, `shell-body.md`)
   - fires: `pnpm josh pretool:guard` — a `gh api` call whose field value, or the file `-F key=@<path>` / `--input <path>` names, holds a token-shaped string (`token-shape.ts`). Every occurrence

@@ -1,5 +1,5 @@
 import type { FileMapStampAccess } from '#scripts/josh/file-map-stamp'
-import { gate_tree } from './gate-tree'
+import { gate_tree, type GateTree } from './gate-tree'
 import { moved_paths, type MovedParts } from './moved-paths'
 import { verification_inputs } from './verification-inputs'
 
@@ -34,17 +34,19 @@ function is_narrowable(label: string, parts: MovedParts | undefined): parts is M
 
 // What moved with a main sync's part kept apart, for a caller that records how much of its input the
 // sync brought in (`josh test:related`, joshuafolkken/kit#4465). `label` names the gate check whose
-// declaration (`verification-inputs.ts`) the record vouches for.
+// declaration (`verification-inputs.ts`) the record vouches for. `tree` is the caller's own reading of
+// the gate tree, so a run that also records its green tree reads it once (joshuafolkken/kit#4655).
 async function read_moved_parts(
 	stamp: FileMapStampAccess,
 	label: string,
 	source?: string,
+	tree?: GateTree,
 ): Promise<MovedParts | undefined> {
 	const record = stamp.read(source)
 
 	if (record === undefined || !stamp.describes_inputs(record)) return undefined
 
-	const parts = await moved_paths.moved_parts(record, await gate_tree.read_gate_tree())
+	const parts = await moved_paths.moved_parts(record, tree ?? (await gate_tree.read_gate_tree()))
 
 	return is_narrowable(label, parts) ? parts : undefined
 }
@@ -54,8 +56,9 @@ async function read_moved(
 	stamp: FileMapStampAccess,
 	label: string,
 	source?: string,
+	tree?: GateTree,
 ): Promise<ReadonlyArray<string> | undefined> {
-	const parts = await read_moved_parts(stamp, label, source)
+	const parts = await read_moved_parts(stamp, label, source, tree)
 
 	return parts === undefined ? undefined : moved_paths.union_of(parts)
 }

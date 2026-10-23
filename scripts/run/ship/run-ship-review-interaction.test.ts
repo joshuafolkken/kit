@@ -1,15 +1,17 @@
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// joshuafolkken/kit#4276: after round 1, a change to the run tooling owes the interaction review —
-// `run_ship_review_steps.review_stage` runs it itself. The round-1 cases are in
-// `run-ship-review-steps.test.ts`.
+// joshuafolkken/kit#4276: a change to the run tooling owes the interaction review —
+// `run_ship_review_steps.review_stage` runs it itself, beside round 1 (joshuafolkken/kit#4672). The
+// round-1 cases are in `run-ship-review-steps.test.ts`.
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
 const record_check_mock = vi.hoisted(() => vi.fn())
 const interaction_status_mock = vi.hoisted(() => vi.fn())
 const read_stamp_text = vi.hoisted(() => vi.fn())
+const mark_stopped = vi.hoisted(() => vi.fn())
+const record_round_one = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
@@ -49,10 +51,10 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 		discard: vi.fn(),
 		is_stopped_on: () => false,
 		is_unmoved_here: async () => true,
-		mark_stopped: vi.fn(),
+		mark_stopped,
 	},
 }))
-vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_round_one: vi.fn() } }))
+vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_round_one } }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 
@@ -66,13 +68,23 @@ const RECORD = `review:record --issue ${ISSUE}`
 const INTERACTION_BRIEF = 'review:brief --interaction'
 const INTERACTION_RECORD = `${RECORD} --interaction`
 const HIGH = 'bug-risks:high:scripts/run/run-board.ts:4'
+const INTERACTION_HIGH = 'bug-risks:high:scripts/lane/lane-close.ts:7'
+const INTERACTION_PATH = 'interaction-'
 const MISSING = 'missing'
+const NOT_REQUIRED = 'not-required'
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
 }
 
-async function stage(): Promise<{ code: number }> {
+// Each slot's findings file: the interaction slot's paths carry its prefix.
+function findings_by_slot(code: string, interaction: string): void {
+	read_stamp_text.mockImplementation((path: string) =>
+		path.includes(INTERACTION_PATH) ? interaction : code,
+	)
+}
+
+async function stage(): Promise<{ code: number; out: string }> {
 	return await run_ship_review_steps.review_stage(ISSUE)
 }
 
@@ -82,12 +94,14 @@ beforeEach(() => {
 	record_check_mock.mockReset().mockResolvedValue({ status: MISSING })
 	interaction_status_mock.mockReset()
 	read_stamp_text.mockReset().mockReturnValue('')
+	mark_stopped.mockReset()
+	record_round_one.mockReset()
 	// Read through git, the tree is this checkout's change, which no case here asserts on (joshuafolkken/kit#4597).
 	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue({ files: {}, base: undefined })
 })
 
 describe('run_ship_review_steps.review_stage — the interaction review', () => {
-	it.each(['not-required', 'ok'])('runs none when its status is %s', async (status) => {
+	it.each([NOT_REQUIRED, 'ok'])('runs none when its status is %s', async (status) => {
 		interaction_status_mock.mockResolvedValue(status)
 
 		expect(await stage()).toHaveProperty('code', OK)
@@ -95,17 +109,16 @@ describe('run_ship_review_steps.review_stage — the interaction review', () => 
 		expect(launch).toHaveBeenCalledOnce()
 	})
 
-	it('runs its brief, a reviewer, attest and an interaction record after round 1', async () => {
-		interaction_status_mock.mockResolvedValue(MISSING)
+	it('runs its brief and reviewer beside round 1, one join and one attest for both', async () => {
+		interaction_status_mock.mockResolvedValueOnce(MISSING).mockResolvedValue('ok')
 
 		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([
 			OPEN,
+			INTERACTION_BRIEF,
 			JOIN,
 			ATTEST,
 			RECORD,
-			INTERACTION_BRIEF,
-			ATTEST,
 			INTERACTION_RECORD,
 		])
 		expect(launch).toHaveBeenCalledTimes(2)
@@ -131,11 +144,67 @@ describe('run_ship_review_steps.review_stage — the interaction review beside r
 		expect(commands().at(-1)).toBe(`${INTERACTION_RECORD} ${HIGH}`)
 	})
 
-	it('runs none after a round 1 that stopped', async () => {
-		interaction_status_mock.mockResolvedValue(MISSING)
+	it('runs it alone when a round-1 fix first made it due', async () => {
+		interaction_status_mock.mockResolvedValueOnce(NOT_REQUIRED).mockResolvedValue(MISSING)
+
+		expect(await stage()).toHaveProperty('code', OK)
+		expect(commands()).toStrictEqual([
+			OPEN,
+			JOIN,
+			ATTEST,
+			RECORD,
+			INTERACTION_BRIEF,
+			ATTEST,
+			INTERACTION_RECORD,
+		])
+	})
+
+	it('runs none after a round 1 that stopped before it was due', async () => {
+		interaction_status_mock.mockResolvedValueOnce(NOT_REQUIRED).mockResolvedValue(MISSING)
 		read_stamp_text.mockReturnValue(HIGH)
 
 		expect(await stage()).toHaveProperty('code', FAILED)
-		expect(commands()).not.toContain(INTERACTION_BRIEF)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${HIGH}`])
+		expect(launch).toHaveBeenCalledOnce()
+	})
+})
+
+describe('run_ship_review_steps.review_stage — a High in either review beside round 1', () => {
+	it('records both and stops once, carrying both findings', async () => {
+		interaction_status_mock.mockResolvedValue(MISSING)
+		findings_by_slot(HIGH, INTERACTION_HIGH)
+
+		const result = await stage()
+
+		expect(result).toHaveProperty('code', FAILED)
+		expect(commands()).toContain(`${RECORD} ${HIGH}`)
+		expect(commands()).toContain(`${INTERACTION_RECORD} ${INTERACTION_HIGH}`)
+		expect(result.out).toContain('run-board.ts')
+		expect(result.out).toContain('lane-close.ts')
+		expect(mark_stopped).toHaveBeenCalledExactlyOnceWith(Number(ISSUE), true)
+		expect(record_round_one).toHaveBeenCalledExactlyOnceWith({
+			issue: Number(ISSUE),
+			verdict: 'blocking',
+		})
+	})
+
+	it('counts round 1 as fixed when only the interaction review fixed in place', async () => {
+		interaction_status_mock.mockResolvedValueOnce(MISSING).mockResolvedValue('ok')
+		findings_by_slot('', `fixed ${INTERACTION_HIGH.replace('high', 'medium')}`)
+
+		expect(await stage()).toHaveProperty('code', OK)
+		expect(record_round_one).toHaveBeenCalledExactlyOnceWith({
+			issue: Number(ISSUE),
+			verdict: 'fixed',
+		})
+	})
+
+	it('stops when only the interaction review has a High', async () => {
+		interaction_status_mock.mockResolvedValue(MISSING)
+		findings_by_slot('', INTERACTION_HIGH)
+
+		expect(await stage()).toHaveProperty('code', FAILED)
+		expect(commands()).toContain(RECORD)
+		expect(commands().at(-1)).toBe(`${INTERACTION_RECORD} ${INTERACTION_HIGH}`)
 	})
 })

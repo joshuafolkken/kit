@@ -65,17 +65,17 @@ describe('unused_members_check.run_unused_members', () => {
 })
 
 describe('unused_members_check.run_unused_members — narrowed to files', () => {
-	it('names only the unused members the given files declare', async () => {
+	it('names only the unused members of namespaces the given files declare or import', async () => {
 		const output = capture()
-		const root = create_project(with_reader(READ_KEPT))
-		const library_exit = await unused_members_check.run_unused_members(root, [
-			path.join(root, 'library.ts'),
-		])
-		const reader_exit = await unused_members_check.run_unused_members(root, [
-			path.join(root, 'reader.ts'),
-		])
+		const root = create_project([...with_reader(READ_KEPT), ['other.ts', 'export const a = 1']])
+		const exits = await Promise.all(
+			['library.ts', 'reader.ts', 'other.ts'].map(
+				async (file) =>
+					await unused_members_check.run_unused_members(root, [path.join(root, file)]),
+			),
+		)
 
-		expect([library_exit, reader_exit]).toStrictEqual([FAIL_EXIT_CODE, PASS_EXIT_CODE])
+		expect(exits).toStrictEqual([FAIL_EXIT_CODE, FAIL_EXIT_CODE, PASS_EXIT_CODE])
 		expect(output.error.join('\n')).toContain(DROPPED_LINE)
 	})
 })

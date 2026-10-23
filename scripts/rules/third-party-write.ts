@@ -1,6 +1,10 @@
 import { repo_party } from '#scripts/discovery/repo-party'
 import { bash_triggers } from './bash-triggers'
 import { gh_api } from './gh-api'
+import { gh_repo_selector } from './gh-repo-selector'
+import { git_argv } from './git-argv'
+import { pr_merge } from './pr-merge'
+import { repo_admin } from './repo-admin'
 import { shell_segments } from './shell-segments'
 
 // The trigger and the delivered text behind the `third-party-write` row of `delivered-rules.ts`.
@@ -70,44 +74,126 @@ function candidates_at(
 	return has_moved ? unreadable_candidates : resolve_placeholder_owners
 }
 
-// The session owner is read only when a segment is actually a `gh api` write to a repository — so an
-// ordinary shell line, and every read, pays nothing for the local config read. `resolve_owner` and
+// A merge or an administration write is refused by its own row whoever owns the target, and one
+// refusal is what a PreToolUse hook carries — so the two readings this row added for
+// joshuafolkken/kit#4659 leave those to the row that names them. Asked only of a candidate, so an
+// ordinary shell line pays nothing for it.
+function is_claimed_by_narrower_row(command: string): boolean {
+	return pr_merge.is_pr_merge(command) || repo_admin.is_repo_admin_write(command)
+}
+
+// **A GraphQL mutation names no repository this guard can read** (joshuafolkken/kit#4659): its target
+// is a node id inside the body, so it is refused whoever owns the session — the disposition
+// `pr-merge.ts` takes for a GraphQL body it cannot read, which that row already refuses for a body
+// read from a file or computed by the shell. A query passes. The keyword is looked for in the whole
+// line, because the segment cut ignores quotes and a multi-line query splits across it. A query field
+// the shell expands (`query="$Q"`, or the whole argument quoted: `"query=$Q"`) hides its keyword the
+// same way, so it is refused as a mutation; a single-quoted `query='query($o: String!) {…}'` is
+// literal and still read. A body read from a file is `pr-merge.ts`'s, which refuses it already.
+const GRAPHQL_MUTATION = /\bmutation\b/u
+const EXPANDED_QUERY = /^(?:-[fF])?"?query=(?!')[\s\S]*\$/u
+
+function is_hidden_or_mutation(command: string, args: ReadonlyArray<string>): boolean {
+	return GRAPHQL_MUTATION.test(command) || args.some((argument) => EXPANDED_QUERY.test(argument))
+}
+
+// The arguments of a `gh api` GraphQL call, or `undefined` when the segment is not one.
+function graphql_args(segment: string): ReadonlyArray<string> | undefined {
+	const call = git_argv.program_of(segment)
+
+	if (call === undefined || !gh_api.is_gh_api(segment)) return undefined
+
+	return pr_merge.is_graphql_call(call.name, call.args) ? call.args : undefined
+}
+
+function is_graphql_mutation(command: string, segment: string): boolean {
+	const args = graphql_args(segment)
+
+	if (args === undefined) return false
+
+	return is_hidden_or_mutation(command, args) && !is_claimed_by_narrower_row(command)
+}
+
+// **A `gh <group> <action> -R <owner>/<repo>` write is judged by its selector** (kit#4659).
+// A selector whose owner cannot be read (`-R "$REPO"`) is refused, like an unreadable placeholder
+// candidate: it is a repository `gh` really writes to.
+function is_third_party_selector_write(
+	command: string,
+	segments: ReadonlyArray<string>,
+	index: number,
+	session_owner: string | undefined,
+): boolean {
+	const selectors = gh_repo_selector.write_selectors(segments, index)
+	const is_third_party = selectors.some((selector) => {
+		const owner = repo_party.selector_owner(selector)
+
+		return (
+			owner === undefined || repo_party.classify(session_owner, owner) === repo_party.THIRD_PARTY
+		)
+	})
+
+	return is_third_party && !is_claimed_by_narrower_row(command)
+}
+
+function is_owner_dependent_write(segments: ReadonlyArray<string>, index: number): boolean {
+	const segment = segments[index] ?? ''
+
+	if (gh_api.is_gh_api(segment)) return gh_api.is_write(segment)
+
+	return gh_repo_selector.write_selectors(segments, index).length > 0
+}
+
+function writes_to_third_party_owner(
+	command: string,
+	segments: ReadonlyArray<string>,
+	resolve_owner: () => string | undefined,
+	resolve_placeholder_owners: () => Array<string | undefined>,
+): boolean {
+	if (segments.every((_segment, index) => !is_owner_dependent_write(segments, index))) return false
+
+	const session_owner = resolve_owner()
+
+	return segments.some(
+		(segment, index) =>
+			is_third_party_selector_write(command, segments, index, session_owner) ||
+			is_third_party_write_segment(
+				segment,
+				session_owner,
+				candidates_at(segments, index, resolve_placeholder_owners),
+			),
+	)
+}
+
+// The session owner is read only when a segment is actually a repository write — so an ordinary shell
+// line, and every read, pays nothing for the local config read. `resolve_owner` and
 // `resolve_placeholder_owners` are injected so the suite fixes the owners without touching the real
 // remotes, the way `file-body.ts` injects `has_file`. Each segment is judged on its own, so a `gh api`
 // write quoted inside another command's argument is read as the write it is not, exactly as every
-// other trigger here reads its own.
+// other trigger here reads its own. The cut is by program — a pipe and a background `&` cut too, a
+// quoted one does not — after joining backslash-continued lines, so `echo hi | gh pr comment …` and a
+// `gh api graphql \⏎ -f query=…` are each read as the one `gh` call they launch.
 function writes_third_party(
 	command: string,
 	resolve_owner: () => string | undefined = repo_party.current_owner,
 	resolve_placeholder_owners: () => Array<string | undefined> = repo_party.placeholder_owners,
 ): boolean {
-	const segments = shell_segments.segments_of(command)
-	const has_write = segments.some(
-		(segment) => gh_api.is_gh_api(segment) && gh_api.is_write(segment),
+	const segments = shell_segments.quote_aware_commands_of(
+		shell_segments.joined_continuations(command),
 	)
 
-	if (!has_write) return false
+	if (segments.some((segment) => is_graphql_mutation(command, segment))) return true
 
-	const session_owner = resolve_owner()
-
-	return segments.some((segment, index) =>
-		is_third_party_write_segment(
-			segment,
-			session_owner,
-			candidates_at(segments, index, resolve_placeholder_owners),
-		),
-	)
+	return writes_to_third_party_owner(command, segments, resolve_owner, resolve_placeholder_owners)
 }
 
 // The instruction in the shape a refusal can carry: what the command does, why it is Tier C, and what
 // to do instead. The command that computes the party is handed over, because the whole point of this
 // Issue is that the test is computed rather than judged.
 const THIRD_PARTY_WRITE_REASON =
-	'⛔ third-party write: this `gh api` call writes to a repository whose owner is not this session, ' +
-	'which is Tier C and needs explicit current-turn user instruction. Check with ' +
-	'`pnpm josh repo:party <owner/repo>`, then record the finding on our own Issue and draft the ' +
-	'artifact for a person to post. This rule fires on every occurrence ' +
-	'(`prompts/collaboration-workflow/upstream-interrupt.md`).'
+	"⛔ third-party write: this `gh` call writes to another owner's repository, or one it cannot " +
+	'read (a GraphQL mutation, an unreadable `-R`) — Tier C. Check `pnpm josh repo:party ' +
+	'<owner/repo>`; first-party, use a REST `repos/<owner>/<repo>` path. Else record it on our ' +
+	'Issue and draft it for a person to post. Fires on every occurrence (`upstream-interrupt.md`).'
 
 // `decide` returns true so it refuses every occurrence; it declares no `keeps` — not writing to
 // another owner's tracker is the absence of a call, not a call, so the row is reported unmeasured
@@ -121,8 +207,9 @@ const ROW = {
 		title: 'Third-party write',
 		topic: '`upstream-interrupt.md`',
 		fires:
-			'a `gh api` write (field flag or a write method) to a repository whose owner is not this session. Every occurrence',
-		quiet: 'a read, or a first-party owner (`pnpm josh repo:party`)',
+			'a `gh api` write (field flag or a write method) or a `gh <group> <action>` write selected by `-R` / `GH_REPO` to a repository whose owner is not this session, or a `gh api graphql` call whose line names `mutation` or whose query the shell expands, outside the merge and administration rows. Every occurrence',
+		quiet:
+			'a read, a GraphQL query, or a first-party owner (pinned at session start, `pnpm josh repo:party`)',
 	},
 }
 

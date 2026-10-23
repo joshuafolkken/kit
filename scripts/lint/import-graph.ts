@@ -45,6 +45,7 @@ interface ProjectConfig {
 
 interface ImportGraph {
 	closure_hash: (file: string) => string
+	imports: (file: string, content?: string) => ReadonlyArray<string>
 	importers: (files: ReadonlyArray<string>, universe: ReadonlyArray<string>) => ReadonlySet<string>
 }
 
@@ -139,12 +140,12 @@ function resolve_type(resolver: Resolver, name: string, file: string): Dependenc
 	return as_dependency(resolved?.resolvedFileName, resolved?.isExternalLibraryImport)
 }
 
-function references_of(context: GraphContext, file: string): Array<Dependency | undefined> {
-	const processed = context.typescript.preProcessFile(
-		file_reader.read_if_readable(file) ?? '',
-		true,
-		true,
-	)
+function references_of(
+	context: GraphContext,
+	file: string,
+	content: string,
+): Array<Dependency | undefined> {
+	const processed = context.typescript.preProcessFile(content, true, true)
 
 	return [
 		...processed.importedFiles.map((reference) =>
@@ -160,7 +161,9 @@ function references_of(context: GraphContext, file: string): Array<Dependency | 
 function direct_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
 	const known = context.dependencies.get(file)
 	if (known !== undefined) return known
-	const found = references_of(context, file).filter((dependency) => dependency !== undefined)
+	const found = references_of(context, file, file_reader.read_if_readable(file) ?? '').filter(
+		(dependency) => dependency !== undefined,
+	)
 
 	context.dependencies.set(file, found)
 
@@ -254,6 +257,19 @@ function closure_hash(context: GraphContext, file: string): string {
 	return input_fingerprint.of_entries(tokens)
 }
 
+// The project's own files `file` imports directly; a package's are left out. `content` reads another
+// text of the file in its place — its version at another revision — resolved from where it sits now.
+function imports(context: GraphContext, file: string, content?: string): Array<string> {
+	const dependencies =
+		content === undefined
+			? direct_dependencies(context, file)
+			: references_of(context, file, content).filter((dependency) => dependency !== undefined)
+
+	return dependencies
+		.filter((dependency) => !dependency.external)
+		.map((dependency) => dependency.file)
+}
+
 function append(map: Map<string, Array<string>>, key: string, value: string): void {
 	const known = map.get(key)
 
@@ -316,6 +332,7 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 
 	return {
 		closure_hash: (file) => closure_hash(context, file),
+		imports: (file, content) => imports(context, file, content),
 		importers: (files, universe) => importers(context, files, universe),
 	}
 }
