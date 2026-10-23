@@ -454,9 +454,9 @@ jobs:
   # `scripts/ci/ci-yml-action-parity.test.ts` compares the two files without the action's own pins
   # (joshuafolkken/kit#3095).
   #
-  # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
-  # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
-  # exactly as it did inside the gate step.
+  # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `josh test:unit` sizes a
+  # lone run's claim on a 4-core runner at vitest's own default, three workers plus vitest itself
+  # (`gate_plan.direct_unit_weight`, joshuafolkken/kit#4607).
   # **Sharded across runners, because one runner is already saturated** (joshuafolkken/kit#3220).
   # Alone on a 4-core runner vitest takes every core, so the suite can only get faster by spreading
   # its files over more machines. `fail-fast: false` keeps a red shard from cancelling the others,

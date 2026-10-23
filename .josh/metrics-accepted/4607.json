@@ -1,0 +1,7 @@
+{
+	"reason": "direct_solo_workers: a lone direct unit run no longer subtracts the gate's sibling reservation, so a 4-core CI runner gets vitest's default workers instead of one (#4607)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

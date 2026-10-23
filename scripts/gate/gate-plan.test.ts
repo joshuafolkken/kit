@@ -258,26 +258,40 @@ describe('gate_plan.check_memory — the memory a check holds', () => {
 // joshuafolkken/kit#3345: a lone direct `josh test:unit` claimed every core, so FIFO admission held it
 // until the ledger emptied and every later claim from other lanes queued behind it.
 describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves', () => {
-	it.each([MEASURED_CORES, MID_SIZED_CORES])(
-		'weighs a lone run on %i cores as the gate weighs its workers, plus vitest itself',
-		(cores) => {
-			const plan = gate_plan.resolve_gate_plan(cores)
+	it('weighs a lone run on the measured machine as the gate weighs its workers, plus vitest itself', () => {
+		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
-			expect(gate_plan.direct_unit_weight(cores, 0)).toBe(
-				gate_plan.check_weight(unit_check(), plan, cores) + unit_worker_share.MAIN_PROCESS_CORES,
-			)
-		},
-	)
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBe(
+			gate_plan.check_weight(unit_check(), plan, MEASURED_CORES) +
+				unit_worker_share.MAIN_PROCESS_CORES,
+		)
+	})
 
 	it('never claims the whole machine', () => {
 		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBeLessThan(MEASURED_CORES)
 	})
 
-	// joshuafolkken/kit#4362: the claim held the workers alone, not the vitest process driving them.
-	it('claims one worker and vitest itself on a runner the static checks fill', () => {
+	// joshuafolkken/kit#4607: the gate's sibling reservation sized a lone CI run to one worker.
+	it("claims vitest's default workers and vitest itself on a four-core runner", () => {
+		const vitest_default = CI_CORES - unit_worker_share.MAIN_PROCESS_CORES
+
 		expect(gate_plan.direct_unit_weight(CI_CORES, 0)).toBe(
-			unit_worker_share.MIN_WORKERS + unit_worker_share.MAIN_PROCESS_CORES,
+			vitest_default + unit_worker_share.MAIN_PROCESS_CORES,
 		)
+	})
+
+	it('claims no more on a mid-sized machine than on the measured one', () => {
+		expect(gate_plan.direct_unit_weight(MID_SIZED_CORES, 0)).toBe(
+			gate_plan.direct_unit_weight(MEASURED_CORES, 0),
+		)
+	})
+
+	it('never shrinks as the machine grows', () => {
+		const weights = Array.from({ length: CORE_COUNTS_PROBED }, (_, index) =>
+			gate_plan.direct_unit_weight(index + 1, 0),
+		)
+
+		expect(weights).toStrictEqual(weights.toSorted((left, right) => left - right))
 	})
 })
 
