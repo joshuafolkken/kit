@@ -112,7 +112,10 @@ function reason(measurement: SizeMeasurement): string {
 // pins the document to both.
 const NOTICE_SECTION = 'Over the guide before the gate'
 const QUESTION_SECTION = 'The question'
-const NOTICE_ACTION = `record why it stays one Issue, or carve the rest out into a new Issue — split-assessment.md → "${NOTICE_SECTION}"`
+// The line that records why an Issue stays one — read the same in a filed body (`size_estimate`) and
+// in the Issue comment that answers the notice (`split_resolution`).
+const REASON_PREFIX = '- 分割しない理由:'
+const NOTICE_ACTION = `record why it stays one Issue in an Issue comment line \`${REASON_PREFIX} <理由>\`, or carve the rest out with \`pnpm josh issue:file --route split\` — split-assessment.md → "${NOTICE_SECTION}"`
 
 // The pre-gate notice `josh main:merge` prints for a diff over the guide. "Clearly" is the `split`
 // verdict — both guides exceeded — so the one bar this file draws is the one the notice fires on,
@@ -128,6 +131,7 @@ const split_assess = {
 	LINE_GUIDE,
 	NOTICE_SECTION,
 	QUESTION_SECTION,
+	REASON_PREFIX,
 	SPLIT_VERDICT,
 	SINGLE_VERDICT,
 	assess,

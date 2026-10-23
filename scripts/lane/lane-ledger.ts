@@ -12,6 +12,8 @@ import {
 	type OverlapRecord,
 	type RoundOneRecord,
 	type RoundTwoRecord,
+	type SplitFiledRecord,
+	type SplitNoticeRecord,
 	type StageRecord,
 	type StopRecord,
 	type TestRelatedRecord,
@@ -171,6 +173,14 @@ async function record_test_related(run: TestRelatedRecord, path?: string): Promi
 	await record({ kind: KIND.TEST_RELATED, at: now_iso(), ...run }, path)
 }
 
+async function record_split_notice(notice: SplitNoticeRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.SPLIT_NOTICE, at: now_iso(), ...notice }, path)
+}
+
+async function record_split_filed(filed: SplitFiledRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.SPLIT_FILED, at: now_iso(), ...filed }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -218,6 +228,8 @@ const lane_ledger = {
 	record_offerable,
 	record_round_one,
 	record_round_two,
+	record_split_filed,
+	record_split_notice,
 	record_stage,
 	record_stop,
 	record_test_related,
@@ -241,6 +253,8 @@ export type {
 	OverlapRecord,
 	RoundOneEntry,
 	RoundTwoEntry,
+	SplitFiledEntry,
+	SplitNoticeEntry,
 	StageEntry,
 	StopEntry,
 	StopRecord,

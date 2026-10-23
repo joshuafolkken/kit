@@ -4,13 +4,13 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { run_cut, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_decline } from './run-cut-decline'
@@ -48,6 +48,7 @@ const {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
+	SPLIT_UNRESOLVED_VERDICT,
 	STALE_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
@@ -60,9 +61,11 @@ const {
 	report_handed_off,
 	report_held_cut,
 	report_incomplete,
+	report_missing_supervisor,
 	report_over,
 	report_relaunched_cut,
 	report_reviewer,
+	report_split_unresolved,
 	report_stale,
 	report_under_threshold,
 	report_unknown,
@@ -74,10 +77,19 @@ const {
 // threshold is introduced — an `under` session skips the cut, and an unmeasurable one still cuts as
 // the safety net. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
-function skips_pre_gate_cut(phase: string): boolean {
-	if (phase !== run_cut.PRE_GATE_PHASE) return false
+//
+// **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
+// boundary the notice names, so a lane that neither split nor recorded why is refused whether or not
+// the cut itself would be taken. Returns the answer given without cutting, or `undefined`.
+async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
+	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
+	const split_note = await split_resolution.ledger_refusal(Number(issue))
+
+	if (split_note !== undefined) return report_split_unresolved(split_note)
 
 	return cost_cli.session_verdict() === cost_verdict.UNDER_VERDICT
+		? report_under_threshold()
+		: undefined
 }
 
 // The exclusive create lost, so a cut is already in flight for this tree — the double-cut guard. The
@@ -98,14 +110,6 @@ function report_relaunch_failure(target: string, note: string): number {
 	run_cut.end_cut(target)
 	console.error(
 		`Relaunch failed: ${note}. The cut was cleared so this process can continue to the gate.`,
-	)
-
-	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
-}
-
-function report_missing_supervisor(issue: string): number {
-	console.error(
-		`The OpenAI supervisor for ${session_cite.issue(issue)} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
 	)
 
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
@@ -247,7 +251,9 @@ async function cut(
 		return await declined({ issue, phase }, state, refuse_unready(state))
 	}
 
-	if (skips_pre_gate_cut(phase)) return report_under_threshold()
+	const answered = await pre_gate_answer(issue, phase)
+
+	if (answered !== undefined) return answered
 
 	clear_expired(target)
 	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
@@ -452,6 +458,7 @@ const run_cut_cli = {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
+	SPLIT_UNRESOLVED_VERDICT,
 	STALE_VERDICT,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,

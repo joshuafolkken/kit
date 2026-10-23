@@ -292,6 +292,21 @@ describe('lane_ledger.record_test_related', () => {
 	})
 })
 
+// joshuafolkken/kit#4695: the split notice a lane got, and the split child it filed, read back.
+describe('lane_ledger — the split notice and the split child', () => {
+	it('records the notice with its counts and the child with the lane it was filed from', async () => {
+		const target = ledger('split')
+
+		await lane_ledger.record_split_notice({ issue: 4695, files: 11, lines: 550 }, target)
+		await lane_ledger.record_split_filed({ issue: 4695, child: '#4700' }, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: lane_ledger.KIND.SPLIT_NOTICE, issue: 4695, files: 11, lines: 550 },
+			{ kind: lane_ledger.KIND.SPLIT_FILED, issue: 4695, child: '#4700' },
+		])
+	})
+})
+
 describe('lane_ledger.record_offerable', () => {
 	it('records whether offerable work and a free lane coexist', async () => {
 		const target = ledger('offerable')

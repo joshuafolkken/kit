@@ -1,0 +1,8 @@
+{
+	"reason": "#4695 adds the split-notice ledger record, the pre-gate run:cut refusal for an unanswered notice and the lane:stats split table; the docs name the reason line and the split route the refusal asks for",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 188,
+		"ai_cost.on_demand_bytes": 187
+	}
+}

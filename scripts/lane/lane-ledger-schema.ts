@@ -18,6 +18,8 @@ const KIND = {
 	CORE_WAIT: 'core-wait',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
+	SPLIT_NOTICE: 'split-notice',
+	SPLIT_FILED: 'split-filed',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -200,6 +202,23 @@ const test_related_schema = z.object({
 	trigger_files: z.array(z.string()).optional(),
 	elapsed_ms: z.number(),
 })
+// The split notice shown to the lane of `issue`, with the measured diff it fired on — written once per
+// Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it first
+// (joshuafolkken/kit#4695).
+const split_notice_schema = z.object({
+	kind: z.literal(KIND.SPLIT_NOTICE),
+	at: z.string(),
+	issue: z.number(),
+	files: z.number(),
+	lines: z.number(),
+})
+// One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
+const split_filed_schema = z.object({
+	kind: z.literal(KIND.SPLIT_FILED),
+	at: z.string(),
+	issue: z.number(),
+	child: z.string(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -216,6 +235,8 @@ const entry_schema = z.discriminatedUnion('kind', [
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
+	split_notice_schema,
+	split_filed_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -236,6 +257,10 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type SplitNoticeEntry = z.infer<typeof split_notice_schema>
+type SplitNoticeRecord = Omit<SplitNoticeEntry, 'kind' | 'at'>
+type SplitFiledEntry = z.infer<typeof split_filed_schema>
+type SplitFiledRecord = Omit<SplitFiledEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -269,6 +294,10 @@ export type {
 	RoundOneRecord,
 	RoundTwoEntry,
 	RoundTwoRecord,
+	SplitFiledEntry,
+	SplitFiledRecord,
+	SplitNoticeEntry,
+	SplitNoticeRecord,
 	StageEntry,
 	StageRecord,
 	StopEntry,
