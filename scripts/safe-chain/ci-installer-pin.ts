@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { composite_actions } from '#scripts/ci/composite-actions'
 import { execaSync } from 'execa'
 
@@ -16,6 +18,9 @@ const VERSION_RE = /^(?<key>[ \t]*SAFE_CHAIN_INSTALLER_VERSION:[ \t]*)(?<value>\
 const SHA256_RE = /^(?<key>[ \t]*SAFE_CHAIN_INSTALLER_SHA256:[ \t]*)(?<value>\S+)[ \t]*$/mu
 const VALUE_GROUP = 'value'
 const DOWNLOAD_TIMEOUT_MS = 30_000
+const REPOSITORY = 'AikidoSec/safe-chain'
+const INSTALLER_NAME = 'install-safe-chain.sh'
+const ATTESTATION_FAILURE = 'could not be verified against its release attestation'
 
 interface InstallerPin {
 	version: string
@@ -23,7 +28,7 @@ interface InstallerPin {
 }
 
 function installer_url(version: string): string {
-	return `https://github.com/AikidoSec/safe-chain/releases/download/${version}/install-safe-chain.sh`
+	return `https://github.com/${REPOSITORY}/releases/download/${version}/${INSTALLER_NAME}`
 }
 
 // The local composite actions follow the workflows: kit's own pin lives in
@@ -50,7 +55,7 @@ function rewrite_pin(content: string, pin: InstallerPin): string {
 		.replace(SHA256_RE, (_match, key: string) => `${key}${pin.sha256}`)
 }
 
-function fetch_installer_sha256(version: string): string | undefined {
+function fetch_installer(version: string): Uint8Array | undefined {
 	// `--proto =https` keeps the release redirect from being followed onto plain HTTP.
 	const result = execaSync('curl', ['--proto', '=https', '-fsSL', installer_url(version)], {
 		encoding: 'buffer',
@@ -61,7 +66,41 @@ function fetch_installer_sha256(version: string): string | undefined {
 	})
 	if (result.exitCode !== 0 || result.stdout.length === 0) return undefined
 
-	return createHash('sha256').update(result.stdout).digest('hex')
+	return result.stdout
+}
+
+// joshuafolkken/kit#4669: the hash recorded is the one the release's GitHub attestation signs, not
+// whatever the download happened to return. `gh release verify-asset` checks the signed attestation
+// GitHub issued when the release was published, so a release asset swapped afterwards fails here.
+function verify_installer(version: string, installer: Uint8Array): boolean {
+	const directory = mkdtempSync(path.join(tmpdir(), 'safe-chain-installer-'))
+	const installer_path = path.join(directory, INSTALLER_NAME)
+
+	try {
+		writeFileSync(installer_path, installer)
+		const result = execaSync(
+			'gh',
+			['release', 'verify-asset', version, installer_path, '--repo', REPOSITORY],
+			{
+				reject: false,
+				timeout: DOWNLOAD_TIMEOUT_MS,
+			},
+		)
+
+		return result.exitCode === 0
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+// The hash to record, or why there is none — a pin is written only from a verified installer.
+function fetch_installer_sha256(version: string): { sha256: string } | { failure: string } {
+	const installer = fetch_installer(version)
+	if (installer === undefined) return { failure: 'could not be downloaded' }
+	// A missing or signed-out `gh` lands here too: no verification means no pin, whatever the reason.
+	if (!verify_installer(version, installer)) return { failure: ATTESTATION_FAILURE }
+
+	return { sha256: createHash('sha256').update(installer).digest('hex') }
 }
 
 // The workflows whose pin lags `latest` — a missing file or one without the pin is not a target.
@@ -83,15 +122,17 @@ function sync(latest: string, workflow_paths: ReadonlyArray<string> = list_workf
 	const targets = stale_workflows(latest, workflow_paths)
 	if (targets.length === 0) return
 
-	const sha256 = fetch_installer_sha256(latest)
+	const fetched = fetch_installer_sha256(latest)
 
-	if (sha256 === undefined) {
-		console.warn(`\n⚠ Could not download the safe-chain ${latest} installer; CI pin left as is`)
+	if ('failure' in fetched) {
+		console.warn(`\n⚠ The safe-chain ${latest} installer ${fetched.failure}; CI pin left as is`)
 
 		return
 	}
 
-	for (const workflow_path of targets) write_pin(workflow_path, { version: latest, sha256 })
+	for (const workflow_path of targets) {
+		write_pin(workflow_path, { version: latest, sha256: fetched.sha256 })
+	}
 }
 
 const ci_installer_pin = {

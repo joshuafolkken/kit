@@ -152,6 +152,10 @@ describe('writes_third_party — a gh write with a repository selector', () => {
 		['pr view of another owner', 'gh pr view 5 -R sveltejs/svelte'],
 		['a variable get of another owner', 'gh variable get NAME -R sveltejs/svelte'],
 		['an attestation verify of another owner', 'gh attestation verify a.tgz -R sveltejs/svelte'],
+		[
+			'a release asset verify of another owner',
+			'gh release verify-asset 1.0.0 a.sh -R AikidoSec/safe-chain',
+		],
 	])('passes %s', (_name, command) => {
 		expect(third_party_write.writes_third_party(command, resolve_session)).toBe(false)
 	})

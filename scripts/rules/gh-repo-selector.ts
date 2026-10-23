@@ -29,6 +29,7 @@ const READ_ACTIONS: ReadonlySet<string> = new Set([
 	'list',
 	'status',
 	'verify',
+	'verify-asset',
 	'view',
 	'watch',
 ])

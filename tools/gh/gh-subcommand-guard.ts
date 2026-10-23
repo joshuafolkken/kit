@@ -153,6 +153,12 @@ const ALLOWED_SPAWNS: ReadonlyArray<AllowedSpawn> = [
 			'This file is the REST layer. Its spawns forward the argument list `to_gh_api_args` built, and that builder puts `api` first unconditionally — pinned by `git-gh-exec.test.ts` and `git-gh-exec-sync.test.ts` rather than by reading the call site.',
 	},
 	{
+		file: 'scripts/safe-chain/ci-installer-pin.ts',
+		subcommand: 'release',
+		reason:
+			'`gh release verify-asset` checks the signature on the release attestation of the safe-chain installer before its hash is pinned (joshuafolkken/kit#4669). The REST attestations endpoint returns the bundle unverified; the signature check is done locally by the CLI.',
+	},
+	{
 		file: START_EXEC_FILE,
 		subcommand: '--version',
 		reason:
