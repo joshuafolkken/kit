@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { test_pinned_cache_logic, type CachedVerdict } from './test-pinned-cache-logic'
+import { test_pinned_cache_logic, type Freshness } from './test-pinned-cache-logic'
 import type { Hunk } from './test-pinned-logic'
 
 const HUNK: Hunk = { file: 'a.ts', new_start: 2, new_count: 1, old_lines: ['old'] }
 const CONTENT = 'one\nnew\nthree\n'
-const ENTRY: CachedVerdict = {
-	verdict: 'red',
-	tests: Object.fromEntries([['a.test.ts', 'digest-a']]),
-}
+const COMMIT = 'commit-a'
+const DIGESTS = new Map([
+	['a.ts', 'digest-a'],
+	['b.ts', 'digest-b'],
+])
 
 describe('test_pinned_cache_logic.hunk_key', () => {
 	it('keeps the key of a hunk that only moved', () => {
@@ -40,14 +41,23 @@ describe('test_pinned_cache_logic.test_set_of', () => {
 	})
 })
 
-describe('test_pinned_cache_logic.tree_relative', () => {
-	it('reads each name under the first root that holds it and drops one under none', () => {
-		const names = ['/var/t/a.test.ts', '/private/var/t/b.test.ts', '/elsewhere/c.test.ts']
+describe('test_pinned_cache_logic.change_of', () => {
+	const change = test_pinned_cache_logic.change_of(COMMIT, ['a.ts', 'b.ts'], DIGESTS)
 
-		expect(test_pinned_cache_logic.tree_relative(names, ['/var/t', '/private/var/t'])).toEqual([
-			'a.test.ts',
-			'b.test.ts',
-		])
+	it('reads the same change whatever order its paths were listed in', () => {
+		expect(test_pinned_cache_logic.change_of(COMMIT, ['b.ts', 'a.ts'], DIGESTS)).toBe(change)
+	})
+
+	it('reads another change on another base, path, content or a deletion', () => {
+		const edited = new Map([...DIGESTS, ['b.ts', 'digest-c']])
+		const deleted = new Map([['a.ts', 'digest-a']])
+
+		expect(test_pinned_cache_logic.change_of('commit-b', ['a.ts', 'b.ts'], DIGESTS)).not.toBe(
+			change,
+		)
+		expect(test_pinned_cache_logic.change_of(COMMIT, ['a.ts'], DIGESTS)).not.toBe(change)
+		expect(test_pinned_cache_logic.change_of(COMMIT, ['a.ts', 'b.ts'], edited)).not.toBe(change)
+		expect(test_pinned_cache_logic.change_of(COMMIT, ['a.ts', 'b.ts'], deleted)).not.toBe(change)
 	})
 })
 
@@ -55,11 +65,12 @@ describe('test_pinned_cache_logic.entries_of', () => {
 	const text = JSON.stringify({
 		test_set: 'set',
 		test_contents: 'contents',
-		entries: { key: ENTRY },
+		change: 'change',
+		entries: { key: 'red' },
 	})
 
-	it('reads the entries written under the same test set', () => {
-		expect(test_pinned_cache_logic.entries_of(text, 'set')).toEqual({ key: ENTRY })
+	it('reads the verdicts written under the same test set', () => {
+		expect(test_pinned_cache_logic.entries_of(text, 'set')).toEqual({ key: 'red' })
 	})
 
 	it('holds nothing under another test set or from an unreadable file', () => {
@@ -68,9 +79,17 @@ describe('test_pinned_cache_logic.entries_of', () => {
 		expect(test_pinned_cache_logic.entries_of('', 'set')).toEqual({})
 	})
 
-	it('reads the test contents the cache was written under, and none from an unreadable file', () => {
-		expect(test_pinned_cache_logic.contents_of(text)).toBe('contents')
-		expect(test_pinned_cache_logic.contents_of('')).toBe('')
+	it('sets the change and test contents it was written under against the ones now', () => {
+		const now = { change: 'change', test_contents: 'other' }
+
+		expect(test_pinned_cache_logic.freshness_of(text, now)).toEqual({
+			is_same_change: true,
+			is_unchanged: false,
+		})
+		expect(test_pinned_cache_logic.freshness_of('', now)).toEqual({
+			is_same_change: false,
+			is_unchanged: false,
+		})
 	})
 })
 
@@ -80,35 +99,30 @@ describe('test_pinned_cache_logic.distinct', () => {
 	})
 })
 
-describe('test_pinned_cache_logic.fresh_entry', () => {
-	const GREEN: CachedVerdict = { ...ENTRY, verdict: 'green' }
+describe('test_pinned_cache_logic.fresh_verdict', () => {
+	const ONLY_TESTS_SAME: Freshness = { is_same_change: false, is_unchanged: true }
+	const ALL_SAME: Freshness = { is_same_change: true, is_unchanged: true }
 
-	it('keeps a red entry while every test it ran has its recorded digest, whatever else changed', () => {
-		const digests = new Map([['a.test.ts', 'digest-a']])
-
-		expect(test_pinned_cache_logic.fresh_entry(ENTRY, digests, false)).toBe(ENTRY)
+	it('keeps a red verdict only while the whole change is the same, even with no test changed', () => {
+		expect(test_pinned_cache_logic.fresh_verdict('red', ALL_SAME)).toBe('red')
+		expect(test_pinned_cache_logic.fresh_verdict('red', ONLY_TESTS_SAME)).toBeUndefined()
 	})
 
-	it('drops a red entry once a test it ran changed or is gone, or when there is none', () => {
-		expect(
-			test_pinned_cache_logic.fresh_entry(ENTRY, new Map([['a.test.ts', 'digest-b']]), true),
-		).toBeUndefined()
-		expect(test_pinned_cache_logic.fresh_entry(ENTRY, new Map(), true)).toBeUndefined()
-		expect(test_pinned_cache_logic.fresh_entry(undefined, new Map(), true)).toBeUndefined()
+	it('keeps a green or test-less verdict while no test file changed, whatever else changed', () => {
+		const tests_changed: Freshness = { is_same_change: false, is_unchanged: false }
+
+		expect(test_pinned_cache_logic.fresh_verdict('green', ONLY_TESTS_SAME)).toBe('green')
+		expect(test_pinned_cache_logic.fresh_verdict('no-test', ONLY_TESTS_SAME)).toBe('no-test')
+		expect(test_pinned_cache_logic.fresh_verdict('green', tests_changed)).toBeUndefined()
 	})
 
-	it('keeps a green or test-less entry only while no test file changed', () => {
-		const digests = new Map([['a.test.ts', 'digest-a']])
-		const no_tests: CachedVerdict = { verdict: 'red', tests: {} }
-
-		expect(test_pinned_cache_logic.fresh_entry(GREEN, digests, true)).toBe(GREEN)
-		expect(test_pinned_cache_logic.fresh_entry(GREEN, digests, false)).toBeUndefined()
-		expect(test_pinned_cache_logic.fresh_entry(no_tests, digests, false)).toBeUndefined()
+	it('holds nothing where nothing was stored', () => {
+		expect(test_pinned_cache_logic.fresh_verdict(undefined, ALL_SAME)).toBeUndefined()
 	})
 })
 
 describe('test_pinned_cache_logic.stored', () => {
-	it('keys each entry and leaves out a key with none', () => {
-		expect(test_pinned_cache_logic.stored(['a', 'b'], [ENTRY, undefined])).toEqual({ a: ENTRY })
+	it('keys each verdict and leaves out a key with none', () => {
+		expect(test_pinned_cache_logic.stored(['a', 'b'], ['red', undefined])).toEqual({ a: 'red' })
 	})
 })

@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { test_declared_logic } from './test-declared-logic'
 import {
 	test_pinned_cache_logic,
-	type CachedVerdict,
+	type Freshness,
 	type VerdictCache,
 } from './test-pinned-cache-logic'
 import type { RedVerdict } from './test-red-logic'
@@ -19,28 +20,29 @@ import type { RedVerdict } from './test-red-logic'
 
 const CACHE_NAME = 'josh-test-pinned-verdicts.json'
 const LINE_BREAK = '\n'
+const NUL = '\0'
+// Peels a ref or tag to the commit it names, so a branch name and its SHA key the same change.
+const AS_COMMIT = '^{commit}'
 
-interface LoadedCache {
+interface LoadedCache extends Omit<VerdictCache, 'entries'> {
 	file: string
-	test_set: string
-	test_contents: string
-	entries: Record<string, CachedVerdict>
-	// No test file's content changed since the cache was written.
-	is_unchanged: boolean
+	entries: Record<string, RedVerdict>
+	freshness: Freshness
 }
 
 async function read_text(file: string): Promise<string> {
 	return existsSync(file) ? await readFile(file, 'utf8') : ''
 }
 
-// Every test file in the work tree, tracked or untracked but not ignored.
+// Every test file in the work tree, tracked or untracked but not ignored. `-z` lists a path as it is,
+// where `core.quotePath` would quote a non-ASCII one.
 async function test_files(): Promise<Array<string>> {
-	const listed = await git_spawn.read(['ls-files', '-co', '--exclude-standard'])
+	const listed = await git_spawn.read(['ls-files', '-coz', '--exclude-standard'])
 
-	return listed.split(LINE_BREAK).filter((file) => test_declared_logic.is_test_file(file))
+	return listed.split(NUL).filter((file) => test_declared_logic.is_test_file(file))
 }
 
-// The digest of each named test file the work tree still holds.
+// The digest of each named file the work tree still holds.
 async function digests_of(files: ReadonlyArray<string>): Promise<Map<string, string>> {
 	const existing = [...new Set(files)].filter((file) => existsSync(file))
 	const texts = await Promise.all(existing.map(async (file) => await readFile(file, 'utf8')))
@@ -58,42 +60,44 @@ async function contents_digest(files: ReadonlyArray<string>): Promise<string> {
 	)
 }
 
-async function load(): Promise<LoadedCache> {
-	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
-	const files = await test_files()
-	const [text, test_contents] = await Promise.all([read_text(file), contents_digest(files)])
-	const test_set = test_pinned_cache_logic.test_set_of(files)
-	const entries = test_pinned_cache_logic.entries_of(text, test_set)
-	const is_unchanged = test_pinned_cache_logic.contents_of(text) === test_contents
+// The whole change: `base` as a commit, and every path changed since it with its content.
+async function change_digest(base: string): Promise<string> {
+	const [commit, paths] = await Promise.all([
+		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
+		changed_paths.read_changed_since(base),
+	])
 
-	return { file, test_set, test_contents, entries, is_unchanged }
+	return test_pinned_cache_logic.change_of(commit.trim(), paths, await digests_of(paths))
 }
 
-// The entry stored under each key, or `undefined` where none is stored or a test it rests on changed.
-async function known(
-	cache: LoadedCache,
-	keys: ReadonlyArray<string>,
-): Promise<Array<CachedVerdict | undefined>> {
-	const entries = keys.map((key) => cache.entries[key])
-	const digests = await digests_of(entries.flatMap((entry) => Object.keys(entry?.tests ?? {})))
+async function load(base: string): Promise<LoadedCache> {
+	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
+	const files = await test_files()
+	const [text, test_contents, change] = await Promise.all([
+		read_text(file),
+		contents_digest(files),
+		change_digest(base),
+	])
+	const test_set = test_pinned_cache_logic.test_set_of(files)
+	const entries = test_pinned_cache_logic.entries_of(text, test_set)
+	const freshness = test_pinned_cache_logic.freshness_of(text, { change, test_contents })
 
-	return entries.map((entry) =>
-		test_pinned_cache_logic.fresh_entry(entry, digests, cache.is_unchanged),
+	return { file, test_set, test_contents, change, entries, freshness }
+}
+
+// The verdict stored under each key, or `undefined` where none is stored or what it rests on changed.
+function known(cache: LoadedCache, keys: ReadonlyArray<string>): Array<RedVerdict | undefined> {
+	return keys.map((key) =>
+		test_pinned_cache_logic.fresh_verdict(cache.entries[key], cache.freshness),
 	)
 }
 
-async function entry_for(
-	verdict: RedVerdict,
-	tests: ReadonlyArray<string>,
-): Promise<CachedVerdict> {
-	return { verdict, tests: Object.fromEntries(await digests_of(tests)) }
-}
-
-// Only the entries this run used are written, so the file never holds a hunk the branch has left behind.
-async function save(cache: LoadedCache, entries: Record<string, CachedVerdict>): Promise<void> {
+// Only the verdicts this run used are written, so the file never holds a hunk the branch has left behind.
+async function save(cache: LoadedCache, entries: Record<string, RedVerdict>): Promise<void> {
 	const content: VerdictCache = {
 		test_set: cache.test_set,
 		test_contents: cache.test_contents,
+		change: cache.change,
 		entries,
 	}
 
@@ -101,7 +105,7 @@ async function save(cache: LoadedCache, entries: Record<string, CachedVerdict>):
 	await writeFile(cache.file, `${JSON.stringify(content)}${LINE_BREAK}`)
 }
 
-const test_pinned_cache = { entry_for, known, load, save }
+const test_pinned_cache = { known, load, save }
 
 export type { LoadedCache }
 export { test_pinned_cache }

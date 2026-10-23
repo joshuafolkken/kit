@@ -7,7 +7,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { test_pinned_cache } from './test-pinned-cache'
-import { test_pinned_cache_logic, type CachedVerdict } from './test-pinned-cache-logic'
+import { test_pinned_cache_logic } from './test-pinned-cache-logic'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
 import {
@@ -17,7 +17,8 @@ import {
 	type UnpinnedHunk,
 } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
-import { test_red, type TreeRun } from './test-red'
+import { test_red } from './test-red'
+import type { RedVerdict } from './test-red-logic'
 import { test_unit_guard } from './test-unit-guard'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -53,9 +54,9 @@ async function read_hunks(base: string, files: ReadonlyArray<string>): Promise<A
 	)
 }
 
-// The run with this one hunk reverted. The file is put back before the next hunk runs, or that
+// The verdict with this one hunk reverted. The file is put back before the next hunk runs, or that
 // hunk's tests would also see this revert.
-async function run_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<TreeRun> {
+async function verdict_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<RedVerdict> {
 	const target = path.join(tree.tree, hunk.file)
 	const content = await readFile(target, 'utf8')
 	const selection = [
@@ -68,36 +69,33 @@ async function run_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<Tree
 	await writeFile(target, test_pinned_logic.revert(content, hunk))
 
 	try {
-		return await test_red.run_in(tree, selection)
+		return await test_red.verdict_in(tree, selection)
 	} finally {
 		await writeFile(target, content)
 	}
 }
 
 // One hunk at a time within a lane: its hunks share the lane's tree (`test-pinned-pool.ts`).
-async function entries_in(
+async function verdicts_in(
 	tree: BaseTree,
 	hunks: ReadonlyArray<Hunk>,
 	workers: number,
-): Promise<Array<CachedVerdict>> {
-	const entries: Array<CachedVerdict> = []
+): Promise<Array<RedVerdict>> {
+	const verdicts: Array<RedVerdict> = []
 
 	for (const hunk of hunks) {
 		// eslint-disable-next-line no-await-in-loop -- the hunks share one tree, so each revert waits for the last restore
-		const { verdict, tests } = await run_of(tree, hunk, workers)
-
-		// eslint-disable-next-line no-await-in-loop -- read beside the run it records
-		entries.push(await test_pinned_cache.entry_for(verdict, tests))
+		verdicts.push(await verdict_of(tree, hunk, workers))
 	}
 
-	return entries
+	return verdicts
 }
 
 // The hunks no fresh cached verdict covers, checked over as many trees as the worker budget allows.
 async function checked_on(
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
-): Promise<Array<CachedVerdict>> {
+): Promise<Array<RedVerdict>> {
 	if (hunks.length === 0) return []
 	const plan = test_pinned_pool.lane_plan(hunks.length, await test_unit_guard.vitest_share([]))
 
@@ -108,7 +106,7 @@ async function checked_on(
 			await base_tree.with_tree(TREE_PREFIX, HEAD, async (tree) => {
 				await base_tree.copy_in(tree.tree, paths)
 
-				return await entries_in(tree, group, plan.workers)
+				return await verdicts_in(tree, group, plan.workers)
 			}),
 	)
 }
@@ -122,41 +120,42 @@ async function keys_of(hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
 	)
 }
 
-// Each hunk's entry: the cached one where it still holds, else a fresh run's, in the hunks' order.
-async function entries_on(
+// Each hunk's verdict: the cached one where it still holds, else a fresh run's, in the hunks' order.
+async function verdicts_on(
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
-	known: ReadonlyArray<CachedVerdict | undefined>,
-): Promise<Array<CachedVerdict | undefined>> {
+	known: ReadonlyArray<RedVerdict | undefined>,
+): Promise<Array<RedVerdict | undefined>> {
 	const fresh = await checked_on(
 		paths,
 		hunks.filter((_hunk, index) => known[index] === undefined),
 	)
 
-	return known.map((entry) => entry ?? fresh.shift())
+	return known.map((verdict) => verdict ?? fresh.shift())
 }
 
 // Green and no-test both leave a hunk unpinned: either way nothing went red when it was reverted.
-function unpinned_of(hunk: Hunk, entry: CachedVerdict | undefined): Array<UnpinnedHunk> {
-	if (entry === undefined || entry.verdict === 'red') return []
+function unpinned_of(hunk: Hunk, verdict: RedVerdict | undefined): Array<UnpinnedHunk> {
+	if (verdict === undefined || verdict === 'red') return []
 
-	return [{ ...hunk, is_green: entry.verdict === 'green' }]
+	return [{ ...hunk, is_green: verdict === 'green' }]
 }
 
-// A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's entry is
+// A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
 // stored again, so a rerun on the same tree starts no vitest.
 async function unpinned_on(
+	base: string,
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
 ): Promise<Array<UnpinnedHunk>> {
 	if (hunks.length === 0) return []
-	const cache = await test_pinned_cache.load()
+	const cache = await test_pinned_cache.load(base)
 	const keys = await keys_of(hunks)
-	const entries = await entries_on(paths, hunks, await test_pinned_cache.known(cache, keys))
+	const verdicts = await verdicts_on(paths, hunks, test_pinned_cache.known(cache, keys))
 
-	await test_pinned_cache.save(cache, test_pinned_cache_logic.stored(keys, entries))
+	await test_pinned_cache.save(cache, test_pinned_cache_logic.stored(keys, verdicts))
 
-	return hunks.flatMap((hunk, index) => unpinned_of(hunk, entries[index]))
+	return hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index]))
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.
@@ -218,7 +217,7 @@ async function report_on(
 	const probes = await read_probes(base, targets)
 	const cap = has_runner ? max_hunks : 0
 	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, cap)
-	const unpinned = await unpinned_on(paths, checked)
+	const unpinned = await unpinned_on(base, paths, checked)
 
 	return { unpinned, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
 }

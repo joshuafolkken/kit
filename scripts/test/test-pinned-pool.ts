@@ -29,13 +29,24 @@ function deal<T>(items: ReadonlyArray<T>, lanes: number): Array<Array<T>> {
 	return groups.filter((group) => group.length > 0)
 }
 
+// The lanes' answers, or the first lane's failure once every lane has ended — a failed lane never
+// returns while the others still run their trees beside whatever the caller does next.
+function settled<R>(outcomes: ReadonlyArray<PromiseSettledResult<R>>): Array<R> {
+	const failed = outcomes.find((outcome) => outcome.status === 'rejected')
+	if (failed !== undefined) throw failed.reason
+
+	return outcomes.flatMap((outcome) => (outcome.status === 'fulfilled' ? [outcome.value] : []))
+}
+
 // Runs every lane at once; a lane answers its own items in the order it was dealt them.
 async function run_lanes<T, R>(
 	items: ReadonlyArray<T>,
 	lanes: number,
 	run_lane: (group: ReadonlyArray<T>) => Promise<ReadonlyArray<R>>,
 ): Promise<Array<ReadonlyArray<R>>> {
-	return await Promise.all(deal(items, lanes).map(async (group) => await run_lane(group)))
+	return settled(
+		await Promise.allSettled(deal(items, lanes).map(async (group) => await run_lane(group))),
+	)
 }
 
 // The one-item slice of lane `index % lanes` that holds item `index`.

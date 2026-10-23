@@ -69,20 +69,6 @@ describe('test_red_logic.ran_file_count', () => {
 	})
 })
 
-describe('test_red_logic.ran_files', () => {
-	it('names each file the report ran, skipping an entry with no name', () => {
-		const name = `/t/${UNIT_TEST}`
-		const report = JSON.stringify({ testResults: [{ name }, { status: 'failed' }] })
-
-		expect(test_red_logic.ran_files(report)).toEqual([name])
-	})
-
-	it('names none from an unreadable report', () => {
-		expect(test_red_logic.ran_files('')).toEqual([])
-		expect(test_red_logic.ran_files(JSON.stringify({ success: true }))).toEqual([])
-	})
-})
-
 describe('test_red_logic.verdict_for', () => {
 	it('answers no-test when nothing ran, red on a failure and green on a pass', () => {
 		expect(test_red_logic.verdict_for(0, false)).toBe('no-test')

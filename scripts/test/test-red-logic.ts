@@ -55,15 +55,6 @@ function ran_file_count(report: string): number {
 	return json_value.parse_with(report, REPORT_SCHEMA)?.testResults.length ?? 0
 }
 
-// The files the report names, as Vitest wrote them (absolute): what `josh test:pinned` keys a cached
-// verdict on (`test-pinned-cache.ts`). An entry with no name is skipped, an unreadable report names none.
-function ran_files(report: string): Array<string> {
-	const results = json_value.parse_with(report, REPORT_SCHEMA)?.testResults ?? []
-	const names = results.map((result) => (json_value.is_record(result) ? result['name'] : undefined))
-
-	return names.filter((name): name is string => typeof name === 'string')
-}
-
 // `no-test` when nothing ran; otherwise a failing run is `red` — the test caught the pre-fix tree — and
 // a passing one is `green`.
 function verdict_for(test_count: number, is_failed: boolean): RedVerdict {
@@ -85,7 +76,6 @@ const test_red_logic = {
 	is_refused,
 	is_test_only,
 	ran_file_count,
-	ran_files,
 	unit_test_files,
 	verdict_for,
 }
