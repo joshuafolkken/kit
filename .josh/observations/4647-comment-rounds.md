@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/review/run-review-pinned.ts:53 | 2026-10-23 | #4647

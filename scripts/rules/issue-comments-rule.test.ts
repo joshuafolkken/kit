@@ -30,7 +30,8 @@ const ENTRY_POINTS = [ENTRY_SEQUENCE_SKILL, KICKOFF_SKILL]
 // The portable spelling. `gh issue view <N> --comments` is GraphQL-backed and a cloud session is
 // answered 403, which `scripts/gh/gh-document-guard.test.ts` enforces for runnable blocks — so the REST
 // call is what the procedure has to name. It is the read itself, so a trim keeps it.
-const REST_READ = 'gh api repos/{owner}/{repo}/issues/<N>/comments'
+// Cross-repository only: the `{owner}` spelling of this repository's read is refused by `direct-issue-read`.
+const REST_READ = 'gh api repos/<owner>/<repo>/issues/<N>/comments'
 // The stop answer that is not the run's to make. Stated once, in `issue-comments.md`, so an entry point that restated
 // it would be the clone `CLAUDE.md` prohibits.
 const STOP_ANSWER = 'no longer has a reason to exist'

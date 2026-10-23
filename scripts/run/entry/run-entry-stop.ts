@@ -23,6 +23,8 @@ interface StopNotice {
 	command: string
 	reason: string
 	should_release: boolean
+	// The choice the Telegram recommends where a rerun alone would stop the same way again.
+	recommended?: string
 }
 
 interface StopPorts {
@@ -79,7 +81,9 @@ async function notify_stop(notice: StopNotice, ports: StopPorts): Promise<void> 
 		issue_title: `${notice.command} ${issue_cite.plain(notice.issue_number)} stopped`,
 		body: body_of(notice),
 		recovery: RECOVERY,
-		recommended: `Run \`${notice.command} ${issue_cite.plain(notice.issue_number)}\` again in a fresh session`,
+		recommended:
+			notice.recommended ??
+			`Run \`${notice.command} ${issue_cite.plain(notice.issue_number)}\` again in a fresh session`,
 		alternatives: [LATER_ALTERNATIVE],
 	})
 

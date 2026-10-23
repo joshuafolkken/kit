@@ -52,6 +52,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-idle.ts', 1],
 	['backlog/backlog-drive-paused.ts', 1],
 	['run/merge/run-merge-auth.ts', 1],
+	// The untrusted-author stop's remedy: the Telegram `recommended`, and a report line the session
+	// reads through `session_cite.text`.
+	['run/entry/run-entry-trust.ts', 1],
 	// A program reads it back: the run event stream, a process pattern, a child prompt, a parse key.
 	['backlog/backlog-drive-adopt.ts', 1],
 	['backlog/backlog-drive-cli.ts', 1],

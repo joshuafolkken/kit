@@ -13,6 +13,7 @@ function stub_issue(): void {
 	vi.spyOn(issue_read_cli, 'read_block').mockResolvedValue({
 		kind: 'ok',
 		block: `The board breaks in \`${TARGET}\`.`,
+		trust: { is_body_trusted: true, has_trusted_comment: false },
 	})
 	vi.spyOn(git_gh_command, 'issue_view_json_classified').mockResolvedValue({
 		kind: 'read',

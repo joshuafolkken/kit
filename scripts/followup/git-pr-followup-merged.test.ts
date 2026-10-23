@@ -10,7 +10,7 @@ import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_get_body: vi.fn(),
+		issue_view_json: vi.fn(),
 		issue_list_comments: vi.fn(),
 		issue_comment: vi.fn(),
 		issue_edit_body: vi.fn(),
@@ -102,7 +102,7 @@ function setup_gh_mocks(): void {
 	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
 	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
-	vi.mocked(git_gh_command.issue_get_body).mockResolvedValue('existing content')
+	vi.mocked(git_gh_command.issue_view_json).mockResolvedValue('{"body":"existing content"}')
 	vi.mocked(git_gh_command.issue_comment).mockResolvedValue('')
 	given_comments([])
 }

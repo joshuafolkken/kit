@@ -7,6 +7,7 @@ import { bash_triggers } from './bash-triggers'
 import { credential_body } from './credential-body'
 import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
+import { direct_issue_read } from './direct-issue-read'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
@@ -126,6 +127,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// points at takes the body by path, so the body rows have nothing left to say.
 	direct_issue_comment.ROW,
 	filing_cap.ROW,
+	// Before `issue-comments`, whose rewrite would add the unfiltered comments to the same read.
+	direct_issue_read.ROW,
 	issue_comments.ROW,
 	{
 		id: 'shell-body',

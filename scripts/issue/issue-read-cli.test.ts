@@ -101,6 +101,30 @@ describe('issue_read_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#4663: `run:entry` gates an untrusted author's issue on what this read decided.
+describe('issue_read_cli.read_block — the trust it carries', () => {
+	it('reports an untrusted body and a trusted comment', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		const block = await issue_read_cli.read_block(ISSUE)
+
+		expect(block).toMatchObject({
+			kind: 'ok',
+			trust: { is_body_trusted: false, has_trusted_comment: true },
+		})
+	})
+
+	it('reports no trusted comment when the listing could not be read', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(undefined)
+
+		const block = await issue_read_cli.read_block(ISSUE)
+
+		expect(block).toMatchObject({ trust: { has_trusted_comment: false } })
+	})
+})
+
 describe('issue_read_cli.run — a number that produced nothing', () => {
 	it('names a number that resolves to nothing, and exits non-zero', async () => {
 		classified_mock.mockResolvedValue({ kind: 'missing' })

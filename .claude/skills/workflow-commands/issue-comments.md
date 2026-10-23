@@ -8,12 +8,16 @@ turn as whatever else the run needs:
 
 ```bash
 pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch
-gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
+gh api repos/<owner>/<repo>/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
 ```
 
 **Type the first line**; it **says when a comment listing could not be read rather than showing no
-comments**. The `gh api` form is for a **cross-repository** read (the command takes no `--repo`). Never
-`gh issue view <N> --comments` — GraphQL-backed, `403` in a cloud session.
+comments**. The `gh api` form is **cross-repository only** (the command takes no `--repo`); a
+`repos/{owner}/…` read of this repository's Issue is refused (`pnpm josh rule:list` → `direct-issue-read`).
+Never `gh issue view <N> --comments` — GraphQL-backed, `403` in a cloud session.
+
+An Issue whose author has no write access stops at `run:entry` until a person with write access
+plans it with `kickoff #N`; the run then follows that plan (`scripts/run/entry/run-entry-trust.ts`).
 
 **This repository writes its agreements into comments and then reads only bodies.** **What the
 reading is for**: the scope boundary — work a comment moved elsewhere or added here; an auto-decision
