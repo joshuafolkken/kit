@@ -75,6 +75,7 @@
 | `- 人の判断: 不要`                            | `auto-ok`（除外ラベルが無ければ） | 方針の判断・外部アカウント・目視確認のどれも要らない                                  |
 | `- 実施可能条件: #<PR> のマージ後 <K> マージ` | `not-before`（待つ間）            | 追跡計測。元の PR のマージ後に lane ledger が K 件のマージを記録するまで着手しない    |
 | `- 実施可能日: <UTC>`                         | `not-before`（待つ間）            | 外部の期限など暦そのものに意味がある待ち（`YYYY-MM-DDTHH:MMZ`）。追跡計測には使わない |
+| ``- 計測宣言: `<command>` <= <数値>``         | なし（閉じたら `measured`）       | 追跡計測の値を 1 コマンドで出せる。比較は `<=` `<` `>=` `>`                           |
 | `- 優先度: 緊急（…）`                         | `priority:critical`               | 下の A か B。条件番号か短縮値を括弧に書く                                             |
 | `- 優先度: 高（…）`                           | `priority:high`                   | 下の C・D・E のどれか。根拠を括弧に書く                                               |
 | `- 優先度: 通常`                              | なし                              | どれにも当たらない（宣言が無いときも同じ）                                            |
@@ -94,6 +95,7 @@
 - `bugfix`（PR のリリース分類）を Issue の `bug` の代わりにしない。`enhancement` と `breaking-change` の両方を持つ Issue の PR は `breaking-change` にする
 - `## 発火点` の名前は `prompts/collaboration-workflow/rule-delivery.md` の配送表と突き合わされる
 - `## ベースライン` の測定コマンドは、マージ後に `pnpm josh measure:rerun <N>` が再実行して before / after を印字する（作者が `OWNER` / `MEMBER` / `COLLABORATOR` の Issue に限る）
+- `- 計測宣言:` は `backlog:drive` がレーンを起こす前に実行し、基準内なら閉じる（`scripts/backlog/backlog-measure-close.ts`）
 - 公開しないと利用側が使えない変更には `--release` を付ける（既存 Issue は `pnpm josh issue:release <N>`、`docs/josh-commands-backlog.md` → `josh issue:release`）
 
 ### 起票元へのバックリンク（`## Origin` / `## Upstream issues`）

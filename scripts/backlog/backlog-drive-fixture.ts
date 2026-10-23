@@ -1,7 +1,7 @@
-import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeTokenRead } from '#scripts/run/merge/run-merge-token'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
+import type { DriveLaunch } from './backlog-drive-launch-pass'
 
 // The scripted ports every `backlog_drive` suite drives the loop through — one copy, so the suites
 // cannot drift on how a child finishes, a merge answers or an offer is queued.
@@ -47,6 +47,8 @@ interface Script {
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
 	unopened_launches?: ReadonlyArray<string>
+	// Issues their measurement declaration closed, so the launch took no lane.
+	measured_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
 	// The limit-room answers in order, the last repeating; unset reads as the free-lane answers.
@@ -109,10 +111,15 @@ function child_ports(
 	}
 }
 
-function launch_outcome(script: Script, issue: string): LaunchOutcome['kind'] {
-	if (script.failed_launches?.includes(issue) === true) return 'failed'
+function launch_outcome(script: Script, issue: string): DriveLaunch {
+	const scripted: ReadonlyArray<[DriveLaunch, ReadonlyArray<string> | undefined]> = [
+		['measured', script.measured_launches],
+		['failed', script.failed_launches],
+		['unopened', script.unopened_launches],
+	]
+	const found = scripted.find(([, issues]) => issues?.includes(issue) === true)
 
-	return script.unopened_launches?.includes(issue) === true ? 'unopened' : 'launched'
+	return found?.[0] ?? 'launched'
 }
 
 // The dispatch-facing ports: offers answer from the script's queue, then `wait`.
@@ -235,6 +242,7 @@ function state(in_flight: ReadonlyArray<string> = []): DriveState {
 }
 
 const backlog_drive_fixture = {
+	ACTIVE,
 	CONFIG,
 	FIRST_CHILD,
 	OFFERED,

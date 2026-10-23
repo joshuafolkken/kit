@@ -86,8 +86,12 @@ describe('run_board_status.statuses_of', () => {
 		expect(statuses.has(3420)).toBe(false)
 	})
 
-	it('leaves a settled child settled', () => {
-		const events = [event_at(1, T0, KIND.MERGE, MERGE_3409)]
+	// A measured close (joshuafolkken/kit#4621) is the drive's, and took no lane.
+	it.each([
+		[KIND.MERGE, MERGE_3409],
+		[KIND.MEASURED, '#3409 measured by backlog:drive: 3 <= 5'],
+	])('leaves a child settled by a %s event settled', (kind, text) => {
+		const events = [event_at(1, T0, kind, text)]
 
 		expect(run_board_status.statuses_of(events, NO_LANES).get(3409)?.state).toBe('merged')
 	})
