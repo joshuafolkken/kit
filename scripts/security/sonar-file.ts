@@ -1,7 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import { init_logic } from '#scripts/init/init-logic'
 import type { SonarIdentifiers } from '#scripts/init/init-logic-sonar'
+import { file_content } from '#scripts/sync/file-content'
+
+// Written through `write_contained` like every other sync write, so a `sonar-project.properties`
+// linked outside the project is refused rather than written through (joshuafolkken/kit#4634).
 
 function write_sonar_file(
 	template_source: string,
@@ -14,8 +17,7 @@ function write_sonar_file(
 		identifiers.organization,
 	)
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, content)
+	file_content.write_contained(destination_path, content)
 }
 
 function merge_sonar_file(
@@ -36,7 +38,10 @@ function merge_sonar_file(
 	)
 	const existing = readFileSync(destination_path, 'utf8')
 
-	writeFileSync(destination_path, init_logic.merge_sonar_properties(existing, template_content))
+	file_content.write_contained(
+		destination_path,
+		init_logic.merge_sonar_properties(existing, template_content),
+	)
 }
 
 const sonar_file = { write_sonar_file, merge_sonar_file }

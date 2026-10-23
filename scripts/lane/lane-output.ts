@@ -1,5 +1,3 @@
-import { writeFileSync } from 'node:fs'
-import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -75,8 +73,8 @@ async function record_output(
 
 	if (content === undefined) return { kind: 'unreadable', lane }
 
-	writeFileSync(
-		path.join(lane.directory, ENV_FILE_NAME),
+	lane_registry.write_environment(
+		lane.directory,
 		lane_environment.with_lane_output(content, output, profile),
 	)
 

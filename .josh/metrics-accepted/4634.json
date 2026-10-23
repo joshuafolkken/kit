@@ -1,0 +1,7 @@
+{
+	"reason": "Security hardening #4634: party refusal for unknown owners, owner-only lane .env writer, contained sonar writes",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}

@@ -77,6 +77,8 @@ e2e/.auth/chrome-profile/
 # Claude Code runtime artifacts
 .claude/scheduled_tasks.lock
 .claude/tmp/
+# The machine-local permission allowlist (commands and paths), never shared
+.claude/settings.local.json
 
 # Scratch files any agent writes (Issue / PR bodies, plans, handoffs, logs); the rest of .josh/ is tracked
 .josh/tmp/

@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
@@ -236,7 +236,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 		const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
 
 		await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
-		writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
+		lane_registry.write_environment(plan.lane.directory, plan.environment_content)
 		release_seat_lock(plan.seat_lock)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
 		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)
