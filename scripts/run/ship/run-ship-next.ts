@@ -42,6 +42,9 @@ interface ShipResume {
 	title: string
 	flags: ReadonlyArray<string>
 	is_review: boolean
+	// `--unpinned-ok "<reason>"` as started; `josh ship` refuses it without `--review`, so only a
+	// command that carries `--review` repeats it.
+	unpinned_ok?: ReadonlyArray<string>
 	// The paths a merge of the default branch left unmerged.
 	conflicts?: ReadonlyArray<string>
 	// The cause a stopped review round tagged its stop with (`run-ship-stop-cause.ts`).
@@ -59,23 +62,32 @@ function shell_word(token: string): string {
 	return BARE_WORD.test(token) ? token : quoted(token)
 }
 
-// A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path,
-// an issue number or the `--unpinned-ok` reason, and `shell_word` quotes the last for the prompt.
+// A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path
+// or an issue number and fits the prompt; `shell_word` quotes the `--unpinned-ok` reason.
 function resume_of(args: ShipArguments): ShipResume {
 	const cites = args.cites.flatMap((cite) => ['--cite', cite])
 
 	return {
 		title: args.title,
-		flags: [...args.unpinned_ok, ...args.notify, ...args.body, ...cites],
+		flags: [...args.notify, ...args.body, ...cites],
 		is_review: args.is_review,
+		unpinned_ok: args.unpinned_ok,
 	}
 }
 
 // The command prefix stays as written; only the stopped ship's own tokens are quoted where needed.
-function ship_command(command: string, resume: ShipResume): string {
-	const words = [...resume.flags, resume.title].map((token) => shell_word(token))
+function ship_command(
+	command: string,
+	resume: ShipResume,
+	review_flags: ReadonlyArray<string> = [],
+): string {
+	const words = [...review_flags, ...resume.flags, resume.title].map((token) => shell_word(token))
 
 	return [command, ...words].join(' ')
+}
+
+function review_command(resume: ShipResume): string {
+	return ship_command(COMMAND.DETACH_REVIEW, resume, resume.unpinned_ok)
 }
 
 // After the merge-side stages, or after round 2 — which is final — the re-detach reviews nothing.
@@ -88,9 +100,9 @@ function detach_again(resume: ShipResume): string {
 // commit; a ship started
 // without `--review` was re-detached after round 2, which is final, so it reviews nothing.
 function detach_as_started(resume: ShipResume): string {
-	const command = resume.is_review ? COMMAND.DETACH_REVIEW : COMMAND.DETACH
+	const command = resume.is_review ? review_command(resume) : ship_command(COMMAND.DETACH, resume)
 
-	return `leave the fix uncommitted and run \`${ship_command(command, resume)}\`.`
+	return `leave the fix uncommitted and run \`${command}\`.`
 }
 
 const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
@@ -108,7 +120,7 @@ const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
 // supervisor reviews it again even on a committed tree (`run-ship-stage.ts`), and `josh followup`
 // refuses the merge until it has (joshuafolkken/kit#4221).
 function detach_review_again(resume: ShipResume): string {
-	return `leave the fix uncommitted and run \`${ship_command(COMMAND.DETACH_REVIEW, resume)}\` — the review read the issue before its update, so the supervisor reviews round 1 again.`
+	return `leave the fix uncommitted and run \`${review_command(resume)}\` — the review read the issue before its update, so the supervisor reviews round 1 again.`
 }
 
 function after_fix(stage: Stage, resume: ShipResume): string {

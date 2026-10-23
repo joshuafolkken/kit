@@ -50,6 +50,7 @@ const EVERY_FIELD: Required<ShipStop> = {
 	title: '',
 	flags: [],
 	is_review: true,
+	unpinned_ok: [],
 	conflicts: [],
 	cause: 'finding',
 	is_review_stale: true,

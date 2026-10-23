@@ -1,8 +1,8 @@
 {
-	"reason": "Round-1 review fixes: test:pinned reports hunks unchecked without Vitest, run:review fails open when test:pinned cannot run, ship refuses a stray --unpinned-ok, plus their tests and doc lines",
+	"reason": "Carry --unpinned-ok as its own resume field so only a --review re-run repeats it (round-2 finding), plus its broker-schema field and tests",
 	"date": "2026-10-23",
 	"growth": {
-		"scripts.code_lines": 235,
+		"scripts.code_lines": 245,
 		"ai_cost.on_demand_bytes": 346
 	}
 }
