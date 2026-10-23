@@ -82,7 +82,7 @@ describe('the unit suite has a job of its own', () => {
 // files — vitest would fail it — because the suite has far more files than shards.
 describe('the unit suite is sharded across runners', () => {
 	it('runs one job per shard and lets every shard finish when one fails', () => {
-		expect(shards()).toEqual([1, 2, 3, 4])
+		expect(shards()).toEqual([1, 2, 3])
 		expect(runtime_job(UNIT_JOB)?.strategy?.['fail-fast']).toBe(false)
 	})
 
