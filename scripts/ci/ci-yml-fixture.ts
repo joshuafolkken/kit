@@ -198,6 +198,7 @@ const ci_yml_fixture = {
 	load_workflow,
 	load_action,
 	find_job,
+	action_name,
 	workflow_concurrency,
 	concurrency_cancels_in_progress,
 	upload_input,

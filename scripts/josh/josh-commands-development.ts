@@ -55,7 +55,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'lint:related': {
 		script: 'scripts/lint/lint-related.ts',
-		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
+		description:
+			'Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
 		core_weight: core_budget.CORE_WEIGHTS.lint,

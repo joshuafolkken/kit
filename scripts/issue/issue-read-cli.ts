@@ -1,3 +1,4 @@
+import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
@@ -30,7 +31,7 @@ const BLOCK_SEPARATOR = '\n\n---\n\n'
 // The same bound `issue:state` puts on its batch read, for the same reason: every read is a `gh`
 // process, and an unbounded fan-out is answered with secondary rate limiting rather than with issues.
 const READ_CONCURRENCY = 8
-const ISSUE_FIELDS = 'title,state,body'
+const ISSUE_FIELDS = `title,state,body,${gh_author_association.AUTHOR_FIELDS}`
 const FAILURE_TERMS = { success_kind: 'issue', misreading: 'the issue is empty' } as const
 
 interface IssueContent {
@@ -75,7 +76,7 @@ async function read_issue(issue_number: string): Promise<NumberResult> {
 
 	if (read.kind !== 'read') return { kind: read.kind }
 
-	const fields = issue_read.parse_issue_fields(read.json)
+	const fields = await issue_read.parse_issue_fields(read.json)
 
 	if (fields === undefined) return { kind: 'unreadable' }
 

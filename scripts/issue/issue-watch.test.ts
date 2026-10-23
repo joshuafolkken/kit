@@ -1,11 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_conditional, type ConditionalRead } from '#scripts/gh/git-gh-conditional'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { issue_watch, type WatchRecord } from './issue-watch'
+import { issue_watch_diff } from './issue-watch-diff'
 
 // joshuafolkken/kit#3773: the per-checkout record of what a run last read of its issue. The poll has
 // to stay quiet inside its interval, keep an unread update across a 304, raise a new one, end with a
@@ -27,6 +29,7 @@ const LATER_TIME = '2026-10-14T01:00:00.000Z'
 const COMMENTS = JSON.stringify([{ id: COMMENT_ID, user: { login: 'person' }, body: 'hi' }])
 
 const EARLIER_UPDATE = 'earlier update'
+const OPEN_STATE = 'open'
 
 // A fresh root per case, and its record removed with it. A getter rather than the path: `beforeEach`
 // assigns a new one per case, and a value captured at definition would be the previous case's.
@@ -49,8 +52,11 @@ function use_temporary_root(): () => string {
 
 const root = use_temporary_root()
 
-function changed(body: string, state = 'open'): ConditionalRead {
-	return { kind: 'changed', etag: NEW_ETAG, body: JSON.stringify({ state, body }) }
+// Filed by the owner unless a case names another author, so the trust check asks no network.
+function changed(body: string, state = OPEN_STATE, author_association = 'OWNER'): ConditionalRead {
+	const issue = { state, body, author_association, user: { login: 'author' } }
+
+	return { kind: 'changed', etag: NEW_ETAG, body: JSON.stringify(issue) }
 }
 
 function stub_issue(
@@ -161,6 +167,33 @@ describe('issue_watch.poll — a due poll', () => {
 
 		await expect(poll_later()).resolves.toBeUndefined()
 		expect(issue_watch.read_record(root())).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4633: a body edit under an author without write access holds nothing, and one
+// whose author's write access could not be checked stays pending with its text withheld.
+describe('issue_watch.poll — a body edit and its author', () => {
+	it('records an untrusted body edit as a notice, never as pending', async () => {
+		stub_issue(changed(EDITED_BODY, OPEN_STATE, 'NONE'))
+		seed()
+
+		const record = await poll_later()
+
+		expect(record?.pending).toBeUndefined()
+		expect(record?.notice).toBe(issue_watch_diff.WITHHELD_BODY_EDIT)
+		expect(record && issue_watch.news_of(record)).toBe(issue_watch_diff.WITHHELD_BODY_EDIT)
+	})
+
+	it('keeps a member body edit pending, text withheld, when the write-access lookup fails', async () => {
+		stub_issue(changed(EDITED_BODY, OPEN_STATE, 'MEMBER'))
+		vi.spyOn(gh_author_association, 'trust_of').mockResolvedValue(undefined)
+		seed()
+
+		const record = await poll_later()
+
+		expect(record?.pending).toContain('body withheld')
+		expect(record?.pending).not.toContain('- two')
+		expect(record?.notice).toBeUndefined()
 	})
 })
 

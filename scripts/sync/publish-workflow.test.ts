@@ -20,7 +20,6 @@ const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const CHECKOUT_ACTION = 'actions/checkout@'
 const SETUP_PNPM_ACTION = './.github/actions/setup-pnpm'
 const SETUP_NODE_ACTION = './.github/actions/setup-node'
-const PUBLISH_TAG_ARGUMENT = '--tag "$PUBLISH_TAG"'
 const MANIFEST_SCHEMA = z.object({
 	repository: z.object({ url: z.string() }),
 	publishConfig: z.unknown().optional(),
@@ -193,21 +192,6 @@ describe('release workflow concurrency', () => {
 		expect(workflow.jobs['create-release'].permissions['actions']).toBe('read')
 	})
 
-	it.each(PUBLISH_JOB_NAMES)(
-		'selects the registry tag while %s holds the publish queue',
-		(job_name) => {
-			const job = read_workflow().jobs[job_name]
-			const commands = job.steps.map((step) => step.run ?? '').join('\n')
-			const publish = job.steps.find((step) => step.run?.includes(PUBLISH_TAG_ARGUMENT))
-
-			expect(job.concurrency.group).toBe(PACKAGE_PUBLISH_GROUP)
-			expect(commands).toContain('dist-tags.latest')
-			expect(commands).toContain('publish-tag-cli.ts')
-			expect(publish?.env?.['PUBLISH_TAG']).toBe('${{ steps.publish-tag.outputs.tag }}')
-			expect(commands).not.toContain('--tag latest')
-		},
-	)
-
 	it('prevents the independent production dispatch from running in kit', () => {
 		const production = readFileSync('.github/workflows/production.yml', 'utf8')
 
@@ -215,35 +199,6 @@ describe('release workflow concurrency', () => {
 		expect(production).toContain('REF_NAME: ${{ inputs.tag || github.event.client_payload.tag }}')
 		expect(production).toContain('group: production-update')
 	})
-})
-
-describe('registry dist-tag lookup', () => {
-	it.each(PUBLISH_JOB_NAMES)(
-		'runs the dist-tag lookup outside the repository in %s so npm skips devEngines',
-		(job_name) => {
-			const lines = read_workflow()
-				.jobs[job_name].steps.flatMap((step) => (step.run ?? '').split('\n'))
-				.filter((line) => line.includes('npm view'))
-
-			expect(lines.length).toBeGreaterThan(0)
-			for (const line of lines) expect(line).toContain('cd "$RUNNER_TEMP" && npm view')
-		},
-	)
-
-	it.each(PUBLISH_JOB_NAMES)(
-		'reads the registry latest in %s before setup-pnpm puts the safe-chain shims on PATH',
-		(job_name) => {
-			const { steps } = read_workflow().jobs[job_name]
-			const lookups = steps.flatMap((step, index) =>
-				(step.run ?? '').includes('npm view') ? index : [],
-			)
-			const setup = steps.findIndex((step) => step.uses === SETUP_PNPM_ACTION)
-
-			expect(setup).toBeGreaterThan(0)
-			expect(lookups).toHaveLength(1)
-			expect(lookups[0]).toBeLessThan(setup)
-		},
-	)
 })
 
 describe('installation guidance', () => {

@@ -18,6 +18,7 @@ const SUCCESS_EXIT_CODE = 0
 const IN_PROGRESS_SPELLING = 'in-progress'
 const OPEN_SPELLING = 'OPEN'
 const CLOSED_SPELLING = 'CLOSED'
+const OWNER_ASSOCIATION = 'OWNER'
 
 function issue(
 	number: number,
@@ -29,6 +30,9 @@ function issue(
 		title: `issue ${String(number)}`,
 		createdAt: created_at,
 		labels: labels.map((name) => ({ name })),
+		// Filed by the owner, so only a test about trust meets an untrusted author.
+		author_association: OWNER_ASSOCIATION,
+		author_trusted: true,
 	}
 }
 

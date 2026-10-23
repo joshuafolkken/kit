@@ -66,6 +66,7 @@ const AUTHOR_GATE = `${workflow_expression_fixture.GITHUB_CONTEXT}.event.pull_re
 // reference paths asserted on cannot drift apart between the copies of the workflow.
 const ECOSYSTEM_OUTPUT = 'package-ecosystem'
 const UPDATE_TYPE_OUTPUT = 'update-type'
+const DEPENDENCY_GROUP_OUTPUT = 'dependency-group'
 const ACTIONS_ECOSYSTEM = 'github_actions'
 const NPM_ECOSYSTEM = 'npm_and_yarn'
 const PATCH_UPDATE = 'version-update:semver-patch'
@@ -85,6 +86,8 @@ interface WorkflowRun {
 	managed_output: string
 	ecosystem: string
 	update_type: string
+	// The group the pull request belongs to, empty when none; only kit's own gate reads it.
+	dependency_group?: string | undefined
 }
 
 function managed_gate(has_kit_managed: boolean): string {
@@ -106,6 +109,7 @@ function build_run_context(run: WorkflowRun): ContextTree {
 	const metadata = {
 		[ECOSYSTEM_OUTPUT]: run.ecosystem,
 		[UPDATE_TYPE_OUTPUT]: run.update_type,
+		[DEPENDENCY_GROUP_OUTPUT]: run.dependency_group ?? NO_OUTPUT,
 	}
 
 	return {

@@ -25,6 +25,7 @@ import { vi } from 'vitest'
 
 const REPO = 'joshuafolkken/kit'
 const CHECKOUT_PATH = '/checkouts/kit'
+const OWNER_ASSOCIATION = 'OWNER'
 
 // GitHub answering normally, which is the sixth question the command asks — and the only one that is
 // asked of the network rather than of a stub, so leaving it out would let a case that reaches the
@@ -38,6 +39,8 @@ interface ChildInput {
 	blocked_by?: ReadonlyArray<number>
 	// The body the defect priority classifies the child by.
 	body?: string
+	// Who filed the child. Left out, the owner did, so the author-trust check asks no network.
+	author_association?: string
 }
 
 interface EpicInput {
@@ -100,7 +103,8 @@ function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): Open
 		untriaged,
 	)
 
-	return { ...row, labels: names.map((name) => ({ name })) }
+	// Filed by the owner unless the case says otherwise, so the pickup's trust check asks no network.
+	return { author_association: OWNER_ASSOCIATION, ...row, labels: names.map((name) => ({ name })) }
 }
 
 // The shape a `number,state,labels,blockedBy,body` read answers with — `blockedBy` is a connection
@@ -112,16 +116,23 @@ function child_labels(
 	return triaged_labels(input.number, input.labels ?? [], untriaged).map((name) => ({ name }))
 }
 
+function blocked_by_of(input: ChildInput): {
+	nodes: Array<{ number: number }>
+	totalCount: number
+} {
+	const blockers = input.blocked_by ?? []
+
+	return { nodes: blockers.map((number) => ({ number })), totalCount: blockers.length }
+}
+
 function gh_child(input: ChildInput, untriaged: ReadonlyArray<number> = []): string {
 	return JSON.stringify({
 		number: input.number,
 		state: input.state ?? 'OPEN',
 		labels: child_labels(input, untriaged),
 		body: input.body,
-		blockedBy: {
-			nodes: (input.blocked_by ?? []).map((number) => ({ number })),
-			totalCount: (input.blocked_by ?? []).length,
-		},
+		author_association: input.author_association ?? OWNER_ASSOCIATION,
+		blockedBy: blocked_by_of(input),
 	})
 }
 

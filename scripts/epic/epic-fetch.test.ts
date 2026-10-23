@@ -109,6 +109,20 @@ describe('epic_fetch.fetch_child', () => {
 	})
 })
 
+// joshuafolkken/kit#4633: `backlog:next` offers a child only when its author has write access.
+describe('epic_fetch.fetch_child — who filed it', () => {
+	it('carries the author fields the read answered with', async () => {
+		const author = { author_association: 'NONE', user: { login: 'outsider' } }
+
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(
+			json_read(JSON.stringify({ number: 1, state: 'OPEN', ...author })),
+		)
+		const child = await epic_fetch.fetch_child(1, REPO)
+
+		expect(child).toMatchObject(author)
+	})
+})
+
 describe('epic_fetch.fetch_child — what it refuses to guess', () => {
 	it('reports a child gh could not answer for', async () => {
 		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)

@@ -1,3 +1,4 @@
+import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -21,6 +22,7 @@ const WATCH_VERDICT = 'watch'
 const BLOCKED_ANSWER = 'blocked'
 const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
+const UNTRUSTED_HEADING = 'Waiting on a person to vouch for the body (author without write access):'
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
 	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
@@ -70,6 +72,13 @@ function labelled_lines(issues: ReadonlyArray<OpenIssueData>, label: string): Ar
 		.map((issue) => cited(issue))
 }
 
+// `backlog:next` holds these for a person exactly as it does a parked one (joshuafolkken/kit#4633).
+function untrusted_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
+	return issues
+		.filter((issue) => !auto_ok_author.is_author_trusted(issue))
+		.map((issue) => cited(issue))
+}
+
 function dated_lines(issues: ReadonlyArray<OpenIssueData>, now_ms: number): Array<string> {
 	const lines: Array<string> = []
 
@@ -92,6 +101,7 @@ function remaining_lines(reading: IdleReading): Array<string> {
 	const lines = [
 		...section(DECISION_HEADING, labelled_lines(reading.issues, NEEDS_DECISION_LABEL)),
 		...section(STALLED_HEADING, labelled_lines(reading.issues, RUN_STALLED_LABEL)),
+		...section(UNTRUSTED_HEADING, untrusted_lines(reading.issues)),
 		...section('Waiting on a date:', dated_lines(reading.issues, reading.now_ms)),
 	]
 

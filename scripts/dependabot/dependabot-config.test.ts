@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { ci_yml_fixture, type WorkflowStep } from '#scripts/ci/ci-yml-fixture'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
 
@@ -11,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 interface DependabotGroup {
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'update-types'?: ReadonlyArray<string>
+	patterns?: ReadonlyArray<string>
 }
 
 interface DependabotUpdate {
@@ -34,6 +36,30 @@ const ACTIONS_ECOSYSTEM = 'github-actions'
 const WEEKLY = 'weekly'
 const VERSION_UPDATES_DISABLED = 0
 const MINOR_AND_PATCH: ReadonlyArray<string> = ['minor', 'patch']
+const PUBLISH_GROUP = 'publish-actions'
+// The remaining group is named after its ecosystem.
+const ACTIONS_GROUP = ACTIONS_ECOSYSTEM
+
+// The jobs that hold publish credentials, and the composite action they set Node.js up through.
+const PUBLISH_WORKFLOW = path.join('.github', 'workflows', 'publish.yml')
+const PUBLISH_JOBS: ReadonlyArray<string> = ['publish-github', 'publish-npm']
+const SETUP_NODE_ACTION = path.join('.github', 'actions', 'setup-node', 'action.yml')
+const LOCAL_ACTION_PREFIX = './'
+
+function remote_actions(steps: ReadonlyArray<WorkflowStep>): ReadonlyArray<string> {
+	return steps
+		.filter((step) => step.uses !== undefined && !step.uses.startsWith(LOCAL_ACTION_PREFIX))
+		.map((step) => ci_yml_fixture.action_name(step))
+}
+
+function credentialed_actions(): ReadonlyArray<string> {
+	const job_steps = PUBLISH_JOBS.flatMap(
+		(job) => ci_yml_fixture.find_job(PUBLISH_WORKFLOW, job)?.steps ?? [],
+	)
+	const action_steps = ci_yml_fixture.load_action(SETUP_NODE_ACTION).runs.steps
+
+	return [...new Set(remote_actions([...job_steps, ...action_steps]))]
+}
 
 function find_entry(config_path: string, ecosystem: string): DependabotUpdate | undefined {
 	const config = yaml_config_fixture.load_yaml_config(config_path) as DependabotConfig
@@ -84,10 +110,24 @@ describe.each([KIT_PATH, TEMPLATE_PATH])('%s github-actions entry (kit#803)', (c
 // joshuafolkken/kit#3916 lost its auto-merge: two separate bumps to `ci.yml` merged first, so its
 // merge commit wrote workflow content its head did not hold, which `GITHUB_TOKEN` may not.
 describe('github-actions grouping (kit#4148)', () => {
-	it('groups every minor and patch bump of kit into one pull request', () => {
-		const groups = Object.values(find_entry(KIT_PATH, ACTIONS_ECOSYSTEM)?.groups ?? {})
+	// The publish-credential actions come first so Dependabot files them in their own pull request,
+	// which the auto-merge workflow leaves to a person (joshuafolkken/kit#4633).
+	it('groups every minor and patch bump of kit into the publish and the remaining group', () => {
+		const groups = find_entry(KIT_PATH, ACTIONS_ECOSYSTEM)?.groups ?? {}
 
-		expect(groups.map((group) => group['update-types'])).toStrictEqual([MINOR_AND_PATCH])
+		expect(Object.keys(groups)).toStrictEqual([PUBLISH_GROUP, ACTIONS_GROUP])
+		expect(Object.values(groups).map((group) => group['update-types'])).toStrictEqual([
+			MINOR_AND_PATCH,
+			MINOR_AND_PATCH,
+		])
+	})
+
+	// A credentialed action missing from the list would fall into the auto-merged group, so every
+	// action those jobs run is required to be listed (joshuafolkken/kit#4633).
+	it('lists every action the publish jobs run in the publish group', () => {
+		const patterns = find_entry(KIT_PATH, ACTIONS_ECOSYSTEM)?.groups?.[PUBLISH_GROUP]?.patterns
+
+		expect(patterns).toEqual(expect.arrayContaining([...credentialed_actions()]))
 	})
 
 	// A consumer's auto-merge holds a whole pull request that touches an upstream-managed workflow,

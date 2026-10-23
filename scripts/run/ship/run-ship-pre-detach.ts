@@ -6,6 +6,7 @@ import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { project_checks } from '#scripts/gate/project-checks'
+import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
@@ -66,13 +67,10 @@ const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
 	'scripts/claude',
 	'scripts/rules',
 	'scripts/josh/josh-command-map.test.ts',
-	'scripts/issue/session-cite-scan.test.ts',
-	'tools/test/untested-sources.test.ts',
+	...structural_checks.STRUCTURAL_GUARD_TARGETS,
 	'tools/test/pure-files.test.ts',
 ]
-// A present directory need not hold a test the project's Vitest includes — a consumer's own
-// `scripts/claude` of shell helpers, say — and a filter that matches nothing would stop every ship.
-const GUARD_TEST_COMMAND: ReadonlyArray<string> = ['josh', 'test:unit', '--passWithNoTests']
+const { GUARD_TEST_COMMAND, failure_prefix, failure_section } = structural_checks
 
 function present_targets(directory: string): ReadonlyArray<string> {
 	return GUARD_TEST_TARGETS.filter((target) => existsSync(path.join(directory, target)))
@@ -123,27 +121,6 @@ function gate_results(runs: ReadonlyArray<PreDetachRun>): Array<GateStepResult> 
 		})
 }
 
-// The front of a failed check's heading — `josh lane:value metrics-stops` counts a ship output that
-// carries the metrics totals' one.
-function failure_prefix(list: ReadonlyArray<string>): string {
-	return `✗ ${list.join(' ')} — `
-}
-
-// Each failure is headed by the check's own command and how it ended: a check that failed with no
-// output of its own (`ELIFECYCLE Command failed` alone, or nothing) otherwise names nothing to fix.
-function failure_heading({ check, result }: PreDetachRun): string {
-	const ending =
-		result.exit_code === undefined
-			? 'no exit code (timed out or ended by a signal)'
-			: `exit code ${String(result.exit_code)}`
-
-	return `${failure_prefix(check.list)}${ending}`
-}
-
-function failure_section(run: PreDetachRun): string {
-	return [failure_heading(run), run.result.output.trim()].filter((part) => part !== '').join('\n')
-}
-
 function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 	const failed = runs.filter(({ result }) => buffered_process.is_process_failed(result))
 
@@ -151,7 +128,9 @@ function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 
 	return {
 		code: FAILURE_EXIT_CODE,
-		out: failed.map((run) => failure_section(run)).join(SECTION_SEPARATOR),
+		out: failed
+			.map(({ check, result }) => failure_section(check.list, result))
+			.join(SECTION_SEPARATOR),
 	}
 }
 

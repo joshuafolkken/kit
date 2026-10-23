@@ -1,3 +1,4 @@
+import { gh_author_association } from './gh-author-association'
 import { git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
 import { git_gh_issue_read } from './git-gh-issue-read'
 import { BLOCKED_BY_COUNT_FIELD } from './git-gh-issue-rest'
@@ -34,8 +35,9 @@ const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 // behind the next-issues display too — where a refused one becomes a failure with no message at all,
 // since the listing swallows the error. `body` costs
 // no request — the REST listing row already carries it — and is what the backlog offer reads for
-// the paths each issue declares.
-const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy,body`
+// the paths each issue declares. The author fields are the same row's too, and decide whether an
+// unattended run may act on that body at all.
+const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy,body,${gh_author_association.AUTHOR_FIELDS}`
 
 // Every listing below goes through the one REST invocation in `git-gh-issue-list.ts`. It kept the
 // `json_fields` / `limit` contract it had as a `gh issue list` wrapper, so these callers changed

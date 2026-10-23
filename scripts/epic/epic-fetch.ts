@@ -23,6 +23,8 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 		labels: epic_issue.label_names(parsed),
 		blocked_by: epic_issue.blocker_references_of(parsed, repo),
 		body: parsed.body,
+		author_association: parsed.author_association,
+		user: parsed.user,
 	}
 }
 

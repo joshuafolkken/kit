@@ -8,8 +8,10 @@ import { gate_plan } from '#scripts/gate/gate-plan'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
+import { structural_checks } from '#scripts/gate/structural-checks'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { split_early_notice } from '#scripts/split/split-early-notice'
 import { lint_parallel } from './lint-parallel'
 import { lint_related_scope } from './lint-related-scope'
 
@@ -61,14 +63,19 @@ function byte_check_exit_code(scope: ChangedFileScope, root: string): number {
 // of its own — it takes the files this run already resolved, so the git contract is the lint
 // command's alone. A lint failure is reported as-is; only a green lint runs the byte check, so the
 // two never race to the exit code, and a green tree here is green on both — which is what the record
-// below then vouches for.
+// below then vouches for. The structural checks (`structural-checks.ts`) run beside the lint rather
+// than after it, so their whole-program scan costs no wall clock the lint has not already spent.
 //
 // The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
 // reported here for the namespaces the changed files declare (joshuafolkken/kit#4645), rather than at
 // ship's pre-detach gate. The fallback scans the whole program, a superset as the lint's is.
 async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<number> {
+	const structural = structural_checks.run_structural(scope, root)
 	const lint_exit = await lint_exit_code(scope)
+	const structural_exit = await structural
+
 	if (lint_exit !== 0) return lint_exit
+	if (structural_exit !== 0) return structural_exit
 	const byte_exit = byte_check_exit_code(scope, root)
 	if (byte_exit !== 0) return byte_exit
 	// The linters' buffered output ends without a newline; keep the check's own line apart from it.
@@ -201,6 +208,7 @@ async function run_related_lint(command_arguments: ReadonlyArray<string>): Promi
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_related_lint(process.argv.slice(changed_file_scope.ARGV_START))
+	await split_early_notice.surface()
 }
 
 const lint_related = { run_related_lint }
