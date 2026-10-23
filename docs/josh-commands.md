@@ -264,6 +264,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.
 - A source file that differs only from the map's tree joins only when its text names a file this change moved; such a test file always joins.
 - A bare run after a green one reads only what moved since, main syncs included, plus the branch's own test files; nothing moved runs no test. The whole change when no record compares (none, or other tools, `NODE_ENV` or `TZ`), a non-code file moved (the map cannot see its read), or a toolchain, TypeScript or test-runner config moved (`scripts/gate/verification-inputs.ts`).
+- In kit, after a green run, the related tests of each changed code file that names the base branch's resolution (`change_base`, `default_branch`, `diff_main`, a quoted `main`) run again in a temporary checkout shaped like CI's — detached, one commit deep, no local `main`, no `origin` — and a failure there fails the run (`scripts/test/test-no-base.ts`). A change that names none builds no checkout.
 
 ### `josh test:declared`
 
