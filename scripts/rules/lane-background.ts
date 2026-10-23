@@ -137,8 +137,8 @@ function foreground_input(
 const FOREGROUND_NOTE =
 	"lane background: a lane child's `josh ship` backgrounded, by its flag or by outrunning the Bash " +
 	'timeout, dies with the headless turn before its supervisor exists — so it was run in the ' +
-	'foreground at the 600000 ms cap, where it detaches itself after the preflight. End the turn on ' +
-	'`launched` / `busy`.'
+	'foreground at the 600000 ms cap, where it detaches itself after the preflight. Then follow ' +
+	'`chain-rule.md` step 0 (`josh ship:wait` on `launched`).'
 
 type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
 
@@ -185,8 +185,8 @@ function pending_agent_ids(tail: string): ReadonlyArray<string> {
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
 	'process whose background tasks die when the turn ends. Hand over to ' +
-	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then end the turn on ' +
-	'`launched` / `busy`. It fires on every occurrence ' +
+	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then `josh ship:wait <N>` on ' +
+	'`launched` or end the turn. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =

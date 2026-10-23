@@ -237,6 +237,14 @@ describe('lane_background.ROW — delivery', () => {
 	it('says the ship is issued in the foreground', () => {
 		expect(lane_background.LANE_BACKGROUND_REASON).toContain('issued in the foreground')
 	})
+
+	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711).
+	it.each([
+		['refusal', lane_background.LANE_BACKGROUND_REASON],
+		['foreground note', lane_background.FOREGROUND_NOTE],
+	])('the %s sends a launched ship to josh ship:wait', (_name, text) => {
+		expect(text).toContain('josh ship:wait')
+	})
 })
 
 describe('lane_background.pending_background_ids', () => {

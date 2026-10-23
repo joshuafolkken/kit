@@ -10,10 +10,12 @@ Review results and successful pushes are never turn boundaries.
    answer the self-check's question 1 — and its `/code-review` subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
    本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
    round's fixes with the scoped pair, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
-   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
+   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
+   `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (Bash `timeout` 600000) and do what it
+   prints (`docs/josh-commands-run.md` → "`josh ship:wait`"); else **end the turn**. No `pnpm josh gate`,
    `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
    and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
-   `metrics` leaves no record it reuses. A stop relaunches a child
+   `metrics` leaves no record it reuses. A stop no session waits on relaunches a child
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
    directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before

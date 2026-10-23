@@ -545,6 +545,22 @@ A re-run resumes: a per-issue stage record, honored only where the actual state 
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".
 
+### `josh ship:wait`
+
+<!-- usage: ship:wait -->
+
+Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending).
+
+```bash
+pnpm josh ship:wait <N>   # re-issue it on `pending`; `returned` prints the stop to fix
+```
+
+<!-- /usage -->
+
+A stop in the gate or review round 1 returns to the lane session waiting here; with no session waiting, a fresh one is launched as before.
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` in detail".
+
 ### `josh run:report`
 
 <!-- usage: run:report -->

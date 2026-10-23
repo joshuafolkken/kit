@@ -33,7 +33,13 @@ vi.mock('#scripts/git/changed-paths', () => ({
 
 vi.mock('node:timers/promises', () => ({ setTimeout: async (): Promise<void> => undefined }))
 
-vi.mock('./run-ship-probe', () => ({ run_ship_probe: { read_review_stale: stale_mock } }))
+// No session waits on the ship here: `run-ship-return-waiter.test.ts` covers the one that does.
+vi.mock('./run-ship-probe', () => ({
+	run_ship_probe: {
+		read_review_stale: stale_mock,
+		repository_directory: async (): Promise<undefined> => undefined,
+	},
+}))
 vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
 }))
