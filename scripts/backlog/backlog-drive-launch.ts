@@ -1,7 +1,11 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
-import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
+import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_measure_close } from './backlog-measure-close'
+
+const { MEASURED_LAUNCH } = backlog_drive_launch_pass
 
 // The driver's lane launch. The parent that ran `josh latest` in the primary
 // checkout leaves its rewritten lock file in a stash under this message — `backlogrun-lanes.md` →
@@ -27,8 +31,10 @@ async function latest_stash(): Promise<string | undefined> {
 	return selection.kind === 'match' ? LATEST_STASH_MESSAGE : undefined
 }
 
-async function launch(issue: string, owner: string): Promise<LaunchOutcome['kind']> {
+// An issue its measurement declaration closed takes no lane (`backlog-measure-close.ts`).
+async function launch(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
+	if (await backlog_measure_close.closed(issue)) return MEASURED_LAUNCH
 	await run_event_setup.emit(run_event_setup.opening_lane(issue))
 
 	const outcome = await lane_launch_cli.launch_lane({ issue, stash: await latest_stash() })

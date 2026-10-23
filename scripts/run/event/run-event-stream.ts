@@ -157,6 +157,10 @@ const EVENT_KIND = {
 	// silent window (joshuafolkken/kit#4270). Emitted once per pause episode (`emit_once_since_with`,
 	// reset by `LANE_STATE`), it is the dedup marker for the one paused-lane Telegram. A trace.
 	PAUSED_NOTICE: 'paused-notice',
+	// `backlog:drive` ran a due issue's measurement declaration itself, found it within its bound and
+	// closed the issue through `issue:measured` — no lane was launched for it (joshuafolkken/kit#4621).
+	// `run:board` draws it merged. A trace: the parent's position is the drive's, not this close.
+	MEASURED: 'measured',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -179,6 +183,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.IDLE_NOTICE,
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
+	EVENT_KIND.MEASURED,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

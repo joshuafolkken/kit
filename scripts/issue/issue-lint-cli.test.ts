@@ -126,3 +126,22 @@ describe('issue:lint expected effect (joshuafolkken/kit#3909)', () => {
 		expect(report).toHaveBeenCalledWith(ENHANCEMENT_OUTPUT)
 	})
 })
+
+function declaring(line: string): string {
+	return `${VALID_BODY}- 種別: 非不具合\n${line}\n${REQUIRED_SECTIONS}`
+}
+
+describe('issue:lint measurement declaration (joshuafolkken/kit#4621)', () => {
+	it('rejects a malformed declaration', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await lint_body(declaring('- 計測宣言: echo 3 under 5'))).toBe(1)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('計測宣言'))
+	})
+
+	it('accepts a well-formed one', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await lint_body(declaring('- 計測宣言: `echo 3` <= 5'))).toBe(0)
+	})
+})

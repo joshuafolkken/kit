@@ -5,6 +5,7 @@ import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_measure_close } from './backlog-measure-close'
 
 const OWNER = '4242'
 const FIRST = '3300'
@@ -25,6 +26,19 @@ beforeEach(() => {
 	vi.spyOn(lane_launch_cli, 'launch_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
 	// The stage a launch writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
+	vi.spyOn(backlog_measure_close, 'closed').mockResolvedValue(false)
+})
+
+// joshuafolkken/kit#4621: an issue its measurement declaration closed takes no lane.
+describe('backlog_drive_launch.launch — a measured close', () => {
+	it('answers measured without opening a lane or a stage', async () => {
+		vi.mocked(backlog_measure_close.closed).mockResolvedValue(true)
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('measured')
+		expect(backlog_measure_close.closed).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
 })
 
 afterEach(() => {
