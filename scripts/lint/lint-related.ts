@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_check } from '#scripts/document/document-byte-check'
+import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -61,11 +62,22 @@ function byte_check_exit_code(scope: ChangedFileScope, root: string): number {
 // command's alone. A lint failure is reported as-is; only a green lint runs the byte check, so the
 // two never race to the exit code, and a green tree here is green on both — which is what the record
 // below then vouches for.
+//
+// The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
+// reported here for the namespaces the changed files declare (joshuafolkken/kit#4645), rather than at
+// ship's pre-detach gate. The fallback scans the whole program, a superset as the lint's is.
 async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<number> {
 	const lint_exit = await lint_exit_code(scope)
 	if (lint_exit !== 0) return lint_exit
+	const byte_exit = byte_check_exit_code(scope, root)
+	if (byte_exit !== 0) return byte_exit
+	// The linters' buffered output ends without a newline; keep the check's own line apart from it.
+	process.stdout.write('\n')
 
-	return byte_check_exit_code(scope, root)
+	return await unused_members_check.run_unused_members(
+		root,
+		scope.mode === 'all' ? undefined : scope.files,
+	)
 }
 
 // **A bare run reads only what moved since its last green run** (`since-green.ts`); explicit file
