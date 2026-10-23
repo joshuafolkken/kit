@@ -23,9 +23,11 @@ function extract_action_names(relative_paths: ReadonlyArray<string>): Array<stri
 
 // The template job each runtime job shares its setup with: kit splits the template's `checks` into
 // `static-checks` and `unit`, and `static-checks` is the half that installs the same way.
+const SECRET_SCAN_JOB = 'secret-scan'
 const SHARED_JOBS = [
 	{ template: 'checks', runtime: 'static-checks' },
 	{ template: 'e2e', runtime: 'e2e' },
+	{ template: SECRET_SCAN_JOB, runtime: SECRET_SCAN_JOB },
 ]
 
 function setup_pnpm_inputs(relative_path: string, job_name: string): unknown {

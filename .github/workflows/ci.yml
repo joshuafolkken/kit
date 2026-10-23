@@ -586,6 +586,46 @@ jobs:
           path: pr-checks-evidence
           retention-days: 1
 
+  # The pre-commit secretlint scan skips when its binary is missing and never runs on a commit made
+  # with `--no-verify`, so this job scans the pull request's changes again where neither applies
+  # (joshuafolkken/kit#4657). It needs no other job and none needs it, so it stays off the critical
+  # path, and its own `Secret Scan` context is what makes a finding block the merge. Only the files
+  # the pull request adds or changes are read: the merge commit's first parent is the base, which is
+  # why the checkout fetches two commits. secretlint comes from the same store cache every other job
+  # installs from, and `JOSH_SECRETLINT_REQUIRE` turns the hook's missing-binary skip into a failure.
+  # `shell: bash` adds `pipefail`, so a diff that fails cannot hand `xargs` an empty list and pass.
+  secret-scan:
+    name: Secret Scan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Setup pnpm and install dependencies
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan the changed files for secrets
+        id: scan
+        shell: bash
+        env:
+          JOSH_SECRETLINT_REQUIRE: '1'
+        run: git diff -z --name-only --diff-filter=d HEAD^1 HEAD | xargs -0 -r pnpm josh secretlint-scan
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
