@@ -57,9 +57,13 @@ const CORE_WEIGHTS = {
 // On 2026-10-17: prettier 260 MB, the retrospective 862 MB and a lane install 65 MB. On 2026-10-22
 // (joshuafolkken/kit#4528) the whole suite, 1,830 files at `--maxWorkers=3` beside four lanes, sampled
 // each worker's resident size once a second: the largest peaked at 381 MB, so the 54-file
-// measurement had read a worker short of the files it lives through.
+// measurement had read a worker short of the files it lives through. On 2026-10-23
+// (joshuafolkken/kit#4595) `josh metrics`, its process tree sampled four times a second, peaked at
+// 1,176 MB on a merge-base cache hit and 1,851 MB on a miss, where its own untyped `max-lines`-only
+// eslint pass still holds its heap beside the `--json` child measuring the merge-base. It takes the miss.
 const MEMORY_MB = {
 	lint: 2400,
+	metrics: 1900,
 	type_check: 1300,
 	spell_check: 350,
 	eslint_scan: 2400,

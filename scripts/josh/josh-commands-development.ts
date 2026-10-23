@@ -84,7 +84,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			['files'],
 		],
 		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		memory_mb: core_budget.MEMORY_MB.metrics,
 		is_kit_only: true,
 		usage: {
 			examples: [

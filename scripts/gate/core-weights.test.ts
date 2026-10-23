@@ -25,6 +25,12 @@ describe('core_weights — the declared cost of each heavy tool', () => {
 		}
 	})
 
+	// joshuafolkken/kit#4595: metrics runs only an untyped `max-lines` eslint pass, so even with its
+	// merge-base child it holds less than the typed whole-tree eslint scan.
+	it('sizes the metrics memory below the whole-tree eslint scan peak', () => {
+		expect(core_weights.MEMORY_MB.metrics).toBeLessThan(core_weights.MEMORY_MB.eslint_scan)
+	})
+
 	it.each(['lint', 'eslint_scan'] as const)(
 		'never weighs the %s eslint run below the cores it was measured at',
 		(tool) => {

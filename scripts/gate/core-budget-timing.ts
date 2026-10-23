@@ -31,7 +31,7 @@ function resolve_timing(options: Partial<TimingConfig>): TimingConfig {
 	}
 }
 
-const core_budget_timing = { resolve_timing }
+const core_budget_timing = { WAIT_CAP_MS, resolve_timing }
 
 export type { TimingConfig }
 export { core_budget_timing }
