@@ -34,7 +34,7 @@ vi.mock('#scripts/review/review-interaction', () => ({
 	review_interaction: { status: async () => undefined },
 }))
 vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_round_two: record_round_two_mock },
+	lane_ledger: { record_round_one: vi.fn(), record_round_two: record_round_two_mock },
 }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
@@ -79,8 +79,8 @@ function answer_with(failing: string | undefined): void {
 	})
 }
 
-async function stage(is_stale = false): Promise<unknown> {
-	return await run_ship_review_steps.review_stage(ISSUE, is_stale)
+async function stage(): Promise<unknown> {
+	return await run_ship_review_steps.review_stage(ISSUE, false)
 }
 
 beforeEach(() => {
@@ -100,28 +100,7 @@ beforeEach(() => {
 	record_round_two_mock.mockClear()
 })
 
-// joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
-// to round 2 rather than reviewing the whole change again as round 1.
-describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
-	// joshuafolkken/kit#3643: a round that ran no review says so, so the ship does not time it as one.
-	it('skips the review when the issue already has a recorded round', async () => {
-		record_check_mock.mockResolvedValueOnce({ status: 'ok' })
-
-		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject(SKIPPED)
-		expect(record_check_mock).toHaveBeenCalledWith(Number(ISSUE))
-		expect(commands()).toStrictEqual([])
-		expect(launch).not.toHaveBeenCalled()
-	})
-
-	// joshuafolkken/kit#4221: an `ok` record is no skip once the review is stale — it read the issue
-	// before its update — so that case runs stale.
-	it.each(['missing', 'not-required', 'ok'])('runs the review on a %s record', async (status) => {
-		record_check_mock.mockResolvedValueOnce({ status })
-
-		expect(await stage(status === 'ok')).toHaveProperty('code', OK)
-		expect(commands()).toContain(OPEN)
-	})
-})
+// The recorded-round cases are in `run-ship-review-steps-reuse.test.ts` (joshuafolkken/kit#4620).
 
 describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('opens, reviews, joins, attests and records a clean round without stopping', async () => {

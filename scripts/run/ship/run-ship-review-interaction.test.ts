@@ -43,6 +43,16 @@ vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record
 vi.mock('#scripts/review/review-interaction', () => ({
 	review_interaction: { status: interaction_status_mock },
 }))
+// A recorded round 1 stands on this tree, so an `ok` record is reused (joshuafolkken/kit#4620).
+vi.mock('#scripts/review/review-reviewed-tree', () => ({
+	review_reviewed_tree: {
+		discard: vi.fn(),
+		is_stopped_on: () => false,
+		is_unmoved_here: async () => true,
+		mark_stopped: vi.fn(),
+	},
+}))
+vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_round_one: vi.fn() } }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 

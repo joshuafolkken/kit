@@ -242,6 +242,18 @@ function is_written_since(source: string, taken_at: string): boolean {
 	}
 }
 
+// Whether the brief the pointer names was attested, on this branch — the half of a finished review
+// that does not depend on where its verdict was written down.
+function is_attested_on(checkout: ReviewCheckout, root?: string): boolean {
+	const pointer = read_pointer(root)
+
+	if (pointer === undefined) return false
+
+	const verdict = verdict_for(pointer.nonce)
+
+	return verdict.status === 'ok' && verdict.expected?.branch === checkout.branch
+}
+
 // **Whether the last briefed review of this branch finished**. A ship resumed
 // after a stop re-issues round 1, and without this answer it briefed the whole change again — the
 // files the finished review had just read, re-read at full cost. It is asked before `record_target`
@@ -255,11 +267,7 @@ function is_written_since(source: string, taken_at: string): boolean {
 function is_reviewed_on(checkout: ReviewCheckout, findings_path: string, root?: string): boolean {
 	const pointer = read_pointer(root)
 
-	if (pointer === undefined) return false
-
-	const verdict = verdict_for(pointer.nonce)
-
-	if (verdict.status !== 'ok' || verdict.expected?.branch !== checkout.branch) return false
+	if (pointer === undefined || !is_attested_on(checkout, root)) return false
 
 	return is_written_since(findings_path, pointer.taken_at)
 }
@@ -334,6 +342,7 @@ const review_attest = {
 	clear,
 	clear_here,
 	expect_path,
+	is_attested_on,
 	is_briefed_since,
 	is_reviewed_on,
 	MISMATCH_VERDICT,

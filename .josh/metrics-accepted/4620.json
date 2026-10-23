@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 fixes for #4620: stop-marker and resume-precedence tests, and the ledger skip for a failed review:record",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 198,
+		"ai_cost.on_demand_bytes": 313
+	}
+}

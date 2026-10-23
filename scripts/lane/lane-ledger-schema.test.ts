@@ -46,3 +46,12 @@ describe('lane_ledger_schema.entry_schema', () => {
 		expect(entry_schema.safeParse({ kind: KIND.MERGE, at: AT }).success).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#4620: how a ship's round 1 ended, for `josh lane:stats`.
+describe('lane_ledger_schema.entry_schema — round one', () => {
+	it('parses the round 1 a ship acted on', () => {
+		const round = { kind: KIND.ROUND_ONE, at: AT, issue: 4620, verdict: 'reused' }
+
+		expect(entry_schema.safeParse(round).data).toStrictEqual(round)
+	})
+})

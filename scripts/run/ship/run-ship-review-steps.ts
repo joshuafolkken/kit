@@ -1,8 +1,10 @@
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_round_one_stats } from '#scripts/lane/lane-round-one-stats'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_record } from '#scripts/review/review-record'
+import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round2 } from '#scripts/review/review-round2'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
@@ -49,7 +51,7 @@ const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
 const ROUND_ONE_RECORDED_NOTE =
-	'round 1 already recorded for this issue — not reviewed again; the gate reads the fixed tree and round 2 decides after the commit.'
+	'round 1 already recorded — reused, not reviewed again; round 2 decides on the fix delta after the commit.'
 
 // The scoped pair's precondition, met by the supervisor itself rather than stopped on,
 // single-sourced with the preflight and gate stages.
@@ -104,7 +106,7 @@ async function record_and_route(
 	round: Round,
 	outcome_of: (verdict: ScoredVerdict) => RoundOutcome,
 	kind: ReadonlyArray<string> = [],
-): Promise<JoshResult> {
+): Promise<StepResult> {
 	const verdict = current_verdict()
 
 	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note, CAUSE.INFRA)
@@ -123,7 +125,7 @@ async function record_and_route(
 // Fixes made in place are counted only once the scoped pair is green on the fixed tree. The reviewer is
 // asked to leave it green; this is the check that it did, and a fix it could not get green is routed as
 // the finding it still is — recorded, then stopped before the gate and the commit take it in.
-async function round_one_record(issue: string, kind?: ReadonlyArray<string>): Promise<JoshResult> {
+async function round_one_record(issue: string, kind?: ReadonlyArray<string>): Promise<StepResult> {
 	const is_fixed = current_verdict().kind === run_ship_review.VERDICT.FIXED
 	const checked = is_fixed ? await scoped_pair() : undefined
 	const is_verified = checked === undefined || checked.code === SUCCESS_EXIT_CODE
@@ -142,26 +144,66 @@ function skipped(out: string): StepResult {
 	return { code: SUCCESS_EXIT_CODE, out, is_skipped: true }
 }
 
-// The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
-// at the first that did not pass.
-//
-// **A recorded round 1 is not run again**. A ship relaunched with `--review`
-// after a round-1 stop would otherwise review the whole change a second time as round 1 — a new Medium
-// there stops it again, and round 2 after the commit makes a third. The fix delta is round 2's to
-// verify, and `round_two_stage` asks whether it is due after the commit — unless the issue changed after
-// that round's brief: the recorded round then never read it, and `josh followup` refuses the merge on it
-// (joshuafolkken/kit#4221).
-async function round_one_stage(issue: string, is_stale: boolean): Promise<StepResult> {
+// How the ship's round 1 ended, for `josh lane:stats` to count the rounds that passed with no fix
+// (joshuafolkken/kit#4620). An unreadable verdict is no outcome; the round stops on it as infra. A
+// round whose `review:record` failed is not counted either: the relaunch re-runs it, and that run is
+// the one that ended.
+async function record_outcome(issue: string, verdict: string, cause?: string): Promise<void> {
+	if (verdict === run_ship_review.VERDICT.INVALID || cause === CAUSE.CHECK) return
+
+	await lane_ledger.record_round_one({ issue: Number(issue), verdict })
+}
+
+// A round that stops on a finding — a fix the scoped pair did not get green included — is counted as
+// `blocking`, and marks its round reusable however the fix then moves the tree.
+async function code_round_one_record(issue: string): Promise<StepResult> {
+	const { kind } = current_verdict()
+	const recorded = await round_one_record(issue)
+	const is_stopped = recorded.cause === CAUSE.FINDING
+
+	review_reviewed_tree.mark_stopped(Number(issue), is_stopped)
+	await record_outcome(issue, is_stopped ? run_ship_review.VERDICT.BLOCKING : kind, recorded.cause)
+
+	return recorded
+}
+
+// **A recorded round 1 is reused while the tree it was recorded on holds still** — a lane's review
+// before the ship (joshuafolkken/kit#4620) — **or after the ship's own round 1 stopped on a finding**,
+// however the lane's fix moved the tree: that fix delta is round 2's after the commit. Any other tree
+// that moved since is reviewed again, from that record (`review-reviewed-tree.ts`), so the round reads
+// the delta alone. An issue that changed after that round's brief is never reused: the recorded
+// round never read it, and `josh followup` refuses the merge on it (joshuafolkken/kit#4221).
+async function is_reusable(issue: string, is_stale: boolean): Promise<boolean> {
+	if (is_stale) return false
+
 	const recorded = await review_record.check(Number(issue))
 
-	if (!is_stale && recorded.status === 'ok') return skipped(ROUND_ONE_RECORDED_NOTE)
+	if (recorded.status !== 'ok') return false
+
+	return (
+		review_reviewed_tree.is_stopped_on(Number(issue)) ||
+		(await review_reviewed_tree.is_unmoved_here())
+	)
+}
+
+// The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
+// at the first that did not pass.
+async function round_one_stage(issue: string, is_stale: boolean): Promise<StepResult> {
+	if (await is_reusable(issue, is_stale)) {
+		await record_outcome(issue, lane_round_one_stats.REUSED)
+
+		return skipped(ROUND_ONE_RECORDED_NOTE)
+	}
+
+	// A stale record narrows nothing: the next round reads the whole change under the new specification.
+	if (is_stale) review_reviewed_tree.discard()
 
 	return await run_phases([
 		tagged_phase(CAUSE.CHECK, scoped_pair),
 		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, ROUND_ONE),
 		tagged_phase(CAUSE.CHECK, join_gate),
 		attest_phase,
-		async () => await round_one_record(issue),
+		async () => await code_round_one_record(issue),
 	])
 }
 

@@ -13,6 +13,7 @@ import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_process_stats } from './lane-process-stats'
+import { lane_round_one_stats } from './lane-round-one-stats'
 import { lane_round_two_stats } from './lane-round-two-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -146,6 +147,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_stage_stats.table(entries, window),
 		lane_stop_stats.table(entries, window, events),
 		lane_gap_stats.table(entries, window, events),
+		lane_round_one_stats.table(entries, window),
 		lane_round_two_stats.table(entries, window),
 		lane_held_stats.table(entries, window),
 		lane_core_wait_stats.table(entries, window),

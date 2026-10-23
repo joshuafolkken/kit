@@ -23,6 +23,7 @@ import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
 import { review_interaction } from './review-interaction'
 import { review_level, type ReviewLevel } from './review-level'
+import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -165,7 +166,7 @@ function record_round_one(
 // **The narrowing is measured from the tree that review was briefed on**, and only when that record
 // was written by the brief the pointer names: one left by an earlier brief is not the tree the
 // finished review read, so the resume reads the whole change instead.
-function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
+function findings_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
 	const { findings } = lane_session_broker.review_paths(PROJECT_ROOT)
 	const briefed = review_stamps.briefed_stamp.read()
 
@@ -178,6 +179,12 @@ function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
 		run_ship_review.is_clean_round_one(stamp_file.read_stamp_text(findings))
 
 	return is_clean ? briefed : undefined
+}
+
+// **A recorded round narrows first**, from the tree `review:record` wrote it on — a lane's review
+// before the ship writes no findings file, and its fixes are in that tree (joshuafolkken/kit#4620).
+function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
+	return review_reviewed_tree.resume_point(checkout) ?? findings_tree(checkout)
 }
 
 async function open_contract(): Promise<{
@@ -423,6 +430,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 const review_brief_cli = {
+	attested_tree,
 	FIRST_ROUND,
 	format_reason,
 	KEPT_NOTE_PREFIX,

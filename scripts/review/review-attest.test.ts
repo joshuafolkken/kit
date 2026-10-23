@@ -95,6 +95,29 @@ describe('review_attest — an unattested review is a refusal, never a pass', ()
 	})
 })
 
+// joshuafolkken/kit#4620: the resumed brief narrows only from a review attested on this branch.
+describe('review_attest.is_attested_on', () => {
+	it('answers true for a brief attested on the same branch', () => {
+		const root = fresh_root()
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+
+		expect(review_attest.is_attested_on(LANE, root)).toBe(true)
+	})
+
+	it('answers false for a brief attested on another branch', () => {
+		const root = fresh_root()
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+
+		expect(review_attest.is_attested_on(SESSION, root)).toBe(false)
+	})
+
+	it('answers false where no brief was recorded', () => {
+		expect(review_attest.is_attested_on(LANE, fresh_root())).toBe(false)
+	})
+})
+
 // A run that crashed before `josh followup` must not hold the next one hostage. The staleness is only
 // ever read in the direction that drops the requirement, so it can never turn a real mismatch into a
 // pass.
