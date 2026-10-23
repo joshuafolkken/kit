@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/test/test-pinned-cache.ts:103 | 2026-10-23 | #4706

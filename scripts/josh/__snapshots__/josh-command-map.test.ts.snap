@@ -12,6 +12,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "by": "bytes",
     "c": "check",
     "ca": "cost:audit",
+    "cr": "check:related",
     "dr": "doctor",
     "eu": "exports:unused",
     "ev": "eval",
@@ -199,6 +200,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "check:related": [
+      "",
+      "developer",
+      [
+        "processes",
       ],
     ],
     "clone:scan": [
